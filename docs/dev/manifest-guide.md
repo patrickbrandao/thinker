@@ -359,7 +359,7 @@ async handler(@CurrentUser() user: AuthUser) {
 
 ### CLI login (`mnfst login`)
 
-`packages/cli/` is the `mnfst` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `mnfst_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package publishes to npm as `mnfst-gateway-cli` (`npm i -g mnfst-gateway-cli`, command still `mnfst`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/mnfst.js`. `packages/cli/README.md` is the user-facing reference; the repo also ships a `mnfst-cli` skill under `.claude/skills/`.
+`packages/cli/` is the `mnfst` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `mnfst_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package publishes to npm as `mnfst-gateway-cli` (`npm i -g mnfst-gateway-cli`, command still `mnfst`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/mnfst.js`. `packages/cli/README.md` is the user-facing reference. The CLI embeds an agent skill whose source is `packages/cli/skill/SKILL.md`. It used to live in `.claude/skills/mnfst-cli/` and was moved out so that it isn't auto-loaded in this repo; #23 recreates it as `.claude/skills/thinker-cli/`.
 
 The default login is a browser flow, PKCE-protected so an intercepted code is useless without the verifier:
 

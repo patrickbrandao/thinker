@@ -25,7 +25,20 @@ A rotina na nuvem é apenas um invólucro fino: o procedimento completo (fontes,
 
 ## Merge
 
-O Principal faz o squash merge sozinho quando o PR cumpre os critérios do [ADR 0002](adr/0002-politica-de-merge.md): CI verde, `reviewer` com `Veredito: aprovado` e `qa-docker` aprovado quando o comportamento em tempo de execução muda. Decisões de produto novas, releases e PRs com `Veredito: risco alto (aguardar mantenedor)` esperam por você. Os detalhes e as exceções estão no ADR.
+O Principal faz o squash merge sozinho quando o PR cumpre os critérios do [ADR 0002](adr/0002-politica-de-merge.md):
+
+- CI verde;
+- `reviewer` com `Veredito: aprovado` no head SHA atual;
+- `qa-docker` aprovado, quando o comportamento em tempo de execução muda.
+
+Estes esperam por você:
+
+- decisões de produto novas e ADRs que mudam uma decisão anterior;
+- PRs que mexem em arquivos de governança (`CLAUDE.md`, `.claude/settings.json`, `.claude/agents/**`, `docs/adr/**`, `docs/decisoes-iniciais.md`);
+- releases e PRs cujo merge publica algo;
+- PRs com `Veredito: risco alto (aguardar mantenedor)`.
+
+Os detalhes e as exceções estão no ADR.
 
 ## Como nasce um novo agente
 

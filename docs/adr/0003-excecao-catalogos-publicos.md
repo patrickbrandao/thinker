@@ -19,10 +19,18 @@ São GETs anônimos, sem dados da instância. Eles alimentam preços, capacidade
 
 ## Decisão
 
+**Destinos permitidos.** Esta é a lista única da exceção à regra "sem phone-home". O `CLAUDE.md`, o `reviewer`, #33 e #34 usam a mesma lista:
+
+| Destino | Quando | Como desligar |
+|---|---|---|
+| `openrouter.ai` (`/api/v1/models`) | ligado por padrão: no boot e uma vez por dia | `THINKER_CATALOG_SYNC=false` |
+| `models.dev` (`/api.json`) | ligado por padrão: no boot e uma vez por dia | `THINKER_CATALOG_SYNC=false` |
+| `raw.githubusercontent.com` (documento do OpenCode Go) | só quando existe um provedor OpenCode Go cadastrado | `THINKER_CATALOG_SYNC=false` |
+
 1. **`modelparams.dev` sai.** A busca remota é removida em #17. O serviço passa a usar só o snapshot embutido do pacote `modelparams`, atualizado junto com as dependências.
-2. **OpenRouter e models.dev continuam ligados por padrão.** São a única exceção documentada à regra "sem phone-home". A variável `THINKER_CATALOG_SYNC=false` desliga as duas buscas, no boot e nos crons. Com a busca desligada ou falhando, o Thinker usa os dados embutidos na imagem (hoje `model-discovery/known-model-prices.ts` e `known-model-modalities.ts`).
-3. **O documento do OpenCode Go só é buscado se existir um provedor OpenCode Go cadastrado.** Sem esse provedor, o aquecimento no boot não roda e a instância não fala com `raw.githubusercontent.com`. `THINKER_CATALOG_SYNC=false` também desliga essa busca. Nesse caso, o custo por requisição do OpenCode Go cai para $0 (como hoje em caso de falha) e o formato da API vem da heurística por família de modelo que já existe em `provider-client.ts`.
-4. **A regra do `CLAUDE.md` ganha esta exceção, e só ela.** Qualquer outro destino de saída fora dos provedores configurados continua proibido. Um novo destino precisa de um novo ADR.
+2. **OpenRouter e models.dev continuam ligados por padrão.** `THINKER_CATALOG_SYNC=false` desliga as duas buscas, no boot e nos crons. Com a busca desligada ou falhando, o Thinker usa os dados embutidos na imagem (hoje `model-discovery/known-model-prices.ts` e `known-model-modalities.ts`).
+3. **O documento do OpenCode Go só é buscado se existir um provedor OpenCode Go cadastrado.** Sem esse provedor, o aquecimento no boot não roda e a instância não fala com `raw.githubusercontent.com`. `THINKER_CATALOG_SYNC=false` também desliga essa busca. Nesse caso, o custo por requisição do OpenCode Go cai para $0 (como hoje em caso de falha), e o formato da API vem da heurística por família de modelo que já existe em `provider-client.ts`.
+4. **A regra do `CLAUDE.md` ganha esta exceção, e só ela**, com os três destinos da tabela. Qualquer outro destino de saída fora dos provedores configurados continua proibido. Um novo destino precisa de um novo ADR.
 5. A documentação de privacidade (#33) lista os três destinos, o gatilho de cada um e a chave para desligar. O teste de egresso de #34 usa esta lista como a dos destinos aprovados.
 
 ## Alternativas consideradas
