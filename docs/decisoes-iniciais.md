@@ -14,7 +14,7 @@ Mudanças de rumo posteriores entram como ADRs em [`docs/adr/`](adr/).
 | Compatibilidade | Nenhuma obrigação com o Manifest (API, env vars, banco, CLI) |
 | Rebranding | **Total**: UI, docs, pacotes, env vars `MANIFEST_*` → `THINKER_*`, chaves `mnfst_` → `thk_`, CLI `mnfst` → `thinker`, imagem Docker |
 | Idioma | Código, identificadores, commits e PRs em inglês; documentação em português (PT-BR). A interface do dashboard fica em inglês na v0.1; o i18n (PT-BR + EN) entra na v0.3 (decisão em #9) |
-| Logo | Ícone Flaticon **5337422** (cérebro azul), com atribuição no README |
+| Logo | Logo original do Thinker, em SVG (assets em `packages/frontend/public/brand/`, notas em [`docs/marca.md`](marca.md)), sem dependência de licença de terceiros (decisão em #10) |
 | Versão | SemVer a partir de **0.1.0**, gerenciado por Changesets; 1.0.0 quando a primeira versão própria estiver estável |
 
 ## 2. Público e modelo de acesso
