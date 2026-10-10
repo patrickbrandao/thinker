@@ -25,6 +25,9 @@ coverage/
 .agents/
 .claude/*
 !.claude/skills/
+!.claude/agents/
+!.claude/settings.json
+.claude/agent-memory-local/
 .continue/
 .cursor/
 .goose/
@@ -38,3 +41,6 @@ scripts/verify-free-model-ids.sh
 docs/superpowers/
 docs/plans/
 .superpowers/
+
+# Local scratch area (not part of the project)
+/tmp/
