@@ -15,14 +15,6 @@ vi.mock('@solidjs/router', () => ({
   A: (props: any) => props.children,
 }));
 
-// NoConnectionsPrompt (the empty-state fallback) gates a "Local" card on the
-// self-hosted check. Stub it so the prompt renders without a real fetch; the
-// value doesn't affect the assertions (they only look for "No providers
-// connected").
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => Promise.resolve(false),
-}));
-
 vi.mock('../../src/services/api/providers.js', () => ({
   getProviders: (...args: unknown[]) => mockGetGlobalProviders(...args),
 }));

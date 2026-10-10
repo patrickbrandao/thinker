@@ -41,13 +41,11 @@ import {
   useOverviewColumns,
   useOverviewRange,
 } from '../services/use-overview-range.js';
-import { usePlanRangeLock } from '../services/plan-range-lock.js';
 import '../styles/overview.css';
 import '../styles/charts.css';
 import '../styles/routing.css';
 import { getAutofixStats } from '../services/api/analytics.js';
 
-const PRO_RANGES = new Set(['30d', '90d', '365d']);
 const AGENT_RANGE_OPTIONS = [
   { label: 'Last 24 hours', value: '24h' },
   { label: 'Last 7 days', value: '7d' },
@@ -109,7 +107,7 @@ type OverviewDetails = Pick<
   'cost_by_model' | 'recent_activity' | 'request_reliability' | 'active_skills'
 >;
 
-type PivotedTimeseries = {
+type KeyedTimeseries = {
   agents: string[];
   timeseries: Array<Record<string, number | string>>;
 };
@@ -131,20 +129,6 @@ const Overview: Component = () => {
   const { range, setRange, handleRangeChange } = useOverviewRange({
     markUserSelected: () => setUserSelectedRange(true),
   });
-  const { isFreePlan, isProRangeLocked, effectiveRange } = usePlanRangeLock(
-    range,
-    PRO_RANGES,
-    '7d',
-  );
-  const proBadge = () => (
-    <span class="pro-range-badge" aria-label="Pro plan required">
-      PRO
-    </span>
-  );
-  const agentRangeOptions = () =>
-    AGENT_RANGE_OPTIONS.map((opt) =>
-      isProRangeLocked(opt.value) ? { ...opt, disabled: true, badge: proBadge() } : opt,
-    );
   const [activeView, setActiveViewRaw] = createSignal<ProviderView>('requests');
   const [tokenChartRequested, setTokenChartRequested] = createSignal(false);
   const [costChartRequested, setCostChartRequested] = createSignal(false);
@@ -167,12 +151,10 @@ const Overview: Component = () => {
     !!localStorage.getItem(`setup_completed_${params.agentName}`),
   );
 
-  // Never waits on billing/status: the plan-hint lock resolves the range
-  // synchronously, so this fetches exactly once at the right range.
   // The memo's identity changes on every range/agent transition (including
   // A → B → A) but stays stable across same-scope SSE refreshes.
   const overviewScope = createMemo(() => ({
-    range: effectiveRange(),
+    range: range(),
     agentName: params.agentName,
   }));
   const [overviewResult, { refetch }] = createResource(
@@ -217,10 +199,6 @@ const Overview: Component = () => {
   };
 
   createEffect(() => {
-    if (isFreePlan() && PRO_RANGES.has(range())) {
-      handleRangeChange('7d');
-      return;
-    }
     if (
       showEmptyState() &&
       !setupCompleted() &&
@@ -269,26 +247,26 @@ const Overview: Component = () => {
   const [selectedProviders, setSelectedProviders] = createSignal<Set<string>>(loadSavedProviders());
 
   const tsKey = (): TimeseriesKey => ({
-    range: effectiveRange(),
+    range: range(),
     agent: params.agentName,
     _ping: analyticsPing(),
   });
   const [providerTokenTs] = createResource(
     () => (tokenChartRequested() ? tsKey() : false),
-    (p) => getPerProviderTimeseries(p.agent, p.range) as Promise<PivotedTimeseries>,
+    (p) => getPerProviderTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
   );
   const [providerMessageTs] = createResource(
     () => tsKey(),
-    (p) => getPerProviderMessageTimeseries(p.agent, p.range) as Promise<PivotedTimeseries>,
+    (p) => getPerProviderMessageTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
   );
   const [providerCostTs] = createResource(
     () => (costChartRequested() ? tsKey() : false),
-    (p) => getPerProviderCostTimeseries(p.agent, p.range) as Promise<PivotedTimeseries>,
+    (p) => getPerProviderCostTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
   );
 
   // ── Autofix resources ─────────────────────────────────
   const autofixScope = createMemo(() => ({
-    range: effectiveRange(),
+    range: range(),
     agent: decodeURIComponent(params.agentName),
   }));
   const [autofixStatsResult] = createResource(
@@ -304,7 +282,7 @@ const Overview: Component = () => {
   // other grouping is meaningful) + the Healed requests tab subset.
   const [statusTimeseries] = createResource(
     () => ({
-      range: effectiveRange(),
+      range: range(),
       agent: decodeURIComponent(params.agentName),
       _ping: analyticsPing(),
     }),
@@ -312,7 +290,7 @@ const Overview: Component = () => {
   );
   const [modelReliability] = createResource(
     () => ({
-      range: effectiveRange(),
+      range: range(),
       agent: decodeURIComponent(params.agentName),
       _ping: analyticsPing(),
     }),
@@ -385,7 +363,7 @@ const Overview: Component = () => {
   const setAllProviders = (on: boolean) =>
     persistProviders(on ? new Set(allProviders()) : new Set<string>());
 
-  const filterTs = (raw: PivotedTimeseries | undefined): PivotedTimeseries | undefined => {
+  const filterTs = (raw: KeyedTimeseries | undefined): KeyedTimeseries | undefined => {
     if (!raw) return undefined;
     const sel = effectiveSelected();
     if (sel.size === 0) return raw;
@@ -422,14 +400,7 @@ const Overview: Component = () => {
       >
         <div class="header-controls">
           <Show when={showDashboard()}>
-            <Select
-              value={range()}
-              onChange={(v) => {
-                if (isProRangeLocked(v)) return;
-                handleRangeChange(v);
-              }}
-              options={agentRangeOptions()}
-            />
+            <Select value={range()} onChange={handleRangeChange} options={AGENT_RANGE_OPTIONS} />
           </Show>
           <Show when={showEmptyState() && !setupCompleted()}>
             <button class="btn btn--primary btn--sm" onClick={() => setSetupOpen(true)}>
@@ -513,7 +484,7 @@ const Overview: Component = () => {
                   <AutofixKpiCards
                     stats={currentAutofixStats()}
                     agentName={decodeURIComponent(params.agentName)}
-                    range={effectiveRange()}
+                    range={range()}
                   />
                   {(() => {
                     return (
@@ -543,7 +514,7 @@ const Overview: Component = () => {
                         costInfoTooltip="Actual API key costs only. Subscription usage is not included."
                         tokensValue={d().summary?.tokens_today?.value ?? 0}
                         tokensTrendPct={d().summary?.tokens_today?.trend_pct ?? 0}
-                        range={effectiveRange()}
+                        range={range()}
                         requestStatusTimeseries={statusTimeseries()}
                         agentTimeseries={filteredTokenTs() ?? undefined}
                         agentCostTimeseries={filteredCostTs() ?? undefined}

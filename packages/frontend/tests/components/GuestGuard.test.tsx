@@ -97,35 +97,19 @@ describe('GuestGuard', () => {
     });
   });
 
-  it('redirects authenticated pro-intent guests to upgrade', async () => {
-    mockSessionData = {
-      data: { user: { id: 'u1', name: 'Test' } },
-      isPending: false,
-    };
-    mockSearchParams = { plan: 'pro' };
-    render(() => (
-      <GuestGuard>
-        <span>Guest content</span>
-      </GuestGuard>
-    ));
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/upgrade', { replace: true });
-    });
-  });
-
   it('redirects authenticated guests to a safe return path first', async () => {
     mockSessionData = {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    mockSearchParams = { redirect: '/upgrade?reason=requests', plan: 'pro' };
+    mockSearchParams = { redirect: '/messages?range=30d' };
     render(() => (
       <GuestGuard>
         <span>Guest content</span>
       </GuestGuard>
     ));
     await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/upgrade?reason=requests', {
+      expect(mockNavigate).toHaveBeenCalledWith('/messages?range=30d', {
         replace: true,
       });
     });
@@ -162,7 +146,7 @@ describe('GuestGuard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('lets authenticated users finish the plan step before redirecting', async () => {
+  it('redirects authenticated users home even with the legacy plan step', async () => {
     mockSessionData = {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
@@ -175,9 +159,9 @@ describe('GuestGuard', () => {
     ));
 
     await vi.waitFor(() => {
-      expect(screen.getByText('Guest content')).not.toBeNull();
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByText('Guest content')).toBeNull();
   });
 
   it('redirects to /setup when setup is incomplete', async () => {

@@ -1,14 +1,10 @@
 import { createResource, createSignal, type Component } from 'solid-js';
 import { getRecording, updateRecording } from '../services/api.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import { toast } from '../services/toast-store.js';
 
 const SettingsRecordingSection: Component<{ agentName: () => string }> = (props) => {
   const [config, { mutate }] = createResource(() => props.agentName(), getRecording);
   const [saving, setSaving] = createSignal(false);
-  // Where the logs live depends on the deployment: self-hosted keeps them in
-  // the operator's own database, cloud in the Manifest workspace.
-  const [selfHosted] = createResource(checkIsSelfHosted);
 
   const enabled = () => (!config.loading && !config.error ? (config()?.enabled ?? false) : false);
   const busy = () => saving() || config.loading || Boolean(config.error);
@@ -39,11 +35,8 @@ const SettingsRecordingSection: Component<{ agentName: () => string }> = (props)
             <span class="settings-card__label-title">Enable logs</span>
             <span class="settings-card__label-desc">
               Log the full content of every request and every attempt, so you can see what your
-              agent sends. You will find these logs on the Requests page, inside each request.{' '}
-              {selfHosted.state === 'ready' &&
-                (selfHosted()
-                  ? "On this self-hosted install, logs stay in your own database and never reach Manifest's cloud."
-                  : 'Logs are stored in your Manifest workspace.')}
+              agent sends. You will find these logs on the Requests page, inside each request. Logs
+              stay in your own database.
             </span>
           </div>
           <div class="settings-card__control settings-card__control--end">

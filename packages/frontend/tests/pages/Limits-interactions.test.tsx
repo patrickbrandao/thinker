@@ -26,7 +26,6 @@ vi.mock("../../src/services/api.js", () => ({
 }));
 
 vi.mock("../../src/services/setup-status.js", () => ({
-  checkIsSelfHosted: vi.fn(() => Promise.resolve(false)),
   checkEmailConfigured: vi.fn(() => Promise.resolve(true)),
 }));
 
@@ -44,11 +43,6 @@ vi.mock("../../src/components/LimitRuleModal.js", () => ({
   ),
 }));
 
-vi.mock("../../src/components/CloudEmailInfo.js", () => ({
-  default: (props: any) => (
-    <div data-testid="cloud-email-info">CloudEmailInfo: {props.email}</div>
-  ),
-}));
 
 vi.mock("../../src/services/auth-client.js", () => ({
   authClient: {

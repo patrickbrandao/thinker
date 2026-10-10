@@ -10,8 +10,8 @@ import {
 
 describe('auth redirect helpers', () => {
   it('accepts safe internal redirects', () => {
-    expect(isSafeInternalRedirect('/upgrade')).toBe(true);
-    expect(isSafeInternalRedirect('/upgrade?reason=requests')).toBe(true);
+    expect(isSafeInternalRedirect('/messages')).toBe(true);
+    expect(isSafeInternalRedirect('/messages?range=30d')).toBe(true);
   });
 
   it('rejects external or malformed redirects', () => {
@@ -23,16 +23,21 @@ describe('auth redirect helpers', () => {
     expect(isSafeInternalRedirect('%')).toBe(false);
   });
 
-  it('chooses redirect before plan intent', () => {
-    expect(getAuthDestination({ redirect: '/messages', plan: 'pro' })).toBe('/messages');
+  it('uses a safe redirect as the destination', () => {
+    expect(getAuthDestination({ redirect: '/messages' })).toBe('/messages');
   });
 
-  it('falls back to upgrade for pro intent', () => {
-    expect(getAuthDestination({ plan: 'pro' })).toBe('/upgrade');
-  });
-
-  it('falls back to home without safe redirect or pro intent', () => {
+  it('falls back to home without a safe redirect', () => {
     expect(getAuthDestination({ redirect: 'https://evil.test' })).toBe('/');
+    expect(getAuthDestination({})).toBe('/');
+  });
+
+  it('ignores the legacy plan intent parameter', () => {
+    expect(getAuthDestination({ plan: 'pro' })).toBe('/');
+    expect(buildSocialAuthUrls({ plan: 'pro' })).toEqual({
+      callbackURL: '/',
+      errorCallbackURL: '/login?oauth=failed',
+    });
   });
 
   it('resumes a signed MCP authorization query after sign-in', () => {
@@ -42,7 +47,7 @@ describe('auth redirect helpers', () => {
     expect(destination).toBe(
       '/api/auth/oauth2/authorize?client_id=https%3A%2F%2Fclient.test%2Fmetadata&redirect_uri=http%3A%2F%2F127.0.0.1%2Fcallback&ba_param=client_id&ba_param=redirect_uri&sig=abc',
     );
-    expect(getAuthDestination({ plan: 'pro' }, query)).toBe(destination);
+    expect(getAuthDestination({}, query)).toBe(destination);
     expect(buildSocialAuthUrls({}, query)).toEqual({
       callbackURL: destination,
       errorCallbackURL: `/login?${new URLSearchParams(query.slice(1)).toString()}`,
@@ -56,28 +61,21 @@ describe('auth redirect helpers', () => {
   });
 
   it('builds encoded login redirects from path and search', () => {
-    expect(buildLoginRedirect('/upgrade', '?reason=requests')).toBe(
-      '/login?redirect=%2Fupgrade%3Freason%3Drequests',
+    expect(buildLoginRedirect('/messages', '?range=30d')).toBe(
+      '/login?redirect=%2Fmessages%3Frange%3D30d',
     );
   });
 
   it('appends search strings to cross-links', () => {
-    expect(appendSearch('/login', '?plan=pro')).toBe('/login?plan=pro');
-    expect(appendSearch('/login', 'plan=pro')).toBe('/login?plan=pro');
+    expect(appendSearch('/login', '?redirect=%2Fmessages')).toBe('/login?redirect=%2Fmessages');
+    expect(appendSearch('/login', 'redirect=%2Fmessages')).toBe('/login?redirect=%2Fmessages');
     expect(appendSearch('/login')).toBe('/login');
   });
 
-  it('builds social callback URLs for pro intent', () => {
-    expect(buildSocialAuthUrls({ plan: 'pro' })).toEqual({
-      callbackURL: '/upgrade',
-      errorCallbackURL: '/login?plan=pro&oauth=failed',
-    });
-  });
-
   it('preserves safe redirects in social error callbacks', () => {
-    expect(buildSocialAuthUrls({ redirect: '/upgrade?reason=requests' })).toEqual({
-      callbackURL: '/upgrade?reason=requests',
-      errorCallbackURL: '/login?redirect=%2Fupgrade%3Freason%3Drequests&oauth=failed',
+    expect(buildSocialAuthUrls({ redirect: '/messages?range=30d' })).toEqual({
+      callbackURL: '/messages?range=30d',
+      errorCallbackURL: '/login?redirect=%2Fmessages%3Frange%3D30d&oauth=failed',
     });
   });
 });

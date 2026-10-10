@@ -3,7 +3,6 @@ import { Show, createEffect, createSignal, onMount, type ParentComponent } from 
 import { authClient } from '../services/auth-client.js';
 import { getAuthDestination, signedOAuthDestination } from '../services/auth-redirects.js';
 import { checkNeedsSetup } from '../services/setup-status.js';
-import { hasPlanBeenChosen } from '../services/plan-selection.js';
 import { getDiscoveryPendingNext } from '../services/discovery.js';
 
 const GuestGuard: ParentComponent = (props) => {
@@ -25,7 +24,6 @@ const GuestGuard: ParentComponent = (props) => {
 
   createEffect(() => {
     const s = session();
-    const step = Array.isArray(searchParams.step) ? searchParams.step[0] : searchParams.step;
     if (!s.isPending && s.data) {
       const destination = getAuthDestination(searchParams, location.search);
       if (signedOAuthDestination(location.search) === destination) {
@@ -38,10 +36,6 @@ const GuestGuard: ParentComponent = (props) => {
       const pendingNext = getDiscoveryPendingNext(s.data.user?.id ?? '');
       if (pendingNext !== null) {
         navigate(`/discovery?next=${encodeURIComponent(pendingNext)}`, { replace: true });
-        return;
-      }
-      if (step === 'plan' && !hasPlanBeenChosen(s.data.user?.id ?? '')) {
-        if (setupChecked()) setReady(true);
         return;
       }
       navigate(destination, { replace: true });

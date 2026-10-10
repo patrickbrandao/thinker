@@ -21,7 +21,6 @@ const apiMocks = vi.hoisted(() => ({
   getOverviewDetails: vi.fn(),
   getOverviewAgentUsage: vi.fn(),
   getOverviewProviderUsage: vi.fn(),
-  getBillingStatus: vi.fn(),
   getConnectionDetail: vi.fn(),
   getProviderAnalytics: vi.fn(),
   getPerAgentTimeseries: vi.fn(),
@@ -124,9 +123,6 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
 }));
 
-vi.mock('../../src/services/api/billing.js', () => ({
-  getBillingStatus: (...args: unknown[]) => apiMocks.getBillingStatus(...args),
-}));
 
 vi.mock('../../src/services/providers.js', () => ({
   PROVIDERS: [
@@ -271,11 +267,7 @@ vi.mock('../../src/components/Select.jsx', () => ({
     <select value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)}>
       {props.options.map((option) => (
         <option value={option.value} disabled={option.disabled}>
-          {option.description
-            ? `${option.label} · ${option.description}`
-            : option.badge
-              ? `${option.label} · PRO`
-              : option.label}
+          {option.description ? `${option.label} · ${option.description}` : option.label}
         </option>
       ))}
     </select>
@@ -379,15 +371,8 @@ vi.mock('manifest-shared', () => ({
   isSuccessStatus: (s: string | null | undefined) => s == null || s === 'ok' || s === 'success',
 }));
 
-// Local providers only exist on self-hosted installs.
-let mockIsSelfHosted = true;
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => Promise.resolve(mockIsSelfHosted),
-}));
-
 import GlobalOverview from '../../src/pages/GlobalOverview';
 import ConnectionDetail from '../../src/pages/providers/ConnectionDetail';
-import { resetPlanStore } from '../../src/services/plan-store';
 
 const overviewResponse = {
   summary: {
@@ -725,13 +710,11 @@ function ensureStorageLike(kind: 'localStorage' | 'sessionStorage') {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetPlanStore();
   ensureStorageLike('localStorage').clear();
   ensureStorageLike('sessionStorage').clear();
   localStorage.setItem('manifest_global_group', 'provider');
   routerState.navigate.mockReset();
   routerState.params = { connectionId: 'conn-openai' };
-  mockIsSelfHosted = true;
 
   apiMocks.getAgents.mockResolvedValue(agentsResponse);
   apiMocks.getCustomProviders.mockResolvedValue([
@@ -749,14 +732,6 @@ beforeEach(() => {
   apiMocks.getOverviewDetails.mockResolvedValue({});
   apiMocks.getOverviewAgentUsage.mockResolvedValue(agentUsageTimeseries);
   apiMocks.getOverviewProviderUsage.mockResolvedValue(providerUsageTimeseries);
-  apiMocks.getBillingStatus.mockResolvedValue({
-    enabled: false,
-    plan: 'free',
-    priceMonthly: { amount: null, currency: null, interval: null },
-    requests: { used: null, limit: null, periodEnd: null },
-    cancelAtPeriodEnd: false,
-    subscriptionPeriodEnd: null,
-  });
   apiMocks.getConnectionDetail.mockResolvedValue(connectionDetail);
   apiMocks.getProviderAnalytics.mockResolvedValue(connectionAnalytics);
   apiMocks.getPerAgentTimeseries.mockResolvedValue(agentTimeseries);
@@ -854,25 +829,22 @@ describe('GlobalOverview (analytics)', () => {
     expect(routerState.navigate).toHaveBeenCalledWith('/harnesses/worker-agent');
   });
 
-  it('limits Free users to 7-day dashboard ranges and labels longer ranges as Pro-only', async () => {
+  it('offers every dashboard range, long windows included, with no plan lock', async () => {
     localStorage.setItem('manifest_global_range', '365d');
-    resetPlanStore({ enabled: true, plan: 'free' });
 
     render(() => <GlobalOverview />);
 
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
-    await waitFor(() => expect(localStorage.getItem('manifest_global_range')).toBe('7d'));
-    expect(apiMocks.getOverview).toHaveBeenCalledWith('7d', undefined, true);
+    expect(apiMocks.getOverview).toHaveBeenCalledWith('365d', undefined, true);
 
     const rangeSelect = screen.getByRole('combobox') as HTMLSelectElement;
-    const lockedOptions = Array.from(rangeSelect.options).filter((option) =>
+    const longOptions = Array.from(rangeSelect.options).filter((option) =>
       ['30d', '90d', '365d'].includes(option.value),
     );
-    expect(lockedOptions.map((option) => option.disabled)).toEqual([true, true, true]);
-    expect(screen.getByText('Last 30 days · PRO')).toBeDefined();
+    expect(longOptions.map((option) => option.disabled)).toEqual([false, false, false]);
 
     fireEvent.change(rangeSelect, { target: { value: '90d' } });
-    expect(localStorage.getItem('manifest_global_range')).toBe('7d');
+    expect(localStorage.getItem('manifest_global_range')).toBe('90d');
   });
 
   it('shows custom provider names instead of custom:<uuid> in provider series', async () => {

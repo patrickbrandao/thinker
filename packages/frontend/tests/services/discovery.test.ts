@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   COMPANY_SIZE_OPTIONS,
   PROJECT_TYPE_OPTIONS,
-  clearDiscoveryPending,
   completeDiscovery,
-  isConfirmedNotSelfHosted,
   getDiscoveryPendingNext,
   hasDiscoveryBeenDoneLocally,
   isDiscoveryRequired,
@@ -84,14 +82,6 @@ describe('discovery service', () => {
     it('ignores an empty user id', () => {
       markDiscoveryPending('', '/welcome');
       expect(getDiscoveryPendingNext('')).toBeNull();
-      expect(() => clearDiscoveryPending('')).not.toThrow();
-    });
-
-    it('clearDiscoveryPending drops the marker without recording completion', () => {
-      markDiscoveryPending('u1', '/welcome');
-      clearDiscoveryPending('u1');
-      expect(getDiscoveryPendingNext('u1')).toBeNull();
-      expect(hasDiscoveryBeenDoneLocally('u1')).toBe(false);
     });
 
     it('swallows storage errors', () => {
@@ -158,33 +148,6 @@ describe('discovery service', () => {
       });
       markDiscoveryPending('u1', '/welcome');
       expect(await isDiscoveryRequired('u1')).toBe(true);
-    });
-  });
-
-  describe('isConfirmedNotSelfHosted', () => {
-    it('confirms only on an explicit non-self-hosted answer', async () => {
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ isSelfHosted: false }) });
-      expect(await isConfirmedNotSelfHosted()).toBe(true);
-    });
-
-    it('denies on a self-hosted answer', async () => {
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ isSelfHosted: true }) });
-      expect(await isConfirmedNotSelfHosted()).toBe(false);
-    });
-
-    it('denies on a success body without the isSelfHosted field', async () => {
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
-      expect(await isConfirmedNotSelfHosted()).toBe(false);
-    });
-
-    it('denies on a non-2xx response', async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 503 });
-      expect(await isConfirmedNotSelfHosted()).toBe(false);
-    });
-
-    it('denies when the request throws', async () => {
-      mockFetch.mockRejectedValue(new Error('network down'));
-      expect(await isConfirmedNotSelfHosted()).toBe(false);
     });
   });
 

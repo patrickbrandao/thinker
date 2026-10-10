@@ -11,7 +11,6 @@ const KNOWN_PROVIDERS = [
   'copilot',
   'commandcode',
   'gemini',
-  'gemini-free',
   'groq',
   'kiro',
   'deepseek',

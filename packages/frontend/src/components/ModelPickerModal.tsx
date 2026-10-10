@@ -125,7 +125,7 @@ const ModelPickerModal: Component<Props> = (props) => {
   // Default to the first connected category (subscription > api_key > local)
   // so the picker opens on something the user actually has. When nothing is
   // connected the default is 'api_key' — matches the pre-local behavior so
-  // existing snapshots / tests that assume the free-models pill is visible
+  // existing snapshots / tests that assume the free-only pill is visible
   // (only shown for api_key) don't start failing.
   const resolveInitialTab = (): AuthType => {
     if (hasSubscription()) return 'subscription';

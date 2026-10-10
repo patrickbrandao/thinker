@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 
 let mockPathname = "/overview";
@@ -27,24 +27,10 @@ vi.mock("@solidjs/router", () => ({
   useLocation: () => ({ get pathname() { return mockPathname; } }),
 }));
 
-vi.mock("../../src/services/dither-ground.js", () => ({
-  mountDither: () => () => {},
-}));
-
-const mockGetBillingStatus = vi.fn();
-vi.mock("../../src/services/api/billing.js", () => ({
-  getBillingStatus: (...args: unknown[]) => mockGetBillingStatus(...args),
-}));
-
-// Local providers only exist on self-hosted installs; the Sidebar hides the
-// Local nav entry in cloud. Default to self-hosted so the legacy link
-// assertions keep applying; cloud tests flip the flag.
-let mockIsSelfHosted = true;
 // MCP is on by default; an install served over plain HTTP runs without it and
 // the nav entry goes with it.
 let mockMcpEnabled = true;
 vi.mock("../../src/services/setup-status.js", () => ({
-  checkIsSelfHosted: () => Promise.resolve(mockIsSelfHosted),
   checkMcpEnabled: () => Promise.resolve(mockMcpEnabled),
 }));
 
@@ -75,12 +61,6 @@ beforeEach(() => {
   sessionStorage.clear();
   vi.clearAllMocks();
   mockPathname = "/overview";
-  mockIsSelfHosted = true;
-  mockGetBillingStatus.mockResolvedValue({
-    enabled: false,
-    plan: "free",
-    requests: { used: null, limit: null, periodEnd: null },
-  });
 });
 
 describe("Sidebar — global nav links", () => {
@@ -94,22 +74,12 @@ describe("Sidebar — global nav links", () => {
     expect(screen.getByText("Requests")).toBeDefined();
   });
 
-  it("renders provider section links (Local resolves async, self-hosted)", async () => {
+  it("renders provider section links, Local included", () => {
     render(() => <Sidebar />);
     expect(screen.getByText("PROVIDERS")).toBeDefined();
     expect(screen.getByText("Subscriptions")).toBeDefined();
     expect(screen.getByText("Usage-based")).toBeDefined();
-    await waitFor(() => expect(screen.getByText("Local")).toBeDefined());
-  });
-
-  it("hides the Local link in cloud", async () => {
-    mockIsSelfHosted = false;
-    const { container } = render(() => <Sidebar />);
-    // Wait for the self-hosted resource to settle (Usage-based is always present).
-    await waitFor(() => expect(screen.getByText("Usage-based")).toBeDefined());
-    await Promise.resolve();
-    expect(container.querySelector('a[href="/providers/local"]')).toBeNull();
-    expect(container.textContent).not.toContain("Local");
+    expect(screen.getByText("Local")).toBeDefined();
   });
 
   it("renders the Harnesses nav link under Requests", () => {
@@ -350,84 +320,14 @@ describe("Sidebar — structure and interaction", () => {
   });
 });
 
-describe("Sidebar — usage card", () => {
-  beforeEach(() => {
-    // The usage meter only occupies the bottom-left slot in cloud; self-hosted
-    // always shows the Autofix card there.
-    mockIsSelfHosted = false;
-  });
-  afterEach(() => {
-    mockIsSelfHosted = true;
-  });
-
-  it("renders free-plan usage and the near-limit warning state", async () => {
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: "free",
-      requests: { used: 8_500, limit: 10_000, periodEnd: null },
-    });
-
+describe("Sidebar — no hosted extras", () => {
+  it("renders no usage meter, upgrade link or announcement card", async () => {
     const { container } = render(() => <Sidebar />);
-
-    await screen.findByText(/8,500/);
-    expect(container.querySelector(".sidebar-usage__count--danger")).not.toBeNull();
-    expect(container.querySelector(".sidebar-usage__fill--danger")).not.toBeNull();
-    expect(container.textContent).toContain(
-      "You're limited to 10,000 requests this month. Upgrade for unlimited.",
+    await waitFor(() =>
+      expect(container.querySelector('a[href="/integrations/mcp"]')).not.toBeNull(),
     );
-    expect(container.querySelector('a[href="/upgrade"]')).not.toBeNull();
-  });
-
-  it("renders the reached-limit warning state", async () => {
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: "free",
-      requests: { used: 10_001, limit: 10_000, periodEnd: null },
-    });
-
-    const { container } = render(() => <Sidebar />);
-
-    await screen.findByText(/10,001/);
-    expect(container.textContent).toContain(
-      "You've reached your monthly limit. Requests are being blocked.",
-    );
-    expect(container.querySelector(".sidebar-usage__fill--danger")).not.toBeNull();
-  });
-
-  it("hides the usage card when the billing fetch fails (fail-soft fallback)", async () => {
-    mockGetBillingStatus.mockRejectedValue(new Error("boom"));
-    const { container } = render(() => <Sidebar />);
-    await waitFor(() => expect(mockGetBillingStatus).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(container.querySelector(".sidebar-usage")).toBeNull();
-  });
-
-  it("renders the warning fill before the danger threshold", async () => {
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: "free",
-      requests: { used: 5_500, limit: 10_000, periodEnd: null },
-    });
-
-    const { container } = render(() => <Sidebar />);
-
-    await screen.findByText(/5,500/);
-    expect(container.querySelector(".sidebar-usage__fill--warning")).not.toBeNull();
-    expect(container.querySelector(".sidebar-usage__fill--danger")).toBeNull();
-  });
-});
-
-describe("Sidebar — API Bot announcement card", () => {
-  it("renders the API Bot card in self-hosted", async () => {
-    const { container } = render(() => <Sidebar />);
-    await screen.findByText("Meet API Bot");
-    expect(container.querySelector(".sidebar-api-bot")).not.toBeNull();
-  });
-
-  it("renders the API Bot card in cloud too", async () => {
-    mockIsSelfHosted = false;
-    const { container } = render(() => <Sidebar />);
-    await screen.findByText("Meet API Bot");
-    expect(container.querySelector(".sidebar-api-bot")).not.toBeNull();
+    expect(container.querySelector('a[href="/upgrade"]')).toBeNull();
+    expect(container.textContent).not.toContain("Upgrade plan");
+    expect(container.textContent).not.toContain("API Bot");
   });
 });

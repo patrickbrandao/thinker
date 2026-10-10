@@ -3,7 +3,7 @@ import { Title, Meta } from '@solidjs/meta';
 import { type Component, createSignal, onMount, Show } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
 import { buildLoginRedirect } from '../services/auth-redirects.js';
-import { checkIsSelfHosted, checkNeedsSetup, createFirstAdmin } from '../services/setup-status.js';
+import { checkNeedsSetup, createFirstAdmin } from '../services/setup-status.js';
 import { markDiscoveryPending } from '../services/discovery.js';
 
 const Setup: Component = () => {
@@ -53,14 +53,10 @@ const Setup: Component = () => {
         navigate(buildLoginRedirect('/discovery', '?next=%2F&signup=1'), { replace: true });
         return;
       }
-      // New self-hosted admins get the one-time discovery step first; the
-      // pending marker lets the guards route them back until it is done.
-      if (await checkIsSelfHosted()) {
-        markDiscoveryPending(signInData?.user?.id ?? '', '/');
-        window.location.href = '/discovery';
-      } else {
-        window.location.href = '/';
-      }
+      // New admins get the one-time discovery step first; the pending marker
+      // lets the guards route them back until it is done.
+      markDiscoveryPending(signInData?.user?.id ?? '', '/');
+      window.location.href = '/discovery';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
