@@ -10,9 +10,6 @@ As [decisões iniciais](../decisoes-iniciais.md) (§6) previam que **você** (o 
 A maior parte desses PRs só executa decisões já tomadas e registradas em issues. O que pede o julgamento do mantenedor é outra coisa: decisões de produto novas, mudanças nas próprias regras de governança, releases e mudanças de risco alto.
 
 A `main` já é protegida no GitHub: exige PR, não aceita force push nem exclusão, e a proteção vale também para administradores (`enforce_admins`). Ainda não há status checks obrigatórios, porque o GitHub Actions está desligado até #38.
-
-**Bootstrap.** Esta política e o ADR 0003 entram pelo PR #40, que mexe em arquivos de governança. Pela regra abaixo, um PR assim espera o mantenedor. O conteúdo do #40, porém, implementa decisões que o mantenedor tomou explicitamente na conversa de 2026-10-10, inclusive o texto destas regras. Por isso o #40 é a única exceção: o Principal pode integrá-lo pelos outros gates (testes locais, `Veredito: aprovado` no head revisado). Qualquer mudança de governança depois dele segue a regra normal.
-
 ## Decisão
 
 ### Gates de merge
@@ -46,7 +43,7 @@ O Principal deixa o PR pronto e pede a aprovação nestes casos:
   - as categorias acima;
   - mudanças em `.github/workflows/**`, `.github/dependabot.yml`, nas permissões do Actions ou no uso de secrets.
 
-  A issue #38 (CI mínima) é exceção a este último critério. Ela está planejada explicitamente e apaga os workflows herdados que publicam.
+  Há uma exceção a este último critério: as mudanças listadas no Escopo da issue #38 (CI mínima). Elas estão planejadas explicitamente e apagam os workflows herdados que publicam. Qualquer mudança de workflow fora desse Escopo, mesmo no PR do #38, continua sendo risco alto.
 
 ### Proibições
 
@@ -73,7 +70,7 @@ O Principal manda ao mantenedor um resumo **ao fim de cada fase da issue de acom
 ## Consequências
 
 - O v0.1 anda sem esperar o mantenedor a cada PR. O controle dele passa para as decisões, a governança, as releases e os casos de risco alto.
-- Os agentes não conseguem afrouxar os próprios gates: qualquer mudança em `CLAUDE.md`, `.claude/**`, ADRs ou nas decisões iniciais passa pelo mantenedor.
+- Os agentes não conseguem afrouxar os próprios gates: qualquer mudança em `CLAUDE.md`, `.claude/settings.json`, `.claude/agents/**`, `docs/adr/**` ou `docs/decisoes-iniciais.md` passa pelo mantenedor.
 - O veredito do `reviewer` vira um gate formal, preso a um SHA. Um commit depois da revisão invalida o veredito, e `--match-head-commit` impede o merge de um head diferente do revisado.
 - Até #38 entrar, a qualidade do gate de CI depende de o agente rodar e registrar lint, typecheck, build e testes. O `reviewer` confere esse registro.
 - As regras de `permissions.deny` e `permissions.ask` cobrem as formas comuns dos comandos, não todas (a documentação do Claude Code avisa que regras de Bash não são uma fronteira de segurança). A proteção da `main` no GitHub, com `enforce_admins`, continua sendo a garantia.

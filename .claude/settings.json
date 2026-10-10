@@ -28,7 +28,8 @@
       "Bash(gh api graphql*mergePullRequest*)",
       "Bash(gh api graphql*BranchProtectionRule*)",
       "Bash(gh api graphql*Ruleset*)",
-      "Bash(gh api graphql*updateRef*)"
+      "Bash(gh api graphql*updateRef*)",
+      "Bash(gh api graphql*deleteRef*)"
     ],
     "ask": [
       "Bash(git *push *--tags*)",
@@ -36,7 +37,11 @@
       "Bash(git *push * v*)",
       "Bash(git *push *refs/tags/*)",
       "Bash(git *push * tag *)",
-      "Bash(gh release create*)",
+      "Bash(git *push *@*)",
+      "Bash(gh release *)",
+      "Bash(gh workflow run*)",
+      "Bash(gh api *dispatches*)",
+      "Bash(gh api *releases*)",
       "Bash(npm *publish*)",
       "Bash(docker *push*)",
       "Bash(*changeset publish*)"
