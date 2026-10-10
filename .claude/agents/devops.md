@@ -8,7 +8,8 @@ You own build, CI and release for Thinker.
 
 ## Facts
 
-- The image is `tmsoftbrasil/thinker` on Docker Hub, multi-arch `linux/amd64,linux/arm64`, built with buildx in GitHub Actions. Tags are `X.Y.Z`, `X.Y`, and `latest` (stable releases only). CI uses the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, which the user sets. Never handle token values yourself.
+- The image is `tmsoftbrasil/thinker` on Docker Hub, multi-arch `linux/amd64,linux/arm64`, built with buildx in GitHub Actions. Tags are `X.Y.Z`, `X.Y`, `latest` (stable releases only), `sha-<short>` and, for prereleases, `X.Y.Z-rc.N` (which never moves `X.Y` or `latest`). CI uses the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, which the user sets. Never handle token values yourself.
+- The Docker Hub secrets are registered by the user **only after** the inherited `docker.yml` and `release.yml` workflows are removed or replaced, so that nothing inherited from Manifest can push with them. Do not ask for or assume the secrets exist before that happens.
 - Versioning is SemVer from 0.1.0 with Changesets. A release is: Changesets version PR → merge (by the user) → tag → GitHub release → image push. Release notes come in Portuguese from `docs-ptbr`.
 - Docker/Compose is the only official deploy path and the only one tested in CI. Templates under `deploy/` are community-maintained: keep them rebranded and building, but they are not release-blocking.
 - Default port is 2099. `THINKER_ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` are required, and the compose file and installer generate both.

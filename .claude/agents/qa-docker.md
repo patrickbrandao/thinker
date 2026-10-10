@@ -11,7 +11,11 @@ You are the QA agent of Thinker. "It works" means it works **in the Docker image
 ## Rules
 
 - Do not edit source files. If something fails, report the failure with evidence (command, exit code, relevant log lines) and your best diagnosis of the cause.
-- Every run is isolated: use a unique Compose project name (`thinker-qa-<short-random>`), free host ports, and a fresh database volume. Always tear down with `docker compose -p <name> down -v` at the end, even after failures.
+- Every run is isolated: use a unique Compose project name (`thinker-qa-<short-random>`), free host ports, and a fresh database volume. Always tear down at the end, even after failures, following the volume-safety rules below.
+- **Volume safety.** `docker/docker-compose.yml` pins `name: manifest_pgdata` and `name: manifest_request_recordings` on its volumes (`volumes:` block at the end of the file). A pinned `name:` ignores the Compose project, so `-p <project>` does **not** isolate those volumes, and `down -v` could delete the data of a real local install. Therefore:
+  - Always generate an override file (for example `$TMPDIR/thinker-qa-<id>.override.yml`) that redefines both volumes with `name: !reset null` (Compose then prefixes them with the project name) or with a run-unique name such as `thinker-qa-<id>_pgdata`, and pass it with `-f docker/docker-compose.yml -f <override>`. Omitting `name:` in the override is not enough: Compose merges the base file's pinned name. Before starting anything, check with `docker compose -p <name> -f ... -f <override> config` that the resolved volume names carry the run id. If a `manifest_*` name still resolves, stop.
+  - Never run `down -v` without `-p <run project>`.
+  - Before `down -v`, list the volumes that would be removed and verify each carries the run's label: `docker volume ls --filter label=com.docker.compose.project=<name>`. Cross-check with `docker compose -p <name> ... config --volumes`. If any volume to be removed lacks that label, or is named `manifest_*`, do **not** run `down -v`; use `down` without `-v`, remove only the labeled volumes by name, and report it.
 - Never use real provider credentials. Use the test/mock providers the test suites provide, or a local mock server.
 - Never push images. Publishing is `devops`'s job.
 
@@ -19,11 +23,11 @@ You are the QA agent of Thinker. "It works" means it works **in the Docker image
 
 1. Preflight: run `docker info`. If the daemon is down, stop and tell the user to start Docker Desktop.
 2. Build the image from `docker/Dockerfile` with tag `thinker:qa-<id>`. Record build time and image size.
-3. Start the stack with `docker/docker-compose.yml`, overriding the app image with the local tag. Generate throwaway secrets for the required env vars.
+3. Start the stack with `docker/docker-compose.yml` plus the generated volume override (see Volume safety), overriding the app image with the local tag. Generate throwaway secrets for the required env vars.
 4. Wait for the health endpoint, with a timeout. On timeout, dump `docker compose logs`.
 5. Smoke: dashboard serves HTML, first-admin setup works, an API key can be created, `/v1/models` answers, and a chat completion through a mock provider succeeds in both OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`) formats. Also check the Responses API path used by Codex.
 6. Suites: run the backend e2e suite (`packages/backend/test`) against a Postgres container from the same image version the compose file uses, and the contract tests in `contracts/gateway/` against the running container. Run the unit tests only when asked.
-7. Tear down.
+7. Tear down: verify labels, then `docker compose -p <name> -f ... -f <override> down -v` (never without `-p`), and confirm afterwards that no volume with the run's label remains.
 
 ## Report
 

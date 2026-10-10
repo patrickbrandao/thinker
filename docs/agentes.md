@@ -11,7 +11,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Backend | `backend-dev.md` | herda | NestJS, TypeORM, proxy, CLI, MCP | Sim |
 | Frontend | `frontend-dev.md` | herda | Dashboard SolidJS | Sim |
 | Provedores | `providers.md` | herda | Adaptadores, catálogos, preços, assinaturas | Sim |
-| Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` |
+| Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` e issues (também planeja milestones e abre as issues) |
 | DevOps | `devops.md` | herda | CI, imagem multi-arch, Docker Hub, releases | Sim (infra) |
 | Docs PT-BR | `docs-ptbr.md` | Sonnet | Documentação e notas de release | Só docs |
 
@@ -20,6 +20,8 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Agente | Gatilho | Saída |
 |---|---|---|
 | Manifest | Rotina semanal na nuvem (Claude Code) + sob demanda | Issues `upstream` + PR atualizando `upstream/STATE.md` |
+
+A rotina na nuvem é apenas um invólucro fino: o procedimento completo (fontes, cortes, deduplicação, branch e PR) vive em [`.claude/agents/manifest-tracker.md`](../.claude/agents/manifest-tracker.md). Para mudar o comportamento da rotina, edite o arquivo do agente, não a configuração da rotina.
 
 ## Como nasce um novo agente
 
@@ -32,3 +34,4 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 - Área: `area:backend`, `area:frontend`, `area:providers`, `area:infra`, `area:docs`
 - Upstream: `upstream`, `upstream:adotar`, `upstream:adaptar`
 - Prioridade: `prioridade:alta`
+- Decisão: `decisão` marca issues que aguardam uma decisão do mantenedor (por exemplo, decisões de produto em aberto levantadas pelo Arquiteto). Não há labels por agente: o agente responsável vai no corpo da issue.

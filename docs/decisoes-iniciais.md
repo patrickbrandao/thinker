@@ -68,12 +68,13 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 | `docs-ptbr` | Documentação em PT-BR e notas de release em português | Sonnet |
 
 - **Novos agentes**: o Principal propõe o arquivo, que só entra com sua aprovação e é registrado em `docs/agentes.md`.
-- **Agente Manifest** roda numa **rotina semanal na nuvem** (Claude Code) e também sob demanda. Para cada item relevante, abre uma issue com label `upstream`, classificada como `adotar`, `adaptar` ou `ignorar`. Atualiza [`upstream/STATE.md`](../upstream/STATE.md) via PR. **Nunca altera código.**
+- **Agente Manifest** roda numa **rotina semanal na nuvem** (Claude Code) e também sob demanda. Para cada item relevante, abre uma issue com label `upstream`, classificada como `adotar` ou `adaptar` (labels `upstream`, `upstream:adotar`, `upstream:adaptar`). Itens a **ignorar** não geram issue: aparecem apenas no resumo da execução. Atualiza [`upstream/STATE.md`](../upstream/STATE.md) via PR. **Nunca altera código.**
 
 ## 6. Fluxo de trabalho
 
 - `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → **você aprova o merge** (squash). Conventional Commits.
-- GitHub Issues + **milestones**; labels por área e por agente.
+- GitHub Issues + **milestones**; labels **por área** (`area:*`). Não há labels de agente: o agente responsável é nomeado no corpo da issue.
+- A label `decisão` marca issues que aguardam uma decisão sua (o mantenedor); o Arquiteto e o Principal a usam para decisões de produto em aberto.
 - Documentação em Markdown no próprio repo (`docs/`), com ADRs em `docs/adr/`.
 
 ## 7. Roadmap
