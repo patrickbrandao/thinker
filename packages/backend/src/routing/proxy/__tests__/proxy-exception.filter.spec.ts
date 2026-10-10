@@ -1,7 +1,6 @@
 import { UnauthorizedException, BadRequestException, HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ArgumentsHost } from '@nestjs/common';
-import { FREE_PLAN_REQUESTS_PER_MONTH } from 'manifest-shared';
 import { ProxyExceptionFilter } from '../proxy-exception.filter';
 import type { ProxyMessageRecorder } from '../proxy-message-recorder';
 
@@ -363,79 +362,50 @@ describe('ProxyExceptionFilter', () => {
     });
   });
 
-  describe('plan request-limit block (402 PLAN_LIMIT_REQUESTS)', () => {
-    const blockExc = () =>
-      new HttpException(
-        {
-          statusCode: 402,
-          code: 'PLAN_LIMIT_REQUESTS',
-          limit: FREE_PLAN_REQUESTS_PER_MONTH,
-          used: FREE_PLAN_REQUESTS_PER_MONTH,
-        },
-        402,
-      );
+  // The gateway no longer has a plan paywall, so a 402 (even one carrying a
+  // quota-style body) gets no special treatment: it follows the same generic
+  // path as any other 4xx, and no upgrade link is ever rendered.
+  describe('402 responses (no plan paywall)', () => {
+    const legacyPlanBlock = () =>
+      new HttpException({ statusCode: 402, code: 'QUOTA_EXCEEDED', limit: 0, used: 0 }, 402);
 
-    it('renders the friendly M204 upgrade message for a non-streaming chat client (HTTP 200)', () => {
+    it('returns the generic 4xx envelope to an SDK/tool client', () => {
+      const { host, res } = createMockHost({}, { accept: 'application/json' });
+      filter.catch(legacyPlanBlock(), host);
+
+      expect(res.status).toHaveBeenCalledWith(402);
+      expect(res.json).toHaveBeenCalledWith({
+        error: { message: expect.any(String), type: 'invalid_request_error' },
+      });
+      const payload = res.json.mock.calls[0][0];
+      expect(JSON.stringify(payload)).not.toMatch(/insufficient_quota|upgrade|M204/i);
+    });
+
+    it('renders the plain exception message for a chat client, without an upgrade link', () => {
       const { host, res } = chatHost();
-      filter.catch(blockExc(), host);
+      filter.catch(new HttpException('Payment required by upstream', 402), host);
 
       expect(res.status).toHaveBeenCalledWith(200);
-      const payload = res.json.mock.calls[0][0];
-      const content = payload.choices[0].message.content as string;
-      expect(content).toContain('M204');
-      expect(content).toContain(`${FREE_PLAN_REQUESTS_PER_MONTH} requests`);
-      expect(content).toContain('http://localhost:3001/upgrade?reason=requests');
+      const content = res.json.mock.calls[0][0].choices[0].message.content as string;
+      expect(content).toBe('Payment required by upstream');
+      expect(content).not.toMatch(/upgrade|M204/i);
     });
 
-    it('returns a real 402 with insufficient_quota + code for an SDK/tool client', () => {
-      const { host, res } = createMockHost({}, { accept: 'application/json' });
-      filter.catch(blockExc(), host);
-
-      expect(res.status).toHaveBeenCalledWith(402);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: expect.objectContaining({
-            type: 'insufficient_quota',
-            code: 'PLAN_LIMIT_REQUESTS',
-            message: expect.stringContaining('Upgrade to Pro'),
-          }),
-          limit: FREE_PLAN_REQUESTS_PER_MONTH,
-          used: FREE_PLAN_REQUESTS_PER_MONTH,
-        }),
-      );
-      const payload = res.json.mock.calls[0][0];
-      expect(payload.error.message).toContain('http://localhost:3001/upgrade?reason=requests');
-    });
-
-    it('ignores a 402 without the PLAN_LIMIT_REQUESTS code (falls through)', () => {
-      const { host, res } = createMockHost({}, { accept: 'application/json' });
-      filter.catch(new HttpException({ statusCode: 402, code: 'SOMETHING_ELSE' }, 402), host);
-
-      // Falls through to the generic tool envelope, not the billing branch.
-      expect(res.status).toHaveBeenCalledWith(402);
-      const payload = res.json.mock.calls[0][0];
-      expect(payload.error.type).not.toBe('insufficient_quota');
-    });
-
-    it('renders the friendly M204 upgrade message as SSE for a streaming chat client', () => {
+    it('streams the plain exception message to a streaming chat client', () => {
       const { host, res } = createMockHost({ stream: true });
-      filter.catch(blockExc(), host);
+      filter.catch(legacyPlanBlock(), host);
 
-      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
       expect(res.status).toHaveBeenCalledWith(200);
       const payload = res.send.mock.calls[0][0] as string;
       expect(payload).toContain('data: [DONE]');
-      expect(payload).toContain('M204');
+      expect(payload).not.toMatch(/upgrade|M204/i);
     });
 
-    it('returns the 402 to an Accept: text/event-stream non-streaming client with a friendly response', () => {
-      const { host, res } = chatHost();
-      filter.catch(blockExc(), host);
+    it('never records a blocked-request row for a 402', () => {
+      const { host } = createMockHost({}, { accept: 'application/json' });
+      filter.catch(legacyPlanBlock(), host);
 
-      expect(res.status).toHaveBeenCalledWith(200);
-      const payload = res.json.mock.calls[0][0];
-      const content = payload.choices[0].message.content as string;
-      expect(content).toContain('M204');
+      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
     });
   });
 });

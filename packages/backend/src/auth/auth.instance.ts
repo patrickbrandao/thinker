@@ -3,19 +3,11 @@ import type { Auth } from 'better-auth';
 import { jwt } from 'better-auth/plugins';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
-import { stripe as stripePlugin } from '@better-auth/stripe';
 import { render } from '@react-email/render';
 import { VerifyEmailEmail } from '../notifications/emails/verify-email';
 import { ResetPasswordEmail } from '../notifications/emails/reset-password';
 import { sendEmail } from '../notifications/services/email-providers/send-email';
-import { isBillingEnabled, getStripeClient } from '../billing/billing.config';
 import { optionalPositiveInteger } from '../config/env.util';
-import {
-  previousPlanFromEvent,
-  sendPlanChangedEmail,
-  sendSubscriptionCanceledEmail,
-  sendSubscriptionConfirmedEmail,
-} from '../billing/subscription-webhook-emails';
 import { fetchClientMetadataResource } from './cimd-client-metadata-fetch';
 import { authOriginFromEnv, mcpAvailability } from './mcp-availability';
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
@@ -183,37 +175,7 @@ function buildPlugins() {
   // unavailable: `mcp()` validates its resource URL as it is constructed, so
   // building it on an HTTP-only install throws here and takes down the whole
   // process, and CIMD exists only to serve MCP clients.
-  const base = [jwt(), ...(mcpEnabled ? buildMcpPlugins() : [])];
-  if (!isBillingEnabled()) return base;
-  const plans = [{ name: 'pro', priceId: process.env['STRIPE_PRO_PRICE_ID']! }];
-  const priceToPlan = new Map(plans.map((plan) => [plan.priceId, plan.name]));
-  return [
-    ...base,
-    stripePlugin({
-      stripeClient: getStripeClient(),
-      stripeWebhookSecret: process.env['STRIPE_WEBHOOK_SECRET']!,
-      subscription: {
-        enabled: true,
-        plans,
-        onSubscriptionComplete: async ({ event, subscription }) => {
-          await sendSubscriptionConfirmedEmail(database, event, subscription);
-        },
-        onSubscriptionCreated: async ({ event, subscription }) => {
-          await sendSubscriptionConfirmedEmail(database, event, subscription);
-        },
-        onSubscriptionUpdate: async ({ event, subscription }) => {
-          const previousPlan = previousPlanFromEvent(event, priceToPlan);
-          await sendPlanChangedEmail(database, event, subscription, previousPlan);
-        },
-        onSubscriptionCancel: async ({ event, subscription }) => {
-          if (event) await sendSubscriptionCanceledEmail(database, event, subscription);
-        },
-        onSubscriptionDeleted: async ({ event, subscription }) => {
-          await sendSubscriptionCanceledEmail(database, event, subscription);
-        },
-      },
-    }),
-  ];
+  return [jwt(), ...(mcpEnabled ? buildMcpPlugins() : [])];
 }
 
 function buildMcpPlugins() {

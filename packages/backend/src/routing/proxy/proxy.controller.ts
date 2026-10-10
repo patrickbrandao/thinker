@@ -9,7 +9,6 @@ import {
   UseFilters,
   Logger,
   HttpException,
-  HttpStatus,
   Optional,
 } from '@nestjs/common';
 import { Request, Response as ExpressResponse } from 'express';
@@ -64,7 +63,6 @@ import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { openAiModelId, subscriptionOpenAiModelId } from './openai-model-id';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
-import { PlanService } from '../../billing/plan.service';
 import { StreamFailure } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
@@ -137,7 +135,6 @@ export class ProxyController {
     private readonly thinkingCache: ThinkingBlockCache,
     private readonly reasoningCache: ReasoningContentCache,
     private readonly modelDiscovery: ModelDiscoveryService,
-    private readonly planService: PlanService,
     private readonly observationReporter: ObservationReporter,
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly modelsDevSync: ModelsDevSyncService,
@@ -344,47 +341,6 @@ export class ProxyController {
           .catch((e) => this.logger.warn(`Failed to complete Provider Attempt: ${e}`));
       return attempt;
     };
-
-    // Plan request-limit gate. A 402 must reach ProxyExceptionFilter (friendly
-    // upgrade message / real 402), but still gets a Manifest-policy row in
-    // agent_messages so the Messages tab explains why the request never routed.
-    // Billing counters exclude Manifest-origin rows, so this does not consume
-    // quota or push the tenant further over the limit.
-    try {
-      await this.planService.assertWithinRequestLimit(req.ingestionContext);
-    } catch (err: unknown) {
-      if (err instanceof HttpException && err.getStatus() === HttpStatus.PAYMENT_REQUIRED) {
-        this.recordManifestBlockedRequest(
-          err,
-          req,
-          requestId,
-          traceId,
-          callerAttribution,
-          requestHeaders,
-          'plan_request_limit_exceeded',
-          apiMode,
-          HttpStatus.PAYMENT_REQUIRED,
-          'M204',
-          Date.now() - startTime,
-        );
-        throw err;
-      }
-      await this.handleProxyError(
-        err,
-        req,
-        res,
-        clientAbort,
-        headersSent,
-        requestId,
-        traceId,
-        callerAttribution,
-        requestHeaders,
-        apiMode,
-        undefined,
-        undefined,
-      );
-      return;
-    }
 
     try {
       // Each of these throws its own ManifestError (M201 per-user, M202 per-IP,
@@ -922,7 +878,6 @@ export class ProxyController {
           if (typeof nested === 'string') return nested;
         }
         const code = record.code;
-        if (code === 'PLAN_LIMIT_REQUESTS') return 'Free plan monthly request limit reached';
         if (typeof code === 'string') return code;
       }
     }

@@ -144,7 +144,6 @@ packages/
 │   │   ├── setup/                           # First-run admin setup wizard
 │   │   ├── free-models/                     # Free LLM model catalog
 │   │   ├── model-discovery/                 # Per-provider model fetching + fallback
-│   │   ├── billing/                         # Stripe billing status + plan limits
 │   │   ├── error-pages/                     # Custom error-page config (internal + public)
 │   │   ├── waitlist/                        # Pivot waiting-list claims + legacy Autofix claim compatibility route
 │   │   ├── discovery/                       # Self-hosted discovery onboarding (forwarded to Peacock)
@@ -430,7 +429,6 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET                       | `/api/v1/providers` / `/api/v1/providers/usage` | Session/API Key                     | Connected provider list + usage                                                                             |
 | GET                       | `/api/v1/provider-analytics/*`                  | Session/API Key                     | Per-provider analytics                                                                                      |
 | GET                       | `/api/v1/errors/breakdown`                      | Session/API Key                     | Error breakdown analytics                                                                                   |
-| GET/PATCH                 | `/api/v1/billing/*`                             | Session/API Key                     | Billing status, light `plan` endpoint, email preferences (Stripe)                                           |
 | POST                      | `/api/v1/waitlist/autofix/claim`                | Public                              | Deprecated no-op compatibility route for older self-hosted versions                                         |
 | POST                      | `/api/v1/waitlist/pivot/claim`                  | Public                              | Closed pivot waiting-list claim, kept for older self-hosted versions; records origin (cloud/self-hosted)   |
 | GET/POST                  | `/api/v1/autofix/status` / `.../enable-all`     | Session/API Key                     | Workspace Autofix coverage + API-only fleet enable (no dashboard caller)                                    |
@@ -528,8 +526,7 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `AUTOFIX_REPORT_ALL_4XX` — Set `true` to stream an agent's request-side 4xx (4xx except 401/402/403/429) to Phoenix's `POST /api/heal/observe` as evidence, carrying the full request body. Serves no fix and creates no heal attempt; it only lets Phoenix see the body that failed. Wider than the heal path in scope (not limited to `AUTOFIX_REPAIRABLE_STATUSES`) but **gated to agents with Autofix on** — `AutofixService.isActiveFor()`, the same per-agent flag that healing checks. Turning Autofix on is what consents to sending failing requests to the healing service; the check fails closed. Off by default: a second, deployment-level switch on top. Manifest persists nothing; the body is secret-scrubbed, capped at 256 KB, batched, and dropped under backpressure. Skipped when Autofix already reported the same failure via `/api/heal`. See `routing/autofix/observation-reporter.ts`.
 - `REQUEST_RECORDING_STORAGE` / `REQUEST_RECORDING_FILESYSTEM_PATH` / `REQUEST_RECORDING_S3_*` / `REQUEST_RECORDING_RETENTION_DAYS` — Provider Attempt body recording storage + retention. See [Request Recording](#request-recording-provider-attempt-bodies).
 - `CREDITS_BASE_URL` / `CREDITS_MASTER_KEY` / `CREDITS_AUTO_PROVISION_ALLOWLIST` / `CREDITS_GEMINI_FREE_MAX_BUDGET` — Managed free providers (e.g. Gemini Free) via the credits gateway (default base URL `https://credits.manifest.build`; free-provider budget default `10`).
-- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRO_PRICE_ID` — Billing (cloud only). See `packages/backend/src/billing/`.
-- `PLAN_LIMIT_FREE_REQUESTS` / `PLAN_LIMIT_PRO_REQUESTS` / `PLAN_REQUEST_QUOTA_RESET_AT` — Per-plan request quotas enforced by `plan.service.ts`.
+- Thinker has no billing, plans or request quotas (#14): the `STRIPE_*`, `PLAN_LIMIT_*` and `PLAN_REQUEST_QUOTA_RESET_AT` variables are gone and ignored if set. The proxy no longer checks a plan limit per request and never answers 402 on its own; `DropBillingSchema1803200000000` drops the leftover billing tables and columns.
 
 ## Domain Terminology
 
@@ -584,7 +581,7 @@ Opt-in, **per-harness** recording of Provider Attempt request/response bodies, b
 - **Toggle**: `GET/PATCH /api/v1/routing/:agentName/recording` (in `tier.controller.ts`); UI in `pages/SettingsRecordingSection.tsx`. **Default ON for newly created harnesses only** — enabling the feature never changed existing harnesses' settings. Setting changes apply immediately across replicas.
 - **Storage selection** (`REQUEST_RECORDING_STORAGE=auto|s3|filesystem|disabled`, default `auto`): complete S3 credentials win; otherwise self-hosted falls back to the filesystem path (`REQUEST_RECORDING_FILESYSTEM_PATH`, default `/data/request-recordings`). Managed Cloud never silently falls back to ephemeral local disk. S3 config: `REQUEST_RECORDING_S3_BUCKET/ENDPOINT/REGION/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`.
 - **Encryption at rest**: recordings are encrypted under the **current** `MANIFEST_ENCRYPTION_KEY` only. The `MANIFEST_ENCRYPTION_KEY_PREVIOUS` re-encryption pass does **not** rewrite recordings — after a key change, older recordings are unreadable until retention removes them. Pre-encryption gzip-only recordings stay readable.
-- **Retention** (`REQUEST_RECORDING_RETENTION_DAYS`): defaults Cloud Free 7d, Cloud Pro 365d, self-hosted 365d. Cleanup cron in `database/request-recording-retention.service.ts`.
+- **Retention** (`REQUEST_RECORDING_RETENTION_DAYS`): one instance-wide value, default 365d (no per-plan retention). Cleanup cron in `database/request-recording-retention.service.ts`.
 - **Privacy**: inline base64 images are stripped from recordings (and from Phoenix observation payloads).
 - **Code**: `common/services/request-recording-storage.service.ts` (storage backends), `common/utils/request-recording-codec.ts` (gzip + encryption codec), `routing/proxy/attempt-recording.service.ts` + `attempt-recording-capture.ts` (capture in the proxy path).
 - **Deploy templates** provision durable recording storage (see README deploy table). Volume-backed templates are single-instance; use S3-compatible storage before scaling horizontally.

@@ -880,7 +880,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
 
   /**
    * The single writer for every Manifest-authored failure row: setup errors
-   * (M100/M101), limits (M200/M204), rate limits (M201–M203), malformed requests
+   * (M100/M101), limits (M200), rate limits (M201–M203), malformed requests
    * (M300), internal errors (M500), and expired keys (M004).
    *
    * `provider` and `routing_tier` are deliberately left NULL — no provider was

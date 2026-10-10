@@ -65,13 +65,6 @@ const QUERIES = [
   },
   {
     tag: 'HOT',
-    name: 'plan quota counter lookup',
-    sql: `SELECT request_count AS n, baseline_counted FROM tenant_request_usage
-          WHERE tenant_id = $1 AND window_start = date_trunc('month', now())`,
-    params: (t) => [t.tenant_id],
-  },
-  {
-    tag: 'HOT',
     name: 'attempts by request id',
     sql: `SELECT id, attempt_number, status FROM agent_messages WHERE request_id = $1 ORDER BY id`,
     params: (t) => [t.request_id],

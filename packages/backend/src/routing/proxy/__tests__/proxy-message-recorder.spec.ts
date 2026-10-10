@@ -1077,36 +1077,6 @@ describe('ProxyMessageRecorder', () => {
       ]);
     });
 
-    it('records plan-limit blocks as Manifest policy rows', async () => {
-      await recorder.recordManifestBlockedRequest(ctx, {
-        httpStatus: 402,
-        errorMessage: 'Free plan request limit reached',
-        reason: 'plan_request_limit_exceeded',
-        model: 'auto',
-        traceId: 'trace-1',
-        sessionKey: 'session-1',
-      });
-
-      expect(insertMock).toHaveBeenCalledTimes(1);
-      expect(insertMock.mock.calls[0][0]).toMatchObject({
-        tenant_id: 'tenant-1',
-        agent_id: 'agent-1',
-        agent_name: 'test-agent',
-        trace_id: 'trace-1',
-        session_key: 'session-1',
-        status: 'failed',
-        error_message: 'Free plan request limit reached',
-        error_http_status: 402,
-        routing_reason: 'plan_request_limit_exceeded',
-        error_origin: 'policy',
-        error_class: 'plan_request_limit_exceeded',
-        superseded: false,
-        model: 'auto',
-        provider: null,
-      });
-      expect(emitMock).toHaveBeenCalledWith('tenant-1', 'message', 'user-1');
-    });
-
     it('records local proxy rate limits as Manifest policy rate-limit rows', async () => {
       await recorder.recordManifestBlockedRequest(ctx, {
         httpStatus: 429,

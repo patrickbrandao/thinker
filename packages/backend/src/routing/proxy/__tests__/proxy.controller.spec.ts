@@ -1,5 +1,4 @@
 import { HttpException, Logger } from '@nestjs/common';
-import { FREE_PLAN_REQUESTS_PER_MONTH } from 'manifest-shared';
 import { ManifestError } from '../../../common/errors/manifest-error';
 import { ProxyController } from '../proxy.controller';
 import { ProxyMessageRecorder } from '../proxy-message-recorder';
@@ -150,7 +149,6 @@ describe('ProxyController', () => {
   let providerParamSpecs: { getCapabilities: jest.Mock };
   let modelsDevSync: { lookupModelCapabilities: jest.Mock };
   let recorder: ProxyMessageRecorder;
-  let planService: { assertWithinRequestLimit: jest.Mock };
   let observationReporter: { report: jest.Mock };
   let recordingConfig: { isRecording: jest.Mock };
   let attemptRecording: { available: boolean; save: jest.Mock };
@@ -158,7 +156,6 @@ describe('ProxyController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     proxyService = { proxyRequest: jest.fn() };
-    planService = { assertWithinRequestLimit: jest.fn().mockResolvedValue(undefined) };
     rateLimiter = {
       checkLimit: jest.fn(),
       checkIpLimit: jest.fn(),
@@ -228,7 +225,6 @@ describe('ProxyController', () => {
       new ThinkingBlockCache(),
       new ReasoningContentCache(),
       modelDiscovery as never,
-      planService as never,
       observationReporter as never,
       providerParamSpecs as never,
       modelsDevSync as never,
@@ -1057,77 +1053,58 @@ describe('ProxyController', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('enforces the plan request limit before routing and records a Manifest policy row', async () => {
-    const block = new HttpException(
-      {
-        statusCode: 402,
-        code: 'PLAN_LIMIT_REQUESTS',
-        limit: FREE_PLAN_REQUESTS_PER_MONTH,
-        used: FREE_PLAN_REQUESTS_PER_MONTH,
+  // There is no plan paywall on the hot path: admission goes straight to the
+  // local rate limiter and routing, with no per-request plan lookup.
+  it('admits a normal request straight to rate limiting and routing', async () => {
+    const responseBody = { choices: [{ message: { content: 'hello' } }] };
+    proxyService.proxyRequest.mockResolvedValue({
+      forward: {
+        response: new Response(JSON.stringify(responseBody), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
       },
-      402,
-    );
-    planService.assertWithinRequestLimit.mockRejectedValueOnce(block);
-    const recordSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+      meta: { tier: 'simple', model: 'gpt-4o', provider: 'OpenAI', confidence: 0.9 },
+    });
+    const blockedSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
 
     const req = mockRequest({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] });
     const { res } = mockResponse();
 
-    // The gate runs BEFORE the try/catch, so the 402 propagates to
-    // ProxyExceptionFilter instead of the local handleProxyError.
-    await expect(controller.chatCompletions(req as never, res as never)).rejects.toBe(block);
-    await flushRecorderMicrotasks();
+    await controller.chatCompletions(req as never, res as never);
 
-    // Gate ran before rate limiting / routing. The recorded row is classified as
-    // Manifest policy, which PlanService excludes from billable request counts.
-    expect(planService.assertWithinRequestLimit).toHaveBeenCalledWith(req.ingestionContext);
-    expect(rateLimiter.checkLimit).not.toHaveBeenCalled();
-    expect(proxyService.proxyRequest).not.toHaveBeenCalled();
-    expect(recordSpy).toHaveBeenCalledWith(
-      req.ingestionContext,
-      expect.objectContaining({
-        httpStatus: 402,
-        errorMessage: 'Free plan monthly request limit reached',
-        reason: 'plan_request_limit_exceeded',
-        model: 'auto',
-      }),
+    expect(rateLimiter.checkLimit).toHaveBeenCalledWith('tenant-1');
+    expect(rateLimiter.checkLimit.mock.invocationCallOrder[0]).toBeLessThan(
+      proxyService.proxyRequest.mock.invocationCallOrder[0]!,
     );
-    expect(mockMessageRepo.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'failed',
-        error_http_status: 402,
-        routing_reason: 'plan_request_limit_exceeded',
-        error_origin: 'policy',
-        error_class: 'plan_request_limit_exceeded',
-      }),
-    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(responseBody);
+    expect(blockedSpy).not.toHaveBeenCalled();
   });
 
-  it('routes a non-402 plan-lookup error through the normal proxy error handler', async () => {
-    // A subscription/tenant lookup failure is Manifest's own bug (M500), not a
-    // provider failure — it must be recorded + normalized, never thrown raw
-    // (which would 500 the caller) and never blamed on the provider.
-    planService.assertWithinRequestLimit.mockRejectedValueOnce(new Error('subscription db down'));
-    const manifestSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
-    const providerSpy = jest.spyOn(recorder, 'recordProviderError');
+  it('handles a 402 raised while routing like any other 4xx, never as a plan block', async () => {
+    proxyService.proxyRequest.mockRejectedValue(new HttpException('Payment required', 402));
+    const blockedSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
 
     const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
     const { res } = mockResponse();
 
-    await controller.chatCompletions(req as never, res as never);
+    // Handled locally (the response is written), not rethrown to the filter.
+    await expect(controller.chatCompletions(req as never, res as never)).resolves.toBeUndefined();
+    await flushRecorderMicrotasks();
 
-    expect(providerSpy).not.toHaveBeenCalled();
-    expect(manifestSpy).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        errorCode: 'M500',
-        reason: 'manifest_internal_error',
-        httpStatus: 500,
-        // The real internal message, not the friendly text the caller sees.
-        errorMessage: expect.stringContaining('subscription db down'),
-      }),
-    );
-    expect(proxyService.proxyRequest).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith({
+      error: { message: 'Payment required', type: 'invalid_request_error' },
+    });
+    for (const [, payload] of blockedSpy.mock.calls) {
+      expect(payload).not.toMatchObject({ reason: 'plan_request_limit_exceeded' });
+      expect(payload).not.toMatchObject({ errorCode: 'M204' });
+    }
+    expect(rateLimiter.releaseSlot).toHaveBeenCalledWith('tenant-1');
   });
 
   it('should expose /v1/responses and convert chat completions output to Responses format', async () => {

@@ -2,13 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource, QueryRunner } from 'typeorm';
-import { isBillingEnabled } from '../billing/billing.config';
-import { PAID_SUBSCRIPTION_STATUS_SQL_LIST } from '../billing/subscription-status';
 import { RequestRecordingStorageService } from '../common/services/request-recording-storage.service';
 
-const FREE_RETENTION_DAYS = 7;
-const PRO_RETENTION_DAYS = 365;
-const NON_BILLING_RETENTION_DAYS = 365;
+const DEFAULT_RETENTION_DAYS = 365;
 const RETENTION_LOCK_KEY = 4011986;
 
 const TRY_LOCK_SQL = `
@@ -23,49 +19,6 @@ const SELECT_ALL_EXPIRED_SQL = `
   WHERE recording_key IS NOT NULL
     AND timestamp < CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
   ORDER BY timestamp ASC
-`;
-
-// The top-level timestamp bound is implied by the OR below (LEAST($1, $2) is
-// the shorter retention, so the later cutoff), but the planner cannot hoist it
-// out of the OR on its own. Stated explicitly it becomes a range scan on the
-// partial index IDX_agent_messages_recording (migration 1802600000000), and the
-// `::int` casts pin $1/$2 to integers, so the retention constants above must
-// stay whole days — a fractional value fails loudly at parse time.
-// Every arm's cutoff must be an argument to `LEAST`, or that arm silently stops
-// matching.
-const SELECT_PLAN_EXPIRED_SQL = `
-  SELECT attempt.id AS attempt_id, attempt.recording_key AS storage_key
-  FROM agent_messages attempt
-  JOIN requests request ON request.id = attempt.request_id
-  WHERE attempt.recording_key IS NOT NULL
-    AND attempt.timestamp < CURRENT_TIMESTAMP - (LEAST($1::int, $2::int) * INTERVAL '1 day')
-    AND (
-    (
-      attempt.timestamp < CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
-      AND NOT EXISTS (
-        SELECT 1
-        FROM tenants tenant
-        JOIN "subscription" subscription
-          ON subscription."referenceId" = tenant.owner_user_id
-        WHERE tenant.id = request.tenant_id
-          AND subscription.plan = 'pro'
-          AND subscription.status IN (${PAID_SUBSCRIPTION_STATUS_SQL_LIST})
-      )
-    )
-    OR (
-      attempt.timestamp < CURRENT_TIMESTAMP - ($2 * INTERVAL '1 day')
-      AND EXISTS (
-        SELECT 1
-        FROM tenants tenant
-        JOIN "subscription" subscription
-          ON subscription."referenceId" = tenant.owner_user_id
-        WHERE tenant.id = request.tenant_id
-          AND subscription.plan = 'pro'
-          AND subscription.status IN (${PAID_SUBSCRIPTION_STATUS_SQL_LIST})
-      )
-    )
-  )
-  ORDER BY attempt.timestamp ASC
 `;
 
 const DELETE_METADATA_SQL = `
@@ -107,13 +60,10 @@ export class RequestRecordingRetentionService {
       acquired = lockRows[0]?.acquired === true;
       if (!acquired) return 0;
 
-      const recordings =
-        this.globalRetentionDays !== null || !isBillingEnabled()
-          ? await this.findAllExpired(
-              queryRunner,
-              this.globalRetentionDays ?? NON_BILLING_RETENTION_DAYS,
-            )
-          : await this.findExpiredByPlan(queryRunner);
+      const recordings = await this.findAllExpired(
+        queryRunner,
+        this.globalRetentionDays ?? DEFAULT_RETENTION_DAYS,
+      );
       const deleted = await this.deleteRecordings(queryRunner, recordings);
 
       if (deleted > 0) {
@@ -140,13 +90,6 @@ export class RequestRecordingRetentionService {
     return queryRunner.query(SELECT_ALL_EXPIRED_SQL, [retentionDays]) as Promise<
       ExpiredRecording[]
     >;
-  }
-
-  private async findExpiredByPlan(queryRunner: QueryRunner): Promise<ExpiredRecording[]> {
-    return queryRunner.query(SELECT_PLAN_EXPIRED_SQL, [
-      FREE_RETENTION_DAYS,
-      PRO_RETENTION_DAYS,
-    ]) as Promise<ExpiredRecording[]>;
   }
 
   private async deleteRecordings(
