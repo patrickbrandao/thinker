@@ -24,6 +24,8 @@ coverage/
 .agent/
 .agents/
 .claude/*
+# Kept un-ignored for the thinker-cli skill that #23 recreates in .claude/skills/thinker-cli/
+# (the old mnfst-cli skill moved to packages/cli/skill/ and is no longer auto-loaded).
 !.claude/skills/
 !.claude/agents/
 !.claude/settings.json

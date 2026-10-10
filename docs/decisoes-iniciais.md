@@ -13,7 +13,7 @@ Mudanças de rumo posteriores entram como ADRs em [`docs/adr/`](adr/).
 | Licença | MIT; o aviso de copyright da MNFST, Inc. permanece ao lado do do Thinker |
 | Compatibilidade | Nenhuma obrigação com o Manifest (API, env vars, banco, CLI) |
 | Rebranding | **Total**: UI, docs, pacotes, env vars `MANIFEST_*` → `THINKER_*`, chaves `mnfst_` → `thk_`, CLI `mnfst` → `thinker`, imagem Docker |
-| Idioma | Código, identificadores, commits e PRs em inglês; documentação em português (PT-BR) |
+| Idioma | Código, identificadores, commits e PRs em inglês; documentação em português (PT-BR). A interface do dashboard fica em inglês na v0.1; o i18n (PT-BR + EN) entra na v0.3 (decisão em #9) |
 | Logo | Ícone Flaticon **5337422** (cérebro azul), com atribuição no README |
 | Versão | SemVer a partir de **0.1.0**, gerenciado por Changesets; 1.0.0 quando a primeira versão própria estiver estável |
 
@@ -72,7 +72,7 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 
 ## 6. Fluxo de trabalho
 
-- `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → **você aprova o merge** (squash). Conventional Commits.
+- `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → squash merge. Conventional Commits. Quem faz o merge e o que espera por você seguem o [ADR 0002](adr/0002-politica-de-merge.md), que substitui a regra original "você aprova o merge".
 - GitHub Issues + **milestones**; labels **por área** (`area:*`). Não há labels de agente: o agente responsável é nomeado no corpo da issue.
 - A label `decisão` marca issues que aguardam uma decisão sua (o mantenedor); o Arquiteto e o Principal a usam para decisões de produto em aberto.
 - Documentação em Markdown no próprio repo (`docs/`), com ADRs em `docs/adr/`.
@@ -83,7 +83,7 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 |---|---|
 | **v0.1** | Limpeza (seção 3), rebranding total, `THINKER_ENCRYPTION_KEY`, retenção 30d, Docker/CI verdes, primeira imagem no Docker Hub |
 | **v0.2** | Upgrades (PG 18 e majors, um PR cada) |
-| **v0.3** | Organizações + papéis + gestão de contas pelo admin |
+| **v0.3** | Organizações + papéis + gestão de contas pelo admin; i18n do dashboard (PT-BR + EN) |
 | **v0.4** | Orçamentos/quotas por organização, membro e harness |
 | **v0.5** | Observabilidade aberta (Prometheus + OpenTelemetry) |
 | **v0.6** | Self-heal local (substituto do Autofix) |

@@ -12,7 +12,7 @@ You implement backend work in Thinker. Stack: NestJS, TypeORM, PostgreSQL, Bette
 - Data isolation: every resource is scoped to its tenant/organization. Never authorize or cache by user id alone.
 - Schema changes go through TypeORM migrations that are safe on an existing database. Never use `synchronize`.
 - Provider credentials and recordings are encrypted with `THINKER_ENCRYPTION_KEY`.
-- No new outbound calls besides configured providers.
+- No new outbound calls besides configured providers. The only exception is the public catalogs of [ADR 0003](../../docs/adr/0003-excecao-catalogos-publicos.md): openrouter.ai and models.dev (on by default) and the OpenCode Go doc on raw.githubusercontent.com (only when an OpenCode Go provider exists). All three are disabled by `THINKER_CATALOG_SYNC=false`. Any other destination needs a new ADR.
 - Naming: `THINKER_*` env vars, `thk_` key prefix. Never add `manifest`/`mnfst` identifiers.
 - Write or update unit and e2e tests with the change, and run the affected suites before handing back.
 - For provider adapter, catalog or pricing work, coordinate with (or defer to) the `providers` agent.
