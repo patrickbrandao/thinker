@@ -2,9 +2,11 @@
 
 Símbolo e logotipo do Thinker: um cérebro visto de cima, com os dois hemisférios separados pela fissura central e trilhas de circuito vazadas que saem da fissura e terminam num ponto de contato.
 
-O desenho é **original do Thinker**. Ele parte do conceito do ícone Flaticon 5337422 (cérebro azul com circuitos), mas não copia nem adapta os traços dele: geometria, proporções, estilo e o desenho das trilhas são novos (ver #10). Por isso não há atribuição a terceiros.
+O desenho é original do Thinker, inspirado em um ícone de cérebro de terceiros. Geometria, proporções, estilo e desenho das trilhas são próprios, e nenhum traço do ícone de referência foi reaproveitado (ver #10).
 
 ## Arquivos
+
+Os assets ficam em `packages/frontend/public/brand/`.
 
 | Arquivo | Uso |
 | --- | --- |
@@ -16,9 +18,11 @@ O desenho é **original do Thinker**. Ele parte do conceito do ícone Flaticon 5
 | `favicon-32.png` | Favicon em PNG, 32 × 32, fundo transparente. |
 | `apple-touch-icon.png` | Ícone de tela inicial do iOS, 180 × 180, fundo branco. |
 
-As cópias de `thinker-logo.svg` e `thinker-logo-dark.svg` em `.github/assets/` servem ao README do repositório e devem ficar idênticas às desta pasta (um teste confere).
+As cópias de `thinker-logo.svg` e `thinker-logo-dark.svg` em `.github/assets/` servem ao README do repositório e devem ficar idênticas às de `public/brand/`. O teste `packages/frontend/tests/brand-assets.test.ts` confere isso.
 
 O sufixo `-dark` indica a variante **para fundo escuro**, não a cor do desenho.
+
+Os arquivos em `/brand/*` são servidos sem hash no nome e com cache `immutable` de um ano. Para usar no painel, importe pelo Vite (URL com hash) ou versione o nome do arquivo ao revisar o desenho.
 
 ## Cores
 
@@ -42,6 +46,8 @@ As trilhas e a fissura são vazadas (transparentes), então mostram a cor do fun
 Os SVGs são escritos à mão: sem metadados de editor, com `role="img"` e `<title>`.
 
 ## Regerar os PNGs
+
+Dentro de `packages/frontend/public/brand/`:
 
 ```sh
 magick -background none -density 1152 favicon.svg -resize 32x32 -strip PNG32:favicon-32.png
