@@ -8,9 +8,10 @@ Os cortes são timestamps ISO-8601 em UTC. A seleção usa `updated_at >= corte`
 
 | Campo | Valor |
 |---|---|
-| Commit | `45627a2d5e58427a7a69d111e41fe85e8a6281e7` |
-| Release | `manifest@6.28.6` |
-| Corte de issues/PRs/discussions | `2026-10-09T14:32:18Z` (horário do commit do baseline, para não pular itens criados depois dele) |
+| Commits | `45627a2d5e58427a7a69d111e41fe85e8a6281e7` |
+| Releases | `manifest@6.28.6` |
+| Issues e PRs | `2026-10-09T14:32:18Z` (horário do commit do baseline, para não pular itens criados depois dele) |
+| Discussions | `2026-10-09T14:32:18Z` |
 | Backlog de itens abertos anteriores ao baseline | **não triado** |
 
 ## Histórico de revisões

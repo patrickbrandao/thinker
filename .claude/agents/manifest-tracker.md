@@ -23,10 +23,16 @@ In the cloud routine, two repositories may be cloned side by side: `patrickbrand
 1. Identify the **Thinker root** explicitly: the checkout where `upstream/BASELINE` exists. Call it `<thinker_root>`. If more than one checkout has it, or none does, stop and report.
 2. Run every write, branch, commit and push with `git -C <thinker_root> ...`. Never rely on the current directory.
 3. Record the **run start time** now, as a full ISO-8601 UTC timestamp (`date -u +%Y-%m-%dT%H:%M:%SZ`). It becomes the new cut-off at the end.
+4. **Pick the working branch before reading anything**, so you never read a stale `STATE.md` or edit it on `main`:
+   - Make sure the tree is clean and run `git -C <thinker_root> fetch origin`.
+   - List open review PRs: `gh api 'repos/patrickbrandao/thinker/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("claude/upstream-review-")) | {number, ref: .head.ref}'`.
+   - If one exists: `git -C <thinker_root> checkout <ref>`, then **merge** `origin/main` into it (`git -C <thinker_root> merge origin/main`). Never rebase and never force-push. This run's changes go on this branch, with no parallel PR. If several exist, use the most recent and mention the others in the summary.
+   - Otherwise: update `main` (`git -C <thinker_root> checkout main && git -C <thinker_root> pull --ff-only`) and create `claude/upstream-review-<YYYYMMDD-HHMM>` (UTC) from it.
+   - Only after this step read or write `upstream/STATE.md`.
 
 ## Inputs
 
-1. Read `<thinker_root>/upstream/STATE.md` for the last reviewed commit SHA, release tag, the per-category cut-offs (ISO-8601 UTC timestamps) and the backlog status.
+1. Read `<thinker_root>/upstream/STATE.md` (on the working branch from Setup) and use these exact fields of "Último ponto revisado": **Commits** (last reviewed SHA), **Releases** (last tag), **Issues e PRs** (cut-off timestamp), **Discussions** (cut-off timestamp), and **Backlog de itens abertos anteriores ao baseline**. Each cut-off is an ISO-8601 UTC timestamp and is advanced independently.
 2. Read `docs/decisoes-iniciais.md` (section 3 lists what Thinker removed or changed) and skim `docs/adr/` so your judgment reflects the current direction.
 3. Collect upstream activity since the cut-off, by category: commits, releases, issues, pull requests (merged **and open**), discussions.
 
@@ -79,10 +85,8 @@ Work inside `<thinker_root>` only.
    - **Relevância para o Thinker**: why it matters and what Thinker currently does in that area (cite file paths).
    - **Classificação**: adotar or adaptar, with an adaptation sketch for `adaptar`.
    - **Esforço estimado**: P, M or G.
-2. Update `upstream/STATE.md`: new cut-off timestamps (only for categories whose source worked), SHA and tag when commits/releases were read, backlog status, and a run-log entry listing the source used per category. Keep earlier log entries.
-3. Branch and PR, all with `git -C <thinker_root>`:
-   - First list open PRs in Thinker: `gh api 'repos/patrickbrandao/thinker/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("claude/upstream-review-")) | {number, ref: .head.ref}'`.
-   - If one exists, check out that branch, rebase or merge `main` into it, and add this run's changes there. Do not open a parallel PR.
-   - Otherwise create `claude/upstream-review-<YYYYMMDD-HHMM>` (UTC) from `main`, commit, push, and open the PR with `gh api repos/patrickbrandao/thinker/pulls -X POST ...`.
+2. Update `upstream/STATE.md`: new values for the fields Commits, Releases, Issues e PRs and Discussions (only for categories whose source worked; the timestamps are the run start time), backlog status, and a run-log entry listing the source used per category. Keep earlier log entries.
+3. Commit and push on the working branch chosen in Setup, with `git -C <thinker_root>`:
+   - Commit and push. Open the PR with `gh api repos/patrickbrandao/thinker/pulls -X POST ...` **only if no review PR existed**; otherwise the push updates the existing one.
    - Commit messages are Conventional Commits in English (e.g. `chore(upstream): review up to <date>`).
 4. Return a concise summary: counts per class, the issues created (with links), ignored items in one line each, the source used per category, and anything urgent.
