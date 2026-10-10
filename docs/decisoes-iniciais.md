@@ -72,7 +72,7 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 
 ## 6. Fluxo de trabalho
 
-- `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → **você aprova o merge** (squash). Conventional Commits.
+- `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → squash merge. Conventional Commits. Quem faz o merge e o que espera por você seguem o [ADR 0002](adr/0002-politica-de-merge.md), que substitui a regra original "você aprova o merge".
 - GitHub Issues + **milestones**; labels **por área** (`area:*`). Não há labels de agente: o agente responsável é nomeado no corpo da issue.
 - A label `decisão` marca issues que aguardam uma decisão sua (o mantenedor); o Arquiteto e o Principal a usam para decisões de produto em aberto.
 - Documentação em Markdown no próprio repo (`docs/`), com ADRs em `docs/adr/`.

@@ -1,4 +1,32 @@
 {
+  "permissions": {
+    "deny": [
+      "Bash(git *push * main)",
+      "Bash(git *push * main *)",
+      "Bash(git *push *:main)",
+      "Bash(git *push *:main *)",
+      "Bash(git *push *refs/heads/main)",
+      "Bash(git *push *refs/heads/main *)",
+      "Bash(git *push *--mirror*)",
+      "Bash(git *push *--all*)",
+      "Bash(git *push *--force*)",
+      "Bash(git *push -f)",
+      "Bash(git *push -f *)",
+      "Bash(git *push * -f)",
+      "Bash(git *push * -f *)",
+      "Bash(git *push -uf *)",
+      "Bash(git *push * -uf *)",
+      "Bash(git *push -fu *)",
+      "Bash(git *push * -fu *)",
+      "Bash(git *push +*)",
+      "Bash(git *push * +*)",
+      "Bash(gh *merge*--admin*)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *git/refs/heads/main*)",
+      "Bash(gh api *branches/*/protection*)",
+      "Bash(gh api *rulesets*)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {

@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: .claude/skills/mnfst-cli/SKILL.md (repo root).
+// Source: packages/cli/skill/SKILL.md.
 // Refresh with: npm run gen (runs automatically in npm run build).
 
 /** The mnfst agent skill, embedded so the CLI can install it anywhere. */

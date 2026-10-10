@@ -14,15 +14,13 @@ const {
 };
 
 describe('embedded skill', () => {
-  it('committed generated file matches .claude/skills/mnfst-cli/SKILL.md (drift guard)', () => {
+  it('committed generated file matches packages/cli/skill/SKILL.md (drift guard)', () => {
     // If this fails, run `npm run gen --workspace=packages/cli` and commit.
     expect(SKILL_MD).toBe(readSkillMarkdown());
   });
 
-  it('the generator reads the repo skill, not a copy inside the package', () => {
-    expect(SKILL_PATH).toBe(
-      path.join(__dirname, '..', '..', '..', '.claude', 'skills', 'mnfst-cli', 'SKILL.md'),
-    );
+  it('the generator reads the package skill, outside the repo .claude/skills/', () => {
+    expect(SKILL_PATH).toBe(path.join(__dirname, '..', 'skill', 'SKILL.md'));
     expect(fs.existsSync(SKILL_PATH)).toBe(true);
   });
 

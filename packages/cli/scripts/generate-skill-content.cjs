@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Embeds the repo's agent skill (.claude/skills/mnfst-cli/SKILL.md) into
+ * Embeds the CLI's agent skill (packages/cli/skill/SKILL.md) into
  * src/skill-content.gen.ts so `mnfst skill show|install` can hand it to an
  * agent without shipping a data file or reading the repo at runtime.
  *
@@ -12,9 +12,12 @@
 const fs = require('fs');
 const path = require('path');
 
-/** Repo root, resolved from this script: packages/cli/scripts → ../../.. */
-const REPO_ROOT = path.join(__dirname, '..', '..', '..');
-const SKILL_PATH = path.join(REPO_ROOT, '.claude', 'skills', 'mnfst-cli', 'SKILL.md');
+/**
+ * Lives inside the package, not under the repo's .claude/skills/, so Claude
+ * Code sessions working on this repo don't auto-load it. The rebranded
+ * thinker-cli skill is tracked in issue #23.
+ */
+const SKILL_PATH = path.join(__dirname, '..', 'skill', 'SKILL.md');
 
 /** The skill markdown as committed — the single source of truth. */
 function readSkillMarkdown() {
@@ -30,7 +33,7 @@ async function main() {
   const markdown = readSkillMarkdown();
   const version = readSkillVersion();
   const out = `// GENERATED FILE — do not edit by hand.
-// Source: .claude/skills/mnfst-cli/SKILL.md (repo root).
+// Source: packages/cli/skill/SKILL.md.
 // Refresh with: npm run gen (runs automatically in npm run build).
 
 /** The mnfst agent skill, embedded so the CLI can install it anywhere. */
