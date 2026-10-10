@@ -27,7 +27,6 @@ coverage/
 !.claude/skills/
 !.claude/agents/
 !.claude/settings.json
-.claude/agent-memory-local/
 .continue/
 .cursor/
 .goose/

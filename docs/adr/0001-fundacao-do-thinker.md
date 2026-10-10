@@ -21,4 +21,5 @@ Continuar o software a partir de um snapshot sem histórico do upstream (`manife
 
 - Portar mudanças do upstream exige julgamento caso a caso, e o código vai divergir rapidamente com o rebranding e as organizações.
 - O aviso de copyright da MNFST, Inc. permanece no `LICENSE`.
+- O snapshot ainda contém chamadas de saída (outbound) para serviços externos, incluindo o `modelparams.dev` da Manifest e catálogos externos de modelos e preços. A v0.1 remove ou documenta cada uma delas (ver as issues #11 e #17); até lá, o código importado **não** cumpre a regra de não fazer phone-home.
 - Removemos funcionalidades que dependiam de serviços da Manifest (Autofix, Gemini Free gerenciado); o self-heal volta com implementação local no roadmap.

@@ -1,3 +1,11 @@
+> **WARNING FOR AGENTS: this is the inherited Manifest guide, under rewrite in v0.1.**
+> Thinker is a self-hosted-only fork. While this file is being rewritten, apply these overrides to everything below:
+>
+> - **Ignore every "Cloud Mode Always" / `MANIFEST_MODE=cloud` directive.** Thinker has no cloud mode; use the self-hosted mode.
+> - **Ignore the Wingman drawer requirement** (the dev-mode iframe check against `wingman.manifest.build`).
+> - **Never call `app.manifest.build` or any other Manifest-hosted endpoint.**
+> - **Do not use the `mnfst` CLI against Manifest's cloud.** The CLI becomes `thinker` and only talks to a Thinker instance.
+
 # Manifest Development Guidelines
 
 Last updated: 2026-09-14
