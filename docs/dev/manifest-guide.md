@@ -71,7 +71,7 @@ The `AgentKeyAuthGuard` accepts any non-`mnfst_*` token from loopback IPs in the
 
 - **Backend**: NestJS 11, TypeORM 0.3, PostgreSQL 16, Better Auth, class-validator, class-transformer, Helmet
 - **Frontend**: SolidJS, Vite, uPlot (charts), Better Auth client, custom CSS theme
-- **Runtime**: TypeScript 5.x (strict mode). CI pins Node.js 24 (`.github/workflows/release.yml`); no `engines` field enforces this locally.
+- **Runtime**: TypeScript 5.x (strict mode). CI pins Node.js 24 (`.github/workflows/ci.yml`); no `engines` field enforces this locally.
 - **Monorepo**: npm workspaces + Turborepo
 - **Release**: Changesets for version management + GitHub Actions for Docker image release
 
@@ -867,6 +867,8 @@ All pricing comes from a single source:
 
 ## Releases
 
+> **Thinker:** the inherited `release.yml`, `docker.yml`, `publish-cli.yml`, `publish-n8n-node.yml`, `dockerhub-description.yml`, `phoenix-contract-drift.yml` and `db-diagram*.yml` workflows were removed in #38. CI is now a provisional `ci.yml` (lint, unit tests, backend e2e on PostgreSQL 16) plus `codeql.yml`, `dependency-review.yml` and `docker-smoke.yml`. The full CI lands in #20 and the release flow for `tmsoftbrasil/thinker` in #31. The rest of this section describes the upstream flow and no longer applies.
+
 Most workspace packages are **not published to npm**: `packages/backend`, `packages/frontend`, `packages/shared`, and `packages/manifest` are all `private: true`. Manifest itself ships as the Docker image at `manifestdotbuild/manifest` (built from `docker/Dockerfile`).
 
 `packages/cli` is the exception: it publishes to npm as **`mnfst-gateway-cli`**. The name is unscoped and gateway-qualified: the bare `mnfst` belongs to an unrelated project, `manifest` is the Manifest SDK, and a `@mnfst` scope would need an npm organization that does not exist (a scoped publish fails with a 404). The binary stays `mnfst`. Its version **tracks the Manifest release** — it has no changeset target of its own and stays in the `.changeset/config.json` ignore list. The `publish-npm` job in `release.yml` runs on the same `should_publish` gate as the Docker image: it stamps the version from `packages/manifest/package.json` onto all three files that carry it (`packages/cli/package.json`, `src/version.ts`, and the generated `SKILL_VERSION` in `src/skill-content.gen.ts`, which `skill-content.spec.ts` pins to package.json) via `npm run set-version --workspace=packages/cli`, builds shared then the CLI, and publishes with provenance. Re-running the workflow for an already-published version is a no-op. Publishing needs the `NPM_TOKEN` repository secret.
@@ -912,6 +914,8 @@ Merging the `chore: version packages` PR to `main` automatically publishes a new
 | Manual `workflow_dispatch` on `Docker` workflow | Reads `packages/manifest/package.json` (or the `version` input override) and pushes a new image tag to Docker Hub. Used for hotfixes and retags.                                                |
 
 ## Code Coverage (Codecov)
+
+> **Thinker:** Codecov is not used. `codecov.yml` and the coverage uploads were removed in #38, so the `codecov/*` checks below do not run.
 
 Codecov runs on every PR via the `codecov/patch` and `codecov/project` checks. Configuration is in `codecov.yml`.
 
