@@ -4,6 +4,7 @@ import { RenameProviderAccessToEnabledProviders1791800000000 } from '../src/data
 import { TenantProviders1792500000000 } from '../src/database/migrations/1792500000000-TenantProviders';
 import { TenantScopedConfigs1792600000000 } from '../src/database/migrations/1792600000000-TenantScopedConfigs';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 /**
  * Runs the REAL migration chain (synchronize:false) so LiftCustomProvidersToUserLevel
@@ -17,9 +18,7 @@ describe('LiftCustomProvidersToUserLevel under migration-built schema (e2e)', ()
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ??
-        'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,
@@ -82,9 +81,7 @@ describe('LiftCustomProvidersToUserLevel data transformation (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ??
-        'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

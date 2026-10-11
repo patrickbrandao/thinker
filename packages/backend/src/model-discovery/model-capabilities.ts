@@ -20,6 +20,8 @@ const STREAMING_ENDPOINT_PROVIDERS = new Set([
   'gemini',
   'groq',
   'huggingface',
+  'llamacpp',
+  'lmstudio',
   'minimax',
   'mistral',
   'moonshot',

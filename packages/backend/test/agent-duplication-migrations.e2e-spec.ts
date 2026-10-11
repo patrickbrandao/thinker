@@ -6,6 +6,7 @@ import { Agent } from '../src/entities/agent.entity';
 import { TenantProvider } from '../src/entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../src/entities/agent-enabled-provider.entity';
 import { AgentDuplicationService } from '../src/analytics/services/agent-duplication.service';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 /**
  * Migration-built schema (NOT synchronize). The rest of the e2e suite uses
@@ -26,9 +27,7 @@ describe('Agent duplication under migration-built schema (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ??
-        'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

@@ -1,161 +1,107 @@
 name: CI
+
+# Provisional minimal CI (#38): lint, unit tests and backend e2e, still on
+# the inherited workspace names. The full CI with the Thinker names
+# (typecheck, builds, scripts, changeset check) lands in #20.
+#
+# Every action is pinned to a full commit SHA. When adding one, resolve the
+# tag with `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` (dereference
+# annotated tags) and add it to the repository's allowed-actions list.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
 permissions:
   contents: read
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Superseded PR runs are cancelled; every commit on main is tested.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # No phone-home from CI tooling.
+  DO_NOT_TRACK: "1"
+  TURBO_TELEMETRY_DISABLED: "1"
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - name: DB diagram renderer smoke test
-        run: node .github/scripts/db-diagram/smoke-test.cjs
 
-  backend-postgres:
-    name: Backend (PostgreSQL)
+  unit:
+    name: Unit (${{ matrix.workspace }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [backend, frontend, shared, cli]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Every other workspace resolves the shared package from its build
+      # output, so it is built first.
+      - run: npm run build --workspace=packages/shared
+      - run: npm test --workspace=packages/${{ matrix.workspace }}
 
+  backend-e2e:
+    name: Backend e2e (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
+        # Same major as docker/docker-compose.yml. PostgreSQL 18 lands in v0.2.
         image: postgres:16
         env:
           POSTGRES_USER: myuser
           POSTGRES_PASSWORD: mypassword
-          POSTGRES_DB: mydatabase
+          # The e2e guard (#67) only drops a database whose name contains
+          # "test", and only with THINKER_E2E_ALLOW_DROP=1.
+          POSTGRES_DB: thinker_e2e_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U myuser -d mydatabase"
+          --health-cmd "pg_isready -U myuser -d thinker_e2e_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     env:
-      DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/mydatabase
+      # Throwaway values for the disposable service container above.
+      DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/thinker_e2e_test
+      THINKER_E2E_ALLOW_DROP: "1"
       BETTER_AUTH_SECRET: ci-test-secret-at-least-32-characters-long!!
       NODE_ENV: test
-
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build --workspace=packages/shared
-      - run: npx tsc --noEmit
-        working-directory: packages/backend
-      - run: npm run build --workspace=packages/backend
-      - name: Test migrations
+      - name: Run migrations
         run: npm run migration:run --workspace=packages/backend
-      - run: npm test --workspace=packages/backend -- --coverage --coverageReporters=lcov
       - run: npm run test:e2e --workspace=packages/backend
-      - name: Upload backend coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: backend
-          # Unit-only lcov. Codecov's server-side merge of a second (e2e) report
-          # under the same flag is lossy — it under-counted the union (96% vs the
-          # real 99.5%), failing the gate. A single native Jest report is read
-          # correctly, matching main. e2e still runs above as a functional gate.
-          files: packages/backend/coverage/lcov.info
-          disable_search: true
-          fail_ci_if_error: false
-
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build --workspace=packages/shared
-      - run: npx tsc --noEmit
-        working-directory: packages/frontend
-      - run: npm test --workspace=packages/frontend -- --coverage
-      - run: npx vite build
-        working-directory: packages/frontend
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      - name: Upload frontend coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: frontend
-          directory: packages/frontend/coverage
-          fail_ci_if_error: false
-
-  shared:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build --workspace=packages/shared
-      - run: npm test --workspace=packages/shared -- --coverage --coverageReporters=lcov
-      - name: Upload shared coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: shared
-          directory: packages/shared/coverage
-          fail_ci_if_error: false
-
-  cli:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      # manifest-shared must be built first: the CLI's gen step and its
-      # drift-guard specs resolve the workspace package at build/test time.
-      - run: npm run build --workspace=packages/shared
-      - run: npm run build --workspace=packages/cli
-      # A stale committed catalog (or embedded skill) must fail CI. The build
-      # regenerates both files, so the drift specs compare against the freshly
-      # generated copy and can never catch it — only the working-tree diff can.
-      - run: git diff --exit-code -- packages/cli/src/provider-catalog.gen.ts packages/cli/src/skill-content.gen.ts
-      - run: npm test --workspace=packages/cli -- --coverage
-
-  changeset-check:
-    name: Changeset status
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Check changeset status
-        run: npx changeset status --since=origin/main
-        continue-on-error: true
-      - name: Check changesets target a releasable package
-        run: node scripts/check-changesets.js

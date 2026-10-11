@@ -32,12 +32,15 @@ import PlaygroundSummaryTable from '../components/playground/PlaygroundSummaryTa
 import PlaygroundModelPicker from '../components/playground/PlaygroundModelPicker.jsx';
 import PlaygroundEmptyState from '../components/playground/PlaygroundEmptyState.jsx';
 import PlaygroundRecentSidebar from '../components/playground/PlaygroundHistoryDrawer.jsx';
-import RequestHeadersPopover, {
+import RequestHeadersPopover from '../components/playground/RequestHeadersPopover.jsx';
+import {
+  activeHeaderCount,
   blankEntry,
-  isBlockedHeaderKey,
+  loadStoredHeaderEntries,
+  persistHeaderNames,
   toHeaderRecord,
   type HeaderEntry,
-} from '../components/playground/RequestHeadersPopover.jsx';
+} from '../services/playground-request-headers.js';
 import { CodeIcon } from '../components/playground/icons.jsx';
 import { useRightSidebar } from '../services/right-sidebar.jsx';
 
@@ -47,46 +50,23 @@ import { useRightSidebar } from '../services/right-sidebar.jsx';
 import '../styles/playground.css';
 import '../styles/routing.css';
 
-const REQUEST_HEADERS_STORAGE_KEY = 'manifest.playground.requestHeaders';
-
-function loadStoredHeaders(): HeaderEntry[] {
+// Web Storage can throw (blocked site data, private mode, quota) or be missing
+// entirely. These preferences are conveniences, so failures fall back silently.
+function readStorage(storage: () => Storage, key: string): string | null {
   try {
-    const raw = localStorage.getItem(REQUEST_HEADERS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (e): e is HeaderEntry =>
-          typeof e === 'object' &&
-          e !== null &&
-          typeof (e as HeaderEntry).id === 'string' &&
-          typeof (e as HeaderEntry).key === 'string' &&
-          typeof (e as HeaderEntry).value === 'string',
-      )
-      .slice(0, 20);
+    return storage().getItem(key);
   } catch {
-    return [];
+    return null;
   }
 }
 
-function persistHeaders(entries: HeaderEntry[]): void {
+function writeStorage(storage: () => Storage, key: string, value: string | null): void {
   try {
-    localStorage.setItem(REQUEST_HEADERS_STORAGE_KEY, JSON.stringify(entries));
+    if (value === null) storage().removeItem(key);
+    else storage().setItem(key, value);
   } catch {
-    /* quota / private mode — silently ignore */
+    /* storage unavailable: nothing to remember */
   }
-}
-
-function activeHeaderCount(entries: HeaderEntry[]): number {
-  let n = 0;
-  for (const e of entries) {
-    const k = e.key.trim();
-    if (!k || !e.value) continue;
-    if (isBlockedHeaderKey(k)) continue;
-    n++;
-  }
-  return n;
 }
 
 function findDisplayName(
@@ -166,12 +146,13 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   const [announcement, setAnnouncement] = createSignal('');
   const [promptHeight, setPromptHeight] = createSignal(0);
   const [historyOpen, setHistoryOpen] = createSignal(
-    !props.embedded && localStorage.getItem('manifest.playground.recentOpen') !== 'false',
+    !props.embedded &&
+      readStorage(() => localStorage, 'manifest.playground.recentOpen') !== 'false',
   );
   const toggleRecent = () => {
     const next = !historyOpen();
     setHistoryOpen(next);
-    localStorage.setItem('manifest.playground.recentOpen', String(next));
+    writeStorage(() => localStorage, 'manifest.playground.recentOpen', String(next));
   };
   const [historyRuns, setHistoryRuns] = createSignal<PlaygroundHistoryRunSummary[]>([]);
   const [historyLoading, setHistoryLoading] = createSignal(false);
@@ -183,7 +164,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   const [completedResults, setCompletedResults] = createSignal<
     import('../services/playground-store.js').PlaygroundColumn[] | null
   >(null);
-  const [headerEntries, setHeaderEntries] = createSignal<HeaderEntry[]>(loadStoredHeaders());
+  const [headerEntries, setHeaderEntries] = createSignal<HeaderEntry[]>(loadStoredHeaderEntries());
   const [headersOpen, setHeadersOpen] = createSignal(false);
   // Best pick for a run shown read-only as an overlay (store isn't loaded in
   // that path, so its best state is tracked separately).
@@ -222,7 +203,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(null);
     setOverlayBestId(null);
     setSearchParams({ run: undefined });
-    sessionStorage.removeItem('manifest.playground.lastRun');
+    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
     // pickDefaults will fire via the existing createEffect since columns are now empty
     requestAnimationFrame(() => promptRef?.focus());
   };
@@ -255,7 +236,8 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       setCompletedResults([...store().columns]);
     }
     if (store().columns.length > 0) return;
-    const runId = searchParams.run || sessionStorage.getItem('manifest.playground.lastRun');
+    const runId =
+      searchParams.run || readStorage(() => sessionStorage, 'manifest.playground.lastRun');
     if (runId && !activeRunId()) {
       getPlaygroundRun(runId)
         .then((detail) => {
@@ -266,14 +248,14 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
         })
         .catch(() => {
           setSearchParams({ run: undefined });
-          sessionStorage.removeItem('manifest.playground.lastRun');
+          writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
         });
     }
   });
 
   const updateHeaders = (entries: HeaderEntry[]) => {
     setHeaderEntries(entries);
-    persistHeaders(entries);
+    persistHeaderNames(entries);
   };
 
   const openHeaders = () => {
@@ -305,7 +287,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(runId);
     setViewingHistory(null);
     setSearchParams({ run: runId });
-    sessionStorage.setItem('manifest.playground.lastRun', runId);
+    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', runId);
   };
 
   const handleRetry = (id: string) => {
