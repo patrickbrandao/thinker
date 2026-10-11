@@ -34,7 +34,7 @@ export type ManifestBlockedRequestReason = (typeof MANIFEST_BLOCKED_REQUEST_REAS
  * `M004` (expired key) is deliberately NOT here — that key does resolve to an
  * agent, so its rejection is recordable.
  */
-export const UNRECORDABLE_MANIFEST_CODES = ['M001', 'M002', 'M003', 'M005'] as const;
+export const UNRECORDABLE_MANIFEST_CODES = ['M001', 'M002', 'M003', 'M005', 'M006'] as const;
 export type UnrecordableManifestCode = (typeof UNRECORDABLE_MANIFEST_CODES)[number];
 
 /** A documented Manifest error that can be attributed to an agent, and so recorded. */

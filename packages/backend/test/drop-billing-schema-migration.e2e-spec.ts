@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { entities, migrations } from '../src/database/data-source-definitions';
 import { DropBillingSchema1803200000000 } from '../src/database/migrations/1803200000000-DropBillingSchema';
 import { toLocalSqlTimestamp } from '../src/common/utils/postgres-sql';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'billing-drop-tenant';
 const AGENT = 'billing-drop-agent';
@@ -133,8 +134,8 @@ describe('DropBillingSchema migration (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      // Goes through the e2e guard: dropSchema below wipes the database.
+      url: resolveE2eDatabaseUrl(),
       // The exact registries the deploy runner uses, not a glob.
       entities,
       migrations,

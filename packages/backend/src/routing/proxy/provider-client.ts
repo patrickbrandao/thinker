@@ -12,6 +12,7 @@ import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
+import { mergeExtraHeaders } from './extra-headers';
 import { injectOpenAiMessageCacheControl, injectOpenRouterCacheControl } from './cache-injection';
 import {
   applyAnthropicAutomaticCacheControl,
@@ -324,6 +325,10 @@ function stripModelPrefix(model: string, endpointKey: string): string {
     endpointKey === 'cline-pass' ||
     endpointKey === 'ollama' ||
     endpointKey === 'ollama-cloud' ||
+    // LM Studio serves hub ids such as `qwen/qwen3-8b`; llama-server echoes
+    // whatever `--alias` or file path it was started with.
+    endpointKey === 'lmstudio' ||
+    endpointKey === 'llamacpp' ||
     endpointKey === 'pioneer'
   )
     return model;
@@ -440,10 +445,13 @@ export class ProviderClient {
       endpointKey === 'openai-subscription'
         ? this.codexAffinity.prepare(apiKey, requestBody)
         : undefined;
-    // Affinity headers are routing-critical and must win over caller-supplied
-    // extraHeaders (provider-side observability hints), so they spread last.
-    const finalHeaders =
-      affinity || extraHeaders ? { ...headers, ...extraHeaders, ...affinity?.headers } : headers;
+    // Affinity headers are routing-critical and count as adapter headers.
+    // Caller-supplied extraHeaders (provider-side session hints, Playground
+    // headers) never replace or duplicate any of them — see mergeExtraHeaders.
+    const finalHeaders = mergeExtraHeaders(
+      affinity ? { ...headers, ...affinity.headers } : headers,
+      extraHeaders,
+    );
 
     const attempt = opts.attempt;
     if (resolvedWireFormat) {

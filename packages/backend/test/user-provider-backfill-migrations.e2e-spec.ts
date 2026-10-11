@@ -9,9 +9,9 @@ import { DropUserScopeFromRouting1792700000000 } from '../src/database/migration
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
 import { runMessageProviderBackfill } from '../src/database/backfills/backfill-message-providers';
 import { TypeOrmBackfillGateway } from '../src/database/backfills/backfill-message-providers.gateway';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
-const DB_URL =
-  process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro';
+const DB_URL = resolveE2eDatabaseUrl();
 
 /**
  * Live-upgrade reproduction for the message → connection attribution backfill.

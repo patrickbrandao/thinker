@@ -3,6 +3,7 @@ import { runRequestBackfill } from '../src/database/backfills/backfill-requests'
 import { TypeOrmRequestBackfillGateway } from '../src/database/backfills/backfill-requests.gateway';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
 import { AddProviderAttemptOrdering1801100000000 } from '../src/database/migrations/1801100000000-AddProviderAttemptOrdering';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 interface LegacyAttempt {
   id: string;
@@ -25,8 +26,7 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
     });
     await dataSource.initialize();
   });

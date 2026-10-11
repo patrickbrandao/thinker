@@ -173,6 +173,75 @@ describe('LimitCheckService', () => {
     expect(mockGetConsumption).toHaveBeenCalledTimes(1);
   });
 
+  describe('window fixed once per request', () => {
+    afterEach(() => jest.useRealTimers());
+
+    const sameMetricRules = [
+      {
+        id: 'r1',
+        tenant_id: 't',
+        agent_name: 'a',
+        metric_type: 'tokens',
+        threshold: 100000,
+        period: 'day',
+      },
+      {
+        id: 'r2',
+        tenant_id: 't',
+        agent_name: 'a',
+        metric_type: 'tokens',
+        threshold: 90000,
+        period: 'day',
+      },
+    ];
+
+    // periodEnd carries milliseconds, so a slow consumption query moves "now"
+    // before the next rule is read. The stub advances the clock on every call
+    // to make that deterministic: recomputing the window per rule would miss
+    // the reuse and query twice.
+    const slowConsumption = (value: number) => async () => {
+      jest.setSystemTime(Date.now() + 37);
+      return value;
+    };
+
+    it('queries once for two same-metric/period rules even when the query is slow', async () => {
+      jest.useFakeTimers({ now: new Date(2026, 5, 10, 11, 16, 0, 100) });
+      mockGetActiveBlockRules.mockResolvedValue(sameMetricRules);
+      mockGetConsumption.mockImplementation(slowConsumption(75000));
+
+      await expect(service.checkLimits('t', 'a')).resolves.toBeNull();
+
+      expect(mockGetConsumption).toHaveBeenCalledTimes(1);
+      expect(mockGetConsumption).toHaveBeenCalledWith(
+        't',
+        'a',
+        'tokens',
+        '2026-06-10 00:00:00',
+        '2026-06-10 11:16:00.100',
+      );
+    });
+
+    it('still queries separately per period and per metric', async () => {
+      jest.useFakeTimers({ now: new Date(2026, 5, 10, 11, 16, 0, 100) });
+      mockGetActiveBlockRules.mockResolvedValue([
+        ...sameMetricRules,
+        { ...sameMetricRules[0], id: 'r3', period: 'month' },
+        { ...sameMetricRules[0], id: 'r4', metric_type: 'cost', threshold: 1000 },
+      ]);
+      mockGetConsumption.mockImplementation(slowConsumption(10));
+
+      await expect(service.checkLimits('t', 'a')).resolves.toBeNull();
+
+      expect(mockGetConsumption).toHaveBeenCalledTimes(3);
+      const windows = mockGetConsumption.mock.calls.map((c) => `${c[2]}|${c[3]}|${c[4]}`);
+      expect(windows).toEqual([
+        'tokens|2026-06-10 00:00:00|2026-06-10 11:16:00.100',
+        'tokens|2026-06-01 00:00:00|2026-06-10 11:16:00.100',
+        'cost|2026-06-10 00:00:00|2026-06-10 11:16:00.100',
+      ]);
+    });
+  });
+
   it('enforces a block rule created through another replica on the next request', async () => {
     await expect(service.checkLimits('tenant-1', 'my-agent')).resolves.toBeNull();
 

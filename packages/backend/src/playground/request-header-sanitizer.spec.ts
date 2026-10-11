@@ -66,7 +66,105 @@ describe('sanitizeRequestHeaders', () => {
   it('isBlockedHeaderName is case-insensitive and covers prefixes', () => {
     expect(isBlockedHeaderName('AUTHORIZATION')).toBe(true);
     expect(isBlockedHeaderName('X-Manifest-Anything')).toBe(true);
+    expect(isBlockedHeaderName('X-Thinker-Anything')).toBe(true);
     expect(isBlockedHeaderName('X-Title')).toBe(false);
+  });
+
+  // Issue #64: every header a provider adapter authenticates with, or that
+  // picks the account/org/project a stored credential acts on.
+  it('drops provider credential and tenant-identity headers in any casing', () => {
+    const out = sanitizeRequestHeaders({
+      'X-API-Key': 'sk-ant-attacker',
+      'api-key': 'azure-attacker',
+      'X-Goog-Api-Key': 'goog-attacker',
+      'x-goog-user-project': 'other-project',
+      'Proxy-Authorization': 'Basic Zm9vOmJhcg==',
+      'Ocp-Apim-Subscription-Key': 'apim-attacker',
+      'OpenAI-Organization': 'org-other',
+      'OpenAI-Project': 'proj-other',
+      'ChatGPT-Account-Id': 'acct-other',
+      'Session-Id': 'sess',
+      'thread-id': 'thr',
+      'x-codex-turn-state': 'state',
+      'X-Amz-Target': 'AmazonCodeWhispererService.Other',
+      'X-Amz-Security-Token': 'token',
+      'X-Forwarded-Host': 'attacker.example',
+      Forwarded: 'host=attacker.example',
+      'Content-Encoding': 'gzip',
+      'X-Custom-Trace': 'kept',
+    });
+    expect(out).toEqual({ 'X-Custom-Trace': 'kept' });
+  });
+
+  it('blocks names after trimming surrounding whitespace', () => {
+    const out = sanitizeRequestHeaders({
+      '  x-api-key ': 'sk-attacker',
+      ' Authorization': 'Bearer attacker',
+      ' X-Title ': 'kept',
+    });
+    expect(out).toEqual({ 'X-Title': 'kept' });
+  });
+
+  it('drops names that are not valid HTTP tokens', () => {
+    const out = sanitizeRequestHeaders({
+      'X Bad': 'space',
+      'X-Bad:Colon': 'colon',
+      ':authority': 'pseudo',
+      'X-Bad\r\nInjected': 'crlf',
+      'X-Good': 'ok',
+    });
+    expect(out).toEqual({ 'X-Good': 'ok' });
+  });
+
+  it('drops values carrying CR, LF or NUL', () => {
+    const out = sanitizeRequestHeaders({
+      'X-Split': 'a\r\nAuthorization: Bearer attacker',
+      'X-Nul': 'a\0b',
+      'X-Good': 'ok',
+    });
+    expect(out).toEqual({ 'X-Good': 'ok' });
+  });
+
+  // Issue #105: any of these makes fetch throw, which used to fail the run
+  // with a 502. The header is dropped and the run goes ahead.
+  it.each([
+    ['SOH', 'a\x01b'],
+    ['backspace', 'a\x08b'],
+    ['vertical tab', 'a\x0bb'],
+    ['form feed', 'a\x0cb'],
+    ['unit separator', 'a\x1fb'],
+    ['DEL', 'a\x7fb'],
+    ['U+0100', 'aĀb'],
+    ['euro sign', 'price €'],
+    ['line separator', 'a b'],
+    ['emoji', 'hi \u{1F600}'],
+  ])('drops a value containing %s', (_label, value) => {
+    expect(sanitizeRequestHeaders({ 'X-Bad': value, 'X-Good': 'ok' })).toEqual({
+      'X-Good': 'ok',
+    });
+  });
+
+  it('keeps horizontal tab, printable ASCII and U+0080-U+00FF values', () => {
+    const values = {
+      'X-Tab': 'a\tb',
+      // C1 controls are obs-text: fetch sends them, as the dashboard assumes.
+      'X-C1': 'a\x85b\x9f',
+      'X-Ascii': ' !"#$%&\'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~',
+      'X-Latin1': 'café  ÿ',
+    };
+    expect(sanitizeRequestHeaders(values)).toEqual(values);
+  });
+
+  it('keeps exactly tab, printable ASCII and U+0080-U+00FF among U+0000-U+02FF', () => {
+    const keptCodes: number[] = [];
+    for (let code = 0; code <= 0x2ff; code++) {
+      const out = sanitizeRequestHeaders({ 'X-C': `a${String.fromCharCode(code)}b` });
+      if (out) keptCodes.push(code);
+    }
+    const expected = [0x09];
+    for (let code = 0x20; code <= 0x7e; code++) expected.push(code);
+    for (let code = 0x80; code <= 0xff; code++) expected.push(code);
+    expect(keptCodes).toEqual(expected);
   });
 
   describe('case-insensitive deduplication', () => {

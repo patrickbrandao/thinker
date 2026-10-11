@@ -14,6 +14,7 @@ import { createServer } from 'net';
 import { tmpdir } from 'os';
 import { join, sep } from 'path';
 import { DataSource } from 'typeorm';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const FORBIDDEN_DESTINATIONS = [
   'telemetry.manifest.build',
@@ -162,8 +163,7 @@ describe('no phone-home egress', () => {
     let records: EgressRecord[] = [];
 
     beforeAll(async () => {
-      const databaseUrl =
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+      const databaseUrl = resolveE2eDatabaseUrl();
       // Start from an empty schema: the real server migrates on boot, and
       // earlier suites leave a synchronize()-built schema behind.
       const reset = new DataSource({ type: 'postgres', url: databaseUrl, dropSchema: true });

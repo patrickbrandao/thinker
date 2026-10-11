@@ -2306,9 +2306,12 @@
         "playground-headers__hint",
         "playground-headers__input",
         "playground-headers__input--key",
+        "playground-headers__input--value",
         "playground-headers__remove",
         "playground-headers__row",
         "playground-headers__row--blocked",
+        "playground-headers__row--invalid-name",
+        "playground-headers__row--invalid-value",
         "playground-headers__rows",
         "playground-headers__title",
         "playground-headers__warning"
@@ -4639,7 +4642,7 @@
     "tokens": 79,
     "darkOverrides": 38,
     "blocks": 276,
-    "classes": 1513,
+    "classes": 1516,
     "canonicalRules": 47,
     "ghostRules": 47
   }

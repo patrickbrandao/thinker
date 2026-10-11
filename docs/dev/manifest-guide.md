@@ -118,7 +118,7 @@ packages/
 │   │   │   ├── controllers/                 # overview, tokens, costs, messages, agents
 │   │   │   └── services/                    # aggregation + timeseries-queries + query-helpers
 │   │   ├── otlp/                            # Agent key auth + onboarding
-│   │   │   ├── guards/agent-key-auth.guard.ts # Bearer token auth (agent API keys)
+│   │   │   ├── guards/agent-key-auth.guard.ts # Agent API key auth (Bearer or x-api-key)
 │   │   │   └── services/api-key.service.ts  # Agent onboarding (creates tenant+agent+key)
 │   │   ├── routing/                         # LLM routing (providers, tiers, proxy, scorer)
 │   │   │   ├── proxy/                       # OpenAI-compatible proxy (anthropic/google adapters, fallback chain, attempt recording, caller-classifier)
@@ -279,11 +279,23 @@ npm run build && npm start
 
 # Tests
 npm test --workspace=packages/backend          # Jest unit tests
-npm run test:e2e --workspace=packages/backend  # Jest e2e tests
+npm run test:e2e:docker --workspace=packages/backend  # Jest e2e tests on a throwaway Postgres (needs Docker)
 npm test --workspace=packages/frontend         # Vitest tests
 npm test --workspace=packages/shared           # Jest unit tests
 npm test --workspace=packages/cli              # Jest unit tests (mnfst CLI)
 ```
+
+#### Backend e2e database safety (issue #67)
+
+The e2e suite connects with `dropSchema: true` (helpers and the migration specs), which wipes the target database. A guard (`packages/backend/test/e2e-db-guard.ts`, enforced by the Jest `globalSetup` and again by every spec that opens a connection) refuses to run, before anything connects, unless:
+
+- `DATABASE_URL` is set. There is no default URL in test mode any more (`app.config.ts`, `auth.instance.ts`, the migration `datasource.ts` and `backfill-message-providers.cli.ts` all require it);
+- the database name in its path contains `test` (or `tests`/`testing`) as a separate token, delimited by the start/end of the name or a non-alphanumeric character: `thinker_e2e_test`, `test_db` and `my-test-db` pass, while `latest`, `contest`, `testament` and `testdb` do not;
+- `THINKER_E2E_ALLOW_DROP=1` is set.
+
+`npm run test:e2e:docker` (`packages/backend/scripts/test-e2e-docker.mjs`) sets all of that up: it picks a free port on `127.0.0.1`, starts a uniquely named `postgres:16-alpine` container with tmpfs data and database `thinker_e2e_test`, waits for it, runs the migrations, runs the suite in band, and removes the container on success, failure or Ctrl-C. Cleanup only touches the container that run created (its ID, or its exact name plus a per-run label). Extra arguments go to Jest, e.g. `npm run test:e2e:docker -- test/limits.e2e-spec.ts`. Combine with `TZ` for timezone checks: `TZ=America/Sao_Paulo npm run test:e2e:docker`.
+
+To use a Postgres you manage yourself, point it at a database dedicated to tests: `DATABASE_URL=postgresql://user:pass@host:port/thinker_e2e_test THINKER_E2E_ALLOW_DROP=1 npm run test:e2e --workspace=packages/backend`. Never point it at a development database or at a port owned by another project.
 
 ### Database Migrations
 
@@ -406,8 +418,8 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET/PATCH/DELETE          | `/api/v1/messages/:id/*`                        | Session/API Key                     | Request details, feedback, miscategorized flag (legacy route name)                                          |
 | GET                       | `/api/v1/security`                              | Session/API Key                     | Security score + events                                                                                     |
 | GET                       | `/api/v1/model-prices`                          | Session/API Key                     | Model pricing list                                                                                          |
-| GET                       | `/api/v1/agent/usage`                           | Bearer (mnfst\_\*)                  | Token usage for the calling agent                                                                           |
-| GET                       | `/api/v1/agent/costs`                           | Bearer (mnfst\_\*)                  | Cost data for the calling agent                                                                             |
+| GET                       | `/api/v1/agent/usage`                           | Bearer / x-api-key (mnfst\_\*)      | Token usage for the calling agent                                                                           |
+| GET                       | `/api/v1/agent/costs`                           | Bearer / x-api-key (mnfst\_\*)      | Cost data for the calling agent                                                                             |
 | GET                       | `/api/v1/overview/*`                            | Session/API Key                     | Overview timeseries/breakdown sub-endpoints                                                                 |
 | GET                       | `/api/v1/providers` / `/api/v1/providers/usage` | Session/API Key                     | Connected provider list + usage                                                                             |
 | GET                       | `/api/v1/provider-analytics/*`                  | Session/API Key                     | Per-provider analytics                                                                                      |
@@ -421,14 +433,14 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET                       | `/api/v1/routing/pricing-health`                | Session/API Key                     | OpenRouter pricing sync health                                                                              |
 | POST                      | `/api/v1/routing/pricing/refresh`               | Session/API Key                     | Force pricing cache refresh                                                                                 |
 | GET/POST/DELETE           | `/api/v1/oauth/:provider/*`                     | Session/API Key                     | OAuth flows (Gemini, OpenAI, Anthropic, xAI, Kiro, MiniMax)                                                 |
-| POST                      | `/api/v1/routing/resolve`                       | Bearer (mnfst\_\*)                  | Model resolution                                                                                            |
-| POST                      | `/api/v1/routing/subscription-providers`        | Bearer (mnfst\_\*)                  | Subscription provider config                                                                                |
+| POST                      | `/api/v1/routing/resolve`                       | Bearer / x-api-key (mnfst\_\*)      | Model resolution                                                                                            |
+| POST                      | `/api/v1/routing/subscription-providers`        | Bearer / x-api-key (mnfst\_\*)      | Subscription provider config                                                                                |
 | GET                       | `/api/v1/setup/status`                          | Public                              | First-run setup status                                                                                      |
 | POST                      | `/api/v1/setup/admin`                           | Public                              | Create initial admin user                                                                                   |
-| GET                       | `/v1/models`                                    | Bearer (mnfst\_\*)                  | Available model list (proxy)                                                                                |
-| POST                      | `/v1/chat/completions`                          | Bearer (mnfst\_\*)                  | LLM proxy (OpenAI-compatible)                                                                               |
-| POST                      | `/v1/responses`                                 | Bearer (mnfst\_\*)                  | LLM proxy (OpenAI Responses API)                                                                            |
-| POST                      | `/v1/messages`                                  | Bearer (mnfst\_\*)                  | LLM proxy (Anthropic Messages API)                                                                          |
+| GET                       | `/v1/models`                                    | Bearer / x-api-key (mnfst\_\*)      | Available model list (proxy)                                                                                |
+| POST                      | `/v1/chat/completions`                          | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (OpenAI-compatible)                                                                               |
+| POST                      | `/v1/responses`                                 | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (OpenAI Responses API)                                                                            |
+| POST                      | `/v1/messages`                                  | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (Anthropic Messages API)                                                                          |
 | POST                      | `/chat/completions`                             | Public                              | Structured 404 pointing callers at `/v1/chat/completions` (missing `/v1` basePath — not a proxy alias)      |
 | ALL                       | `/otlp/v1/*`, `/v1/{traces,metrics,logs}`       | Public                              | Structured **410 Gone** — OTLP ingest is removed (`otlp-deprecated.controller.ts`)                          |
 | GET/POST/PATCH            | `/api/v1/playground/*`                          | Session/API Key                     | Playground runs (run, list, star, mark best)                                                                |
@@ -444,7 +456,8 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 See `packages/backend/.env.example` for all variables. Key ones:
 
 - `BETTER_AUTH_SECRET` — **Required.** Secret for Better Auth session signing (min 32 chars). Generate with `openssl rand -hex 32`.
-- `DATABASE_URL` — **Required** in every environment except `NODE_ENV=test` (which falls back to `postgresql://myuser:mypassword@localhost:5432/mydatabase`, matching the local Docker command). Dev and production both throw on boot if unset. Format: `postgresql://user:password@host:port/database`.
+- `DATABASE_URL` — **Required** in every environment, `NODE_ENV=test` included (there is no default URL, see "Backend e2e database safety"). The app, Better Auth, the migration runner and the message-provider backfill CLI throw if it is unset (a blank `MIGRATION_DATABASE_URL`/`DATABASE_UNPOOLED_URL` does not override it). Format: `postgresql://user:password@host:port/database`.
+- `THINKER_E2E_ALLOW_DROP` — Test-only. Must be `1` for the backend e2e suite to run (together with a `DATABASE_URL` whose database name has `test` as a separate token), because the suite drops the schema. Never set it outside a disposable test database.
 - `MANIFEST_ENCRYPTION_KEY` — Recommended. AES-256-GCM key (min 32 chars) for encrypting stored provider API keys and OAuth tokens. Defaults to `BETTER_AUTH_SECRET` if unset — set this independently so a session-cookie leak doesn't also expose provider credentials.
 - `MANIFEST_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption always tries `MANIFEST_ENCRYPTION_KEY`, then this, then `BETTER_AUTH_SECRET`, so old rows stay readable. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `MANIFEST_ENCRYPTION_KEY` and `MANIFEST_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Introducing a dedicated key on an install that used the `BETTER_AUTH_SECRET` fallback: set `MANIFEST_ENCRYPTION_KEY` (old rows keep decrypting via the session secret); to move them onto the new key, set `PREVIOUS` to the session secret's value for one deploy. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
 - `PORT` — Server port. Default: `3001`
@@ -493,6 +506,7 @@ See `packages/backend/.env.example` for all variables. Key ones:
     - the names `metadata.google.internal`, `metadata.goog`, `metadata`, `instance-data`, `instance-data.ec2.internal`.
   - Per-organization hardening is v0.3 work.
 - `AUTH_DB_POOL_MAX` — Connection pool size for Better Auth's own `pg.Pool`, separate from `DB_POOL_MAX`. Default: `5`.
+- `THINKER_LMSTUDIO_BASE_URL` / `THINKER_LLAMACPP_BASE_URL` — OpenAI-compatible server for the built-in `lmstudio` / `llamacpp` providers (connected with `authType: 'local'`). With or without the trailing `/v1`. Default `http://<host alias>:1234` / `http://<host alias>:8080`, where the alias is `host.docker.internal` in Docker, `host.containers.internal` in Podman and `localhost` otherwise (`common/constants/local-servers.ts`). Operator-set, so not SSRF-revalidated, like `OLLAMA_HOST`. A value that is not an absolute `http(s)` URL (e.g. `192.168.1.20:1234`, or one with credentials or a query string) is ignored with a warning at boot and the default is used. Tile-connected servers are custom providers and use their own base URL instead; `lmstudio`, `llamacpp` and every other built-in provider id are reserved, so a custom provider cannot publish under them.
 - `OLLAMA_HOST` — Ollama endpoint for the built-in tile. Defaults to `http://localhost:11434` outside Docker and `http://host.docker.internal:11434` inside the bundled `docker/docker-compose.yml`.
 - `REQUEST_RECORDING_STORAGE` / `REQUEST_RECORDING_FILESYSTEM_PATH` / `REQUEST_RECORDING_S3_*` / `REQUEST_RECORDING_RETENTION_DAYS` — Provider Attempt body recording storage + retention. See [Request Recording](#request-recording-provider-attempt-bodies).
 - Thinker has no billing, plans or request quotas (#14): the `STRIPE_*`, `PLAN_LIMIT_*` and `PLAN_REQUEST_QUOTA_RESET_AT` variables are gone and ignored if set. The proxy no longer checks a plan limit per request and never answers 402 on its own; `DropBillingSchema1803200000000` drops the leftover billing tables and columns.
@@ -527,7 +541,7 @@ Every failure Manifest itself produces — as opposed to one a provider returned
 
 **Raise them with `ManifestError`** (`common/errors/manifest-error.ts`), never a bare `HttpException`. The type is what lets `proxy.controller.ts` tell "Manifest refused this request" from "the provider returned a 4xx". Before it existed, a malformed body (M300) and a Manifest bug (M500) were both recorded as _provider_ errors and counted against `provider_error_rate`.
 
-**Every code is recorded on a Manifest Request**, with four exceptions. `M001`, `M002`, `M003`, and `M005` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_MANIFEST_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.manifestErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/manifest-error.spec.ts` fails if a new code is neither mapped in `MANIFEST_CODE_TO_REASON` nor declared unrecordable.
+**Every code is recorded on a Manifest Request**, with five exceptions. `M001`, `M002`, `M003`, `M005`, and `M006` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_MANIFEST_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.manifestErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/manifest-error.spec.ts` fails if a new code is neither mapped in `MANIFEST_CODE_TO_REASON` nor declared unrecordable.
 
 **`ProxyMessageRecorder.recordManifestBlockedRequest()` is the only writer of Manifest-authored rejected requests.** It creates one `requests` row, stamps `requests.error_code` plus the _rendered_ message (the `[🦚 Manifest M100] No anthropic API key yet. Add one here: …` text the caller saw — not a generic stand-in), and creates zero `agent_messages` rows because no provider was contacted. Do not route these through `recordSuccessMessage` or manufacture a `provider='manifest'` attempt.
 
@@ -595,9 +609,11 @@ The only outbound destinations left are the providers the operator configures an
 - **Body parsing**: Disabled at NestJS level (`bodyParser: false`). Better Auth mounted first (needs raw body), then `express.json()` and `express.urlencoded()`.
 - **QueryBuilder API**: Analytics and ingestion services use TypeORM `Repository.createQueryBuilder()` instead of raw SQL. The `addTenantFilter()` helper in `query-helpers.ts` applies multi-tenant WHERE clauses. Only the database seeder and notification cron still use `DataSource.query()` with numbered `$1, $2, ...` placeholders.
 - **PostgreSQL time functions**: `NOW() - CAST(:interval AS interval)`, `to_char(date_trunc('hour', timestamp), ...)`, `timestamp::date`.
+- **Timestamp convention**: `agent_messages.timestamp` and the other `timestamp without time zone` columns hold the Node process's **local** wall clock, because TypeORM turns the ISO strings into `Date`s and the pg driver serialises `Date`s in local time. Windows and cutoffs compared against them must be local too: `computePeriodBoundaries`, `computeCutoff`, `toLocalSqlTimestamp`. An exclusive "now" bound keeps milliseconds (`toLocalSqlTimestampMs`), otherwise rows from the current second drop out of limit checks. Raw-SQL seeds in tests must pass a `Date`, never a UTC ISO string: Postgres ignores the `Z` and stores the UTC wall clock, which is hours off the window outside UTC (issue #53). Run limit/period tests under a non-UTC `TZ` as well, e.g. `TZ=America/Sao_Paulo npm run test:e2e:docker`.
 - **Better Auth database**: Uses a `pg.Pool` instance passed directly to `betterAuth({ database: pool })`. See `packages/backend/src/auth/auth.instance.ts`.
 - **PostgreSQL container**: `docker run -d --name postgres_db -e POSTGRES_USER=myuser -e POSTGRES_PASSWORD=mypassword -e POSTGRES_DB=mydatabase -p 5432:5432 postgres:16`
 - **Validation**: Global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`. Explicit `@Type()` decorators on numeric DTO fields.
+- **Agent key transports**: `AgentKeyAuthGuard` reads the agent key from `Authorization: Bearer <key>` or from `x-api-key: <key>` (the Anthropic SDK default). Both go through the same validation and caches. A request that carries both headers with different values is rejected before any lookup; the same key in both is accepted. On the `/v1/*` gateway routes the rejection is the `M006` envelope from `ProxyExceptionFilter`; on `/api/v1/agent/*` and `/api/v1/routing/{resolve,subscription-providers}`, which do not use that filter, it is a plain Nest 401 with the message `Conflicting API key headers`. The guard caches are keyed by the token itself (after the prefix and 12–512 length checks), never logged. `x-api-key` is never forwarded upstream (provider headers are rebuilt from the provider credential) and is dropped from recorded request headers.
 - **Agent key auth caching**: `AgentKeyAuthGuard` caches verified API-key context in-memory for 5 minutes, but checks that the key row is still active on every request so rotation and deletion apply across replicas immediately.
 - **Database migrations**: TypeORM migrations are version-controlled in `src/database/migrations/`. `synchronize` is permanently `false`. Migrations auto-run on boot by default, gated by `RUN_MIGRATIONS_ON_BOOT` (default `true`; disable for multi-replica deploys). `migrationsTransactionMode` is `'each'` (one transaction per migration, not one for the whole run) because some `agent_messages` index migrations run `CONCURRENTLY`, which PostgreSQL forbids inside a shared transaction. The CLI DataSource is at `src/database/datasource.ts`. Better Auth manages its own tables separately via `ctx.runMigrations()`.
 - **SSE**: `SseController` provides `/api/v1/events` for real-time dashboard updates.
@@ -815,3 +831,11 @@ This applies to:
 ### E2E Test Entities
 
 When adding new TypeORM entities to `database/data-source-definitions.ts` (the entities array `database.module.ts` imports from), also add them to the E2E test helper (`packages/backend/test/helpers.ts`) entities array. Missing entities cause `EntityMetadataNotFoundError` in services that depend on them.
+
+### Supertest servers listen on 127.0.0.1
+
+Never hand supertest a server that isn't listening yet. In that case it calls `server.listen(0)` on every request, which binds the wildcard address (`::`), and then dials `127.0.0.1:<port>`. macOS hands out ephemeral ports in sequence, and it can give that wildcard listener a port another local process already holds on `127.0.0.1` only, such as Docker Desktop publishing a compose stack, a browser, or an editor. The more specific binding wins, so the request reaches the other process. Issue #62 was this: a duplication e2e request landed in a locally running Thinker, whose real `ApiKeyGuard` answered 401 to the test key.
+
+`createTestApp()` already listens on an ephemeral loopback port. Apps built some other way use `listenOnLoopback(app)` (Nest) or `serveOnLoopback(handler)` (Express or plain handlers) from `packages/backend/test/loopback.ts`. Unit specs under `src/` can't import from `test/`, so they bind `127.0.0.1` themselves (see `mcp-discovery.spec.ts`).
+
+`test/jest-e2e.json` sets a 30 s `testTimeout`, which also covers hooks. Each suite boots a full Nest app and syncs the schema in `beforeAll`, and on a loaded machine that can take more than Jest's default 5 s.

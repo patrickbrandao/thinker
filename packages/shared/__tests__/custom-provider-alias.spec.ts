@@ -4,6 +4,7 @@ import {
   isReservedCustomProviderAlias,
   normalizeCustomProviderAlias,
 } from '../src/custom-provider-alias';
+import { SHARED_PROVIDERS } from '../src/providers';
 
 describe('custom provider alias', () => {
   describe('CUSTOM_PROVIDER_ALIAS_PATTERN', () => {
@@ -49,9 +50,21 @@ describe('custom provider alias', () => {
       expect(isReservedCustomProviderAlias('vercel-ai-gateway')).toBe(false);
     });
 
-    it('leaves tile-only local providers free, since they only exist as custom providers', () => {
+    it('reserves every local runner id that has a native route', () => {
+      for (const id of ['ollama', 'ollama-cloud', 'lmstudio', 'llamacpp']) {
+        expect(isReservedCustomProviderAlias(id)).toBe(true);
+      }
+    });
+
+    it('reserves the id of every registry entry, tile-only or not', () => {
+      for (const entry of SHARED_PROVIDERS) {
+        expect(isReservedCustomProviderAlias(entry.id)).toBe(true);
+      }
+    });
+
+    it('leaves the display-name aliases of tile-only providers free for the dashboard tile', () => {
       expect(isReservedCustomProviderAlias('llama.cpp')).toBe(false);
-      expect(isReservedCustomProviderAlias('lmstudio')).toBe(false);
+      expect(isReservedCustomProviderAlias('llama-cpp')).toBe(false);
       expect(isReservedCustomProviderAlias('lm-studio')).toBe(false);
     });
   });
@@ -84,6 +97,17 @@ describe('custom provider alias', () => {
     it('returns null for reserved names so built-in routes stay unambiguous', () => {
       expect(deriveCustomProviderAlias('OpenAI')).toBeNull();
       expect(deriveCustomProviderAlias('auto')).toBeNull();
+    });
+
+    it('returns null for names that derive to a native local runner id', () => {
+      expect(deriveCustomProviderAlias('LMStudio')).toBeNull();
+      expect(deriveCustomProviderAlias('llamacpp')).toBeNull();
+      expect(deriveCustomProviderAlias('Ollama')).toBeNull();
+    });
+
+    it('still derives the tile names the dashboard uses', () => {
+      expect(deriveCustomProviderAlias('LM Studio')).toBe('lm-studio');
+      expect(deriveCustomProviderAlias('llama.cpp')).toBe('llama.cpp');
     });
   });
 });

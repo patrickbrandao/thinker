@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import request from 'supertest';
 import type { Server } from 'http';
 import { parseFrameAncestors } from '../src/cors-csp-config';
+import { closeServer, serveOnLoopback } from './loopback';
 
 // Mirrors the helmet config in src/main.ts. If the two drift, this test
 // stops guarding the real deployment — keep them in sync. The
@@ -35,12 +36,12 @@ function buildApp() {
 describe('CSP header', () => {
   let server: Server;
 
-  beforeAll(() => {
-    server = buildApp().listen(0);
+  beforeAll(async () => {
+    server = await serveOnLoopback(buildApp());
   });
 
-  afterAll((done) => {
-    server.close(() => done());
+  afterAll(async () => {
+    await closeServer(server);
   });
 
   it('does NOT include upgrade-insecure-requests (breaks LAN deployments over HTTP)', async () => {
@@ -71,7 +72,7 @@ describe('CSP header', () => {
   it('honors a configured FRAME_ANCESTORS and drops the bare wildcard', async () => {
     const prev = process.env['FRAME_ANCESTORS'];
     process.env['FRAME_ANCESTORS'] = 'https://app.example.com, *';
-    const scopedServer = buildApp().listen(0);
+    const scopedServer = await serveOnLoopback(buildApp());
     try {
       const res = await request(scopedServer).get('/').expect(200);
       const csp = res.headers['content-security-policy'] as string;
@@ -80,7 +81,7 @@ describe('CSP header', () => {
       expect(csp).not.toContain('frame-ancestors *');
       expect(csp).not.toMatch(/frame-ancestors[^;]*\s\*/);
     } finally {
-      await new Promise<void>((resolve) => scopedServer.close(() => resolve()));
+      await closeServer(scopedServer);
       if (prev === undefined) delete process.env['FRAME_ANCESTORS'];
       else process.env['FRAME_ANCESTORS'] = prev;
     }

@@ -48,6 +48,8 @@ describe('auth.instance', () => {
       ...originalEnv,
       NODE_ENV: 'test',
       BETTER_AUTH_SECRET: 'a]3kF9!xLm2@pQzR7^wYu4&vN6*cE0hT',
+      // pg is mocked; the URL only has to be present.
+      DATABASE_URL: 'postgresql://unit:unit@127.0.0.1:1/unit_test',
     };
   });
 
@@ -405,18 +407,14 @@ describe('auth.instance', () => {
       );
     });
 
-    it('falls back to default DATABASE_URL when not set', () => {
+    it('throws instead of falling back to a default database when DATABASE_URL is not set', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Pool } = require('pg') as { Pool: jest.Mock };
+      Pool.mockClear();
       delete process.env['DATABASE_URL'];
 
-      loadModule();
-
-      expect(Pool).toHaveBeenCalledWith(
-        expect.objectContaining({
-          connectionString: 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
-        }),
-      );
+      expect(() => loadModule()).toThrow('DATABASE_URL is required');
+      expect(Pool).not.toHaveBeenCalled();
     });
 
     it('caps the pool size and reaps idle connections by default', () => {
