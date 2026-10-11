@@ -30,8 +30,8 @@ describe('configFilePath', () => {
 
 describe('normalizeOrigin', () => {
   it('reduces URLs to a lowercase origin', () => {
-    expect(normalizeOrigin('HTTPS://App.Manifest.Build/dashboard?x=1')).toBe(
-      'https://app.manifest.build',
+    expect(normalizeOrigin('HTTPS://Gateway.Example.COM/dashboard?x=1')).toBe(
+      'https://gateway.example.com',
     );
     expect(normalizeOrigin('http://localhost:2099/api')).toBe('http://localhost:2099');
   });
@@ -96,7 +96,18 @@ describe('resolveTarget', () => {
     },
   };
 
-  it('resolves url as flag > MANIFEST_URL > activeHost > cloud default', () => {
+  it('defaults to a local Thinker, never a hosted service (#17)', () => {
+    expect(DEFAULT_URL).toBe('http://localhost:2099');
+    expect(normalizeOrigin(DEFAULT_URL)).toBe('http://localhost:2099');
+    // An env key with nothing else configured stays on this machine.
+    expect(resolveTarget(undefined, { MANIFEST_API_KEY: 'env-key' }, {})).toEqual({
+      origin: 'http://localhost:2099',
+      apiKey: 'env-key',
+      source: 'env',
+    });
+  });
+
+  it('resolves url as flag > MANIFEST_URL > activeHost > local default', () => {
     expect(resolveTarget('http://flag:1', { MANIFEST_URL: 'http://env:2' }, config).origin).toBe(
       'http://flag:1',
     );

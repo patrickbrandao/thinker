@@ -1,91 +1,64 @@
 import {
   CORS_PREFLIGHT_MAX_AGE_SECONDS,
-  HOSTED_WINGMAN_ORIGIN,
   applyPrivateNetworkAllow,
   buildCorsOptions,
   buildDevAllowedOrigins,
   buildProdAllowedOrigins,
-  buildFrameSrc,
   createCorsOriginHandler,
+  parseExtraOrigins,
   parseFrameAncestors,
 } from './cors-csp-config';
 
-describe('HOSTED_WINGMAN_ORIGIN', () => {
-  it('points at the hosted Wingman SPA', () => {
-    expect(HOSTED_WINGMAN_ORIGIN).toBe('https://wingman.manifest.build');
+const TOOL_ORIGIN = 'https://tools.acme.dev';
+
+describe('parseExtraOrigins', () => {
+  it('returns nothing when unset or blank', () => {
+    expect(parseExtraOrigins(undefined)).toEqual([]);
+    expect(parseExtraOrigins('')).toEqual([]);
+    expect(parseExtraOrigins('  , ,')).toEqual([]);
+  });
+
+  it('trims entries and strips a trailing slash', () => {
+    expect(parseExtraOrigins(' https://a.example.com/ , https://b.example.com')).toEqual([
+      'https://a.example.com',
+      'https://b.example.com',
+    ]);
   });
 });
 
 describe('buildDevAllowedOrigins', () => {
-  it('allows the Vite frontend, both loopback Wingman ports, and the hosted Wingman (deduped)', () => {
-    expect(
-      buildDevAllowedOrigins({
-        configuredOrigin: 'http://localhost:3000',
-        wingmanPort: 3002,
-      }),
-    ).toEqual([
+  it('allows only the configured Vite frontend by default', () => {
+    expect(buildDevAllowedOrigins({ configuredOrigin: 'http://localhost:3000' })).toEqual([
       'http://localhost:3000',
-      'http://localhost:3002',
-      'http://127.0.0.1:3002',
-      HOSTED_WINGMAN_ORIGIN,
     ]);
   });
 
-  it('respects a custom Wingman port and configured origin', () => {
-    const allowed = buildDevAllowedOrigins({
-      configuredOrigin: 'http://localhost:38240',
-      wingmanPort: 38239,
-    });
-    expect(allowed).toContain('http://localhost:38240');
-    expect(allowed).toContain('http://localhost:38239');
-    expect(allowed).toContain('http://127.0.0.1:38239');
-    expect(allowed).toContain(HOSTED_WINGMAN_ORIGIN);
+  it('adds THINKER_CORS_ORIGINS extras, deduped', () => {
+    expect(
+      buildDevAllowedOrigins({
+        configuredOrigin: 'http://localhost:3000',
+        extraOrigins: `${TOOL_ORIGIN}, http://localhost:3000/`,
+      }),
+    ).toEqual(['http://localhost:3000', TOOL_ORIGIN]);
   });
 });
 
 describe('buildProdAllowedOrigins', () => {
-  it('allows the hosted Wingman origin by default', () => {
-    expect(buildProdAllowedOrigins()).toEqual([HOSTED_WINGMAN_ORIGIN]);
+  it('allows no cross-origin caller by default', () => {
+    expect(buildProdAllowedOrigins()).toEqual([]);
+    expect(buildProdAllowedOrigins({ extraOrigins: '' })).toEqual([]);
   });
 
-  it('appends operator-configured extra origins, trimmed and deduped', () => {
+  it('allows only operator-configured origins, trimmed and deduped', () => {
     expect(
       buildProdAllowedOrigins({
-        extraOrigins:
-          ' https://wingman.acme.dev , https://wingman.manifest.build ,https://tools.acme.dev',
+        extraOrigins: ` ${TOOL_ORIGIN} , https://other.acme.dev ,${TOOL_ORIGIN}/`,
       }),
-    ).toEqual([HOSTED_WINGMAN_ORIGIN, 'https://wingman.acme.dev', 'https://tools.acme.dev']);
+    ).toEqual([TOOL_ORIGIN, 'https://other.acme.dev']);
   });
 
   it('ignores empty / whitespace-only extra origins', () => {
-    expect(buildProdAllowedOrigins({ extraOrigins: '  , ,' })).toEqual([HOSTED_WINGMAN_ORIGIN]);
-    expect(buildProdAllowedOrigins({ extraOrigins: '' })).toEqual([HOSTED_WINGMAN_ORIGIN]);
-  });
-
-  it('strips a trailing slash so it matches the browser Origin header', () => {
-    expect(buildProdAllowedOrigins({ extraOrigins: 'https://wingman.acme.dev/' })).toEqual([
-      HOSTED_WINGMAN_ORIGIN,
-      'https://wingman.acme.dev',
-    ]);
-  });
-});
-
-describe('buildFrameSrc', () => {
-  it('in production, allows only self (drawer is dev-only)', () => {
-    expect(buildFrameSrc({ isDev: false, wingmanPort: 3002 })).toEqual(["'self'"]);
-  });
-
-  it('in dev, allows local Wingman ports and the hosted Wingman', () => {
-    expect(buildFrameSrc({ isDev: true, wingmanPort: 3002 })).toEqual([
-      "'self'",
-      'http://localhost:3002',
-      'http://127.0.0.1:3002',
-      HOSTED_WINGMAN_ORIGIN,
-    ]);
-  });
-
-  it('respects a custom Wingman port in dev', () => {
-    expect(buildFrameSrc({ isDev: true, wingmanPort: 38239 })).toContain('http://localhost:38239');
+    expect(buildProdAllowedOrigins({ extraOrigins: '  , ,' })).toEqual([]);
   });
 });
 
@@ -137,7 +110,7 @@ describe('parseFrameAncestors', () => {
 });
 
 describe('createCorsOriginHandler', () => {
-  const handler = createCorsOriginHandler([HOSTED_WINGMAN_ORIGIN, 'http://localhost:3000']);
+  const handler = createCorsOriginHandler([TOOL_ORIGIN, 'http://localhost:3000']);
 
   it('allows requests with no Origin header (same-origin / curl / server-to-server)', () => {
     const cb = jest.fn();
@@ -147,7 +120,7 @@ describe('createCorsOriginHandler', () => {
 
   it('allows a listed origin', () => {
     const cb = jest.fn();
-    handler(HOSTED_WINGMAN_ORIGIN, cb);
+    handler(TOOL_ORIGIN, cb);
     expect(cb).toHaveBeenCalledWith(null, true);
   });
 
@@ -160,19 +133,19 @@ describe('createCorsOriginHandler', () => {
 
 describe('buildCorsOptions', () => {
   it('caches the preflight via maxAge so reloads stop re-running it', () => {
-    const opts = buildCorsOptions([HOSTED_WINGMAN_ORIGIN]);
+    const opts = buildCorsOptions([TOOL_ORIGIN]);
     expect(opts.maxAge).toBe(CORS_PREFLIGHT_MAX_AGE_SECONDS);
     expect(CORS_PREFLIGHT_MAX_AGE_SECONDS).toBe(7200);
   });
 
   it('keeps credentials off the cross-origin path (bearer keys, never cookies)', () => {
-    expect(buildCorsOptions([HOSTED_WINGMAN_ORIGIN]).credentials).toBe(false);
+    expect(buildCorsOptions([TOOL_ORIGIN]).credentials).toBe(false);
   });
 
   it('wires the allow-list origin handler (allows listed, blocks unlisted)', () => {
-    const { origin } = buildCorsOptions([HOSTED_WINGMAN_ORIGIN]);
+    const { origin } = buildCorsOptions([TOOL_ORIGIN]);
     const allow = jest.fn();
-    origin(HOSTED_WINGMAN_ORIGIN, allow);
+    origin(TOOL_ORIGIN, allow);
     expect(allow).toHaveBeenCalledWith(null, true);
     const block = jest.fn();
     origin('https://evil.example.com', block);
@@ -181,7 +154,7 @@ describe('buildCorsOptions', () => {
 });
 
 describe('applyPrivateNetworkAllow', () => {
-  const allowed = [HOSTED_WINGMAN_ORIGIN, 'http://localhost:3000'];
+  const allowed = [TOOL_ORIGIN, 'http://localhost:3000'];
 
   it('echoes the PNA allow header for OPTIONS preflight from a listed origin', () => {
     const setHeader = jest.fn();
@@ -189,7 +162,7 @@ describe('applyPrivateNetworkAllow', () => {
       {
         method: 'OPTIONS',
         headers: {
-          origin: HOSTED_WINGMAN_ORIGIN,
+          origin: TOOL_ORIGIN,
           'access-control-request-private-network': 'true',
         },
       },
@@ -205,7 +178,7 @@ describe('applyPrivateNetworkAllow', () => {
       {
         method: 'GET',
         headers: {
-          origin: HOSTED_WINGMAN_ORIGIN,
+          origin: TOOL_ORIGIN,
           'access-control-request-private-network': 'true',
         },
       },
@@ -218,7 +191,7 @@ describe('applyPrivateNetworkAllow', () => {
   it('does not echo when the PNA request header is missing', () => {
     const setHeader = jest.fn();
     applyPrivateNetworkAllow(
-      { method: 'OPTIONS', headers: { origin: HOSTED_WINGMAN_ORIGIN } },
+      { method: 'OPTIONS', headers: { origin: TOOL_ORIGIN } },
       allowed,
       setHeader,
     );
@@ -260,7 +233,7 @@ describe('applyPrivateNetworkAllow', () => {
       {
         method: 'OPTIONS',
         headers: {
-          origin: [HOSTED_WINGMAN_ORIGIN, HOSTED_WINGMAN_ORIGIN],
+          origin: [TOOL_ORIGIN, TOOL_ORIGIN],
           'access-control-request-private-network': 'true',
         },
       },

@@ -100,7 +100,7 @@ cd packages/backend && NODE_OPTIONS='-r dotenv/config' npx nest start --watch
 npm run dev
 ```
 
-The frontend runs on `http://localhost:3000` and proxies API requests to the backend on `http://localhost:3001`. The Wingman drawer in the bottom-right (FAB or `⌘/Ctrl+Shift+W`) embeds the hosted SPA at `https://wingman.manifest.build` — no local setup required. It only renders in dev mode and is stripped from production bundles.
+The frontend runs on `http://localhost:3000` and proxies API requests to the backend on `http://localhost:3001`.
 
 `npm run dev` is filtered to exactly `manifest-frontend` — adding a new workspace with a `dev` script will not silently join the dev set.
 

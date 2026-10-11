@@ -17,7 +17,6 @@ import { TierAssignment } from '../entities/tier-assignment.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { HeaderTier } from '../entities/header-tier.entity';
-import { InstallMetadata } from '../entities/install-metadata.entity';
 import { BackfillState } from '../entities/backfill-state.entity';
 import { AgentModelParams } from '../entities/agent-model-params.entity';
 import { PlaygroundRun } from '../entities/playground-run.entity';
@@ -57,6 +56,7 @@ import { CoverHarnessRequestsIndex1803100000000 } from './migrations/18031000000
 import { DropBillingSchema1803200000000 } from './migrations/1803200000000-DropBillingSchema';
 import { DropSaasFeatureSchema1803300000000 } from './migrations/1803300000000-DropSaasFeatureSchema';
 import { DropAutofixSchema1803400000000 } from './migrations/1803400000000-DropAutofixSchema';
+import { DropInstallMetadata1803500000000 } from './migrations/1803500000000-DropInstallMetadata';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -191,7 +191,6 @@ export const entities = [
   CustomProvider,
   SpecificityAssignment,
   HeaderTier,
-  InstallMetadata,
   AgentModelParams,
   PlaygroundRun,
   PlaygroundColumn,
@@ -352,4 +351,5 @@ export const migrations = [
   DropBillingSchema1803200000000,
   DropSaasFeatureSchema1803300000000,
   DropAutofixSchema1803400000000,
+  DropInstallMetadata1803500000000,
 ];

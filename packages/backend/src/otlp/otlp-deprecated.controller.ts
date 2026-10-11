@@ -29,7 +29,7 @@ const WRONG_PATH_RESPONSE = {
   error: {
     message:
       'Use /v1/chat/completions (not /chat/completions). ' +
-      'Set your baseURL to https://app.manifest.build/v1',
+      'Set your baseURL to this gateway URL followed by /v1 (for example http://localhost:2099/v1).',
     type: 'invalid_request_error',
     status: 404,
   },

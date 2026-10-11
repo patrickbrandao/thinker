@@ -1,5 +1,3 @@
-// Keep this first so opt-in Sentry error monitoring initializes before Nest.
-import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -22,7 +20,6 @@ import {
   buildCorsOptions,
   buildDevAllowedOrigins,
   buildProdAllowedOrigins,
-  buildFrameSrc,
   parseFrameAncestors,
 } from './cors-csp-config';
 import { createRateLimitReachedHandler } from './common/middleware/rate-limit-log';
@@ -43,15 +40,6 @@ export async function bootstrap() {
   const hstsEnabled = /^https:\/\//i.test(betterAuthUrl);
   const isDev = process.env['NODE_ENV'] !== 'production';
 
-  // The Wingman drawer is a dev-only affordance — `frame-src` only loosens
-  // up when NODE_ENV !== 'production' to allow the hosted Wingman SPA
-  // (https://wingman.manifest.build) and locally-running Wingman builds
-  // at `WINGMAN_PORT` (defaults to backend port + 1). Docker / cloud
-  // builds keep the strict 'self'-only frame policy.
-  const backendPort = Number(process.env['PORT']) || 3001;
-  const wingmanPort = Number(process.env['WINGMAN_PORT']) || backendPort + 1;
-  const frameSrc = buildFrameSrc({ isDev, wingmanPort });
-
   app.use(
     helmet({
       hsts: hstsEnabled,
@@ -64,7 +52,7 @@ export async function bootstrap() {
           connectSrc: ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
-          frameSrc,
+          frameSrc: ["'self'"],
           frameAncestors: parseFrameAncestors(process.env['FRAME_ANCESTORS']),
           // Disable helmet's default `upgrade-insecure-requests`: it breaks
           // HTTP-only LAN deployments (10.x / 192.168.x / 172.16-31.x) where
@@ -82,21 +70,19 @@ export async function bootstrap() {
   // the package's default content-type filter.
   app.use(compression({ filter: shouldCompress }));
 
-  // CORS: the dashboard is same-origin, but the hosted Wingman gateway tester
-  // (https://wingman.manifest.build) is a legitimate cross-origin caller of the
-  // gateway routes, so both dev and production allow its origin. Dev also allows
-  // the Vite frontend on :3000 and the local Wingman build at `WINGMAN_PORT`;
-  // production allows the hosted Wingman origin plus any `WINGMAN_CORS_ORIGINS` a
-  // self-hoster opts into.
+  // CORS: the dashboard is same-origin, so production allows no cross-origin
+  // browser caller unless the operator lists it in `THINKER_CORS_ORIGINS`. Dev
+  // also allows the Vite frontend (`CORS_ORIGIN`, default :3000).
   //
   // See `buildCorsOptions` for the rationale behind `credentials: false`, the
   // omitted `allowedHeaders`, and the preflight `maxAge`.
+  const extraCorsOrigins = process.env['THINKER_CORS_ORIGINS'];
   const corsAllowedOrigins = isDev
     ? buildDevAllowedOrigins({
         configuredOrigin: process.env['CORS_ORIGIN'] || 'http://localhost:3000',
-        wingmanPort,
+        extraOrigins: extraCorsOrigins,
       })
-    : buildProdAllowedOrigins({ extraOrigins: process.env['WINGMAN_CORS_ORIGINS'] });
+    : buildProdAllowedOrigins({ extraOrigins: extraCorsOrigins });
   // Legacy Private Network Access support, for browsers older than Chrome 138.
   // Newer Chrome replaced PNA with Local Network Access, a user permission that
   // no response header can satisfy — so this does *not* fix a blocked

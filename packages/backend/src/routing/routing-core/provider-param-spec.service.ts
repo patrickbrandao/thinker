@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable } from '@nestjs/common';
 import {
   AUTH_TYPES,
   MODEL_CAPABILITIES,
@@ -29,10 +28,6 @@ import {
 
 const MODELPARAMS_PACKAGE_JSON = 'modelparams/package.json';
 const MODELPARAMS_DATA_RELATIVE_PATH = 'dist/generated/data.js';
-const MODELPARAMS_API_DEFAULT_URL = 'https://modelparams.dev/api/v1/models.json';
-const MODELPARAMS_API_TIMEOUT_MS = 10000;
-/** Sanity bound on the buffered payload; today's catalog is ~0.6 MB. */
-const MODELPARAMS_API_MAX_BYTES = 16 * 1024 * 1024;
 const SUBSCRIPTION_MODEL_SUFFIX = '-subscription';
 const SHORT_CLAUDE_MODEL_RE = /^claude-(opus|sonnet|haiku)-/i;
 const DOTTED_CLAUDE_MINOR_RE = /-(\d+)\.(\d{1,2})(?=$|-\d{8}$)/g;
@@ -62,7 +57,7 @@ const MOONSHOT_PARAM_MODEL_ALIASES: Readonly<Record<string, string>> = {
   'kimi-for-coding-highspeed': 'kimi-k2.7-code-highspeed',
 };
 
-interface ModelParametersApiResponse {
+interface ModelParametersCatalogData {
   models?: unknown;
 }
 
@@ -74,103 +69,13 @@ interface ProviderlessModelParamCandidate {
 const requireFromThisModule = createRequire(__filename);
 
 @Injectable()
-export class ProviderParamSpecService implements OnModuleInit {
-  private readonly logger = new Logger(ProviderParamSpecService.name);
+export class ProviderParamSpecService {
   /**
-   * Seeded synchronously from the bundled modelparams package so the service
-   * always has a catalog (offline installs, API outages, cold boots), then
-   * kept fresh from the modelparams.dev API.
+   * Loaded synchronously from the `modelparams` package bundled with this
+   * build. Thinker never fetches the catalog at runtime (#17, ADR 0003): the
+   * snapshot moves forward with dependency updates.
    */
-  private specs: ProviderParamSpecCatalog = loadModelparamsCatalog();
-  private catalogEtag: string | null = null;
-  private refreshInFlight: Promise<boolean> | null = null;
-
-  onModuleInit(): void {
-    // Fire-and-forget so a slow modelparams.dev fetch can't delay app.listen()
-    // (same rationale as ModelsDevSyncService — see #1894). refreshCatalog
-    // never rejects, so no dangling rejection to handle here.
-    void this.refreshCatalog();
-  }
-
-  /** Hourly, off the top of the hour to avoid stampeding the CDN with every deploy. */
-  @Cron('34 * * * *')
-  async scheduledRefresh(): Promise<void> {
-    await this.refreshCatalog();
-  }
-
-  /**
-   * Fetch the live catalog from modelparams.dev and swap it in atomically.
-   * Conditional on the last ETag (304 = no work), validated before the swap,
-   * and stale-on-error: any failure keeps the current catalog. Never rejects.
-   * Returns true when a new catalog was applied.
-   */
-  refreshCatalog(): Promise<boolean> {
-    if (process.env.MODELPARAMS_API_DISABLED === 'true') return Promise.resolve(false);
-    // Concurrent callers share one in-flight refresh instead of racing the swap.
-    if (this.refreshInFlight) return this.refreshInFlight;
-    this.refreshInFlight = this.fetchAndSwapCatalog()
-      .catch((err: unknown) => {
-        this.logger.warn(`modelparams catalog refresh failed, keeping current catalog: ${err}`);
-        return false;
-      })
-      .finally(() => {
-        this.refreshInFlight = null;
-      });
-    return this.refreshInFlight;
-  }
-
-  private async fetchAndSwapCatalog(): Promise<boolean> {
-    const url = process.env.MODELPARAMS_API_URL ?? MODELPARAMS_API_DEFAULT_URL;
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: this.catalogEtag ? { 'if-none-match': this.catalogEtag } : undefined,
-        signal: AbortSignal.timeout(MODELPARAMS_API_TIMEOUT_MS),
-      });
-    } catch (err) {
-      this.logger.warn(`modelparams catalog fetch failed, keeping current catalog: ${err}`);
-      return false;
-    }
-
-    if (response.status === 304) return false;
-    if (!response.ok) {
-      this.logger.warn(
-        `modelparams catalog fetch returned ${response.status}, keeping current catalog`,
-      );
-      return false;
-    }
-
-    // Reject an oversized declared payload before buffering it. A chunked or
-    // lying response is deliberately left to the 10s AbortSignal (which also
-    // bounds body consumption) rather than a streaming byte cap — this is our
-    // own CDN, and the simplicity is worth the residual risk.
-    if (Number(response.headers.get('content-length')) > MODELPARAMS_API_MAX_BYTES) {
-      this.logger.warn(
-        `modelparams catalog response declares more than ${MODELPARAMS_API_MAX_BYTES} bytes, keeping current catalog`,
-      );
-      return false;
-    }
-    const body = await response.text();
-
-    let raw: unknown;
-    try {
-      raw = JSON.parse(body) as unknown;
-    } catch {
-      this.logger.warn('modelparams catalog response is not valid JSON, keeping current catalog');
-      return false;
-    }
-
-    const catalog = parseModelParametersCatalog(raw);
-    if (!catalog) {
-      this.logger.warn('modelparams catalog response failed validation, keeping current catalog');
-      return false;
-    }
-
-    this.specs = freezeCatalog(catalog);
-    this.catalogEtag = response.headers.get('etag');
-    this.logger.log(`modelparams catalog refreshed: ${catalog.length} entries`);
-    return true;
-  }
+  private readonly specs: ProviderParamSpecCatalog = loadModelparamsCatalog();
 
   async list(): Promise<ProviderParamSpecCatalog> {
     return this.specs;
@@ -426,9 +331,13 @@ function freezeCatalog(catalog: ProviderParamSpecCatalog): ProviderParamSpecCata
   );
 }
 
-function parseModelParametersCatalog(raw: unknown): ProviderParamSpecCatalog | null {
+/**
+ * Validates the bundled catalog data: malformed entries and params are dropped,
+ * and a body with no usable entry yields null. Exported for tests.
+ */
+export function parseModelParametersCatalog(raw: unknown): ProviderParamSpecCatalog | null {
   if (!isRecord(raw)) return null;
-  const models = (raw as ModelParametersApiResponse).models;
+  const models = (raw as ModelParametersCatalogData).models;
   if (!Array.isArray(models)) return null;
 
   const catalog: ProviderModelParamSpec[] = [];

@@ -19,7 +19,7 @@ npx mnfst-gateway-cli --help
 
 ## Quick start
 
-Sign in to the hosted Manifest gateway, then create an agent and connect a provider:
+Sign in to your gateway, then create an agent and connect a provider. With no `--url`, `MANIFEST_URL` or stored login, the CLI targets a gateway on this machine at `http://localhost:2099`; it never falls back to a hosted service.
 
 ```bash
 mnfst login
@@ -33,7 +33,7 @@ mnfst agent setup my-app
 
 Set `OPENAI_API_KEY` in your environment before connecting the provider. Choose a model shown by `mnfst models` if `gpt-4o-mini` is unavailable to your account. `mnfst agent setup` returns wiring instructions with the agent key masked.
 
-For a self-hosted gateway, pass its URL when you sign in:
+For a gateway on another host, pass its URL when you sign in:
 
 ```bash
 mnfst login --url https://gateway.example.com
@@ -69,11 +69,9 @@ The CLI stores login credentials for each gateway host in `~/.config/manifest/co
 
 Agent keys are separate from management credentials. The CLI stores a newly created agent key in its local keystore and does not print it in `mnfst agent setup` unless you pass `--reveal`. Use `mnfst agent env my-app` to get the key and URL for your application; its output contains the key, so handle it as a secret.
 
-## Usage telemetry
+## No telemetry
 
-The CLI records usage telemetry by default. It batches events locally and normally sends one request per install per day. The payload contains a random, persistent install ID; CLI version; operating system; Cloud or self-hosted target; and each command's name, result, duration, and minute-level time. It may include the detected coding-agent runtime. It does not include command arguments, agent or provider names, gateway URLs, prompts, or credentials.
-
-Set `MANIFEST_TELEMETRY_DISABLED=1` to opt out. Telemetry files are stored beside the CLI config. You can set `MANIFEST_CLI_TELEMETRY_ENDPOINT` to send usage data to your own endpoint.
+The CLI collects no usage data and makes no network call of its own: it only talks to the gateway you point it at.
 
 ## Documentation
 

@@ -123,7 +123,6 @@ fly logs --app <your-fly-app>
 - Tigris is shared across Machines, so recording storage remains consistent if you scale the Manifest app horizontally.
 - For production, choose a larger Postgres configuration or Fly Managed Postgres instead of the small script default.
 - Add a custom domain before configuring OAuth callback URLs.
-- Set `MANIFEST_TELEMETRY_DISABLED=1` as a Fly secret if you want to disable anonymous self-hosted telemetry.
 - Destroy the app, database, and recording bucket when testing is done. Export any recordings you need before destroying the bucket:
 
 ```bash

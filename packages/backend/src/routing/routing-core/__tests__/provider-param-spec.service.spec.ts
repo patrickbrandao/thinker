@@ -1,4 +1,7 @@
-import { ProviderParamSpecService } from '../provider-param-spec.service';
+import {
+  ProviderParamSpecService,
+  parseModelParametersCatalog,
+} from '../provider-param-spec.service';
 
 describe('ProviderParamSpecService', () => {
   it('loads model parameter specs from the modelparams package without network fetches', async () => {
@@ -202,141 +205,91 @@ describe('ProviderParamSpecService', () => {
   });
 });
 
-describe('ProviderParamSpecService API refresh', () => {
-  const CATALOG_BODY = JSON.stringify({
-    models: [
-      {
-        provider: 'openai',
-        authType: 'api_key',
-        model: 'gpt-refreshed',
-        params: [
-          {
-            path: 'max_tokens',
-            type: 'integer',
-            label: 'Max tokens',
-            description: 'Maximum number of tokens.',
-            group: 'generation_length',
-          },
-        ],
-      },
-    ],
+describe('ProviderParamSpecService bundled snapshot only (#17)', () => {
+  it('never fetches the catalog: no boot hook, no scheduled refresh, no network call', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    try {
+      const service = new ProviderParamSpecService() as unknown as Record<string, unknown>;
+
+      expect(service['onModuleInit']).toBeUndefined();
+      expect(service['scheduledRefresh']).toBeUndefined();
+      expect(service['refreshCatalog']).toBeUndefined();
+      await (service as unknown as ProviderParamSpecService).list();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
+});
 
-  const jsonResponse = (body: string, init?: ResponseInit): Response =>
-    new Response(body, { status: 200, ...init });
-
-  let fetchSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    fetchSpy = jest.spyOn(globalThis, 'fetch');
-  });
-
-  afterEach(() => {
-    fetchSpy.mockRestore();
-    delete process.env.MODELPARAMS_API_DISABLED;
-    delete process.env.MODELPARAMS_API_URL;
-  });
-
-  it('swaps in a fetched catalog and remembers its ETag', async () => {
-    fetchSpy.mockResolvedValue(jsonResponse(CATALOG_BODY, { headers: { etag: '"v1"' } }));
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(true);
-    const specs = await service.getSpecs('openai', 'api_key', 'gpt-refreshed');
-    expect(specs.map((spec) => spec.path)).toEqual(['max_tokens']);
-
-    fetchSpy.mockResolvedValue(new Response(null, { status: 304 }));
-    await expect(service.refreshCatalog()).resolves.toBe(false);
-    const [, secondInit] = fetchSpy.mock.calls[1] as [string, RequestInit];
-    expect(secondInit.headers).toEqual({ 'if-none-match': '"v1"' });
-    // The 304 keeps the previously fetched catalog.
-    expect((await service.getSpecs('openai', 'api_key', 'gpt-refreshed')).length).toBe(1);
-  });
-
-  it('honors MODELPARAMS_API_URL and sends no conditional header on the first fetch', async () => {
-    process.env.MODELPARAMS_API_URL = 'https://example.test/catalog.json';
-    fetchSpy.mockResolvedValue(jsonResponse(CATALOG_BODY));
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(true);
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://example.test/catalog.json');
-    expect(init.headers).toBeUndefined();
-  });
-
-  it('does nothing when MODELPARAMS_API_DISABLED is set', async () => {
-    process.env.MODELPARAMS_API_DISABLED = 'true';
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(false);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('shares one in-flight refresh between concurrent callers', async () => {
-    let release!: (value: Response) => void;
-    fetchSpy.mockReturnValue(
-      new Promise<Response>((resolve) => {
-        release = resolve;
-      }),
-    );
-    const service = new ProviderParamSpecService();
-
-    const first = service.refreshCatalog();
-    const second = service.refreshCatalog();
-    release(jsonResponse(CATALOG_BODY));
-    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+describe('parseModelParametersCatalog', () => {
+  const validParam = {
+    path: 'max_tokens',
+    type: 'integer',
+    label: 'Max tokens',
+    description: 'Maximum number of tokens.',
+    group: 'generation_length',
+  };
+  const entry = (overrides: Record<string, unknown> = {}) => ({
+    provider: 'openai',
+    authType: 'api_key',
+    model: 'gpt-test',
+    params: [validParam],
+    ...overrides,
   });
 
   it.each([
-    ['a network error', () => fetchSpy.mockRejectedValue(new Error('boom'))],
-    ['a non-2xx status', () => fetchSpy.mockResolvedValue(new Response('nope', { status: 503 }))],
-    ['invalid JSON', () => fetchSpy.mockResolvedValue(jsonResponse('{not json'))],
-    ['an empty body', () => fetchSpy.mockResolvedValue(new Response(null, { status: 200 }))],
-    [
-      'a body that fails catalog validation',
-      () => fetchSpy.mockResolvedValue(jsonResponse(JSON.stringify({ models: 'wat' }))),
-    ],
-  ])('keeps the bundled catalog on %s', async (_label, arm) => {
-    arm();
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(false);
-    const specs = await service.getSpecs('openai', 'api_key', 'gpt-4o');
-    expect(specs.length).toBeGreaterThan(0);
+    ['a non-object body', 'wat'],
+    ['an array body', []],
+    ['a body without models', {}],
+    ['a non-array models field', { models: 'wat' }],
+    ['a body with no usable entry', { models: [entry({ authType: 'bogus' })] }],
+  ])('rejects %s', (_label, raw) => {
+    expect(parseModelParametersCatalog(raw)).toBeNull();
   });
 
-  it('rejects an oversized Content-Length without reading the body', async () => {
-    const response = jsonResponse(CATALOG_BODY, {
-      headers: { 'content-length': String(17 * 1024 * 1024) },
+  it('keeps valid entries and drops malformed ones', () => {
+    const catalog = parseModelParametersCatalog({
+      models: [
+        entry(),
+        entry({ model: '' }),
+        entry({ provider: 42 }),
+        entry({ params: 'wat' }),
+        entry({ model: 'only-bad-params', params: [{ ...validParam, type: 'nope' }] }),
+        entry({ model: 'bad-capability', capabilities: ['not-a-capability'] }),
+      ],
     });
-    fetchSpy.mockResolvedValue(response);
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(false);
-    expect(response.bodyUsed).toBe(false);
+    expect(catalog?.map((e) => e.model)).toEqual(['gpt-test']);
   });
 
-  it('keeps the bundled catalog when reading the response body throws', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.error(new Error('socket reset'));
-      },
+  it('drops API-level params, enums without values and invalid defaults', () => {
+    const catalog = parseModelParametersCatalog({
+      models: [
+        entry({
+          params: [
+            validParam,
+            { ...validParam, path: 'stream', type: 'boolean' },
+            { ...validParam, path: 'reasoning_effort', type: 'enum', group: 'reasoning' },
+            {
+              ...validParam,
+              path: 'temperature',
+              type: 'number',
+              range: { min: 0, max: 2 },
+              default: 5,
+            },
+            { ...validParam, path: 'top_p', type: 'number', range: { step: 0 } },
+          ],
+        }),
+      ],
     });
-    fetchSpy.mockResolvedValue(new Response(stream, { status: 200 }));
-    const service = new ProviderParamSpecService();
-
-    await expect(service.refreshCatalog()).resolves.toBe(false);
+    expect(catalog?.[0].params.map((p) => p.path)).toEqual(['max_tokens']);
   });
 
-  it('refreshes on module init and on the cron tick, surviving failures', async () => {
-    fetchSpy.mockRejectedValue(new Error('offline'));
-    const service = new ProviderParamSpecService();
-
-    service.onModuleInit();
-    await service.scheduledRefresh();
-    expect(fetchSpy).toHaveBeenCalled();
-    // Both paths swallow the failure; the bundled catalog still serves.
-    expect((await service.list()).length).toBeGreaterThan(0);
+  it('accepts a capability-only entry', () => {
+    const catalog = parseModelParametersCatalog({
+      models: [entry({ params: undefined, capabilities: ['tools', 'tools'] })],
+    });
+    expect(catalog?.[0].capabilities).toEqual(['tools']);
+    expect(catalog?.[0].params).toEqual([]);
   });
 });

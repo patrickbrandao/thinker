@@ -31,7 +31,6 @@ describe('OtlpDeprecatedController', () => {
       const result = controller.traces();
       expect(result.error.message).toContain('/v1/chat/completions');
     });
-
   });
 
   describe('metrics', () => {
@@ -112,9 +111,10 @@ describe('OtlpDeprecatedController', () => {
       expect(result.error.type).toBe('invalid_request_error');
     });
 
-    it('includes the correct baseURL hint', () => {
+    it('points the baseURL hint at this gateway, never a hosted one', () => {
       const result = controller.wrongChatPath();
-      expect(result.error.message).toContain('https://app.manifest.build/v1');
+      expect(result.error.message).toContain('this gateway URL followed by /v1');
+      expect(result.error.message).not.toMatch(/manifest\.build/);
     });
   });
 });

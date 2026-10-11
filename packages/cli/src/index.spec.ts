@@ -90,6 +90,49 @@ describe('run', () => {
     expect(io.lastJson()).toMatchObject({ error: 'internal_error', message: 'boom' });
   });
 
+  it('sends only the command request: no usage report, no spool on disk (#17)', async () => {
+    const urls: string[] = [];
+    const io = makeIo({
+      env: { MANIFEST_URL: 'http://localhost:2099', MANIFEST_API_KEY: 'k' },
+      fetchImpl: async (input) => {
+        urls.push(String(input));
+        return new Response(JSON.stringify({ agents: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+    for (const ok of [true, false]) {
+      if (!ok) io.env['MANIFEST_API_KEY'] = '';
+      await run(io, ['agent', 'list']);
+    }
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.startsWith('http://localhost:2099/'))).toBe(true);
+    const written = fs.readdirSync(io.configDir, { recursive: true }).map(String);
+    expect(written.filter((name) => /telemetry/.test(name))).toEqual([]);
+  });
+
+  it('sends an env key only to the local default when no host is configured (#17)', async () => {
+    const calls: Array<{ url: string; key: string | undefined }> = [];
+    const io = makeIo({
+      env: { MANIFEST_API_KEY: 'env-key' },
+      fetchImpl: async (input, init) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        calls.push({ url: String(input), key: headers['X-API-Key'] });
+        return new Response(JSON.stringify({ agents: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+    expect(await run(io, ['agent', 'list'])).toBe(0);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call.url.startsWith('http://localhost:2099/')).toBe(true);
+    }
+    expect(calls[0].key).toBe('env-key');
+  });
+
   it('usage documents every registered command group', () => {
     for (const key of Object.keys(COMMANDS)) {
       const firstWord = key.split(' ')[0];
@@ -120,9 +163,8 @@ describe('run', () => {
     );
   });
 
-  it('usage names the persistent anonymous install id in the telemetry notice', () => {
-    expect(USAGE).toContain('~/.config/manifest/telemetry-id');
-    expect(USAGE).toContain('MANIFEST_TELEMETRY_DISABLED=1');
+  it('usage carries no telemetry notice: the CLI reports nothing (#17)', () => {
+    expect(USAGE).not.toMatch(/telemetry/i);
   });
 });
 
