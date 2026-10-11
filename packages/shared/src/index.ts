@@ -172,6 +172,13 @@ export type {
   PlaygroundHistoryRunSummary,
   PlaygroundHistoryRunDetail,
 } from './playground';
+export {
+  PLAYGROUND_BLOCKED_HEADERS,
+  PLAYGROUND_BLOCKED_HEADER_PREFIXES,
+  isPlaygroundHeaderBlocked,
+  isPlaygroundHeaderNameValid,
+  isPlaygroundHeaderValueValid,
+} from './playground-headers';
 export { AUTOFIX_STATUSES, AUTOFIX_STATUS_LABELS, deriveAutofixStatus } from './autofix-status';
 export type { AutofixStatus, AutofixStatusChainEntry, AutofixStatusRecord } from './autofix-status';
 export {

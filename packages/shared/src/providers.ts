@@ -36,11 +36,17 @@ export interface SharedProviderEntry {
   /** Whether Manifest provisions this provider through its managed free-provider flow. */
   managedFree?: boolean;
   /**
-   * Tiles that deep-link users into the local-server detail view (LM
-   * Studio today). They do not have a fixed proxy endpoint — once
-   * connected, the backend routes through the `custom:<uuid>` path
-   * using the user-entered base URL. The proxy endpoint sanity test
-   * skips entries with `tileOnly: true`.
+   * Local servers whose dashboard tile deep-links into the local-server
+   * detail view (LM Studio, llama.cpp). The tile connects them as a custom
+   * provider named after the server, routed through `custom:<uuid>` with
+   * the user-entered base URL; messages from such a provider are logged
+   * under the canonical id (`canonicalTileIdForName`).
+   *
+   * They also have a native route: connecting the id itself with
+   * `authType: 'local'` uses the fixed endpoint in `PROVIDER_ENDPOINTS`
+   * (`THINKER_<ID>_BASE_URL` or the container host alias) and publishes
+   * `<id>/<model>`. So the id is a reserved custom-provider alias, while
+   * the display-name aliases stay free (see `isReservedCustomProviderAlias`).
    */
   tileOnly?: boolean;
 }

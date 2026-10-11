@@ -4,8 +4,8 @@ import { optionalPositiveInteger } from './env.util';
 function resolveDatabaseUrl(): string {
   const url = process.env['DATABASE_URL'];
   if (url) return url;
-  if (process.env['NODE_ENV'] === 'test')
-    return 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+  // Required in every environment, tests included: there is no default
+  // database, so nothing silently targets localhost:5432 (issue #67).
   throw new Error('DATABASE_URL is required. Set it in your .env file.');
 }
 

@@ -1,4 +1,4 @@
-import { toLocalSqlTimestamp } from './postgres-sql';
+import { toLocalSqlTimestamp, toLocalSqlTimestampMs } from './postgres-sql';
 
 export interface PeriodBoundaries {
   periodStart: string;
@@ -13,6 +13,12 @@ export interface PeriodBoundaries {
 // /cost limits never trip. Use local Date constructors + toLocalSqlTimestamp to
 // stay aligned with how the rows are written (see computeCutoff for the same
 // rationale on the analytics range cutoffs).
+//
+// `periodEnd` is "now" and is used as an exclusive bound (`timestamp < :end`),
+// so it keeps millisecond precision: truncated to whole seconds it would drop
+// every message written earlier in the current second, letting a burst of
+// requests through a hard limit and hiding fresh usage from the soft-limit
+// check (issue #53).
 export function computePeriodBoundaries(period: string): PeriodBoundaries {
   const now = new Date();
   let start: Date;
@@ -38,7 +44,7 @@ export function computePeriodBoundaries(period: string): PeriodBoundaries {
   }
 
   const end = new Date(now.getTime());
-  return { periodStart: toLocalSqlTimestamp(start), periodEnd: toLocalSqlTimestamp(end) };
+  return { periodStart: toLocalSqlTimestamp(start), periodEnd: toLocalSqlTimestampMs(end) };
 }
 
 // Computed in local time for the same reason as computePeriodBoundaries: the

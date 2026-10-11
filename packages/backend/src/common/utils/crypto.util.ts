@@ -37,6 +37,16 @@ let warnedAboutSecretReuse = false;
 const keyCache = new Map<string, Buffer>();
 const KEY_CACHE_MAX = 1024;
 
+/**
+ * Cheap scrypt fingerprint of a secret, for use as an in-memory cache index so
+ * the raw secret never lives as a Map key string (heap dumps, core dumps). Not
+ * a password hash and not a KDF: callers pair it with a random salt that never
+ * leaves the process, and keep the security-critical verification elsewhere.
+ */
+export function scryptFingerprint(secret: string, salt: Buffer): string {
+  return scryptSync(secret, salt, FINGERPRINT_LENGTH, FINGERPRINT_SCRYPT_OPTS).toString('base64');
+}
+
 function deriveKey(secret: string, salt: Buffer): Buffer {
   // Index the cache by a cheap scrypt-based fingerprint of (secret, salt) so
   // the raw secret never lives as a Map key string. A heap dump of the Node.js
@@ -44,9 +54,7 @@ function deriveKey(secret: string, salt: Buffer): Buffer {
   // key; the fingerprint removes that path. We deliberately use scrypt (the
   // same approved KDF family as the actual key derivation below) at minimal
   // cost — this is purely a cache index, not the security-critical KDF.
-  const cacheKey = scryptSync(secret, salt, FINGERPRINT_LENGTH, FINGERPRINT_SCRYPT_OPTS).toString(
-    'base64',
-  );
+  const cacheKey = scryptFingerprint(secret, salt);
   const cached = keyCache.get(cacheKey);
   if (cached) return cached;
   const derived = scryptSync(secret, salt, KEY_LENGTH);
