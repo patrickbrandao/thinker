@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { EventEmitter } from 'events';
 import request from 'supertest';
+import { createServer, type RequestListener, type Server } from 'http';
 import {
   API_BODY_LIMIT,
   PROXY_BODY_LIMIT,
@@ -24,6 +25,23 @@ function createParserTestApp() {
   return app;
 }
 
+// Hand supertest a server already listening on 127.0.0.1. Given an app that is
+// not listening, supertest binds the wildcard address on every request and
+// then dials 127.0.0.1, and on macOS that port can already belong to another
+// local process's 127.0.0.1 listener, which then answers instead (#62).
+const loopbackServers: Server[] = [];
+async function serveOnLoopback(handler: RequestListener): Promise<Server> {
+  const server = createServer(handler);
+  loopbackServers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return server;
+}
+afterEach(async () => {
+  await Promise.all(
+    loopbackServers.splice(0).map((s) => new Promise<void>((resolve) => s.close(() => resolve()))),
+  );
+});
+
 function createMockResponse() {
   const res = new EventEmitter() as express.Response & EventEmitter;
   res.status = jest.fn(() => res) as unknown as express.Response['status'];
@@ -36,8 +54,11 @@ describe('body parser limits', () => {
     const content = 'x'.repeat(1024 * 1024 + 1);
     const payload = { messages: [{ role: 'user', content }] };
 
-    await request(createParserTestApp()).post('/v1/chat/completions').send(payload).expect(200);
-    const apiRes = await request(createParserTestApp())
+    await request(await serveOnLoopback(createParserTestApp()))
+      .post('/v1/chat/completions')
+      .send(payload)
+      .expect(200);
+    const apiRes = await request(await serveOnLoopback(createParserTestApp()))
       .post('/api/v1/test')
       .send(payload)
       .expect(413);
@@ -50,7 +71,7 @@ describe('body parser limits', () => {
   });
 
   it('returns JSON 400s for malformed proxy JSON', async () => {
-    const res = await request(createParserTestApp())
+    const res = await request(await serveOnLoopback(createParserTestApp()))
       .post('/v1/chat/completions')
       .set('Content-Type', 'application/json')
       .send('{"messages":')
