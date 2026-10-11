@@ -326,18 +326,53 @@ export function getReliabilityStats(range = '7d', agentName?: string): Promise<R
 }
 
 /**
+ * Legacy request-status key for requests recovered by the removed Autofix. A
+ * backend that predates #16 can still return it for old rows (or for a harness
+ * that inherited the backend's Autofix default before the dashboard opted every
+ * create out). The backend's success rate already counts those requests as
+ * successes, so they are folded into `success`: the stacked bars keep summing
+ * to the Requests total, Success + Recovered + Error matches the Success rate
+ * card, and Recovered stays the fallback-only number the KPI shows.
+ */
+const LEGACY_RECOVERED_KEY = 'healed';
+
+/** Fold the legacy key into `success` (see LEGACY_RECOVERED_KEY). Pure. */
+export function foldLegacyRecoveredKey(ts: StatusTimeseries): StatusTimeseries {
+  const legacyIdx = ts.keys.indexOf(LEGACY_RECOVERED_KEY);
+  if (legacyIdx === -1) return ts;
+  const keys = ts.keys.filter((_, i) => i !== legacyIdx);
+  const hasSuccess = keys.includes('success');
+  const outKeys = hasSuccess ? keys : ['success', ...keys];
+  const successOut = outKeys.indexOf('success');
+  const successIn = ts.keys.indexOf('success');
+  return {
+    ...ts,
+    keys: outKeys,
+    buckets: ts.buckets.map((b) => {
+      const counts = outKeys.map((k) =>
+        k === 'success' ? 0 : (b.counts[ts.keys.indexOf(k)] ?? 0),
+      );
+      counts[successOut] =
+        (successIn === -1 ? 0 : (b.counts[successIn] ?? 0)) + (b.counts[legacyIdx] ?? 0);
+      return { bucket: b.bucket, counts };
+    }),
+  };
+}
+
+/**
  * Logical requests over time by final status (`success`, `fallback`,
  * `error`): the "By request status" chart and its recovered subset.
  */
-export function getRequestStatusTimeseries(
+export async function getRequestStatusTimeseries(
   range = '7d',
   agentName?: string,
 ): Promise<StatusTimeseries> {
-  return fetchJson(RELIABILITY_PATHS.requestStatusTimeseries, {
+  const ts = (await fetchJson(RELIABILITY_PATHS.requestStatusTimeseries, {
     range,
     by: 'disposition',
     ...(agentName ? { agent_name: agentName } : {}),
-  }) as Promise<StatusTimeseries>;
+  })) as StatusTimeseries;
+  return ts && Array.isArray(ts.keys) ? foldLegacyRecoveredKey(ts) : ts;
 }
 
 /**

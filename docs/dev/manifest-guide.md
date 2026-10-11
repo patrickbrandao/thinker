@@ -769,11 +769,15 @@ The id is minted lazily by `InstallIdService.getOrCreate()` (exported from `Tele
 
 **Recording separates the request verdict from attempt audit.** `requests.autofix_status` is the one outcome for the logical request; only `retry_succeeded` means the request was recovered by Autofix. Actual provider calls remain `agent_messages` rows with their own `status`. When Manifest sends a patched retry, the related attempt rows use `autofix_applied`, `autofix_group_id`, `autofix_role`, and `autofix_operations`; Phoenix's decision metadata is exposed by the entity as `autofix_decision` (`{status,issueId,patchId,healAttemptId,explanation}`) and mapped to the retained physical column `autofix_phoenix`. A Phoenix consultation that produces no patched retry must not create a fake provider attempt.
 
-**Frontend:** none. The dashboard's Autofix UI (Settings toggle, create-time switch, KPI card, badges, filters, Phoenix panels and the notification bell) was removed in #13; agents are created without `autofix_enabled`, so the self-hosted default (off) applies.
+**Frontend:** none. The dashboard's Autofix UI (Settings toggle, create-time switch, KPI card, badges, filters, Phoenix panels and the notification bell) was removed in #13.
+
+**Until #16 removes the backend side, the dashboard opts every new harness out.** A harness stored with `autofix_enabled = NULL` inherits `!isSelfHosted()`, which is **ON** whenever the backend detects no container (`/.dockerenv`, `/run/.containerenv`, `KUBERNETES_SERVICE_HOST`) and no `MANIFEST_MODE=selfhosted` — a bare-metal `npm start` or a dev run. Such a harness would send its repairable 4xx failures to the hosted healer. So `createAgent` in `packages/frontend/src/services/api/agents.ts` always sends `autofix_enabled: false`, and `duplicateAgent` follows the copy with `PATCH /api/v1/routing/:agent/autofix {enabled:false}` (the duplicate endpoint has no field for it).
+
+**Operator workaround for harnesses created before that** (or through the API/MCP/CLI without the flag): set `AUTOFIX_GLOBAL_ENABLED=false` (the global kill switch, checked before any per-agent flag), or run with `MANIFEST_MODE=selfhosted` so NULL resolves to off. The Docker image is already detected as self-hosted.
 
 **Self-hosted consent is once, and rides on the per-agent enable.** On self-hosted, consent is remembered via `install_metadata.autofix_consented_at` — a single nullable column on the existing telemetry singleton. Consent is recorded by **any** enable path: the per-agent `PATCH …/autofix` with `enabled: true` (a disable never mints it), the enable-all endpoint, and the Autofix switch on first agent creation. The singleton row is upserted, minting an `install_id` if telemetry never did — so consent alone never starts telemetry.
 
-**The dashboard has no Autofix enablement path** (#13).
+**The dashboard has no Autofix enablement or disablement path** (#13); use `AUTOFIX_GLOBAL_ENABLED=false` above.
 
 `POST /api/v1/autofix/enable-all` remains as an API-level fleet backfill (no dashboard caller): it runs `UPDATE agents SET autofix_enabled = true` for every live, non-playground agent in the tenant (**including any previously turned off**), invalidates the per-tenant config cache, records consent, and returns the refreshed workspace status. Soft-deleted agents are left alone so resurrecting one doesn't silently arrive with Autofix on.
 

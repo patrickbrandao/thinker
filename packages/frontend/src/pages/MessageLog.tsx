@@ -8,6 +8,7 @@ import {
   For,
   on,
   onCleanup,
+  onMount,
   Show,
   type Component,
 } from 'solid-js';
@@ -253,6 +254,16 @@ const MessageLog: Component = () => {
   const [triggerFilter, setTriggerFilter] = createSignal<TriggerChoice>(
     triggerListToChoice(normalizeTriggerFilters(searchParams.trigger)),
   );
+  // Rewrite a stale deep link (e.g. a recovery kind the dashboard no longer
+  // offers) to what the filter actually applies, so the URL never claims a
+  // filter that is not in effect.
+  onMount(() => {
+    const rawTrigger = searchParams.trigger;
+    const appliedTrigger = triggerChoiceToParam(triggerFilter());
+    if (typeof rawTrigger === 'string' && rawTrigger !== appliedTrigger) {
+      setSearchParams({ trigger: appliedTrigger }, { replace: true });
+    }
+  });
   // Attempt-status facet: a plain select (all / with a failed attempt / with
   // a succeeded attempt). NOT derivable from Status + Recovery — "has a failed
   // attempt" is Status=Failed UNION Recovery!=none, and those two AND together.

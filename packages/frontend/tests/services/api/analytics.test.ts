@@ -137,6 +137,46 @@ describe('analytics API client', () => {
     }
   });
 
+  it('folds a legacy healed request-status series into success', async () => {
+    setupFetch({
+      range: '7d',
+      by: 'disposition',
+      keys: ['success', 'healed', 'fallback', 'error'],
+      buckets: [
+        { bucket: '2026-06-04', counts: [5, 2, 3, 1] },
+        { bucket: '2026-06-05', counts: [1, 0, 0, 4] },
+      ],
+    });
+    const ts = await analytics.getRequestStatusTimeseries('7d');
+    expect(ts.keys).toEqual(['success', 'fallback', 'error']);
+    // Bars still sum to the request total: 11 and 5.
+    expect(ts.buckets).toEqual([
+      { bucket: '2026-06-04', counts: [7, 3, 1] },
+      { bucket: '2026-06-05', counts: [1, 0, 4] },
+    ]);
+  });
+
+  it('creates the success series when only the legacy key carries successes', () => {
+    const ts = analytics.foldLegacyRecoveredKey({
+      range: '24h',
+      by: 'disposition',
+      keys: ['healed', 'error'],
+      buckets: [{ bucket: 'b', counts: [2, 1] }],
+    });
+    expect(ts.keys).toEqual(['success', 'error']);
+    expect(ts.buckets[0]!.counts).toEqual([2, 1]);
+  });
+
+  it('leaves a timeseries without the legacy key untouched', () => {
+    const input = {
+      range: '24h',
+      by: 'disposition',
+      keys: ['success', 'fallback'],
+      buckets: [{ bucket: 'b', counts: [2, 1] }],
+    };
+    expect(analytics.foldLegacyRecoveredKey(input)).toBe(input);
+  });
+
   it('counts recovered requests from fallback saves only', () => {
     expect(analytics.recoveredCount({ fallback_saves: 4 })).toBe(4);
     expect(analytics.recoveredCount({})).toBe(0);

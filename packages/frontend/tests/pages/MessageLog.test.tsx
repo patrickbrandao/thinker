@@ -819,6 +819,37 @@ describe('MessageLog', () => {
         expect.objectContaining({ trigger: 'fallback' }),
       );
     });
+    // The URL is rewritten to the filter actually applied.
+    expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: 'fallback' }, { replace: true });
+  });
+
+  it('strips a stale ?trigger=autofix deep link instead of keeping it in the URL', async () => {
+    mockSearchParams = { trigger: 'autofix' };
+    mockGetMessages.mockResolvedValue(messagesData);
+    render(() => <MessageLog />);
+
+    await vi.waitFor(() => {
+      expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: undefined }, { replace: true });
+    });
+    expect(mockGetMessages).not.toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: expect.anything() }),
+    );
+  });
+
+  it('leaves a current ?trigger=fallback deep link alone', async () => {
+    mockSearchParams = { trigger: 'fallback' };
+    mockGetMessages.mockResolvedValue(messagesData);
+    render(() => <MessageLog />);
+
+    await vi.waitFor(() => {
+      expect(mockGetMessages).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'fallback' }),
+      );
+    });
+    expect(mockSetSearchParams).not.toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: expect.anything() }),
+      expect.anything(),
+    );
   });
 
   it('seeds the status filter from the status search param', async () => {

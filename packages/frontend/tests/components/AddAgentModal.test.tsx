@@ -95,6 +95,8 @@ describe('AddAgentModal', () => {
     fireEvent.input(input, { target: { value: 'first-agent' } });
     fireEvent.click(createBtn);
     await vi.waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+    // The modal sends no Autofix choice of its own; the API client adds the
+    // legacy opt-out to every create (tests/services/api/agents.test.ts).
     expect(mockCreateAgent.mock.calls[0]![0]).not.toHaveProperty('autofix_enabled');
   });
 
