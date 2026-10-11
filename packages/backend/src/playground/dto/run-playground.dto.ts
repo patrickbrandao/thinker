@@ -125,8 +125,9 @@ export class RunPlaygroundDto {
 
   /**
    * Extra HTTP headers to attach to the outgoing provider request.
-   * Sanitized server-side — Manifest-managed and transport-layer headers
-   * are silently dropped.
+   * Sanitized server-side: credential, tenant-identity, gateway-managed and
+   * transport-layer headers are silently dropped (see
+   * `PLAYGROUND_BLOCKED_HEADERS` in manifest-shared).
    */
   @IsOptional()
   @IsObject()

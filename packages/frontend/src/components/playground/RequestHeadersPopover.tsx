@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
+import { isPlaygroundHeaderBlocked } from 'manifest-shared';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
 import { PlusIcon, TrashIcon, XIcon } from './icons.jsx';
 
@@ -15,26 +16,12 @@ interface Props {
   onClose: () => void;
 }
 
-const BLOCKED_EXACT = new Set([
-  'authorization',
-  'proxy-authorization',
-  'cookie',
-  'set-cookie',
-  'host',
-  'content-length',
-  'content-type',
-  'connection',
-  'transfer-encoding',
-  'upgrade',
-  'te',
-  'trailer',
-]);
-
+/**
+ * Mirrors the server-side blocklist (shared list) so the user sees a warning
+ * on exactly the headers the backend drops. The server still enforces it.
+ */
 export function isBlockedHeaderKey(key: string): boolean {
-  const lower = key.trim().toLowerCase();
-  if (!lower) return false;
-  if (BLOCKED_EXACT.has(lower)) return true;
-  return lower.startsWith('x-manifest-');
+  return isPlaygroundHeaderBlocked(key);
 }
 
 export function toHeaderRecord(entries: HeaderEntry[]): Record<string, string> {
@@ -154,7 +141,7 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   </button>
                   <Show when={blocked()}>
                     <p class="playground-headers__warning">
-                      {entry.key.trim()} is managed by Manifest and will be dropped.
+                      {entry.key.trim()} is reserved by Thinker and will be dropped.
                     </p>
                   </Show>
                 </div>
