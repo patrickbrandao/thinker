@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { timingSafeEqual } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import {
@@ -20,10 +20,11 @@ import {
 import { verifyKey, keyPrefix as computePrefix } from '../../common/utils/hash.util';
 import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
 import { isLoopbackPeer } from '../../common/utils/local-ip';
+import { scryptFingerprint } from '../../common/utils/crypto.util';
 const MIN_TOKEN_LENGTH = 12;
 // Generated keys are `mnfst_` + 43 base64url chars. The ceiling is generous on
-// purpose; it exists because the caches below are keyed by the token itself, so
-// an unbounded header could pin up to MAX_*_CACHE_SIZE large strings in memory.
+// purpose; it bounds the input to the cache fingerprint below, so an oversized
+// header cannot buy extra scrypt work per request.
 const MAX_TOKEN_LENGTH = 512;
 
 /**
@@ -80,14 +81,15 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   // sharing the maps process-wide makes invalidateCache()/clearCache() reach
   // every instance.
   //
-  // Both caches are keyed by the presented token itself, and only after it
-  // passed the prefix and length checks. They used to be keyed by an unsalted
-  // SHA-256 of the token, which CodeQL reports as an insufficient password hash
-  // (js/insufficient-password-hash) once the token can come from `x-api-key`.
-  // A fast digest of a 256-bit random key never protected anything a heap dump
-  // would not already expose (in-flight request headers, decrypted provider
-  // credentials, the encryption secret), and the persisted key hash stays
-  // scrypt (verifyKey). Never log or serialize these map keys.
+  // Both caches are keyed by a fingerprint of the presented token, never the
+  // token itself, so a heap snapshot or core dump does not hold every working
+  // agent key as a greppable string. The fingerprint is the cheap scrypt index
+  // from crypto.util (N=2, 16 bytes) under a random salt generated once per
+  // process: it is computed only after the prefix and length checks, costs a
+  // few microseconds, and with 128 bits of output a collision between two
+  // tokens is not a practical concern. It is a cache index only; the persisted
+  // key hash and the real verification stay full-cost scrypt (verifyKey).
+  private static readonly CACHE_FINGERPRINT_SALT = randomBytes(16);
   private static cache = new Map<string, CachedKey>();
   private devContext: { context: IngestionContext; expiresAt: number } | null = null;
   // 5 min TTL amortizes the expensive prefix lookup and hash verification.
@@ -95,7 +97,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   // take effect across replicas without waiting for this TTL.
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly MAX_CACHE_SIZE = 10_000;
-  // Maps a rejected token to when its rejection stops being trusted.
+  // Maps a rejected token's fingerprint to when its rejection stops being trusted.
   // Without this, every request bearing a wrong/revoked mnfst_ key runs a
   // fresh indexed DB lookup AND emits a warn log — so a single misconfigured
   // agent in a retry loop sustains DB load and floods the logs indefinitely.
@@ -213,16 +215,22 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   }
 
   invalidateCache(key: string) {
-    AgentKeyAuthGuard.cache.delete(key);
+    const fingerprint = AgentKeyAuthGuard.fingerprint(key);
+    AgentKeyAuthGuard.cache.delete(fingerprint);
     // Drop any negative entry too, so re-creating or rotating a key that was
     // briefly rejected (e.g. a client raced ahead of key creation) takes
     // effect immediately instead of waiting out the negative TTL.
-    AgentKeyAuthGuard.negativeCache.delete(key);
+    AgentKeyAuthGuard.negativeCache.delete(fingerprint);
   }
 
   clearCache() {
     AgentKeyAuthGuard.cache.clear();
     AgentKeyAuthGuard.negativeCache.clear();
+  }
+
+  /** Cache index for a token. Never log or serialize it alongside the token. */
+  private static fingerprint(token: string): string {
+    return scryptFingerprint(token, AgentKeyAuthGuard.CACHE_FINGERPRINT_SALT);
   }
 
   private setContext(request: Request, ctx: IngestionContext): void {
@@ -238,31 +246,32 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   }
 
   private async validateMnfstToken(request: Request, token: string): Promise<boolean> {
+    const fingerprint = AgentKeyAuthGuard.fingerprint(token);
     const now = Date.now();
 
     // Negative cache first: a recently-rejected token short-circuits here
     // without touching the DB or emitting a log line. This is what collapses
     // a wrong/revoked-key storm to one DB lookup + one warn per TTL window.
-    const negativeExpiry = AgentKeyAuthGuard.negativeCache.get(token);
+    const negativeExpiry = AgentKeyAuthGuard.negativeCache.get(fingerprint);
     if (negativeExpiry !== undefined && negativeExpiry > now) {
       // LRU touch — re-insert to move to tail of insertion order.
-      AgentKeyAuthGuard.negativeCache.delete(token);
-      AgentKeyAuthGuard.negativeCache.set(token, negativeExpiry);
+      AgentKeyAuthGuard.negativeCache.delete(fingerprint);
+      AgentKeyAuthGuard.negativeCache.set(fingerprint, negativeExpiry);
       throw new UnauthorizedException('Invalid API key');
     }
     if (negativeExpiry !== undefined) {
       // Stale negative entry — drop it and re-check against the DB so a key
       // that has since been created/reactivated can authenticate again.
-      AgentKeyAuthGuard.negativeCache.delete(token);
+      AgentKeyAuthGuard.negativeCache.delete(fingerprint);
     }
 
-    const cached = AgentKeyAuthGuard.cache.get(token);
+    const cached = AgentKeyAuthGuard.cache.get(fingerprint);
     // A key whose own expiry has passed must stop authenticating immediately,
     // even if its cache entry is still inside the 5-min TTL. Drop the stale
     // entry and fall through to the DB path (which re-checks expiry and rejects
     // with "API key expired") rather than honoring it here.
     if (cached && cached.keyExpiresAt !== null && cached.keyExpiresAt <= now) {
-      AgentKeyAuthGuard.cache.delete(token);
+      AgentKeyAuthGuard.cache.delete(fingerprint);
     } else if (cached && cached.expiresAt > now) {
       let stillActive: boolean;
       try {
@@ -275,13 +284,13 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
         throw new UnauthorizedException('Invalid API key');
       }
       if (!stillActive) {
-        AgentKeyAuthGuard.cache.delete(token);
-        this.rememberInvalid(token);
+        AgentKeyAuthGuard.cache.delete(fingerprint);
+        this.rememberInvalid(fingerprint);
         throw new UnauthorizedException('Invalid API key');
       }
       // LRU touch — re-insert to move to tail of insertion order
-      AgentKeyAuthGuard.cache.delete(token);
-      AgentKeyAuthGuard.cache.set(token, cached);
+      AgentKeyAuthGuard.cache.delete(fingerprint);
+      AgentKeyAuthGuard.cache.set(fingerprint, cached);
       this.setContext(request, {
         tenantId: cached.tenantId,
         agentId: cached.agentId,
@@ -315,7 +324,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     if (!keyRecord) {
       // Remember the rejection so an identical repeat is served from the
       // negative cache (no DB, no log) until the short TTL lapses.
-      this.rememberInvalid(token);
+      this.rememberInvalid(fingerprint);
       // Log only the fixed prefix — even leaking the next character or two
       // narrows the search space if these warnings end up in a SIEM that
       // retains them indefinitely.
@@ -331,7 +340,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     // key: remember the rejection (so an identical retry is served from the
     // negative cache) and return a clean 401.
     if (!keyRecord.agent || !keyRecord.tenant) {
-      this.rememberInvalid(token);
+      this.rememberInvalid(fingerprint);
       this.logger.warn(
         `Rejected agent key with unhydrated relations (prefix: ${API_KEY_PREFIX}...)`,
       );
@@ -367,7 +376,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       AgentKeyAuthGuard.cache.delete(firstKey);
     }
 
-    AgentKeyAuthGuard.cache.set(token, {
+    AgentKeyAuthGuard.cache.set(fingerprint, {
       keyId: keyRecord.id,
       tenantId: keyRecord.tenant_id,
       agentId: keyRecord.agent_id,
@@ -423,14 +432,14 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     return ctx;
   }
 
-  private rememberInvalid(token: string): void {
+  private rememberInvalid(fingerprint: string): void {
     this.evictExpired();
     while (AgentKeyAuthGuard.negativeCache.size >= this.MAX_NEGATIVE_CACHE_SIZE) {
       const firstKey = AgentKeyAuthGuard.negativeCache.keys().next().value;
       if (firstKey === undefined) break;
       AgentKeyAuthGuard.negativeCache.delete(firstKey);
     }
-    AgentKeyAuthGuard.negativeCache.set(token, Date.now() + this.NEGATIVE_CACHE_TTL_MS);
+    AgentKeyAuthGuard.negativeCache.set(fingerprint, Date.now() + this.NEGATIVE_CACHE_TTL_MS);
   }
 
   private evictExpired() {

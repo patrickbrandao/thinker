@@ -2,10 +2,13 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AgentKeyAuthGuard, CONFLICTING_API_KEY_HEADERS } from './agent-key-auth.guard';
 import { hashKey } from '../../common/utils/hash.util';
+import { scryptFingerprint } from '../../common/utils/crypto.util';
 
-/** The guard's caches are keyed by the presented token itself. */
+/** The guard's caches are keyed by a salted scrypt fingerprint of the token. */
 function testCacheKey(token: string): string {
-  return token;
+  const salt = (AgentKeyAuthGuard as unknown as { CACHE_FINGERPRINT_SALT: Buffer })
+    .CACHE_FINGERPRINT_SALT;
+  return scryptFingerprint(token, salt);
 }
 
 function makeContext(headers: Record<string, string | undefined>, ip = '203.0.113.1') {
@@ -686,8 +689,9 @@ describe('AgentKeyAuthGuard', () => {
     expect(negativeCache.size).toBe(0);
   });
 
-  it('keys the positive cache by the token, never by a fast hash of it', async () => {
+  it('does not store plaintext tokens in either cache', async () => {
     const token = 'mnfst_plaintext-check-key';
+    const rejected = 'mnfst_plaintext-check-rejected';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-pt',
@@ -704,8 +708,48 @@ describe('AgentKeyAuthGuard', () => {
     await guard.canActivate(ctx);
 
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
-    expect(internalCache.has(token)).toBe(true);
-    expect(internalCache.size).toBe(1);
+    expect(internalCache.has(testCacheKey(token))).toBe(true);
+    expect(internalCache.has(token)).toBe(false);
+
+    mockGetMany.mockResolvedValue([]);
+    const { ctx: rejectedCtx } = makeContext({ 'x-api-key': rejected });
+    await expect(guard.canActivate(rejectedCtx)).rejects.toThrow('Invalid API key');
+    const negativeCache = (AgentKeyAuthGuard as unknown as { negativeCache: Map<string, number> })
+      .negativeCache;
+    expect(negativeCache.has(testCacheKey(rejected))).toBe(true);
+
+    // No map key equals, contains or embeds either token (or its prefix).
+    const allKeys = [...internalCache.keys(), ...negativeCache.keys()];
+    expect(allKeys).toHaveLength(2);
+    for (const key of allKeys) {
+      expect(key).not.toContain(token);
+      expect(key).not.toContain(rejected);
+      expect(key).not.toContain('mnfst_');
+    }
+  });
+
+  it('salts the fingerprint per process, so it is not a plain digest of the token', () => {
+    const salt = (AgentKeyAuthGuard as unknown as { CACHE_FINGERPRINT_SALT: Buffer })
+      .CACHE_FINGERPRINT_SALT;
+    expect(salt).toBeInstanceOf(Buffer);
+    expect(salt.length).toBe(16);
+    expect(testCacheKey('mnfst_same-token')).toBe(testCacheKey('mnfst_same-token'));
+    expect(scryptFingerprint('mnfst_same-token', Buffer.alloc(16))).not.toBe(
+      testCacheKey('mnfst_same-token'),
+    );
+  });
+
+  it('invalidateCache drops the fingerprinted entries for a raw key', async () => {
+    const token = 'mnfst_invalidate-fingerprint';
+    mockGetMany.mockResolvedValue([]);
+    const { ctx } = makeContext({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
+    const negativeCache = (AgentKeyAuthGuard as unknown as { negativeCache: Map<string, number> })
+      .negativeCache;
+    expect(negativeCache.has(testCacheKey(token))).toBe(true);
+
+    guard.invalidateCache(token);
+    expect(negativeCache.has(testCacheKey(token))).toBe(false);
   });
 
   it('rejects an over-long token before it can reach the caches', async () => {
@@ -869,7 +913,8 @@ describe('AgentKeyAuthGuard', () => {
 
       const negCache = negativeCacheOf(guard);
       expect(negCache.has(testCacheKey(token))).toBe(true);
-      expect(negCache.size).toBe(1);
+      // Stored under the fingerprint, never the raw token.
+      expect(negCache.has(token)).toBe(false);
       const ttl = negCache.get(testCacheKey(token))! - Date.now();
       expect(ttl).toBeGreaterThan(30 * 1000 - 2000);
       expect(ttl).toBeLessThanOrEqual(30 * 1000 + 100);
