@@ -7,12 +7,11 @@ const mockFetch = jest.fn();
 // Issue #76: LM Studio and llama.cpp connected as built-in local providers,
 // but every chat failed with "No endpoint configured for provider".
 describe('built-in local OpenAI-compatible servers (LM Studio, llama.cpp)', () => {
-  const ENV_KEYS = ['MANIFEST_MODE', 'THINKER_LMSTUDIO_BASE_URL', 'THINKER_LLAMACPP_BASE_URL'];
+  const ENV_KEYS = ['THINKER_LMSTUDIO_BASE_URL', 'THINKER_LLAMACPP_BASE_URL'];
   const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   let client: ProviderClient;
 
   beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     process.env['THINKER_LMSTUDIO_BASE_URL'] = 'http://127.0.0.1:41234/v1';
     process.env['THINKER_LLAMACPP_BASE_URL'] = 'http://127.0.0.1:48080';
     client = new ProviderClient();

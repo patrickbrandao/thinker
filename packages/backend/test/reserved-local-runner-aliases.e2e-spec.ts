@@ -59,7 +59,7 @@ function rootUrl(mock: MockServer): string {
 // Issue #101: a custom provider could take the alias `lmstudio` and publish
 // the same ids as the built-in LM Studio connection.
 describe('Reserved local runner aliases (e2e)', () => {
-  const ENV_KEYS = ['MANIFEST_MODE', 'THINKER_LMSTUDIO_BASE_URL'];
+  const ENV_KEYS = ['THINKER_LMSTUDIO_BASE_URL'];
   const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   const agentName = 'alias-e2e';
   const headers = { 'x-api-key': TEST_API_KEY };
@@ -85,7 +85,6 @@ describe('Reserved local runner aliases (e2e)', () => {
   beforeAll(async () => {
     native = await startServer('native', ['qwen/qwen3-8b']);
     secondBox = await startServer('second-box', ['qwen/qwen3-8b', 'mistral-7b']);
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     process.env['THINKER_LMSTUDIO_BASE_URL'] = rootUrl(native);
 
     app = await createTestApp({

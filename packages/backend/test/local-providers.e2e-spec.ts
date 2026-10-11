@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { json } from 'express';
 import { INestApplication } from '@nestjs/common';
 import type { IncomingMessage, Server, ServerResponse } from 'http';
@@ -124,7 +125,7 @@ function anthropicStreamText(sse: string): string {
 // Issue #76: LM Studio and llama.cpp connected (201, auth_type local) but
 // every chat failed with "No endpoint configured for provider".
 describe('Built-in local providers: LM Studio and llama.cpp (e2e)', () => {
-  const ENV_KEYS = ['MANIFEST_MODE', 'THINKER_LMSTUDIO_BASE_URL', 'THINKER_LLAMACPP_BASE_URL'];
+  const ENV_KEYS = ['THINKER_LMSTUDIO_BASE_URL', 'THINKER_LLAMACPP_BASE_URL'];
   const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   let app: INestApplication;
   let lmstudio: MockServer;
@@ -138,8 +139,6 @@ describe('Built-in local providers: LM Studio and llama.cpp (e2e)', () => {
   beforeAll(async () => {
     lmstudio = await startLocalServer('lmstudio');
     llamacpp = await startLocalServer('llamacpp');
-    // Built-in local providers are self-hosted only.
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     process.env['THINKER_LMSTUDIO_BASE_URL'] = baseUrl(lmstudio);
     process.env['THINKER_LLAMACPP_BASE_URL'] = baseUrl(llamacpp);
 
@@ -296,22 +295,35 @@ describe('Built-in local providers: LM Studio and llama.cpp (e2e)', () => {
   );
 
   it('logs local requests under the canonical provider at zero cost', async () => {
+    // Earlier tests in this suite also log llama.cpp requests, and a row is
+    // written as `pending` before its usage lands. Tag this request with its
+    // own W3C trace id and wait for that one row to settle (#101).
+    const traceId = randomBytes(16).toString('hex');
     await proxy('/v1/chat/completions')
+      .set('traceparent', `00-${traceId}-${randomBytes(8).toString('hex')}-01`)
       .send({ model: 'llamacpp/gemma-3-4b-it', messages: [{ role: 'user', content: 'Hi' }] })
       .expect(200);
 
     const ds = app.get(DataSource);
     let rows: Json[] = [];
-    for (let i = 0; i < 50 && rows.length === 0; i++) {
+    for (let i = 0; i < 100 && rows.length === 0; i++) {
       rows = await ds.query(
-        `SELECT provider, model, cost_usd, input_tokens, output_tokens
-           FROM agent_messages WHERE agent_id = $1 AND provider = 'llamacpp'`,
-        [agentId],
+        `SELECT provider, model, cost_usd, input_tokens, output_tokens, status
+           FROM agent_messages
+          WHERE agent_id = $1 AND trace_id = $2 AND status <> 'pending'
+          ORDER BY timestamp ASC`,
+        [agentId, traceId],
       );
       if (rows.length === 0) await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows[0]).toMatchObject({ provider: 'llamacpp', input_tokens: 7, output_tokens: 4 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      provider: 'llamacpp',
+      model: 'gemma-3-4b-it',
+      status: 'success',
+      input_tokens: 7,
+      output_tokens: 4,
+    });
     expect(Number(rows[0].cost_usd ?? 0)).toBe(0);
   });
 });

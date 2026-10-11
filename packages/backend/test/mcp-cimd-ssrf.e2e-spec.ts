@@ -23,6 +23,7 @@ import { createServer, type AddressInfo, type Server, type Socket } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const BACKEND = join(__dirname, '..');
 // Better Auth's own client_id check rejects localhost, IP literals and metadata
@@ -146,8 +147,8 @@ describe('MCP OAuth CIMD client_id SSRF guard (e2e)', () => {
     await new Promise<void>((resolve) => privateHost.listen(0, '127.0.0.1', resolve));
     privatePort = (privateHost.address() as AddressInfo).port;
 
-    const databaseUrl =
-      process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+    // Refuses anything but an explicit, disposable test database (#67).
+    const databaseUrl = resolveE2eDatabaseUrl();
     // Start from an empty schema: the real server migrates on boot, and earlier
     // suites leave a synchronize()-built schema behind.
     const reset = new DataSource({ type: 'postgres', url: databaseUrl, dropSchema: true });
