@@ -92,10 +92,10 @@ describe('every documented error code is accounted for', () => {
     expect(error_class).toBe('not_found');
   });
 
-  it('puts a cloud-inaccessible local provider on the config origin', () => {
+  it('still classifies historical local_provider_unavailable rows on the config origin', () => {
     const { error_origin, error_class } = classifyMessageError({
       status: 'error',
-      routingReason: MANIFEST_CODE_TO_REASON.M303,
+      routingReason: 'local_provider_unavailable',
     });
 
     expect(error_origin).toBe('config');

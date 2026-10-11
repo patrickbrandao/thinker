@@ -3,17 +3,7 @@ import type { TenantContext } from '../common/decorators/tenant-context.decorato
 import type { TenantProvider } from '../entities/tenant-provider.entity';
 
 describe('TenantProvidersController', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
   const ctx: TenantContext = { tenantId: 'tenant-1', userId: 'user-1' };
-
-  beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'cloud';
-  });
-
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
-  });
 
   const makeProvider = (id: string, label: string): TenantProvider =>
     ({
@@ -119,7 +109,7 @@ describe('TenantProvidersController', () => {
     expect(result.model_counts).toEqual({});
   });
 
-  it('hides legacy built-in local rows in cloud but keeps tunneled custom providers', async () => {
+  it('lists built-in local rows alongside custom providers', async () => {
     const providerRepo = {
       find: jest.fn().mockResolvedValue([
         { ...makeProvider('ollama-row', 'Default'), provider: 'ollama', auth_type: 'local' },
@@ -142,7 +132,10 @@ describe('TenantProvidersController', () => {
 
     const result = await controller.listProviders(ctx);
 
-    expect(result.providers.map((provider) => provider.provider)).toEqual(['custom:runtime-id']);
+    expect(result.providers.map((provider) => provider.provider).sort()).toEqual([
+      'custom:runtime-id',
+      'ollama',
+    ]);
   });
 
   it('returns empty providers when ctx has no tenant (fresh account)', async () => {

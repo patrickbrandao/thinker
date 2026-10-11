@@ -1,7 +1,7 @@
 > **WARNING FOR AGENTS: this is the inherited Manifest guide, under rewrite in v0.1.**
 > Thinker is a self-hosted-only fork. While this file is being rewritten, apply these overrides to everything below:
 >
-> - **Ignore every "Cloud Mode Always" / `MANIFEST_MODE=cloud` directive.** Thinker has no cloud mode; use the self-hosted mode.
+> - **There is no deployment mode** (#18). `MANIFEST_MODE` and the container detection are gone: the backend always behaves as self-hosted (local providers and LAN/`http://` custom-provider URLs accepted, filesystem recordings without S3), on any runtime.
 > - **The dashboard has no Wingman drawer, update check, Discovery step or Autofix UI** (#13), the backend has no Autofix (#16), and neither the backend nor the CLI phones home (#17, see [No phone-home](#no-phone-home)).
 > - **Never call `app.manifest.build` or any other Manifest-hosted endpoint.**
 > - **Do not use the `mnfst` CLI against Manifest's cloud.** The CLI becomes `thinker` and only talks to a Thinker instance.
@@ -24,9 +24,9 @@ The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "ne
 
 **Three management surfaces share one REST API.** The dashboard, the `mnfst` CLI (`packages/cli/`), and the remote MCP server (`packages/backend/src/mcp/`) all drive the same `/api/v1/*` services with the same tenant scoping. Add a capability to the service layer once, then expose it on whichever surfaces need it; never fork logic per surface. See [CLI login](#cli-login-mnfst-login) and [Remote MCP server](#remote-mcp-server) below.
 
-## IMPORTANT: Cloud Mode Always
+## IMPORTANT: Fresh Database per Session
 
-When starting the app for development or testing (e.g. `/serve`), **always use `MANIFEST_MODE=cloud`** (the default). Every dev session must use a **fresh PostgreSQL database** via Docker — multiple concurrent dev instances sharing one DB cause cross-run data pollution and intermittent test failures:
+When starting the app for development or testing (e.g. `/serve`), every dev session must use a **fresh PostgreSQL database** via Docker — multiple concurrent dev instances sharing one DB cause cross-run data pollution and intermittent test failures:
 
 ```bash
 # 1. Ensure the postgres_db container is running
@@ -50,7 +50,7 @@ This guarantees each session starts with a clean, isolated database and avoids a
 To test routing from an OpenClaw agent against a local Manifest dev server, point OpenClaw at the dev server's OpenAI-compatible proxy directly — there is no plugin anymore:
 
 ```bash
-# 1. Build and start the backend in cloud mode
+# 1. Build and start the backend
 npm run build
 PORT=38238 BIND_ADDRESS=127.0.0.1 \
   node -r dotenv/config packages/backend/dist/main.js
@@ -112,7 +112,7 @@ packages/
 │   │   │   ├── interceptors/               # agent-cache, user-cache
 │   │   │   ├── constants/                   # api-key, cache, ollama, providers, openai-models, xai-models, subscription-clients
 │   │   │   ├── services/                    # ingest-event-bus, manifest-runtime, tenant-cache, request-recording-storage
-│   │   │   └── utils/                       # crypto, hash, range, period, slugify, url-validation, provider-inference, postgres-sql, cost-calculator, detect-self-hosted, frontend-path, og-rewrite, secret-scrub, ttl-cache, local-ip, etc.
+│   │   │   └── utils/                       # crypto, hash, range, period, slugify, url-validation, provider-inference, postgres-sql, cost-calculator, container-host, frontend-path, og-rewrite, secret-scrub, ttl-cache, local-ip, etc.
 │   │   ├── health/                          # @Public() health check
 │   │   ├── analytics/                       # Dashboard analytics
 │   │   │   ├── controllers/                 # overview, tokens, costs, messages, agents
@@ -479,7 +479,7 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `MANIFEST_FRONTEND_DIR` / `MANIFEST_EMBEDDED` — Internal. Custom path to the built frontend (`common/utils/frontend-path.ts`), and a flag that skips the auto `bootstrap()` in `main.ts` when the backend is embedded by another process.
 - `ANNOUNCE_APP_URL` / `DOCTOR_TUTORIAL_URL` — Inputs to the release-announcement React Email template only; the sending tool lives outside this repo. Not read by the server.
 - `PLUGIN_OTLP_ENDPOINT` — Dead. Still listed in `.env.example` but no code reads it since OTLP ingest was removed; safe to delete.
-- `MIGRATION_DATABASE_URL` / `BACKFILL_DATABASE_URL` — Cloud-only direct (non-PgBouncer) database URLs used for migrations and backfills; unset on self-hosted (falls back to `DATABASE_URL`).
+- `MIGRATION_DATABASE_URL` / `BACKFILL_DATABASE_URL` — Direct (non-PgBouncer) database URLs for migrations and the standalone `request-backfill.cli.ts` worker. The boot-time backfills always use the app's `DATABASE_URL` connection (#18).
 - `PROVIDER_TIMEOUT_MS` — Per-attempt timeout (ms) for upstream provider requests. Default: `180000`
 - `STREAM_WARMUP_MS` — Timeout (ms) to wait for the first chunk of a streaming response before trying a fallback. Default: `15000`
 - `STREAM_IDLE_TIMEOUT_MS` — Max silence (ms) between upstream streaming events before the attempt is failed with HTTP 504. Default: `180000`
@@ -495,7 +495,16 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub OAuth (optional)
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` — Discord OAuth (optional)
 - `SEED_DATA` — Set `true` to seed demo data on startup. Dev/test only — ignored when `NODE_ENV=production` (use the first-run setup wizard instead).
-- `MANIFEST_MODE` — `selfhosted` or `cloud` (default: `cloud`; auto-detected as `selfhosted` inside Docker via `/.dockerenv` or Podman via `/run/.containerenv`). Self-hosted mode allows custom-provider URLs with `http://` / private IPs. `local` is accepted as a legacy alias for `selfhosted`.
+- `THINKER_CIMD_ALLOW_PRIVATE` — `true` lets an MCP client whose Client ID Metadata Document URL (its OAuth `client_id`) resolves to a private or loopback address sign in. Default `false`: that URL comes from an unauthenticated client, so `auth/cimd-client-metadata-fetch.ts` only fetches from public addresses and treats a DNS failure as an error. Cloud metadata addresses are refused either way.
+- **SSRF policy (#18).** There is no deployment mode any more (`MANIFEST_MODE` was removed; it is ignored if set). Custom-provider URLs and user-supplied provider base URLs follow one policy:
+  - **Allowed:** LAN, loopback and `http://` destinations are a feature (Ollama, LM Studio, vLLM). The URL comes from an authenticated tenant member. `http://` to a public address is still refused.
+  - **Up-front check:** `validatePublicUrl(url, { allowPrivate: true })` runs on create, update, probe and before each forward. A hostname that does not resolve is an error, never a pass.
+  - **At connect time:** the request itself (`custom-provider.service.ts` probe, and the `provider-client.ts` forward for endpoints with `requiresSsrfRevalidation`) goes through `common/utils/ssrf-safe-fetch.ts`. That module uses undici's own `fetch` with a shared `Agent` whose `connect.lookup` resolves the name once and refuses the connection if **any** answer is a metadata address. The socket gets only the validated addresses, so DNS rebinding between the check and the connection cannot reach IMDS. Undici's own `fetch` is used instead of Node's built-in one because Node bundles a different undici major, and passing a foreign `Agent` to the built-in `fetch` breaks across Node versions. Unit specs that mock `globalThis.fetch` mock `ssrf-safe-fetch` to delegate to it.
+  - **Always refused (metadata):**
+    - addresses `169.254.169.254`, `169.254.169.253`, `100.100.100.200`, `169.254.170.2` (ECS/Fargate credentials), `169.254.170.23`, `fd00:ec2::254`, `fd00:ec2::23` (EKS Pod Identity);
+    - any of those embedded in IPv6: IPv4-mapped, IPv4-compatible, NAT64 `64:ff9b::/96`, 6to4, Teredo;
+    - the names `metadata.google.internal`, `metadata.goog`, `metadata`, `instance-data`, `instance-data.ec2.internal`.
+  - Per-organization hardening is v0.3 work.
 - `AUTH_DB_POOL_MAX` — Connection pool size for Better Auth's own `pg.Pool`, separate from `DB_POOL_MAX`. Default: `5`.
 - `THINKER_LMSTUDIO_BASE_URL` / `THINKER_LLAMACPP_BASE_URL` — OpenAI-compatible server for the built-in `lmstudio` / `llamacpp` providers (connected with `authType: 'local'`). With or without the trailing `/v1`. Default `http://<host alias>:1234` / `http://<host alias>:8080`, where the alias is `host.docker.internal` in Docker, `host.containers.internal` in Podman and `localhost` otherwise (`common/constants/local-servers.ts`). Operator-set, so not SSRF-revalidated, like `OLLAMA_HOST`. A value that is not an absolute `http(s)` URL (e.g. `192.168.1.20:1234`, or one with credentials or a query string) is ignored with a warning at boot and the default is used. Tile-connected servers are custom providers and use their own base URL instead; `lmstudio`, `llamacpp` and every other built-in provider id are reserved, so a custom provider cannot publish under them.
 - `OLLAMA_HOST` — Ollama endpoint for the built-in tile. Defaults to `http://localhost:11434` outside Docker and `http://host.docker.internal:11434` inside the bundled `docker/docker-compose.yml`.
@@ -555,7 +564,7 @@ When the primary and every fallback fail, the response **says what the provider 
 Opt-in, **per-harness** recording of Provider Attempt request/response bodies, browsable from the Requests log.
 
 - **Toggle**: `GET/PATCH /api/v1/routing/:agentName/recording` (in `tier.controller.ts`); UI in `pages/SettingsRecordingSection.tsx`. **Default ON for newly created harnesses only** — enabling the feature never changed existing harnesses' settings. Setting changes apply immediately across replicas.
-- **Storage selection** (`REQUEST_RECORDING_STORAGE=auto|s3|filesystem|disabled`, default `auto`): complete S3 credentials win; otherwise self-hosted falls back to the filesystem path (`REQUEST_RECORDING_FILESYSTEM_PATH`, default `/data/request-recordings`). Managed Cloud never silently falls back to ephemeral local disk. S3 config: `REQUEST_RECORDING_S3_BUCKET/ENDPOINT/REGION/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`.
+- **Storage selection** (`REQUEST_RECORDING_STORAGE=auto|s3|filesystem|disabled`, default `auto`): complete S3 credentials win; otherwise recordings go to the filesystem path (`REQUEST_RECORDING_FILESYSTEM_PATH`, default `/data/request-recordings` in production, `.data/request-recordings` under the working directory otherwise). S3 config: `REQUEST_RECORDING_S3_BUCKET/ENDPOINT/REGION/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`.
 - **Encryption at rest**: recordings are encrypted under the **current** `MANIFEST_ENCRYPTION_KEY` only. The `MANIFEST_ENCRYPTION_KEY_PREVIOUS` re-encryption pass does **not** rewrite recordings — after a key change, older recordings are unreadable until retention removes them. Pre-encryption gzip-only recordings stay readable.
 - **Retention** (`REQUEST_RECORDING_RETENTION_DAYS`): one instance-wide value, default 365d (no per-plan retention). Cleanup cron in `database/request-recording-retention.service.ts`.
 - **Privacy**: inline base64 images are stripped from recordings.

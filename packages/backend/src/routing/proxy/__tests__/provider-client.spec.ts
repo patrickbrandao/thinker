@@ -1,6 +1,9 @@
+// Pinned fetch goes through the mocked global fetch here; its own behavior is covered by ssrf-safe-fetch.spec.ts.
+jest.mock('../../../common/utils/ssrf-safe-fetch', () => ({
+  ssrfSafeFetch: jest.fn((url: string, init?: RequestInit) => globalThis.fetch(url, init)),
+}));
 import { Buffer } from 'node:buffer';
 import { ProviderClient } from '../provider-client';
-import { ManifestError } from '../../../common/errors/manifest-error';
 import { buildCustomEndpoint, buildEndpointOverride } from '../provider-endpoints';
 import { ThinkingBlockCache, type ThinkingBlockRouteContext } from '../thinking-block-cache';
 import { ModelsDevReasoningCatalog } from '../reasoning-model-catalog';
@@ -39,18 +42,11 @@ function kiroEventFrame(eventType: string, payload: unknown, messageType = 'even
 }
 
 describe('ProviderClient', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
   let client: ProviderClient;
 
   beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     client = new ProviderClient();
     mockFetch.mockReset();
-  });
-
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   const body = {
@@ -59,10 +55,10 @@ describe('ProviderClient', () => {
   };
 
   describe('OpenAI-compatible providers', () => {
-    it('refuses to dial a built-in local provider from cloud', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
+    it('dials a built-in local provider with no deployment mode configured', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
-      const request = client.forward({
+      await client.forward({
         provider: 'ollama',
         apiKey: '',
         model: 'qwen2.5:0.5b',
@@ -70,12 +66,7 @@ describe('ProviderClient', () => {
         stream: false,
       });
 
-      await expect(request).rejects.toMatchObject({ code: 'M303' });
-      await expect(request).rejects.toBeInstanceOf(ManifestError);
-      await expect(request).rejects.toThrow(
-        'Built-in local providers are only available in self-hosted Manifest',
-      );
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('builds correct URL and headers for openai', async () => {
@@ -5887,17 +5878,9 @@ describe('ProviderClient', () => {
 });
 
 describe('ProviderClient provider-specific message fields', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
-
   beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     mockFetch.mockReset();
     mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
-  });
-
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   const reasoningBody = {

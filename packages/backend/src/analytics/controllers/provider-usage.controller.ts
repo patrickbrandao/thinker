@@ -4,7 +4,6 @@ import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context
 import { UserCacheInterceptor } from '../../common/interceptors/user-cache.interceptor';
 import { DASHBOARD_CACHE_TTL_MS } from '../../common/constants/cache.constants';
 import { ProviderUsageService, ProviderUsageSummary } from '../services/provider-usage.service';
-import { filterProvidersForDeployment } from '../../common/utils/provider-availability';
 
 /**
  * Usage half of the provider dashboard split. Config (cheap, from
@@ -24,7 +23,6 @@ export class ProviderUsageController {
 
   @Get()
   async getUsage(@TenantCtx() ctx: TenantContext): Promise<{ providers: ProviderUsageSummary[] }> {
-    const providers = await this.providerUsage.getUsage(ctx.tenantId);
-    return { providers: filterProvidersForDeployment(providers) };
+    return { providers: await this.providerUsage.getUsage(ctx.tenantId) };
   }
 }

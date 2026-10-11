@@ -29,7 +29,7 @@ import { ProviderService } from '../routing-core/provider.service';
 import { RoutingCacheService } from '../routing-core/routing-cache.service';
 import { CreateCustomProviderDto, UpdateCustomProviderDto } from '../dto/custom-provider.dto';
 import { validatePublicUrl } from '../../common/utils/url-validation';
-import { isSelfHosted } from '../../common/utils/detect-self-hosted';
+import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import { decryptWithAny, getDecryptionSecrets } from '../../common/utils/crypto.util';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
@@ -37,6 +37,14 @@ import { IngestEventBusService } from '../../common/services/ingest-event-bus.se
 import { classifyProbeError } from './probe-error';
 
 const PROBE_TIMEOUT_MS = 5000;
+
+// Private and LAN destinations are a feature: operators point custom providers
+// at Ollama, LM Studio or vLLM on their own network. Cloud metadata endpoints
+// stay blocked inside validatePublicUrl regardless of this flag, and every
+// request to the URL goes through ssrfSafeFetch, which re-checks the address
+// it actually connects to (DNS rebinding). The URL comes from an authenticated
+// tenant member, not an anonymous client.
+const CUSTOM_PROVIDER_URL_POLICY = { allowPrivate: true } as const;
 
 /**
  * OpenAI-compatible `/v1/models` endpoints return every model the server
@@ -306,7 +314,7 @@ export class CustomProviderService {
     if (alias && dto.alias !== undefined) this.assertAliasAvailable(alias, allForTenant);
 
     try {
-      await validatePublicUrl(dto.base_url, { allowPrivate: isSelfHosted() });
+      await validatePublicUrl(dto.base_url, CUSTOM_PROVIDER_URL_POLICY);
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }
@@ -409,7 +417,7 @@ export class CustomProviderService {
 
     if (dto.base_url !== undefined) {
       try {
-        await validatePublicUrl(dto.base_url, { allowPrivate: isSelfHosted() });
+        await validatePublicUrl(dto.base_url, CUSTOM_PROVIDER_URL_POLICY);
       } catch (err) {
         throw new BadRequestException((err as Error).message);
       }
@@ -552,7 +560,7 @@ export class CustomProviderService {
     providerName?: string,
   ): Promise<CustomProviderModel[]> {
     try {
-      await validatePublicUrl(baseUrl, { allowPrivate: isSelfHosted() });
+      await validatePublicUrl(baseUrl, CUSTOM_PROVIDER_URL_POLICY);
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }
@@ -571,12 +579,13 @@ export class CustomProviderService {
       }
       // User-controlled URL is intentional here — this endpoint exists to
       // connect to operator-chosen LLM servers. validatePublicUrl() above is
-      // our SSRF mitigation: cloud metadata is always blocked, private IPs
-      // only accepted in the self-hosted version. `redirect: 'error'`
+      // the early check and ssrfSafeFetch pins the connection to a validated
+      // address: cloud metadata is always blocked; private and LAN hosts are
+      // allowed by design (local models). `redirect: 'error'`
       // ensures a hostile server can't redirect the probe to a destination
       // that would bypass validation.
       // codeql[js/request-forgery]
-      const res = await fetch(url, {
+      const res = await ssrfSafeFetch(url, {
         headers,
         signal: controller.signal,
         redirect: 'error',

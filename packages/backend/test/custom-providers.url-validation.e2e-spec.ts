@@ -92,8 +92,8 @@ describe('Custom Providers URL validation (e2e)', () => {
 
     it('accepts http://localhost:9000 with explicit scheme', async () => {
       // Local LLM servers (Ollama, LM Studio, vLLM, llama.cpp) all bind
-      // to localhost. NODE_ENV=test skips SSRF, mirroring the real
-      // selfhosted allowPrivate path.
+      // to localhost. NODE_ENV=test skips SSRF here; the real validator
+      // allows it too (see the SSRF guard block below).
       const res = await request(app.getHttpServer())
         .post(`/api/v1/routing/${agentName}/custom-providers`)
         .set(headers)
@@ -119,84 +119,78 @@ describe('Custom Providers URL validation (e2e)', () => {
     });
   });
 
-  describe('POST — service-layer SSRF guard (cloud mode)', () => {
-    // Flip SKIP_SSRF_VALIDATION per-test so the NODE_ENV=test short-circuit
-    // is bypassed and the real cloud-mode behavior runs. MANIFEST_MODE is
-    // forced to "cloud" so a Docker auto-detect doesn't switch modes.
+  describe('POST — service-layer SSRF guard (single self-hosted mode)', () => {
+    // Flip SKIP_SSRF_VALIDATION per-test so the NODE_ENV=test short-circuit is
+    // bypassed and the real validator runs. No deployment-mode variable is set:
+    // Thinker has one mode, and LAN/local destinations are a feature (local
+    // models), while cloud metadata endpoints stay blocked. Hosts are literals
+    // or reserved names so the outcome never depends on the runner's DNS.
     let originalSkip: string | undefined;
-    let originalMode: string | undefined;
 
     beforeEach(() => {
       originalSkip = process.env['SKIP_SSRF_VALIDATION'];
-      originalMode = process.env['MANIFEST_MODE'];
       process.env['SKIP_SSRF_VALIDATION'] = 'false';
-      process.env['MANIFEST_MODE'] = 'cloud';
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       if (originalSkip === undefined) delete process.env['SKIP_SSRF_VALIDATION'];
       else process.env['SKIP_SSRF_VALIDATION'] = originalSkip;
-      if (originalMode === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = originalMode;
+      await deleteByName('LAN Ollama');
+      await deleteByName('Loopback');
     });
 
-    it('rejects plaintext http:// to a public host in cloud mode as 400', async () => {
-      // AC-2 in the Mine paper: forwarding API keys + completions over
-      // http leaks credentials to passive wire-sniffers.
+    it.each([
+      ['LAN Ollama', 'http://192.168.1.50:11434/v1'],
+      ['LAN Ollama', 'http://10.0.0.5:8000/v1'],
+      ['Loopback', 'http://127.0.0.1:1234/v1'],
+      ['Loopback', 'http://[::1]:8080/v1'],
+    ])('accepts a LAN or loopback URL (%s: %s) with no mode configured', async (name, url) => {
       const res = await request(app.getHttpServer())
         .post(`/api/v1/routing/${agentName}/custom-providers`)
         .set(headers)
-        .send({
-          name: 'Plaintext HTTP',
-          base_url: 'http://api.example.com/v1',
-          models: baseModels,
-        })
-        .expect(400);
+        .send({ name, base_url: url, models: baseModels })
+        .expect(201);
 
-      // The error message hints at MANIFEST_MODE=selfhosted; the "https"
-      // substring is the user-actionable key. Loose-match it so message
-      // refactors that preserve intent don't fail the test.
-      const body = res.body as { message?: string };
-      expect(typeof body.message === 'string' && body.message.includes('https')).toBe(true);
+      expect(res.body.base_url).toBe(url);
+      await deleteByName(name);
     });
 
-    it('rejects private-IP URLs in cloud mode as 400 (SSRF)', async () => {
-      // RFC 1918 private space must never be reachable from the cloud
-      // proxy — that's how attackers pivot to internal services.
-      await request(app.getHttpServer())
-        .post(`/api/v1/routing/${agentName}/custom-providers`)
-        .set(headers)
-        .send({ name: 'Private IP', base_url: 'https://10.0.0.5/v1', models: baseModels })
-        .expect(400);
-    });
-
-    it('rejects 127.0.0.1 loopback URLs in cloud mode as 400', async () => {
-      // Loopback is the classic SSRF target (admin consoles bound there).
-      // Even with https://, cloud mode must refuse it.
-      await request(app.getHttpServer())
-        .post(`/api/v1/routing/${agentName}/custom-providers`)
-        .set(headers)
-        .send({ name: 'Loopback', base_url: 'https://127.0.0.1:8080/v1', models: baseModels })
-        .expect(400);
-    });
-
-    it('rejects cloud-metadata IMDS URL even when self-hosted', async () => {
-      // The one URL family blocked in both modes: cloud metadata
-      // (169.254.169.254 etc.). Flipping into self-hosted proves the
-      // override path doesn't reopen the IMDS hole.
-      process.env['MANIFEST_MODE'] = 'selfhosted';
+    it('rejects plaintext http:// to a public host as 400', async () => {
+      // AC-2 in the Mine paper: forwarding API keys + completions over http
+      // to a public host leaks credentials to passive wire-sniffers.
       const res = await request(app.getHttpServer())
         .post(`/api/v1/routing/${agentName}/custom-providers`)
         .set(headers)
-        .send({
-          name: 'IMDS',
-          base_url: 'http://169.254.169.254/latest/meta-data',
-          models: baseModels,
-        })
+        .send({ name: 'Plaintext HTTP', base_url: 'http://93.184.216.34/v1', models: baseModels })
         .expect(400);
 
       const body = res.body as { message?: string };
-      expect(typeof body.message === 'string' && body.message.includes('metadata')).toBe(true);
+      expect(body.message).toContain('http:// is only allowed for private hosts');
+    });
+
+    it.each([
+      'http://169.254.169.254/latest/meta-data',
+      'https://169.254.169.254/latest/meta-data',
+      'http://[fd00:ec2::254]/latest/meta-data',
+      'http://[::ffff:169.254.169.254]/latest/meta-data',
+      'http://100.100.100.200/latest/meta-data',
+      'http://metadata.google.internal/computeMetadata/v1/',
+      // AWS container credential endpoints (ECS/Fargate, EKS Pod Identity).
+      'http://169.254.170.2/v2/credentials/abc',
+      'http://169.254.170.23/v1/credentials',
+      'http://[fd00:ec2::23]/v1/credentials',
+      // IMDS embedded in IPv6: IPv4-compatible and NAT64.
+      'http://[::a9fe:a9fe]/latest/meta-data',
+      'http://[64:ff9b::a9fe:a9fe]/latest/meta-data',
+    ])('rejects the cloud metadata endpoint %s as 400', async (url) => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/routing/${agentName}/custom-providers`)
+        .set(headers)
+        .send({ name: 'IMDS', base_url: url, models: baseModels })
+        .expect(400);
+
+      const body = res.body as { message?: string };
+      expect(body.message).toContain('cloud metadata');
     });
   });
 
@@ -238,23 +232,42 @@ describe('Custom Providers URL validation (e2e)', () => {
         .expect(400);
     });
 
-    it('rejects plaintext http to a public host on update in cloud mode', async () => {
+    async function withSsrfValidation(run: () => Promise<void>): Promise<void> {
       const originalSkip = process.env['SKIP_SSRF_VALIDATION'];
-      const originalMode = process.env['MANIFEST_MODE'];
       process.env['SKIP_SSRF_VALIDATION'] = 'false';
-      process.env['MANIFEST_MODE'] = 'cloud';
       try {
-        await request(app.getHttpServer())
-          .put(`/api/v1/routing/${agentName}/custom-providers/${createdId}`)
-          .set(headers)
-          .send({ base_url: 'http://api.example.com/v1' })
-          .expect(400);
+        await run();
       } finally {
         if (originalSkip === undefined) delete process.env['SKIP_SSRF_VALIDATION'];
         else process.env['SKIP_SSRF_VALIDATION'] = originalSkip;
-        if (originalMode === undefined) delete process.env['MANIFEST_MODE'];
-        else process.env['MANIFEST_MODE'] = originalMode;
       }
+    }
+
+    it('rejects plaintext http to a public host on update', async () => {
+      await withSsrfValidation(async () => {
+        await request(app.getHttpServer())
+          .put(`/api/v1/routing/${agentName}/custom-providers/${createdId}`)
+          .set(headers)
+          .send({ base_url: 'http://93.184.216.34/v1' })
+          .expect(400);
+      });
+    });
+
+    it('accepts a LAN URL on update and still rejects cloud metadata', async () => {
+      await withSsrfValidation(async () => {
+        const res = await request(app.getHttpServer())
+          .put(`/api/v1/routing/${agentName}/custom-providers/${createdId}`)
+          .set(headers)
+          .send({ base_url: 'http://192.168.1.50:11434/v1' })
+          .expect(200);
+        expect(res.body.base_url).toBe('http://192.168.1.50:11434/v1');
+
+        await request(app.getHttpServer())
+          .put(`/api/v1/routing/${agentName}/custom-providers/${createdId}`)
+          .set(headers)
+          .send({ base_url: 'http://169.254.169.254/latest/meta-data' })
+          .expect(400);
+      });
     });
 
     it('accepts a fresh valid https URL on update (sanity)', async () => {

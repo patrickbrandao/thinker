@@ -84,35 +84,6 @@ describe('SetupService', () => {
     });
   });
 
-  describe('isSelfHosted', () => {
-    const originalMode = process.env['MANIFEST_MODE'];
-
-    afterEach(() => {
-      if (originalMode === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = originalMode;
-    });
-
-    it('returns true when MANIFEST_MODE is selfhosted', () => {
-      process.env['MANIFEST_MODE'] = 'selfhosted';
-      expect(service.isSelfHosted()).toBe(true);
-    });
-
-    it('returns true for legacy MANIFEST_MODE=local', () => {
-      process.env['MANIFEST_MODE'] = 'local';
-      expect(service.isSelfHosted()).toBe(true);
-    });
-
-    it('returns false when MANIFEST_MODE is cloud', () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
-      expect(service.isSelfHosted()).toBe(false);
-    });
-
-    it('returns false when MANIFEST_MODE is not set', () => {
-      delete process.env['MANIFEST_MODE'];
-      expect(service.isSelfHosted()).toBe(false);
-    });
-  });
-
   describe('isOllamaAvailable', () => {
     const originalFetch = global.fetch;
 

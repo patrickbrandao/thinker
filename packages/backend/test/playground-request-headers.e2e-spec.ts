@@ -124,8 +124,6 @@ function parsePlaygroundSse(text: string): Json[] {
 // provider. Credential, tenant-identity, gateway and transport headers must
 // never reach the upstream; ordinary custom headers still must.
 describe('Playground extra request headers (e2e)', () => {
-  const ENV_KEYS = ['MANIFEST_MODE'];
-  const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   let app: INestApplication;
   let mock: { server: Server; received: Received[] };
   const providerIds: Record<'openai' | 'anthropic', string> = { openai: '', anthropic: '' };
@@ -134,8 +132,6 @@ describe('Playground extra request headers (e2e)', () => {
 
   beforeAll(async () => {
     mock = await startMockProvider();
-    // Custom providers on a loopback URL are allowed only when self-hosted.
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     app = await createTestApp();
 
     const port = (mock.server.address() as AddressInfo).port;
@@ -165,10 +161,6 @@ describe('Playground extra request headers (e2e)', () => {
   afterAll(async () => {
     await app?.close();
     if (mock) await closeServer(mock.server);
-    for (const key of ENV_KEYS) {
-      if (savedEnv[key] === undefined) delete process.env[key];
-      else process.env[key] = savedEnv[key];
-    }
   });
 
   async function runPlayground(

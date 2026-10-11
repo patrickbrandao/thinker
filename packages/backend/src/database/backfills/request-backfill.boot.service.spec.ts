@@ -40,7 +40,6 @@ function makeState(completed: boolean, transitionFinalized = false) {
 
 describe('RequestBackfillBootService', () => {
   const originalEnv = process.env['NODE_ENV'];
-  const originalMode = process.env['MANIFEST_MODE'];
   const originalBackfillUrl = process.env['BACKFILL_DATABASE_URL'];
   const originalMigrationUrl = process.env['MIGRATION_DATABASE_URL'];
   const originalUnpooledUrl = process.env['DATABASE_UNPOOLED_URL'];
@@ -52,8 +51,6 @@ describe('RequestBackfillBootService', () => {
 
   afterEach(() => {
     process.env['NODE_ENV'] = originalEnv;
-    if (originalMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = originalMode;
     if (originalBackfillUrl === undefined) delete process.env['BACKFILL_DATABASE_URL'];
     else process.env['BACKFILL_DATABASE_URL'] = originalBackfillUrl;
     if (originalMigrationUrl === undefined) delete process.env['MIGRATION_DATABASE_URL'];
@@ -70,80 +67,35 @@ describe('RequestBackfillBootService', () => {
     expect(ds.createQueryRunner).not.toHaveBeenCalled();
   });
 
-  it('uses a separate direct DataSource in cloud production', async () => {
+  it('runs on the application DataSource in production, never a direct pool', async () => {
     process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'cloud';
-    process.env['MIGRATION_DATABASE_URL'] = 'postgres://direct/cloud';
-    const appDataSource = { createQueryRunner: jest.fn() } as unknown as DataSource;
-    const directState = makeState(true);
-    const directDataSource = {
-      initialize: jest.fn(async () => undefined),
-      destroy: jest.fn(async () => undefined),
-      isInitialized: true,
-      getRepository: jest.fn(() => directState.repo),
+    // Even with a direct URL configured, the boot path stays on DATABASE_URL:
+    // there is no deployment mode that switches to a separate pool.
+    process.env['MIGRATION_DATABASE_URL'] = 'postgres://direct/db';
+    const state = makeState(true, true);
+    const ds = {
       query: jest.fn(async () => [{ present: false }]),
       createQueryRunner: jest.fn(),
     } as unknown as DataSource;
-    const factory = jest
-      .spyOn(requestBackfillDataSource, 'createRequestBackfillDataSource')
-      .mockReturnValue(directDataSource);
-    const providerBackfill = jest
-      .spyOn(MessageProviderBackfillBootService.prototype, 'runUntilComplete')
-      .mockResolvedValue(undefined);
-    const service = new RequestBackfillBootService(appDataSource, makeState(false).repo);
-
-    service.onApplicationBootstrap();
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(factory).toHaveBeenCalledWith(process.env);
-    expect(directDataSource.initialize).toHaveBeenCalled();
-    expect(directDataSource.getRepository).toHaveBeenCalledWith(BackfillState);
-    expect(providerBackfill).toHaveBeenCalledTimes(1);
-    expect(appDataSource.createQueryRunner).not.toHaveBeenCalled();
-    expect(directDataSource.query).not.toHaveBeenCalled();
-    expect(directDataSource.destroy).toHaveBeenCalledTimes(1);
-    await service.onApplicationShutdown();
-    expect(directDataSource.destroy).toHaveBeenCalledTimes(1);
-  });
-
-  it('closes a Cloud direct pool that finishes connecting during shutdown', async () => {
-    process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'cloud';
-    process.env['MIGRATION_DATABASE_URL'] = 'postgres://direct/cloud';
-    let finishInitialize!: () => void;
-    const directDataSource = {
-      initialize: jest.fn(
-        () =>
-          new Promise<void>((resolve) => {
-            finishInitialize = resolve;
-          }),
-      ),
-      destroy: jest.fn(async () => undefined),
-      isInitialized: true,
-      getRepository: jest.fn(),
-    } as unknown as DataSource;
-    jest
-      .spyOn(requestBackfillDataSource, 'createRequestBackfillDataSource')
-      .mockReturnValue(directDataSource);
-    const service = new RequestBackfillBootService(
-      { createQueryRunner: jest.fn() } as unknown as DataSource,
-      makeState(false).repo,
+    const factory = jest.spyOn(requestBackfillDataSource, 'createRequestBackfillDataSource');
+    const providerBackfill = jest.spyOn(
+      MessageProviderBackfillBootService.prototype,
+      'runUntilComplete',
     );
+    const service = new RequestBackfillBootService(ds, state.repo);
 
     service.onApplicationBootstrap();
-    await Promise.resolve();
-    await service.onApplicationShutdown();
-    finishInitialize();
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(directDataSource.destroy).toHaveBeenCalledTimes(1);
-    expect(directDataSource.getRepository).not.toHaveBeenCalled();
+    expect(state.countBy).toHaveBeenCalledWith({ name: REQUEST_BACKFILL_NAME });
+    expect(factory).not.toHaveBeenCalled();
+    expect(providerBackfill).not.toHaveBeenCalled();
+    await service.onApplicationShutdown();
   });
 
-  it('retries a self-hosted startup failure without requiring a restart or direct URL', async () => {
+  it('retries a startup failure without requiring a restart or direct URL', async () => {
     jest.useFakeTimers();
     process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     delete process.env['BACKFILL_DATABASE_URL'];
     delete process.env['MIGRATION_DATABASE_URL'];
     delete process.env['DATABASE_UNPOOLED_URL'];
@@ -174,10 +126,9 @@ describe('RequestBackfillBootService', () => {
     }
   });
 
-  it('stops retrying a self-hosted failure during shutdown', async () => {
+  it('stops retrying a failure during shutdown', async () => {
     jest.useFakeTimers();
     process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     const state = makeState(false);
     state.countBy.mockRejectedValue(new Error('db down'));
     const service = new RequestBackfillBootService(
@@ -194,58 +145,6 @@ describe('RequestBackfillBootService', () => {
       await jest.advanceTimersByTimeAsync(REQUEST_BACKFILL_LOCK_RETRY_MS);
 
       expect(state.countBy).toHaveBeenCalledTimes(1);
-    } finally {
-      jest.clearAllTimers();
-      jest.useRealTimers();
-    }
-  });
-
-  it('recreates the Cloud direct pool after a transient coordinator failure', async () => {
-    jest.useFakeTimers();
-    process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'cloud';
-    process.env['MIGRATION_DATABASE_URL'] = 'postgres://direct/cloud';
-    const failedState = makeState(false);
-    failedState.countBy.mockRejectedValue(new Error('connection reset'));
-    const completedState = makeState(true);
-    const firstDirect = {
-      initialize: jest.fn(async () => undefined),
-      destroy: jest.fn(async () => undefined),
-      isInitialized: true,
-      getRepository: jest.fn(() => failedState.repo),
-    } as unknown as DataSource;
-    const secondDirect = {
-      initialize: jest.fn(async () => undefined),
-      destroy: jest.fn(async () => undefined),
-      isInitialized: true,
-      getRepository: jest.fn(() => completedState.repo),
-      query: jest.fn(async () => [{ present: false }]),
-    } as unknown as DataSource;
-    const factory = jest
-      .spyOn(requestBackfillDataSource, 'createRequestBackfillDataSource')
-      .mockReturnValueOnce(firstDirect)
-      .mockReturnValueOnce(secondDirect);
-    const service = new RequestBackfillBootService(
-      { createQueryRunner: jest.fn() } as unknown as DataSource,
-      makeState(false).repo,
-    );
-
-    try {
-      service.onApplicationBootstrap();
-      await jest.advanceTimersByTimeAsync(0);
-
-      expect(firstDirect.destroy).toHaveBeenCalled();
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('connection reset; retrying in 30s'),
-      );
-
-      await jest.advanceTimersByTimeAsync(REQUEST_BACKFILL_LOCK_RETRY_MS);
-
-      expect(factory).toHaveBeenCalledTimes(2);
-      expect(secondDirect.initialize).toHaveBeenCalled();
-      expect(completedState.countBy).toHaveBeenCalled();
-      await service.onApplicationShutdown();
-      expect(secondDirect.destroy).toHaveBeenCalled();
     } finally {
       jest.clearAllTimers();
       jest.useRealTimers();
@@ -695,7 +594,6 @@ describe('RequestBackfillBootService', () => {
   it('waits through the rolling-deploy grace window before finalizing the transition', async () => {
     jest.useFakeTimers();
     process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     const ds = {
       query: jest.fn().mockResolvedValue([{ present: true }]),
       createQueryRunner: jest.fn(),
@@ -723,7 +621,6 @@ describe('RequestBackfillBootService', () => {
   it('reports a self-hosted tail failure and stops the timer on shutdown', async () => {
     jest.useFakeTimers();
     process.env['NODE_ENV'] = 'production';
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     const ds = {
       query: jest.fn().mockResolvedValue([{ present: true }]),
       createQueryRunner: jest.fn(),

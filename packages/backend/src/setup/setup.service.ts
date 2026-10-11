@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { OLLAMA_HOST } from '../common/constants/ollama';
-import { getContainerHostAlias, isSelfHosted } from '../common/utils/detect-self-hosted';
+import { getContainerHostAlias } from '../common/utils/container-host';
 import { isEmailConfigured } from '../notifications/services/email-providers/send-email';
 import { mcpAvailability } from '../auth/mcp-availability';
 
@@ -18,14 +18,6 @@ export class SetupService {
   private readonly logger = new Logger(SetupService.name);
 
   constructor(private readonly dataSource: DataSource) {}
-
-  /**
-   * Returns true when running in the self-hosted version.
-   * Auto-detects Docker containers; can be overridden via MANIFEST_MODE env var.
-   */
-  isSelfHosted(): boolean {
-    return isSelfHosted();
-  }
 
   /**
    * Returns the hostname the backend should use to reach host-installed

@@ -349,19 +349,11 @@ describe('MCP tools', () => {
       expect(
         (await call(tools, 'manifest_provider_connect', { provider: 'nope', agent: 'demo' })).error,
       ).toBe(true);
-      // Local-only providers are rejected outside self-hosted installs. Pin the
-      // deployment mode so a container marker cannot flip isSelfHosted().
-      const previousMode = process.env['MANIFEST_MODE'];
-      process.env['MANIFEST_MODE'] = 'cloud';
-      try {
-        expect(
-          (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
-            .error,
-        ).toBe(true);
-      } finally {
-        if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-        else process.env['MANIFEST_MODE'] = previousMode;
-      }
+      // Built-in local providers connect with no deployment mode configured.
+      expect(
+        (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
+          .error,
+      ).toBeFalsy();
 
       // Discovery failing after the connection is saved still succeeds.
       const discoveryFails = makeDeps();

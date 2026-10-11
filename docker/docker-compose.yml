@@ -88,13 +88,9 @@ services:
       # would only offer a setting that cannot take effect.
       - SEED_DATA=false
       - NODE_ENV=production
-      # Force self-hosted semantics regardless of the container runtime.
-      # The auto-detection inside the app reads /.dockerenv (Docker),
-      # /run/.containerenv (Podman), and KUBERNETES_SERVICE_HOST, but
-      # explicit beats inferred — and a number of rootless / nspawn /
-      # exotic runtimes produce neither marker. Setting this avoids
-      # silently flipping users back to cloud-mode SSRF rules (issue #1780).
-      - MANIFEST_MODE=${MANIFEST_MODE:-selfhosted}
+      # MCP clients whose Client ID Metadata Document lives on a private or
+      # loopback host are refused unless this is true (SSRF guard, #18).
+      - THINKER_CIMD_ALLOW_PRIVATE=${THINKER_CIMD_ALLOW_PRIVATE:-false}
       # Message recordings use this mounted Docker volume automatically when
       # S3-compatible bucket credentials are not present.
       - REQUEST_RECORDING_STORAGE=${REQUEST_RECORDING_STORAGE:-auto}

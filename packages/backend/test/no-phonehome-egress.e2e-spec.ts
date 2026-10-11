@@ -31,12 +31,11 @@ const FORBIDDEN_DESTINATIONS = [
 const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
 /**
  * Backend production files that still name a hosted gateway host, none of them
- * as a request destination: Cloud trusted origins (#18), and the dashboard link
- * fallback with the OG-tag placeholder it matches in the frontend's index.html
- * (#22, #25). The list may only shrink.
+ * as a request destination: the dashboard link fallback with the OG-tag
+ * placeholder it matches in the frontend's index.html (#22, #25). The list may
+ * only shrink.
  */
 const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
-  'backend/src/auth/auth.instance.ts',
   'backend/src/common/utils/dashboard-url.ts',
   'backend/src/common/utils/og-rewrite.ts',
 ];

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { getContainerHostAlias } from '../utils/detect-self-hosted';
+import { getContainerHostAlias } from '../utils/container-host';
 
 /**
  * Built-in local OpenAI-compatible servers that connect as a canonical

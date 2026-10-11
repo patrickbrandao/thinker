@@ -1,5 +1,5 @@
 const mockGetContainerHostAlias = jest.fn(() => 'localhost');
-jest.mock('../utils/detect-self-hosted', () => ({
+jest.mock('../utils/container-host', () => ({
   getContainerHostAlias: () => mockGetContainerHostAlias(),
 }));
 

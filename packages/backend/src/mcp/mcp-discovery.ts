@@ -5,9 +5,9 @@ import type { Request, Response } from 'express';
 import { mcpOAuthResponse } from '../auth/mcp-oauth-response';
 import {
   authInstance,
-  authIssuerForHost,
-  authOriginForHost,
-  mcpResourceForHost,
+  authIssuer,
+  authOrigin,
+  mcpResource,
   MCP_SCOPES,
 } from '../auth/auth.instance';
 
@@ -43,13 +43,12 @@ export function mountMcpDiscovery(app: INestApplication): void {
   const serveAuthMetadata = async (req: Request, res: Response): Promise<void> => {
     cors(res);
     try {
-      const webRequest = new globalThis.Request(
-        `${authOriginForHost(req.headers.host)}${req.originalUrl}`,
-        {
-          method: req.method,
-          headers: fromNodeHeaders(req.headers),
-        },
-      );
+      // Always the canonical origin: the MCP resource and issuer are bound to
+      // BETTER_AUTH_URL, never to a client-supplied Host header.
+      const webRequest = new globalThis.Request(`${authOrigin}${req.originalUrl}`, {
+        method: req.method,
+        headers: fromNodeHeaders(req.headers),
+      });
       const response = await mcpOAuthResponse(webRequest, await authServerMetadata(webRequest));
       response.headers.forEach((value, key) => res.set(key, value));
       res.status(response.status).send(req.method === 'HEAD' ? undefined : await response.text());
@@ -75,11 +74,11 @@ export function mountMcpDiscovery(app: INestApplication): void {
   });
 
   for (const path of PROTECTED_RESOURCE_PATHS) {
-    expressApp.get(path, (req: Request, res: Response) => {
+    expressApp.get(path, (_req: Request, res: Response) => {
       cors(res);
       res.status(200).json({
-        resource: mcpResourceForHost(req.headers.host),
-        authorization_servers: [authIssuerForHost(req.headers.host)],
+        resource: mcpResource,
+        authorization_servers: [authIssuer],
         bearer_methods_supported: ['header'],
         scopes_supported: [...MCP_SCOPES],
       });
