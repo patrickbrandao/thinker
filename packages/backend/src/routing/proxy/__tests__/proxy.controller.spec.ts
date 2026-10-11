@@ -315,26 +315,6 @@ describe('ProxyController', () => {
     });
   });
 
-  it('lists a renamed custom provider under its new alias only, next to the built-in route', async () => {
-    modelDiscovery.getModelsForAgent.mockResolvedValue([
-      makeDiscoveredModel({ id: 'qwen/qwen3-8b', provider: 'lmstudio', authType: 'local' }),
-      makeDiscoveredModel({
-        id: 'custom:cp-lm/qwen/qwen3-8b',
-        provider: 'custom:cp-lm',
-        providerName: 'LMStudio',
-        providerAlias: 'lmstudio-custom',
-        providerLegacyAlias: 'lmstudio',
-        authType: 'api_key',
-      }),
-    ]);
-
-    const { data } = await controller.models(mockRequest({}) as never);
-    const ids = data.map((m: { id: string }) => m.id);
-
-    expect(ids).toEqual(['auto', 'lmstudio/qwen/qwen3-8b', 'lmstudio-custom/qwen/qwen3-8b']);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
   it('should keep the default /v1/models shape unchanged when optional metadata exists', async () => {
     modelDiscovery.getModelsForAgent.mockResolvedValue([
       makeDiscoveredModel({

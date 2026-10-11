@@ -109,51 +109,6 @@ describe('OpenAI model ids', () => {
     expect(routeForOpenAiModelId('alibaba/qwen-3-14b', [custom])).toBeNull();
   });
 
-  describe('legacy alias of a custom provider renamed off a reserved id', () => {
-    const renamed = model({
-      id: 'custom:cp-lm/qwen/qwen3-8b',
-      provider: 'custom:cp-lm',
-      providerAlias: 'lmstudio-custom',
-      providerLegacyAlias: 'lmstudio',
-    });
-    const customRoute = {
-      provider: 'custom:cp-lm',
-      authType: 'api_key',
-      model: 'custom:cp-lm/qwen/qwen3-8b',
-    };
-
-    it('publishes only the new alias', () => {
-      expect(openAiModelId(renamed)).toBe('lmstudio-custom/qwen/qwen3-8b');
-    });
-
-    it('still routes the old alias, the new alias and the internal key to the custom provider', () => {
-      expect(routeForOpenAiModelId('lmstudio/qwen/qwen3-8b', [renamed])).toEqual(customRoute);
-      expect(routeForOpenAiModelId('lmstudio-custom/qwen/qwen3-8b', [renamed])).toEqual(
-        customRoute,
-      );
-      expect(routeForOpenAiModelId('custom:cp-lm/qwen/qwen3-8b', [renamed])).toEqual(customRoute);
-    });
-
-    it('lets the built-in route win when it publishes the same id', () => {
-      const native = model({ id: 'qwen/qwen3-8b', provider: 'lmstudio', authType: 'local' });
-      const expected = { provider: 'lmstudio', authType: 'local', model: 'qwen/qwen3-8b' };
-      expect(routeForOpenAiModelId('lmstudio/qwen/qwen3-8b', [renamed, native])).toEqual(expected);
-      expect(routeForOpenAiModelId('lmstudio/qwen/qwen3-8b', [native, renamed])).toEqual(expected);
-    });
-
-    it('falls back to the custom provider for a model only it serves', () => {
-      const native = model({ id: 'gemma-3', provider: 'lmstudio', authType: 'local' });
-      expect(routeForOpenAiModelId('lmstudio/qwen/qwen3-8b', [native, renamed])).toEqual(
-        customRoute,
-      );
-    });
-
-    it('ignores a legacy alias on a non-custom model', () => {
-      const odd = model({ id: 'gpt-4o', provider: 'openai', providerLegacyAlias: 'legacy' });
-      expect(routeForOpenAiModelId('legacy/gpt-4o', [odd])).toBeNull();
-    });
-  });
-
   it('resolves listed ids back to routable provider/auth/model triples', () => {
     const route = routeForOpenAiModelId('openrouter/anthropic/claude-sonnet-4.5', [
       model({

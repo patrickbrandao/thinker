@@ -30,24 +30,9 @@ export function subscriptionOpenAiModelId(provider: string, modelId: string): st
  */
 function customOpenAiModelId(model: DiscoveredModel): string {
   if (!model.providerAlias) return model.id;
-  return `${model.providerAlias}/${customModelName(model)}`;
-}
-
-/**
- * The `<legacy_alias>/<model_name>` id a custom provider model published
- * before its alias was reserved for a built-in route, or null. Accepted by
- * the proxy as a fallback only; never listed in `/v1/models`.
- */
-export function legacyOpenAiModelId(model: DiscoveredModel): string | null {
-  if (!model.providerLegacyAlias || !model.provider.toLowerCase().startsWith('custom:')) {
-    return null;
-  }
-  return `${model.providerLegacyAlias}/${customModelName(model)}`;
-}
-
-function customModelName(model: DiscoveredModel): string {
   const prefix = `${model.provider}/`;
-  return model.id.startsWith(prefix) ? model.id.slice(prefix.length) : model.id;
+  const modelName = model.id.startsWith(prefix) ? model.id.slice(prefix.length) : model.id;
+  return `${model.providerAlias}/${modelName}`;
 }
 
 export function openAiModelId(model: DiscoveredModel): string {

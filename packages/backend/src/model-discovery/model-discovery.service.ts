@@ -656,7 +656,6 @@ export class ModelDiscoveryService {
           qualityScore: 2,
           providerName: cp.name,
           ...(cp.alias ? { providerAlias: cp.alias } : {}),
-          ...(cp.legacy_alias ? { providerLegacyAlias: cp.legacy_alias } : {}),
         });
       }
     }

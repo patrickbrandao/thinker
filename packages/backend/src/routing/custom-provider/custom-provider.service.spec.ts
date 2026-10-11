@@ -748,12 +748,7 @@ describe('CustomProviderService', () => {
       it.each(['lmstudio', 'llamacpp'])(
         'rejects switching to the native local runner id %s',
         async (alias) => {
-          const existing = {
-            id: 'cp1',
-            name: 'LMStudio',
-            alias: `${alias}-custom`,
-            legacy_alias: alias,
-          } as CustomProvider;
+          const existing = { id: 'cp1', name: 'LMStudio', alias: null } as CustomProvider;
           const { svc, save } = makeDeps({ findOneResults: [existing] });
           await expect(svc.update('cp1', 'tenant-1', { alias })).rejects.toBeInstanceOf(
             BadRequestException,

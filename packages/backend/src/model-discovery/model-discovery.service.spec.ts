@@ -972,27 +972,6 @@ describe('ModelDiscoveryService', () => {
       expect(result[0].providerName).toBe('My Custom');
     });
 
-    it('carries the legacy alias of a custom provider renamed off a reserved id', async () => {
-      providerRepo.find.mockResolvedValue([]);
-      customProviderRepo.find.mockResolvedValue([
-        makeCustomProvider({ alias: 'lmstudio-custom', legacy_alias: 'lmstudio' }),
-      ]);
-
-      const result = await service.getModelsForAgent('agent-1');
-
-      expect(result[0].providerAlias).toBe('lmstudio-custom');
-      expect(result[0].providerLegacyAlias).toBe('lmstudio');
-    });
-
-    it('omits the legacy alias when the provider has none', async () => {
-      providerRepo.find.mockResolvedValue([]);
-      customProviderRepo.find.mockResolvedValue([makeCustomProvider({ alias: 'my-custom' })]);
-
-      const result = await service.getModelsForAgent('agent-1');
-
-      expect(result[0]).not.toHaveProperty('providerLegacyAlias');
-    });
-
     it('should filter stale unsupported OpenAI subscription cached models', async () => {
       const providers = [
         makeProvider({
