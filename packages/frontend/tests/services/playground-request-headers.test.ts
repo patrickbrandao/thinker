@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LEGACY_REQUEST_HEADERS_STORAGE_KEY,
+  MAX_PERSISTED_NAME_LENGTH,
   REQUEST_HEADER_NAMES_STORAGE_KEY,
   activeHeaderCount,
   blankEntry,
+  cleanUpStoredHeaders,
   headerEntryIssue,
   headerValueIssue,
   isBlockedHeaderKey,
@@ -118,6 +120,44 @@ describe('toHeaderRecord / activeHeaderCount', () => {
     expect(activeHeaderCount(entries)).toBe(2);
     expect(activeHeaderCount([])).toBe(0);
   });
+
+  // Same rule as the server sanitizer: case-insensitive, first occurrence wins.
+  it('keeps only the first of case-variant duplicates', () => {
+    const dupes = [
+      { id: '1', key: 'X-Title', value: 'first' },
+      { id: '2', key: 'x-title', value: 'second' },
+      { id: '3', key: ' X-TITLE ', value: 'third' },
+    ];
+    expect(toHeaderRecord(dupes)).toEqual({ 'X-Title': 'first' });
+    expect(activeHeaderCount(dupes)).toBe(1);
+  });
+
+  it('skips dropped rows before de-duplicating, like the server', () => {
+    const rows = [
+      { id: '1', key: 'X-Title', value: 'bad\n' },
+      { id: '2', key: 'x-title', value: 'good' },
+    ];
+    expect(toHeaderRecord(rows)).toEqual({ 'x-title': 'good' });
+  });
+
+  it('caps forwarded headers at 20, keeping the first ones', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      id: String(i),
+      key: `X-H${i}`,
+      value: 'v',
+    }));
+    const record = toHeaderRecord(many);
+    expect(Object.keys(record)).toHaveLength(20);
+    expect(record['X-H0']).toBe('v');
+    expect(record['X-H19']).toBe('v');
+    expect(record['X-H20']).toBeUndefined();
+    expect(activeHeaderCount(many)).toBe(20);
+  });
+
+  it('still sends a valid name too long to be saved', () => {
+    const name = `X-${'a'.repeat(MAX_PERSISTED_NAME_LENGTH)}`;
+    expect(toHeaderRecord([{ id: '1', key: name, value: 'v' }])).toEqual({ [name]: 'v' });
+  });
 });
 
 describe('blankEntry', () => {
@@ -170,6 +210,26 @@ describe('header storage (names only)', () => {
       { id: '5', key: 'x-title', value: 'b' },
     ]);
     expect(JSON.parse(store[REQUEST_HEADER_NAMES_STORAGE_KEY]!)).toEqual(['X-Title']);
+  });
+
+  // A long "name" is most likely a token pasted into the wrong field.
+  it(`does not save names longer than ${MAX_PERSISTED_NAME_LENGTH} characters`, () => {
+    const max = `X-${'a'.repeat(MAX_PERSISTED_NAME_LENGTH - 2)}`;
+    const tooLong = `sk-proj-${'b'.repeat(MAX_PERSISTED_NAME_LENGTH)}`;
+    persistHeaderNames([
+      { id: '1', key: tooLong, value: 'v' },
+      { id: '2', key: max, value: 'v' },
+    ]);
+    const raw = store[REQUEST_HEADER_NAMES_STORAGE_KEY]!;
+    expect(JSON.parse(raw)).toEqual([max]);
+    expect(raw).not.toContain('sk-proj-');
+  });
+
+  it('drops over-long names already saved when loading', () => {
+    const tooLong = `X-${'c'.repeat(MAX_PERSISTED_NAME_LENGTH)}`;
+    store[REQUEST_HEADER_NAMES_STORAGE_KEY] = JSON.stringify([tooLong, 'X-Title']);
+    expect(loadStoredHeaderEntries().map((e) => e.key)).toEqual(['X-Title']);
+    expect(store[REQUEST_HEADER_NAMES_STORAGE_KEY]).toBe('["X-Title"]');
   });
 
   it('removes the key when nothing is worth saving', () => {
@@ -247,6 +307,25 @@ describe('header storage (names only)', () => {
     expect(store[REQUEST_HEADER_NAMES_STORAGE_KEY]).toBeUndefined();
   });
 
+  it('cleanUpStoredHeaders (app startup) migrates and removes the legacy key', () => {
+    store[LEGACY_REQUEST_HEADERS_STORAGE_KEY] = JSON.stringify([
+      { id: 'h1', key: 'X-Title', value: 'my-app' },
+      { id: 'h2', key: 'Authorization', value: 'Bearer sk-secret' },
+    ]);
+    cleanUpStoredHeaders();
+    expect(store[LEGACY_REQUEST_HEADERS_STORAGE_KEY]).toBeUndefined();
+    expect(store[REQUEST_HEADER_NAMES_STORAGE_KEY]).toBe('["X-Title"]');
+    expect(JSON.stringify(store)).not.toMatch(/secret|my-app/);
+    // Idempotent: a second run keeps the migrated names.
+    cleanUpStoredHeaders();
+    expect(store[REQUEST_HEADER_NAMES_STORAGE_KEY]).toBe('["X-Title"]');
+  });
+
+  it('cleanUpStoredHeaders leaves empty storage empty', () => {
+    cleanUpStoredHeaders();
+    expect(store).toEqual({});
+  });
+
   it('returns no rows and does not throw when storage access throws', () => {
     vi.stubGlobal('localStorage', {
       getItem: () => {
@@ -260,6 +339,7 @@ describe('header storage (names only)', () => {
       },
     });
     expect(loadStoredHeaderEntries()).toEqual([]);
+    expect(() => cleanUpStoredHeaders()).not.toThrow();
     expect(() => persistHeaderNames([{ id: '1', key: 'X-Title', value: 'v' }])).not.toThrow();
     expect(() => persistHeaderNames([])).not.toThrow();
   });
@@ -267,6 +347,7 @@ describe('header storage (names only)', () => {
   it('does not throw when localStorage itself is unavailable', () => {
     vi.stubGlobal('localStorage', undefined);
     expect(loadStoredHeaderEntries()).toEqual([]);
+    expect(() => cleanUpStoredHeaders()).not.toThrow();
     expect(() => persistHeaderNames([{ id: '1', key: 'X-Title', value: 'v' }])).not.toThrow();
   });
 });

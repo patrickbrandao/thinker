@@ -824,22 +824,32 @@ describe('Playground page', () => {
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
     });
 
-    it('mounts with no entries when reading localStorage throws', async () => {
-      vi.stubGlobal('localStorage', {
-        getItem: (k: string) => {
-          if (k.includes('requestHeader')) throw new Error('SecurityError');
-          return lsStore[k] ?? null;
+    it('does not crash when every Web Storage access throws', async () => {
+      const blocked = {
+        getItem: () => {
+          throw new Error('SecurityError');
         },
-        setItem: (k: string, v: string) => {
-          lsStore[k] = v;
+        setItem: () => {
+          throw new Error('SecurityError');
         },
-        removeItem: (k: string) => {
-          delete lsStore[k];
+        removeItem: () => {
+          throw new Error('SecurityError');
         },
-      });
+      };
+      vi.stubGlobal('localStorage', blocked);
+      vi.stubGlobal('sessionStorage', blocked);
       render(() => <Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
+      // Writes swallow the error too: the history toggle (recentOpen) and the
+      // header names.
+      renderSidebar();
+      fireEvent.click(await find('sidebar-toggle'));
+      expect((await find('sidebar-open')).textContent).toBe('false');
+      const trigger = document.querySelector('[aria-label="Request headers"]') as HTMLElement;
+      fireEvent.click(trigger);
+      fireEvent.click(await find('headers-change'));
+      expect(document.querySelector('.playground-prompt__headers-badge')?.textContent).toBe('1');
     });
 
     it('silently ignores a localStorage write failure when persisting headers', async () => {

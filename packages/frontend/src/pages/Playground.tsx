@@ -50,6 +50,25 @@ import { useRightSidebar } from '../services/right-sidebar.jsx';
 import '../styles/playground.css';
 import '../styles/routing.css';
 
+// Web Storage can throw (blocked site data, private mode, quota) or be missing
+// entirely. These preferences are conveniences, so failures fall back silently.
+function readStorage(storage: () => Storage, key: string): string | null {
+  try {
+    return storage().getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(storage: () => Storage, key: string, value: string | null): void {
+  try {
+    if (value === null) storage().removeItem(key);
+    else storage().setItem(key, value);
+  } catch {
+    /* storage unavailable: nothing to remember */
+  }
+}
+
 function findDisplayName(
   available: { model_name: string; display_name?: string | null }[],
   modelName: string,
@@ -127,12 +146,13 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   const [announcement, setAnnouncement] = createSignal('');
   const [promptHeight, setPromptHeight] = createSignal(0);
   const [historyOpen, setHistoryOpen] = createSignal(
-    !props.embedded && localStorage.getItem('manifest.playground.recentOpen') !== 'false',
+    !props.embedded &&
+      readStorage(() => localStorage, 'manifest.playground.recentOpen') !== 'false',
   );
   const toggleRecent = () => {
     const next = !historyOpen();
     setHistoryOpen(next);
-    localStorage.setItem('manifest.playground.recentOpen', String(next));
+    writeStorage(() => localStorage, 'manifest.playground.recentOpen', String(next));
   };
   const [historyRuns, setHistoryRuns] = createSignal<PlaygroundHistoryRunSummary[]>([]);
   const [historyLoading, setHistoryLoading] = createSignal(false);
@@ -183,7 +203,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(null);
     setOverlayBestId(null);
     setSearchParams({ run: undefined });
-    sessionStorage.removeItem('manifest.playground.lastRun');
+    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
     // pickDefaults will fire via the existing createEffect since columns are now empty
     requestAnimationFrame(() => promptRef?.focus());
   };
@@ -216,7 +236,8 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       setCompletedResults([...store().columns]);
     }
     if (store().columns.length > 0) return;
-    const runId = searchParams.run || sessionStorage.getItem('manifest.playground.lastRun');
+    const runId =
+      searchParams.run || readStorage(() => sessionStorage, 'manifest.playground.lastRun');
     if (runId && !activeRunId()) {
       getPlaygroundRun(runId)
         .then((detail) => {
@@ -227,7 +248,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
         })
         .catch(() => {
           setSearchParams({ run: undefined });
-          sessionStorage.removeItem('manifest.playground.lastRun');
+          writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
         });
     }
   });
@@ -266,7 +287,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(runId);
     setViewingHistory(null);
     setSearchParams({ run: runId });
-    sessionStorage.setItem('manifest.playground.lastRun', runId);
+    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', runId);
   };
 
   const handleRetry = (id: string) => {

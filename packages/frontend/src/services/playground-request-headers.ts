@@ -11,6 +11,13 @@ export interface HeaderEntry {
 export const MAX_HEADER_ENTRIES = 20;
 
 /**
+ * Longest name that is saved to localStorage. Real header names are short; a
+ * longer "name" is most likely a token pasted into the wrong field, so it is
+ * kept in memory (and sent, if valid) but never written to disk.
+ */
+export const MAX_PERSISTED_NAME_LENGTH = 64;
+
+/**
  * Why the server will drop a header row, or `null` when it is sent.
  * - `blocked`: the name is on the shared blocklist (credentials, transport...).
  * - `invalid-name`: the name is not an RFC 9110 token.
@@ -59,13 +66,23 @@ export function headerEntryIssue(entry: Pick<HeaderEntry, 'key' | 'value'>): Hea
   return headerValueIssue(entry.value);
 }
 
-/** Headers that will actually be sent: named, valued and free of issues. */
+/**
+ * Headers that will actually be forwarded: named, valued and free of issues.
+ * Mirrors the server sanitizer: names are case-insensitive and the FIRST
+ * occurrence wins, and at most MAX_HEADER_ENTRIES are kept. So the badge
+ * count equals what reaches the provider.
+ */
 export function toHeaderRecord(entries: HeaderEntry[]): Record<string, string> {
   const out: Record<string, string> = {};
+  const seenLower = new Set<string>();
   for (const e of entries) {
+    if (seenLower.size >= MAX_HEADER_ENTRIES) break;
     const key = e.key.trim();
     if (!key || !e.value) continue;
     if (headerEntryIssue(e)) continue;
+    const lower = key.toLowerCase();
+    if (seenLower.has(lower)) continue;
+    seenLower.add(lower);
     out[key] = e.value;
   }
   return out;
@@ -96,14 +113,18 @@ export const REQUEST_HEADER_NAMES_STORAGE_KEY = 'thinker.playground.requestHeade
  */
 export const LEGACY_REQUEST_HEADERS_STORAGE_KEY = 'manifest.playground.requestHeaders';
 
-/** Names worth keeping: trimmed, valid, not blocked, de-duplicated, capped. */
+/**
+ * Names worth keeping: trimmed, valid, not blocked, at most
+ * MAX_PERSISTED_NAME_LENGTH characters, de-duplicated, capped.
+ */
 function persistableNames(names: readonly unknown[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const raw of names) {
     if (typeof raw !== 'string') continue;
     const name = raw.trim();
-    if (!name || !isValidHeaderName(name) || isBlockedHeaderKey(name)) continue;
+    if (!name || name.length > MAX_PERSISTED_NAME_LENGTH) continue;
+    if (!isValidHeaderName(name) || isBlockedHeaderKey(name)) continue;
     const lower = name.toLowerCase();
     if (seen.has(lower)) continue;
     seen.add(lower);
@@ -140,12 +161,12 @@ function removeLegacy(): void {
 }
 
 /**
- * Restores the saved header names as rows with empty values. Also migrates
- * and cleans storage: names are taken from the legacy entry list, its stored
- * values are discarded, the legacy key is removed, and the current key is
- * rewritten with only valid, non-blocked names.
+ * Reads the saved header names and cleans storage in the same pass: names
+ * are taken from the legacy entry list when the current key is empty, every
+ * legacy value is discarded, the legacy key is removed, and the current key
+ * is rewritten with only persistable names. Never throws.
  */
-export function loadStoredHeaderEntries(): HeaderEntry[] {
+function readAndCleanStoredNames(): string[] {
   const current = readJson(REQUEST_HEADER_NAMES_STORAGE_KEY);
   let names: unknown[] = Array.isArray(current) ? current : [];
 
@@ -159,7 +180,20 @@ export function loadStoredHeaderEntries(): HeaderEntry[] {
 
   const clean = persistableNames(names);
   writeNames(clean);
-  return clean.map((key) => ({ ...blankEntry(), key }));
+  return clean;
+}
+
+/**
+ * Run once at app startup so header values saved by older builds are wiped
+ * even if the user never opens the Playground again. Never throws.
+ */
+export function cleanUpStoredHeaders(): void {
+  readAndCleanStoredNames();
+}
+
+/** Restores the saved header names as rows with empty values (and cleans storage). */
+export function loadStoredHeaderEntries(): HeaderEntry[] {
+  return readAndCleanStoredNames().map((key) => ({ ...blankEntry(), key }));
 }
 
 /** Persists the names of the given rows (never their values). */

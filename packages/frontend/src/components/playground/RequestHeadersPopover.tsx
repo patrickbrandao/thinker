@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
+import { Index, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
 import {
   blankEntry,
@@ -13,6 +13,11 @@ interface Props {
   entries: HeaderEntry[];
   onChange: (entries: HeaderEntry[]) => void;
   onClose: () => void;
+}
+
+/** DOM id of a row's warning, referenced by the input's aria-describedby. */
+export function headerWarningId(entryId: string): string {
+  return `playground-header-warning-${entryId}`;
 }
 
 /** Warning shown under a row the server will drop. */
@@ -48,6 +53,31 @@ const RequestHeadersPopover: Component<Props> = (props) => {
     () => props.open,
     () => panelRef(),
   );
+
+  // Screen-reader announcement for warnings that appear while typing. Only a
+  // row whose issue *changes* to a new problem is announced, so typing more
+  // characters into an already-invalid name doesn't repeat the message. The
+  // first pass (opening with existing rows) is silent: the warning is still
+  // reachable through each input's aria-describedby.
+  const [announcement, setAnnouncement] = createSignal('');
+  let previousIssues: Map<string, HeaderIssue | null> | undefined;
+  createEffect(() => {
+    const next = new Map<string, HeaderIssue | null>();
+    let message = '';
+    let anyIssue = false;
+    for (const e of props.entries) {
+      const issue = headerEntryIssue(e);
+      next.set(e.id, issue);
+      if (!issue) continue;
+      anyIssue = true;
+      if (previousIssues && !message && previousIssues.get(e.id) !== issue) {
+        message = headerIssueMessage(e.key.trim(), issue);
+      }
+    }
+    if (message) setAnnouncement(message);
+    else if (!anyIssue) setAnnouncement('');
+    previousIssues = next;
+  });
 
   const update = (id: string, patch: Partial<HeaderEntry>) => {
     props.onChange(props.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
@@ -93,12 +123,15 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         </Show>
 
         <div class="playground-headers__rows">
-          <For each={props.entries}>
+          {/* Index (not For): rows are updated immutably, and For would
+              recreate the row on every keystroke, dropping input focus. */}
+          <Index each={props.entries}>
             {(entry) => {
-              const issue = () => headerEntryIssue(entry);
+              const issue = () => headerEntryIssue(entry());
               const nameIssue = () => issue() === 'blocked' || issue() === 'invalid-name';
               const valueIssue = () =>
                 issue() === 'control-chars' || issue() === 'unsupported-chars';
+              const warningId = () => headerWarningId(entry().id);
               return (
                 <div
                   class="playground-headers__row"
@@ -112,43 +145,49 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                     type="text"
                     class="playground-headers__input playground-headers__input--key"
                     placeholder="Header"
-                    value={entry.key}
+                    value={entry().key}
                     aria-label="Header name"
                     aria-invalid={nameIssue() ? 'true' : undefined}
+                    aria-describedby={nameIssue() ? warningId() : undefined}
                     spellcheck={false}
                     autocomplete="off"
-                    onInput={(e) => update(entry.id, { key: e.currentTarget.value })}
+                    onInput={(e) => update(entry().id, { key: e.currentTarget.value })}
                   />
                   <input
                     type="text"
                     class="playground-headers__input playground-headers__input--value"
                     placeholder="Value"
-                    value={entry.value}
+                    value={entry().value}
                     aria-label="Header value"
                     aria-invalid={valueIssue() ? 'true' : undefined}
+                    aria-describedby={valueIssue() ? warningId() : undefined}
                     spellcheck={false}
                     autocomplete="off"
-                    onInput={(e) => update(entry.id, { value: e.currentTarget.value })}
+                    onInput={(e) => update(entry().id, { value: e.currentTarget.value })}
                   />
                   <button
                     type="button"
                     class="playground-headers__remove"
-                    aria-label={`Remove ${entry.key || 'header'}`}
-                    onClick={() => remove(entry.id)}
+                    aria-label={`Remove ${entry().key || 'header'}`}
+                    onClick={() => remove(entry().id)}
                   >
                     <TrashIcon size={14} />
                   </button>
                   <Show when={issue()}>
                     {(current) => (
-                      <p class="playground-headers__warning">
-                        {headerIssueMessage(entry.key.trim(), current())}
+                      <p id={warningId()} class="playground-headers__warning">
+                        {headerIssueMessage(entry().key.trim(), current())}
                       </p>
                     )}
                   </Show>
                 </div>
               );
             }}
-          </For>
+          </Index>
+        </div>
+
+        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcement()}
         </div>
 
         <footer class="playground-headers__footer">
