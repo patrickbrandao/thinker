@@ -8,7 +8,7 @@ import '../styles/analytics-overview.css';
 import {
   RECOVERED_REQUESTS_TOOLTIP,
   REQUEST_SUCCESS_RATE_TOOLTIP,
-  type AutofixStats,
+  type ReliabilityStats,
 } from '../services/api/analytics.js';
 
 function fmtPct(v: number): string {
@@ -31,8 +31,8 @@ function trendBadge(current: number, previous: number) {
   );
 }
 
-export interface AutofixKpiCardsProps {
-  stats: AutofixStats | undefined;
+export interface ReliabilityKpiCardsProps {
+  stats: ReliabilityStats | undefined;
   /** Scopes the deep links to one harness; omitted, they cover every harness. */
   agentName?: string;
   /** The page's current window, carried on the deep links. */
@@ -44,11 +44,11 @@ export interface AutofixKpiCardsProps {
 const viewMore = (): JSX.Element => <span class="view-more-link">View more</span>;
 
 /**
- * The reliability story, request-first: Success rate · Self-healed requests %
- * · Self-healed via Autofix · Self-healed via Fallback. Self-healed =
- * autofix_saves + fallback_saves over the window total.
+ * The reliability story, request-first: Success rate · Recovered requests %
+ * · Recovered by fallback · Failed requests. Recovered = fallback_saves over
+ * the window total.
  */
-const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
+const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
   const navigate = useNavigate();
   const requestsLink = (extra: string) => {
     if (props.noLinks) return null;
@@ -81,31 +81,23 @@ const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
       : {};
   const scopeTitle = (subject: string) =>
     props.agentName ? `View this harness's ${subject}` : `View ${subject} across all harnesses`;
-  const selfHealed = () => {
-    const s = props.stats;
-    if (!s) return 0;
-    return s.autofix_saves.value + (s.fallback_saves?.value ?? 0);
-  };
-  const selfHealedPrev = () => {
-    const s = props.stats;
-    if (!s) return 0;
-    return s.autofix_saves.previous + (s.fallback_saves?.previous ?? 0);
-  };
-  const selfHealedPct = () => {
+  const recovered = () => props.stats?.fallback_saves?.value ?? 0;
+  const recoveredPrev = () => props.stats?.fallback_saves?.previous ?? 0;
+  const recoveredPct = () => {
     const s = props.stats;
     if (!s || !s.total_requests || s.total_requests.value === 0) return 0;
-    return selfHealed() / s.total_requests.value;
+    return recovered() / s.total_requests.value;
   };
-  const selfHealedPctPrev = () => {
+  const recoveredPctPrev = () => {
     const s = props.stats;
     if (!s || !s.total_requests || s.total_requests.previous === 0) return 0;
-    return selfHealedPrev() / s.total_requests.previous;
+    return recoveredPrev() / s.total_requests.previous;
   };
 
   return (
     <Show when={props.stats}>
       {(s) => (
-        <div class="overview-stats overview-stats--5">
+        <div class="overview-stats">
           <div class="overview-stat-card">
             <span class="overview-stat-card__label">
               Success rate
@@ -119,7 +111,7 @@ const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
           <div
             class="overview-stat-card"
             {...linkProps(
-              requestsLink('&status=ok&trigger=autofix,fallback'),
+              requestsLink('&status=ok&trigger=fallback'),
               scopeTitle('recovered requests'),
             )}
           >
@@ -128,22 +120,8 @@ const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
               <InfoTooltip text={RECOVERED_REQUESTS_TOOLTIP} />
             </span>
             <div class="overview-stat-card__value-row">
-              <span class="overview-stat-card__value">{fmtPct(selfHealedPct())}</span>
-              {trendBadge(selfHealedPct(), selfHealedPctPrev())}
-              <Show when={requestsLink('')}>{viewMore()}</Show>
-            </div>
-          </div>
-          <div
-            class="overview-stat-card overview-stat-card--autofix"
-            {...linkProps(
-              requestsLink('&status=ok&trigger=autofix'),
-              scopeTitle('requests recovered by Autofix'),
-            )}
-          >
-            <span class="overview-stat-card__label">Recovered by Autofix</span>
-            <div class="overview-stat-card__value-row">
-              <span class="overview-stat-card__value">{formatNumber(s().autofix_saves.value)}</span>
-              {trendBadge(s().autofix_saves.value, s().autofix_saves.previous)}
+              <span class="overview-stat-card__value">{fmtPct(recoveredPct())}</span>
+              {trendBadge(recoveredPct(), recoveredPctPrev())}
               <Show when={requestsLink('')}>{viewMore()}</Show>
             </div>
           </div>
@@ -156,10 +134,8 @@ const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
           >
             <span class="overview-stat-card__label">Recovered by Fallback</span>
             <div class="overview-stat-card__value-row">
-              <span class="overview-stat-card__value">
-                {formatNumber(s().fallback_saves?.value ?? 0)}
-              </span>
-              {trendBadge(s().fallback_saves?.value ?? 0, s().fallback_saves?.previous ?? 0)}
+              <span class="overview-stat-card__value">{formatNumber(recovered())}</span>
+              {trendBadge(recovered(), recoveredPrev())}
               <Show when={requestsLink('')}>{viewMore()}</Show>
             </div>
           </div>
@@ -182,4 +158,4 @@ const AutofixKpiCards: Component<AutofixKpiCardsProps> = (props) => {
   );
 };
 
-export default AutofixKpiCards;
+export default ReliabilityKpiCards;

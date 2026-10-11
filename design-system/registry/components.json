@@ -355,14 +355,6 @@
         "theme.css"
       ]
     },
-    "add-agent-legal": {
-      "classes": [
-        "add-agent-legal"
-      ],
-      "files": [
-        "modals.css"
-      ]
-    },
     "add-agent-toggles": {
       "classes": [
         "add-agent-toggles",
@@ -598,8 +590,7 @@
         "auth-form__success"
       ],
       "files": [
-        "auth.css",
-        "discovery.css"
+        "auth.css"
       ]
     },
     "auth-header": {
@@ -667,55 +658,6 @@
       ],
       "files": [
         "auth.css"
-      ]
-    },
-    "autofix-card": {
-      "classes": [
-        "autofix-card",
-        "autofix-card--autofix",
-        "autofix-card--fallback",
-        "autofix-card__branding",
-        "autofix-card__header",
-        "autofix-card__ids",
-        "autofix-card__op",
-        "autofix-card__op-desc",
-        "autofix-card__op-type",
-        "autofix-card__ops",
-        "autofix-card__phrase",
-        "autofix-card__sibling-btn",
-        "autofix-card__title"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "autofix-card-row": {
-      "classes": [
-        "autofix-card-row"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "autofix-consent": {
-      "classes": [
-        "autofix-consent__agent-icon",
-        "autofix-consent__agent-name",
-        "autofix-consent__agent-row",
-        "autofix-consent__agents",
-        "autofix-consent__agents-label",
-        "autofix-consent__legal"
-      ],
-      "files": [
-        "modals.css"
-      ]
-    },
-    "autofix-icon": {
-      "classes": [
-        "autofix-icon"
-      ],
-      "files": [
-        "data.css"
       ]
     },
     "breadcrumb": {
@@ -1022,7 +964,6 @@
       "files": [
         "connection-detail.css",
         "custom-select.css",
-        "discovery.css",
         "routing-providers.css"
       ]
     },
@@ -1078,49 +1019,11 @@
         "overview.css"
       ]
     },
-    "discovery-actions": {
-      "classes": [
-        "discovery-actions"
-      ],
-      "files": [
-        "discovery.css"
-      ]
-    },
-    "discovery-card": {
-      "classes": [
-        "discovery-card",
-        "discovery-card__desc",
-        "discovery-card__form",
-        "discovery-card__intro",
-        "discovery-card__logo",
-        "discovery-card__title"
-      ],
-      "files": [
-        "discovery.css"
-      ]
-    },
-    "discovery-form": {
-      "classes": [
-        "discovery-form"
-      ],
-      "files": [
-        "discovery.css"
-      ]
-    },
-    "discovery-select": {
-      "classes": [
-        "discovery-select--empty"
-      ],
-      "files": [
-        "discovery.css"
-      ]
-    },
     "drawer": {
       "classes": [
         "drawer",
         "drawer--open",
         "drawer__badge",
-        "drawer__badge--autofix",
         "drawer__badge--fallback",
         "drawer__body",
         "drawer__close",
@@ -1145,7 +1048,6 @@
     "drawer-context-card": {
       "classes": [
         "drawer-context-card",
-        "drawer-context-card--autofix",
         "drawer-context-card--error",
         "drawer-context-card--fallback"
       ],
@@ -1204,33 +1106,6 @@
         "theme.css"
       ]
     },
-    "error-autofix-row": {
-      "classes": [
-        "error-autofix-row",
-        "error-autofix-row--solo",
-        "error-autofix-row--triple",
-        "error-autofix-row__arrow",
-        "error-autofix-row__arrow-down",
-        "error-autofix-row__arrow-right",
-        "error-autofix-row__autofix",
-        "error-autofix-row__autofix--autofix",
-        "error-autofix-row__autofix--fallback",
-        "error-autofix-row__autofix-btn",
-        "error-autofix-row__autofix-btn--secondary",
-        "error-autofix-row__autofix-text",
-        "error-autofix-row__autofix-title",
-        "error-autofix-row__error",
-        "error-autofix-row__error--full",
-        "error-autofix-row__meta-hint",
-        "error-autofix-row__meta-label",
-        "error-autofix-row__meta-table",
-        "error-autofix-row__meta-value",
-        "error-autofix-row__title"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
     "error-class-card": {
       "classes": [
         "error-class-card",
@@ -1245,6 +1120,29 @@
       ],
       "files": [
         "analytics-overview.css"
+      ]
+    },
+    "error-recovery-row": {
+      "classes": [
+        "error-recovery-row",
+        "error-recovery-row--solo",
+        "error-recovery-row__arrow",
+        "error-recovery-row__arrow-down",
+        "error-recovery-row__arrow-right",
+        "error-recovery-row__card",
+        "error-recovery-row__card--fallback",
+        "error-recovery-row__card-text",
+        "error-recovery-row__card-title",
+        "error-recovery-row__error",
+        "error-recovery-row__error--full",
+        "error-recovery-row__meta-hint",
+        "error-recovery-row__meta-label",
+        "error-recovery-row__meta-table",
+        "error-recovery-row__meta-value",
+        "error-recovery-row__title"
+      ],
+      "files": [
+        "data.css"
       ]
     },
     "expandable-card": {
@@ -1693,15 +1591,6 @@
         "syntax-highlight.css"
       ]
     },
-    "info-card": {
-      "classes": [
-        "info-card__content",
-        "info-card__text"
-      ],
-      "files": [
-        "cards.css"
-      ]
-    },
     "info-tooltip": {
       "classes": [
         "info-tooltip",
@@ -2146,14 +2035,6 @@
         "data.css"
       ]
     },
-    "msg-highlight": {
-      "classes": [
-        "msg-highlight"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
     "msg-row": {
       "classes": [
         "msg-row--clickable",
@@ -2190,22 +2071,6 @@
       ],
       "files": [
         "layout.css"
-      ]
-    },
-    "notif-dropdown": {
-      "classes": [
-        "notif-dropdown",
-        "notif-dropdown__desc",
-        "notif-dropdown__dot",
-        "notif-dropdown__dot-col",
-        "notif-dropdown__header",
-        "notif-dropdown__item",
-        "notif-dropdown__item--read",
-        "notif-dropdown__list",
-        "notif-dropdown__title"
-      ],
-      "files": [
-        "notifications-bell.css"
       ]
     },
     "notif-hint": {
@@ -2288,7 +2153,6 @@
     "overview-stat-card": {
       "classes": [
         "overview-stat-card",
-        "overview-stat-card--autofix",
         "overview-stat-card--destructive",
         "overview-stat-card--fallback",
         "overview-stat-card__label",
@@ -2722,11 +2586,30 @@
         "welcome.css"
       ]
     },
+    "recovery-card": {
+      "classes": [
+        "recovery-card",
+        "recovery-card--fallback",
+        "recovery-card__branding",
+        "recovery-card__phrase",
+        "recovery-card__title"
+      ],
+      "files": [
+        "data.css"
+      ]
+    },
+    "recovery-card-row": {
+      "classes": [
+        "recovery-card-row"
+      ],
+      "files": [
+        "data.css"
+      ]
+    },
     "recovery-opt-icon": {
       "classes": [
         "recovery-opt-icon",
-        "recovery-opt-icon__none",
-        "recovery-opt-icon__plus"
+        "recovery-opt-icon__none"
       ],
       "files": [
         "data.css"
@@ -3228,9 +3111,6 @@
         "settings-card",
         "settings-card--danger",
         "settings-card--disabled",
-        "settings-card--flush",
-        "settings-card--highlight",
-        "settings-card--info",
         "settings-card__body",
         "settings-card__control",
         "settings-card__control--end",
@@ -3247,14 +3127,11 @@
         "settings-card__label-desc",
         "settings-card__label-desc--meta",
         "settings-card__label-title",
-        "settings-card__legal",
         "settings-card__row"
       ],
       "files": [
         "agents.css",
-        "cards.css",
         "controls.css",
-        "modals.css",
         "notifications.css"
       ]
     },
@@ -3277,7 +3154,6 @@
       ],
       "files": [
         "agents.css",
-        "modals.css",
         "welcome.css"
       ]
     },
@@ -3561,7 +3437,6 @@
     "status-badge": {
       "classes": [
         "status-badge",
-        "status-badge--auto_fixed",
         "status-badge--error",
         "status-badge--fallback_error",
         "status-badge--neutral",
@@ -3835,10 +3710,7 @@
     },
     "version-indicator": {
       "classes": [
-        "version-indicator",
-        "version-indicator--update",
-        "version-indicator__dismiss",
-        "version-indicator__update"
+        "version-indicator"
       ],
       "files": [
         "version-indicator.css"
@@ -3872,11 +3744,6 @@
         "welcome__agent-wait",
         "welcome__agent-wait--success",
         "welcome__agent-wait-heading",
-        "welcome__autofix-details",
-        "welcome__autofix-examples",
-        "welcome__autofix-heading",
-        "welcome__autofix-how",
-        "welcome__autofix-section",
         "welcome__availability-note",
         "welcome__error",
         "welcome__eyebrow",
@@ -3895,7 +3762,6 @@
         "welcome__launch-stack--complete",
         "welcome__launch-stack-header",
         "welcome__launch-track",
-        "welcome__legal",
         "welcome__liftoff",
         "welcome__liftoff-action",
         "welcome__liftoff-beacon",
@@ -3975,32 +3841,6 @@
         "welcome.css"
       ]
     },
-    "wingman-drawer": {
-      "classes": [
-        "wingman-drawer",
-        "wingman-drawer--resizing",
-        "wingman-drawer__actions",
-        "wingman-drawer__frame",
-        "wingman-drawer__head",
-        "wingman-drawer__icon-btn",
-        "wingman-drawer__resizer",
-        "wingman-drawer__sub",
-        "wingman-drawer__title"
-      ],
-      "files": [
-        "controls.css"
-      ]
-    },
-    "wingman-fab": {
-      "classes": [
-        "wingman-fab",
-        "wingman-fab__label"
-      ],
-      "files": [
-        "controls.css",
-        "version-indicator.css"
-      ]
-    },
     "workspace-table": {
       "classes": [
         "workspace-table__actions",
@@ -4020,7 +3860,7 @@
       "prop": "color",
       "value": "hsl(var(--foreground))",
       "file": "analytics-overview.css",
-      "line": 213
+      "line": 183
     },
     {
       "selector": ".custom-select__option--top > svg",
@@ -4090,21 +3930,21 @@
       "prop": "border",
       "value": "1px solid hsl(36 80% 50% / 0.24)",
       "file": "request-drawer.css",
-      "line": 918
+      "line": 910
     },
     {
       "selector": ".request-tool",
       "prop": "border-radius",
       "value": "var(--radius-sm)",
       "file": "request-drawer.css",
-      "line": 919
+      "line": 911
     },
     {
       "selector": ".request-tool",
       "prop": "background",
       "value": "hsl(36 80% 50% / 0.04)",
       "file": "request-drawer.css",
-      "line": 920
+      "line": 912
     },
     {
       "selector": ".hljs-attr",
@@ -4314,28 +4154,35 @@
       "prop": "outline",
       "value": "2px solid hsl(var(--ring))",
       "file": "welcome.css",
-      "line": 865
+      "line": 860
     },
     {
       "selector": ".welcome__text-link:focus-visible",
       "prop": "outline-offset",
       "value": "3px",
       "file": "welcome.css",
-      "line": 866
+      "line": 861
     },
     {
       "selector": ".welcome__route-test-heading",
       "prop": "align-items",
       "value": "center",
       "file": "welcome.css",
-      "line": 903
+      "line": 896
     },
     {
       "selector": ".welcome__route-test-heading",
       "prop": "gap",
       "value": "10px",
       "file": "welcome.css",
-      "line": 904
+      "line": 897
+    },
+    {
+      "selector": ".welcome__text-link",
+      "prop": "padding",
+      "value": "6px 0",
+      "file": "welcome.css",
+      "line": 1090
     }
   ],
   "ghostRules": [
@@ -4393,7 +4240,7 @@
       "value": "hsl(var(--muted-foreground))",
       "file": "cards.css",
       "line": 72,
-      "losesTo": "analytics-overview.css:213"
+      "losesTo": "analytics-overview.css:183"
     },
     {
       "selector": ".chart-card",
@@ -4520,7 +4367,7 @@
       "prop": "background",
       "value": "hsl(var(--muted-foreground) / 0.1)",
       "file": "data.css",
-      "line": 299,
+      "line": 252,
       "losesTo": "overview.css:105"
     },
     {
@@ -4528,7 +4375,7 @@
       "prop": "color",
       "value": "hsl(var(--muted-foreground))",
       "file": "data.css",
-      "line": 300,
+      "line": 253,
       "losesTo": "overview.css:106"
     },
     {
@@ -4536,7 +4383,7 @@
       "prop": "align-items",
       "value": "flex-start",
       "file": "data.css",
-      "line": 507,
+      "line": 460,
       "losesTo": "theme.css:586"
     },
     {
@@ -4544,7 +4391,7 @@
       "prop": "gap",
       "value": "12px",
       "file": "data.css",
-      "line": 508,
+      "line": 461,
       "losesTo": "theme.css:587"
     },
     {
@@ -4552,7 +4399,7 @@
       "prop": "padding",
       "value": "12px 0",
       "file": "data.css",
-      "line": 509,
+      "line": 462,
       "losesTo": "theme.css:588"
     },
     {
@@ -4640,31 +4487,31 @@
       "prop": "border",
       "value": "1px solid hsl(var(--border))",
       "file": "request-drawer.css",
-      "line": 670,
-      "losesTo": "request-drawer.css:918"
+      "line": 662,
+      "losesTo": "request-drawer.css:910"
     },
     {
       "selector": ".request-tool",
       "prop": "border-radius",
       "value": "var(--radius)",
       "file": "request-drawer.css",
-      "line": 671,
-      "losesTo": "request-drawer.css:919"
+      "line": 663,
+      "losesTo": "request-drawer.css:911"
     },
     {
       "selector": ".request-tool",
       "prop": "background",
       "value": "hsl(var(--card))",
       "file": "request-drawer.css",
-      "line": 672,
-      "losesTo": "request-drawer.css:920"
+      "line": 664,
+      "losesTo": "request-drawer.css:912"
     },
     {
       "selector": ".hljs-attr",
       "prop": "color",
       "value": "hsl(187 60% 38%)",
       "file": "request-drawer.css",
-      "line": 1098,
+      "line": 1090,
       "losesTo": "syntax-highlight.css:41"
     },
     {
@@ -4681,7 +4528,7 @@
       "value": "3px solid hsl(var(--ring))",
       "file": "welcome.css",
       "line": 726,
-      "losesTo": "welcome.css:865"
+      "losesTo": "welcome.css:860"
     },
     {
       "selector": ".welcome__text-link:focus-visible",
@@ -4689,23 +4536,31 @@
       "value": "2px",
       "file": "welcome.css",
       "line": 727,
-      "losesTo": "welcome.css:866"
+      "losesTo": "welcome.css:861"
     },
     {
       "selector": ".welcome__route-test-heading",
       "prop": "align-items",
       "value": "flex-start",
       "file": "welcome.css",
-      "line": 873,
-      "losesTo": "welcome.css:903"
+      "line": 868,
+      "losesTo": "welcome.css:896"
     },
     {
       "selector": ".welcome__route-test-heading",
       "prop": "gap",
       "value": "14px",
       "file": "welcome.css",
-      "line": 875,
-      "losesTo": "welcome.css:904"
+      "line": 870,
+      "losesTo": "welcome.css:897"
+    },
+    {
+      "selector": ".welcome__text-link",
+      "prop": "padding",
+      "value": "0",
+      "file": "welcome.css",
+      "line": 1079,
+      "losesTo": "welcome.css:1090"
     }
   ],
   "componentSheets": {
@@ -4713,7 +4568,7 @@
       "components/ChartHoverTooltip.tsx"
     ],
     "analytics-overview.css": [
-      "components/AutofixKpiCards.tsx",
+      "components/ReliabilityKpiCards.tsx",
       "pages/GlobalOverview.tsx",
       "pages/providers/ConnectionDetail.tsx",
       "pages/providers/ProviderConnectionsPage.tsx"
@@ -4721,18 +4576,12 @@
     "connection-detail.css": [
       "pages/providers/ConnectionDetail.tsx"
     ],
-    "discovery.css": [
-      "pages/Discovery.tsx"
-    ],
     "filter-select.css": [
       "components/FilterSelect.tsx"
     ],
     "model-filter.css": [
       "components/ModelPricesFilterBar.tsx",
       "pages/MessageLog.tsx"
-    ],
-    "notifications-bell.css": [
-      "components/NotificationBell.tsx"
     ],
     "overview.css": [
       "pages/GlobalOverview.tsx",
@@ -4789,9 +4638,9 @@
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 288,
-    "classes": 1583,
-    "canonicalRules": 46,
-    "ghostRules": 46
+    "blocks": 276,
+    "classes": 1513,
+    "canonicalRules": 47,
+    "ghostRules": 47
   }
 }

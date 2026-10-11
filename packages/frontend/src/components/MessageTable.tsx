@@ -13,8 +13,6 @@ export interface MessageTableProps {
   ) => { platform: string | null; category: string | null } | undefined;
   onFallbackErrorClick?: (model: string) => void;
   onTriggerClick?: (id: string) => void;
-  /** Open a linked message (Autofix sibling) from an expanded row's detail. */
-  onOpenMessage?: (id: string) => void;
   rowIdPrefix?: string;
   showHeaderTooltips?: boolean;
   expandable?: boolean;
@@ -99,10 +97,7 @@ function ExpandableRow(props: {
       <Show when={expanded() && !useDrawer()}>
         <tr class="msg-detail__row">
           <td colspan={colSpan()} class="msg-detail__cell">
-            <MessageDetails
-              messageId={props.item.id}
-              onOpenMessage={props.tableProps.onOpenMessage}
-            />
+            <MessageDetails messageId={props.item.id} />
           </td>
         </tr>
       </Show>

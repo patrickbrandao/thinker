@@ -83,15 +83,7 @@ vi.mock('../../src/components/InfoTooltip.jsx', () => ({
 }));
 
 vi.mock('../../src/components/MessageDetails.jsx', () => ({
-  // Reads `onOpenMessage` so the lazy prop getter that threads it through
-  // MessageTable is exercised.
-  default: (props: any) => (
-    <div
-      data-testid="message-details"
-      data-id={props.messageId}
-      data-has-open={props.onOpenMessage ? 'yes' : 'no'}
-    />
-  ),
+  default: (props: any) => <div data-testid="message-details" data-id={props.messageId} />,
 }));
 
 import MessageTable from '../../src/components/MessageTable';
@@ -170,7 +162,7 @@ describe('MessageTable', () => {
           agentName="agent-1"
         />
       ));
-      const tokensHeader = container.querySelectorAll('th')[7]!; // 'totalTokens' is at index 7 in COMPACT_COLUMNS (after selfheal)
+      const tokensHeader = container.querySelectorAll('th')[7]!; // 'totalTokens' is at index 7 in COMPACT_COLUMNS (after recovery)
       expect(tokensHeader.textContent).toBe('Tokens');
       expect(tokensHeader.querySelector('[data-testid="info-tooltip"]')).toBeNull();
     });
@@ -499,19 +491,6 @@ describe('MessageTable', () => {
   });
 
   describe('attempts column', () => {
-    it('renders just the attempt count (no icons) for a row with autofix_applied', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ attempt_count: 2, autofix_applied: true })]}
-          columns={['attempts']}
-          agentName="agent-1"
-        />
-      ));
-      expect(container.querySelector('td')!.textContent).toContain('2');
-      // Icons moved to selfheal column
-      expect(container.querySelector('[title="Autofix"]')).toBeNull();
-    });
-
     it('renders just the attempt count (no icons) when fallback_from_model is set', () => {
       const { container } = render(() => (
         <MessageTable
@@ -521,30 +500,17 @@ describe('MessageTable', () => {
         />
       ));
       expect(container.querySelector('td')!.textContent).toContain('2');
-      // Icons moved to selfheal column
+      // Icons live in the recovery column
       expect(container.querySelector('[title="Fallback"]')).toBeNull();
     });
   });
 
-  describe('selfheal column', () => {
-    it('renders autofix icon with text label when autofix_applied', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ autofix_applied: true })]}
-          columns={['selfheal']}
-          agentName="agent-1"
-        />
-      ));
-      const badge = container.querySelector('[title="Autofix"]') as HTMLElement;
-      expect(badge).not.toBeNull();
-      expect(badge.textContent).toContain('autofix');
-    });
-
+  describe('recovery column', () => {
     it('renders fallback icon with text label when fallback_from_model is set', () => {
       const { container } = render(() => (
         <MessageTable
           items={[makeRow({ fallback_from_model: 'gpt-4o' })]}
-          columns={['selfheal']}
+          columns={['recovery']}
           agentName="agent-1"
         />
       ));
@@ -553,11 +519,11 @@ describe('MessageTable', () => {
       expect(badge.textContent).toContain('fallback');
     });
 
-    it('renders dash when neither autofix nor fallback applies', () => {
+    it('renders dash when no fallback applies', () => {
       const { container } = render(() => (
         <MessageTable
           items={[makeRow()]}
-          columns={['selfheal']}
+          columns={['recovery']}
           agentName="agent-1"
         />
       ));
@@ -738,22 +704,6 @@ describe('MessageTable', () => {
       const details = container.querySelector('[data-testid="message-details"]');
       expect(details).not.toBeNull();
       expect(details!.getAttribute('data-id')).toBe('specific-msg-id');
-    });
-
-    it('threads onOpenMessage through to the expanded MessageDetails', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-          onOpenMessage={vi.fn()}
-        />
-      ));
-      const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLButtonElement;
-      fireEvent.click(btn);
-      const details = container.querySelector('[data-testid="message-details"]');
-      expect(details!.getAttribute('data-has-open')).toBe('yes');
     });
 
     it('sets aria-label on chevron button', () => {

@@ -25,10 +25,8 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
     PLATFORMS_BY_CATEGORY['personal'][0] ?? null,
   );
   const [creating, setCreating] = createSignal(false);
-  // Both default ON — explicit so create always sends a choice rather than
-  // relying on the server-side inherit path (which is OFF for Autofix on
-  // self-hosted).
-  const [autofixEnabled, setAutofixEnabled] = createSignal(true);
+  // Defaults ON — explicit so create always sends a choice rather than
+  // relying on the server-side default.
   const [recordingEnabled, setRecordingEnabled] = createSignal(true);
 
   // Tracks whether the user dismissed the modal (overlay click / Escape) while a
@@ -73,9 +71,8 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
 
   /**
    * @param token attempt id from {@link beginAttempt}, re-checked after every await.
-   * @param autofixChoice the Autofix setting pinned when the submit started.
    */
-  const createAgentNow = async (token: number, autofixChoice: boolean) => {
+  const createAgentNow = async (token: number) => {
     const agentName = name().trim();
     if (!agentName) return;
     setCreating(true);
@@ -84,7 +81,6 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
         name: agentName,
         ...(category() ? { agent_category: category()! } : {}),
         ...(platform() ? { agent_platform: platform()! } : {}),
-        autofix_enabled: autofixChoice,
         record_messages: recordingEnabled(),
       });
       // Local creates do not wait for the asynchronous server-sent event. This
@@ -137,16 +133,13 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
     // A second submit while the create is already running would issue a
     // duplicate agent-creation request.
     if (creating()) return;
-    // The legal line under the toggles is the consent act: the backend records
-    // the install-level consent when the create carries autofix_enabled: true.
-    await createAgentNow(beginAttempt(), autofixEnabled());
+    await createAgentNow(beginAttempt());
   };
 
   const resetForm = () => {
     setName('');
     setCategory('personal');
     setPlatform(PLATFORMS_BY_CATEGORY['personal'][0] ?? null);
-    setAutofixEnabled(true);
     setRecordingEnabled(true);
   };
 
@@ -211,33 +204,6 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
                 <div class="model-params__row">
                   <div class="model-params__row-text">
                     <div class="model-params__label-title">
-                      <span>Autofix</span>
-                    </div>
-                    <div class="model-params__label-hint">
-                      Repair eligible failing requests before falling back.
-                    </div>
-                  </div>
-                  <div class="model-params__row-control">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={autofixEnabled()}
-                      aria-label="Autofix"
-                      class="settings-switch"
-                      classList={{ 'settings-switch--on': autofixEnabled() }}
-                      disabled={creating()}
-                      onClick={() => setAutofixEnabled(!autofixEnabled())}
-                    >
-                      <span class="settings-switch__track">
-                        <span class="settings-switch__thumb" />
-                      </span>
-                    </button>
-                  </div>
-                </div>
-                <div class="model-params__separator" />
-                <div class="model-params__row">
-                  <div class="model-params__row-text">
-                    <div class="model-params__label-title">
                       <span>Enable logs</span>
                     </div>
                     <div class="model-params__label-hint">
@@ -265,20 +231,6 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
               </div>
             </div>
           </div>
-
-          <Show when={autofixEnabled()}>
-            <p class="autofix-consent__legal add-agent-legal">
-              By enabling Autofix, you agree to Manifest&apos;s{' '}
-              <a href="https://manifest.build/terms" target="_blank" rel="noopener noreferrer">
-                Terms
-              </a>{' '}
-              and{' '}
-              <a href="https://manifest.build/privacy" target="_blank" rel="noopener noreferrer">
-                Privacy Policy
-              </a>
-              .
-            </p>
-          </Show>
 
           <div class="modal-card__footer">
             <button

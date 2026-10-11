@@ -6,11 +6,10 @@ import { authClient } from '../services/auth-client.js';
 import { appendSearch } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
 import { checkSocialProviders } from '../services/setup-status.js';
-import { markDiscoveryPending } from '../services/discovery.js';
 
 const RESEND_COOLDOWN_SECONDS = 60;
-// Signups pass through the one-time discovery step before the welcome flow.
-const POST_SIGNUP_URL = '/discovery?next=%2Fwelcome';
+// New accounts land on the onboarding flow, which hands off to the dashboard.
+const POST_SIGNUP_URL = '/welcome';
 
 const Register: Component = () => {
   const [name, setName] = createSignal('');
@@ -28,7 +27,6 @@ const Register: Component = () => {
   const emailId = createUniqueId();
   const passwordId = createUniqueId();
   const errorId = createUniqueId();
-  const socialSignupUrl = `${POST_SIGNUP_URL}&signup=1`;
 
   onMount(async () => {
     setSocialProviders(await checkSocialProviders());
@@ -78,10 +76,6 @@ const Register: Component = () => {
     }
     setAlreadyExists(false);
     setLastAuthMethod('email');
-
-    // Remember the discovery step is pending so the guards keep routing this
-    // user back to it until it is completed or skipped.
-    markDiscoveryPending(data?.user?.id ?? '', '/welcome');
 
     if (data?.token) {
       window.location.href = POST_SIGNUP_URL;
@@ -162,7 +156,7 @@ const Register: Component = () => {
         <SocialButtons
           enabledProviders={socialProviders()}
           lastUsed={lastAuthMethod()}
-          callbackURL={socialSignupUrl}
+          callbackURL={POST_SIGNUP_URL}
         />
 
         <Show when={socialProviders().length > 0}>

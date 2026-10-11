@@ -96,14 +96,13 @@
 --z-toast: 8000
 --z-tooltip: 9999
 
-## Blocks (288 BEM blocks, 1583 classes)
+## Blocks (276 BEM blocks, 1513 classes)
 account-back-btn (agents.css): account-back-btn
 account-modal (agents.css): account-modal account-modal--standalone account-modal__inner
 account-security-error (agents.css): account-security-error
 account-security-footer (agents.css): account-security-footer
 action-menu (action-menu.css): action-menu action-menu--open action-menu__dropdown action-menu__item action-menu__item--danger action-menu__trigger
 active (controls.css, theme.css): active
-add-agent-legal (modals.css): add-agent-legal
 add-agent-toggles (modals.css): add-agent-toggles add-agent-toggles__header
 afx-kpi-line (analytics-overview.css): afx-kpi-line afx-kpi-line__primary afx-kpi-line__sep afx-kpi-line__stat
 agent-card (action-menu.css, agents.css): agent-card agent-card--skeleton agent-card__chart agent-card__menu agent-card__name agent-card__platform-icon agent-card__stat agent-card__stat-label agent-card__stat-value agent-card__stats agent-card__top
@@ -123,7 +122,7 @@ attempt-item (request-drawer.css): attempt-item attempt-item--active attempt-ite
 auth-card (auth.css): auth-card
 auth-divider (auth.css): auth-divider auth-divider__text
 auth-footer (auth.css): auth-footer auth-footer__link
-auth-form (auth.css, discovery.css): auth-form auth-form__actions auth-form__error auth-form__error-link auth-form__forgot auth-form__input auth-form__label auth-form__link-btn auth-form__notice auth-form__notice-link auth-form__submit auth-form__submit--secondary auth-form__success
+auth-form (auth.css): auth-form auth-form__actions auth-form__error auth-form__error-link auth-form__forgot auth-form__input auth-form__label auth-form__link-btn auth-form__notice auth-form__notice-link auth-form__submit auth-form__submit--secondary auth-form__success
 auth-header (auth.css): auth-header auth-header__subtitle auth-header__title
 auth-last-used (auth.css): auth-last-used
 auth-layout (auth.css): auth-layout
@@ -131,10 +130,6 @@ auth-logo (auth.css): auth-logo auth-logo__img auth-logo__img--dark auth-logo__i
 auth-social-btn (auth.css): auth-social-btn auth-social-btn--discord auth-social-btn--github auth-social-btn--google auth-social-btn__icon
 auth-social-group (auth.css): auth-social-group
 auth-terms (auth.css): auth-terms auth-terms__link
-autofix-card (data.css): autofix-card autofix-card--autofix autofix-card--fallback autofix-card__branding autofix-card__header autofix-card__ids autofix-card__op autofix-card__op-desc autofix-card__op-type autofix-card__ops autofix-card__phrase autofix-card__sibling-btn autofix-card__title
-autofix-card-row (data.css): autofix-card-row
-autofix-consent (modals.css): autofix-consent__agent-icon autofix-consent__agent-name autofix-consent__agent-row autofix-consent__agents autofix-consent__agents-label autofix-consent__legal
-autofix-icon (data.css): autofix-icon
 breadcrumb (layout.css, theme.css): breadcrumb
 btn (controls.css, layout.css, limits.css, modals.css, routing-providers.css, routing.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
 cards-grid (layout.css, theme.css, wizard.css): cards-grid
@@ -158,24 +153,20 @@ count-link (theme.css): count-link
 custom-provider-item (routing-providers.css): custom-provider-item custom-provider-item__delete custom-provider-item__icon custom-provider-item__info custom-provider-item__meta custom-provider-item__name
 custom-provider-model-row (routing-providers.css): custom-provider-model-row custom-provider-model-row__name custom-provider-model-row__price custom-provider-model-row__remove
 custom-provider-models (routing-providers.css): custom-provider-models custom-provider-models__column custom-provider-models__column--name custom-provider-models__column--price custom-provider-models__column-spacer custom-provider-models__columns custom-provider-models__label
-custom-select (connection-detail.css, custom-select.css, discovery.css, routing-providers.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
+custom-select (connection-detail.css, custom-select.css, routing-providers.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
 dark (agent-type-select.css, agents.css, analytics-overview.css, auth.css, controls.css, data.css, modals.css, model-filter.css, overview.css, platform-icons.css, request-drawer.css, routing-deprecation.css, routing-providers.css, routing.css, syntax-highlight.css, tokens.css, welcome.css, wizard.css): dark
 data-table (data.css, feedback.css, theme.css): data-table data-table__sortable
 data-table-scroll (data.css): data-table-scroll
 demo-dashboard (overview.css): demo-dashboard
-discovery-actions (discovery.css): discovery-actions
-discovery-card (discovery.css): discovery-card discovery-card__desc discovery-card__form discovery-card__intro discovery-card__logo discovery-card__title
-discovery-form (discovery.css): discovery-form
-discovery-select (discovery.css): discovery-select--empty
-drawer (request-drawer.css): drawer drawer--open drawer__badge drawer__badge--autofix drawer__badge--fallback drawer__body drawer__close drawer__content drawer__content-empty drawer__header drawer__messages-pane drawer__meta-row drawer__meta-sep drawer__meta-text drawer__sidebar drawer__sidebar-title drawer__split drawer__tabs-full drawer__title drawer__title-row
-drawer-context-card (request-drawer.css): drawer-context-card drawer-context-card--autofix drawer-context-card--error drawer-context-card--fallback
+drawer (request-drawer.css): drawer drawer--open drawer__badge drawer__badge--fallback drawer__body drawer__close drawer__content drawer__content-empty drawer__header drawer__messages-pane drawer__meta-row drawer__meta-sep drawer__meta-text drawer__sidebar drawer__sidebar-title drawer__split drawer__tabs-full drawer__title drawer__title-row
+drawer-context-card (request-drawer.css): drawer-context-card drawer-context-card--error drawer-context-card--fallback
 drawer-kv (request-drawer.css): drawer-kv drawer-kv__key
 drawer-metadata (request-drawer.css): drawer-metadata
 drawer-status (request-drawer.css): drawer-status drawer-status--error drawer-status--neutral drawer-status--success
 duplicate-agent (agents.css): duplicate-agent__badge duplicate-agent__list duplicate-agent__section duplicate-agent__section-header
 empty-state (data.css, theme.css): empty-state empty-state__img empty-state__img-wrapper empty-state__title
-error-autofix-row (data.css): error-autofix-row error-autofix-row--solo error-autofix-row--triple error-autofix-row__arrow error-autofix-row__arrow-down error-autofix-row__arrow-right error-autofix-row__autofix error-autofix-row__autofix--autofix error-autofix-row__autofix--fallback error-autofix-row__autofix-btn error-autofix-row__autofix-btn--secondary error-autofix-row__autofix-text error-autofix-row__autofix-title error-autofix-row__error error-autofix-row__error--full error-autofix-row__meta-hint error-autofix-row__meta-label error-autofix-row__meta-table error-autofix-row__meta-value error-autofix-row__title
 error-class-card (analytics-overview.css): error-class-card error-class-card__bar error-class-card__bar-wrap error-class-card__count error-class-card__empty error-class-card__label error-class-card__list error-class-card__row error-class-card__title
+error-recovery-row (data.css): error-recovery-row error-recovery-row--solo error-recovery-row__arrow error-recovery-row__arrow-down error-recovery-row__arrow-right error-recovery-row__card error-recovery-row__card--fallback error-recovery-row__card-text error-recovery-row__card-title error-recovery-row__error error-recovery-row__error--full error-recovery-row__meta-hint error-recovery-row__meta-label error-recovery-row__meta-table error-recovery-row__meta-value error-recovery-row__title
 expandable-card (charts.css, theme.css): expandable-card expandable-card__btn expandable-card__content expandable-card__fade
 fallback-icon (data.css): fallback-icon
 fallback-list (routing.css): fallback-list fallback-list__add fallback-list__card fallback-list__card--dragging fallback-list__card--skipped fallback-list__card--swapping fallback-list__drag-handle fallback-list__drop-indicator fallback-list__drop-indicator--active fallback-list__empty fallback-list__empty-desc fallback-list__empty-icon fallback-list__empty-title fallback-list__icon fallback-list__items fallback-list__model fallback-list__params fallback-list__rank fallback-list__remove
@@ -216,7 +207,6 @@ hljs-template-tag (syntax-highlight.css): hljs-template-tag
 hljs-title (syntax-highlight.css): hljs-title
 hljs-type (syntax-highlight.css): hljs-type
 hljs-variable (syntax-highlight.css): hljs-variable
-info-card (cards.css): info-card__content info-card__text
 info-tooltip (tooltip.css): info-tooltip info-tooltip__bubble info-tooltip__icon
 integration-grid (wizard.css): integration-grid
 integration-panel (wizard.css): integration-panel__desc integration-panel__header integration-panel__tabs
@@ -251,11 +241,9 @@ model-modality-badges (routing-modal.css): model-modality-badges
 model-params (params-card.css, routing.css): model-params__body model-params__default-hint model-params__dialog model-params__empty model-params__empty-link model-params__field model-params__footer model-params__footer-actions model-params__group model-params__group-card model-params__group-header model-params__help model-params__help-tooltip model-params__label-hint model-params__label-title model-params__number model-params__number--slider model-params__param-key model-params__request-link model-params__reset model-params__row model-params__row--disabled model-params__row-control model-params__row-text model-params__separator model-params__slider model-params__slider-bound model-params__slider-bounds model-params__slider-control model-params__slider-field model-params__slider-field--disabled model-params__slider-tick model-params__slider-track-bg model-params__slider-track-wrapper model-params__status model-params__toggle
 model-params-modal (routing.css): model-params-modal model-params-modal--empty
 msg-detail (data.css): msg-detail msg-detail__cell msg-detail__chevron msg-detail__chevron--open msg-detail__chevron-btn msg-detail__chevron-btn--open msg-detail__chevron-cell msg-detail__chevron-th msg-detail__count msg-detail__count-badge msg-detail__error msg-detail__error-box msg-detail__error-code msg-detail__error-inline msg-detail__eye-btn msg-detail__fallback-banner msg-detail__loader msg-detail__log-body msg-detail__meta msg-detail__meta-item msg-detail__meta-label msg-detail__miscat-btn msg-detail__mono msg-detail__mono-xs msg-detail__param-value msg-detail__row msg-detail__section msg-detail__section-row msg-detail__section-title msg-detail__section-title--inline msg-detail__section-title--toggle msg-detail__severity-dot msg-detail__spinner msg-detail__summary msg-detail__summary-item msg-detail__table
-msg-highlight (data.css): msg-highlight
 msg-row (data.css): msg-row--clickable msg-row--expanded msg-row--selected
 no-connections-prompt (routing.css): no-connections-prompt no-connections-prompt__card no-connections-prompt__card-desc no-connections-prompt__card-icon no-connections-prompt__card-title no-connections-prompt__cards no-connections-prompt__desc no-connections-prompt__header no-connections-prompt__title
 not-found (layout.css): not-found not-found__code not-found__link not-found__text not-found__title
-notif-dropdown (notifications-bell.css): notif-dropdown notif-dropdown__desc notif-dropdown__dot notif-dropdown__dot-col notif-dropdown__header notif-dropdown__item notif-dropdown__item--read notif-dropdown__list notif-dropdown__title
 notif-hint (notifications.css): notif-hint
 notif-table (notifications.css): notif-table notif-table--flush notif-table__actions notif-table__mono notif-table__period notif-table__row--disabled
 notification-modal (notifications.css): notification-modal__select
@@ -264,7 +252,7 @@ notification-toggle (notifications.css): notification-toggle notification-toggle
 output-controls (routing.css): output-controls output-controls--compact output-controls__field output-controls__label output-controls__segment output-controls__segment--active output-controls__segments
 overview (agents.css): overview__platform-icon
 overview-split (analytics-overview.css): overview-split
-overview-stat-card (analytics-overview.css): overview-stat-card overview-stat-card--autofix overview-stat-card--destructive overview-stat-card--fallback overview-stat-card__label overview-stat-card__value overview-stat-card__value-row
+overview-stat-card (analytics-overview.css): overview-stat-card overview-stat-card--destructive overview-stat-card--fallback overview-stat-card__label overview-stat-card__value overview-stat-card__value-row
 overview-stats (analytics-overview.css): overview-stats overview-stats--3 overview-stats--5
 page-header (analytics-overview.css, connection-detail.css, layout.css, theme.css): page-header page-header--wrap page-header__intro page-header__subtitle page-header__title
 pagination (data.css): pagination pagination__btn pagination__controls pagination__summary
@@ -289,7 +277,9 @@ provider-setup (notifications.css): provider-setup__subtitle provider-setup__tit
 provider-setup-card (notifications.css): provider-setup-card provider-setup-card__desc provider-setup-card__logo provider-setup-card__name
 provider-setup-grid (notifications.css): provider-setup-grid
 provider-toggle (routing-providers.css, routing.css, welcome.css): provider-toggle provider-toggle--action provider-toggle__actions provider-toggle__add-btn provider-toggle__add-tooltip provider-toggle__badge provider-toggle__badge--connected provider-toggle__disconnect-btn provider-toggle__expand provider-toggle__icon provider-toggle__info provider-toggle__key-input provider-toggle__key-row provider-toggle__local-only provider-toggle__name provider-toggle__name--action provider-toggle__subtitle provider-toggle__switch provider-toggle__switch--on provider-toggle__switch-thumb provider-toggle__tag
-recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none recovery-opt-icon__plus
+recovery-card (data.css): recovery-card recovery-card--fallback recovery-card__branding recovery-card__phrase recovery-card__title
+recovery-card-row (data.css): recovery-card-row
+recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none
 rel-chart (reliability-card.css): rel-chart__legend rel-chart__legend-dot rel-chart__legend-item
 rel-col (theme.css): rel-col
 request-message (request-drawer.css): request-message request-message--active request-message__body request-message__body--capped request-message__chevron request-message__chevron--open request-message__content request-message__footer request-message__header request-message__index request-message__meta-code request-message__preview request-message__role request-message__role--assistant request-message__role--system request-message__role--tool request-message__role--unknown request-message__role--user request-message__uncap
@@ -325,9 +315,9 @@ rule-menu (limits.css): rule-menu__btn rule-menu__dropdown rule-menu__item rule-
 scroll-panel (analytics-overview.css, routing-providers.css): scroll-panel scroll-panel--at-bottom scroll-panel__body
 security-event (data.css, theme.css): security-event security-event__badge security-event__desc security-event__dot security-event__dot--critical security-event__dot--info security-event__dot--warning security-event__time
 select (controls.css, theme.css): select
-settings-card (agents.css, cards.css, controls.css, modals.css, notifications.css): settings-card settings-card--danger settings-card--disabled settings-card--flush settings-card--highlight settings-card--info settings-card__body settings-card__control settings-card__control--end settings-card__copy-btn settings-card__desc settings-card__footer settings-card__id-row settings-card__id-value settings-card__input settings-card__key-actions settings-card__key-row settings-card__key-value settings-card__label settings-card__label-desc settings-card__label-desc--meta settings-card__label-title settings-card__legal settings-card__row
+settings-card (agents.css, controls.css, notifications.css): settings-card settings-card--danger settings-card--disabled settings-card__body settings-card__control settings-card__control--end settings-card__copy-btn settings-card__desc settings-card__footer settings-card__id-row settings-card__id-value settings-card__input settings-card__key-actions settings-card__key-row settings-card__key-value settings-card__label settings-card__label-desc settings-card__label-desc--meta settings-card__label-title settings-card__row
 settings-section (agents.css, controls.css): settings-section__title settings-section__title--danger
-settings-switch (agents.css, modals.css, welcome.css): settings-switch settings-switch--on settings-switch__thumb settings-switch__track
+settings-switch (agents.css, welcome.css): settings-switch settings-switch--on settings-switch__thumb settings-switch__track
 setup-agents-card (wizard.css): setup-agents-card setup-agents-card__title
 setup-agents-coming-soon (wizard.css): setup-agents-coming-soon setup-agents-coming-soon__text
 setup-change-type-link (wizard.css): setup-change-type-link
@@ -354,7 +344,7 @@ specificity-modal (routing-specificity.css): specificity-modal specificity-modal
 specificity-output-controls (routing-specificity.css): specificity-output-controls
 spinner (skeleton.css): spinner
 sr-only (playground.css, skeleton.css): sr-only
-status-badge (data.css, theme.css): status-badge status-badge--auto_fixed status-badge--error status-badge--fallback_error status-badge--neutral status-badge--ok status-badge--rate_limited status-badge--retry
+status-badge (data.css, theme.css): status-badge status-badge--error status-badge--fallback_error status-badge--neutral status-badge--ok status-badge--rate_limited status-badge--retry
 status-badge-tooltip (data.css): status-badge-tooltip status-badge-tooltip__bubble
 subscription-detail (routing-providers.css): subscription-detail__alt subscription-detail__alt-divider subscription-detail__alt-hint subscription-detail__btn subscription-detail__primary
 summary-card (cards.css, theme.css): summary-card summary-card__label summary-card__subtitle summary-card__value
@@ -378,12 +368,10 @@ u-marker (charts.css, theme.css): u-marker
 u-series (charts.css, theme.css): u-series
 u-value (charts.css, theme.css): u-value
 u-wrap (cards.css, charts.css, theme.css): u-wrap
-version-indicator (version-indicator.css): version-indicator version-indicator--update version-indicator__dismiss version-indicator__update
+version-indicator (version-indicator.css): version-indicator
 view-more-link (analytics-overview.css, cards.css): view-more-link
 waiting-banner (overview.css): waiting-banner waiting-banner--success
-welcome (welcome.css): welcome welcome__actions welcome__actions--split welcome__actions--sticky welcome__actions-note welcome__agent-wait welcome__agent-wait--success welcome__agent-wait-heading welcome__autofix-details welcome__autofix-examples welcome__autofix-heading welcome__autofix-how welcome__autofix-section welcome__availability-note welcome__error welcome__eyebrow welcome__first-request welcome__form-panel welcome__harness-summary welcome__harness-summary-icon welcome__harness-summary-name welcome__harness-summary-type welcome__inline-code welcome__input-hint welcome__launch-orbit welcome__launch-rocket welcome__launch-rocket--complete welcome__launch-stack welcome__launch-stack--complete welcome__launch-stack-header welcome__launch-track welcome__legal welcome__liftoff welcome__liftoff-action welcome__liftoff-beacon welcome__liftoff-copy welcome__liftoff-description welcome__liftoff-earth welcome__liftoff-exit welcome__liftoff-flash welcome__liftoff-kicker welcome__liftoff-orbit welcome__liftoff-plume welcome__liftoff-plume-inner welcome__liftoff-rocket welcome__liftoff-smoke welcome__liftoff-stars welcome__liftoff-stars--far welcome__liftoff-stars--near welcome__liftoff-status welcome__liftoff-title welcome__liftoff-title--launch welcome__liftoff-title--orbit welcome__liftoff-titles welcome__logo-dark welcome__logo-light welcome__logo-mark welcome__main welcome__model-badge welcome__nav welcome__nav-btn welcome__nav-check welcome__nav-dot welcome__nav-hint welcome__nav-item welcome__nav-item--active welcome__nav-item--done welcome__nav-label welcome__nav-mobile-rocket welcome__nav-mobile-rocket--complete welcome__output welcome__panel welcome__panel--playground welcome__panel--setup welcome__panel-desc welcome__panel-header welcome__panel-title welcome__pending welcome__plan-heading welcome__plan-section welcome__playground welcome__playground-actions welcome__playground-link welcome__progress welcome__progress-header welcome__prompt-label welcome__provider-connected welcome__provider-list welcome__request-failure welcome__response welcome__rocket-flame welcome__route-test-heading welcome__route-test-section welcome__route-test-title welcome__section-desc welcome__section-heading welcome__setup-snippets welcome__sidebar welcome__sidebar-footer welcome__sidebar-top welcome__skip-row welcome__spinner welcome__stats welcome__success-icon welcome__text-link welcome__textarea
-wingman-drawer (controls.css): wingman-drawer wingman-drawer--resizing wingman-drawer__actions wingman-drawer__frame wingman-drawer__head wingman-drawer__icon-btn wingman-drawer__resizer wingman-drawer__sub wingman-drawer__title
-wingman-fab (controls.css, version-indicator.css): wingman-fab wingman-fab__label
+welcome (welcome.css): welcome welcome__actions welcome__actions--split welcome__actions--sticky welcome__actions-note welcome__agent-wait welcome__agent-wait--success welcome__agent-wait-heading welcome__availability-note welcome__error welcome__eyebrow welcome__first-request welcome__form-panel welcome__harness-summary welcome__harness-summary-icon welcome__harness-summary-name welcome__harness-summary-type welcome__inline-code welcome__input-hint welcome__launch-orbit welcome__launch-rocket welcome__launch-rocket--complete welcome__launch-stack welcome__launch-stack--complete welcome__launch-stack-header welcome__launch-track welcome__liftoff welcome__liftoff-action welcome__liftoff-beacon welcome__liftoff-copy welcome__liftoff-description welcome__liftoff-earth welcome__liftoff-exit welcome__liftoff-flash welcome__liftoff-kicker welcome__liftoff-orbit welcome__liftoff-plume welcome__liftoff-plume-inner welcome__liftoff-rocket welcome__liftoff-smoke welcome__liftoff-stars welcome__liftoff-stars--far welcome__liftoff-stars--near welcome__liftoff-status welcome__liftoff-title welcome__liftoff-title--launch welcome__liftoff-title--orbit welcome__liftoff-titles welcome__logo-dark welcome__logo-light welcome__logo-mark welcome__main welcome__model-badge welcome__nav welcome__nav-btn welcome__nav-check welcome__nav-dot welcome__nav-hint welcome__nav-item welcome__nav-item--active welcome__nav-item--done welcome__nav-label welcome__nav-mobile-rocket welcome__nav-mobile-rocket--complete welcome__output welcome__panel welcome__panel--playground welcome__panel--setup welcome__panel-desc welcome__panel-header welcome__panel-title welcome__pending welcome__plan-heading welcome__plan-section welcome__playground welcome__playground-actions welcome__playground-link welcome__progress welcome__progress-header welcome__prompt-label welcome__provider-connected welcome__provider-list welcome__request-failure welcome__response welcome__rocket-flame welcome__route-test-heading welcome__route-test-section welcome__route-test-title welcome__section-desc welcome__section-heading welcome__setup-snippets welcome__sidebar welcome__sidebar-footer welcome__sidebar-top welcome__skip-row welcome__spinner welcome__stats welcome__success-icon welcome__text-link welcome__textarea
 workspace-table (agents.css): workspace-table__actions workspace-table__icon workspace-table__name
 
 ## Primitives (0)
@@ -392,8 +380,8 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
-## Canonical rules — same selector+property declared twice with different values; the winner renders (46)
-.view-more-link { color: hsl(var(--foreground)) }  ← analytics-overview.css:213
+## Canonical rules — same selector+property declared twice with different values; the winner renders (47)
+.view-more-link { color: hsl(var(--foreground)) }  ← analytics-overview.css:183
 .custom-select__option--top > svg { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
 .custom-select__option--top > img { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
 .setup-modal__header { align-items: center }  ← overview.css:15
@@ -403,9 +391,9 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .setup-modal__next:hover { opacity: 0.85 }  ← overview.css:55
 .tier-badge--fallback { background: hsl(38 92% 50% / 0.15) }  ← overview.css:105
 .tier-badge--fallback { color: hsl(38 92% 40%) }  ← overview.css:106
-.request-tool { border: 1px solid hsl(36 80% 50% / 0.24) }  ← request-drawer.css:918
-.request-tool { border-radius: var(--radius-sm) }  ← request-drawer.css:919
-.request-tool { background: hsl(36 80% 50% / 0.04) }  ← request-drawer.css:920
+.request-tool { border: 1px solid hsl(36 80% 50% / 0.24) }  ← request-drawer.css:910
+.request-tool { border-radius: var(--radius-sm) }  ← request-drawer.css:911
+.request-tool { background: hsl(36 80% 50% / 0.04) }  ← request-drawer.css:912
 .hljs-attr { color: hsl(var(--chart-4)) }  ← syntax-highlight.css:41
 .summary-card { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px }  ← theme.css:196
 .trend--up { color: hsl(var(--success)) }  ← theme.css:237
@@ -437,19 +425,20 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
     0 2px 4px -2px rgb(0 0 0 / 0.1) }  ← toast.css:22
 .toast { animation: toastSlideIn 200ms ease-out }  ← toast.css:26
 .welcome__progress-header span { letter-spacing: 0.02em }  ← welcome.css:554
-.welcome__text-link:focus-visible { outline: 2px solid hsl(var(--ring)) }  ← welcome.css:865
-.welcome__text-link:focus-visible { outline-offset: 3px }  ← welcome.css:866
-.welcome__route-test-heading { align-items: center }  ← welcome.css:903
-.welcome__route-test-heading { gap: 10px }  ← welcome.css:904
+.welcome__text-link:focus-visible { outline: 2px solid hsl(var(--ring)) }  ← welcome.css:860
+.welcome__text-link:focus-visible { outline-offset: 3px }  ← welcome.css:861
+.welcome__route-test-heading { align-items: center }  ← welcome.css:896
+.welcome__route-test-heading { gap: 10px }  ← welcome.css:897
+.welcome__text-link { padding: 6px 0 }  ← welcome.css:1090
 
-## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (46)
+## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (47)
 .summary-card { box-shadow: var(--card-shadow) }  at cards.css:7 loses to theme.css:196
 .trend--up { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:237
 .trend--down { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:242
 .trend--up { background: hsl(var(--muted)) }  at cards.css:49 loses to theme.css:238
 .trend--down { background: hsl(var(--muted)) }  at cards.css:49 loses to theme.css:243
 .panel { box-shadow: var(--card-shadow) }  at cards.css:59 loses to theme.css:268
-.view-more-link { color: hsl(var(--muted-foreground)) }  at cards.css:72 loses to analytics-overview.css:213
+.view-more-link { color: hsl(var(--muted-foreground)) }  at cards.css:72 loses to analytics-overview.css:183
 .chart-card { box-shadow: var(--card-shadow) }  at cards.css:86 loses to theme.css:284
 .chart-card__header { align-items: stretch }  at cards.css:92 loses to theme.css:290
 .chart-card__value-row { align-items: center }  at cards.css:160 loses to theme.css:322
@@ -465,11 +454,11 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .sidebar { padding: var(--gap-md) 0 }  at controls.css:213 loses to theme.css:784
 .custom-select__option--top > svg { margin-top: calc((18px - 13px) / 2) }  at custom-select.css:137 loses to custom-select.css:142
 .custom-select__option--top > img { margin-top: calc((18px - 13px) / 2) }  at custom-select.css:137 loses to custom-select.css:142
-.tier-badge--fallback { background: hsl(var(--muted-foreground) / 0.1) }  at data.css:299 loses to overview.css:105
-.tier-badge--fallback { color: hsl(var(--muted-foreground)) }  at data.css:300 loses to overview.css:106
-.feed-item { align-items: flex-start }  at data.css:507 loses to theme.css:586
-.feed-item { gap: 12px }  at data.css:508 loses to theme.css:587
-.feed-item { padding: 12px 0 }  at data.css:509 loses to theme.css:588
+.tier-badge--fallback { background: hsl(var(--muted-foreground) / 0.1) }  at data.css:252 loses to overview.css:105
+.tier-badge--fallback { color: hsl(var(--muted-foreground)) }  at data.css:253 loses to overview.css:106
+.feed-item { align-items: flex-start }  at data.css:460 loses to theme.css:586
+.feed-item { gap: 12px }  at data.css:461 loses to theme.css:587
+.feed-item { padding: 12px 0 }  at data.css:462 loses to theme.css:588
 .theme-toggle { width: 2rem }  at layout.css:141 loses to theme.css:947
 .theme-toggle { padding: 0 }  at layout.css:149 loses to theme.css:938
 .modal { box-shadow: var(--card-shadow),
@@ -481,24 +470,23 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .setup-modal__next { color: hsl(var(--primary-foreground)) }  at modals.css:101 loses to overview.css:46
 .setup-modal__next { background: hsl(var(--primary)) }  at modals.css:102 loses to overview.css:45
 .setup-modal__next:hover { opacity: 0.9 }  at modals.css:110 loses to overview.css:55
-.request-tool { border: 1px solid hsl(var(--border)) }  at request-drawer.css:670 loses to request-drawer.css:918
-.request-tool { border-radius: var(--radius) }  at request-drawer.css:671 loses to request-drawer.css:919
-.request-tool { background: hsl(var(--card)) }  at request-drawer.css:672 loses to request-drawer.css:920
-.hljs-attr { color: hsl(187 60% 38%) }  at request-drawer.css:1098 loses to syntax-highlight.css:41
+.request-tool { border: 1px solid hsl(var(--border)) }  at request-drawer.css:662 loses to request-drawer.css:910
+.request-tool { border-radius: var(--radius) }  at request-drawer.css:663 loses to request-drawer.css:911
+.request-tool { background: hsl(var(--card)) }  at request-drawer.css:664 loses to request-drawer.css:912
+.hljs-attr { color: hsl(187 60% 38%) }  at request-drawer.css:1090 loses to syntax-highlight.css:41
 .welcome__progress-header span { letter-spacing: 0.09em }  at welcome.css:548 loses to welcome.css:554
-.welcome__text-link:focus-visible { outline: 3px solid hsl(var(--ring)) }  at welcome.css:726 loses to welcome.css:865
-.welcome__text-link:focus-visible { outline-offset: 2px }  at welcome.css:727 loses to welcome.css:866
-.welcome__route-test-heading { align-items: flex-start }  at welcome.css:873 loses to welcome.css:903
-.welcome__route-test-heading { gap: 14px }  at welcome.css:875 loses to welcome.css:904
+.welcome__text-link:focus-visible { outline: 3px solid hsl(var(--ring)) }  at welcome.css:726 loses to welcome.css:860
+.welcome__text-link:focus-visible { outline-offset: 2px }  at welcome.css:727 loses to welcome.css:861
+.welcome__route-test-heading { align-items: flex-start }  at welcome.css:868 loses to welcome.css:896
+.welcome__route-test-heading { gap: 14px }  at welcome.css:870 loses to welcome.css:897
+.welcome__text-link { padding: 0 }  at welcome.css:1079 loses to welcome.css:1090
 
-## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (20)
+## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (18)
 agent-chart-tooltip.css ← components/ChartHoverTooltip.tsx
-analytics-overview.css ← components/AutofixKpiCards.tsx, pages/GlobalOverview.tsx, pages/providers/ConnectionDetail.tsx, pages/providers/ProviderConnectionsPage.tsx
+analytics-overview.css ← components/ReliabilityKpiCards.tsx, pages/GlobalOverview.tsx, pages/providers/ConnectionDetail.tsx, pages/providers/ProviderConnectionsPage.tsx
 connection-detail.css ← pages/providers/ConnectionDetail.tsx
-discovery.css ← pages/Discovery.tsx
 filter-select.css ← components/FilterSelect.tsx
 model-filter.css ← components/ModelPricesFilterBar.tsx, pages/MessageLog.tsx
-notifications-bell.css ← components/NotificationBell.tsx
 overview.css ← pages/GlobalOverview.tsx, pages/MessageLog.tsx, pages/Overview.tsx
 playground.css ← pages/Playground.tsx
 reliability-card.css ← components/ReliabilityChart.tsx

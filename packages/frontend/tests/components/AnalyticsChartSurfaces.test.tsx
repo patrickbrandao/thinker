@@ -79,7 +79,7 @@ vi.mock('../../src/services/sse.js', () => ({
 }));
 
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
   getErrorBreakdown: (...args: unknown[]) => mockGetErrorBreakdown(...args),
@@ -89,7 +89,7 @@ import GlobalOverviewSkeleton from '../../src/components/GlobalOverviewSkeleton'
 import MultiAgentTokenChart, { AGENT_COLORS } from '../../src/components/MultiAgentTokenChart';
 import ProviderChartCard from '../../src/components/ProviderChartCard';
 import UnifiedChartCard from '../../src/components/UnifiedChartCard';
-import AutofixKpiCards from '../../src/components/AutofixKpiCards';
+import ReliabilityKpiCards from '../../src/components/ReliabilityKpiCards';
 import ErrorClassCard from '../../src/components/ErrorClassCard';
 import ReliabilityChart from '../../src/components/ReliabilityChart';
 
@@ -115,23 +115,23 @@ const buildLazyChart = async () => {
 };
 
 describe('analytics chart surface components', () => {
-  it('renders the self-healed requests tab from the disposition timeseries', async () => {
+  it('renders the recovered requests tab from the request-status timeseries', async () => {
     const onTabChange = vi.fn();
-    const selfHealedTimeseries = {
+    const recoveredTimeseries = {
       range: '7d',
       by: 'disposition',
-      keys: ['healed', 'fallback'],
-      buckets: [{ bucket: '2026-06-04', counts: [12, 3] }],
+      keys: ['fallback'],
+      buckets: [{ bucket: '2026-06-04', counts: [3] }],
     };
     const { unmount } = render(() => (
       <UnifiedChartCard
-        activeTab="selfheal"
+        activeTab="recovered"
         onTabChange={onTabChange}
         requestsValue={10}
         requestsTrendPct={0}
-        selfHealedValue={15}
-        selfHealedTrendPct={20}
-        selfHealedTimeseries={selfHealedTimeseries}
+        recoveredValue={15}
+        recoveredTrendPct={20}
+        recoveredTimeseries={recoveredTimeseries}
         tokensValue={100}
         tokensTrendPct={0}
         range="7d"
@@ -151,8 +151,7 @@ describe('analytics chart surface components', () => {
     await buildLazyChart();
     // Stacked series are reversed (top-of-stack first).
     const labels = capturedChartOpts.series.slice(1).map((s: { label: string }) => s.label);
-    expect(labels).toContain('Success - recovered by Autofix');
-    expect(labels).toContain('Success - recovered by Fallback');
+    expect(labels).toEqual(['Success - recovered by Fallback']);
     unmount();
   });
 
@@ -187,16 +186,16 @@ describe('analytics chart surface components', () => {
     unmount();
   });
 
-  it('renders the self-healed empty state and hides the tab without a timeseries', () => {
+  it('renders the recovered empty state and hides the tab without a timeseries', () => {
     const { unmount } = render(() => (
       <UnifiedChartCard
-        activeTab="selfheal"
+        activeTab="recovered"
         onTabChange={vi.fn()}
         requestsValue={0}
         requestsTrendPct={0}
-        selfHealedValue={0}
-        selfHealedTrendPct={0}
-        selfHealedTimeseries={{ range: '24h', by: 'disposition', keys: [], buckets: [] }}
+        recoveredValue={0}
+        recoveredTrendPct={0}
+        recoveredTimeseries={{ range: '24h', by: 'disposition', keys: [], buckets: [] }}
         tokensValue={0}
         tokensTrendPct={0}
         range="24h"
@@ -221,15 +220,15 @@ describe('analytics chart surface components', () => {
     noTab.unmount();
   });
 
-  it('orders disposition series success → healed → fallback → error (legend and stack)', async () => {
+  it('orders disposition series success → fallback → error (legend and stack)', async () => {
     // Backend delivers keys in an arbitrary order; the chart must normalize.
     const { container, unmount } = render(() => (
       <ReliabilityChart
         timeseries={{
           range: '7d',
           by: 'disposition',
-          keys: ['error', 'fallback', 'success', 'healed'],
-          buckets: [{ bucket: '2026-06-04', counts: [4, 3, 1, 2] }],
+          keys: ['error', 'fallback', 'success'],
+          buckets: [{ bucket: '2026-06-04', counts: [4, 3, 1] }],
         }}
         range="7d"
         seriesMode="disposition"
@@ -240,19 +239,14 @@ describe('analytics chart surface components', () => {
     const legend = [...container.querySelectorAll('.rel-chart__legend-item')].map((e) =>
       e.textContent?.trim(),
     );
-    expect(legend).toEqual([
-      'Success',
-      'Success - recovered by Autofix',
-      'Success - recovered by Fallback',
-      'Error',
-    ]);
+    expect(legend).toEqual(['Success', 'Success - recovered by Fallback', 'Error']);
 
     // Stack order (bottom → top) follows the same order: the cumulative data
     // rows are reversed (top first), so the LAST row is the bottom (success=1)
-    // and the first is the full stack (…+error=10).
+    // and the first is the full stack (…+error=8).
     const data = capturedLifecycleOpts.buildData();
     const stacks = data.slice(1).map((s: number[]) => s[0]);
-    expect(stacks).toEqual([10, 6, 3, 1]); // error top, then fallback, healed, success bottom
+    expect(stacks).toEqual([8, 4, 1]); // error top, then fallback, success bottom
     unmount();
   });
 
@@ -262,8 +256,8 @@ describe('analytics chart surface components', () => {
         timeseries={{
           range: '7d',
           by: 'disposition',
-          keys: ['error', 'fallback', 'success', 'healed'],
-          buckets: [{ bucket: '2026-06-04', counts: [4, 3, 1, 2] }],
+          keys: ['error', 'fallback', 'success'],
+          buckets: [{ bucket: '2026-06-04', counts: [4, 3, 1] }],
         }}
         range="7d"
         seriesMode="disposition"
@@ -295,11 +289,10 @@ describe('analytics chart surface components', () => {
     }));
     expect(rows).toEqual([
       { label: 'Success', value: '1' },
-      { label: 'Success - recovered by Autofix', value: '2' },
       { label: 'Success - recovered by Fallback', value: '3' },
       { label: 'Error', value: '4' },
     ]);
-    expect(container.querySelector('.agent-chart-tooltip__total-value')?.textContent).toBe('10');
+    expect(container.querySelector('.agent-chart-tooltip__total-value')?.textContent).toBe('8');
 
     // Cursor off the data hides it.
     capturedChartOpts.hooks.setCursor[0]({ cursor: { idx: -1 } });
@@ -319,19 +312,15 @@ describe('analytics chart surface components', () => {
     expect(capturedLifecycleOpts.buildChart()).toBeNull();
   });
 
-  it('renders the self-healed KPI cards (rate, share, via Autofix, via Fallback)', () => {
+  it('renders the reliability KPI cards (rate, recovered share, via Fallback, failed)', () => {
     const base = {
       success_rate: { value: 0.8, previous: 0.7 },
       errors_remaining: { value: 0, previous: 0 },
-      coverage: { rate: 0.555, previous_rate: 0.5 },
-      dispositions: { healed: 5, no_fix_found: 2, resolving: 1, ineffective: 0 },
-      needs_attention: [],
     };
     const { unmount } = render(() => (
-      <AutofixKpiCards
+      <ReliabilityKpiCards
         stats={{
           ...base,
-          autofix_saves: { value: 5, previous: 0 },
           fallback_saves: { value: 3, previous: 0 },
           total_requests: { value: 100, previous: 0 },
         }}
@@ -339,27 +328,25 @@ describe('analytics chart surface components', () => {
     ));
     expect(screen.getByText('Success rate')).toBeDefined();
     expect(screen.getByText('80.0%')).toBeDefined();
-    // Self-healed share = (5 + 3) / 100.
+    // Recovered share = 3 / 100.
     expect(screen.getByText('Recovered requests')).toBeDefined();
-    expect(screen.getByText('8.0%')).toBeDefined();
+    expect(screen.getByText('3.0%')).toBeDefined();
     expect(screen.getByText('Failed requests')).toBeDefined();
-    expect(screen.getByText('Recovered by Autofix')).toBeDefined();
-    expect(screen.getByText('5')).toBeDefined();
     expect(screen.getByText('Recovered by Fallback')).toBeDefined();
     expect(screen.getByText('3')).toBeDefined();
-    // The five-card row relies on the responsive `overview-stats--5` modifier;
-    // an inline grid-template-columns would override the phone breakpoints.
+    expect(document.body.textContent).not.toContain('Autofix');
+    // Four cards use the base responsive grid; an inline grid-template-columns
+    // would override the phone breakpoints.
     const grid = screen.getByText('Success rate').closest('.overview-stats') as HTMLElement;
-    expect(grid.classList.contains('overview-stats--5')).toBe(true);
+    expect(grid.querySelectorAll('.overview-stat-card')).toHaveLength(4);
     expect(grid.style.gridTemplateColumns).toBe('');
     unmount();
 
     // Trends: previous window present → percentage badges.
     render(() => (
-      <AutofixKpiCards
+      <ReliabilityKpiCards
         stats={{
           ...base,
-          autofix_saves: { value: 1, previous: 2 },
           fallback_saves: { value: 1, previous: 2 },
           total_requests: { value: 10, previous: 10 },
         }}
@@ -372,15 +359,11 @@ describe('analytics chart surface components', () => {
     const base = {
       success_rate: { value: 0.8, previous: 0.7 },
       errors_remaining: { value: 0, previous: 0 },
-      coverage: { rate: 0.555, previous_rate: 0.5 },
-      dispositions: { healed: 5, no_fix_found: 2, resolving: 1, ineffective: 0 },
-      needs_attention: [],
     };
     render(() => (
-      <AutofixKpiCards
+      <ReliabilityKpiCards
         stats={{
           ...base,
-          autofix_saves: { value: 5, previous: 0 },
           fallback_saves: { value: 3, previous: 0 },
           total_requests: { value: 100, previous: 0 },
         }}
@@ -392,17 +375,14 @@ describe('analytics chart surface components', () => {
     expect(routerNavigate).toHaveBeenCalledWith(
       '/messages?agent=demo-agent&range=7d&status=failed',
     );
-    fireEvent.click(screen.getByText('Recovered by Autofix').closest('.overview-stat-card')!);
-    expect(routerNavigate).toHaveBeenCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=ok&trigger=autofix',
-    );
     fireEvent.click(screen.getByText('Recovered by Fallback').closest('.overview-stat-card')!);
     expect(routerNavigate).toHaveBeenCalledWith(
       '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
     );
+    routerNavigate.mockClear();
     fireEvent.click(screen.getByText('Recovered requests').closest('.overview-stat-card')!);
     expect(routerNavigate).toHaveBeenCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=ok&trigger=autofix,fallback',
+      '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
     );
 
     const failedCard = screen.getByText('Failed requests').closest('.overview-stat-card')!;
@@ -423,16 +403,12 @@ describe('analytics chart surface components', () => {
 
   it('describes global KPI links as covering all harnesses', () => {
     render(() => (
-      <AutofixKpiCards
+      <ReliabilityKpiCards
         stats={{
           success_rate: { value: 0.8, previous: 0.7 },
           errors_remaining: { value: 2, previous: 1 },
-          autofix_saves: { value: 5, previous: 0 },
           fallback_saves: { value: 3, previous: 0 },
           total_requests: { value: 100, previous: 0 },
-          coverage: { rate: 0.5, previous_rate: 0.4 },
-          dispositions: { healed: 5, no_fix_found: 2, resolving: 1, ineffective: 0 },
-          needs_attention: [],
         }}
       />
     ));
@@ -532,7 +508,7 @@ describe('analytics chart surface components', () => {
     ));
 
     expect(screen.getByTestId('info-tooltip').textContent).toBe(
-      'Caller success: 95.0%. Provider-attempt success: 80.0%. The gap is recovery from fallbacks and Autofix.',
+      'Caller success: 95.0%. Provider-attempt success: 80.0%. The gap is recovery from fallbacks.',
     );
     unmount();
 

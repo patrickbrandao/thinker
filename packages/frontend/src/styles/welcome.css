@@ -818,10 +818,6 @@
   }
 }
 
-.welcome__legal {
-  margin-top: var(--gap-sm);
-}
-
 .welcome__error {
   margin: 0;
   color: hsl(var(--destructive));
@@ -837,7 +833,6 @@
   line-height: 1.5;
 }
 
-.welcome__autofix-section,
 .welcome__first-request,
 .welcome__plan-section {
   border-top: 1px solid hsl(var(--border));
@@ -888,8 +883,6 @@
   border-radius: var(--radius);
   background: hsl(var(--muted) / 0.28);
 }
-
-/* ── Autofix step ──────────────────────────────── */
 
 /* ── Route & test step ──────────────────────────── */
 
@@ -1082,64 +1075,7 @@
   border-radius: 4px;
 }
 
-/* ── Autofix step: concrete repair examples ────── */
-
-.welcome__autofix-details {
-  margin-top: 18px;
-}
-
-.welcome__autofix-heading {
-  margin: 0 0 10px;
-  color: hsl(var(--muted-foreground));
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.welcome__autofix-examples {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.welcome__autofix-examples li {
-  display: grid;
-  gap: 5px;
-  padding: 11px 13px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--card));
-}
-
-.welcome__autofix-examples code {
-  overflow: hidden;
-  color: hsl(var(--destructive) / 0.85);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.welcome__autofix-examples span {
-  color: hsl(var(--muted-foreground));
-  font-size: var(--font-size-xs);
-  line-height: 1.45;
-}
-
-.welcome__autofix-how {
-  max-width: 640px;
-  margin: 12px 0 0;
-  color: hsl(var(--muted-foreground));
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
-}
-
-.welcome__autofix-how .welcome__text-link {
+.welcome__text-link {
   padding: 0;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1563,10 +1499,6 @@
 
   .welcome__sidebar-footer .welcome__text-link {
     white-space: nowrap;
-  }
-
-  .welcome__autofix-examples {
-    grid-template-columns: 1fr;
   }
 
   .welcome__panel .routing-cards--centered {

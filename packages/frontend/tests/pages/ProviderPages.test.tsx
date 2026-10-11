@@ -95,13 +95,11 @@ vi.mock('../../src/services/api.js', () => ({
 }));
 
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
-  totalAttemptsTooltip: (doctor: boolean) =>
-    doctor
-      ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-      : 'Every provider call counts here, including fallback retries. One request can produce several attempts.',
+  TOTAL_ATTEMPTS_TOOLTIP:
+    'Every provider call counts here, including fallback retries. One request can produce several attempts.',
   MODEL_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this model.',
   PROVIDER_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this provider.',
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D:

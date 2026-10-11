@@ -42,9 +42,16 @@ describe('agents API client', () => {
   });
 
   it('getAgentInfo unwraps the { agent } envelope', async () => {
-    const fetchMock = setupFetch({ agent: { agent_name: 'a', display_name: 'A', agent_category: null, agent_platform: null } });
+    const fetchMock = setupFetch({
+      agent: { agent_name: 'a', display_name: 'A', agent_category: null, agent_platform: null },
+    });
     const out = await agents.getAgentInfo('a');
-    expect(out).toEqual({ agent_name: 'a', display_name: 'A', agent_category: null, agent_platform: null });
+    expect(out).toEqual({
+      agent_name: 'a',
+      display_name: 'A',
+      agent_category: null,
+      agent_platform: null,
+    });
     const url = fetchMock.mock.calls[0][0] as string;
     expect(url).toContain('/api/v1/agents/a');
   });
@@ -125,11 +132,17 @@ describe('agents API client', () => {
     expect(url).toContain('/api/v1/agents/demo/duplicate-preview');
   });
 
-  it('duplicateAgent POSTs the new name to the duplicate endpoint', async () => {
+  it('duplicateAgent POSTs the new name, then opts the copy out of legacy Autofix', async () => {
     const fetchMock = setupFetch({
       agent: { id: '1', name: 'demo-copy', display_name: 'Demo Copy' },
       apiKey: 'mnfst_new',
-      copied: { providers: 0, customProviders: 0, tierAssignments: 0, specificityAssignments: 0, modelParams: 0 },
+      copied: {
+        providers: 0,
+        customProviders: 0,
+        tierAssignments: 0,
+        specificityAssignments: 0,
+        modelParams: 0,
+      },
     });
     const out = await agents.duplicateAgent('demo', 'demo-copy');
     expect(out.agent.name).toBe('demo-copy');
@@ -137,6 +150,38 @@ describe('agents API client', () => {
     expect(url).toContain('/api/v1/agents/demo/duplicate');
     expect((init as RequestInit).method).toBe('POST');
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ name: 'demo-copy' });
+    // Until #16: the duplicate endpoint takes no Autofix field, so the copy is
+    // switched off right after it is created.
+    const [optOutUrl, optOutInit] = fetchMock.mock.calls[1];
+    expect(optOutUrl).toContain('/api/v1/routing/demo-copy/autofix');
+    expect((optOutInit as RequestInit).method).toBe('PATCH');
+    expect(JSON.parse((optOutInit as RequestInit).body as string)).toEqual({ enabled: false });
+  });
+
+  it('duplicateAgent still returns the copy when the Autofix opt-out fails', async () => {
+    const created = {
+      agent: { id: '1', name: 'demo-copy', display_name: 'Demo Copy' },
+      apiKey: 'mnfst_new',
+      copied: { providers: 0, tierAssignments: 0, specificityAssignments: 0, modelParams: 0 },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => created,
+        text: async () => JSON.stringify(created),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: 'boom' }),
+        text: async () => JSON.stringify({ message: 'boom' }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await agents.duplicateAgent('demo', 'demo-copy');
+    expect(out.agent.name).toBe('demo-copy');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('createAgent POSTs the create payload', async () => {
@@ -159,10 +204,19 @@ describe('agents API client', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/api/v1/agents');
     expect((init as RequestInit).method).toBe('POST');
+    // Until #16: every create opts out of the legacy backend Autofix default.
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       name: 'new-agent',
       agent_category: 'coding',
       agent_platform: 'openclaw',
+      autofix_enabled: false,
     });
+  });
+
+  it('createAgent always sends autofix_enabled: false, even for a bare name', async () => {
+    const fetchMock = setupFetch({ agent: { name: 'my-agent' }, apiKey: 'k' });
+    await agents.createAgent({ name: 'my-agent' });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toEqual({ name: 'my-agent', autofix_enabled: false });
   });
 });

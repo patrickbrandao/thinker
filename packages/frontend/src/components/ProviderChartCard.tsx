@@ -89,7 +89,7 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
                 text={
                   props.requestSuccessRate == null
                     ? `Provider-attempt success: ${props.attemptSuccessRate!.toFixed(1)}%.`
-                    : `Caller success: ${props.requestSuccessRate.toFixed(1)}%. Provider-attempt success: ${props.attemptSuccessRate!.toFixed(1)}%. The gap is recovery from fallbacks and Autofix.`
+                    : `Caller success: ${props.requestSuccessRate.toFixed(1)}%. Provider-attempt success: ${props.attemptSuccessRate!.toFixed(1)}%. The gap is recovery from fallbacks.`
                 }
               />
             </Show>

@@ -152,7 +152,7 @@ describe('Register', () => {
     expect(container.querySelector('a[href="/reset-password"]')).not.toBeNull();
   });
 
-  it('routes email signups through the discovery step', async () => {
+  it('sends email signups straight to the onboarding flow', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
     const { container } = render(() => <Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
@@ -168,12 +168,12 @@ describe('Register', () => {
         name: 'Test',
         email: 'test@test.com',
         password: 'pass123',
-        callbackURL: '/discovery?next=%2Fwelcome',
+        callbackURL: '/welcome',
       });
     });
   });
 
-  it('routes social signups through the discovery step', async () => {
+  it('sends social signups straight to the onboarding flow', async () => {
     mockCheckSocialProviders.mockResolvedValue(['github']);
     render(() => <Register />);
 
@@ -181,12 +181,12 @@ describe('Register', () => {
 
     expect(mockSignInSocial).toHaveBeenCalledWith({
       provider: 'github',
-      callbackURL: '/discovery?next=%2Fwelcome&signup=1',
+      callbackURL: '/welcome',
       errorCallbackURL: '/login?oauth=failed',
     });
   });
 
-  it('redirects token signups to the discovery step', async () => {
+  it('redirects token signups to the onboarding flow', async () => {
     const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
       href: '',
@@ -208,10 +208,10 @@ describe('Register', () => {
     });
     fireEvent.submit(container.querySelector('form')!);
     await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith('/discovery?next=%2Fwelcome');
+      expect(hrefSetter).toHaveBeenCalledWith('/welcome');
     });
-    // The pending marker lets the guards route Back presses to the form.
-    expect(localStorage.getItem('manifest_discovery_pending_u1')).toBe('/welcome');
+    // No questionnaire marker is left behind for the guards to act on.
+    expect(localStorage.getItem('manifest_discovery_pending_u1')).toBeNull();
 
     locationSpy.mockRestore();
   });
@@ -280,7 +280,7 @@ describe('Register', () => {
       await vi.waitFor(() => {
         expect(mockSendVerificationEmail).toHaveBeenCalledWith({
           email: 'test@test.com',
-          callbackURL: '/discovery?next=%2Fwelcome',
+          callbackURL: '/welcome',
         });
       });
     }

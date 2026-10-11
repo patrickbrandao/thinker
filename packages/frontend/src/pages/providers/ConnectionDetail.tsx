@@ -22,7 +22,7 @@ import {
   getConnectionAttemptHttpStatusTimeseries,
   getConnectionAttemptBreakdown,
   attemptSuccessRate,
-  totalAttemptsTooltip,
+  TOTAL_ATTEMPTS_TOOLTIP,
   CONNECTION_SUCCESS_RATE_TOOLTIP,
   CONNECTION_HARNESS_SUCCESS_RATE_TOOLTIP,
 } from '../../services/api/analytics.js';
@@ -788,9 +788,8 @@ const ConnectionDetail: Component = () => {
               </div>
 
               {/* Attempt world cards: the connection's own numbers on the
-                  filtered period. Fallback retries exist for everyone;
-                  autofixed attempts only exist with the Doctor version. */}
-              <div class="overview-stats overview-stats--5" style="margin-bottom: 16px;">
+                  filtered period. */}
+              <div class="overview-stats" style="margin-bottom: 16px;">
                 <div class="overview-stat-card">
                   <span class="overview-stat-card__label">
                     Success rate
@@ -855,25 +854,6 @@ const ConnectionDetail: Component = () => {
                     {viewMore()}
                   </div>
                 </div>
-                <div
-                  class="overview-stat-card"
-                  style="cursor: pointer;"
-                  title="View the requests where this connection ran an autofixed attempt"
-                  onClick={() => navigate(requestsLink('&trigger=autofix'))}
-                >
-                  <span class="overview-stat-card__label">Autofixed attempts</span>
-                  <div class="overview-stat-card__value-row">
-                    <span class="overview-stat-card__value">
-                      {formatNumber(breakdown()?.autofix_attempts ?? 0)}
-                    </span>
-                    <Show when={(breakdown()?.autofix_attempts ?? 0) > 0}>
-                      <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                        {formatNumber(breakdown()?.autofix_attempts_succeeded ?? 0)} succeeded
-                      </span>
-                    </Show>
-                    {viewMore()}
-                  </div>
-                </div>
               </div>
 
               {/* Chart */}
@@ -893,7 +873,7 @@ const ConnectionDetail: Component = () => {
                       activeTab={chartView()}
                       onTabChange={setChartView}
                       requestsLabel="Attempts"
-                      requestsInfoTooltip={totalAttemptsTooltip(true)}
+                      requestsInfoTooltip={TOTAL_ATTEMPTS_TOOLTIP}
                       requestsValue={attemptTotals().attempts}
                       requestsTrendPct={0}
                       tokensValue={analytics()!.summary.tokens.value}
@@ -1119,7 +1099,7 @@ const ConnectionDetail: Component = () => {
                           </Show>
                           <th class="rel-col">
                             Total attempts
-                            <InfoTooltip text={totalAttemptsTooltip(true)} />
+                            <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
                           </th>
                           <th class="rel-col">
                             Success rate

@@ -34,7 +34,7 @@ import { PROVIDERS } from '../services/providers.js';
 import { AGENT_COLORS } from '../components/MultiAgentTokenChart.jsx';
 import InfoTooltip from '../components/InfoTooltip.jsx';
 import UnifiedChartCard from '../components/UnifiedChartCard.jsx';
-import AutofixKpiCards from '../components/AutofixKpiCards.jsx';
+import ReliabilityKpiCards from '../components/ReliabilityKpiCards.jsx';
 import Sparkline from '../components/Sparkline.jsx';
 import FilterSelect from '../components/FilterSelect.jsx';
 import Select from '../components/Select.jsx';
@@ -53,15 +53,15 @@ import '../styles/charts.css';
 import '../styles/analytics-overview.css';
 import '../styles/routing.css';
 import {
-  getAutofixStats,
-  getAutofixTimeseries,
+  getReliabilityStats,
+  getRequestStatusTimeseries,
   getPerProviderReliability,
   getPerAgentReliability,
   getPerModelReliability,
-  selfHealedCount,
+  recoveredCount,
   successRate,
   attemptSuccessRate,
-  totalAttemptsTooltip,
+  TOTAL_ATTEMPTS_TOOLTIP,
   MODEL_SUCCESS_RATE_TOOLTIP,
   PROVIDER_SUCCESS_RATE_TOOLTIP,
   CONNECTION_SUCCESS_RATE_TOOLTIP,
@@ -186,7 +186,7 @@ const GlobalOverview: Component = () => {
   };
 
   // ── Chart view state ─────────────────────────────────────────────────
-  const [chartView, setChartView] = createSignal<'requests' | 'selfheal' | 'tokens' | 'cost'>(
+  const [chartView, setChartView] = createSignal<'requests' | 'recovered' | 'tokens' | 'cost'>(
     'requests',
   );
 
@@ -260,29 +260,27 @@ const GlobalOverview: Component = () => {
     },
   );
 
-  // ── Autofix resources ─────────────────────────────────
-  const autofixScope = createMemo(() => ({ range: chartRange() }));
-  const [autofixStatsResult] = createResource(
-    () => ({ scope: autofixScope(), _ping: analyticsPing() }),
-    async (p) => ({ scope: p.scope, data: await getAutofixStats(p.scope.range) }),
+  // ── Reliability resources ─────────────────────────────
+  const reliabilityScope = createMemo(() => ({ range: chartRange() }));
+  const [reliabilityStatsResult] = createResource(
+    () => ({ scope: reliabilityScope(), _ping: analyticsPing() }),
+    async (p) => ({ scope: p.scope, data: await getReliabilityStats(p.scope.range) }),
   );
-  const autofixStats = () => {
-    const result = autofixStatsResult();
-    return result?.scope === autofixScope() ? result.data : undefined;
+  const reliabilityStats = () => {
+    const result = reliabilityStatsResult();
+    return result?.scope === reliabilityScope() ? result.data : undefined;
   };
 
-  // Disposition timeseries: feeds the "By request status" chart view AND the
-  // Self-healed requests tab (recovered subset: healed + fallback series).
+  // Request-status timeseries: feeds the "By request status" chart view AND
+  // the Recovered requests tab (the fallback series alone).
   const [requestStatusTs] = createResource(
     () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getAutofixTimeseries(p.range, 'disposition'),
+    (p) => getRequestStatusTimeseries(p.range),
   );
-  const selfHealedTs = () => {
+  const recoveredTs = () => {
     const ts = requestStatusTs();
     if (!ts) return undefined;
-    const picked = ts.keys
-      .map((k, i) => ({ k, i }))
-      .filter(({ k }) => k === 'healed' || k === 'fallback');
+    const picked = ts.keys.map((k, i) => ({ k, i })).filter(({ k }) => k === 'fallback');
     return {
       ...ts,
       keys: picked.map(({ k }) => k),
@@ -636,8 +634,8 @@ const GlobalOverview: Component = () => {
           </Show>
         }
       >
-        {/* ── Autofix KPI cards ── */}
-        <AutofixKpiCards stats={autofixStats()} range={chartRange()} />
+        {/* ── Reliability KPI cards ── */}
+        <ReliabilityKpiCards stats={reliabilityStats()} range={chartRange()} />
 
         {/* ── 2. Unified Chart Card ─────────────────────────────────── */}
         {(() => {
@@ -653,19 +651,16 @@ const GlobalOverview: Component = () => {
               onTabChange={setChartView}
               requestsValue={o().summary.messages.value}
               requestsTrendPct={o().summary.messages.trend_pct}
-              selfHealedValue={
-                (autofixStats()?.autofix_saves.value ?? 0) +
-                (autofixStats()?.fallback_saves?.value ?? 0)
-              }
-              selfHealedTrendPct={(() => {
-                const s = autofixStats();
+              recoveredValue={reliabilityStats()?.fallback_saves?.value ?? 0}
+              recoveredTrendPct={(() => {
+                const s = reliabilityStats();
                 if (!s) return 0;
-                const cur = s.autofix_saves.value + (s.fallback_saves?.value ?? 0);
-                const prev = s.autofix_saves.previous + (s.fallback_saves?.previous ?? 0);
+                const cur = s.fallback_saves?.value ?? 0;
+                const prev = s.fallback_saves?.previous ?? 0;
                 if (prev === 0) return 0;
                 return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
               })()}
-              selfHealedTimeseries={selfHealedTs()}
+              recoveredTimeseries={recoveredTs()}
               costValue={o().summary.cost_today.value}
               costTrendPct={o().summary.cost_today.trend_pct}
               costInfoTooltip="Actual API key costs only. Subscription usage is not included."
@@ -790,7 +785,7 @@ const GlobalOverview: Component = () => {
                   <th style="text-align: right;">Est. cost</th>
                   <th class="rel-col">
                     Total attempts
-                    <InfoTooltip text={totalAttemptsTooltip(true)} />
+                    <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
                   </th>
                   <th class="rel-col">
                     Success rate
@@ -923,7 +918,7 @@ const GlobalOverview: Component = () => {
                   <th>Status</th>
                   <th class="rel-col">
                     Total attempts
-                    <InfoTooltip text={totalAttemptsTooltip(true)} />
+                    <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
                   </th>
                   <th class="rel-col">
                     Failed attempts
@@ -1197,8 +1192,8 @@ const GlobalOverview: Component = () => {
                                 <Show when={rel()} fallback="—">
                                   {(() => {
                                     // Recovered = successful requests holding a
-                                    // recovery attempt (autofix or fallback).
-                                    const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}&status=ok&trigger=autofix,fallback`;
+                                    // fallback attempt.
+                                    const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}&status=ok&trigger=fallback`;
                                     return (
                                       <a
                                         class="count-link"
@@ -1210,7 +1205,7 @@ const GlobalOverview: Component = () => {
                                           navigate(link);
                                         }}
                                       >
-                                        {formatNumber(selfHealedCount(rel()!))}
+                                        {formatNumber(recoveredCount(rel()!))}
                                       </a>
                                     );
                                   })()}

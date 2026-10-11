@@ -120,10 +120,6 @@
   background: hsl(36 80% 60% / 0.12);
   color: hsl(36 80% 40%);
 }
-.drawer__badge--autofix {
-  background: hsl(222 47% 50% / 0.1);
-  color: hsl(222 47% 50%);
-}
 
 /* ── Split layout: sidebar + content ── */
 .drawer__split {
@@ -312,7 +308,7 @@
   padding-right: 12px;
 }
 
-/* ── Context cards (error, autofix, fallback) inside the Details tab ── */
+/* ── Context cards (error, fallback) inside the Details tab ── */
 /* grid-column: 1 / -1 spans both KV columns so the card is full width */
 .drawer-context-card {
   grid-column: 1 / -1;
@@ -323,10 +319,6 @@
 .drawer-context-card--error {
   background: hsl(var(--destructive) / 0.06);
   border: 1px solid hsl(var(--destructive) / 0.25);
-}
-.drawer-context-card--autofix {
-  background: hsl(222 47% 50% / 0.06);
-  border: 1px solid hsl(222 47% 50% / 0.3);
 }
 .drawer-context-card--fallback {
   background: hsl(36 80% 60% / 0.08);

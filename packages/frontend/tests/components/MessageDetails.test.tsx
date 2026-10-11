@@ -107,7 +107,7 @@ describe('MessageDetails', () => {
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       // The redesign renders the error message inside `.msg-detail__error-inline`
-      // (an icon + the message span) within the error/autofix row.
+      // (an icon + the message span) within the error/recovery row.
       const errorBox = container.querySelector('.msg-detail__error-inline');
       expect(errorBox).not.toBeNull();
       expect(errorBox!.textContent).toBe('401 Unauthorized: invalid API key');
@@ -252,8 +252,6 @@ describe('MessageDetails', () => {
         error_origin: 'provider',
         error_class: 'server_error',
         superseded: true,
-        autofix_applied: false,
-        autofix_role: null,
       },
     });
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
@@ -263,16 +261,55 @@ describe('MessageDetails', () => {
     });
   });
 
-  it('does not treat a normalized superseded Autofix original as a fallback error', async () => {
-    // A superseded row that is the Autofix original must route to its own
-    // next-action panel, never the fallback one — the `!isAutofixOriginal`
-    // guard on the new superseded branch.
+  it('shows only the next-action card for a superseded fallback attempt', async () => {
+    // A fallback hop that failed and handed off again is superseded: it shows
+    // what came next, not what triggered it.
+    mockGetMessageDetails.mockResolvedValue({
+      message: {
+        ...detailsResponse.message,
+        status: 'failed',
+        error_message: 'Overloaded again',
+        superseded: true,
+        fallback_from_model: 'gpt-4o',
+        fallback_index: 1,
+      },
+    });
+    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('A fallback was triggered after this error.');
+    });
+    expect(container.textContent).not.toContain('this request was triggered by a fallback from');
+  });
+
+  it('pairs a failed fallback attempt with its trigger when nothing came after', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: {
+        ...detailsResponse.message,
+        status: 'failed',
+        error_message: 'Still failing',
+        superseded: false,
+        fallback_from_model: 'gpt-4o',
+        fallback_index: 0,
+      },
+    });
+    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Still failing');
+    });
+    const row = container.querySelector('.error-recovery-row');
+    expect(row).not.toBeNull();
+    expect(row!.classList.contains('error-recovery-row--solo')).toBe(false);
+    expect(container.textContent).toContain('this request was triggered by a fallback from');
+  });
+
+  it('never renders Autofix metadata or cards', async () => {
     mockGetMessageDetails.mockResolvedValue({
       message: {
         ...detailsResponse.message,
         status: 'failed',
         error_message: 'Bad request',
-        superseded: true,
+        // Legacy fields a pre-#16 backend may still send are ignored.
+        autofix_status: 'retry_succeeded',
         autofix_applied: true,
         autofix_role: 'original',
       },
@@ -281,7 +318,8 @@ describe('MessageDetails', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Bad request');
     });
-    expect(container.textContent).not.toContain('A fallback was triggered after this error.');
+    expect(container.textContent).not.toMatch(/autofix/i);
+    expect(container.querySelector('.error-recovery-row--solo')).not.toBeNull();
   });
 
   it('shows message summary', async () => {
@@ -383,8 +421,8 @@ describe('MessageDetails', () => {
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       // A successful request reached via fallback renders the fallback
-      // trigger card (`.autofix-card--fallback`) with the attempt number.
-      const banner = container.querySelector('.autofix-card--fallback');
+      // trigger card (`.recovery-card--fallback`) with the attempt number.
+      const banner = container.querySelector('.recovery-card--fallback');
       expect(banner).not.toBeNull();
       expect(banner!.textContent).toContain('gemini-2.5-flash-lite');
       expect(banner!.textContent).toContain('#1');
@@ -395,7 +433,7 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      expect(container.querySelector('.autofix-card--fallback')).toBeNull();
+      expect(container.querySelector('.recovery-card--fallback')).toBeNull();
     });
   });
 
@@ -663,7 +701,7 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(fallbackNoIndexResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      const banner = container.querySelector('.autofix-card--fallback');
+      const banner = container.querySelector('.recovery-card--fallback');
       expect(banner).not.toBeNull();
       expect(banner!.textContent).toContain('gemini-2.5-flash-lite');
       // With no explicit index the attempt number falls back to #1 rather than
