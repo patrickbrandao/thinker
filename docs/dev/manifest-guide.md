@@ -967,3 +967,11 @@ This applies to:
 ### E2E Test Entities
 
 When adding new TypeORM entities to `database/data-source-definitions.ts` (the entities array `database.module.ts` imports from), also add them to the E2E test helper (`packages/backend/test/helpers.ts`) entities array. Missing entities cause `EntityMetadataNotFoundError` in services that depend on them.
+
+### Supertest servers listen on 127.0.0.1
+
+Never hand supertest a server that isn't listening yet. In that case it calls `server.listen(0)` on every request, which binds the wildcard address (`::`), and then dials `127.0.0.1:<port>`. macOS hands out ephemeral ports in sequence, and it can give that wildcard listener a port another local process already holds on `127.0.0.1` only, such as Docker Desktop publishing a compose stack, a browser, or an editor. The more specific binding wins, so the request reaches the other process. Issue #62 was this: a duplication e2e request landed in a locally running Thinker, whose real `ApiKeyGuard` answered 401 to the test key.
+
+`createTestApp()` already listens on an ephemeral loopback port. Apps built some other way use `listenOnLoopback(app)` (Nest) or `serveOnLoopback(handler)` (Express or plain handlers) from `packages/backend/test/loopback.ts`. Unit specs under `src/` can't import from `test/`, so they bind `127.0.0.1` themselves (see `mcp-discovery.spec.ts`).
+
+`test/jest-e2e.json` sets a 30 s `testTimeout`, which also covers hooks. Each suite boots a full Nest app and syncs the schema in `beforeAll`, and on a loaded machine that can take more than Jest's default 5 s.
