@@ -47,7 +47,7 @@
     "cacheable": "^2.5.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
-    "compression": "^1.8.1",
+    "compression": "^1.8.2",
     "eventsource-parser": "^3.1.0",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
