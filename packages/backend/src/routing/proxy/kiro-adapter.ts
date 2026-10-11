@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
+import { mergeExtraHeaders } from './extra-headers';
 
 export const KIRO_BASE_URL = 'https://q.us-east-1.amazonaws.com';
 export const KIRO_MODELS_TARGET = 'AmazonCodeWhispererService.ListAvailableModels';
@@ -1171,11 +1172,15 @@ export async function forwardKiroChat(opts: {
 }): Promise<Response> {
   const timeoutSignal = AbortSignal.timeout(opts.timeoutMs);
   const fetchSignal = opts.signal ? AbortSignal.any([timeoutSignal, opts.signal]) : timeoutSignal;
-  const headers = {
-    ...buildKiroHeaders(opts.apiKey, KIRO_CHAT_TARGET),
-    'x-amzn-kiro-agent-mode': KIRO_AGENT_MODE,
-    ...opts.extraHeaders,
-  };
+  // The Kiro headers carry the stored OAuth token and pick the AWS operation;
+  // extra headers never replace or duplicate any of them.
+  const headers = mergeExtraHeaders(
+    {
+      ...buildKiroHeaders(opts.apiKey, KIRO_CHAT_TARGET),
+      'x-amzn-kiro-agent-mode': KIRO_AGENT_MODE,
+    },
+    opts.extraHeaders,
+  );
   const { body, toolNameMap } = buildKiroConversation(opts.body, opts.model);
   // Kiro reports no token counts, so seed the estimated usage with the prompt
   // size of the conversation we are about to send.

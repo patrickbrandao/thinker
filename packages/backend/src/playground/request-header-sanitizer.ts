@@ -1,12 +1,11 @@
-import { isPlaygroundHeaderBlocked } from 'manifest-shared';
+import {
+  isPlaygroundHeaderBlocked,
+  isPlaygroundHeaderNameValid,
+  isPlaygroundHeaderValueValid,
+} from 'manifest-shared';
 
 const MAX_HEADERS = 20;
 const MAX_VALUE_LENGTH = 2_000;
-
-/** RFC 9110 `token`. Anything else is not a valid header name and makes fetch throw. */
-const HEADER_NAME_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
-/** CR, LF and NUL are rejected by fetch and would allow header injection. */
-const FORBIDDEN_VALUE_CHARS_RE = /[\r\n\0]/;
 
 /**
  * Credential, tenant-identity, gateway-managed and transport headers a client
@@ -19,9 +18,10 @@ export function isBlockedHeaderName(name: string): boolean {
 
 /**
  * Sanitize user-supplied request headers before forwarding to a provider.
- * Drops blocklist entries silently (the client UI shows a warning; we don't
- * 400 the request). Returns `undefined` when nothing survives — callers can
- * skip the `extraHeaders` field entirely.
+ * Silently drops blocklist entries, invalid names, and values fetch would
+ * refuse (the client UI shows a warning; we don't 400 the request, and the run
+ * goes ahead without the dropped header). Returns `undefined` when nothing
+ * survives — callers can skip the `extraHeaders` field entirely.
  */
 export function sanitizeRequestHeaders(
   raw: Record<string, string> | undefined,
@@ -36,10 +36,11 @@ export function sanitizeRequestHeaders(
     if (Object.keys(out).length >= MAX_HEADERS) break;
     if (typeof rawKey !== 'string' || typeof rawValue !== 'string') continue;
     const key = rawKey.trim();
-    if (!key || !HEADER_NAME_RE.test(key)) continue;
+    // Name check before the blocklist: see isPlaygroundHeaderNameValid.
+    if (!key || !isPlaygroundHeaderNameValid(key)) continue;
     if (isBlockedHeaderName(key)) continue;
     const value = rawValue.slice(0, MAX_VALUE_LENGTH);
-    if (FORBIDDEN_VALUE_CHARS_RE.test(value)) continue;
+    if (!isPlaygroundHeaderValueValid(value)) continue;
     const lower = key.toLowerCase();
     if (seenLower.has(lower)) continue;
     seenLower.add(lower);
