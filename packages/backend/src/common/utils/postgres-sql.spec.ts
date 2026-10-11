@@ -10,6 +10,7 @@ import {
   timestampType,
   toSqlTimestamp,
   toLocalSqlTimestamp,
+  toLocalSqlTimestampMs,
 } from './postgres-sql';
 
 describe('postgres-sql', () => {
@@ -141,6 +142,26 @@ describe('postgres-sql', () => {
       jest.useFakeTimers();
       jest.setSystemTime(new Date('2026-01-02T03:04:05.000Z').getTime());
       expect(toLocalSqlTimestamp()).toBe(toLocalSqlTimestamp(new Date()));
+      jest.useRealTimers();
+    });
+  });
+
+  describe('toLocalSqlTimestampMs', () => {
+    it('appends zero-padded milliseconds to the local-time string', () => {
+      const d = new Date(2026, 3, 20, 12, 34, 56, 7);
+      expect(toLocalSqlTimestampMs(d)).toBe('2026-04-20 12:34:56.007');
+      expect(toLocalSqlTimestampMs(d).startsWith(toLocalSqlTimestamp(d))).toBe(true);
+    });
+
+    it('round-trips to the exact instant, milliseconds included, when parsed as local time', () => {
+      const d = new Date('2026-04-20T12:34:56.789Z');
+      expect(new Date(toLocalSqlTimestampMs(d).replace(' ', 'T')).getTime()).toBe(d.getTime());
+    });
+
+    it('defaults to the current time when no Date is given', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 0, 2, 3, 4, 5, 678));
+      expect(toLocalSqlTimestampMs()).toBe('2026-01-02 03:04:05.678');
       jest.useRealTimers();
     });
   });
