@@ -7,6 +7,7 @@
 import { DataSource } from 'typeorm';
 import { AddMessageErrorCode1800200000000 } from '../src/database/migrations/1800200000000-AddMessageErrorCode';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'errcode-tenant-1';
 const AGENT = 'errcode-agent-1';
@@ -93,8 +94,7 @@ describe('AddMessageErrorCode migration — data backfill (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

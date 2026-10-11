@@ -7,7 +7,8 @@ const PEACOCK = '🦚';
 export const MANIFEST_ERRORS = {
   M001: {
     title: 'Missing Authorization header',
-    template: 'Missing the Authorization header. Set it to "Bearer mnfst_<your-key>".',
+    template:
+      'Missing the Authorization header. Send your key as "Authorization: Bearer mnfst_<your-key>" or "x-api-key: mnfst_<your-key>".',
   },
   M002: {
     title: 'Empty Bearer token',
@@ -26,6 +27,11 @@ export const MANIFEST_ERRORS = {
     title: 'Key not recognized',
     template:
       "I don't recognize this key. It might have been rotated or deleted. Grab the current one from the dashboard.",
+  },
+  M006: {
+    title: 'Conflicting API keys',
+    template:
+      'The Authorization and x-api-key headers carry different credentials. Send your key in only one of them, or the same key in both.',
   },
   M100: {
     title: 'Provider API key missing',

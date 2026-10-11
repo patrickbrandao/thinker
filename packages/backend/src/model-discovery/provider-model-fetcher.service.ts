@@ -31,6 +31,7 @@ import {
   normalizeXiaomiTokenPlanBaseUrl,
 } from '../routing/xiaomi-region';
 import { getZaiCodingPlanBaseUrl, normalizeZaiCodingPlanBaseUrl } from '../routing/zai-region';
+import { buildLocalServerHeaders, getLocalServerBaseUrl } from '../common/constants/local-servers';
 import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
 import { OpencodeGoCatalogService } from './opencode-go-catalog.service';
 import {
@@ -1086,6 +1087,17 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     endpoint: `${OLLAMA_CLOUD_HOST}/api/tags`,
     buildHeaders: bearerHeaders,
     parse: parseOllama,
+  },
+  // LM Studio and llama-server list loaded models on OpenAI's `/v1/models`.
+  lmstudio: {
+    endpoint: () => `${getLocalServerBaseUrl('lmstudio')}/v1/models`,
+    buildHeaders: buildLocalServerHeaders,
+    parse: parseOpenAI,
+  },
+  llamacpp: {
+    endpoint: () => `${getLocalServerBaseUrl('llamacpp')}/v1/models`,
+    buildHeaders: buildLocalServerHeaders,
+    parse: parseOpenAI,
   },
   copilot: {
     endpoint: 'https://api.githubcopilot.com/models',

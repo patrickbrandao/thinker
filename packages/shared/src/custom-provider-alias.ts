@@ -15,8 +15,13 @@ export const CUSTOM_PROVIDER_ALIAS_MESSAGE =
  * Aliases that would collide with another published route: the synthetic
  * `auto` route, Manifest itself, the internal `custom:` prefix, and every
  * built-in provider id or alias (`openai/gpt-4o` must keep meaning OpenAI).
- * Tile-only local providers (llama.cpp, LM Studio) are exempt: they only
- * ever exist as custom providers, so no native route can claim the name.
+ *
+ * Tile-only local servers (llama.cpp, LM Studio) reserve their id only. The
+ * built-in connection publishes `lmstudio/<model>` and `llamacpp/<model>`, so
+ * those two are taken. Their display-name aliases (`lm-studio`, `llama.cpp`,
+ * `llama-cpp`) stay free: the native route never publishes them, and the
+ * dashboard tile creates a custom provider named "LM Studio" / "llama.cpp",
+ * whose default alias derives to exactly those names.
  */
 const RESERVED_ALIASES: ReadonlySet<string> = new Set(['auto', 'manifest', 'custom']);
 
@@ -29,7 +34,8 @@ export function normalizeCustomProviderAlias(input: string | null | undefined): 
 export function isReservedCustomProviderAlias(alias: string): boolean {
   if (RESERVED_ALIASES.has(alias)) return true;
   const entry = SHARED_PROVIDER_BY_ID_OR_ALIAS.get(alias);
-  return entry !== undefined && !entry.tileOnly;
+  if (entry === undefined) return false;
+  return entry.tileOnly ? alias === entry.id : true;
 }
 
 /**

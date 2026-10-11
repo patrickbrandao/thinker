@@ -13,10 +13,14 @@ import NotFound from './pages/NotFound.jsx';
 import ToastContainer from './components/ToastContainer.jsx';
 import { lazyReload, clearReloadFlag } from './services/lazy-reload.js';
 import { RightSidebarProvider } from './services/right-sidebar.jsx';
+import { cleanUpStoredHeaders } from './services/playground-request-headers.js';
 import type { ParentComponent } from 'solid-js';
 import './styles/theme.css';
 
 clearReloadFlag();
+// Wipe Playground header values saved in plain text by older builds, even if
+// the Playground is never opened again (#105). Never throws.
+cleanUpStoredHeaders();
 
 const GlobalOverview = lazyReload(() => import('./pages/GlobalOverview.jsx'));
 const AgentDetail = lazyReload(() => import('./pages/AgentDetail.jsx'));
