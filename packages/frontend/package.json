@@ -14,13 +14,13 @@
   "dependencies": {
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^0.16.2",
-    "better-auth": "1.7.4",
-    "dompurify": "^3.4.14",
+    "better-auth": "1.7.7",
+    "dompurify": "^3.4.16",
     "highlight.js": "^11.12.0",
     "manifest-shared": "*",
     "marked": "^18.0.11",
     "motion": "^12.42.2",
-    "solid-js": "^1.9.15",
+    "solid-js": "^1.9.17",
     "uplot": "^1.6.31"
   },
   "devDependencies": {

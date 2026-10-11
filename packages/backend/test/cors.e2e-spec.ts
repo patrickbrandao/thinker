@@ -10,6 +10,7 @@ import {
   buildDevAllowedOrigins,
   buildProdAllowedOrigins,
 } from '../src/cors-csp-config';
+import { listenOnLoopback } from './loopback';
 
 @Controller()
 class CorsTestController {
@@ -44,7 +45,7 @@ async function buildDevApp(): Promise<INestApplication> {
     next();
   });
   app.enableCors(buildCorsOptions(allowedOrigins));
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 
@@ -63,7 +64,7 @@ async function buildProdApp(extraOrigins?: string): Promise<INestApplication> {
     next();
   });
   app.enableCors(buildCorsOptions(allowedOrigins));
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 

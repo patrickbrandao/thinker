@@ -2,6 +2,7 @@ import { UnauthorizedException, BadRequestException, HttpException } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { ArgumentsHost } from '@nestjs/common';
 import { ProxyExceptionFilter } from '../proxy-exception.filter';
+import { CONFLICTING_API_KEY_HEADERS } from '../../../otlp/guards/agent-key-auth.guard';
 import type { ProxyMessageRecorder } from '../proxy-message-recorder';
 
 function createMockHost(body: Record<string, unknown> = {}, headers: Record<string, string> = {}) {
@@ -105,6 +106,26 @@ describe('ProxyExceptionFilter', () => {
       expect(res.status).toHaveBeenCalledWith(200);
       const content = res.json.mock.calls[0][0].choices[0].message.content;
       expect(content).toContain("I don't recognize this key");
+    });
+
+    it('mentions both key transports when no key was sent (M001)', () => {
+      const { host, res } = chatHost();
+      filter.catch(new UnauthorizedException('Authorization header required'), host);
+
+      const content = res.json.mock.calls[0][0].choices[0].message.content;
+      expect(content).toContain('[🦚 Manifest M001]');
+      expect(content).toContain('Authorization: Bearer');
+      expect(content).toContain('x-api-key');
+    });
+
+    it('converts conflicting key headers to M006', () => {
+      const { host, res } = chatHost();
+      filter.catch(new UnauthorizedException(CONFLICTING_API_KEY_HEADERS), host);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const content = res.json.mock.calls[0][0].choices[0].message.content;
+      expect(content).toContain('[🦚 Manifest M006]');
+      expect(content).toContain('Authorization and x-api-key headers carry different credentials');
     });
   });
 
@@ -306,6 +327,23 @@ describe('ProxyExceptionFilter', () => {
           }),
         }),
       );
+    });
+
+    it('returns HTTP 401 with M006 for conflicting key headers', () => {
+      const { host, res } = createMockHost();
+      filter.catch(new UnauthorizedException(CONFLICTING_API_KEY_HEADERS), host);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.error.type).toBe('auth_error');
+      expect(payload.error.code).toBe('manifest_auth');
+      expect(payload.error.message).toContain('[🦚 Manifest M006]');
+    });
+
+    it('records nothing for conflicting key headers (no agent resolved)', () => {
+      const { host } = createMockHost();
+      filter.catch(new UnauthorizedException(CONFLICTING_API_KEY_HEADERS), host);
+      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
     });
 
     it('returns HTTP 400 when a known auth error originated as a 400', () => {

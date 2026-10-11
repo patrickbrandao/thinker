@@ -532,3 +532,87 @@ describe('ProviderClient — anthropic-beta merge', () => {
     expect(mockFetch.mock.calls[0][1].headers).not.toHaveProperty('anthropic-beta');
   });
 });
+
+describe('ProviderClient — extra headers never override adapter headers (#105)', () => {
+  let client: ProviderClient;
+
+  beforeEach(() => {
+    client = new ProviderClient();
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+  });
+
+  const sentHeaders = () => mockFetch.mock.calls[0][1].headers as Record<string, string>;
+
+  it('drops a differently-cased copy of the adapter credential and version', async () => {
+    await client.forward({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-key',
+      model: 'claude-sonnet-4-20250514',
+      body,
+      stream: false,
+      extraHeaders: {
+        'X-API-KEY': 'attacker-key',
+        'Anthropic-Version': '2099-01-01',
+        'content-type': 'text/plain',
+        'X-Custom-Trace': 'trace-123',
+      },
+    });
+
+    expect(sentHeaders()).toEqual({
+      'x-api-key': 'sk-ant-key',
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'X-Custom-Trace': 'trace-123',
+    });
+  });
+
+  it("drops the user's Authorization in any casing on a Bearer route", async () => {
+    await client.forward({
+      provider: 'openai',
+      apiKey: 'sk-stored',
+      model: 'gpt-4o',
+      body,
+      stream: false,
+      extraHeaders: { authorization: 'Bearer attacker' },
+    });
+
+    const headers = sentHeaders();
+    expect(headers.Authorization).toBe('Bearer sk-stored');
+    expect(Object.keys(headers).filter((k) => k.toLowerCase() === 'authorization')).toEqual([
+      'Authorization',
+    ]);
+  });
+
+  it("merges a Playground anthropic-beta into the subscription's OAuth flags", async () => {
+    await client.forward({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-oat-token',
+      model: 'claude-sonnet-4-20250514',
+      body,
+      stream: false,
+      authType: 'subscription',
+      extraHeaders: { 'Anthropic-Beta': 'structured-outputs-2025-11-13' },
+    });
+
+    const headers = sentHeaders();
+    const flags = headers['anthropic-beta'].split(',');
+    expect(flags).toContain('oauth-2025-04-20');
+    expect(flags[flags.length - 1]).toBe('structured-outputs-2025-11-13');
+    expect(headers).not.toHaveProperty('Anthropic-Beta');
+  });
+
+  it('keeps proxy session hints the adapter does not set', async () => {
+    await client.forward({
+      provider: 'xai',
+      apiKey: 'xai-key',
+      model: 'grok-4',
+      body,
+      stream: false,
+      extraHeaders: { 'x-grok-conv-id': 'manifest-abc' },
+    });
+
+    expect(sentHeaders()['x-grok-conv-id']).toBe('manifest-abc');
+    expect(sentHeaders().Authorization).toBe('Bearer xai-key');
+  });
+});
