@@ -68,10 +68,7 @@ import {
   OPENAI_MODEL_ID_AUTO,
   routeForOpenAiModelId,
   SUBSCRIPTION_MODEL_SUFFIX,
-  subscriptionOpenAiModelId,
 } from './openai-model-id';
-import { AutofixService } from '../autofix/autofix.service';
-import type { AutofixRecord } from '../autofix/autofix.types';
 import { recordingResponseFromText } from './attempt-recording-capture';
 
 type ResolvedRouting = Awaited<ReturnType<ResolveService['resolve']>> & {
@@ -166,58 +163,18 @@ export interface RoutingMeta {
   primaryAttempt?: ProviderAttemptRef;
   /** Whether the primary/retry actually crossed the provider transport boundary. */
   primaryProviderCallStarted?: boolean;
-  /** Internal identity of the original failure before an Autofix retry. */
-  autofixOriginalAttempt?: ProviderAttemptRef;
-  /** Whether the pre-Autofix original actually invoked provider transport. */
-  autofixOriginalProviderCallStarted?: boolean;
 }
 
 export interface ProxyResult {
   forward: ForwardResult;
   meta: RoutingMeta;
   failedFallbacks?: FailedFallback[];
-  /** Autofix audit when a repairable failure was sent to the healing service. */
-  autofix?: AutofixRecord;
-  /**
-   * Autofix audit for the winning fallback hop. Separate from {@link autofix}
-   * (which is the primary's) so a recovered fallback's Phoenix metadata is
-   * recorded without overwriting the primary's attribution.
-   */
-  fallbackAutofix?: AutofixRecord;
-}
-
-/** Everything Autofix's reforward needs to re-send a healed body to a provider. */
-interface HealedReforwardContext {
-  agentId: string;
-  tenantId: string;
-  apiMode: ProxyApiMode;
-  sessionKey: string;
-  sessionCacheKey?: string;
-  providerCacheKey?: string;
-  sessionMomentumKey?: string;
-  signal?: AbortSignal;
-  stream: boolean;
-  specificityOverride?: ProxyRequestOptions['specificityOverride'];
-  headers?: ProxyRequestOptions['headers'];
-  signatureLookup: SignatureLookup;
-  thinkingLookup: ThinkingBlockLookup;
-  startProviderAttempt?: StartProviderAttempt;
-  provider: string;
-  apiKey: string;
-  rawApiKey: string;
-  model: string;
-  keyLabel?: string;
-  authType?: AuthType;
-  resourceUrl?: string;
-  providerRegion?: string | null;
-  paramMergeContext: ParamMergeContext | undefined;
-  tenantProviderId: string | null;
 }
 
 /**
  * Stand-in for a streaming 200 whose body never produced a byte. Keeps the
- * attempt and wire fields so fallback, Autofix and recording treat it as a
- * failed provider response.
+ * attempt and wire fields so fallback and recording treat it as a failed
+ * provider response.
  */
 function warmupFailureForward(forward: ForwardResult, message: string): ForwardResult {
   return {
@@ -251,7 +208,6 @@ export class ProxyService {
     private readonly thinkingCache: ThinkingBlockCache,
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
-    private readonly autofixService: AutofixService,
   ) {}
 
   async proxyRequest(opts: ProxyRequestOptions): Promise<ProxyResult> {
@@ -440,7 +396,7 @@ export class ProxyService {
       );
     }
 
-    let forward = await this.fallbackService.tryForwardToProvider({
+    const forward = await this.fallbackService.tryForwardToProvider({
       provider: route.provider,
       apiKey: credentials.apiKey,
       model: primaryModel,
@@ -468,63 +424,6 @@ export class ProxyService {
       tenantProviderId: credentials.tenantProviderId,
       startProviderAttempt,
     });
-    const autofixOriginalAttempt = forward.attempt;
-    const autofixOriginalProviderCallStarted = forward.providerCallStarted;
-
-    // Autofix runs BEFORE the fallback chain: heal a repairable 4xx and retry
-    // the patched request, so a fixable request isn't sprayed across every
-    // fallback provider. A no-op unless the agent opted in and the forward
-    // failed with a repairable status, so successful traffic is untouched.
-    const wireRequestBody = forward.wireRequestBody;
-    const wireApiMode = forward.wireApiMode;
-    const wireFormat = forward.wireFormat;
-    const retryWireBody = forward.retryWireBody;
-    const autofixApiMode = wireApiMode ?? apiMode;
-    const autofixAttempt =
-      wireRequestBody && retryWireBody && (wireApiMode || wireFormat)
-        ? await this.autofixService.maybeHeal({
-            forward,
-            agentId,
-            tenantId,
-            provider: route.provider,
-            model: primaryModel,
-            authType: route.authType,
-            apiMode: autofixApiMode,
-            requestBody: wireRequestBody,
-            reforward: (healedBody) =>
-              this.reforwardHealed(healedBody, forward, {
-                agentId,
-                tenantId,
-                apiMode: autofixApiMode,
-                sessionKey,
-                sessionCacheKey,
-                providerCacheKey,
-                sessionMomentumKey,
-                signal,
-                stream,
-                specificityOverride,
-                headers,
-                provider: route.provider,
-                apiKey: credentials.apiKey,
-                rawApiKey: credentials.rawApiKey,
-                model: primaryModel,
-                // The selected row's label, so the healed-retry row stamps the
-                // same connection its tenant_provider_id points at.
-                keyLabel: credentials.keyLabel,
-                authType: route.authType,
-                resourceUrl: credentials.resourceUrl,
-                providerRegion: credentials.providerRegion,
-                paramMergeContext,
-                signatureLookup,
-                thinkingLookup,
-                tenantProviderId: credentials.tenantProviderId,
-                startProviderAttempt,
-              }),
-          })
-        : null;
-    const autofixRecord = autofixAttempt?.record;
-    if (autofixAttempt) forward = autofixAttempt.forward;
-
     if (
       !explicitModelOverride &&
       !forward.response.ok &&
@@ -555,17 +454,7 @@ export class ProxyService {
         credentialDashboardUrl: dashboardUrl,
         clientAnthropicBeta: headers?.['anthropic-beta'],
       });
-      if (fallbackResult) {
-        return {
-          ...fallbackResult,
-          meta: {
-            ...fallbackResult.meta,
-            autofixOriginalAttempt,
-            autofixOriginalProviderCallStarted,
-          },
-          autofix: autofixRecord,
-        };
-      }
+      if (fallbackResult) return fallbackResult;
     }
 
     // Stream warm-up: for streaming 200 responses, verify the provider
@@ -588,11 +477,7 @@ export class ProxyService {
           isCodeAssist: forward.isCodeAssist,
           responsesTextFormat: forward.responsesTextFormat,
           responsesToolNames: forward.responsesToolNames,
-          wireRequestBody: forward.wireRequestBody,
-          wireRequestUrl: forward.wireRequestUrl,
           wireFormat: forward.wireFormat,
-          wireApiMode: forward.wireApiMode,
-          retryWireBody: forward.retryWireBody,
           providerCallStarted: forward.providerCallStarted,
         };
         this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
@@ -607,10 +492,7 @@ export class ProxyService {
             provider_key_label: credentials.keyLabel,
             attempt: forward.attempt,
             providerCallStarted: forward.providerCallStarted,
-            autofixOriginalAttempt,
-            autofixOriginalProviderCallStarted,
           }),
-          autofix: autofixRecord,
         };
       }
 
@@ -644,17 +526,7 @@ export class ProxyService {
           credentialDashboardUrl: dashboardUrl,
           clientAnthropicBeta: headers?.['anthropic-beta'],
         });
-        if (fallbackResult) {
-          return {
-            ...fallbackResult,
-            meta: {
-              ...fallbackResult.meta,
-              autofixOriginalAttempt,
-              autofixOriginalProviderCallStarted,
-            },
-            autofix: autofixRecord,
-          };
-        }
+        if (fallbackResult) return fallbackResult;
       }
 
       // Warmup failed and no fallbacks available: return the synthetic 502
@@ -669,10 +541,7 @@ export class ProxyService {
           provider_key_label: credentials.keyLabel,
           attempt: forward.attempt,
           providerCallStarted: forward.providerCallStarted,
-          autofixOriginalAttempt,
-          autofixOriginalProviderCallStarted,
         }),
-        autofix: autofixRecord,
       };
     }
 
@@ -686,10 +555,7 @@ export class ProxyService {
         provider_key_label: credentials.keyLabel,
         attempt: forward.attempt,
         providerCallStarted: forward.providerCallStarted,
-        autofixOriginalAttempt,
-        autofixOriginalProviderCallStarted,
       }),
-      autofix: autofixRecord,
     };
   }
 
@@ -712,200 +578,6 @@ export class ProxyService {
     if (apiMode === 'responses') return toChatCompletionsRequest(body);
     if (apiMode === 'messages') return messagesToChatCompletionsRequest(body);
     return undefined;
-  }
-
-  /**
-   * Re-send an Autofix-healed wire body. Same model → use the exact resolved
-   * transport without re-merging or translating. Model changed (e.g. an
-   * unknown-model fix) → re-resolve so it reaches the right provider/key (M5).
-   */
-  private async reforwardHealed(
-    healedBody: Record<string, unknown>,
-    originalForward: ForwardResult,
-    ctx: HealedReforwardContext,
-  ): Promise<ForwardResult> {
-    const retry = await this.sendHealedRetry(healedBody, originalForward, ctx);
-    // Autofix judges the patch by this response. A streaming 200 that never
-    // produces a byte is not a working patch: warm it up here, so the Autofix
-    // verdict and the outcome reported to Phoenix see the stall, and the
-    // fallback chain runs from a failed retry instead of a "healed" one.
-    if (!ctx.stream || !retry.response.ok || !retry.response.body) return retry;
-    const warmup = await peekStream(retry.response.body, STREAM_WARMUP_MS);
-    if (!warmup.ok) {
-      this.logger.warn(
-        `Autofix retry stream warmup failed: provider=${ctx.provider} model=${ctx.model} ` +
-          `reason=${warmup.reason} message=${warmup.message}`,
-      );
-      return warmupFailureForward(retry, warmup.message);
-    }
-    return {
-      ...retry,
-      response: new Response(warmup.stream, {
-        status: retry.response.status,
-        statusText: retry.response.statusText,
-        headers: retry.response.headers,
-      }),
-    };
-  }
-
-  private sendHealedRetry(
-    healedBody: Record<string, unknown>,
-    originalForward: ForwardResult,
-    ctx: HealedReforwardContext,
-  ): Promise<ForwardResult> {
-    const originalModel = originalForward.wireRequestBody?.model;
-    const healedModel = typeof healedBody.model === 'string' ? healedBody.model : undefined;
-    if (healedModel && healedModel !== originalModel) {
-      // Phoenix speaks in provider-native model ids. Manifest owns the public
-      // `-subscription` route syntax, so add it only while resolving the healed
-      // retry. The helper is idempotent for older Phoenix patches that already
-      // carry the legacy route id.
-      const routingBody =
-        ctx.authType === 'subscription'
-          ? {
-              ...healedBody,
-              model: subscriptionOpenAiModelId(ctx.provider, healedModel),
-            }
-          : healedBody;
-      return this.forwardResolvedHealed(routingBody, healedBody, originalForward, ctx);
-    }
-    return this.fallbackService.retryWireBody(originalForward, healedBody, {
-      provider: ctx.provider,
-      model: ctx.model,
-      signal: ctx.signal,
-      stream: ctx.stream,
-      authType: ctx.authType,
-      agentId: ctx.agentId,
-      tenantProviderId: ctx.tenantProviderId,
-      providerKeyLabel: ctx.keyLabel,
-      startProviderAttempt: ctx.startProviderAttempt,
-    });
-  }
-
-  private async forwardResolvedHealed(
-    routingBody: Record<string, unknown>,
-    healedBody: Record<string, unknown>,
-    originalForward: ForwardResult,
-    ctx: HealedReforwardContext,
-  ): Promise<ForwardResult> {
-    const resolveChatBody = this.createChatBodyResolver(ctx.apiMode, healedBody);
-    const resolveRoutingChatBody =
-      routingBody === healedBody
-        ? resolveChatBody
-        : this.createChatBodyResolver(ctx.apiMode, routingBody);
-    const resolved = await this.resolveRouting(
-      ctx.agentId,
-      ctx.tenantId,
-      routingBody,
-      resolveRoutingChatBody,
-      ctx.sessionMomentumKey,
-      ctx.specificityOverride,
-      ctx.headers,
-      ctx.apiMode,
-    );
-    const route = resolved.route;
-    if (!route) {
-      return this.retryHealedOnOriginalTransport(
-        healedBody,
-        originalForward,
-        ctx,
-        'no route resolved for the healed model',
-      );
-    }
-    const credentials = await this.resolveCredentials(ctx.agentId, ctx.tenantId, {
-      provider: route.provider,
-      auth_type: route.authType,
-      provider_key_label: route.keyLabel ?? undefined,
-    });
-    if (!credentials.ok) {
-      return this.retryHealedOnOriginalTransport(
-        healedBody,
-        originalForward,
-        ctx,
-        'no provider key for the healed model',
-      );
-    }
-    const model = normalizeProviderModel(route.provider, route.model);
-    const explicitModelOverride = resolved.explicit_model_override === true;
-    const scopeKey = modelParamsScopeForRouting({
-      tier: resolved.tier,
-      specificityCategory: resolved.specificity_category,
-      headerTierId: resolved.header_tier_id,
-    });
-    return this.fallbackService.tryForwardToProvider({
-      provider: route.provider,
-      apiKey: credentials.apiKey,
-      model,
-      body: healedBody,
-      resolveChatBody,
-      stream: ctx.stream,
-      sessionKey: ctx.sessionKey,
-      reasoningCacheKey: ctx.sessionCacheKey,
-      providerCacheKey: ctx.providerCacheKey,
-      signal: ctx.signal,
-      agentId: ctx.agentId,
-      tenantId: ctx.tenantId,
-      rawApiKey: credentials.rawApiKey,
-      // Selected row's label so the recorded connection matches
-      // credentials.tenantProviderId.
-      providerKeyLabel: credentials.keyLabel,
-      authType: route.authType,
-      apiMode: ctx.apiMode,
-      resourceUrl: credentials.resourceUrl,
-      providerRegion: credentials.providerRegion,
-      signatureLookup: ctx.signatureLookup,
-      thinkingLookup: ctx.thinkingLookup,
-      clientAnthropicBeta: ctx.headers?.['anthropic-beta'],
-      paramMergeContext: explicitModelOverride ? undefined : { agentId: ctx.agentId, scopeKey },
-      tenantProviderId: credentials.tenantProviderId,
-      startProviderAttempt: ctx.startProviderAttempt,
-    });
-  }
-
-  /**
-   * The healed model didn't re-resolve for this tenant — usually a stale
-   * `cached_models` snapshot, not a genuinely missing provider: the original
-   * request already reached a provider over a working connection. Retry the
-   * healed body on that same transport and let the provider judge the model,
-   * instead of synthesizing a 502 the caller can't act on. Only a
-   * Manifest-blocked original (no wire transport to reuse) keeps the
-   * synthetic 502.
-   */
-  private retryHealedOnOriginalTransport(
-    healedBody: Record<string, unknown>,
-    originalForward: ForwardResult,
-    ctx: HealedReforwardContext,
-    reason: string,
-  ): Promise<ForwardResult> {
-    if (!originalForward.retryWireBody) {
-      return Promise.resolve(this.autofixReforwardError(reason));
-    }
-    const healedModel = typeof healedBody.model === 'string' ? healedBody.model : ctx.model;
-    return this.fallbackService.retryWireBody(originalForward, healedBody, {
-      provider: ctx.provider,
-      model: healedModel,
-      signal: ctx.signal,
-      stream: ctx.stream,
-      authType: ctx.authType,
-      tenantProviderId: ctx.tenantProviderId,
-      providerKeyLabel: ctx.keyLabel,
-      startProviderAttempt: ctx.startProviderAttempt,
-    });
-  }
-
-  /** Synthetic failed forward so a heal that can't be re-routed surfaces the original error. */
-  private autofixReforwardError(reason: string): ForwardResult {
-    return {
-      response: new Response(JSON.stringify({ error: { message: `Autofix: ${reason}` } }), {
-        status: 502,
-        headers: { 'content-type': 'application/json' },
-      }),
-      isGoogle: false,
-      isAnthropic: false,
-      isChatGpt: false,
-      isResponses: false,
-      isCodeAssist: false,
-    };
   }
 
   private validatePayload(body: ProxyRequestOptions['body'], apiMode: ProxyApiMode): void {
@@ -992,8 +664,8 @@ export class ProxyService {
           tenantId,
           async () => {
             const scoringBody = resolveChatBody ? await resolveChatBody() : body;
-            // Not guaranteed to be an array here: a healed body reaches this
-            // path without validatePayload after Phoenix rewrites it.
+            // Not guaranteed to be an array: the scorer must tolerate a body
+            // whose `messages` field is missing or malformed.
             const messages = (
               Array.isArray(scoringBody.messages) ? scoringBody.messages : []
             ) as ScorerMessage[];
@@ -1328,7 +1000,6 @@ export class ProxyService {
           request_params: fallbackRequestParams,
         }),
         failedFallbacks: failures,
-        fallbackAutofix: success.autofix,
       };
     }
 

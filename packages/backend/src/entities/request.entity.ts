@@ -2,7 +2,6 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 import { timestampType } from '../common/utils/postgres-sql';
 import type { CallerAttribution } from '../routing/proxy/caller-classifier';
 import type { ProxyApiMode } from '../routing/proxy/proxy-types';
-import type { AutofixStatus } from 'manifest-shared';
 
 /**
  * One request made by a caller to Manifest.
@@ -55,10 +54,6 @@ export class ManifestRequest {
   /** Set after this completed Request has been added to agent_usage_daily. */
   @Column(timestampType(), { nullable: true })
   agent_usage_rolled_up_at?: string | null;
-
-  /** How Autofix ended for this request. NULL means it was not recorded. */
-  @Column('varchar', { nullable: true })
-  autofix_status!: AutofixStatus | null;
 
   @Column('varchar', { nullable: true })
   error_message!: string | null;

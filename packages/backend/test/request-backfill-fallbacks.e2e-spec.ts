@@ -12,10 +12,6 @@ interface LegacyAttempt {
   fallbackFrom?: string;
   fallbackIndex?: number;
   superseded?: boolean;
-  autofixGroup?: string;
-  autofixApplied?: boolean;
-  autofixRole?: string;
-  autofixDecision?: object;
   errorOrigin?: string;
   requestParams?: object;
   traceId?: string;
@@ -67,10 +63,6 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
         feedback_rating varchar,
         feedback_tags varchar,
         feedback_details text,
-        autofix_group_id varchar,
-        autofix_applied boolean DEFAULT false,
-        autofix_role varchar,
-        autofix_phoenix jsonb,
         superseded boolean DEFAULT false,
         fallback_from_model varchar,
         fallback_index integer
@@ -90,13 +82,12 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
       `INSERT INTO agent_messages (
         id, tenant_id, agent_id, agent_name, timestamp, duration_ms, status,
         model, fallback_from_model, fallback_index, superseded,
-        autofix_group_id, autofix_applied, autofix_role, autofix_phoenix,
         error_origin, caller_attribution, request_headers,
         request_params, trace_id, session_key, session_id
       ) VALUES (
         $1, 'tenant-1', 'agent-1', 'Agent', $2, 100, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, '{"agent":"openai-sdk"}',
-        '{"content-type":"application/json"}', $13, $14, $15, $16
+        $8, '{"agent":"openai-sdk"}',
+        '{"content-type":"application/json"}', $9, $10, $11, $12
       )`,
       [
         attempt.id,
@@ -106,10 +97,6 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
         attempt.fallbackFrom ?? null,
         attempt.fallbackIndex ?? null,
         attempt.superseded ?? false,
-        attempt.autofixGroup ?? null,
-        attempt.autofixApplied ?? false,
-        attempt.autofixRole ?? null,
-        attempt.autofixDecision ?? null,
         attempt.errorOrigin ?? null,
         attempt.requestParams ?? { model: 'openai/gpt-4o' },
         attempt.traceId ?? null,
@@ -580,26 +567,25 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
 
     await dataSource.query(`
       INSERT INTO agent_messages (
-        id, tenant_id, agent_id, agent_name, timestamp, status, model, autofix_phoenix
+        id, tenant_id, agent_id, agent_name, timestamp, status, model, error_origin
       ) VALUES (
         'old-replica', 'tenant-1', 'agent-1', 'Agent',
-        '2026-01-01 00:05:00.000', 'error', 'openai/gpt-4o',
-        '{"status":"no_patch","issueId":"issue-1"}'::jsonb
+        '2026-01-01 00:05:00.000', 'error', 'openai/gpt-4o', 'provider'
       )
     `);
     await dataSource.query(`
       UPDATE agent_messages
-      SET status = 'ok', autofix_phoenix = '{"status":"no_patch","issueId":"issue-2"}'::jsonb
+      SET status = 'ok', error_origin = NULL
       WHERE id = 'old-replica'
     `);
 
     const [attempt] = await dataSource.query(
-      `SELECT status, autofix_phoenix, request_id, attempt_number
+      `SELECT status, error_origin, request_id, attempt_number
        FROM agent_messages WHERE id = 'old-replica'`,
     );
     expect(attempt).toEqual({
       status: 'ok',
-      autofix_phoenix: { status: 'no_patch', issueId: 'issue-2' },
+      error_origin: null,
       request_id: null,
       attempt_number: null,
     });
@@ -625,7 +611,7 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
     expect(request).toEqual({ status: 'failed' });
   });
 
-  it('preserves ordinary and Autofix grouping behavior', async () => {
+  it('turns each trace-less ordinary attempt into its own first-attempt request', async () => {
     await insertAttempt({
       id: 'plain',
       timestamp: '2026-01-01 00:03:00.000',
@@ -633,106 +619,24 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
       model: 'openai/gpt-4o',
     });
     await insertAttempt({
-      id: 'autofix-original',
+      id: 'plain-failed',
       timestamp: '2026-01-01 00:03:01.000',
-      status: 'auto_fixed',
+      status: 'error',
       model: 'openai/gpt-4o',
-      superseded: true,
-      autofixGroup: 'heal-1',
       errorOrigin: 'provider',
-    });
-    await insertAttempt({
-      id: 'autofix-retry',
-      timestamp: '2026-01-01 00:03:01.100',
-      status: 'ok',
-      model: 'openai/gpt-4o',
-      autofixGroup: 'heal-1',
     });
 
     await backfill();
 
-    const [{ requests, parents, ordered }] = await dataSource.query(
-      `SELECT (SELECT count(*)::int FROM requests) requests,
-              (SELECT count(DISTINCT request_id)::int FROM agent_messages) parents,
-              (SELECT array_agg(attempt_number ORDER BY attempt_number)
-               FROM agent_messages
-               WHERE autofix_group_id = 'heal-1') ordered`,
+    const rows = await dataSource.query(
+      `SELECT pa.id, pa.attempt_number, r.status
+       FROM agent_messages pa
+       JOIN requests r ON r.id = pa.request_id
+       ORDER BY pa.id`,
     );
-    expect({ requests, parents, ordered }).toEqual({
-      requests: 2,
-      parents: 2,
-      ordered: [1, 2],
-    });
-  });
-
-  it('backfills each recorded Autofix outcome onto its request', async () => {
-    const base = {
-      timestamp: '2026-01-01 00:03:00.000',
-      status: 'error',
-      model: 'openai/gpt-4o',
-      errorOrigin: 'provider',
-      autofixApplied: true,
-    };
-    await insertAttempt({
-      ...base,
-      id: 'no-patch',
-      autofixDecision: { status: 'no_patch', issueId: 'issue-no-patch' },
-    });
-    await insertAttempt({
-      ...base,
-      id: 'resolving',
-      autofixDecision: { status: 'resolving', issueId: 'issue-resolving' },
-    });
-    await insertAttempt({ ...base, id: 'service-error' });
-    await insertAttempt({
-      ...base,
-      id: 'legacy-no-patch',
-      autofixDecision: { issueId: 'legacy-issue' },
-    });
-    await insertAttempt({
-      ...base,
-      id: 'retry-success-original',
-      status: 'auto_fixed',
-      superseded: true,
-      autofixGroup: 'success-group',
-      autofixRole: 'original',
-      autofixDecision: { status: 'patched', healAttemptId: 'heal-success' },
-    });
-    await insertAttempt({
-      ...base,
-      id: 'retry-success',
-      timestamp: '2026-01-01 00:03:00.100',
-      status: 'ok',
-      autofixGroup: 'success-group',
-      autofixRole: 'retry',
-    });
-    await insertAttempt({
-      ...base,
-      id: 'retry-failed',
-      autofixGroup: 'failed-group',
-      autofixRole: 'retry',
-      autofixDecision: { status: 'patched', healAttemptId: 'heal-failed' },
-    });
-
-    await backfill({ batchSize: 1 });
-
-    const rows = await dataSource.query(`
-      SELECT pa.id, r.autofix_status
-      FROM agent_messages pa
-      JOIN requests r ON r.id = pa.request_id
-      WHERE pa.id IN (
-        'no-patch', 'resolving', 'service-error', 'legacy-no-patch',
-        'retry-success', 'retry-failed'
-      )
-      ORDER BY pa.id
-    `);
     expect(rows).toEqual([
-      { id: 'legacy-no-patch', autofix_status: 'no_patch' },
-      { id: 'no-patch', autofix_status: 'no_patch' },
-      { id: 'resolving', autofix_status: 'resolving' },
-      { id: 'retry-failed', autofix_status: 'retry_failed' },
-      { id: 'retry-success', autofix_status: 'retry_succeeded' },
-      { id: 'service-error', autofix_status: 'service_error' },
+      { id: 'plain', attempt_number: 1, status: 'success' },
+      { id: 'plain-failed', attempt_number: 1, status: 'failed' },
     ]);
   });
 });

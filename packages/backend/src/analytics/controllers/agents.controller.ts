@@ -5,7 +5,6 @@ import {
   Controller,
   Delete,
   Get,
-  Inject,
   Logger,
   NotFoundException,
   Param,
@@ -15,8 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
-import { CACHE_MANAGER, CacheTTL } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { TimeseriesQueriesService } from '../services/timeseries-queries.service';
 import { AgentLifecycleService } from '../services/agent-lifecycle.service';
 import { AgentDuplicationService } from '../services/agent-duplication.service';
@@ -32,7 +30,6 @@ import { AgentListCacheService } from '../../common/services/agent-list-cache.se
 import { slugify } from '../../common/utils/slugify';
 import { PLAYGROUND_AGENT_SLUG } from '../../common/constants/playground.constants';
 import { ProviderService } from '../../routing/routing-core/provider.service';
-import { AutofixStatsService } from '../services/autofix-stats.service';
 
 @Controller('api/v1')
 export class AgentsController {
@@ -45,9 +42,7 @@ export class AgentsController {
     private readonly apiKeyGenerator: ApiKeyGeneratorService,
     private readonly eventBus: IngestEventBusService,
     private readonly providerService: ProviderService,
-    private readonly autofixStats: AutofixStatsService,
     private readonly agentListCache: AgentListCacheService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private async invalidateAgentListCache(tenantId: string | null): Promise<void> {
@@ -57,11 +52,6 @@ export class AgentsController {
     // mutation. No tenant → nothing was ever cached.
     if (!tenantId) return;
     await this.agentListCache.invalidate(tenantId);
-  }
-
-  private async invalidateAutofixStatusCache(tenantId: string | null): Promise<void> {
-    if (!tenantId) return;
-    await this.cacheManager.del(`${tenantId}:/api/v1/autofix/status`);
   }
 
   private emitAgentEvent(tenantId: string | null, userId: string | null): void {
@@ -93,13 +83,6 @@ export class AgentsController {
     const displayName = body.name.trim();
     let result: Awaited<ReturnType<ApiKeyGeneratorService['onboardAgent']>>;
     try {
-      // The create dialog presents the hosted Autofix disclosure and legal
-      // links whenever this explicit opt-in is on. Persist that install-level
-      // consent before creating an enabled agent so failures stay fail-closed.
-      if (body.autofix_enabled === true) {
-        await this.autofixStats.recordAutofixConsent();
-        await this.invalidateAutofixStatusCache(ctx.tenantId);
-      }
       result = await this.apiKeyGenerator.onboardAgent({
         tenantId: ctx.tenantId,
         ownerUserId: ctx.userId,
@@ -107,7 +90,6 @@ export class AgentsController {
         displayName,
         agentCategory: body.agent_category,
         agentPlatform: body.agent_platform,
-        autofixEnabled: body.autofix_enabled,
         recordMessages: body.record_messages,
       });
     } catch (error) {
@@ -141,20 +123,11 @@ export class AgentsController {
       }
       // The agent was committed (briefly visible) then rolled back, so drop the
       // cache entries that captured it — deleteAgent only clears the resolve +
-      // routing caches. The Autofix status key matters as much as the agent
-      // list: without it, /autofix/status keeps reporting the rolled-back agent
-      // as enabled for the dashboard TTL, so the sidebar disagrees with the
-      // workspace about an agent that no longer exists.
-      await Promise.all([
-        this.invalidateAgentListCache(result.tenantId),
-        this.invalidateAutofixStatusCache(result.tenantId),
-      ]);
+      // routing caches.
+      await this.invalidateAgentListCache(result.tenantId);
       throw error;
     }
-    await Promise.all([
-      this.invalidateAgentListCache(result.tenantId),
-      this.invalidateAutofixStatusCache(result.tenantId),
-    ]);
+    await this.invalidateAgentListCache(result.tenantId);
     this.emitAgentEvent(result.tenantId, ctx.userId);
     return {
       agent: {

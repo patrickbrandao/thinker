@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   classifyMessageError,
-  deriveAutofixStatus,
   FAILED_STATUS,
   normalizeStatus,
   CANCELLED_STATUS,
@@ -36,72 +35,9 @@ import {
   isRecordableManifestCode,
   type ManifestBlockedRequestReason,
 } from '../../common/errors/manifest-error';
-import {
-  getAutofixRetry,
-  type AutofixChainEntry,
-  type AutofixRecord,
-} from '../autofix/autofix.types';
-import { serializeProviderError } from '../autofix/provider-error-normalizer';
 import { normalizeProviderErrorForStorage } from './proxy-error-sanitizer';
 
 export const FAILED_WITHOUT_MESSAGE = 'Request failed without an error message.';
-
-/**
- * Phoenix's decision metadata for a healed row: its issue/patch/heal-attempt ids
- * plus the human-readable "why" ({@link AutofixChainEntry.explanation}). Null when
- * the entry carries none (e.g. the heal call never reached Phoenix).
- */
-function buildAutofixDecision(entry: AutofixChainEntry | undefined): object | null {
-  if (!entry) return null;
-  const present =
-    entry.phoenix_status != null ||
-    entry.issue_id != null ||
-    entry.patch_id != null ||
-    entry.heal_attempt_id != null ||
-    entry.explanation != null;
-  if (!present) return null;
-  return {
-    status: entry.phoenix_status ?? null,
-    issueId: entry.issue_id ?? null,
-    patchId: entry.patch_id ?? null,
-    healAttemptId: entry.heal_attempt_id ?? null,
-    explanation: entry.explanation ?? null,
-  };
-}
-
-/**
- * Autofix audit for every Phoenix decision, plus linked-flow columns only when
- * Manifest actually sent a patched retry.
- */
-function autofixColumns(
-  autofix: AutofixRecord | undefined,
-  role: 'original' | 'retry',
-): Partial<AgentMessage> {
-  if (!autofix) return {};
-  // The heal decision (ids, operations, explanation) rides the attempt-0 entry.
-  const healEntry = autofix.chain.find(
-    (e) =>
-      e.operations != null ||
-      e.issue_id != null ||
-      e.heal_attempt_id != null ||
-      e.explanation != null,
-  );
-  const decision = buildAutofixDecision(healEntry);
-  if (!getAutofixRetry(autofix)) {
-    return decision ? { autofix_decision: decision } : {};
-  }
-  return {
-    autofix_applied: true,
-    autofix_group_id: autofix.groupId,
-    autofix_role: role,
-    autofix_operations: (healEntry?.operations as object | null) ?? null,
-    autofix_decision: buildAutofixDecision(healEntry),
-  };
-}
-
-function terminalAutofixRole(autofix: AutofixRecord | undefined): 'original' | 'retry' {
-  return getAutofixRetry(autofix) ? 'retry' : 'original';
-}
 
 export interface HeaderTierRef {
   headerTierId?: string | null;
@@ -144,8 +80,6 @@ export interface ProviderErrorOpts extends HeaderTierRef {
    * provider request. Persisted to `agent_messages.request_params`.
    */
   requestParams?: RequestParamDefaults | null;
-  /** Autofix audit when this error was the terminal outcome after healing. */
-  autofix?: AutofixRecord;
   /** API surface to retain when this terminal write creates the Request. */
   apiMode?: ProxyApiMode;
 }
@@ -154,8 +88,6 @@ export type { ManifestBlockedRequestReason };
 
 export interface ManifestBlockedRequestOpts {
   requestId?: string;
-  /** Real provider retry to finalize when Autofix did not clear a Manifest block. */
-  attempt?: ProviderAttemptRef;
   /**
    * The status the caller saw, when there was one. Omitted for the HTTP-200
    * friendly stubs (no provider was contacted, so there is no upstream status
@@ -171,13 +103,6 @@ export interface ManifestBlockedRequestOpts {
   sessionKey?: string;
   callerAttribution?: CallerAttribution | null;
   requestHeaders?: Record<string, string> | null;
-  /**
-   * Autofix audit when this Manifest-blocked failure was handed to the healing
-   * service (e.g. an M302 unknown model). This path is used only when the block
-   * remains caller-visible; a healed request finishes through the success path
-   * and records only the provider retry Attempt.
-   */
-  autofix?: AutofixRecord;
   /** End-to-end time until Manifest returned the rejection. */
   durationMs?: number;
   /**
@@ -258,14 +183,6 @@ export interface FallbackSuccessOpts extends HeaderTierRef {
    * known params apply. Persisted to `agent_messages.request_params`.
    */
   requestParams?: RequestParamDefaults | null;
-  /** Request-level Autofix outcome when a failed retry later fell back. */
-  autofix?: AutofixRecord;
-  /**
-   * Autofix audit of the winning fallback hop itself. Only this record stamps
-   * the fallback-success row's linkage columns, so an ordinary fallback success
-   * never inherits the primary's Autofix retry metadata.
-   */
-  fallbackAutofix?: AutofixRecord;
   /** API surface to retain when this terminal write creates the Request. */
   apiMode?: ProxyApiMode;
 }
@@ -290,26 +207,8 @@ export interface SuccessMessageOpts extends HeaderTierRef {
   callerAttribution?: CallerAttribution | null;
   requestHeaders?: Record<string, string> | null;
   requestParams?: RequestParamDefaults | null;
-  /** Autofix audit when a healed request succeeded. */
-  autofix?: AutofixRecord;
   /** API surface to retain when this terminal write creates the Request. */
   apiMode?: ProxyApiMode;
-}
-
-export interface AutofixOriginalOpts extends HeaderTierRef {
-  requestId?: string;
-  attemptNumber?: number;
-  attempt?: ProviderAttemptRef;
-  provider?: string;
-  reason?: string;
-  authType?: string;
-  traceId?: string;
-  specificityCategory?: string;
-  providerKeyLabel?: string;
-  tenantProviderId?: string | null;
-  callerAttribution?: CallerAttribution | null;
-  requestHeaders?: Record<string, string> | null;
-  requestParams?: RequestParamDefaults | null;
 }
 
 function buildMessageRow(
@@ -332,8 +231,8 @@ function buildMessageRow(
   };
   // Stamp the orthogonal error axes from this row's own signals so every insert
   // site is classified identically (and identically to the backfill migration).
-  // classifyRow reads the *rich* status (`rate_limited` / `fallback_error` /
-  // `auto_fixed`) to derive error_class + superseded, then the stored status is
+  // classifyRow reads the *rich* status (`rate_limited` / `fallback_error`) to
+  // derive error_class + superseded, then the stored status is
   // collapsed onto the canonical `success`/`failed` vocabulary — the reason it
   // failed now lives entirely on those orthogonal columns.
   const classified = classifyRow(row);
@@ -370,7 +269,6 @@ function buildRequestRow(
   requestId: string,
   attempt: Partial<AgentMessage>,
   terminal: boolean,
-  autofix?: AutofixRecord,
   apiMode?: ProxyApiMode,
 ): ManifestRequest {
   const classified = classifyRow(attempt);
@@ -396,7 +294,6 @@ function buildRequestRow(
     timestamp,
     duration_ms: attempt.duration_ms ?? null,
     status,
-    autofix_status: deriveAutofixStatus(autofix),
     error_message: errorMessage,
     error_http_status: terminal ? (attempt.error_http_status ?? null) : null,
     error_code: terminal ? (attempt.error_code ?? null) : null,
@@ -584,7 +481,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     requestId: string,
     attempt: Partial<AgentMessage>,
     terminal: boolean,
-    autofix?: AutofixRecord,
     apiMode?: ProxyApiMode,
   ): Promise<boolean> {
     // Unit-test repository doubles predate the request table. Production
@@ -593,7 +489,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     if (!getRepository) return false;
     const repo = getRepository(ManifestRequest);
     if (typeof repo.createQueryBuilder !== 'function') return false;
-    const row = buildRequestRow(ctx, requestId, attempt, terminal, autofix, apiMode);
+    const row = buildRequestRow(ctx, requestId, attempt, terminal, apiMode);
     const insert = repo.createQueryBuilder().insert().into(ManifestRequest).values(row);
     if (terminal) {
       // Most terminal writers do not need to repeat the ingress surface. When
@@ -607,7 +503,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         'session_id',
         'duration_ms',
         'status',
-        'autofix_status',
         'error_message',
         'error_http_status',
         'error_code',
@@ -678,7 +573,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         request_headers: opts.requestHeaders ?? null,
       },
       false,
-      undefined,
       opts.apiMode,
     );
   }
@@ -731,7 +625,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       error_message: null,
       error_http_status: null,
     });
-    await this.persistRequest(ctx, opts.requestId, row, true, undefined, opts.apiMode);
+    await this.persistRequest(ctx, opts.requestId, row, true, opts.apiMode);
     if (opts.attempt) await this.persistAttempt(row, opts.attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
@@ -820,18 +714,9 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
-      autofix,
       apiMode,
     } = opts ?? {};
-    // A real Autofix retry must never disappear behind the generic 429
-    // deduplication window; it is required to complete the linked attempt story.
-    if (
-      httpStatus === 429 &&
-      !attempt &&
-      !skipAttempt &&
-      !getAutofixRetry(autofix) &&
-      this.shouldSkipRateLimitRecord(ctx)
-    ) {
+    if (httpStatus === 429 && !attempt && !skipAttempt && this.shouldSkipRateLimitRecord(ctx)) {
       return;
     }
 
@@ -855,7 +740,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         2000,
       ),
       error_http_status: httpStatus,
-      ...autofixColumns(autofix, terminalAutofixRole(autofix)),
       model: canonical.model,
       provider: canonical.provider,
       routing_tier: tier ?? null,
@@ -873,7 +757,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
     });
-    await this.persistRequest(ctx, requestId, row, true, autofix, apiMode);
+    await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row, attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
@@ -905,9 +789,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       sessionKey,
       callerAttribution,
       requestHeaders,
-      autofix,
       durationMs,
-      attempt,
       apiMode,
       routing,
     } = opts;
@@ -925,7 +807,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       timestamp: new Date().toISOString(),
       duration_ms: durationMs ?? null,
       status: httpStatus === 429 ? 'rate_limited' : 'error',
-      ...autofixColumns(autofix, 'original'),
       error_message: scrubSecrets(errorMessage).slice(0, 2000),
       error_code: errorCode ?? null,
       error_http_status: httpStatus ?? null,
@@ -946,17 +827,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_name: routing?.headerTierName ?? null,
       header_tier_color: routing?.headerTierColor ?? null,
     });
-    // An M302 patched retry is real provider work even when Manifest ultimately
-    // returns its friendly stub; finish that pending Attempt from the audit.
-    await this.persistRequest(ctx, requestId, row, true, autofix, apiMode);
-    const retry = getAutofixRetry(autofix);
-    if (attempt && retry?.error) {
-      await attempt.completeFailure?.({
-        status: retry.http_status,
-        errorBody: serializeProviderError(retry.error),
-        superseded: false,
-      });
-    }
+    await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
@@ -1071,9 +942,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           header_tier_id: headerTierId ?? null,
           header_tier_name: headerTierName ?? null,
           header_tier_color: headerTierColor ?? null,
-          // Autofix audit for a fallback hop Phoenix was consulted on, so a
-          // recovered hop keeps its issue/patch/operations like a healed primary.
-          ...autofixColumns(f.autofix, f.autofixRole ?? 'original'),
         }),
       );
     }
@@ -1116,14 +984,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId?: string | null;
       headerTierName?: string | null;
       headerTierColor?: string | null;
-      /** Provider status for the superseded primary or failed Autofix retry. */
+      /** Provider status for the superseded primary. */
       httpStatus?: number | null;
-      /**
-       * Autofix audit when this superseded primary was also an Autofix
-       * attempt. Stamped onto THIS row (not a separate `auto_fixed` row) so a
-       * heal-then-fallback flow records the primary failure exactly once.
-       */
-      autofix?: AutofixRecord;
       /** HTTP status returned to the caller when every fallback was exhausted. */
       terminalHttpStatus?: number;
       /** API surface to retain when the exhausted chain creates the Request. */
@@ -1145,7 +1007,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       timestamp,
       duration_ms: opts?.requestDurationMs ?? null,
       status: 'fallback_error',
-      ...autofixColumns(opts?.autofix, terminalAutofixRole(opts?.autofix)),
       error_message: errorMessage,
       // Credential failures (M100/M102) land here with a peacock body; stamp
       // error_code so Messages filters and analytics can group on it.
@@ -1179,7 +1040,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       requestId,
       requestOutcome,
       Boolean(opts?.terminalHttpStatus),
-      opts?.autofix,
       opts?.apiMode,
     );
     await this.persistAttempt(row, opts?.attempt);
@@ -1213,8 +1073,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
-      autofix,
-      fallbackAutofix,
       apiMode,
     } = opts ?? {};
 
@@ -1274,16 +1132,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
-      // A healed fallback's winning attempt is the Autofix retry: stamp the
-      // group, role, operations, and Phoenix decision so it links to the
-      // original hop recorded in recordFailedFallbacks. Only the fallback's own
-      // record qualifies — an ordinary fallback success must not inherit the
-      // primary's Autofix retry metadata.
-      ...autofixColumns(fallbackAutofix, 'retry'),
     });
-    // The request-level Autofix status prefers the fallback's own outcome when
-    // it healed, falling back to the primary's record otherwise.
-    await this.persistRequest(ctx, requestId, row, true, fallbackAutofix ?? autofix, apiMode);
+    await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row, attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
@@ -1314,7 +1164,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
-      autofix,
       apiMode,
     } = opts ?? {};
     const requestId = providedRequestId ?? uuid();
@@ -1380,67 +1229,9 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
-      ...autofixColumns(autofix, 'retry'),
     });
-    await this.persistRequest(ctx, requestId, requestRow, true, autofix, apiMode);
+    await this.persistRequest(ctx, requestId, requestRow, true, apiMode);
     await this.persistAttempt(requestRow, attempt);
-    this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
-  }
-
-  /**
-   * Record the failed original request of an Autofix flow as its own row,
-   * linked to the successful or failed retry via `autofix.groupId`.
-   */
-  async recordAutofixOriginal(
-    ctx: IngestionContext,
-    model: string,
-    tier: string,
-    autofix: AutofixRecord,
-    opts?: AutofixOriginalOpts,
-  ): Promise<void> {
-    if (!getAutofixRetry(autofix)) return;
-    const original = autofix.chain.find((entry) => entry.origin === 'original' && entry.error);
-    if (!original?.error) return;
-
-    const canonical = await this.customProviders.canonicalizeAgentMessageKeys(
-      ctx.tenantId,
-      opts?.provider,
-      model,
-    );
-    const requestId = opts?.requestId ?? uuid();
-    const row = buildMessageRow(ctx, {
-      request_id: requestId,
-      ...attemptIdentity(opts?.attempt, opts?.attemptNumber),
-      trace_id: opts?.traceId ?? null,
-      timestamp: new Date(Date.now() - 1000).toISOString(),
-      status: 'auto_fixed',
-      // The full `{"error":{…}}` envelope, like every other error row — storing the
-      // bare message would drop the `type`/`param`/`code` that identify the error
-      // downstream (see serializeProviderError).
-      error_message: serializeProviderError(original.error),
-      error_http_status: original.http_status,
-      model: canonical.model,
-      provider: canonical.provider,
-      routing_tier: tier ?? null,
-      routing_reason: opts?.reason ?? null,
-      auth_type: opts?.authType ?? null,
-      specificity_category: opts?.specificityCategory ?? null,
-      provider_key_label: opts?.providerKeyLabel ?? null,
-      tenant_provider_id: opts?.tenantProviderId ?? null,
-      caller_attribution: opts?.callerAttribution ?? null,
-      request_headers: opts?.requestHeaders ?? null,
-      request_params: opts?.requestParams ?? null,
-      header_tier_id: opts?.headerTierId ?? null,
-      header_tier_name: opts?.headerTierName ?? null,
-      header_tier_color: opts?.headerTierColor ?? null,
-      autofix_applied: true,
-      autofix_group_id: autofix.groupId,
-      autofix_role: 'original',
-      autofix_operations: (original.operations as object | null) ?? null,
-      autofix_decision: buildAutofixDecision(original),
-    });
-    await this.persistRequest(ctx, requestId, row, false, autofix);
-    await this.persistAttempt(row, opts?.attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
 

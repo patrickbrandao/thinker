@@ -3,7 +3,6 @@ import { v4 as uuid } from 'uuid';
 import { Response as ExpressResponse } from 'express';
 import { IngestionContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { RoutingMeta } from './proxy.service';
-import { getAutofixRetry, type AutofixRecord } from '../autofix/autofix.types';
 import { FailedFallback } from './proxy-fallback.service';
 import { ForwardResult } from './provider-client';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
@@ -59,10 +58,8 @@ import type { AttemptRecordingCapture } from './attempt-recording-capture';
 
 const logger = new Logger('ProxyResponseHandler');
 
-/** The current primary is attempt 2 only when Autofix actually sent a retry. */
-export function currentPrimaryAttemptNumber(autofix: AutofixRecord | undefined): number {
-  return getAutofixRetry(autofix) ? 2 : 1;
-}
+/** The primary provider call is always the request's first attempt. */
+export const PRIMARY_ATTEMPT_NUMBER = 1;
 
 interface ResponsesSequenceTracker {
   feed(chunk: string): void;
@@ -108,53 +105,6 @@ export function nextResponsesSequenceNumber(res: ExpressResponse): number {
 
 function recordSafely(promise: Promise<unknown>, label: string): void {
   promise.catch((e) => logger.warn(`Failed to record ${label}: ${e}`));
-}
-
-function recordAutofixOriginalIfRetried(
-  ctx: IngestionContext,
-  meta: RoutingMeta,
-  recorder: ProxyMessageRecorder,
-  autofix: AutofixRecord | undefined,
-  traceId?: string,
-  callerAttribution?: CallerAttribution | null,
-  requestHeaders?: Record<string, string> | null,
-  requestId?: string,
-  route?: {
-    model?: string;
-    provider?: string;
-    authType?: string;
-    tenantProviderId?: string | null;
-  },
-): void {
-  if (!autofix || !getAutofixRetry(autofix) || meta.autofixOriginalProviderCallStarted === false)
-    return;
-  recordSafely(
-    recorder.recordAutofixOriginal(ctx, route?.model ?? meta.model, meta.tier, autofix, {
-      requestId,
-      attemptNumber: 1,
-      attempt: meta.autofixOriginalAttempt,
-      provider: route ? route.provider : meta.provider,
-      reason: meta.reason,
-      authType: route?.authType ?? meta.auth_type,
-      traceId,
-      callerAttribution,
-      requestHeaders,
-      requestParams: meta.request_params,
-      specificityCategory: meta.specificity_category,
-      // Same rule as tenantProviderId below: on a fallback-success flow
-      // `provider_key_label` names the connection that RECOVERED the request,
-      // while this row belongs to the primary that failed. The direct-success
-      // call site is guarded by `!meta.fallbackFromModel`, so primaryKeyLabel
-      // is absent there and the meta label is already the right one.
-      providerKeyLabel: meta.primaryKeyLabel ?? meta.provider_key_label,
-      tenantProviderId:
-        route?.tenantProviderId === undefined ? meta.tenantProviderId : route.tenantProviderId,
-      headerTierId: meta.header_tier_id,
-      headerTierName: meta.header_tier_name,
-      headerTierColor: meta.header_tier_color,
-    }),
-    'autofix original',
-  );
 }
 
 function thinkingRouteContext(meta: RoutingMeta): ThinkingBlockRouteContext {
@@ -240,22 +190,10 @@ export async function handleProviderError(
   traceId?: string,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  autofix?: AutofixRecord,
   requestId: string = uuid(),
   requestDurationMs?: number,
   apiMode?: ProxyApiMode,
 ): Promise<void> {
-  recordAutofixOriginalIfRetried(
-    ctx,
-    meta,
-    recorder,
-    autofix,
-    traceId,
-    callerAttribution,
-    requestHeaders,
-    requestId,
-  );
-
   if (failedFallbacks && failedFallbacks.length > 0 && !meta.fallbackFromModel) {
     await handleFallbackExhausted(
       res,
@@ -269,7 +207,6 @@ export async function handleProviderError(
       traceId,
       callerAttribution,
       requestHeaders,
-      autofix,
       requestId,
       requestDurationMs,
       apiMode,
@@ -280,7 +217,7 @@ export async function handleProviderError(
   recordSafely(
     recorder.recordProviderError(ctx, errorStatus, errorBody, {
       requestId,
-      attemptNumber: currentPrimaryAttemptNumber(autofix),
+      attemptNumber: PRIMARY_ATTEMPT_NUMBER,
       attempt: meta.attempt,
       skipAttempt: meta.providerCallStarted === false,
       requestDurationMs,
@@ -301,7 +238,6 @@ export async function handleProviderError(
       headerTierId: meta.header_tier_id,
       headerTierName: meta.header_tier_name,
       headerTierColor: meta.header_tier_color,
-      autofix,
       apiMode,
     }),
     'provider error',
@@ -339,13 +275,12 @@ function handleFallbackExhausted(
   traceId: string | undefined,
   callerAttribution: CallerAttribution | null | undefined,
   requestHeaders: Record<string, string> | null | undefined,
-  autofix: AutofixRecord | undefined,
   requestId: string,
   requestDurationMs?: number,
   apiMode?: ProxyApiMode,
 ): void {
   const baseTime = Date.now();
-  const primaryAttemptNumber = currentPrimaryAttemptNumber(autofix);
+  const primaryAttemptNumber = PRIMARY_ATTEMPT_NUMBER;
   recordSafely(
     recorder.recordFailedFallbacks(ctx, meta.tier, meta.model, failedFallbacks, {
       requestId,
@@ -395,9 +330,6 @@ function handleFallbackExhausted(
         headerTierColor: meta.header_tier_color,
         httpStatus: errorStatus,
         terminalHttpStatus: errorStatus,
-        // When a patched retry exists this row is that retry; otherwise it is
-        // the plain original failure carrying only Phoenix's audit.
-        autofix,
         apiMode,
       },
     ),
@@ -409,7 +341,6 @@ function handleFallbackExhausted(
   setHeaders(res, metaHeaders);
   res.setHeader('X-Manifest-Fallback-Exhausted', 'true');
   const attempted = attemptedFallbackEntries(failedFallbacks, apiMode);
-  const primaryAutofix = autofixSummary(autofix);
   // Every attempt reached a provider, so the error is provider-authored: the
   // exhaustion is a routing outcome (the boolean + header), not an error class,
   // and `code` keeps whatever the primary provider sent (null when nothing).
@@ -423,7 +354,6 @@ function handleFallbackExhausted(
       fallback_exhausted: true,
       primary_model: meta.model,
       primary_provider: meta.provider,
-      ...(primaryAutofix ? { autofix: primaryAutofix } : {}),
       attempted_fallbacks: attempted,
     },
   });
@@ -440,53 +370,25 @@ function handleFallbackExhausted(
   res.json(responseBody);
 }
 
-/** Request-scoped Autofix evidence for the wire error body (never config). */
-function autofixSummary(
-  record: AutofixRecord | undefined,
-): { applied: boolean; original_status: number; retry_status: number | null } | undefined {
-  if (!record) return undefined;
-  const retry = getAutofixRetry(record);
-  return {
-    applied: retry !== undefined,
-    original_status: record.original_http_status,
-    retry_status: retry?.http_status ?? null,
-  };
-}
-
-/**
- * One wire entry per fallback hop, each with the same sanitized message/code the
- * primary gets. A patched retry and the original it replaced are two provider
- * attempts (two audit rows) but one hop to the caller: keep the retry's entry
- * and let its Autofix summary carry the pre-heal status.
- */
+/** One wire entry per fallback hop, each with the same sanitized message/code the primary gets. */
 function attemptedFallbackEntries(
   failedFallbacks: FailedFallback[],
   apiMode?: ProxyApiMode,
 ): Array<Record<string, unknown> & { provider: string; model: string; status: number }> {
-  const retriedHops = new Set(
-    failedFallbacks.filter((f) => f.autofixRole === 'retry').map((f) => f.fallbackIndex),
-  );
-  return failedFallbacks
-    .filter((f) => !(f.autofixRole === 'original' && retriedHops.has(f.fallbackIndex)))
-    .map((f) => {
-      const hop = buildOpenAiCompatibleError(f.status, f.errorBody, { apiMode });
-      const hopAutofix = autofixSummary(f.autofix);
-      return {
-        model: f.model,
-        provider: f.provider,
-        auth_type: f.authType ?? null,
-        status: f.status,
-        code: hop.code ?? null,
-        message: hop.message,
-        ...(hopAutofix ? { autofix: hopAutofix } : {}),
-      };
-    });
+  return failedFallbacks.map((f) => {
+    const hop = buildOpenAiCompatibleError(f.status, f.errorBody, { apiMode });
+    return {
+      model: f.model,
+      provider: f.provider,
+      auth_type: f.authType ?? null,
+      status: f.status,
+      code: hop.code ?? null,
+      message: hop.message,
+    };
+  });
 }
 
-/**
- * Lead with the primary provider's own sentence, then list the chain. No count:
- * a patched-then-failed hop is two provider attempts but one entry here.
- */
+/** Lead with the primary provider's own sentence, then list the chain. */
 function exhaustedMessage(
   primaryMessage: string,
   attempts: Array<{ provider: string; model: string; status: number }>,
@@ -503,35 +405,18 @@ export function recordFallbackFailures(
   recorder: ProxyMessageRecorder,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  autofix?: AutofixRecord,
   requestId: string = uuid(),
 ): string | undefined {
   if (!meta.fallbackFromModel) return undefined;
 
   const fallbackBaseTime = Date.now();
   const failures = failedFallbacks ?? [];
-  const primaryAttemptNumber = currentPrimaryAttemptNumber(autofix);
+  const primaryAttemptNumber = PRIMARY_ATTEMPT_NUMBER;
 
   // The primary's auth_type is preserved separately on a fallback-success flow
   // (see RoutingMeta.primaryAuthType / #1173). Older meta shapes only carry
   // `auth_type`, so fall back to it when primaryAuthType is absent.
   const primaryAuthType = meta.primaryAuthType ?? meta.auth_type;
-  recordAutofixOriginalIfRetried(
-    ctx,
-    meta,
-    recorder,
-    autofix,
-    undefined,
-    callerAttribution,
-    requestHeaders,
-    requestId,
-    {
-      model: meta.fallbackFromModel,
-      provider: meta.primaryProvider,
-      authType: primaryAuthType,
-      tenantProviderId: meta.primaryTenantProviderId,
-    },
-  );
   recordSafely(
     recorder.recordPrimaryFailure(
       ctx,
@@ -568,9 +453,6 @@ export function recordFallbackFailures(
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
         httpStatus: meta.primaryErrorStatus,
-        // A failed patched retry is the primary failure that triggered fallback.
-        // No-patch consultations remain an unmarked original with audit only.
-        autofix,
       },
     ),
     'primary failure',
@@ -730,9 +612,8 @@ export async function handleStreamResponse(
       relayOptions,
     );
   }
-  // A native Responses upstream reaches this point only for a Chat Completions
-  // or Messages client (an Autofix heal that re-routes the Codex wire body), and
-  // its SSE is the same Responses stream the ChatGPT transformer converts.
+  // A native Responses upstream speaks the same Responses SSE the ChatGPT
+  // transformer converts.
   if (forward.isChatGpt || forward.isResponses) {
     // Stateful: must be created once per stream and fed events in order.
     const chatGptTransformer = providerClient.createChatGptStreamTransformer(meta.model);
@@ -875,9 +756,6 @@ export async function handleNonStreamResponse(
     }
     delete (responseBody as Record<string, unknown>)._extractedThinkingBlocks;
   } else if (forward.isChatGpt || forward.isResponses) {
-    // A native Responses upstream lands here for a Chat Completions or Messages
-    // client: an Autofix heal that changes the model re-routes the Codex wire
-    // body in `responses` mode, so its forward is isResponses, not isChatGpt.
     // Responses-format upstreams differ on their non-streaming shape. The
     // ChatGPT Codex subscription backend always returns SSE even when
     // stream:false, but the Bedrock mantle /openai/v1/responses endpoint (and
@@ -976,16 +854,9 @@ export function recordSuccess(
   startTime?: number,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  autofix?: AutofixRecord,
   requestId: string = uuid(),
-  attemptNumber: number = currentPrimaryAttemptNumber(autofix),
+  attemptNumber: number = PRIMARY_ATTEMPT_NUMBER,
   apiMode?: ProxyApiMode,
-  /**
-   * Autofix audit of the winning fallback hop. When set, the fallback-success
-   * row is stamped with the fallback's Phoenix metadata (role `retry`) instead
-   * of the primary's record.
-   */
-  fallbackAutofix?: AutofixRecord,
 ): void {
   if (meta.fallbackFromModel && fallbackSuccessTs) {
     const requestDurationMs = startTime == null ? undefined : Date.now() - startTime;
@@ -1011,11 +882,6 @@ export function recordSuccess(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
-        // `autofix` is the primary's record (request-level status); the winning
-        // fallback's own record is passed separately so only it can stamp the
-        // fallback-success row.
-        autofix,
-        fallbackAutofix,
         apiMode,
       }),
       'fallback success',
@@ -1042,25 +908,9 @@ export function recordSuccess(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
-        autofix,
         apiMode,
       }),
       'success message',
-    );
-  }
-
-  // Fallback-success flows recorded the original and failed retry above in
-  // recordFallbackFailures. A direct Autofix success records its original here.
-  if (!meta.fallbackFromModel) {
-    recordAutofixOriginalIfRetried(
-      ctx,
-      meta,
-      recorder,
-      autofix,
-      traceId,
-      callerAttribution,
-      requestHeaders,
-      requestId,
     );
   }
 }

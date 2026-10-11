@@ -25,8 +25,8 @@ describe('dashboard URLs', () => {
 
   it('keeps an explicitly supplied dashboard ahead of the deployment default', () => {
     process.env['BETTER_AUTH_URL'] = 'https://selfhosted.example';
-    expect(getEmailAssetUrl('autofix-icon-email.png', 'https://dashboard.example/')).toBe(
-      'https://dashboard.example/autofix-icon-email.png',
+    expect(getEmailAssetUrl('manifest-logo.png', 'https://dashboard.example/')).toBe(
+      'https://dashboard.example/manifest-logo.png',
     );
   });
 

@@ -525,7 +525,7 @@ export function toAnthropicRequest(
   // Anthropic-native fields forwarded when the inbound request originated as
   // Anthropic Messages (POST /v1/messages). Chat-completions clients won't
   // set these, so this is a no-op for the OpenAI-compat path. Model-specific
-  // rejection fixes belong in Autofix, not in this protocol adapter.
+  // rejection fixes do not belong in this protocol adapter.
   if (body.thinking !== undefined) {
     result.thinking = body.thinking;
   }

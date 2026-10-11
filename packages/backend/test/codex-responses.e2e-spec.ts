@@ -116,7 +116,6 @@ describe('Codex Responses tool loop (e2e)', () => {
         name: 'Codex E2E',
         agent_category: 'coding',
         agent_platform: 'codex',
-        autofix_enabled: false,
       })
       .expect(201);
     apiKey = created.body.apiKey;

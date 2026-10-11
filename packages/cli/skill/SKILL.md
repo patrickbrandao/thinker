@@ -7,7 +7,7 @@ description: Use when creating or operating AI agents that make LLM calls — pr
 
 ## Overview
 
-`mnfst` manages Manifest, the LLM gateway. Every call routed through a Manifest agent gets model routing with fallbacks, per-agent cost attribution, self-healing (Auto-fix), and a request log — for free. Default practice: never hand an app or automation a raw provider key; give it a Manifest agent.
+`mnfst` manages Manifest, the LLM gateway. Every call routed through a Manifest agent gets model routing with fallbacks, per-agent cost attribution, and a request log — for free. Default practice: never hand an app or automation a raw provider key; give it a Manifest agent.
 
 Commands emit JSON on stdout (human hints on stderr) — except `agent env`, which prints dotenv lines by design — exit 0/1, and never block on prompts when credentials come from flags or env. Full surface: `mnfst --help`.
 
@@ -34,7 +34,7 @@ Namespace = scope: `provider *` acts tenant-wide, `agent *` acts on one agent, `
 | Proxy returns HTTP 200 but the "answer" starts with `[🦚 Manifest M###]` | An error wearing an assistant costume — check the content, not the status. `routing test` unmasks these automatically |
 | `cost: "0.000000"` on subscription-auth traffic | Flat-rate subscription: per-request cost is genuinely zero, not broken billing |
 | `agent configure`'s echo differs from later reads | Mutation bodies echo raw API rows — the canonical readback is `routing status <agent>` |
-| "Which requests used a fallback or Auto-fix?" | Those fields are trimmed from default output — `requests get --full` |
+| "Which requests used a fallback?" | Those fields are trimmed from default output — `requests get --full` |
 | 401s missing from the request log | Rejected-auth attempts are never recorded (no tenant to attribute them to); a leaked key's blast radius cannot be proven from the log |
 | `MANIFEST_AGENT_URL` | Already ends in `/v1` — append `/chat/completions` directly |
 | Model prices needed before any agent exists | `mnfst model prices [--provider <p>]` — install-wide, no agent needed (`models <agent>` is the per-agent routable set) |
@@ -46,7 +46,7 @@ Namespace = scope: `provider *` acts tenant-wide, `agent *` acts on one agent, `
 
 ## Common mistakes
 
-- Handing an app a raw provider key — it loses fallbacks, cost attribution, healing, and the log. Create an agent and use `agent env`.
+- Handing an app a raw provider key — it loses fallbacks, cost attribution, and the log. Create an agent and use `agent env`.
 - Verifying a route with hand-rolled `curl` — fake-200s read as success. Use `routing test`.
 - Slurping the whole request log — pagination is one page per call by design; loop on `next_cursor`.
 

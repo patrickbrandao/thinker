@@ -127,8 +127,10 @@ describe('DropSaasFeatureSchema migration (e2e)', () => {
 
   it('drops a leftover cloud-mode CRM index', async () => {
     await ds.query(
+      // The real index filtered on requests.autofix_status, which #16 dropped;
+      // only its name matters to this migration.
       `CREATE INDEX "IDX_requests_autofix_healed" ON "requests" ("tenant_id", "timestamp")
-       INCLUDE ("status") WHERE "autofix_status" = 'retry_succeeded'`,
+       INCLUDE ("status")`,
     );
     expect((await saasArtifacts(ds)).crmIndex).toBe('"IDX_requests_autofix_healed"');
 

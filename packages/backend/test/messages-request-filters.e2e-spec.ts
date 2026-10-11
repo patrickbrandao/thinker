@@ -9,7 +9,7 @@ import { createTestApp, TEST_API_KEY, TEST_TENANT_ID } from './helpers';
  *
  * Attempt lookups are bounded by the parent's tenant and time window, the
  * harness is resolved to its id before the query, and "no recovery attempt" is
- * two anti-joins. Those are planner hints: every filter and combination here
+ * an anti-join on the fallback attempt. Those are planner hints: every filter and combination here
  * must return exactly the requests it returned before, with a matching total.
  */
 
@@ -23,7 +23,6 @@ type Attempt = {
   model: string;
   status: string;
   fallbackFrom?: string;
-  autofix?: boolean;
 };
 
 let app: INestApplication;
@@ -74,8 +73,8 @@ async function seedRequest(
   );
   for (const [index, attempt] of opts.attempts.entries()) {
     await ds.query(
-      `INSERT INTO agent_messages (id, request_id, attempt_number, tenant_id, agent_id, agent_name, user_id, timestamp, status, provider, model, fallback_from_model, autofix_applied, input_tokens, output_tokens, service_type)
-       VALUES ($1, $2, $3, $4, $5, $6, 'test-user-001', $7, $8, $9, $10, $11, $12, 10, 5, 'agent')`,
+      `INSERT INTO agent_messages (id, request_id, attempt_number, tenant_id, agent_id, agent_name, user_id, timestamp, status, provider, model, fallback_from_model, input_tokens, output_tokens, service_type)
+       VALUES ($1, $2, $3, $4, $5, $6, 'test-user-001', $7, $8, $9, $10, $11, 10, 5, 'agent')`,
       [
         uuid(),
         id,
@@ -89,7 +88,6 @@ async function seedRequest(
         attempt.provider,
         attempt.model,
         attempt.fallbackFrom ?? null,
-        attempt.autofix ?? false,
       ],
     );
   }
@@ -119,11 +117,12 @@ beforeAll(async () => {
       { provider: 'openai', model: 'probe-a', status: 'success', fallbackFrom: 'probe-b' },
     ],
   });
-  await seedRequest(ds, 'autofix', {
+  // A failed attempt retried on the same route, with no fallback hop.
+  await seedRequest(ds, 'retried', {
     msAgo: 3 * HOUR,
     attempts: [
       { provider: 'openai', model: 'probe-a', status: 'error' },
-      { provider: 'openai', model: 'probe-a', status: 'success', autofix: true },
+      { provider: 'openai', model: 'probe-a', status: 'success' },
     ],
   });
   await seedRequest(ds, 'failed', {
@@ -201,18 +200,16 @@ async function expectHarnessWeek(filters: string, expected: string[]): Promise<v
 
 describe('GET /api/v1/messages request filters', () => {
   it('lists the harness week with no other filter', async () => {
-    await expectHarnessWeek('', ['plain', 'fallback', 'autofix', 'failed', 'blocked', 'edge']);
+    await expectHarnessWeek('', ['plain', 'fallback', 'retried', 'failed', 'blocked', 'edge']);
   });
 
   it.each([
     ['trigger=fallback', ['fallback', 'edge']],
-    ['trigger=autofix', ['autofix']],
-    ['trigger=none', ['plain', 'failed', 'blocked']],
-    ['trigger=fallback,none', ['plain', 'fallback', 'failed', 'blocked', 'edge']],
-    ['trigger=autofix,fallback', ['fallback', 'autofix', 'edge']],
+    ['trigger=none', ['plain', 'retried', 'failed', 'blocked']],
+    ['trigger=fallback,none', ['plain', 'fallback', 'retried', 'failed', 'blocked', 'edge']],
     ['status=failed', ['failed', 'blocked']],
-    ['status=ok', ['plain', 'fallback', 'autofix', 'edge']],
-    ['status=ok&trigger=autofix', ['autofix']],
+    ['status=ok', ['plain', 'fallback', 'retried', 'edge']],
+    ['status=ok&trigger=none', ['plain', 'retried']],
     ['status=failed&trigger=none', ['failed', 'blocked']],
     ['origin=provider', ['failed']],
     ['origin=manifest', ['blocked']],
@@ -220,11 +217,18 @@ describe('GET /api/v1/messages request filters', () => {
     ['provider=anthropic&trigger=none', ['failed']],
     ['model=probe-b', ['fallback', 'failed', 'edge']],
     ['model=probe-blocked', ['blocked']],
-    ['model=probe-a&trigger=autofix', ['autofix']],
-    ['attempts=has_failed', ['fallback', 'autofix', 'failed', 'edge']],
-    ['attempts=has_failed,has_succeeded', ['fallback', 'autofix', 'edge']],
+    ['model=probe-a&trigger=none', ['plain', 'retried']],
+    ['attempts=has_failed', ['fallback', 'retried', 'failed', 'edge']],
+    ['attempts=has_failed,has_succeeded', ['fallback', 'retried', 'edge']],
   ])('%s', async (filters, expected) => {
     await expectHarnessWeek(filters, expected);
+  });
+
+  it('rejects the trigger value of the removed Autofix feature', async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/messages?range=7d&agent_name=${HARNESS}&trigger=autofix`)
+      .set('x-api-key', TEST_API_KEY)
+      .expect(400);
   });
 
   it('keeps requests older than the range out and lets a wider range in', async () => {
@@ -245,18 +249,18 @@ describe('GET /api/v1/messages request filters', () => {
   it('pages a filtered view with a stable total', async () => {
     const first = await log(`range=7d&agent_name=${HARNESS}&trigger=fallback,none&limit=2`);
     expect(keysOf(first)).toEqual(['plain', 'fallback']);
-    expect(first.total_count).toBe(5);
+    expect(first.total_count).toBe(6);
 
     const cursor = encodeURIComponent(first.next_cursor ?? '');
     const second = await log(
       `range=7d&agent_name=${HARNESS}&trigger=fallback,none&limit=2&cursor=${cursor}`,
     );
-    expect(keysOf(second)).toEqual(['failed', 'blocked']);
+    expect(keysOf(second)).toEqual(['retried', 'failed']);
 
     const third = await log(
       `range=7d&agent_name=${HARNESS}&trigger=fallback,none&limit=2&cursor=${encodeURIComponent(second.next_cursor ?? '')}`,
     );
-    expect(keysOf(third)).toEqual(['edge']);
+    expect(keysOf(third)).toEqual(['blocked', 'edge']);
     expect(third.next_cursor).toBeNull();
   });
 

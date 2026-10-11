@@ -36,7 +36,6 @@ import { HeaderTier } from '../../entities/header-tier.entity';
 // share one definition of an error status (see query-helpers.sqlCountMessages).
 const FAILED_STATUSES = ERROR_MESSAGE_STATUSES;
 const ERROR_STATUSES = ERROR_MESSAGE_STATUSES;
-const AUTOFIX_TRIGGER_ROLE = 'retry';
 
 const MODELS_CACHE_TTL_MS = 5 * 60_000;
 const DISTINCT_MODELS_DEFAULT_INTERVAL = '90 days';
@@ -450,20 +449,14 @@ export class MessagesQueryService {
           AND ${condition}${connScope}
       )`;
       const parts = params.triggers.map((trigger) => {
-        if (trigger === 'autofix') return triggerExists('trigger_attempt.autofix_applied = true');
         if (trigger === 'fallback')
           return triggerExists('trigger_attempt.fallback_from_model IS NOT NULL');
-        // 'none': no recovery attempt anywhere on the request. Two anti-joins
-        // rather than one over `autofix OR fallback`: each kind has its own
-        // partial index, and the OR forced a heap read of every attempt in range.
-        const noAttempt = (condition: string): string => `NOT EXISTS (
+        // 'none': no fallback attempt anywhere on the request.
+        return `NOT EXISTS (
           SELECT 1 FROM agent_messages trigger_attempt
           WHERE trigger_attempt.request_id = r.id AND ${window('trigger_attempt')}
-            AND ${condition}
+            AND trigger_attempt.fallback_from_model IS NOT NULL
         )`;
-        return `(${noAttempt('trigger_attempt.autofix_applied = true')} AND ${noAttempt(
-          'trigger_attempt.fallback_from_model IS NOT NULL',
-        )})`;
       });
       qb.andWhere(`(${parts.join(' OR ')})`, triggerParameters);
     }
@@ -560,7 +553,7 @@ export class MessagesQueryService {
     }
 
     qb.leftJoin(AgentMessage, 'at', 'at.request_id = r.id');
-    const rank = `CASE WHEN ${sqlIsSuccessStatus('at.status')} THEN 3 WHEN NOT COALESCE(at.superseded, false) AND at.status NOT IN ('fallback_error', 'auto_fixed') THEN 2 ELSE 1 END`;
+    const rank = `CASE WHEN ${sqlIsSuccessStatus('at.status')} THEN 3 WHEN NOT COALESCE(at.superseded, false) AND at.status <> 'fallback_error' THEN 2 ELSE 1 END`;
     const picked = (column: string): string =>
       `(ARRAY_AGG(${column} ORDER BY at.attempt_number DESC NULLS LAST, ${rank} DESC, at.timestamp DESC, at.id DESC) FILTER (WHERE at.id IS NOT NULL))[1]`;
     const safeCost = sqlSanitizeCost('at.cost_usd');
@@ -597,11 +590,6 @@ export class MessagesQueryService {
       .addSelect(picked('at.header_tier_color'), 'header_tier_color')
       .addSelect(picked('at.provider_key_label'), 'provider_key_label')
       .addSelect(picked('cp.name'), 'custom_provider_name')
-      .addSelect('COALESCE(BOOL_OR(at.autofix_applied), false)', 'autofix_applied')
-      .addSelect(
-        `CASE WHEN COALESCE(BOOL_OR(at.autofix_applied), false) THEN 'retry' ELSE NULL END`,
-        'autofix_role',
-      )
       .addSelect('COALESCE(SUM(at.cache_read_tokens), 0)', 'cache_read_tokens')
       .addSelect('COALESCE(SUM(at.cache_creation_tokens), 0)', 'cache_creation_tokens')
       .addSelect('COUNT(at.id)::int', 'attempt_count')
@@ -984,27 +972,15 @@ export class MessagesQueryService {
     if (!triggers?.length) return;
     if (triggers.length > 1) {
       // Attempt-grain OR of the selected kinds.
-      const conditions = triggers.map((t) => {
-        if (t === 'autofix') return 'at.autofix_role = :triggerAutofixRole';
-        if (t === 'fallback')
-          return "(COALESCE(at.autofix_role, '') != :triggerAutofixRole AND at.fallback_from_model IS NOT NULL AND at.fallback_from_model != '')";
-        return "(COALESCE(at.autofix_role, '') != :triggerAutofixRole AND (at.fallback_from_model IS NULL OR at.fallback_from_model = ''))";
-      });
-      qb.andWhere(`(${conditions.join(' OR ')})`, { triggerAutofixRole: AUTOFIX_TRIGGER_ROLE });
+      const conditions = triggers.map((t) =>
+        t === 'fallback'
+          ? "(at.fallback_from_model IS NOT NULL AND at.fallback_from_model != '')"
+          : "(at.fallback_from_model IS NULL OR at.fallback_from_model = '')",
+      );
+      qb.andWhere(`(${conditions.join(' OR ')})`);
       return;
     }
     const trigger = triggers[0];
-
-    if (trigger === 'autofix') {
-      qb.andWhere('at.autofix_role = :triggerAutofixRole', {
-        triggerAutofixRole: AUTOFIX_TRIGGER_ROLE,
-      });
-      return;
-    }
-
-    qb.andWhere('(at.autofix_role IS NULL OR at.autofix_role != :triggerAutofixRole)', {
-      triggerAutofixRole: AUTOFIX_TRIGGER_ROLE,
-    });
 
     if (trigger === 'fallback') {
       qb.andWhere("at.fallback_from_model IS NOT NULL AND at.fallback_from_model != ''");

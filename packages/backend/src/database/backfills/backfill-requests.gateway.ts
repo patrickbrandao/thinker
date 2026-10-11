@@ -42,43 +42,11 @@ const REQUEST_LEVEL_ORIGINS = `'config', 'policy', 'request', 'internal'`;
  * `success` / `failed` vocabulary, same as the live recorder now writes, so the
  * `requests` table is coherent regardless of which side created a row. Historical
  * `agent_messages.status` still holds the legacy values (`ok` / `error` /
- * `rate_limited` / `fallback_error` / `auto_fixed`); this collapses a terminal
+ * `rate_limited` / `fallback_error`); this collapses a terminal
  * attempt status onto the request outcome while preserving in-flight work.
  */
 const normalizeAttemptStatusSql = (expr: string): string =>
   `CASE WHEN ${expr} IN ('pending', 'cancelled') THEN ${expr} WHEN ${expr} IN ('ok', 'success') THEN 'success' ELSE 'failed' END`;
-
-/**
- * Historical decisions written before this migration have no JSON `status`.
- * With no retry evidence those rows are necessarily no-patch or resolving, but
- * the two cannot be distinguished retrospectively; use the terminal no_patch
- * value rather than inventing an in-progress state for old traffic.
- */
-const autofixStatusFromAttempt = (alias: string): string => `CASE
-  WHEN ${alias}.autofix_role = 'retry' THEN
-    CASE WHEN ${alias}.status IN ('ok', 'success') THEN 'retry_succeeded' ELSE 'retry_failed' END
-  WHEN COALESCE(${alias}.autofix_applied, false)
-    AND ${alias}.autofix_phoenix->>'healAttemptId' IS NOT NULL THEN 'retry_failed'
-  WHEN ${alias}.autofix_phoenix->>'status' = 'resolving' THEN 'resolving'
-  WHEN ${alias}.autofix_phoenix->>'status' = 'no_patch' THEN 'no_patch'
-  WHEN ${alias}.autofix_phoenix IS NOT NULL THEN 'no_patch'
-  WHEN COALESCE(${alias}.autofix_applied, false) THEN 'service_error'
-  ELSE NULL
-END`;
-
-const autofixStatusFromAttempts = (alias: string): string => `CASE
-  WHEN BOOL_OR(${alias}.autofix_role = 'retry' AND ${alias}.status IN ('ok', 'success'))
-    THEN 'retry_succeeded'
-  WHEN BOOL_OR(${alias}.autofix_role = 'retry')
-    OR BOOL_OR(COALESCE(${alias}.autofix_applied, false)
-      AND ${alias}.autofix_phoenix->>'healAttemptId' IS NOT NULL)
-    THEN 'retry_failed'
-  WHEN BOOL_OR(${alias}.autofix_phoenix->>'status' = 'resolving') THEN 'resolving'
-  WHEN BOOL_OR(${alias}.autofix_phoenix->>'status' = 'no_patch') THEN 'no_patch'
-  WHEN BOOL_OR(${alias}.autofix_phoenix IS NOT NULL) THEN 'no_patch'
-  WHEN BOOL_OR(COALESCE(${alias}.autofix_applied, false)) THEN 'service_error'
-  ELSE NULL
-END`;
 
 /**
  * The legacy recorder encoded fallback chains with exact 100 ms timestamp
@@ -173,7 +141,7 @@ export const INSERT_LEGACY_FALLBACK_PAIRS_SQL = `
     JOIN "request_backfill_fallback_indexes" fi ON true
     JOIN "agent_messages" t
       ON t."request_id" IS NULL
-     AND t.status NOT IN ('ok', 'fallback_error', 'auto_fixed')
+     AND t.status NOT IN ('ok', 'fallback_error')
      AND NOT COALESCE(t.superseded, false)
      AND t.fallback_from_model = p.model
      AND t.fallback_index = fi.fallback_index
@@ -338,8 +306,7 @@ export const INSERT_LEGACY_FALLBACK_REQUESTS_SQL = `
   ), totals AS (
     SELECT g.request_id,
            min(pa.timestamp) AS started_at,
-           sum(pa.duration_ms)::int AS duration_ms,
-           ${autofixStatusFromAttempts('pa')} AS autofix_status
+           sum(pa.duration_ms)::int AS duration_ms
     FROM groups g
     JOIN "request_backfill_fallback_groups" member ON member.request_id = g.request_id
     JOIN "agent_messages" pa ON pa.id = member.attempt_id
@@ -348,14 +315,14 @@ export const INSERT_LEGACY_FALLBACK_REQUESTS_SQL = `
     INSERT INTO "requests" (
       id, tenant_id, agent_id, user_id, agent_name, trace_id, session_key, session_id,
       timestamp, duration_ms, status, error_message, error_http_status, error_code,
-      autofix_status, error_origin, error_class, requested_model, caller_attribution, request_headers,
+      error_origin, error_class, requested_model, caller_attribution, request_headers,
       request_params, feedback_rating, feedback_tags, feedback_details
     )
     SELECT
       g.request_id, terminal.tenant_id, terminal.agent_id, terminal.user_id,
       terminal.agent_name, terminal.trace_id, terminal.session_key, terminal.session_id,
       totals.started_at, totals.duration_ms, ${normalizeAttemptStatusSql('terminal.status')}, terminal.error_message,
-      terminal.error_http_status, terminal.error_code, totals.autofix_status, terminal.error_origin,
+      terminal.error_http_status, terminal.error_code, terminal.error_origin,
       terminal.error_class, primary_attempt.model, terminal.caller_attribution,
       terminal.request_headers, terminal.request_params, terminal.feedback_rating,
       terminal.feedback_tags, terminal.feedback_details
@@ -399,13 +366,13 @@ export const INSERT_REJECTIONS_SQL = `
     INSERT INTO "requests" (
       id, tenant_id, agent_id, user_id, agent_name, trace_id, session_key, session_id,
       timestamp, duration_ms, status, error_message, error_http_status, error_code,
-      autofix_status, error_origin, error_class, requested_model, caller_attribution, request_headers,
+      error_origin, error_class, requested_model, caller_attribution, request_headers,
       request_params, feedback_rating, feedback_tags, feedback_details
     )
     SELECT
       id, tenant_id, agent_id, user_id, agent_name, trace_id, session_key, session_id,
       timestamp, duration_ms, ${normalizeAttemptStatusSql('status')}, error_message, error_http_status, error_code,
-      ${autofixStatusFromAttempt('batch')}, error_origin, error_class, model, caller_attribution, request_headers,
+      error_origin, error_class, model, caller_attribution, request_headers,
       request_params, feedback_rating, feedback_tags, feedback_details
     FROM batch
     ON CONFLICT (id) DO NOTHING
@@ -430,8 +397,6 @@ export const MARK_REJECTIONS_SQL = `
 `;
 
 const LEGACY_REQUEST_ID = `CASE
-  WHEN autofix_group_id IS NOT NULL THEN
-    'legacy-autofix-' || md5(COALESCE(tenant_id, '') || ':' || COALESCE(agent_id, '') || ':' || autofix_group_id)
   WHEN trace_id IS NOT NULL THEN
     'legacy-trace-' || md5(COALESCE(tenant_id, '') || ':' || COALESCE(agent_id, '') || ':' || trace_id)
   ELSE id
@@ -440,7 +405,7 @@ END`;
 const OUTCOME_RANK = `CASE
   WHEN status IN ('ok', 'success') THEN 3
   WHEN NOT COALESCE(superseded, false)
-    AND status NOT IN ('fallback_error', 'auto_fixed') THEN 2
+    AND status <> 'fallback_error' THEN 2
   ELSE 1
 END`;
 
@@ -458,7 +423,7 @@ export const INSERT_ATTEMPT_REQUESTS_SQL = `
     INSERT INTO "requests" (
       id, tenant_id, agent_id, user_id, agent_name, trace_id, session_key, session_id,
       timestamp, duration_ms, status, error_message, error_http_status, error_code,
-      autofix_status, error_origin, error_class, requested_model, caller_attribution, request_headers,
+      error_origin, error_class, requested_model, caller_attribution, request_headers,
       request_params, feedback_rating, feedback_tags, feedback_details
     )
     SELECT
@@ -468,7 +433,6 @@ export const INSERT_ATTEMPT_REQUESTS_SQL = `
       CASE WHEN outcome_rank = 1 THEN NULL ELSE error_message END,
       CASE WHEN outcome_rank = 1 THEN NULL ELSE error_http_status END,
       CASE WHEN outcome_rank = 1 THEN NULL ELSE error_code END,
-      ${autofixStatusFromAttempt('terminal')},
       CASE WHEN outcome_rank = 1 THEN NULL ELSE error_origin END,
       CASE WHEN outcome_rank = 1 THEN NULL ELSE error_class END,
       COALESCE(fallback_from_model, model), caller_attribution, request_headers,
@@ -482,7 +446,6 @@ export const INSERT_ATTEMPT_REQUESTS_SQL = `
         WHEN EXCLUDED.status = 'pending' THEN requests.status
         ELSE EXCLUDED.status
       END,
-      autofix_status = COALESCE(EXCLUDED.autofix_status, requests.autofix_status),
       error_message = CASE WHEN requests.status IN ('ok', 'success') OR EXCLUDED.status = 'pending'
         THEN requests.error_message ELSE EXCLUDED.error_message END,
       error_http_status = CASE WHEN requests.status IN ('ok', 'success') OR EXCLUDED.status = 'pending'
@@ -499,51 +462,11 @@ export const INSERT_ATTEMPT_REQUESTS_SQL = `
 `;
 
 export const LINK_ATTEMPTS_SQL = `
-  WITH target_autofix_groups AS MATERIALIZED (
-    SELECT DISTINCT
-      COALESCE(tenant_id, '') AS tenant_key,
-      COALESCE(agent_id, '') AS agent_key,
-      autofix_group_id AS group_id
-    FROM "agent_messages"
-    WHERE "request_id" IS NULL AND id > $1 AND id <= $2
-      AND timestamp < $3
-      AND autofix_group_id IS NOT NULL
-      AND autofix_role IS NULL
-  ), autofix_group_stats AS MATERIALIZED (
-    SELECT target.tenant_key,
-           target.agent_key,
-           target.group_id,
-           count(*)::int AS attempt_count,
-           count(*) FILTER (
-             WHERE other.status = 'auto_fixed' AND COALESCE(other.superseded, false)
-           )::int AS original_count
-    FROM target_autofix_groups target
-    JOIN "agent_messages" other
-      ON COALESCE(other.tenant_id, '') = target.tenant_key
-     AND COALESCE(other.agent_id, '') = target.agent_key
-     AND other.autofix_group_id = target.group_id
-    GROUP BY target.tenant_key, target.agent_key, target.group_id
-  ), batch AS (
+  WITH batch AS (
     SELECT pa.id,
            ${LEGACY_REQUEST_ID} AS legacy_request_id,
-           CASE
-             WHEN pa.autofix_group_id IS NOT NULL THEN CASE
-               WHEN pa.autofix_role = 'original' THEN 1
-               WHEN pa.autofix_role = 'retry' THEN 2
-               WHEN stats.attempt_count = 2 AND stats.original_count = 1 THEN CASE
-                 WHEN pa.status = 'auto_fixed' AND COALESCE(pa.superseded, false) THEN 1
-                 ELSE 2
-               END
-               ELSE NULL
-             END
-             WHEN pa.trace_id IS NULL THEN 1
-             ELSE NULL
-           END AS attempt_number
+           CASE WHEN pa.trace_id IS NULL THEN 1 ELSE NULL END AS attempt_number
     FROM "agent_messages" pa
-    LEFT JOIN autofix_group_stats stats
-      ON stats.tenant_key = COALESCE(pa.tenant_id, '')
-     AND stats.agent_key = COALESCE(pa.agent_id, '')
-     AND stats.group_id = pa.autofix_group_id
     WHERE pa."request_id" IS NULL AND pa.id > $1 AND pa.id <= $2
       AND pa.timestamp < $3
   ), updated AS (
@@ -581,22 +504,16 @@ export const REFRESH_ATTEMPT_REQUESTS_SQL = `
       CASE
         WHEN pa.status IN ('ok', 'success') THEN 3
         WHEN NOT COALESCE(pa.superseded, false)
-          AND pa.status NOT IN ('fallback_error', 'auto_fixed') THEN 2
+          AND pa.status <> 'fallback_error' THEN 2
         ELSE 1
       END DESC,
       pa.timestamp DESC,
       pa.id DESC
-  ), autofix AS (
-    SELECT pa.request_id, ${autofixStatusFromAttempts('pa')} AS autofix_status
-    FROM "agent_messages" pa
-    JOIN affected a ON a.request_id = pa.request_id
-    GROUP BY pa.request_id
   )
   UPDATE "requests" r
   SET timestamp = totals.started_at,
       duration_ms = totals.duration_ms,
       status = ${normalizeAttemptStatusSql('terminal.status')},
-      autofix_status = autofix.autofix_status,
       error_message = terminal.error_message,
       error_http_status = terminal.error_http_status,
       error_code = terminal.error_code,
@@ -604,7 +521,6 @@ export const REFRESH_ATTEMPT_REQUESTS_SQL = `
       error_class = terminal.error_class
   FROM totals
   JOIN terminal ON terminal.request_id = totals.request_id
-  JOIN autofix ON autofix.request_id = totals.request_id
   WHERE r.id = totals.request_id
 `;
 
@@ -614,8 +530,7 @@ export const FINALIZE_PENDING_REQUESTS_SQL = `
     FROM "requests" r
     WHERE r.status = 'pending'
       AND (
-        r.id LIKE 'legacy-autofix-%'
-        OR r.id LIKE 'legacy-trace-%'
+        r.id LIKE 'legacy-trace-%'
         OR EXISTS (
           SELECT 1 FROM "agent_messages" pa
           WHERE pa.request_id = r.id AND pa.id = r.id

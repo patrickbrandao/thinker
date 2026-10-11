@@ -191,16 +191,6 @@ describe('classifyMessageError', () => {
     });
   });
 
-  it('marks an auto_fixed row (healed original) as superseded while classifying its cause', () => {
-    // The failed original of a healed request was recovered by the retry, so it
-    // must not count as a live fault — same as fallback_error.
-    expect(classifyMessageError({ status: 'auto_fixed', errorHttpStatus: 400 })).toEqual({
-      error_origin: 'provider',
-      error_class: 'invalid_request',
-      superseded: true,
-    });
-  });
-
   it('marks a fallback_error row with no HTTP status as superseded transport/network', () => {
     expect(classifyMessageError({ status: 'fallback_error', errorHttpStatus: null })).toEqual({
       error_origin: 'transport',
@@ -355,7 +345,7 @@ describe('canonical status vocabulary', () => {
       expect(normalizeStatus(undefined)).toBe('success');
     });
 
-    it.each(['error', 'rate_limited', 'fallback_error', 'auto_fixed', 'failed', 'anything-else'])(
+    it.each(['error', 'rate_limited', 'fallback_error', 'failed', 'anything-else'])(
       'collapses %s onto failed',
       (value) => {
         expect(normalizeStatus(value)).toBe('failed');

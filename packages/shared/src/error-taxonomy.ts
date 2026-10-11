@@ -37,24 +37,22 @@ export const OK_STATUS = 'ok';
 export const RATE_LIMITED_STATUS = 'rate_limited';
 /** A row that failed but was recovered by a later attempt (retry / fallback). */
 export const SUPERSEDED_STATUS = 'fallback_error';
-/** The failed original of a healed Autofix flow — recovered by the retry row. */
-export const AUTOFIX_ORIGINAL_STATUS = 'auto_fixed';
 /** Every status whose row is a recovered (superseded) attempt, not a terminal failure. */
-export const SUPERSEDED_STATUSES: readonly string[] = [SUPERSEDED_STATUS, AUTOFIX_ORIGINAL_STATUS];
+export const SUPERSEDED_STATUSES: readonly string[] = [SUPERSEDED_STATUS];
 
 /**
  * Canonical outcome vocabulary for `requests.status` and `agent_messages.status`.
  *
  * The legacy `status` column conflated the outcome with the *reason* it failed
- * (`rate_limited`, `fallback_error`, `auto_fixed`). Those reasons now live on the
- * orthogonal axes — `error_class` (rate limit), `superseded` (recovered attempt),
- * and the `autofix_*` columns — so `status` carries only the terminal outcome:
+ * (`rate_limited`, `fallback_error`). Those reasons now live on the orthogonal
+ * axes — `error_class` (rate limit) and `superseded` (recovered attempt) — so
+ * `status` carries only the terminal outcome:
  *
  *  - `pending` — accepted, no terminal outcome yet.
  *  - `cancelled` — the caller disconnected before a terminal provider outcome.
  *  - `success` — completed successfully (legacy `ok`).
  *  - `failed`  — completed without succeeding (legacy `error` / `rate_limited` /
- *    `fallback_error` / `auto_fixed`).
+ *    `fallback_error`).
  *
  * Rolling-deploy note: during a deploy, old replicas still write the legacy
  * values while new replicas write these. Every reader must therefore compare
@@ -86,7 +84,7 @@ export type AttemptStatus = (typeof ATTEMPT_STATUSES)[number];
 
 /**
  * Collapse any status value — legacy (`ok`/`error`/`rate_limited`/
- * `fallback_error`/`auto_fixed`) or canonical — onto the canonical vocabulary.
+ * `fallback_error`) or canonical — onto the canonical vocabulary.
  * A nullish value is treated as `success`, matching the legacy writer convention
  * where an absent status meant `ok`. Unknown non-null values fail closed.
  */
@@ -249,8 +247,7 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
     return { error_origin: null, error_class: null, superseded: false };
   }
 
-  // `auto_fixed` (the failed original of a healed request) is a recovered attempt
-  // just like `fallback_error`, so it's superseded too — otherwise it would count
+  // A `fallback_error` row was recovered by a later attempt, so it must not count
   // as a live fault against the provider.
   const superseded = SUPERSEDED_STATUSES.includes(signals.status);
 

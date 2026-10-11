@@ -32,20 +32,15 @@ export function computeTrend(current: number, previous: number): number {
  * "what is an error" — consumed both by the Messages-log error filter and by
  * every "messages" KPI count below, so the two notions can never drift.
  */
-// `auto_fixed` is the failed-original row of a healed Autofix pair; its paired
-// `ok` retry row is the real success, so the original is excluded here to avoid
-// double-counting one logical request.
-//
-// Both vocabularies are listed on purpose: `error`/`rate_limited`/`fallback_error`/
-// `auto_fixed` are the legacy values still present on historical rows and on writes
-// from not-yet-drained replicas, while `failed` is the canonical value new writes
+// Both vocabularies are listed on purpose: `error`/`rate_limited`/`fallback_error`
+// are the legacy values still present on historical rows and on writes from
+// not-yet-drained replicas, while `failed` is the canonical value new writes
 // use. Listing both keeps the "real message" count correct across the transition —
 // the reason a row failed now lives on `error_class` / `superseded`, not on `status`.
 export const ERROR_MESSAGE_STATUSES = [
   'error',
   'fallback_error',
   'rate_limited',
-  'auto_fixed',
   'failed',
 ] as const;
 
@@ -399,8 +394,6 @@ export const MESSAGE_ROW_SELECT_ALIASES = [
   'header_tier_color',
   'provider_key_label',
   'custom_provider_name',
-  'autofix_applied',
-  'autofix_role',
 ] as const;
 
 export function selectMessageRowColumns<T extends ObjectLiteral>(
@@ -436,7 +429,5 @@ export function selectMessageRowColumns<T extends ObjectLiteral>(
     .addSelect('at.header_tier_name', 'header_tier_name')
     .addSelect('at.header_tier_color', 'header_tier_color')
     .addSelect('at.provider_key_label', 'provider_key_label')
-    .addSelect('cp.name', 'custom_provider_name')
-    .addSelect('at.autofix_applied', 'autofix_applied')
-    .addSelect('at.autofix_role', 'autofix_role');
+    .addSelect('cp.name', 'custom_provider_name');
 }

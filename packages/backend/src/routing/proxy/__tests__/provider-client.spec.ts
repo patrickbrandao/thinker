@@ -177,31 +177,15 @@ describe('ProviderClient', () => {
       });
     });
 
-    it('records an empty retry response against the retry attempt', async () => {
-      const retryBody = { choices: [] };
-      mockFetch
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              choices: [
-                {
-                  index: 0,
-                  message: { role: 'assistant', content: 'Initial response' },
-                  finish_reason: 'stop',
-                },
-              ],
-            }),
-            { status: 200, headers: { 'content-type': 'application/json' } },
-          ),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(retryBody), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          }),
-        );
-      const originalFinishRecording = jest.fn().mockResolvedValue(undefined);
-      const retryFinishRecording = jest.fn().mockResolvedValue(undefined);
+    it('records an empty response against the forward attempt', async () => {
+      const emptyBody = { choices: [] };
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(emptyBody), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+      const finishRecording = jest.fn().mockResolvedValue(undefined);
 
       const result = await client.forward({
         provider: 'openai',
@@ -211,26 +195,17 @@ describe('ProviderClient', () => {
         stream: false,
         apiMode: 'chat_completions',
         attempt: {
-          id: 'attempt-original',
+          id: 'attempt-1',
           attemptNumber: 1,
           startedAtMs: 0,
           startedAt: new Date(0).toISOString(),
           pendingWrite: Promise.resolve(true),
-          finishRecording: originalFinishRecording,
+          finishRecording,
         },
       });
-      const retry = await result.retryWireBody!(body, {
-        id: 'attempt-retry',
-        attemptNumber: 2,
-        startedAtMs: 1,
-        startedAt: new Date(1).toISOString(),
-        pendingWrite: Promise.resolve(true),
-        finishRecording: retryFinishRecording,
-      });
 
-      expect(retry.response.status).toBe(502);
-      expect(originalFinishRecording).not.toHaveBeenCalled();
-      expect(retryFinishRecording).toHaveBeenCalledWith({ type: 'json', body: retryBody });
+      expect(result.response.status).toBe(502);
+      expect(finishRecording).toHaveBeenCalledWith({ type: 'json', body: emptyBody });
     });
 
     it.each([
@@ -369,29 +344,20 @@ describe('ProviderClient', () => {
       expect(sentBody.prompt_cache_key).toBe('caller-conversation');
     });
 
-    it('captures the wire body and retries a healed body without rebuilding it', async () => {
+    it('sends the built wire body exactly once and reports its wire format', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
-      const first = await client.forward({
+      const result = await client.forward({
         provider: 'openai',
         apiKey: 'sk-test',
         model: 'gpt-4o',
         body,
         stream: false,
       });
-      const healedBody = {
-        model: 'gpt-4o',
-        messages: body.messages,
-        healed_provider_extension: true,
-      };
-      const retry = await first.retryWireBody!(healedBody);
 
-      expect(first.wireApiMode).toBe('chat_completions');
-      expect(first.wireRequestBody).toEqual(JSON.parse(mockFetch.mock.calls[0][1].body));
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual(healedBody);
-      expect(retry.wireRequestBody).toBe(healedBody);
-      expect(retry.retryWireBody).toBe(first.retryWireBody);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.wireFormat).toBe('openai_chat_completions');
+      expect(result).not.toHaveProperty('retryWireBody');
     });
 
     it('preserves image parts for OpenAI-compatible providers', async () => {
@@ -736,7 +702,7 @@ describe('ProviderClient', () => {
       expect(sentBody.messages).toBeUndefined();
       expect(sentBody.stream).toBe(false);
       expect(result.isChatGpt).toBe(true);
-      expect(result.wireApiMode).toBe('responses');
+      expect(result.wireFormat).toBe('openai_responses');
     });
 
     it('preserves Bedrock Responses conversion for a selected region', async () => {
@@ -899,7 +865,7 @@ describe('ProviderClient', () => {
         { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
       ]);
       expect(result.isAnthropic).toBe(true);
-      expect(result.wireApiMode).toBe('messages');
+      expect(result.wireFormat).toBe('anthropic_messages');
     });
 
     it.each(['us.anthropic.claude-sonnet-5-5', 'bedrock/us.anthropic.claude-sonnet-5-5'])(
@@ -929,7 +895,7 @@ describe('ProviderClient', () => {
         const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
         expect(sentBody.model).toBe('us.anthropic.claude-sonnet-5-5');
         expect(result.isAnthropic).toBe(true);
-        expect(result.wireApiMode).toBe('messages');
+        expect(result.wireFormat).toBe('anthropic_messages');
       },
     );
 
@@ -1688,8 +1654,7 @@ describe('ProviderClient', () => {
       ]);
       // Inbound body untouched (no surprise mutations).
       expect((anthropicBody.tools[1] as Record<string, unknown>).cache_control).toBeUndefined();
-      expect(result.wireApiMode).toBe('messages');
-      expect(result.wireRequestBody).toEqual(sent);
+      expect(result.wireFormat).toBe('anthropic_messages');
       expect(resolveChatBody).not.toHaveBeenCalled();
     });
 
@@ -2250,10 +2215,7 @@ describe('ProviderClient', () => {
       expect(init.headers['x-goog-api-key']).toBe('AIza-test');
       expect(result.isGoogle).toBe(true);
       expect(result.isAnthropic).toBe(false);
-      expect(result.wireApiMode).toBeUndefined();
       expect(result.wireFormat).toBe('google_generate_content');
-      expect(result.wireRequestUrl).toBe(url);
-      expect(result.wireRequestBody).toEqual(JSON.parse(mockFetch.mock.calls[0][1].body));
     });
 
     it('streams through streamGenerateContent with alt=sse', async () => {
@@ -4896,7 +4858,7 @@ describe('ProviderClient', () => {
         thinking: { type: 'enabled' },
         reasoning_effort: 'max',
       });
-      expect(result.wireRequestBody).toEqual(sentBody);
+      expect(result.wireFormat).toBe('openai_chat_completions');
     });
 
     it('preserves DeepSeek max_tokens above a possible provider limit', async () => {
@@ -4914,7 +4876,7 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBe(12000);
     });
 
-    it('preserves non-positive DeepSeek max_tokens values for Autofix', async () => {
+    it('preserves non-positive DeepSeek max_tokens values for the provider to judge', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
       await client.forward({
@@ -4929,7 +4891,7 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBe(0);
     });
 
-    it('preserves string DeepSeek max_tokens values for Autofix', async () => {
+    it('preserves string DeepSeek max_tokens values for the provider to judge', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
       await client.forward({
@@ -4944,7 +4906,7 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBe('9000');
     });
 
-    it('preserves reasoning_content for Mistral Autofix without mutating the input', async () => {
+    it('preserves reasoning_content for Mistral without mutating the input', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
       const bodyWithReasoningContent = makeBodyWithReasoningContent();
 
@@ -4979,7 +4941,7 @@ describe('ProviderClient', () => {
       expect(sentBody.messages[1].reasoning_content).toBe('Detailed internal reasoning');
     });
 
-    it('preserves reasoning_content for native OpenAI Autofix', async () => {
+    it('preserves reasoning_content for native OpenAI', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
       const bodyWithReasoningContent = makeBodyWithReasoningContent();
 

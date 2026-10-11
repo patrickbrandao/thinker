@@ -3,7 +3,6 @@ import { RouteModelParamsModule } from '../routing/model-params/route-model-para
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { CommonModule } from '../common/common.module';
-import { AutofixModule } from '../routing/autofix/autofix.module';
 import { CustomProviderModule } from '../routing/custom-provider/custom-provider.module';
 import { HeaderTiersModule } from '../routing/header-tiers/header-tiers.module';
 import { RoutingCoreModule } from '../routing/routing-core/routing-core.module';
@@ -28,7 +27,6 @@ import { McpController } from './mcp.controller';
     RoutingCoreModule,
     HeaderTiersModule,
     CustomProviderModule,
-    AutofixModule,
     ModelDiscoveryModule,
     ModelPricesModule,
     OtlpModule,

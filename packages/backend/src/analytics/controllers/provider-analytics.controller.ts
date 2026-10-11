@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
 import { AggregationService } from '../services/aggregation.service';
-import { AutofixStatsService } from '../services/autofix-stats.service';
 import { AttemptStatsService } from '../services/attempt-stats.service';
 import { TimeseriesQueriesService } from '../services/timeseries-queries.service';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
@@ -27,7 +26,6 @@ export class ProviderAnalyticsController {
   constructor(
     private readonly aggregation: AggregationService,
     private readonly timeseries: TimeseriesQueriesService,
-    private readonly autofixStats: AutofixStatsService,
     private readonly attemptStats: AttemptStatsService,
     @InjectRepository(TenantProvider)
     private readonly providerRepo: Repository<TenantProvider>,
@@ -345,7 +343,7 @@ export class ProviderAnalyticsController {
       .addSelect('MAX(a.agent_platform)', 'agent_platform')
       // Attempt-world reliability columns: every provider call this
       // connection served for the harness counts, by its own outcome.
-      // Healing is a request concept and does not belong here.
+      // Recovery is a request concept and does not belong here.
       .addSelect('COUNT(*)', 'attempts')
       .addSelect(`COUNT(*) FILTER (WHERE ${sqlIsSuccessStatus('at.status')})`, 'succeeded')
       // Join on agent identity, not name: a soft-deleted agent sharing a slug

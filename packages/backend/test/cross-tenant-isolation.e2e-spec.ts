@@ -53,7 +53,9 @@ describe('cross-tenant isolation (e2e)', () => {
     req.set('x-api-key', TEST_API_KEY).set('x-test-user-id', USER_B);
 
   it('the owning tenant can read its harness', async () => {
-    const res = await asA(request(app.getHttpServer()).get('/api/v1/agents/test-agent')).expect(200);
+    const res = await asA(request(app.getHttpServer()).get('/api/v1/agents/test-agent')).expect(
+      200,
+    );
     expect(res.body.agent?.agent_name ?? res.body.agent?.name).toBe('test-agent');
   });
 
@@ -74,7 +76,6 @@ describe('cross-tenant isolation (e2e)', () => {
   it.each([
     ['GET', '/api/v1/agents/test-agent/key'],
     ['GET', '/api/v1/routing/test-agent/tiers'],
-    ['GET', '/api/v1/routing/test-agent/autofix'],
     ['GET', '/api/v1/routing/test-agent/recording'],
   ])('a foreign tenant cannot GET %s (%s)', async (_label, path) => {
     // Tenant-first resolution throws NotFound for a foreign harness.
@@ -89,9 +90,7 @@ describe('cross-tenant isolation (e2e)', () => {
     ).expect(404);
 
     await asB(
-      request(app.getHttpServer())
-        .post('/api/v1/agents/test-agent/rotate-key')
-        .send({}),
+      request(app.getHttpServer()).post('/api/v1/agents/test-agent/rotate-key').send({}),
     ).expect(404);
 
     await asB(request(app.getHttpServer()).delete('/api/v1/agents/test-agent')).expect(404);
@@ -116,7 +115,9 @@ describe('cross-tenant isolation (e2e)', () => {
   });
 
   it('the owning agent still exists after the foreign attempts', async () => {
-    const row = await ds.query(`SELECT tenant_id, deleted_at FROM agents WHERE name = 'test-agent'`);
+    const row = await ds.query(
+      `SELECT tenant_id, deleted_at FROM agents WHERE name = 'test-agent'`,
+    );
     expect(row).toHaveLength(1);
     expect(row[0].tenant_id).toBe(TEST_TENANT_ID);
     expect(row[0].deleted_at).toBeNull();

@@ -1,5 +1,4 @@
 import { ProxyMessageRecorder } from '../proxy-message-recorder';
-import type { AutofixRecord } from '../../autofix/autofix.types';
 
 describe('ProxyMessageRecorder request parents', () => {
   const ctx = {
@@ -60,7 +59,6 @@ describe('ProxyMessageRecorder request parents', () => {
       expect.objectContaining({
         id: 'request-1',
         status: 'failed',
-        autofix_status: null,
         error_origin: 'transport',
         api_mode: 'responses',
       }),
@@ -273,51 +271,16 @@ describe('ProxyMessageRecorder request parents', () => {
     recorder.onModuleDestroy();
   });
 
-  it.each([
-    [
-      'no_patch',
-      [
-        {
-          attempt: 0,
-          origin: 'original',
-          request: {},
-          http_status: 400,
-          phoenix_status: 'no_patch',
-        },
-      ],
-    ],
-    [
-      'resolving',
-      [
-        {
-          attempt: 0,
-          origin: 'original',
-          request: {},
-          http_status: 400,
-          phoenix_status: 'resolving',
-        },
-      ],
-    ],
-    ['retry_succeeded', [{ attempt: 1, origin: 'autofix', request: {}, http_status: 200 }]],
-    ['retry_failed', [{ attempt: 1, origin: 'autofix', request: {}, http_status: 422 }]],
-    ['service_error', []],
-  ] as const)('records the %s Autofix outcome on the request', async (expected, chain) => {
+  it('writes no repair outcome column on the request row', async () => {
     const { recorder, requestValues } = setup();
-    const autofix: AutofixRecord = {
-      groupId: 'autofix-1',
-      outcome: 'exhausted',
-      original_http_status: 400,
-      chain: [...chain],
-    } as AutofixRecord;
 
     await recorder.recordProviderError(ctx, 400, 'provider error', {
-      requestId: `request-${expected}`,
-      autofix,
+      requestId: 'request-plain-400',
     });
 
-    expect(requestValues).toHaveBeenCalledWith(
-      expect.objectContaining({ autofix_status: expected }),
-    );
+    const row = requestValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(row).toMatchObject({ id: 'request-plain-400', status: 'failed' });
+    expect(Object.keys(row).filter((key) => key.startsWith('auto'))).toEqual([]);
     recorder.onModuleDestroy();
   });
 

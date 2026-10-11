@@ -69,11 +69,6 @@ describe('MessageDetailsService', () => {
     header_tier_color: null,
     specificity_category: null,
     specificity_miscategorized: false,
-    autofix_applied: false,
-    autofix_group_id: null,
-    autofix_role: null,
-    autofix_operations: null,
-    autofix_decision: null,
   };
 
   beforeEach(async () => {
@@ -126,7 +121,6 @@ describe('MessageDetailsService', () => {
       agent_name: 'my-agent',
       model: 'gpt-4o',
       status: 'ok',
-      autofix_status: null,
       error_message: null,
       error_http_status: null,
       error_origin: null,
@@ -160,47 +154,7 @@ describe('MessageDetailsService', () => {
       header_tier_id: null,
       header_tier_name: null,
       header_tier_color: null,
-      autofix_applied: false,
-      autofix_role: null,
-      autofix_operations: null,
-      autofix_decision: null,
-      autofix_sibling: null,
     });
-  });
-
-  it('maps autofix_decision ids when the message carries them', async () => {
-    // The "maps all fields" test above covers the null case; here the stored
-    // row has a non-null autofix_decision, exercising the `?? null` mapping's
-    // non-null branch.
-    const phoenix = { status: 'patched', issueId: 'i', patchId: 'p', healAttemptId: 'h' };
-    msgQb.getOne.mockResolvedValue({ ...baseMessage, autofix_decision: phoenix });
-    const result = await service.getDetails('msg-1', 'u1');
-    expect(result.message.autofix_decision).toEqual(phoenix);
-  });
-
-  it('resolves the autofix sibling when the message has a group id', async () => {
-    msgQb.getOne
-      .mockResolvedValueOnce({
-        ...baseMessage,
-        id: 'msg-1',
-        autofix_group_id: 'grp-9',
-        autofix_role: 'original',
-      })
-      .mockResolvedValueOnce({ id: 'msg-retry', autofix_role: 'retry', status: 'ok' });
-    const result = await service.getDetails('msg-1', 'u1');
-    expect(result.message.autofix_sibling).toEqual({
-      id: 'msg-retry',
-      role: 'retry',
-      status: 'ok',
-    });
-  });
-
-  it('returns a null sibling when no paired row exists', async () => {
-    msgQb.getOne
-      .mockResolvedValueOnce({ ...baseMessage, id: 'msg-1', autofix_group_id: 'grp-9' })
-      .mockResolvedValueOnce(null);
-    const result = await service.getDetails('msg-1', 'u1');
-    expect(result.message.autofix_sibling).toBeNull();
   });
 
   it('does not expose a request-level recording or restore legacy trace payloads', async () => {
@@ -310,7 +264,6 @@ describe('MessageDetailsService', () => {
       agent_name: 'my-agent',
       requested_model: 'requested-model',
       status: 'ok',
-      autofix_status: 'retry_failed',
       error_message: null,
       error_code: null,
       error_http_status: null,
@@ -352,8 +305,6 @@ describe('MessageDetailsService', () => {
         cache_creation_tokens: 4,
         cost_usd: 0.12,
         duration_ms: 400,
-        autofix_applied: true,
-        autofix_role: 'retry',
         fallback_from_model: 'gpt-4o',
         fallback_index: 0,
         request_headers: { 'user-agent': 'test-agent' },
@@ -390,8 +341,6 @@ describe('MessageDetailsService', () => {
         trace_id: 'trace-request',
         session_key: 'session-request',
         feedback_tags: ['Accurate', 'Fast'],
-        autofix_applied: true,
-        autofix_status: 'retry_failed',
       }),
     );
     expect(result.message.attempts).toEqual([
@@ -405,7 +354,7 @@ describe('MessageDetailsService', () => {
       wire_format: 'anthropic_messages',
     });
     // The drawer tells each attempt's full story — the projection must carry
-    // the error, fallback, autofix, token and headers/params surface.
+    // the error, fallback, token and headers/params surface.
     expect(result.message.attempts![0]).toEqual(
       expect.objectContaining({
         status: 'error',
@@ -416,8 +365,6 @@ describe('MessageDetailsService', () => {
     );
     expect(result.message.attempts![1]).toEqual(
       expect.objectContaining({
-        autofix_applied: true,
-        autofix_role: 'retry',
         fallback_from_model: 'gpt-4o',
         fallback_index: 0,
         input_tokens: 20,
@@ -503,7 +450,6 @@ describe('MessageDetailsService', () => {
           agent_name: null,
           requested_model: 'gpt-4o',
           status: 'error',
-          autofix_status: null,
           error_message: 'No provider',
           error_code: 'MNFST001',
           error_http_status: 400,

@@ -63,8 +63,6 @@ export const COMMANDS: Record<string, Handler> = {
   'routing custom list': routing.routingCustom.list,
   'routing custom create': routing.routingCustom.create,
   'routing custom delete': routing.routingCustom.delete,
-  'routing autofix get': routing.routingAutofix.get,
-  'routing autofix set': routing.routingAutofix.set,
   'routing recording get': routing.routingRecording.get,
   'routing recording set': routing.routingRecording.set,
   'routing params get': routing.routingParams.get,
@@ -99,7 +97,7 @@ Agents
   mnfst agent list [--include-playground]
   mnfst agent platforms
   mnfst agent create --name <name> --platform <p> [--category <${CATEGORY_CATALOG.join('|')}>] [--key-file <path>] [--if-absent]
-  mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--autofix true|false] [--recording true|false] [--force]
+  mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--recording true|false] [--force]
     (--models is the full chain: first = route, rest = fallbacks, one entry clears fallbacks;
      default route unless --tier names a custom tier, upserted on "x-manifest-tier: <name>";
      models are checked against the agent's discovered set — --force writes them anyway)
@@ -138,7 +136,6 @@ Routing readouts + custom-tier lifecycle (route writes go through mnfst agent co
   mnfst routing custom list <agent>
   mnfst routing custom create <agent> --name <n> --model <m> --provider <p> [--auth-type <a>] [--fallbacks <m1,m2>] [--header-key <k>] [--header-value <v>] [--force]
   mnfst routing custom delete <agent> <name> --yes
-  mnfst routing autofix get <agent> | mnfst routing autofix set <agent> --enabled true|false
   mnfst routing recording get <agent> | mnfst routing recording set <agent> --enabled true|false
   mnfst routing params get <agent> [--tier <t>] [--model <m>]
   mnfst routing params set <agent> [--tier <t>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]

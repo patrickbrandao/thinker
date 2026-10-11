@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import type { CallerAttribution } from '../../routing/proxy/caller-classifier';
-import type { PhoenixExplanation, PhoenixOperation } from '../../routing/autofix/phoenix.types';
-import { isSuccessStatus, type AutofixStatus, type RequestParamDefaults } from 'manifest-shared';
+import { isSuccessStatus, type RequestParamDefaults } from 'manifest-shared';
 import { ManifestRequest } from '../../entities/request.entity';
 import type { RecordingResponseBody } from '../../routing/proxy/attempt-recording.types';
 import { RequestRecordingStorageService } from '../../common/services/request-recording-storage.service';
@@ -17,7 +16,6 @@ export interface MessageDetailResponse {
     agent_name: string | null;
     model: string | null;
     status: string;
-    autofix_status: AutofixStatus | null;
     error_message: string | null;
     error_code: string | null;
     error_http_status: number | null;
@@ -52,19 +50,6 @@ export interface MessageDetailResponse {
     header_tier_id: string | null;
     header_tier_name: string | null;
     header_tier_color: string | null;
-    autofix_applied: boolean;
-    autofix_role: string | null;
-    autofix_operations: PhoenixOperation[] | null;
-    /** Phoenix's decision behind this provider attempt. */
-    autofix_decision: {
-      status: string | null;
-      issueId: string | null;
-      patchId: string | null;
-      healAttemptId: string | null;
-      explanation?: PhoenixExplanation | null;
-    } | null;
-    /** The paired row (failed original ↔ successful retry), for the visual link. */
-    autofix_sibling: { id: string; role: string | null; status: string } | null;
     attempts?: Array<{
       id: string;
       model: string | null;
@@ -83,10 +68,6 @@ export interface MessageDetailResponse {
       fallback_index: number | null;
       request_headers: Record<string, string> | null;
       request_params: object | null;
-      autofix_applied: boolean;
-      autofix_role: string | null;
-      autofix_operations: object | null;
-      autofix_decision: object | null;
       recording: AttemptRecordingDetail | null;
     }>;
   };
@@ -158,10 +139,6 @@ export class MessageDetailsService {
 
     const recordingsByAttempt = await this.loadAttemptRecordings(attempts);
 
-    const autofix_sibling = message?.autofix_group_id
-      ? await this.findAutofixSibling(message.id, message.autofix_group_id, tenantId)
-      : null;
-
     const inputTokens = request
       ? attempts.reduce((sum, attempt) => sum + attempt.input_tokens, 0)
       : message!.input_tokens;
@@ -190,7 +167,6 @@ export class MessageDetailsService {
         agent_name: request?.agent_name ?? message?.agent_name ?? null,
         model: message?.model ?? request?.requested_model ?? null,
         status: request?.status ?? message!.status,
-        autofix_status: request?.autofix_status ?? null,
         error_message: request?.error_message ?? message?.error_message ?? null,
         error_code: request ? (request.error_code ?? null) : message!.error_code,
         error_http_status: request?.error_http_status ?? message?.error_http_status ?? null,
@@ -226,24 +202,10 @@ export class MessageDetailsService {
         header_tier_id: message?.header_tier_id ?? null,
         header_tier_name: message?.header_tier_name ?? null,
         header_tier_color: message?.header_tier_color ?? null,
-        autofix_applied:
-          attempts.some((attempt) => attempt.autofix_applied) ||
-          (message?.autofix_applied ?? false),
-        autofix_role: message?.autofix_role ?? null,
-        autofix_operations: (message?.autofix_operations as PhoenixOperation[] | null) ?? null,
-        autofix_decision:
-          (message?.autofix_decision as {
-            status: string | null;
-            issueId: string | null;
-            patchId: string | null;
-            healAttemptId: string | null;
-            explanation?: PhoenixExplanation | null;
-          } | null) ?? null,
-        autofix_sibling,
         ...(request
           ? {
               // The drawer renders each attempt's full story (details, error
-              // card, fallback/autofix context cards, headers/params tabs) —
+              // card, fallback context cards, headers/params tabs) —
               // project the whole per-attempt surface, not just the summary.
               attempts: attempts.map((attempt) => ({
                 id: attempt.id,
@@ -263,10 +225,6 @@ export class MessageDetailsService {
                 fallback_index: attempt.fallback_index,
                 request_headers: attempt.request_headers,
                 request_params: attempt.request_params,
-                autofix_applied: attempt.autofix_applied,
-                autofix_role: attempt.autofix_role,
-                autofix_operations: attempt.autofix_operations,
-                autofix_decision: attempt.autofix_decision,
                 recording: recordingsByAttempt.get(attempt.id) ?? null,
               })),
             }
@@ -309,22 +267,5 @@ export class MessageDetailsService {
       );
       return null;
     }
-  }
-
-  /** Resolve the paired Autofix row (failed original ↔ successful retry). */
-  private async findAutofixSibling(
-    id: string,
-    groupId: string,
-    tenantId: string,
-  ): Promise<{ id: string; role: string | null; status: string } | null> {
-    const sibling = await this.messageRepo
-      .createQueryBuilder('m')
-      .where('m.autofix_group_id = :groupId', { groupId })
-      .andWhere('m.tenant_id = :tenantId', { tenantId })
-      .andWhere('m.id != :id', { id })
-      .orderBy('m.timestamp', 'DESC')
-      .getOne();
-    if (!sibling) return null;
-    return { id: sibling.id, role: sibling.autofix_role, status: sibling.status };
   }
 }

@@ -36,19 +36,18 @@ const timeouts = { lockTimeoutMs: 5_000, statementTimeoutMs: 60_000 };
 const before = '2026-01-01 00:00:00';
 
 describe('TypeOrmRequestBackfillGateway', () => {
-  it('derives every request-level Autofix status during historical backfill', () => {
-    const sql = `${INSERT_ATTEMPT_REQUESTS_SQL}\n${REFRESH_ATTEMPT_REQUESTS_SQL}`;
-    for (const status of [
-      'no_patch',
-      'resolving',
-      'retry_succeeded',
-      'retry_failed',
-      'service_error',
-    ]) {
-      expect(sql).toContain(`'${status}'`);
-    }
-    expect(sql).toContain("autofix_phoenix->>'status'");
-    expect(sql).toContain("autofix_phoenix->>'healAttemptId'");
+  it('reads and writes no dropped repair columns', () => {
+    const sql = [
+      INSERT_ATTEMPT_REQUESTS_SQL,
+      REFRESH_ATTEMPT_REQUESTS_SQL,
+      LINK_ATTEMPTS_SQL,
+      INSERT_LEGACY_FALLBACK_REQUESTS_SQL,
+      INSERT_REJECTIONS_SQL,
+      FINALIZE_PENDING_REQUESTS_SQL,
+    ].join('\n');
+    // Migration 1803400000000 (#16) dropped these columns; a backfill that
+    // still named them would fail at boot on a migrated database.
+    expect(sql).not.toMatch(/auto_?fix/);
   });
 
   it('preserves non-outcome attempts when deriving request status', () => {
@@ -57,10 +56,8 @@ describe('TypeOrmRequestBackfillGateway', () => {
     expect(sql).toContain("WHEN status IN ('pending', 'cancelled') THEN status");
   });
 
-  it('precomputes legacy Autofix group sizes once per window', () => {
-    expect(LINK_ATTEMPTS_SQL).toContain('target_autofix_groups AS MATERIALIZED');
-    expect(LINK_ATTEMPTS_SQL).toContain('autofix_group_stats AS MATERIALIZED');
-    expect(LINK_ATTEMPTS_SQL).toContain('LEFT JOIN autofix_group_stats stats');
+  it('numbers a trace-less legacy attempt as the first attempt of its own request', () => {
+    expect(LINK_ATTEMPTS_SQL).toContain('CASE WHEN pa.trace_id IS NULL THEN 1 ELSE NULL END');
     expect(LINK_ATTEMPTS_SQL).not.toMatch(/WHEN \(\s*SELECT count\(\*\)/);
   });
 

@@ -14,7 +14,7 @@ function agentPath(agent: string, suffix: string): string {
  *
  *   mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p>
  *   mnfst agent configure <name> --tier test --models <primary> --provider <p>
- *   mnfst agent configure <name> --autofix true --recording false
+ *   mnfst agent configure <name> --recording false
  *
  * --models is the FULL desired chain: first entry is the route, the rest are
  * fallbacks, and stating a single model clears any existing fallbacks.
@@ -26,16 +26,7 @@ function agentPath(agent: string, suffix: string): string {
  */
 export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
   const args = parseArgs(argv, {
-    strings: [
-      'url',
-      'models',
-      'provider',
-      'auth-type',
-      'key-label',
-      'tier',
-      'autofix',
-      'recording',
-    ],
+    strings: ['url', 'models', 'provider', 'auth-type', 'key-label', 'tier', 'recording'],
     booleans: ['force'],
     maxPositionals: 1,
   });
@@ -51,12 +42,11 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
     args.strings['provider'] !== undefined ||
     args.strings['auth-type'] !== undefined ||
     args.strings['key-label'] !== undefined;
-  const wantsAutofix = args.strings['autofix'] !== undefined;
   const wantsRecording = args.strings['recording'] !== undefined;
-  if (!wantsRoute && !wantsAutofix && !wantsRecording) {
+  if (!wantsRoute && !wantsRecording) {
     throw new CliError(
       'missing_flag',
-      'Nothing to configure — pass --models + --provider, --autofix, and/or --recording',
+      'Nothing to configure — pass --models + --provider and/or --recording',
     );
   }
   if (args.strings['tier'] !== undefined && !wantsRoute) {
@@ -117,12 +107,6 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
     }
   }
 
-  if (wantsAutofix) {
-    const enabled = parseBooleanFlag(args.strings['autofix'] as string, 'autofix');
-    output['autofix'] = await client.request('PATCH', agentPath(agent, '/autofix'), {
-      body: { enabled },
-    });
-  }
   if (wantsRecording) {
     const enabled = parseBooleanFlag(args.strings['recording'] as string, 'recording');
     output['recording'] = await client.request('PATCH', agentPath(agent, '/recording'), {

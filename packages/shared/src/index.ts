@@ -43,7 +43,6 @@ export {
   RATE_LIMITED_STATUS,
   SUPERSEDED_STATUS,
   SUPERSEDED_STATUSES,
-  AUTOFIX_ORIGINAL_STATUS,
   PENDING_STATUS,
   CANCELLED_STATUS,
   SUCCESS_STATUS,
@@ -172,8 +171,6 @@ export type {
   PlaygroundHistoryRunSummary,
   PlaygroundHistoryRunDetail,
 } from './playground';
-export { AUTOFIX_STATUSES, AUTOFIX_STATUS_LABELS, deriveAutofixStatus } from './autofix-status';
-export type { AutofixStatus, AutofixStatusChainEntry, AutofixStatusRecord } from './autofix-status';
 export {
   coerceContentToText,
   extractRecordedConversationMessages,

@@ -252,12 +252,6 @@ export function responseModeFromDto(body: SetResponseModeDto): ResponseMode | un
   return body.response_mode ?? body.responseMode;
 }
 
-export class UpdateAutofixDto {
-  @IsOptional()
-  @IsBoolean()
-  enabled?: boolean;
-}
-
 export class UpdateRecordingDto {
   @IsOptional()
   @IsBoolean()

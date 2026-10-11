@@ -1,5 +1,12 @@
 # Autofix (self-healing requests) — POC specification
 
+> **Nota do Thinker:** documento de referência, insumo para o self-heal local
+> (v0.6). O Autofix do upstream dependia do serviço hospedado Phoenix da
+> Manifest e foi removido do Thinker: a UI em #13 e o backend em #16. Nenhum
+> arquivo, endpoint, coluna ou variável citado abaixo existe mais no código;
+> o texto fica como registro do desenho original. Veja
+> `docs/decisoes-iniciais.md` (§3 e §7).
+
 **Status:** Backend + frontend implemented, green, verified live · **Last updated:** 2026-07-01
 
 > **⚠️ This spec describes the original aspirational design and has diverged from
@@ -56,8 +63,8 @@ from a waitlist shell; today the engine and settings surface are generally avail
 
 | Surface     | File                                                     | What it is                                       |
 | ----------- | -------------------------------------------------------- | ------------------------------------------------ |
-| Settings    | `packages/frontend/src/pages/SettingsAutofixSection.tsx` | Per-agent Autofix toggle, shown to every tenant |
-| Routing API | `packages/backend/src/routing/tier.controller.ts`        | `GET/PATCH /api/v1/routing/:agentName/autofix`   |
+| Settings    | `SettingsAutofixSection.tsx` (removed from Thinker in #13) | Per-agent Autofix toggle, shown to every tenant |
+| Routing API | `tier.controller.ts` (endpoints removed from Thinker in #16) | `GET/PATCH /api/v1/routing/:agentName/autofix`   |
 
 The marketing copy is the product promise we're now building the engine for:
 

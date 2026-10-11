@@ -1,4 +1,4 @@
-import { fetchJson, fetchMutate, routingPath } from './core.js';
+import { fetchJson, fetchMutate } from './core.js';
 
 export function getAgents(includePlayground = false) {
   // includePlayground surfaces the reserved Playground (is_playground) agent — the
@@ -86,44 +86,12 @@ export interface DuplicateAgentResult {
   copied: DuplicateAgentPreview['copied'];
 }
 
-// ---------------------------------------------------------------------------
-// Temporary legacy Autofix opt-out, removed by #16.
-//
-// The dashboard has no Autofix UI, but until #16 deletes Autofix from the
-// backend, a harness stored without an explicit `autofix_enabled` inherits the
-// backend default. That default is ON whenever the backend does not detect a
-// container (bare-metal `npm start`, dev runs), which would send failing
-// requests to Manifest's hosted healer. Every harness the dashboard creates
-// therefore opts out explicitly, here in the client so no caller can forget.
-// ---------------------------------------------------------------------------
-const LEGACY_AUTOFIX_OPT_OUT = { autofix_enabled: false } as const;
-
-/** Turn the legacy per-harness Autofix flag off (the duplicate endpoint has no field for it). */
-function optOutOfLegacyAutofix(agentName: string) {
-  return fetchMutate(routingPath(agentName, 'autofix'), {
-    method: 'PATCH',
+export function duplicateAgent(sourceName: string, name: string) {
+  return fetchMutate<DuplicateAgentResult>(`/agents/${encodeURIComponent(sourceName)}/duplicate`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: false }),
+    body: JSON.stringify({ name }),
   });
-}
-
-export async function duplicateAgent(sourceName: string, name: string) {
-  const result = await fetchMutate<DuplicateAgentResult>(
-    `/agents/${encodeURIComponent(sourceName)}/duplicate`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    },
-  );
-  if (result?.agent?.name) {
-    try {
-      await optOutOfLegacyAutofix(result.agent.name);
-    } catch {
-      // The copy exists either way; fetchMutate already surfaced the error.
-    }
-  }
-  return result;
 }
 
 export function createAgent(params: CreateAgentParams) {
@@ -139,6 +107,6 @@ export function createAgent(params: CreateAgentParams) {
   }>('/agents', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...params, ...LEGACY_AUTOFIX_OPT_OUT }),
+    body: JSON.stringify(params),
   });
 }

@@ -24,7 +24,7 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
     expect(sql).toContain('DISTINCT ON (r.id)');
     // The Requests list's ranking: canonical/legacy success wins, else the terminal failure.
     expect(sql).toContain("pa.status IN ('ok', 'success')");
-    expect(sql).toContain("pa.status NOT IN ('fallback_error', 'auto_fixed') THEN 2");
+    expect(sql).toContain("pa.status <> 'fallback_error' THEN 2");
     // In-flight requests have no outcome to chart.
     expect(sql).toContain("r.status NOT IN ('pending', 'cancelled')");
     // Unlinked legacy attempts stay in the universe (KPI parity).
@@ -38,10 +38,9 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
   it('maps dispositions from how the request CONCLUDED, one count each', async () => {
     await service.getDispositionTimeseries({ tenantId: 't1', range: '24h', hourly: true });
     const sql = lastSql();
-    // Method is the request-level Autofix outcome; a rescued request counts once.
+    // A rescued request counts once, by the method of its terminal attempt.
     expect(sql).toContain("t.request_status IN ('ok', 'success')");
-    expect(sql).toContain("t.autofix_status = 'retry_succeeded' THEN 'healed'");
-    expect(sql).toContain('r.autofix_status');
+    expect(sql).not.toMatch(/auto_?fix|healed/);
     expect(sql).toContain("t.fallback_from_model IS NOT NULL THEN 'fallback'");
     expect(sql).toContain("THEN 'success'");
     expect(sql).toContain("ELSE 'error'");
@@ -80,12 +79,10 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
 
   it('computes per-dimension request totals with terminal outcomes', async () => {
     messageRepo.query.mockResolvedValue([
-      { key: 'openai', requests: '10', failed: '2', succeeded: '8', healed: '1', fallback: '2' },
+      { key: 'openai', requests: '10', failed: '2', succeeded: '8', fallback: '2' },
     ]);
     const rows = await service.getVolumeByDimension('provider', { tenantId: 't1', range: '7d' });
-    expect(rows).toEqual([
-      { key: 'openai', requests: 10, failed: 2, succeeded: 8, healed: 1, fallback: 2 },
-    ]);
+    expect(rows).toEqual([{ key: 'openai', requests: 10, failed: 2, succeeded: 8, fallback: 2 }]);
     const sql = lastSql();
     // The trio fold: custom:<uuid> providers group as 'custom'.
     expect(sql).toContain("THEN 'custom'");
@@ -130,8 +127,8 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
       splitAt: '2026-01-08',
     });
     expect(windows).toEqual({
-      current: { total: 5, success: 3, healed: 0, fallback: 0, error: 2 },
-      previous: { total: 5, success: 4, healed: 0, fallback: 0, error: 1 },
+      current: { total: 5, success: 3, fallback: 0, error: 2 },
+      previous: { total: 5, success: 4, fallback: 0, error: 1 },
     });
     const sql = lastSql();
     // No agent scope: the split is the 4th parameter, after the defaulted `to`.
@@ -146,14 +143,11 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
     expect(params[1]).toBe('2026-01-01');
     expect(typeof params[2]).toBe('string'); // `to` defaulted to now
     expect(params[3]).toBe('2026-01-08');
-    // Recovered by Autofix reads the materialized request verdict.
-    expect(sql).toContain("t.autofix_status = 'retry_succeeded'");
   });
 
   it('splits current and previous disposition totals from ONE scan', async () => {
     messageRepo.query.mockResolvedValue([
-      { dim: 'success', current_count: 70, previous_count: 60 },
-      { dim: 'healed', current_count: 4, previous_count: 3 },
+      { dim: 'success', current_count: 74, previous_count: 63 },
       { dim: 'fallback', current_count: 6, previous_count: 5 },
       { dim: 'error', current_count: 20, previous_count: 30 },
     ]);
@@ -165,8 +159,8 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
       agentName: 'demo',
     });
     expect(windows).toEqual({
-      current: { total: 100, success: 70, healed: 4, fallback: 6, error: 20 },
-      previous: { total: 98, success: 60, healed: 3, fallback: 5, error: 30 },
+      current: { total: 100, success: 74, fallback: 6, error: 20 },
+      previous: { total: 98, success: 63, fallback: 5, error: 30 },
     });
     // A single terminal-CTE execution for both windows.
     expect(messageRepo.query).toHaveBeenCalledTimes(1);
@@ -187,8 +181,8 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
         splitAt: '2026-01-08',
       }),
     ).resolves.toEqual({
-      current: { total: 0, success: 0, healed: 0, fallback: 0, error: 0 },
-      previous: { total: 0, success: 0, healed: 0, fallback: 0, error: 0 },
+      current: { total: 0, success: 0, fallback: 0, error: 0 },
+      previous: { total: 0, success: 0, fallback: 0, error: 0 },
     });
     expect(messageRepo.query).not.toHaveBeenCalled();
   });

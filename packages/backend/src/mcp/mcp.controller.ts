@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Post, Req, Res, Inject, Logger } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Req, Res, Logger } from '@nestjs/common';
 import { createMcpProtectedRequestHandler } from '@better-auth/mcp';
 import { createDpopReplayStore } from 'better-auth/oauth2';
 import { createMcpHandler } from '@modelcontextprotocol/server';
@@ -6,8 +6,6 @@ import { fromNodeHeaders } from 'better-auth/node';
 import { Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { pipeline } from 'node:stream/promises';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
 import type { Request, Response } from 'express';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,7 +18,6 @@ import { AgentRecordingConfigService } from '../common/services/agent-recording-
 import { TimeseriesQueriesService } from '../analytics/services/timeseries-queries.service';
 import { AgentLifecycleService } from '../analytics/services/agent-lifecycle.service';
 import { MessagesQueryService } from '../analytics/services/messages-query.service';
-import { AutofixStatsService } from '../analytics/services/autofix-stats.service';
 import { ApiKeyGeneratorService } from '../otlp/services/api-key.service';
 import { ProviderService } from '../routing/routing-core/provider.service';
 import { TierService } from '../routing/routing-core/tier.service';
@@ -28,7 +25,6 @@ import { SpecificityService } from '../routing/routing-core/specificity.service'
 import { ResolveAgentService } from '../routing/routing-core/resolve-agent.service';
 import { HeaderTierService } from '../routing/header-tiers/header-tier.service';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
-import { AutofixService } from '../routing/autofix/autofix.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelPricesService } from '../model-prices/model-prices.service';
@@ -61,7 +57,6 @@ export class McpController {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantCache: TenantCacheService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly agentListCache: AgentListCacheService,
     private readonly eventBus: IngestEventBusService,
     private readonly recording: AgentRecordingConfigService,
@@ -69,14 +64,12 @@ export class McpController {
     private readonly lifecycle: AgentLifecycleService,
     private readonly apiKeys: ApiKeyGeneratorService,
     private readonly messages: MessagesQueryService,
-    private readonly autofixStats: AutofixStatsService,
     private readonly providers: ProviderService,
     private readonly tiers: TierService,
     private readonly specificity: SpecificityService,
     private readonly resolveAgentService: ResolveAgentService,
     private readonly headerTiers: HeaderTierService,
     private readonly customProviders: CustomProviderService,
-    private readonly autofix: AutofixService,
     private readonly routeModelParams: RouteModelParamsService,
     private readonly modelDiscovery: ModelDiscoveryService,
     private readonly pricingSync: PricingSyncService,
@@ -93,14 +86,12 @@ export class McpController {
     return {
       dataSource: this.dataSource,
       tenantCache: this.tenantCache,
-      cacheManager: this.cacheManager,
       agentListCache: this.agentListCache,
       eventBus: this.eventBus,
       recording: this.recording,
       timeseries: this.timeseries,
       lifecycle: this.lifecycle,
       apiKeys: this.apiKeys,
-      autofixStats: this.autofixStats,
       messages: this.messages,
       providers: this.providers,
       tiers: this.tiers,
@@ -108,7 +99,6 @@ export class McpController {
       resolveAgent: this.resolveAgentService,
       headerTiers: this.headerTiers,
       customProviders: this.customProviders,
-      autofix: this.autofix,
       routeModelParams: this.routeModelParams,
       modelDiscovery: this.modelDiscovery,
       pricingSync: this.pricingSync,

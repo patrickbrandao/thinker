@@ -214,7 +214,7 @@ describe('provider-client-converters', () => {
 
     /* ── Message field preservation ── */
 
-    it('should preserve reasoning_content for provider-specific Autofix', () => {
+    it('should preserve reasoning_content for the provider to judge', () => {
       const body = {
         messages: [{ role: 'assistant', content: 'Hi', reasoning_content: 'I thought...' }],
       };

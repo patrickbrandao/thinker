@@ -56,6 +56,7 @@ import { CoverRequestsLogFilters1803000000000 } from './migrations/1803000000000
 import { CoverHarnessRequestsIndex1803100000000 } from './migrations/1803100000000-CoverHarnessRequestsIndex';
 import { DropBillingSchema1803200000000 } from './migrations/1803200000000-DropBillingSchema';
 import { DropSaasFeatureSchema1803300000000 } from './migrations/1803300000000-DropSaasFeatureSchema';
+import { DropAutofixSchema1803400000000 } from './migrations/1803400000000-DropAutofixSchema';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -350,4 +351,5 @@ export const migrations = [
   CoverHarnessRequestsIndex1803100000000,
   DropBillingSchema1803200000000,
   DropSaasFeatureSchema1803300000000,
+  DropAutofixSchema1803400000000,
 ];
