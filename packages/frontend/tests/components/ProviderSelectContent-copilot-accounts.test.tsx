@@ -12,10 +12,6 @@ vi.mock('../../src/services/api.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: vi.fn().mockResolvedValue(false),
-}));
-
 vi.mock('../../src/services/toast-store.js', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));

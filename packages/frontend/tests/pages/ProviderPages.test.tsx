@@ -16,13 +16,6 @@ vi.mock('@solidjs/router', () => ({
   Navigate: (props: { href: string }) => <div data-testid="navigate" data-href={props.href} />,
 }));
 
-// The Local providers page only exists on self-hosted installs; cloud
-// redirects to BYOK. Default to self-hosted so the page tests apply.
-let mockIsSelfHosted = true;
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => Promise.resolve(mockIsSelfHosted),
-}));
-
 vi.mock('@solidjs/meta', () => ({
   Title: (props: { children: unknown }) => <title>{props.children as string}</title>,
 }));
@@ -216,7 +209,6 @@ describe('provider pages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams = {};
-    mockIsSelfHosted = true;
     mockRenameProviderKey.mockResolvedValue(undefined);
     mockGetGlobalProviders.mockResolvedValue(globalProvidersResponse);
     // The usage endpoint returns the per-(provider, auth_type) stats that the
@@ -454,20 +446,6 @@ describe('provider pages', () => {
       expect(screen.getByText('My local connections')).toBeDefined();
       expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
     });
-  });
-
-  it('redirects the local providers page to the usage-based page in cloud', async () => {
-    mockIsSelfHosted = false;
-    const { container } = render(() => <LocalProviders />);
-
-    await waitFor(() => {
-      const navigate = container.querySelector('[data-testid="navigate"]');
-      expect(navigate).not.toBeNull();
-      expect(navigate?.getAttribute('data-href')).toBe('/providers/usage-based');
-    });
-    // The page content (its connected-connections heading) must not render —
-    // cloud short-circuits straight to the redirect.
-    expect(container.textContent).not.toContain('My local connections');
   });
 
   it('auto-opens the modal from add=true and clears the query param', async () => {

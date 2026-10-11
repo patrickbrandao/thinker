@@ -1,6 +1,5 @@
-import { SHARED_PROVIDERS, type AuthType } from 'manifest-shared';
-import { invalidateAll } from './cache.js';
-import { BASE_URL, fetchJson, parseErrorMessage } from './core.js';
+import type { AuthType } from 'manifest-shared';
+import { fetchJson } from './core.js';
 
 export interface TenantProviderConnection {
   id: string;
@@ -66,64 +65,9 @@ export interface ProviderUsageResponse {
   providers: TenantProviderUsage[];
 }
 
-export interface ManagedFreeEnsureResponse {
-  connected: boolean;
-  connection_id: string | null;
-  source: 'existing' | 'auto' | 'manual' | 'none';
-  auto_available: boolean;
-}
-
-const managedFreeEnsureInflight = new Map<string, Promise<ManagedFreeEnsureResponse>>();
-
-export async function ensureManagedFreeProvider(
-  providerId: string,
-  apiKey?: string,
-): Promise<ManagedFreeEnsureResponse> {
-  const existing = managedFreeEnsureInflight.get(providerId);
-  if (!apiKey && existing) return existing;
-
-  const run = (async () => {
-    const response = await fetch(`${BASE_URL}/providers/${encodeURIComponent(providerId)}/ensure`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiKey ? { apiKey } : {}),
-    });
-    if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
-    }
-    const data = (await response.json()) as ManagedFreeEnsureResponse;
-    if (data.source === 'auto' || data.source === 'manual') {
-      invalidateAll();
-    }
-    return data;
-  })();
-
-  if (!apiKey) {
-    const tracked = run.finally(() => {
-      if (managedFreeEnsureInflight.get(providerId) === tracked) {
-        managedFreeEnsureInflight.delete(providerId);
-      }
-    });
-    managedFreeEnsureInflight.set(providerId, tracked);
-    return tracked;
-  }
-  return run;
-}
-
-/**
- * Fetch provider CONFIG only (cheap; paints immediately).
- * Managed free-provider provisioning stays in the background so an unavailable
- * LiteLLM gateway never blocks provider configuration or routing screens.
- */
+/** Fetch provider CONFIG only (cheap; paints immediately). */
 export function getProviders() {
-  const providers = fetchJson<ProvidersResponse>('/providers');
-  for (const provider of SHARED_PROVIDERS) {
-    if (provider.managedFree) {
-      void ensureManagedFreeProvider(provider.id).catch(() => undefined);
-    }
-  }
-  return providers;
+  return fetchJson<ProvidersResponse>('/providers');
 }
 
 /** Fetch provider USAGE stats (the expensive 30d aggregation). */

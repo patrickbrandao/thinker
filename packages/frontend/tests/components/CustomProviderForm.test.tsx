@@ -9,7 +9,6 @@ const mockGetProviders = vi.fn().mockResolvedValue([]);
 const mockConnectProvider = vi.fn().mockResolvedValue({});
 const mockDisconnectProvider = vi.fn().mockResolvedValue({ ok: true, notifications: [] });
 const mockRenameProviderKey = vi.fn().mockResolvedValue({});
-const mockCheckIsSelfHosted = vi.fn().mockResolvedValue(false);
 
 vi.mock("../../src/services/api.js", () => ({
   createCustomProvider: (...args: unknown[]) => mockCreateCustomProvider(...args),
@@ -21,10 +20,6 @@ vi.mock("../../src/services/api.js", () => ({
   disconnectProvider: (...args: unknown[]) => mockDisconnectProvider(...args),
   renameProviderKey: (...args: unknown[]) => mockRenameProviderKey(...args),
   revokeOpenaiOAuth: vi.fn(),
-}));
-
-vi.mock("../../src/services/setup-status.js", () => ({
-  checkIsSelfHosted: () => mockCheckIsSelfHosted(),
 }));
 
 vi.mock("../../src/services/toast-store.js", () => ({
@@ -481,7 +476,13 @@ describe("CustomProviderForm — Fetch models probe", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckIsSelfHosted.mockResolvedValue(true);
+  });
+
+  it("always shows the local-server base URL hint", () => {
+    render(() => (
+      <CustomProviderForm agentName="test-agent" onCreated={onCreated} onBack={onBack} />
+    ));
+    expect(screen.getByText("http://host.docker.internal:<port>")).toBeDefined();
   });
 
   it("fetches models via probe and populates the model rows", async () => {
@@ -1274,7 +1275,6 @@ describe("CustomProviderForm — probe edge cases and model-row interactions", (
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckIsSelfHosted.mockResolvedValue(true);
   });
 
   it("shows an error when Fetch models runs with an empty base URL", async () => {

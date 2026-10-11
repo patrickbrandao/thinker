@@ -20,7 +20,6 @@ import { getModelDisplayName } from '../services/model-display.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.jsx';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
 import { platformIcon, isSuccessStatus } from 'manifest-shared';
-import { isPlanRequestLimitMessage } from '../services/message-error-taxonomy.js';
 
 const MONO = 'font-family: var(--font-mono);';
 const MONO_XS =
@@ -388,12 +387,7 @@ const ERROR_DESCRIPTORS: Record<string, string> = {
   request: 'Bad request',
 };
 
-function isPlanLimitBlock(item: MessageRow): boolean {
-  return isPlanRequestLimitMessage(item);
-}
-
 function statusErrorDescriptor(item: MessageRow): string | null {
-  if (isPlanLimitBlock(item)) return 'Plan limit';
   return item.error_origin ? (ERROR_DESCRIPTORS[item.error_origin] ?? null) : null;
 }
 
@@ -434,33 +428,15 @@ export function StatusCell(item: MessageRow, _agentName: string | undefined): JS
 
   // A Manifest software limit is one red pill linking to its agent's limits page.
   if (pill.limitAgent) {
-    const planLimit = isPlanLimitBlock(item);
     return (
-      <td style={planLimit ? 'padding: 8.1px var(--gap-md)' : undefined}>
+      <td>
         <A
           class={pill.cls}
-          href={
-            planLimit
-              ? '/upgrade?reason=requests'
-              : `/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`
-          }
-          title={
-            planLimit
-              ? 'Free plan request limit reached - upgrade to Pro'
-              : 'Manifest usage limit reached - open your limits'
-          }
+          href={`/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`}
+          title="Manifest usage limit reached - open your limits"
         >
           {pill.label}
         </A>
-        {planLimit && (
-          <A
-            href="/upgrade?reason=requests"
-            class="btn btn--primary btn--sm"
-            style="margin-left: 6px; font-size: 11px; padding: 2px 8px; text-decoration: none;"
-          >
-            Upgrade plan
-          </A>
-        )}
       </td>
     );
   }

@@ -114,7 +114,7 @@ describe('MessageDetails', () => {
     });
   });
 
-  it('links request-limit 402 errors to the upgrade page', async () => {
+  it('shows legacy plan request-limit errors without an upgrade call to action', async () => {
     mockGetMessageDetails.mockResolvedValue({
       message: {
         ...detailsResponse.message,
@@ -131,11 +131,10 @@ describe('MessageDetails', () => {
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Upgrade to Pro for unlimited requests.');
-      expect(container.textContent).toContain('Plan request limit');
-      const link = screen.getByText('Upgrade plan').closest('a');
-      expect(link?.getAttribute('href')).toBe('/upgrade?reason=requests');
+      expect(container.textContent).toContain('Request limit reached');
     });
+    expect(container.textContent).not.toContain('Upgrade');
+    expect(container.querySelector('a[href^="/upgrade"]')).toBeNull();
   });
 
   it('surfaces a Manifest config error as origin/type, not a provider fault', async () => {

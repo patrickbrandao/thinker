@@ -1,17 +1,9 @@
-import {
-  createEffect,
-  createResource,
-  createSignal,
-  onCleanup,
-  Show,
-  type Component,
-} from 'solid-js';
+import { createEffect, createSignal, onCleanup, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import AgentTypeSelect from './AgentTypeSelect.jsx';
 import { createAgent, getGlobalProviders } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import { refreshAgents } from '../services/sse.js';
 import { type AgentCategory, type AgentPlatform, PLATFORMS_BY_CATEGORY } from 'manifest-shared';
 
@@ -38,9 +30,6 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
   // self-hosted).
   const [autofixEnabled, setAutofixEnabled] = createSignal(true);
   const [recordingEnabled, setRecordingEnabled] = createSignal(true);
-  // Where the logs live depends on the deployment: self-hosted keeps them in
-  // the operator's own database, cloud in the Manifest workspace.
-  const [selfHosted] = createResource(checkIsSelfHosted);
 
   // Tracks whether the user dismissed the modal (overlay click / Escape) while a
   // create request was still in flight. A dismissed create must NOT run its
@@ -252,11 +241,8 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
                       <span>Enable logs</span>
                     </div>
                     <div class="model-params__label-hint">
-                      See exactly what your agent sends on every attempt, and debug it faster.{' '}
-                      {selfHosted.state === 'ready' &&
-                        (selfHosted()
-                          ? 'Logs stay in your own database.'
-                          : 'Logs are stored in your Manifest workspace.')}
+                      See exactly what your agent sends on every attempt, and debug it faster. Logs
+                      stay in your own database.
                     </div>
                   </div>
                   <div class="model-params__row-control">

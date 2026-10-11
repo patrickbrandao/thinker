@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onMount, Show, type Component } from 'solid-js';
+import { createEffect, createSignal, Show, type Component } from 'solid-js';
 import { normalizeProviderName } from 'manifest-shared';
 import { PROVIDERS, type ProviderDef } from '../services/providers.js';
 import {
@@ -10,7 +10,6 @@ import {
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../services/routing-params.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import CustomProviderForm from './CustomProviderForm.js';
 import CopilotDeviceLogin from './CopilotDeviceLogin.js';
 import LocalServerDetailView from './LocalServerDetailView.js';
@@ -40,7 +39,7 @@ const ProviderSelectContent: Component<ProviderSelectContentProps> = (props) => 
   const deepLink = props.providerDeepLink;
   const deepLinkProv = deepLink ? PROVIDERS.find((p) => p.id === deepLink.providerId) : null;
   // A `custom:<id>` deep link can't resolve to a standard PROVIDERS entry; it
-  // targets a custom provider whose editor we open directly (see onMount below).
+  // targets a custom provider whose editor we open directly (see the effect below).
   const deepLinkCustomId = deepLink?.providerId.startsWith('custom:')
     ? deepLink.providerId.slice('custom:'.length)
     : null;
@@ -48,10 +47,6 @@ const ProviderSelectContent: Component<ProviderSelectContentProps> = (props) => 
   const [activeTab, setActiveTab] = createSignal<'subscription' | 'api_key' | 'local'>(
     deepLink?.authType ?? props.initialTab ?? 'subscription',
   );
-  const [isSelfHosted, setIsSelfHosted] = createSignal(false);
-  onMount(async () => {
-    setIsSelfHosted(await checkIsSelfHosted());
-  });
   // Custom-provider deep link: open the custom editor for the matching id
   // instead of leaving the modal on the provider list (which can't resolve a
   // `custom:` id). An effect (not onMount) covers custom providers that load

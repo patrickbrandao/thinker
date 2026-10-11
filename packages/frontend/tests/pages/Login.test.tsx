@@ -96,9 +96,9 @@ describe('Login', () => {
   });
 
   it('preserves the query string on the register link', () => {
-    mockLocationSearch = '?plan=pro';
+    mockLocationSearch = '?redirect=%2Fmessages';
     const { container } = render(() => <Login />);
-    expect(container.querySelector('a[href="/register?plan=pro"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/register?redirect=%2Fmessages"]')).not.toBeNull();
   });
 
   it('has forgot password link', () => {
@@ -230,7 +230,7 @@ describe('Login', () => {
     });
   });
 
-  it('redirects to upgrade after successful pro-intent login', async () => {
+  it('uses a safe redirect after successful login', async () => {
     const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
       href: '',
@@ -238,7 +238,7 @@ describe('Login', () => {
     const hrefSetter = vi.fn();
     Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true });
 
-    mockSearchParams = { plan: 'pro' };
+    mockSearchParams = { redirect: '/messages?range=30d' };
     mockSignInEmail.mockResolvedValue({ error: null });
     const { container } = render(() => <Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
@@ -249,32 +249,7 @@ describe('Login', () => {
     });
     fireEvent.submit(container.querySelector('form')!);
     await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith('/upgrade');
-    });
-
-    locationSpy.mockRestore();
-  });
-
-  it('uses a safe redirect before pro intent after successful login', async () => {
-    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
-      ...window.location,
-      href: '',
-    });
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true });
-
-    mockSearchParams = { redirect: '/upgrade?reason=requests', plan: 'pro' };
-    mockSignInEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
-    fireEvent.input(container.querySelector('input[type="email"]')!, {
-      target: { value: 't@t.com' },
-    });
-    fireEvent.input(container.querySelector('input[type="password"]')!, {
-      target: { value: 'password123' },
-    });
-    fireEvent.submit(container.querySelector('form')!);
-    await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith('/upgrade?reason=requests');
+      expect(hrefSetter).toHaveBeenCalledWith('/messages?range=30d');
     });
 
     locationSpy.mockRestore();
@@ -304,8 +279,8 @@ describe('Login', () => {
     locationSpy.mockRestore();
   });
 
-  it('resends unverified pro logins with an upgrade callback', async () => {
-    mockSearchParams = { plan: 'pro' };
+  it('resends unverified logins with the redirect as callback', async () => {
+    mockSearchParams = { redirect: '/messages' };
     mockSignInEmail.mockResolvedValue({
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
@@ -328,7 +303,7 @@ describe('Login', () => {
     await vi.waitFor(() => {
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
         email: 'user@test.com',
-        callbackURL: '/upgrade',
+        callbackURL: '/messages',
       });
     });
   });
@@ -357,7 +332,7 @@ describe('Login', () => {
   });
 
   it('offers email verification after an unlinked social login', async () => {
-    mockSearchParams = { oauth: 'failed', error: 'account_not_linked', redirect: '/upgrade' };
+    mockSearchParams = { oauth: 'failed', error: 'account_not_linked', redirect: '/messages' };
     mockSendVerificationEmail.mockResolvedValue({ error: null });
     const { container } = render(() => <Login />);
     await vi.waitFor(() => {
@@ -374,7 +349,7 @@ describe('Login', () => {
     await vi.waitFor(() => {
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
         email: 'user@test.com',
-        callbackURL: '/upgrade',
+        callbackURL: '/messages',
       });
       expect(container.textContent).toContain('Verification email sent');
     });

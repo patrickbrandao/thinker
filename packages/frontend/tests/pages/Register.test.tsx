@@ -4,14 +4,8 @@ import { render, screen, fireEvent } from '@solidjs/testing-library';
 const mockSignUpEmail = vi.fn().mockResolvedValue({});
 const mockSignInSocial = vi.fn().mockResolvedValue({});
 const mockSendVerificationEmail = vi.fn().mockResolvedValue({});
-const mockSubscriptionUpgrade = vi.fn().mockResolvedValue({});
-const mockGetBillingStatus = vi.fn().mockResolvedValue({ enabled: false, plan: 'free' });
-const mockCheckIsSelfHosted = vi.fn().mockResolvedValue(false);
 const mockCheckSocialProviders = vi.fn().mockResolvedValue([]);
-const mockNavigate = vi.fn();
-const mockToastError = vi.fn();
 let mockLocationSearch = '';
-let mockSearchParams: Record<string, string | undefined> = {};
 
 vi.mock('@solidjs/router', () => ({
   A: (props: any) => (
@@ -20,8 +14,8 @@ vi.mock('@solidjs/router', () => ({
     </a>
   ),
   useLocation: () => ({ search: mockLocationSearch }),
-  useNavigate: () => mockNavigate,
-  useSearchParams: () => [mockSearchParams],
+  // SocialButtons reads the query to build its callbacks.
+  useSearchParams: () => [{}],
 }));
 
 vi.mock('@solidjs/meta', () => ({
@@ -31,32 +25,14 @@ vi.mock('@solidjs/meta', () => ({
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => ({
-      data: { user: { id: 'u1', name: 'Test User', email: 'test@test.com' } },
-      isPending: false,
-    }),
     signUp: { email: (...args: unknown[]) => mockSignUpEmail(...args) },
     signIn: { social: (...args: unknown[]) => mockSignInSocial(...args) },
     sendVerificationEmail: (...args: unknown[]) => mockSendVerificationEmail(...args),
-    subscription: { upgrade: (...args: unknown[]) => mockSubscriptionUpgrade(...args) },
-  },
-}));
-
-vi.mock('../../src/services/api/billing.js', () => ({
-  getBillingStatus: (...args: unknown[]) => mockGetBillingStatus(...args),
-}));
-
-vi.mock('../../src/services/toast-store.js', () => ({
-  toast: {
-    error: (...args: unknown[]) => mockToastError(...args),
-    success: vi.fn(),
-    warning: vi.fn(),
   },
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
   checkSocialProviders: (...args: unknown[]) => mockCheckSocialProviders(...args),
-  checkIsSelfHosted: (...args: unknown[]) => mockCheckIsSelfHosted(...args),
 }));
 
 import Register from '../../src/pages/Register';
@@ -67,12 +43,8 @@ describe('Register', () => {
     vi.clearAllMocks();
     mockSignUpEmail.mockResolvedValue({});
     mockSignInSocial.mockResolvedValue({});
-    mockSubscriptionUpgrade.mockResolvedValue({});
-    mockGetBillingStatus.mockResolvedValue({ enabled: false, plan: 'free' });
-    mockCheckIsSelfHosted.mockResolvedValue(false);
     mockCheckSocialProviders.mockResolvedValue([]);
     mockLocationSearch = '';
-    mockSearchParams = {};
     localStorage.clear();
   });
 
@@ -99,9 +71,9 @@ describe('Register', () => {
   });
 
   it('preserves the query string on sign-in links', () => {
-    mockLocationSearch = '?plan=pro';
+    mockLocationSearch = '?redirect=%2Fmessages';
     const { container } = render(() => <Register />);
-    expect(container.querySelector('a[href="/login?plan=pro"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/login?redirect=%2Fmessages"]')).not.toBeNull();
   });
 
   it('shows terms and privacy links', () => {
@@ -123,27 +95,6 @@ describe('Register', () => {
     fireEvent.submit(container.querySelector('form')!);
     await vi.waitFor(() => {
       expect(mockSignUpEmail).toHaveBeenCalled();
-    });
-  });
-
-  it('passes the upgrade callback to signup', async () => {
-    mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
-    fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
-    fireEvent.input(container.querySelector('input[type="email"]')!, {
-      target: { value: 'test@test.com' },
-    });
-    fireEvent.input(container.querySelector('input[type="password"]')!, {
-      target: { value: 'pass123' },
-    });
-    fireEvent.submit(container.querySelector('form')!);
-    await vi.waitFor(() => {
-      expect(mockSignUpEmail).toHaveBeenCalledWith({
-        name: 'Test',
-        email: 'test@test.com',
-        password: 'pass123',
-        callbackURL: '/welcome',
-      });
     });
   });
 
@@ -201,40 +152,9 @@ describe('Register', () => {
     expect(container.querySelector('a[href="/reset-password"]')).not.toBeNull();
   });
 
-  it('redirects directly to /welcome when signup returns a token', async () => {
-    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
-      ...window.location,
-      href: '',
-    });
-    const hrefSetter = vi.fn();
-    Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true });
-
-    mockSignUpEmail.mockResolvedValue({
-      data: { token: 'tok', user: { id: 'u1' } },
-      error: null,
-    });
-    const { container } = render(() => <Register />);
-    fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
-    fireEvent.input(container.querySelector('input[type="email"]')!, {
-      target: { value: 'new@test.com' },
-    });
-    fireEvent.input(container.querySelector('input[type="password"]')!, {
-      target: { value: 'pass12345' },
-    });
-    fireEvent.submit(container.querySelector('form')!);
-    await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith('/welcome');
-    });
-
-    locationSpy.mockRestore();
-  });
-
-  it('routes self-hosted email signups through the discovery step', async () => {
-    mockCheckIsSelfHosted.mockResolvedValue(true);
+  it('routes email signups through the discovery step', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
     const { container } = render(() => <Register />);
-    // Let onMount resolve checkIsSelfHosted before submitting.
-    await new Promise((resolve) => setTimeout(resolve, 0));
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -253,8 +173,7 @@ describe('Register', () => {
     });
   });
 
-  it('routes self-hosted social signups through the discovery step', async () => {
-    mockCheckIsSelfHosted.mockResolvedValue(true);
+  it('routes social signups through the discovery step', async () => {
     mockCheckSocialProviders.mockResolvedValue(['github']);
     render(() => <Register />);
 
@@ -267,7 +186,7 @@ describe('Register', () => {
     });
   });
 
-  it('redirects self-hosted token signups to the discovery step', async () => {
+  it('redirects token signups to the discovery step', async () => {
     const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
       href: '',
@@ -275,13 +194,11 @@ describe('Register', () => {
     const hrefSetter = vi.fn();
     Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true });
 
-    mockCheckIsSelfHosted.mockResolvedValue(true);
     mockSignUpEmail.mockResolvedValue({
       data: { token: 'tok', user: { id: 'u1' } },
       error: null,
     });
     const { container } = render(() => <Register />);
-    await new Promise((resolve) => setTimeout(resolve, 0));
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'new@test.com' },
@@ -297,87 +214,6 @@ describe('Register', () => {
     expect(localStorage.getItem('manifest_discovery_pending_u1')).toBe('/welcome');
 
     locationSpy.mockRestore();
-  });
-
-  it('redirects already-Pro users away from the plan step', async () => {
-    mockSearchParams = { step: 'plan' };
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'pro',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
-    render(() => <Register />);
-
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
-    });
-  });
-
-  it('lets users choose the free plan from the plan step', async () => {
-    const replace = vi.fn();
-    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
-      ...window.location,
-      replace,
-    });
-    mockSearchParams = { step: 'plan' };
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'free',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
-    const { container } = render(() => <Register />);
-    await screen.findByText('Choose your plan');
-
-    const freeCard = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.plan-picker__card'),
-    ).find((card) => card.textContent?.includes('Free'));
-    if (!freeCard) throw new Error('Free plan card not found');
-    fireEvent.click(freeCard);
-    fireEvent.click(container.querySelector('.plan-picker__cta')!);
-
-    expect(replace).toHaveBeenCalledWith('/');
-    locationSpy.mockRestore();
-  });
-
-  it('starts Pro checkout from the plan step', async () => {
-    mockSearchParams = { step: 'plan' };
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'free',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
-    const { container } = render(() => <Register />);
-    await screen.findByText('Choose your plan');
-    fireEvent.click(container.querySelector('.plan-picker__cta')!);
-
-    await vi.waitFor(() => {
-      expect(mockSubscriptionUpgrade).toHaveBeenCalledWith({
-        plan: 'pro',
-        successUrl: `${window.location.origin}/overview?upgraded=1`,
-        cancelUrl: `${window.location.origin}/register?step=plan`,
-      });
-    });
-  });
-
-  it('shows an error toast when Pro checkout returns an error payload from the plan step', async () => {
-    mockSearchParams = { step: 'plan' };
-    mockSubscriptionUpgrade.mockResolvedValue({ error: { message: 'stripe down' } });
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'free',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
-    const { container } = render(() => <Register />);
-    await screen.findByText('Choose your plan');
-    fireEvent.click(container.querySelector('.plan-picker__cta')!);
-
-    await vi.waitFor(() =>
-      expect(mockToastError).toHaveBeenCalledWith('Could not start the upgrade. Please try again.'),
-    );
   });
 
   it('shows loading state during submission', async () => {
@@ -444,7 +280,7 @@ describe('Register', () => {
       await vi.waitFor(() => {
         expect(mockSendVerificationEmail).toHaveBeenCalledWith({
           email: 'test@test.com',
-          callbackURL: '/welcome',
+          callbackURL: '/discovery?next=%2Fwelcome',
         });
       });
     }
@@ -530,33 +366,12 @@ describe('Register', () => {
     });
   });
 
-  it('shows "Choose your plan" title when context=login (existing/OAuth user)', async () => {
-    mockSearchParams = { step: 'plan', context: 'login' };
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'free',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
+  it('never renders a plan picker, even with the legacy plan step', () => {
+    mockLocationSearch = '?step=plan';
     render(() => <Register />);
-    await vi.waitFor(() => {
-      expect(screen.getByText('Choose your plan')).toBeDefined();
-    });
-    expect(screen.getByText(/Manifest now offers Free and Pro plans/)).toBeDefined();
-  });
-
-  it('shows "Create an account" title without context=login (email signup)', async () => {
-    mockSearchParams = { step: 'plan' };
-    mockGetBillingStatus.mockResolvedValue({
-      enabled: true,
-      plan: 'free',
-      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
-    });
-
-    render(() => <Register />);
-    await vi.waitFor(() => {
-      expect(screen.getByText('Create an account')).toBeDefined();
-    });
+    expect(screen.getByText('Create an account')).toBeDefined();
+    expect(screen.queryByText('Choose your plan')).toBeNull();
+    expect(screen.queryByText(/Pro/)).toBeNull();
   });
 
   it('clears the cooldown interval on unmount', async () => {

@@ -5,22 +5,19 @@ import '../styles/discovery.css';
 import Select from '../components/Select.jsx';
 import { authClient } from '../services/auth-client.js';
 import { isSafeInternalRedirect } from '../services/auth-redirects.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import {
   COMPANY_SIZE_OPTIONS,
   PROJECT_TYPE_OPTIONS,
-  clearDiscoveryPending,
   completeDiscovery,
-  isConfirmedNotSelfHosted,
   isDiscoveryRequired,
   markDiscoveryPending,
   type DiscoverySubmission,
 } from '../services/discovery.js';
 
 /**
- * One-time post-signup step for self-hosted installs. Self-guards like
- * Setup.tsx: anyone who should not see it (cloud, already completed, already
- * skipped, direct navigation later) is redirected to the `next` destination.
+ * One-time post-signup step. Self-guards like Setup.tsx: anyone who should not
+ * see it (already completed, already skipped, direct navigation later) is
+ * redirected to the `next` destination.
  */
 const Discovery: Component = () => {
   const navigate = useNavigate();
@@ -50,17 +47,6 @@ const Discovery: Component = () => {
   };
 
   onMount(async () => {
-    if (!(await checkIsSelfHosted())) {
-      // Only a confirmed non-self-hosted answer drops the marker and leaves.
-      // On an unconfirmed answer (transient status failure) we fall through
-      // and behave as self-hosted: leaving while the marker stands would let
-      // the guards bounce the user back here in an endless loop.
-      if (await isConfirmedNotSelfHosted()) {
-        clearDiscoveryPending(userId());
-        leave();
-        return;
-      }
-    }
     if (isSignupRedirect()) markDiscoveryPending(userId(), next());
     if (!(await isDiscoveryRequired(userId()))) {
       leave();

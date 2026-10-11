@@ -21,7 +21,6 @@
 @import './action-menu.css';
 @import './feedback.css';
 @import './params-card.css';
-@import './api-bot.css';
 
 /*
  * Route-scoped stylesheets are intentionally NOT imported here. They are
@@ -891,10 +890,6 @@ h6 {
   background: hsl(var(--border));
 }
 
-.sidebar__spacer {
-  flex: 1;
-}
-
 .sidebar__feedback {
   display: block;
   padding: var(--gap-md) var(--gap-lg);
@@ -1288,9 +1283,7 @@ h6 {
   }
   .header__separator,
   .header__breadcrumb-link,
-  .header__docs-link,
-  .header__github-star,
-  .header__star-separator {
+  .header__docs-link {
     display: none;
   }
   .header__breadcrumb-current {
@@ -1414,7 +1407,6 @@ h6 {
     transform: translateX(0);
   }
   .sidebar__section-label,
-  .sidebar__spacer,
   .sidebar__feedback {
     display: block;
   }
@@ -1543,9 +1535,6 @@ h6 {
 }
 
 @media (max-width: 480px) {
-  .header__mode-badge {
-    display: none;
-  }
   .header__breadcrumb-current {
     max-width: 34vw;
   }

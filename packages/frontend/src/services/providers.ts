@@ -285,11 +285,6 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
       'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',
     models: [],
   },
-  'gemini-free': {
-    initial: 'GF',
-    subtitle: 'Free Gemini models via Manifest',
-    models: [],
-  },
   kiro: {
     initial: 'K',
     subtitle: 'Claude, DeepSeek, MiniMax, GLM, Qwen via Kiro',
@@ -527,7 +522,6 @@ const PROVIDER_ORDER = [
   'commandcode',
   'deepseek',
   'fireworks',
-  'gemini-free',
   'copilot',
   'gemini',
   'vertex',

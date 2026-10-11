@@ -83,25 +83,14 @@ describe('SocialButtons', () => {
     expect(getLastAuthMethod()).toBe('google');
   });
 
-  it('routes pro-intent social auth to upgrade', async () => {
-    mockSearchParams = { plan: 'pro' };
-    render(() => <SocialButtons />);
-    await fireEvent.click(screen.getByText('Continue with Google'));
-    expect(mockSignInSocial).toHaveBeenCalledWith({
-      provider: 'google',
-      callbackURL: '/upgrade',
-      errorCallbackURL: '/login?plan=pro&oauth=failed',
-    });
-  });
-
   it('preserves safe redirect intent for social auth', async () => {
-    mockSearchParams = { redirect: '/upgrade?reason=requests' };
+    mockSearchParams = { redirect: '/messages?range=30d' };
     render(() => <SocialButtons />);
     await fireEvent.click(screen.getByText('Continue with GitHub'));
     expect(mockSignInSocial).toHaveBeenCalledWith({
       provider: 'github',
-      callbackURL: '/upgrade?reason=requests',
-      errorCallbackURL: '/login?redirect=%2Fupgrade%3Freason%3Drequests&oauth=failed',
+      callbackURL: '/messages?range=30d',
+      errorCallbackURL: '/login?redirect=%2Fmessages%3Frange%3D30d&oauth=failed',
     });
   });
 

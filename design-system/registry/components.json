@@ -307,28 +307,11 @@
         "agents.css"
       ]
     },
-    "account-email-footer": {
-      "classes": [
-        "account-email-footer"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "account-email-toggle": {
-      "classes": [
-        "account-email-toggle--disabled"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
     "account-modal": {
       "classes": [
         "account-modal",
         "account-modal--standalone",
-        "account-modal__inner",
-        "account-modal__inner--upgrade"
+        "account-modal__inner"
       ],
       "files": [
         "agents.css"
@@ -511,31 +494,6 @@
       ],
       "files": [
         "routing-providers.css"
-      ]
-    },
-    "api-bot-banner": {
-      "classes": [
-        "api-bot-banner",
-        "api-bot-banner__text"
-      ],
-      "files": [
-        "api-bot.css"
-      ]
-    },
-    "api-bot-btn": {
-      "classes": [
-        "api-bot-btn"
-      ],
-      "files": [
-        "api-bot.css"
-      ]
-    },
-    "api-bot-close": {
-      "classes": [
-        "api-bot-close"
-      ],
-      "files": [
-        "api-bot.css"
       ]
     },
     "api-key-display": {
@@ -760,37 +718,6 @@
         "data.css"
       ]
     },
-    "billing-footer": {
-      "classes": [
-        "billing-footer",
-        "billing-footer__actions",
-        "billing-footer__link",
-        "billing-footer__note"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "billing-stat": {
-      "classes": [
-        "billing-stat",
-        "billing-stat__cancel",
-        "billing-stat__label",
-        "billing-stat__meta",
-        "billing-stat__value"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "billing-stats": {
-      "classes": [
-        "billing-stats"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
     "breadcrumb": {
       "classes": [
         "breadcrumb"
@@ -810,9 +737,7 @@
         "btn--sm"
       ],
       "files": [
-        "agents.css",
         "controls.css",
-        "data.css",
         "layout.css",
         "limits.css",
         "modals.css",
@@ -870,17 +795,6 @@
       ],
       "files": [
         "syntax-highlight.css"
-      ]
-    },
-    "cloud-email-info": {
-      "classes": [
-        "cloud-email-info",
-        "cloud-email-info__desc",
-        "cloud-email-info__icon",
-        "cloud-email-info__title"
-      ],
-      "files": [
-        "notifications.css"
       ]
     },
     "complexity-empty": {
@@ -1201,14 +1115,6 @@
         "discovery.css"
       ]
     },
-    "dither-ground": {
-      "classes": [
-        "dither-ground"
-      ],
-      "files": [
-        "api-bot.css"
-      ]
-    },
     "drawer": {
       "classes": [
         "drawer",
@@ -1319,8 +1225,7 @@
         "error-autofix-row__meta-label",
         "error-autofix-row__meta-table",
         "error-autofix-row__meta-value",
-        "error-autofix-row__title",
-        "error-autofix-row__upgrade"
+        "error-autofix-row__title"
       ],
       "files": [
         "data.css"
@@ -1455,55 +1360,6 @@
         "wizard.css"
       ]
     },
-    "free-models-accordion": {
-      "classes": [
-        "free-models-accordion",
-        "free-models-accordion--open"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "free-models-base-url-row": {
-      "classes": [
-        "free-models-base-url-row"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "free-models-caret": {
-      "classes": [
-        "free-models-caret"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "free-models-disabled-btn": {
-      "classes": [
-        "free-models-disabled-btn"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "free-models-logo-dark": {
-      "classes": [
-        "free-models-logo-dark"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
-    "free-models-logo-light": {
-      "classes": [
-        "free-models-logo-light"
-      ],
-      "files": [
-        "data.css"
-      ]
-    },
     "free-tag": {
       "classes": [
         "free-tag"
@@ -1540,24 +1396,13 @@
         "header__dropdown-name",
         "header__gear",
         "header__gear-btn",
-        "header__github-icon",
-        "header__github-star",
-        "header__github-star-action",
-        "header__github-star-btn",
-        "header__github-star-close",
-        "header__github-star-count",
-        "header__github-star-label",
         "header__left",
         "header__logo",
         "header__logo-img",
         "header__logo-img--dark",
         "header__logo-img--light",
-        "header__mode-badge",
-        "header__mode-badge--dev",
-        "header__pro-badge",
         "header__right",
-        "header__separator",
-        "header__star-separator"
+        "header__separator"
       ],
       "files": [
         "controls.css",
@@ -2514,32 +2359,6 @@
         "wizard.css"
       ]
     },
-    "plan-picker": {
-      "classes": [
-        "plan-picker",
-        "plan-picker__amount",
-        "plan-picker__badge",
-        "plan-picker__card",
-        "plan-picker__card--expanded",
-        "plan-picker__card--pro",
-        "plan-picker__cta",
-        "plan-picker__details",
-        "plan-picker__features",
-        "plan-picker__name",
-        "plan-picker__period",
-        "plan-picker__price-inline",
-        "plan-picker__radio",
-        "plan-picker__radio-dot",
-        "plan-picker__row",
-        "plan-picker__section-header",
-        "plan-picker__section-subtitle",
-        "plan-picker__section-title",
-        "plan-picker__usage"
-      ],
-      "files": [
-        "auth.css"
-      ]
-    },
     "platform-icon": {
       "classes": [
         "platform-icon"
@@ -2711,14 +2530,6 @@
       ],
       "files": [
         "playground.css"
-      ]
-    },
-    "pro-range-badge": {
-      "classes": [
-        "pro-range-badge"
-      ],
-      "files": [
-        "custom-select.css"
       ]
     },
     "provider-auth-badge": {
@@ -3641,50 +3452,11 @@
         "sidebar__logo",
         "sidebar__logo-dot",
         "sidebar__section-add",
-        "sidebar__section-label",
-        "sidebar__spacer"
+        "sidebar__section-label"
       ],
       "files": [
         "controls.css",
         "theme.css"
-      ]
-    },
-    "sidebar-api-bot": {
-      "classes": [
-        "sidebar-api-bot",
-        "sidebar-api-bot__close",
-        "sidebar-api-bot__image",
-        "sidebar-api-bot__text",
-        "sidebar-api-bot__title"
-      ],
-      "files": [
-        "api-bot.css"
-      ]
-    },
-    "sidebar-upgrade": {
-      "classes": [
-        "sidebar-upgrade"
-      ],
-      "files": [
-        "modals.css"
-      ]
-    },
-    "sidebar-usage": {
-      "classes": [
-        "sidebar-usage",
-        "sidebar-usage__alert",
-        "sidebar-usage__bar",
-        "sidebar-usage__count",
-        "sidebar-usage__count--danger",
-        "sidebar-usage__fill",
-        "sidebar-usage__fill--danger",
-        "sidebar-usage__fill--warning",
-        "sidebar-usage__header",
-        "sidebar-usage__month",
-        "sidebar-usage__title"
-      ],
-      "files": [
-        "modals.css"
       ]
     },
     "skeleton": {
@@ -4061,107 +3833,6 @@
         "theme.css"
       ]
     },
-    "upgrade-back": {
-      "classes": [
-        "upgrade-back"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-limit-notice": {
-      "classes": [
-        "upgrade-limit-notice"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-page-header": {
-      "classes": [
-        "upgrade-page-header",
-        "upgrade-page-header--centered",
-        "upgrade-page-header__copy"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-plan-card": {
-      "classes": [
-        "upgrade-plan-card",
-        "upgrade-plan-card--pro",
-        "upgrade-plan-card__amount",
-        "upgrade-plan-card__amount--custom",
-        "upgrade-plan-card__badge",
-        "upgrade-plan-card__body",
-        "upgrade-plan-card__cta",
-        "upgrade-plan-card__desc",
-        "upgrade-plan-card__divider",
-        "upgrade-plan-card__features",
-        "upgrade-plan-card__features-intro",
-        "upgrade-plan-card__footer",
-        "upgrade-plan-card__header",
-        "upgrade-plan-card__no-commitment",
-        "upgrade-plan-card__period",
-        "upgrade-plan-card__price",
-        "upgrade-plan-card__usage"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-plan-grid": {
-      "classes": [
-        "upgrade-plan-grid"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-pro-current": {
-      "classes": [
-        "upgrade-pro-current",
-        "upgrade-pro-current__card",
-        "upgrade-pro-current__status"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "upgrade-success-modal": {
-      "classes": [
-        "upgrade-success-modal",
-        "upgrade-success-modal__body",
-        "upgrade-success-modal__done",
-        "upgrade-success-modal__features",
-        "upgrade-success-modal__icon",
-        "upgrade-success-modal__subtitle",
-        "upgrade-success-modal__title"
-      ],
-      "files": [
-        "modals.css"
-      ]
-    },
-    "upgrade-terms": {
-      "classes": [
-        "upgrade-terms"
-      ],
-      "files": [
-        "agents.css"
-      ]
-    },
-    "usage-limit-banner": {
-      "classes": [
-        "usage-limit-banner",
-        "usage-limit-banner__actions",
-        "usage-limit-banner__btn",
-        "usage-limit-banner__text"
-      ],
-      "files": [
-        "modals.css"
-      ]
-    },
     "version-indicator": {
       "classes": [
         "version-indicator",
@@ -4447,154 +4118,154 @@
       "prop": "box-shadow",
       "value": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
       "file": "theme.css",
-      "line": 197
+      "line": 196
     },
     {
       "selector": ".trend--up",
       "prop": "color",
       "value": "hsl(var(--success))",
       "file": "theme.css",
-      "line": 238
+      "line": 237
     },
     {
       "selector": ".trend--up",
       "prop": "background",
       "value": "hsl(var(--success) / 0.1)",
       "file": "theme.css",
-      "line": 239
+      "line": 238
     },
     {
       "selector": ".trend--down",
       "prop": "color",
       "value": "hsl(var(--destructive))",
       "file": "theme.css",
-      "line": 243
+      "line": 242
     },
     {
       "selector": ".trend--down",
       "prop": "background",
       "value": "hsl(var(--destructive) / 0.1)",
       "file": "theme.css",
-      "line": 244
+      "line": 243
     },
     {
       "selector": ".panel",
       "prop": "box-shadow",
       "value": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
       "file": "theme.css",
-      "line": 269
+      "line": 268
     },
     {
       "selector": ".chart-card",
       "prop": "box-shadow",
       "value": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
       "file": "theme.css",
-      "line": 285
+      "line": 284
     },
     {
       "selector": ".chart-card__header",
       "prop": "align-items",
       "value": "flex-end",
       "file": "theme.css",
-      "line": 291
+      "line": 290
     },
     {
       "selector": ".chart-card__value-row",
       "prop": "align-items",
       "value": "baseline",
       "file": "theme.css",
-      "line": 323
+      "line": 322
     },
     {
       "selector": ".feed-item",
       "prop": "align-items",
       "value": "center",
       "file": "theme.css",
-      "line": 587
+      "line": 586
     },
     {
       "selector": ".feed-item",
       "prop": "gap",
       "value": "var(--gap-md)",
       "file": "theme.css",
-      "line": 588
+      "line": 587
     },
     {
       "selector": ".feed-item",
       "prop": "padding",
       "value": "10px 0",
       "file": "theme.css",
-      "line": 589
+      "line": 588
     },
     {
       "selector": ".sidebar",
       "prop": "padding",
       "value": "var(--gap-lg) 0 0 0",
       "file": "theme.css",
-      "line": 785
+      "line": 784
     },
     {
       "selector": ".theme-toggle",
       "prop": "padding",
       "value": "6px 12px",
       "file": "theme.css",
-      "line": 943
+      "line": 938
     },
     {
       "selector": ".theme-toggle",
       "prop": "width",
       "value": "100%",
       "file": "theme.css",
-      "line": 952
+      "line": 947
     },
     {
       "selector": ".chart-tooltip",
       "prop": "font-size",
       "value": "var(--font-size-xs)",
       "file": "theme.css",
-      "line": 1029
+      "line": 1024
     },
     {
       "selector": ".expandable-card__fade",
       "prop": "height",
       "value": "64px",
       "file": "theme.css",
-      "line": 1060
+      "line": 1055
     },
     {
       "selector": ".expandable-card__fade",
       "prop": "background",
       "value": "linear-gradient(transparent, hsl(var(--card)) 70%)",
       "file": "theme.css",
-      "line": 1061
+      "line": 1056
     },
     {
       "selector": ".expandable-card__fade",
       "prop": "padding-bottom",
       "value": "12px",
       "file": "theme.css",
-      "line": 1066
+      "line": 1061
     },
     {
       "selector": ".modal",
       "prop": "box-shadow",
       "value": "rgba(0, 0, 0, 0.08) 0px 0px 0px 1px,\n    0 25px 50px -12px rgb(0 0 0 / 0.25)",
       "file": "theme.css",
-      "line": 1117
+      "line": 1112
     },
     {
       "selector": ".modal__close",
       "prop": "width",
       "value": "2rem",
       "file": "theme.css",
-      "line": 1142
+      "line": 1137
     },
     {
       "selector": ".modal__close",
       "prop": "height",
       "value": "2rem",
       "file": "theme.css",
-      "line": 1143
+      "line": 1138
     },
     {
       "selector": ".toast",
@@ -4674,7 +4345,7 @@
       "value": "var(--card-shadow)",
       "file": "cards.css",
       "line": 7,
-      "losesTo": "theme.css:197"
+      "losesTo": "theme.css:196"
     },
     {
       "selector": ".trend--up",
@@ -4682,31 +4353,31 @@
       "value": "hsl(var(--muted-foreground))",
       "file": "cards.css",
       "line": 48,
+      "losesTo": "theme.css:237"
+    },
+    {
+      "selector": ".trend--down",
+      "prop": "color",
+      "value": "hsl(var(--muted-foreground))",
+      "file": "cards.css",
+      "line": 48,
+      "losesTo": "theme.css:242"
+    },
+    {
+      "selector": ".trend--up",
+      "prop": "background",
+      "value": "hsl(var(--muted))",
+      "file": "cards.css",
+      "line": 49,
       "losesTo": "theme.css:238"
     },
     {
       "selector": ".trend--down",
-      "prop": "color",
-      "value": "hsl(var(--muted-foreground))",
+      "prop": "background",
+      "value": "hsl(var(--muted))",
       "file": "cards.css",
-      "line": 48,
+      "line": 49,
       "losesTo": "theme.css:243"
-    },
-    {
-      "selector": ".trend--up",
-      "prop": "background",
-      "value": "hsl(var(--muted))",
-      "file": "cards.css",
-      "line": 49,
-      "losesTo": "theme.css:239"
-    },
-    {
-      "selector": ".trend--down",
-      "prop": "background",
-      "value": "hsl(var(--muted))",
-      "file": "cards.css",
-      "line": 49,
-      "losesTo": "theme.css:244"
     },
     {
       "selector": ".panel",
@@ -4714,7 +4385,7 @@
       "value": "var(--card-shadow)",
       "file": "cards.css",
       "line": 59,
-      "losesTo": "theme.css:269"
+      "losesTo": "theme.css:268"
     },
     {
       "selector": ".view-more-link",
@@ -4730,7 +4401,7 @@
       "value": "var(--card-shadow)",
       "file": "cards.css",
       "line": 86,
-      "losesTo": "theme.css:285"
+      "losesTo": "theme.css:284"
     },
     {
       "selector": ".chart-card__header",
@@ -4738,7 +4409,7 @@
       "value": "stretch",
       "file": "cards.css",
       "line": 92,
-      "losesTo": "theme.css:291"
+      "losesTo": "theme.css:290"
     },
     {
       "selector": ".chart-card__value-row",
@@ -4746,7 +4417,7 @@
       "value": "center",
       "file": "cards.css",
       "line": 160,
-      "losesTo": "theme.css:323"
+      "losesTo": "theme.css:322"
     },
     {
       "selector": ".chart-tooltip",
@@ -4754,7 +4425,7 @@
       "value": "var(--tooltip-font-size)",
       "file": "charts.css",
       "line": 78,
-      "losesTo": "theme.css:1029"
+      "losesTo": "theme.css:1024"
     },
     {
       "selector": ".expandable-card__fade",
@@ -4762,7 +4433,7 @@
       "value": "80px",
       "file": "charts.css",
       "line": 110,
-      "losesTo": "theme.css:1060"
+      "losesTo": "theme.css:1055"
     },
     {
       "selector": ".expandable-card__fade",
@@ -4770,7 +4441,7 @@
       "value": "linear-gradient(transparent, hsl(var(--card)) 60%)",
       "file": "charts.css",
       "line": 111,
-      "losesTo": "theme.css:1061"
+      "losesTo": "theme.css:1056"
     },
     {
       "selector": ".expandable-card__fade",
@@ -4778,7 +4449,7 @@
       "value": "16px",
       "file": "charts.css",
       "line": 116,
-      "losesTo": "theme.css:1066"
+      "losesTo": "theme.css:1061"
     },
     {
       "selector": ".toast",
@@ -4826,7 +4497,7 @@
       "value": "var(--gap-md) 0",
       "file": "controls.css",
       "line": 213,
-      "losesTo": "theme.css:785"
+      "losesTo": "theme.css:784"
     },
     {
       "selector": ".custom-select__option--top > svg",
@@ -4866,7 +4537,7 @@
       "value": "flex-start",
       "file": "data.css",
       "line": 507,
-      "losesTo": "theme.css:587"
+      "losesTo": "theme.css:586"
     },
     {
       "selector": ".feed-item",
@@ -4874,7 +4545,7 @@
       "value": "12px",
       "file": "data.css",
       "line": 508,
-      "losesTo": "theme.css:588"
+      "losesTo": "theme.css:587"
     },
     {
       "selector": ".feed-item",
@@ -4882,7 +4553,7 @@
       "value": "12px 0",
       "file": "data.css",
       "line": 509,
-      "losesTo": "theme.css:589"
+      "losesTo": "theme.css:588"
     },
     {
       "selector": ".theme-toggle",
@@ -4890,7 +4561,7 @@
       "value": "2rem",
       "file": "layout.css",
       "line": 141,
-      "losesTo": "theme.css:952"
+      "losesTo": "theme.css:947"
     },
     {
       "selector": ".theme-toggle",
@@ -4898,7 +4569,7 @@
       "value": "0",
       "file": "layout.css",
       "line": 149,
-      "losesTo": "theme.css:943"
+      "losesTo": "theme.css:938"
     },
     {
       "selector": ".modal",
@@ -4906,7 +4577,7 @@
       "value": "var(--card-shadow),\n    0 25px 50px -12px rgb(0 0 0 / 0.25)",
       "file": "modals.css",
       "line": 22,
-      "losesTo": "theme.css:1117"
+      "losesTo": "theme.css:1112"
     },
     {
       "selector": ".modal__close",
@@ -4914,7 +4585,7 @@
       "value": "32px",
       "file": "modals.css",
       "line": 47,
-      "losesTo": "theme.css:1142"
+      "losesTo": "theme.css:1137"
     },
     {
       "selector": ".modal__close",
@@ -4922,7 +4593,7 @@
       "value": "32px",
       "file": "modals.css",
       "line": 48,
-      "losesTo": "theme.css:1143"
+      "losesTo": "theme.css:1138"
     },
     {
       "selector": ".setup-modal__header",
@@ -5118,8 +4789,8 @@
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 318,
-    "classes": 1700,
+    "blocks": 288,
+    "classes": 1583,
     "canonicalRules": 46,
     "ghostRules": 46
   }

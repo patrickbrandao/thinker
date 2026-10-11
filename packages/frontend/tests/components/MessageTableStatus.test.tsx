@@ -34,7 +34,7 @@ function renderStatus(row: Partial<MessageRow>) {
 }
 
 describe('MessageTable status labels', () => {
-  it('labels billing plan request-limit blocks as plan limits', () => {
+  it('never links legacy plan request-limit rows to an upgrade page', () => {
     renderStatus({
       error_origin: 'policy',
       error_class: 'plan_request_limit_exceeded',
@@ -43,8 +43,8 @@ describe('MessageTable status labels', () => {
     });
 
     const link = screen.getByText('Failed') as HTMLAnchorElement;
-    expect(link.getAttribute('href')).toBe('/upgrade?reason=requests');
-    expect(link.getAttribute('title')).toBe('Free plan request limit reached - upgrade to Pro');
+    expect(link.getAttribute('href')).toBe('/harnesses/demo-agent/limits');
+    expect(screen.queryByText('Upgrade plan')).toBeNull();
   });
 
   it('keeps other Manifest policy failures labelled as custom limits', () => {

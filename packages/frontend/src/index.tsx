@@ -34,7 +34,6 @@ const Routing = lazyReload(() => import('./pages/Routing.jsx'));
 const Playground = lazyReload(() => import('./pages/Playground.jsx'));
 const Limits = lazyReload(() => import('./pages/Limits.jsx'));
 const Account = lazyReload(() => import('./pages/Account.jsx'));
-const Upgrade = lazyReload(() => import('./pages/Upgrade.jsx'));
 const CliAuth = lazyReload(() => import('./pages/CliAuth.jsx'));
 const Consent = lazyReload(() => import('./pages/Consent.jsx'));
 const OauthError = lazyReload(() => import('./pages/OauthError.jsx'));
@@ -46,7 +45,6 @@ const Discovery = lazyReload(() => import('./pages/Discovery.jsx'));
 const Welcome = lazyReload(() => import('./pages/Welcome.jsx'));
 const ModelPrices = lazyReload(() => import('./pages/ModelPrices.jsx'));
 const Help = lazyReload(() => import('./pages/Help.jsx'));
-const FreeModels = lazyReload(() => import('./pages/FreeModels.jsx'));
 const ConnectProvider = lazyReload(() => import('./pages/ConnectProvider.jsx'));
 const Subscriptions = lazyReload(() => import('./pages/providers/Subscriptions.jsx'));
 const Byok = lazyReload(() => import('./pages/providers/Byok.jsx'));
@@ -61,9 +59,9 @@ const GuestLayout: ParentComponent = (props) => (
   </GuestGuard>
 );
 
-// Post-signup discovery step (self-hosted only): authenticated, rendered as
-// its own centered two-column card outside the App shell. The page itself
-// redirects anyone who should not see it (cloud, already completed or skipped).
+// Post-signup discovery step: authenticated, rendered as its own centered
+// two-column card outside the App shell. The page itself redirects anyone who
+// should not see it (already completed or skipped).
 const DiscoveryLayout: ParentComponent = (props) => <AuthGuard>{props.children}</AuthGuard>;
 
 // Full-page onboarding: authenticated but outside the App dashboard shell.
@@ -123,7 +121,6 @@ render(
 
             {/* Non-tab agent routes: kept reachable but not primary tabs */}
             <Route path="/model-prices" component={ModelPrices} />
-            <Route path="/free-models" component={FreeModels} />
             <Route path="/help" component={Help} />
           </Route>
 
@@ -148,9 +145,6 @@ render(
 
           <Route path="/connect-provider" component={ConnectProvider} />
           <Route path="/account" component={Account} />
-        </Route>
-        <Route path="/upgrade" component={AuthGuard}>
-          <Route path="/" component={Upgrade} />
         </Route>
         <Route path="/cli/auth" component={AuthGuard}>
           <Route path="/" component={CliAuth} />

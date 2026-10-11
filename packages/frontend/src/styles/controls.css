@@ -306,30 +306,6 @@
   display: block;
 }
 
-.header__mode-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 4px 7px 3px;
-  border-radius: var(--radius);
-  background: hsl(var(--success) / 0.15);
-  color: hsl(var(--success));
-  /* The header's left group shrinks around the breadcrumb on small screens;
-     the badge must stay one line rather than break "SELF-" / "HOSTED". */
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1;
-  user-select: none;
-}
-
-.header__mode-badge--dev {
-  background: hsl(25 95% 53% / 0.15);
-  color: hsl(25 95% 53%);
-}
-
 .header__separator {
   color: hsl(var(--muted-foreground));
   font-size: var(--font-size-sm);
@@ -442,16 +418,6 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: hsl(var(--foreground));
-}
-
-.header__pro-badge {
-  padding: 1px 6px;
-  border-radius: 2px;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .header__dropdown-email {
@@ -729,103 +695,4 @@
   width: 100%;
   border: none;
   background: hsl(var(--background));
-}
-
-/* ── GitHub Star Button ──────────────────────────── */
-.header__github-star {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.header__github-star-btn {
-  display: inline-flex;
-  align-items: stretch;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  font-family: var(--font-family);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-  line-height: 1;
-  overflow: hidden;
-}
-
-.header__github-star-btn:hover {
-  border-color: hsl(var(--ring) / 0.3);
-}
-
-.header__github-star-action {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  background: hsl(var(--muted));
-  transition: background var(--transition-fast);
-}
-
-.header__github-star-btn:hover .header__github-star-action {
-  background: hsl(var(--muted-foreground) / 0.15);
-}
-
-.header__github-icon {
-  flex-shrink: 0;
-}
-
-.header__github-star-label {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-}
-
-.header__github-star-count {
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  border-left: 1px solid hsl(var(--border));
-}
-
-.header__github-star-close {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  color: hsl(var(--muted-foreground));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: all var(--transition-fast);
-  padding: 0;
-  line-height: 1;
-}
-
-.header__github-star:hover .header__github-star-close {
-  opacity: 1;
-}
-
-.header__github-star-close:hover {
-  background: hsl(var(--destructive));
-  border-color: hsl(var(--destructive));
-  color: white;
-}
-
-.header__star-separator {
-  width: 1px;
-  align-self: stretch;
-  background: hsl(var(--border));
-  margin: 0 8px;
 }

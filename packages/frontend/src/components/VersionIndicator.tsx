@@ -26,16 +26,15 @@ function writeDismissed(version: string): void {
 }
 
 /**
- * Bottom-corner `vX.Y.Z` badge for self-hosted installs. When the backend
+ * Bottom-corner `vX.Y.Z` badge. When the backend
  * reports a newer release, the badge grows a link to the changelog for that
  * release, with a dismiss button. A failed check degrades to the plain badge.
  */
 const VersionIndicator = () => {
-  const isSelfHosted = import.meta.env.VITE_MANIFEST_SELFHOSTED === 'true';
   const version = __MANIFEST_VERSION__;
 
   const [info] = createResource<VersionInfo | null, boolean>(
-    () => isSelfHosted && Boolean(version),
+    () => Boolean(version),
     () => getVersionInfo().catch(() => null),
   );
   const [dismissed, setDismissed] = createSignal<string | null>(readDismissed());
@@ -51,7 +50,7 @@ const VersionIndicator = () => {
   };
 
   return (
-    <Show when={isSelfHosted && version}>
+    <Show when={version}>
       <div
         class="version-indicator"
         classList={{ 'version-indicator--update': update() !== null }}

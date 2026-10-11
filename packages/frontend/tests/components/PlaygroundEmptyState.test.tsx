@@ -7,10 +7,6 @@ import { render } from '@solidjs/testing-library';
 vi.mock('@solidjs/router', () => ({
   A: (props: { children?: unknown }) => props.children,
 }));
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: vi.fn().mockResolvedValue(false),
-}));
-
 import PlaygroundEmptyState from '../../src/components/playground/PlaygroundEmptyState';
 
 describe('PlaygroundEmptyState', () => {

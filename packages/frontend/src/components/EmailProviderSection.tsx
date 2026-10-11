@@ -12,7 +12,7 @@ interface EmailProviderSectionProps {
 }
 
 // No margin on the wrapper: .provider-card carries its own bottom gap, and the
-// unboxed setup/skeleton branches bring theirs, so spacing matches cloud's card.
+// unboxed setup/skeleton branches bring theirs.
 const EmailProviderSection: Component<EmailProviderSectionProps> = (props) => (
   <div>
     <Show

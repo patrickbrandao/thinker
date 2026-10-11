@@ -15,9 +15,8 @@ export interface FetchJsonOptions {
   /**
    * Whether a 401 that looks like a session expiry hard-navigates the browser
    * to `/login`. Defaults to `true`. Pass `false` for a probe that may run
-   * before the session is known (the plan prefetch in AuthGuard): it then
-   * rejects with the same error and leaves the redirect, and the preserved
-   * requested path, to the auth guard.
+   * before the session is known: it then rejects with the same error and
+   * leaves the redirect, and the preserved requested path, to the auth guard.
    */
   loginRedirect?: boolean;
 }

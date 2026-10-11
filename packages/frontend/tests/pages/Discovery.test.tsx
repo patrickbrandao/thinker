@@ -2,12 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
 
 const mockNavigate = vi.fn();
-const mockCheckIsSelfHosted = vi.fn();
 const mockIsDiscoveryRequired = vi.fn();
 const mockCompleteDiscovery = vi.fn();
 const mockMarkDiscoveryPending = vi.fn();
-const mockClearDiscoveryPending = vi.fn();
-const mockIsConfirmedNotSelfHosted = vi.fn();
 let mockSearchParams: Record<string, string | string[] | undefined> = {};
 
 vi.mock('@solidjs/router', () => ({
@@ -29,10 +26,6 @@ vi.mock('../../src/services/auth-client.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: (...args: unknown[]) => mockCheckIsSelfHosted(...args),
-}));
-
 vi.mock('../../src/services/discovery.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/services/discovery.js')>();
   return {
@@ -40,8 +33,6 @@ vi.mock('../../src/services/discovery.js', async (importOriginal) => {
     isDiscoveryRequired: (...args: unknown[]) => mockIsDiscoveryRequired(...args),
     completeDiscovery: (...args: unknown[]) => mockCompleteDiscovery(...args),
     markDiscoveryPending: (...args: unknown[]) => mockMarkDiscoveryPending(...args),
-    clearDiscoveryPending: (...args: unknown[]) => mockClearDiscoveryPending(...args),
-    isConfirmedNotSelfHosted: (...args: unknown[]) => mockIsConfirmedNotSelfHosted(...args),
   };
 });
 
@@ -51,10 +42,8 @@ describe('Discovery page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams = {};
-    mockCheckIsSelfHosted.mockResolvedValue(true);
     mockIsDiscoveryRequired.mockResolvedValue(true);
     mockCompleteDiscovery.mockResolvedValue(undefined);
-    mockIsConfirmedNotSelfHosted.mockResolvedValue(true);
   });
 
   async function renderForm() {
@@ -65,26 +54,10 @@ describe('Discovery page', () => {
     return result;
   }
 
-  it('redirects to the dashboard on non-self-hosted deployments', async () => {
-    mockCheckIsSelfHosted.mockResolvedValue(false);
-    render(() => <Discovery />);
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
-    });
-    expect(mockIsDiscoveryRequired).not.toHaveBeenCalled();
-    expect(screen.queryByText('Help us understand who uses Manifest')).toBeNull();
-    // The pending marker is dropped so the guards cannot loop back here.
-    expect(mockClearDiscoveryPending).toHaveBeenCalledWith('u1');
-  });
-
-  it('behaves as self-hosted when the non-self-hosted answer is unconfirmed', async () => {
-    mockCheckIsSelfHosted.mockResolvedValue(false);
-    mockIsConfirmedNotSelfHosted.mockResolvedValue(false);
+  it('shows the form without any deployment-mode check', async () => {
     await renderForm();
-    // No redirect and no marker loss: leaving while the marker stands would
-    // let the guards loop the user back here forever.
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(mockClearDiscoveryPending).not.toHaveBeenCalled();
+    expect(mockIsDiscoveryRequired).toHaveBeenCalledWith('u1');
   });
 
   it('redirects to next when the step was already completed', async () => {

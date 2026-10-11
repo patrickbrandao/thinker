@@ -1,5 +1,4 @@
 import { createResource, createSignal, For, Show, type JSX } from 'solid-js';
-import { A } from '@solidjs/router';
 import {
   getMessageDetails,
   flagMessageMiscategorized,
@@ -10,7 +9,6 @@ import { inferProviderName } from '../services/routing-utils.js';
 import { getModelDisplayName } from '../services/model-display.js';
 import { AUTOFIX_STATUS_LABELS, manifestErrorDocsUrl, isSuccessStatus } from 'manifest-shared';
 import { formatErrorClass, formatErrorOrigin } from '../services/formatters.js';
-import { isPlanRequestLimitMessage } from '../services/message-error-taxonomy.js';
 import { ModelParamsSection, RequestHeadersSection } from './MessageDetailsSections.jsx';
 import { routingTierLabel } from './message-table-types.js';
 
@@ -284,7 +282,6 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
           const hasTrigger = isAutofixRetry || isFallbackTrigger;
           const hasNextAction = isAutofixOriginal || isFallbackError;
           const isTripleLayout = hasTrigger && hasNextAction && !!m.error_message;
-          const isPlanLimitBlock = () => isPlanRequestLimitMessage(m);
           return (
             <>
               {/* ── Message section — always first ─────────────────── */}
@@ -364,22 +361,7 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                           <line x1="15" y1="9" x2="9" y2="15" />
                           <line x1="9" y1="9" x2="15" y2="15" />
                         </svg>
-                        <span>
-                          {m.error_message}
-                          <Show when={isPlanLimitBlock()}>
-                            {' '}
-                            Upgrade to Pro for unlimited requests.
-                          </Show>
-                        </span>
-                        <Show when={isPlanLimitBlock()}>
-                          <A
-                            href="/upgrade?reason=requests"
-                            class="btn btn--primary btn--sm"
-                            style="text-decoration: none; flex-shrink: 0; margin-left: 8px;"
-                          >
-                            Upgrade plan
-                          </A>
-                        </Show>
+                        <span>{m.error_message}</span>
                       </div>
                       <table class="error-autofix-row__meta-table">
                         <tbody>
@@ -441,8 +423,6 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                                     'The provider experienced an internal error.'}
                                   {m.error_class === 'no_provider_key' &&
                                     'No API key is configured for this provider.'}
-                                  {m.error_class === 'plan_request_limit_exceeded' &&
-                                    'The Manifest Free plan monthly request quota was reached.'}
                                 </span>
                               </td>
                             </tr>

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getFreeModels } from '../../src/services/api/free-models.js';
 import { submitOpenaiOAuthCallback } from '../../src/services/api/oauth.js';
 import {
   probeCustomProvider,
@@ -39,16 +38,6 @@ function mockOk(body: unknown) {
     text: () => Promise.resolve(JSON.stringify(body)),
   });
 }
-
-describe('api/free-models', () => {
-  it('fetches /free-models and returns the payload', async () => {
-    mockOk({ providers: [], last_synced_at: null });
-    const out = await getFreeModels();
-    expect(out).toEqual({ providers: [], last_synced_at: null });
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('/api/v1/free-models');
-  });
-});
 
 describe('api/oauth', () => {
   it('submitOpenaiOAuthCallback POSTs code + state as JSON', async () => {

@@ -43,30 +43,10 @@ describe('VersionIndicator', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
-  it('renders nothing when not self-hosted', () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', '');
-    const { container } = render(() => <VersionIndicator />);
-    expect(container.querySelector('.version-indicator')).toBeNull();
-  });
-
-  it("renders nothing when the flag is anything other than 'true'", () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'false');
-    const { container } = render(() => <VersionIndicator />);
-    expect(container.querySelector('.version-indicator')).toBeNull();
-  });
-
-  it('does not ask the backend for version info when not self-hosted', () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', '');
-    render(() => <VersionIndicator />);
-    expect(mockGetVersionInfo).not.toHaveBeenCalled();
-  });
-
-  it('renders v{version} when self-hosted', () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
+  it('renders v{version}', () => {
     const { container } = render(() => <VersionIndicator />);
     const badge = container.querySelector('.version-indicator');
     expect(badge).not.toBeNull();
@@ -75,7 +55,6 @@ describe('VersionIndicator', () => {
   });
 
   it('keeps the plain badge when already on the latest release', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     const { container } = render(() => <VersionIndicator />);
     await waitFor(() => expect(mockGetVersionInfo).toHaveBeenCalledTimes(1));
     expect(container.querySelector('.version-indicator__update')).toBeNull();
@@ -85,7 +64,6 @@ describe('VersionIndicator', () => {
   });
 
   it('links to the changelog when a newer release exists', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     mockGetVersionInfo.mockResolvedValue(newer());
     const { container, findByText } = render(() => <VersionIndicator />);
 
@@ -103,7 +81,6 @@ describe('VersionIndicator', () => {
   });
 
   it('shows neither an upgrade link nor a releases-behind count', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     mockGetVersionInfo.mockResolvedValue(newer());
     const { container, findByText } = render(() => <VersionIndicator />);
 
@@ -114,7 +91,6 @@ describe('VersionIndicator', () => {
   });
 
   it('hides the update notice when dismissed and remembers the dismissed version', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     mockGetVersionInfo.mockResolvedValue(newer());
     const { container, findByLabelText } = render(() => <VersionIndicator />);
 
@@ -131,7 +107,6 @@ describe('VersionIndicator', () => {
   });
 
   it('stays dismissed on later loads while the latest version is unchanged', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     localStorage.setItem(UPDATE_DISMISSED_STORAGE_KEY, '9.9.9');
     mockGetVersionInfo.mockResolvedValue(newer());
     const { container } = render(() => <VersionIndicator />);
@@ -142,7 +117,6 @@ describe('VersionIndicator', () => {
   });
 
   it('shows the notice again once an even newer version is released', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     localStorage.setItem(UPDATE_DISMISSED_STORAGE_KEY, '9.9.8');
     mockGetVersionInfo.mockResolvedValue(newer());
     const { findByText } = render(() => <VersionIndicator />);
@@ -151,7 +125,6 @@ describe('VersionIndicator', () => {
   });
 
   it('still works when localStorage is unavailable', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
@@ -167,7 +140,6 @@ describe('VersionIndicator', () => {
   });
 
   it('keeps the plain badge when the version check fails', async () => {
-    vi.stubEnv('VITE_MANIFEST_SELFHOSTED', 'true');
     mockGetVersionInfo.mockRejectedValue(new Error('network down'));
     const { container } = render(() => <VersionIndicator />);
     await waitFor(() => expect(mockGetVersionInfo).toHaveBeenCalledTimes(1));

@@ -125,7 +125,6 @@ const ERROR_CLASS_LABELS: Record<string, string> = {
   no_provider_key: 'Missing API key',
   subscription_credentials_unusable: 'Subscription credentials',
   limit_exceeded: 'Limit exceeded',
-  plan_request_limit_exceeded: 'Plan request limit',
   internal: 'Internal error',
 };
 

@@ -7,11 +7,6 @@ import {
   useOverviewColumns,
 } from '../../src/services/use-overview-range';
 
-const mockCheckIsSelfHosted = vi.fn(() => Promise.resolve(false));
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => mockCheckIsSelfHosted(),
-}));
-
 vi.mock('../../src/components/message-table-types.js', () => ({
   COMPACT_COLUMNS: ['status', 'trigger', 'date', 'model'],
 }));
@@ -19,7 +14,6 @@ vi.mock('../../src/components/message-table-types.js', () => ({
 describe('use-overview-range', () => {
   beforeEach(() => {
     localStorage.clear();
-    mockCheckIsSelfHosted.mockResolvedValue(false);
   });
 
   afterEach(() => {

@@ -1,6 +1,5 @@
 type SearchParams = Record<string, string | string[] | undefined>;
 
-const UPGRADE_PATH = '/upgrade';
 const HOME_PATH = '/';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -40,7 +39,7 @@ export function getAuthDestination(searchParams: SearchParams, rawSearch = ''): 
   if (oauthDestination) return oauthDestination;
   const redirect = firstParam(searchParams.redirect);
   if (isSafeInternalRedirect(redirect)) return redirect;
-  return firstParam(searchParams.plan) === 'pro' ? UPGRADE_PATH : HOME_PATH;
+  return HOME_PATH;
 }
 
 export function buildLoginRedirect(pathname: string, search = ''): string {
@@ -72,9 +71,6 @@ export function buildSocialAuthUrls(
 
   if (isSafeInternalRedirect(redirect)) {
     errorParams.set('redirect', redirect);
-  }
-  if (firstParam(searchParams.plan) === 'pro') {
-    errorParams.set('plan', 'pro');
   }
   // Better Auth appends the actual `error` code to this URL. Keep our fallback
   // marker separate so the callback does not contain two `error` parameters.

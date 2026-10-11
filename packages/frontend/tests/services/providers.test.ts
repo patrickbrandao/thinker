@@ -487,14 +487,9 @@ describe('PROVIDERS', () => {
     expect(ollama.minKeyLength).toBe(0);
   });
 
-  it('exposes Gemini Free as a managed free provider', () => {
-    const provider = PROVIDERS.find((entry) => entry.id === 'gemini-free')!;
-    expect(provider.name).toBe('Gemini Free');
-    expect(provider.subtitle).toBe('Free Gemini models via Manifest');
-    expect(provider.keyPlaceholder).toBe('sk-...');
-    expect(getRoutingProviderApiKeyUrl('gemini-free')).toBe(
-      'https://calendly.com/sebastien-manifest/30min',
-    );
+  it('does not list the hosted Gemini Free provider', () => {
+    expect(PROVIDERS.find((entry) => entry.id === 'gemini-free')).toBeUndefined();
+    expect(getRoutingProviderApiKeyUrl('gemini-free')).toBeUndefined();
   });
 
   it('exposes the current Meta Muse Spark catalog and Contributor warning', () => {

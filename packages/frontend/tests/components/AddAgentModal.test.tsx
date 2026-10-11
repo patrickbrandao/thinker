@@ -30,12 +30,6 @@ vi.mock('../../src/services/sse.js', () => ({
   refreshAgents: (...args: unknown[]) => mockRefreshAgents(...args),
 }));
 
-// Deployment mode drives the logs storage note in the toggle description.
-let mockIsSelfHosted = false;
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => Promise.resolve(mockIsSelfHosted),
-}));
-
 vi.mock('../../src/components/AgentTypeSelect.jsx', () => ({
   default: (props: any) => (
     <div
@@ -75,7 +69,6 @@ const renderOpen = () => {
 describe('AddAgentModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsSelfHosted = false;
     mockCreateAgent.mockResolvedValue({ agent: { name: 'new-agent' }, apiKey: 'key-1' });
     mockGetGlobalProviders.mockResolvedValue({ providers: [{ provider: 'openai' }] });
   });
@@ -295,20 +288,11 @@ describe('AddAgentModal', () => {
     });
   });
 
-  it('labels the logs toggle and shows the cloud storage note', async () => {
+  it('labels the logs toggle and shows the local storage note', () => {
     renderOpen();
     expect(screen.getByText('Enable logs')).toBeTruthy();
-    await vi.waitFor(() =>
-      expect(document.body.textContent).toContain('Logs are stored in your Manifest workspace.'),
-    );
-  });
-
-  it('shows the machine-local storage note on self-hosted', async () => {
-    mockIsSelfHosted = true;
-    renderOpen();
-    await vi.waitFor(() =>
-      expect(document.body.textContent).toContain('Logs stay in your own database.'),
-    );
+    expect(document.body.textContent).toContain('Logs stay in your own database.');
+    expect(document.body.textContent).not.toContain('Manifest workspace');
   });
 
   it('resets the category/platform to defaults when a category changes', () => {

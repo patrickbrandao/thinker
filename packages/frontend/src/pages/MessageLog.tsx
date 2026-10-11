@@ -32,7 +32,6 @@ import {
   getRoutingStatus,
 } from '../services/api.js';
 import { createCursorPagination } from '../services/cursor-pagination.js';
-import { usePlanRangeLock } from '../services/plan-range-lock.js';
 import { getModelDisplayName, preloadModelDisplayNames } from '../services/model-display.js';
 import { PROVIDERS, SPECIFICITY_STAGES } from '../services/providers.js';
 import { providerIcon } from '../components/ProviderIcon.jsx';
@@ -91,8 +90,6 @@ const normalizeStatusFilter = (value: unknown): MessageStatusFilterValue =>
 const MESSAGE_RANGE_FILTERS = ['24h', '7d', '30d', '90d', '365d'] as const;
 type MessageRangeFilter = (typeof MESSAGE_RANGE_FILTERS)[number];
 type MessageRangeFilterValue = '' | MessageRangeFilter;
-// Same Pro gating as the Overview range selector: long windows are paid.
-const PRO_RANGES = new Set(['30d', '90d', '365d']);
 
 const isMessageRangeFilter = (value: unknown): value is MessageRangeFilter =>
   typeof value === 'string' && (MESSAGE_RANGE_FILTERS as readonly string[]).includes(value);
@@ -299,8 +296,6 @@ const MessageLog: Component = () => {
   const [rangeFilter, setRangeFilterValue] = createSignal<MessageRangeFilterValue>(
     normalizeRangeFilter(searchParams.range),
   );
-  const { isFreePlan, isProRangeLocked, effectiveRange } =
-    usePlanRangeLock<MessageRangeFilterValue>(rangeFilter, PRO_RANGES, '7d');
   const [tierFilter, setTierFilter] = createSignal('');
   const [originFilter, setOriginFilter] = createSignal('');
   const [statusFilterValue, setStatusFilterValue] = createSignal<MessageStatusFilterValue>(
@@ -340,15 +335,10 @@ const MessageLog: Component = () => {
     setSearchParams({ trigger: triggerChoiceToParam(next) }, { replace: true });
   };
   const setRangeFilter = (value: string) => {
-    if (isProRangeLocked(value)) return;
     const next = normalizeRangeFilter(value);
     setRangeFilterValue(next);
     setSearchParams({ range: next || undefined }, { replace: true });
   };
-
-  createEffect(() => {
-    if (isFreePlan() && PRO_RANGES.has(rangeFilter())) setRangeFilter('7d');
-  });
 
   createEffect(
     on(
@@ -408,7 +398,7 @@ const MessageLog: Component = () => {
     }
     const status = statusFilterValue();
     if (status) q.status = status;
-    const range = effectiveRange();
+    const range = rangeFilter();
     if (range) q.range = range;
     const origin = originFilter();
     if (origin) q.origin = origin;
@@ -464,7 +454,7 @@ const MessageLog: Component = () => {
   const [messageFilterOptions] = createResource(
     () => ({
       agentName: agentFilter() || params.agentName,
-      range: effectiveRange(),
+      range: rangeFilter(),
       _ping: analyticsPing(),
     }),
     (p) => {
@@ -598,23 +588,14 @@ const MessageLog: Component = () => {
     );
   });
 
-  const proBadge = () => (
-    <span class="pro-range-badge" aria-label="Pro plan required">
-      PRO
-    </span>
-  );
-  const rangeOptions = createMemo(() => [
+  const rangeOptions = [
     { label: 'All time', value: '' },
-    ...[
-      { label: 'Last 24 hours', value: '24h' },
-      { label: 'Last 7 days', value: '7d' },
-      { label: 'Last 30 days', value: '30d' },
-      { label: 'Last 90 days', value: '90d' },
-      { label: 'Last 365 days', value: '365d' },
-    ].map((opt) =>
-      isProRangeLocked(opt.value) ? { ...opt, disabled: true, badge: proBadge() } : opt,
-    ),
-  ]);
+    { label: 'Last 24 hours', value: '24h' },
+    { label: 'Last 7 days', value: '7d' },
+    { label: 'Last 30 days', value: '30d' },
+    { label: 'Last 90 days', value: '90d' },
+    { label: 'Last 365 days', value: '365d' },
+  ];
 
   const attemptStatusOptions = [
     { label: 'All attempt statuses', value: '' },
@@ -800,7 +781,7 @@ const MessageLog: Component = () => {
             <Select
               value={rangeFilter()}
               onChange={setRangeFilter}
-              options={rangeOptions()}
+              options={rangeOptions}
               label="Period filter"
             />
           </Show>
