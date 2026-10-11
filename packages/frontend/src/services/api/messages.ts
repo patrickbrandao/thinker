@@ -1,25 +1,4 @@
 import { fetchJson, fetchMutate, type FetchJsonOptions } from './core.js';
-import type { AutofixStatus } from 'manifest-shared';
-
-/** A deterministic edit Phoenix applied to heal a request. */
-export interface AutofixOperation {
-  type: string;
-  from?: string;
-  to?: string;
-}
-
-export interface AutofixDecision {
-  status: string | null;
-  issueId: string | null;
-  patchId: string | null;
-  healAttemptId: string | null;
-  /** Phoenix's human-readable "why" for the fix (null for pre-explanation rows). */
-  explanation?: {
-    summary: string;
-    operations: Array<{ type: string; detail: string }>;
-    source: string;
-  } | null;
-}
 
 export interface AttemptRecording {
   request_body: Record<string, unknown>;
@@ -38,7 +17,6 @@ export interface MessageDetailResponse {
     agent_name: string | null;
     model: string | null;
     status: string;
-    autofix_status: AutofixStatus | null;
     error_message: string | null;
     /** Documented Manifest error code ('M100', 'M300', …). Null for provider failures. */
     error_code: string | null;
@@ -92,13 +70,6 @@ export interface MessageDetailResponse {
       appUrl?: string;
       categories?: string[];
     } | null;
-    autofix_applied: boolean;
-    autofix_role: string | null;
-    autofix_operations: AutofixOperation[] | null;
-    /** Phoenix's decision behind this provider attempt. */
-    autofix_decision: AutofixDecision | null;
-    /** The paired row (failed original ↔ successful retry), for the visual link. */
-    autofix_sibling: { id: string; role: string | null; status: string } | null;
     attempts?: Array<{
       id: string;
       model: string | null;
@@ -117,10 +88,6 @@ export interface MessageDetailResponse {
       fallback_index: number | null;
       request_headers: Record<string, string> | null;
       request_params: Record<string, unknown> | null;
-      autofix_applied: boolean;
-      autofix_role: string | null;
-      autofix_operations: AutofixOperation[] | null;
-      autofix_decision: AutofixDecision | null;
       /** Exact provider-facing payload for this Provider Attempt. */
       recording: AttemptRecording | null;
     }>;

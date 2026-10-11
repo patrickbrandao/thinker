@@ -32,14 +32,6 @@ packages/
 └── frontend/             # SolidJS single-page app (Vite, uPlot)
 ```
 
-> The Wingman gateway tester now lives in its own repository at
-> [`mnfst/wingman`](https://github.com/mnfst/wingman) and is hosted at
-> [`wingman.manifest.build`](https://wingman.manifest.build). The dashboard
-> embeds it as an iframe drawer **in dev mode only** — it is dead-code-
-> eliminated from production / self-hosted bundles. To run Wingman
-> locally instead of the hosted SPA, clone that repo and set
-> `VITE_WINGMAN_URL=http://localhost:3002` when building the frontend.
-
 Self-hosting is supported via the [Docker image](https://hub.docker.com/r/manifestdotbuild/manifest).
 
 ## Getting Started
@@ -147,14 +139,6 @@ The backend runs standalone and OpenClaw talks to it as a regular OpenAI-compati
 - Testing routing, tier assignment, or model resolution
 - Debugging the proxy or message ingestion
 - Working on the dashboard UI with live data
-
-## Wingman — gateway tester (dev only)
-
-**Wingman** is an in-browser playground for sending one-shot requests at the gateway while impersonating any of the agents/SDKs Manifest tracks (OpenClaw, Hermes, OpenAI SDK, Vercel AI SDK, LangChain, cURL, Raw). It lives in its own repo at [`mnfst/wingman`](https://github.com/mnfst/wingman) and is hosted at [`wingman.manifest.build`](https://wingman.manifest.build). The dashboard embeds it as an iframe drawer (FAB at bottom-right, or `⌘/Ctrl + Shift + W`) **only in dev mode** — it is dead-code-eliminated from production / self-hosted bundles via the `__DEV_MODE__` build constant in `packages/frontend/vite.config.ts`.
-
-Pick a profile, type a message, see the request and response side by side with the assistant's text, status pill, latency, tokens, and full headers/body dumps. Each send is saved to a localStorage history sidebar so you can compare runs and replay any of them.
-
-The hosted SPA is a static bundle with no first-party backend. Your API key is sent directly from the browser to whatever Manifest backend you configure as the base URL (the same endpoint the key is already used against); nothing is proxied through wingman.manifest.build. To point the drawer at a locally-running Wingman build instead, set `VITE_WINGMAN_URL=http://localhost:3002` when building the frontend, and run Wingman from the `mnfst/wingman` repo.
 
 ## Available Scripts
 

@@ -13,7 +13,7 @@ import { PROVIDERS } from '../services/providers.js';
 import InfoTooltip from './InfoTooltip.jsx';
 import {
   attemptSuccessRate,
-  totalAttemptsTooltip,
+  TOTAL_ATTEMPTS_TOOLTIP,
   MODEL_SUCCESS_RATE_TOOLTIP,
   type ModelReliabilityRow,
 } from '../services/api/analytics.js';
@@ -31,8 +31,6 @@ interface CostByModelRow {
 
 interface CostByModelTableProps {
   rows: CostByModelRow[];
-  /** Doctor availability drives the Total attempts tooltip wording. */
-  doctorAvailable?: boolean;
   /** Per-model reliability (Total attempts · Success rate). The three columns
       render only when reliability data is provided. */
   reliability?: ModelReliabilityRow[];
@@ -79,7 +77,7 @@ const CostByModelTable: Component<CostByModelTableProps> = (props) => {
               <>
                 <th class="rel-col">
                   Total attempts
-                  <InfoTooltip text={totalAttemptsTooltip(props.doctorAvailable ?? false)} />
+                  <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
                 </th>
                 <th class="rel-col">
                   Success rate

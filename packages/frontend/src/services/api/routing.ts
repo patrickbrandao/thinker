@@ -206,26 +206,6 @@ export function toggleComplexity(agentName: string) {
   });
 }
 
-/* -- Routing: Autofix -- */
-
-export interface AutofixConfig {
-  enabled: boolean;
-  /** True once the self-hosted install consented (modal hidden thereafter). */
-  consented?: boolean;
-}
-
-export function getAutofix(agentName: string) {
-  return fetchJson<AutofixConfig>(routingPath(agentName, 'autofix'));
-}
-
-export function updateAutofix(agentName: string, body: { enabled?: boolean }) {
-  return fetchMutate<AutofixConfig>(routingPath(agentName, 'autofix'), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
 /* -- Routing: Message recording -- */
 
 export interface RecordingConfig {

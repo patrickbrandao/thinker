@@ -31,7 +31,7 @@ describe('CostByModelTable', () => {
     ));
     expect(container.textContent).toContain('Model usage');
     const headers = Array.from(container.querySelectorAll('th')).map((h) => h.textContent?.trim());
-    // Attempt world: a model is not healed, it acts. Total attempts counts
+    // Attempt world: Total attempts counts
     // every provider call on the model; Success rate is attempt-level.
     expect(headers).toEqual(['Model', 'Tokens', '% of total', 'Cost', 'Total attempts', 'Success rate']);
     const cells = Array.from(container.querySelectorAll('tbody td')).map((c) =>
@@ -280,32 +280,19 @@ describe('CostByModelTable', () => {
     });
   });
 
-  it('words the Total attempts tooltip by Doctor availability', () => {
-    const { container, unmount } = render(() => (
-      <CostByModelTable
-        rows={[row({ model: 'gpt-4o' })]}
-        reliability={[{ model: 'gpt-4o', attempts: 10, failed: 1, succeeded: 9 }]}
-        doctorAvailable
-      />
-    ));
-    const labels = () =>
-      [...container.querySelectorAll('.info-tooltip')].map((e) => e.getAttribute('aria-label'));
-    expect(labels().join(' ')).toContain('including fallback retries and autofixed attempts');
-    unmount();
-
-    const { container: c2 } = render(() => (
+  it('words the Total attempts tooltip around fallback retries only', () => {
+    const { container } = render(() => (
       <CostByModelTable
         rows={[row({ model: 'gpt-4o' })]}
         reliability={[{ model: 'gpt-4o', attempts: 10, failed: 1, succeeded: 9 }]}
       />
     ));
-    // Without the Doctor version the sentence never mentions Autofix.
-    const labels2 = [...c2.querySelectorAll('.info-tooltip')]
+    const labels = [...container.querySelectorAll('.info-tooltip')]
       .map((e) => e.getAttribute('aria-label'))
       .join(' ');
-    expect(labels2).toContain('including fallback retries.');
-    expect(labels2).not.toContain('autofixed');
+    expect(labels).toContain('including fallback retries.');
+    expect(labels).not.toContain('autofixed');
     // Success rate carries the model-grain definition.
-    expect(labels2).toContain('Successful attempts over all attempts for this model.');
+    expect(labels).toContain('Successful attempts over all attempts for this model.');
   });
 });

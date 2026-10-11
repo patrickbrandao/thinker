@@ -49,10 +49,6 @@ vi.mock('../../src/services/agent-display-name.js', () => ({
   agentDisplayName: () => mockAgentDisplayName,
 }));
 
-vi.mock('../../src/components/NotificationBell.jsx', () => ({
-  default: () => null,
-}));
-
 import Header from '../../src/components/Header';
 import { setConnectionBreadcrumb } from '../../src/services/connection-breadcrumb-store';
 

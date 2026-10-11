@@ -41,7 +41,7 @@ import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import Sparkline from '../../components/Sparkline.jsx';
 import {
   attemptSuccessRate,
-  totalAttemptsTooltip,
+  TOTAL_ATTEMPTS_TOOLTIP,
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D,
 } from '../../services/api/analytics.js';
 import '../../styles/routing.css';
@@ -583,7 +583,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
           <div class="overview-stat-card">
             <span class="overview-stat-card__label">
               Total attempts (30d)
-              <InfoTooltip text={totalAttemptsTooltip(true)} />
+              <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
             </span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">{formatNumber(totalAttempts())}</span>
@@ -637,7 +637,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                     </Show>
                     <th class="rel-col">
                       Total attempts (30d)
-                      <InfoTooltip text={totalAttemptsTooltip(true)} />
+                      <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
                     </th>
                     <th class="rel-col">
                       Success rate (30d)

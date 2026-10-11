@@ -6,7 +6,6 @@ import ErrorState from '../components/ErrorState.jsx';
 import AgentTypeGrid from '../components/AgentTypeGrid.jsx';
 import SetupStepAddProvider from '../components/SetupStepAddProvider.jsx';
 import SetupModal from '../components/SetupModal.jsx';
-import SettingsAutofixSection from './SettingsAutofixSection.jsx';
 import SettingsRecordingSection from './SettingsRecordingSection.jsx';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { installOrigin } from '../services/install-endpoints.js';
@@ -225,9 +224,6 @@ const Settings: Component = () => {
           </div>
         </div>
       </div>
-
-      {/* -- Autofix ---------------------------------- */}
-      <SettingsAutofixSection agentName={agentName} />
 
       {/* -- Message recording ------------------------- */}
       <SettingsRecordingSection agentName={agentName} />

@@ -21,9 +21,11 @@ vi.mock('../../src/components/MessageDetailsSections.jsx', () => ({
 
 import RequestDrawer from '../../src/components/RequestDrawer';
 
+// The `autofix_*` fields mimic what a backend that predates #16 may still send:
+// the drawer must ignore them.
 const fullMessage = {
   id: 'request-1234567890',
-  status: 'auto_fixed',
+  status: 'failed',
   provider: 'openai',
   model: 'requested-model',
   model_id: 'requested-model-id',
@@ -47,7 +49,7 @@ const fullMessage = {
   attempts: [
     {
       id: 'attempt-1',
-      status: 'auto_fixed',
+      status: 'error',
       provider: 'openai',
       model: 'gpt-4o',
       model_id: 'gpt-4o-id',
@@ -114,21 +116,18 @@ describe('RequestDrawer', () => {
 
     await waitFor(() => expect(screen.getByText('Request request-1234')).toBeDefined());
     expect(mockGetMessageDetails).toHaveBeenCalledWith('request-1234567890');
-    expect(screen.getAllByText('Autofixed').length).toBeGreaterThan(0);
-    expect(screen.getByText('Autofix: Retry succeeded')).toBeDefined();
-    // The header meta row carries NO fallback/autofix badge: that story belongs
-    // to the attempts (sidebar icons + context cards), not the request title.
+    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
+    // The header meta row carries NO fallback badge: that story belongs to the
+    // attempts (sidebar icons + context cards), not the request title.
     expect(container.querySelector('.drawer__meta-row .trigger-badge')).toBeNull();
-    // The branded badges still exist further down, on the attempt content.
-    expect(screen.getAllByText('autofix').length).toBeGreaterThan(0);
-    // Sidebar attempt icons use the same branded squares.
+    // Sidebar attempt icons use the branded fallback square.
     expect(container.querySelector('.attempt-item__icon .fallback-icon')).not.toBeNull();
-    expect(container.querySelector('.attempt-item__icon .autofix-icon')).not.toBeNull();
     expect(screen.getByText('bad parameter')).toBeDefined();
     expect(screen.getByText('invalid_request')).toBeDefined();
     expect(screen.getByText('$0.0123')).toBeDefined();
-    // Autofix context card: role-aware copy + operations table.
-    expect(container.textContent).toContain('rename: old → new');
+    // Legacy autofix fields are ignored: no status line, badge or operations.
+    expect(container.textContent).not.toMatch(/autofix/i);
+    expect(container.textContent).not.toContain('rename: old → new');
 
     fireEvent.click(screen.getByText('Request headers'));
     expect(screen.getByText('alpha')).toBeDefined();
@@ -152,23 +151,7 @@ describe('RequestDrawer', () => {
   });
 
   it.each([
-    ['no_patch', 'No patch'],
-    ['resolving', 'Resolving'],
-    ['retry_succeeded', 'Retry succeeded'],
-    ['retry_failed', 'Retry failed'],
-    ['service_error', 'Service error'],
-  ] as const)('labels the %s request outcome as %s', async (autofix_status, label) => {
-    mockGetMessageDetails.mockResolvedValue({
-      message: { ...fullMessage, autofix_status },
-    });
-    render(() => <RequestDrawer messageId={`status-${autofix_status}`} onClose={vi.fn()} />);
-
-    await waitFor(() => expect(screen.getByText(`Autofix: ${label}`)).toBeDefined());
-  });
-
-  it.each([
     [{ fallback_from_model: 'old' }, 'fallback'],
-    [{ autofix_role: 'retry' }, 'autofix'],
     [{}, 'initial'],
   ])('builds a single %s attempt when no attempt array is present', async (extra, type) => {
     mockGetMessageDetails.mockResolvedValue({
@@ -179,7 +162,6 @@ describe('RequestDrawer', () => {
       autofix_applied: false,
       fallback_index: undefined,
       fallback_from_model: (extra as { fallback_from_model?: string }).fallback_from_model,
-      autofix_role: (extra as { autofix_role?: string }).autofix_role,
       request_headers: { header: 'value' },
       request_params: { max_tokens: 10 },
       cost: 0,

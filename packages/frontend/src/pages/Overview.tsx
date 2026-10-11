@@ -10,7 +10,7 @@ import {
   type Component,
 } from 'solid-js';
 import UnifiedChartCard from '../components/UnifiedChartCard.jsx';
-import AutofixKpiCards from '../components/AutofixKpiCards.jsx';
+import ReliabilityKpiCards from '../components/ReliabilityKpiCards.jsx';
 
 import FilterSelect from '../components/FilterSelect.jsx';
 import { AGENT_COLORS } from '../components/MultiAgentTokenChart.jsx';
@@ -26,7 +26,8 @@ import { agentPlatform, agentCategory } from '../services/agent-platform-store.j
 import { PROVIDERS } from '../services/providers.js';
 import { getOverview, getOverviewDetails } from '../services/api.js';
 import {
-  getAutofixTimeseries,
+  getReliabilityStats,
+  getRequestStatusTimeseries,
   getPerModelReliability,
   getPerProviderTimeseries,
   getPerProviderMessageTimeseries,
@@ -44,7 +45,6 @@ import {
 import '../styles/overview.css';
 import '../styles/charts.css';
 import '../styles/routing.css';
-import { getAutofixStats } from '../services/api/analytics.js';
 
 const AGENT_RANGE_OPTIONS = [
   { label: 'Last 24 hours', value: '24h' },
@@ -112,7 +112,7 @@ type KeyedTimeseries = {
   timeseries: Array<Record<string, number | string>>;
 };
 
-type ProviderView = 'requests' | 'selfheal' | 'cost' | 'tokens';
+type ProviderView = 'requests' | 'recovered' | 'cost' | 'tokens';
 type TimeseriesKey = { range: string; agent: string; _ping: number };
 
 const Overview: Component = () => {
@@ -264,29 +264,32 @@ const Overview: Component = () => {
     (p) => getPerProviderCostTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
   );
 
-  // ── Autofix resources ─────────────────────────────────
-  const autofixScope = createMemo(() => ({
+  // ── Reliability resources ─────────────────────────────
+  const reliabilityScope = createMemo(() => ({
     range: range(),
     agent: decodeURIComponent(params.agentName),
   }));
-  const [autofixStatsResult] = createResource(
-    () => ({ scope: autofixScope(), _ping: analyticsPing() }),
-    async (p) => ({ scope: p.scope, data: await getAutofixStats(p.scope.range, p.scope.agent) }),
+  const [reliabilityStatsResult] = createResource(
+    () => ({ scope: reliabilityScope(), _ping: analyticsPing() }),
+    async (p) => ({
+      scope: p.scope,
+      data: await getReliabilityStats(p.scope.range, p.scope.agent),
+    }),
   );
-  const currentAutofixStats = () => {
-    const result = autofixStatsResult();
-    return result?.scope === autofixScope() ? result.data : undefined;
+  const currentReliabilityStats = () => {
+    const result = reliabilityStatsResult();
+    return result?.scope === reliabilityScope() ? result.data : undefined;
   };
-  // Disposition timeseries: the Requests chart's ONLY view on this page (an
+  // Request-status timeseries: the Requests chart's ONLY view on this page (an
   // agent is the harness, and a request may touch several providers, so no
-  // other grouping is meaningful) + the Healed requests tab subset.
+  // other grouping is meaningful) + the Recovered requests tab subset.
   const [statusTimeseries] = createResource(
     () => ({
       range: range(),
       agent: decodeURIComponent(params.agentName),
       _ping: analyticsPing(),
     }),
-    (p) => getAutofixTimeseries(p.range, 'disposition', p.agent),
+    (p) => getRequestStatusTimeseries(p.range, p.agent),
   );
   const [modelReliability] = createResource(
     () => ({
@@ -309,12 +312,10 @@ const Overview: Component = () => {
   });
   const scopeChanging = () => loadedScope() !== overviewScope();
 
-  const selfHealedTs = () => {
+  const recoveredTs = () => {
     const ts = statusTimeseries();
     if (!ts) return undefined;
-    const picked = ts.keys
-      .map((k, i) => ({ k, i }))
-      .filter(({ k }) => k === 'healed' || k === 'fallback');
+    const picked = ts.keys.map((k, i) => ({ k, i })).filter(({ k }) => k === 'fallback');
     return {
       ...ts,
       keys: picked.map(({ k }) => k),
@@ -481,8 +482,8 @@ const Overview: Component = () => {
                       </p>
                     </div>
                   </Show>
-                  <AutofixKpiCards
-                    stats={currentAutofixStats()}
+                  <ReliabilityKpiCards
+                    stats={currentReliabilityStats()}
                     agentName={decodeURIComponent(params.agentName)}
                     range={range()}
                   />
@@ -493,22 +494,19 @@ const Overview: Component = () => {
                         onTabChange={setActiveView}
                         requestsValue={d().summary?.messages?.value ?? 0}
                         requestsTrendPct={d().summary?.messages?.trend_pct ?? 0}
-                        selfHealedValue={
-                          (currentAutofixStats()?.autofix_saves.value ?? 0) +
-                          (currentAutofixStats()?.fallback_saves?.value ?? 0)
-                        }
-                        selfHealedTrendPct={(() => {
-                          const s = currentAutofixStats();
+                        recoveredValue={currentReliabilityStats()?.fallback_saves?.value ?? 0}
+                        recoveredTrendPct={(() => {
+                          const s = currentReliabilityStats();
                           if (!s) return 0;
-                          const cur = s.autofix_saves.value + (s.fallback_saves?.value ?? 0);
-                          const prev = s.autofix_saves.previous + (s.fallback_saves?.previous ?? 0);
+                          const cur = s.fallback_saves?.value ?? 0;
+                          const prev = s.fallback_saves?.previous ?? 0;
                           if (prev === 0) return 0;
                           return Math.max(
                             -999,
                             Math.min(999, Math.round(((cur - prev) / prev) * 100)),
                           );
                         })()}
-                        selfHealedTimeseries={selfHealedTs()}
+                        recoveredTimeseries={recoveredTs()}
                         costValue={d().summary?.cost_today?.value ?? 0}
                         costTrendPct={d().summary?.cost_today?.trend_pct ?? 0}
                         costInfoTooltip="Actual API key costs only. Subscription usage is not included."
@@ -575,7 +573,6 @@ const Overview: Component = () => {
                   <CostByModelTable
                     rows={overviewDetails()?.cost_by_model ?? d().cost_by_model ?? []}
                     reliability={modelReliability()}
-                    doctorAvailable
                   />
                 </>
               );
