@@ -188,25 +188,6 @@
   overflow: hidden;
 }
 
-.settings-card--highlight {
-  animation: settings-highlight-blink 1.5s ease;
-}
-
-@keyframes settings-highlight-blink {
-  0% {
-    background: hsl(var(--card));
-  }
-  15% {
-    background: hsl(38, 92%, 50%, 0.15);
-  }
-  70% {
-    background: hsl(38, 92%, 50%, 0.15);
-  }
-  100% {
-    background: hsl(var(--card));
-  }
-}
-
 .settings-card__row {
   display: flex;
   align-items: center;
@@ -324,7 +305,7 @@
   padding: var(--gap-md) var(--gap-lg);
 }
 
-/* ── Settings toggle switch (e.g. Autofix) ─────────── */
+/* ── Settings toggle switch (e.g. message recording) ── */
 .settings-switch {
   display: inline-flex;
   align-items: center;

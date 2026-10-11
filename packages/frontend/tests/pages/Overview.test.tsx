@@ -84,15 +84,13 @@ const mockPerProvider = vi.fn(() => Promise.resolve({ agents: [], timeseries: []
 const mockPerProviderTokens = vi.fn((...a: unknown[]) => mockPerProvider(...a));
 const mockPerProviderMessages = vi.fn((...a: unknown[]) => mockPerProvider(...a));
 const mockPerProviderCosts = vi.fn((...a: unknown[]) => mockPerProvider(...a));
-const mockGetAutofixStats = vi.fn();
+const mockGetReliabilityStats = vi.fn();
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
-  totalAttemptsTooltip: (doctor: boolean) =>
-    doctor
-      ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-      : 'Every provider call counts here, including fallback retries. One request can produce several attempts.',
+  TOTAL_ATTEMPTS_TOOLTIP:
+    'Every provider call counts here, including fallback retries. One request can produce several attempts.',
   MODEL_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this model.',
   PROVIDER_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this provider.',
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D:
@@ -115,20 +113,13 @@ vi.mock('../../src/services/api/analytics.js', () => ({
       fallbacked_attempts: { value: 5, previous: 4 },
     }),
   getAttemptTimeseries: () => Promise.resolve({ range: '7d', by: 'metric', keys: [], buckets: [] }),
-  getWorkspaceAutofixStatus: () =>
-    Promise.resolve({ any_enabled: false, enabled_agents: [], consented: true }),
-  getAutofixStats: (...a: unknown[]) => mockGetAutofixStats(...a),
-  getAutofixTimeseries: () =>
+  getReliabilityStats: (...a: unknown[]) => mockGetReliabilityStats(...a),
+  getRequestStatusTimeseries: () =>
     Promise.resolve({ range: '7d', by: 'disposition', keys: [], buckets: [] }),
   getPerProviderReliability: () => Promise.resolve([]),
   getPerModelReliability: () => Promise.resolve([]),
-  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
+  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {} }),
 }));
-
-vi.mock('../../src/services/api/routing.js', () => ({
-  getAutofix: () => Promise.resolve({ enabled: false }),
-}));
-
 
 vi.mock('../../src/components/MultiAgentTokenChart.jsx', () => ({
   AGENT_COLORS: ['#111111', '#222222', '#333333'],
@@ -277,13 +268,11 @@ describe('Overview', () => {
     const [agentName, setAgentName] = createSignal(mockAgentName);
     agentNameBox.read = agentName;
     agentNameBox.set = setAgentName;
-    mockGetAutofixStats.mockResolvedValue({
+    mockGetReliabilityStats.mockResolvedValue({
       success_rate: { value: 0.9, previous: 0.8 },
-      autofix_saves: { value: 7, previous: 5 },
       fallback_saves: { value: 2, previous: 1 },
       total_requests: { value: 100, previous: 90 },
       errors_remaining: { value: 3, previous: 4 },
-      coverage: { rate: 0.7, previous_rate: 5 / 9 },
     });
     mockGetCustomProviders.mockResolvedValue([]);
     mockPerProvider.mockResolvedValue({ agents: [], timeseries: [] });
@@ -354,15 +343,13 @@ describe('Overview', () => {
   it('renders the new agent before secondary metrics finish loading', async () => {
     const firstAgentStats = {
       success_rate: { value: 0.9, previous: 0.8 },
-      autofix_saves: { value: 777, previous: 5 },
-      fallback_saves: { value: 2, previous: 1 },
+      fallback_saves: { value: 777, previous: 5 },
       total_requests: { value: 100, previous: 90 },
       errors_remaining: { value: 3, previous: 4 },
-      coverage: { rate: 0.7, previous_rate: 5 / 9 },
     };
     const secondAgentStats = {
       ...firstAgentStats,
-      autofix_saves: { value: 888, previous: 6 },
+      fallback_saves: { value: 888, previous: 6 },
     };
     const secondAgentOverview = {
       ...overviewData,
@@ -383,7 +370,7 @@ describe('Overview', () => {
         return value;
       });
     });
-    mockGetAutofixStats.mockImplementation((_range: string, agent: string) =>
+    mockGetReliabilityStats.mockImplementation((_range: string, agent: string) =>
       agent === 'other-agent' ? secondAgentStatsPromise : Promise.resolve(firstAgentStats),
     );
 
@@ -415,19 +402,17 @@ describe('Overview', () => {
   it('renders the critical overview when switching back before secondary metrics finish', async () => {
     const firstAgentStats = {
       success_rate: { value: 0.9, previous: 0.8 },
-      autofix_saves: { value: 777, previous: 5 },
-      fallback_saves: { value: 2, previous: 1 },
+      fallback_saves: { value: 777, previous: 5 },
       total_requests: { value: 100, previous: 90 },
       errors_remaining: { value: 3, previous: 4 },
-      coverage: { rate: 0.7, previous_rate: 5 / 9 },
     };
     const secondAgentStats = {
       ...firstAgentStats,
-      autofix_saves: { value: 888, previous: 6 },
+      fallback_saves: { value: 888, previous: 6 },
     };
     const returningAgentStats = {
       ...firstAgentStats,
-      autofix_saves: { value: 999, previous: 7 },
+      fallback_saves: { value: 999, previous: 7 },
     };
     const secondAgentOverview = {
       ...overviewData,
@@ -448,7 +433,7 @@ describe('Overview', () => {
     mockGetOverview.mockImplementation((_range: string, agent: string) =>
       Promise.resolve(agent === 'other-agent' ? secondAgentOverview : overviewData),
     );
-    mockGetAutofixStats.mockImplementation((_range: string, agent: string) => {
+    mockGetReliabilityStats.mockImplementation((_range: string, agent: string) => {
       if (agent === 'other-agent') return secondAgentStatsPromise;
       firstAgentStatsCalls += 1;
       return firstAgentStatsCalls === 1
@@ -694,17 +679,17 @@ describe('Overview', () => {
     expect(screen.getAllByText('Recovered requests').length).toBeGreaterThan(0);
   });
 
-  it('loads and renders the self-healed KPIs and tab for every tenant', async () => {
+  it('loads and renders the reliability KPIs and recovered tab for every tenant', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
     render(() => <Overview />);
 
     await vi.waitFor(() => {
       expect(screen.getAllByText('Success rate').length).toBeGreaterThan(0);
     });
-    expect(mockGetAutofixStats).toHaveBeenCalledWith('30d', 'test-agent');
+    expect(mockGetReliabilityStats).toHaveBeenCalledWith('30d', 'test-agent');
     // Tab + KPI cards share the label; both surfaces are present.
     expect(screen.getAllByText('Recovered requests').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('Recovered by Autofix')).toBeDefined();
+    expect(screen.queryByText('Recovered by Autofix')).toBeNull();
     expect(screen.getByText('Recovered by Fallback')).toBeDefined();
   });
 
@@ -1299,7 +1284,7 @@ describe('Overview', () => {
     mockGetOverview.mockResolvedValue(dataWithFallback);
     const { container } = render(() => <Overview />);
     await vi.waitFor(() => {
-      // Fallback is now surfaced in the Self-heal column, not a Model-cell badge.
+      // Fallback is now surfaced in the Recovery column, not a Model-cell badge.
       const badge = container.querySelector('[title="Fallback"]');
       expect(badge).not.toBeNull();
       expect(badge!.getAttribute('title')).toBe('Fallback');

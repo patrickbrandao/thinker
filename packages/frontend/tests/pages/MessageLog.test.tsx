@@ -25,6 +25,9 @@ vi.mock('@solidjs/router', () => ({
       get range() {
         return mockSearchParams.range;
       },
+      get trigger() {
+        return mockSearchParams.trigger;
+      },
       get model() {
         return mockSearchModelAccessor ? mockSearchModelAccessor() : mockSearchParams.model;
       },
@@ -791,10 +794,10 @@ describe('MessageLog', () => {
     });
 
     const triggerSelect = selectWithOption(container, 'All attempts');
-    expect(triggerSelect.textContent).toContain('With any recovery attempt');
-    expect(triggerSelect.textContent).toContain('With an autofix attempt');
     expect(triggerSelect.textContent).toContain('With a fallback attempt');
     expect(triggerSelect.textContent).toContain('No recovery attempt');
+    expect(triggerSelect.textContent).not.toMatch(/autofix/i);
+    expect(triggerSelect.textContent).not.toContain('With any recovery attempt');
 
     mockGetMessages.mockClear();
     await fireEvent.change(triggerSelect, { target: { value: 'fallback' } });
@@ -804,18 +807,49 @@ describe('MessageLog', () => {
       );
     });
     expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: 'fallback' }, { replace: true });
+  });
 
-    // 'With any recovery attempt' folds both kinds on the wire, so it matches
-    // exactly what the recovered-requests deep links send.
-    mockGetMessages.mockClear();
-    await fireEvent.change(selectWithOption(container, 'All attempts'), {
-      target: { value: 'any' },
-    });
+  it('reads an old ?trigger=autofix,fallback deep link as the fallback filter', async () => {
+    mockSearchParams = { trigger: 'autofix,fallback' };
+    mockGetMessages.mockResolvedValue(messagesData);
+    render(() => <MessageLog />);
+
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(
-        expect.objectContaining({ trigger: 'autofix,fallback' }),
+        expect.objectContaining({ trigger: 'fallback' }),
       );
     });
+    // The URL is rewritten to the filter actually applied.
+    expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: 'fallback' }, { replace: true });
+  });
+
+  it('strips a stale ?trigger=autofix deep link instead of keeping it in the URL', async () => {
+    mockSearchParams = { trigger: 'autofix' };
+    mockGetMessages.mockResolvedValue(messagesData);
+    render(() => <MessageLog />);
+
+    await vi.waitFor(() => {
+      expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: undefined }, { replace: true });
+    });
+    expect(mockGetMessages).not.toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: expect.anything() }),
+    );
+  });
+
+  it('leaves a current ?trigger=fallback deep link alone', async () => {
+    mockSearchParams = { trigger: 'fallback' };
+    mockGetMessages.mockResolvedValue(messagesData);
+    render(() => <MessageLog />);
+
+    await vi.waitFor(() => {
+      expect(mockGetMessages).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'fallback' }),
+      );
+    });
+    expect(mockSetSearchParams).not.toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: expect.anything() }),
+      expect.anything(),
+    );
   });
 
   it('seeds the status filter from the status search param', async () => {
@@ -1359,7 +1393,7 @@ describe('MessageLog', () => {
     mockGetMessages.mockResolvedValue(dataWithFallback);
     const { container } = render(() => <MessageLog />);
     await vi.waitFor(() => {
-      // Fallback is now shown in the Self-heal column, not a Model-cell tier badge.
+      // Fallback is now shown in the Recovery column, not a Model-cell tier badge.
       const badge = container.querySelector('[title="Fallback"]');
       expect(badge).not.toBeNull();
       expect(badge!.getAttribute('title')).toBe('Fallback');
@@ -1458,7 +1492,7 @@ describe('MessageLog', () => {
       expect(badge!.getAttribute('title')).toBe('Fallback');
     });
     // The badge lives on the recovered row, and there's exactly one (the failed
-    // original carries no fallback_from_model, so no Self-heal badge).
+    // original carries no fallback_from_model, so no Recovery badge).
     expect(container.querySelectorAll('[title="Fallback"]').length).toBe(1);
     const successRow = container.querySelector('#msg-success-1')!;
     expect(successRow.querySelector('[title="Fallback"]')).not.toBeNull();

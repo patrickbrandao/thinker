@@ -32,8 +32,6 @@ export interface MessageRow {
   cache_creation_tokens?: number | null;
   duration_ms?: number | null;
   feedback_rating?: string | null;
-  autofix_applied?: boolean;
-  autofix_role?: string | null;
   attempt_count?: number;
 }
 
@@ -54,7 +52,7 @@ export type MessageColumnKey =
   | 'duration'
   | 'status'
   | 'attempts'
-  | 'selfheal'
+  | 'recovery'
   | 'agent';
 
 // Reading order: identity first (status, when, who, what), THEN the
@@ -65,7 +63,7 @@ export const COMPACT_COLUMNS: MessageColumnKey[] = [
   'date',
   'model',
   'attempts',
-  'selfheal',
+  'recovery',
   'message',
   'cost',
   'totalTokens',
@@ -78,7 +76,7 @@ export const DETAILED_COLUMNS: MessageColumnKey[] = [
   'date',
   'model',
   'attempts',
-  'selfheal',
+  'recovery',
   'message',
   'cost',
   'totalTokens',

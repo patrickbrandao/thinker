@@ -1,12 +1,12 @@
 import { Show, Suspense, lazy, type Component, type JSX } from 'solid-js';
 import InfoTooltip from './InfoTooltip.jsx';
 import { formatNumber, formatCost } from '../services/formatters.js';
-import { RECOVERED_REQUESTS_TOOLTIP, type AutofixTimeseries } from '../services/api/analytics.js';
+import { RECOVERED_REQUESTS_TOOLTIP, type StatusTimeseries } from '../services/api/analytics.js';
 
 const MultiAgentTokenChart = lazy(() => import('./MultiAgentTokenChart.jsx'));
 const ReliabilityChart = lazy(() => import('./ReliabilityChart.jsx'));
 
-export type ChartTab = 'requests' | 'selfheal' | 'cost' | 'tokens';
+export type ChartTab = 'requests' | 'recovered' | 'cost' | 'tokens';
 
 interface AgentTimeseries {
   agents: string[];
@@ -25,14 +25,14 @@ export interface UnifiedChartCardProps {
   requestsTrendPct: number;
   agentRequestTimeseries?: AgentTimeseries;
   /** When set, the Requests tab shows this (disposition) instead of agentRequestTimeseries */
-  requestStatusTimeseries?: AutofixTimeseries;
+  requestStatusTimeseries?: StatusTimeseries;
   /** Series mode for the status chart (colors/labels): disposition by default. */
   requestStatusSeriesMode?: string;
-  // Self-healed requests tab (the recovered subset — autofix + fallback).
+  // Recovered requests tab (the subset recovered by fallback).
   // The tab renders only when the timeseries is provided.
-  selfHealedValue?: number;
-  selfHealedTrendPct?: number;
-  selfHealedTimeseries?: AutofixTimeseries;
+  recoveredValue?: number;
+  recoveredTrendPct?: number;
+  recoveredTimeseries?: StatusTimeseries;
   // Cost tab
   costValue?: number;
   costTrendPct?: number;
@@ -75,7 +75,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
     switch (props.activeTab) {
       case 'requests':
         return props.requestsLabel ?? 'Requests';
-      case 'selfheal':
+      case 'recovered':
         return 'Recovered requests';
       case 'cost':
         return 'Cost';
@@ -105,20 +105,20 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
             {trendBadge(props.requestsTrendPct)}
           </div>
         </button>
-        <Show when={props.selfHealedTimeseries}>
+        <Show when={props.recoveredTimeseries}>
           <button
             type="button"
             class="chart-card__stat chart-card__stat--clickable"
-            classList={{ 'chart-card__stat--active': props.activeTab === 'selfheal' }}
-            onClick={() => props.onTabChange('selfheal')}
+            classList={{ 'chart-card__stat--active': props.activeTab === 'recovered' }}
+            onClick={() => props.onTabChange('recovered')}
           >
             <span class="chart-card__label">
               Recovered requests
               <InfoTooltip text={RECOVERED_REQUESTS_TOOLTIP} />
             </span>
             <div class="chart-card__value-row">
-              <span class="chart-card__value">{formatNumber(props.selfHealedValue ?? 0)}</span>
-              {trendBadge(props.selfHealedTrendPct ?? 0)}
+              <span class="chart-card__value">{formatNumber(props.recoveredValue ?? 0)}</span>
+              {trendBadge(props.recoveredTrendPct ?? 0)}
             </div>
           </button>
         </Show>
@@ -159,8 +159,8 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
       <div class="chart-card__subtitle">
         <span class="chart-card__subtitle-title">{tabTitle()}</span>
         {/* The grouping filters (by status/provider/harness) only apply to the
-            other tabs — self-healed is already a fixed autofix/fallback split. */}
-        <Show when={props.seriesFilters && props.activeTab !== 'selfheal'}>
+            other tabs — recovered is already a fixed fallback subset. */}
+        <Show when={props.seriesFilters && props.activeTab !== 'recovered'}>
           <div class="chart-card__filters">{props.seriesFilters}</div>
         </Show>
       </div>
@@ -198,13 +198,13 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
               </Show>
             </Show>
           </Show>
-          <Show when={props.activeTab === 'selfheal'}>
+          <Show when={props.activeTab === 'recovered'}>
             <Show
-              when={props.selfHealedTimeseries && props.selfHealedTimeseries.buckets.length > 0}
+              when={props.recoveredTimeseries && props.recoveredTimeseries.buckets.length > 0}
               fallback={EMPTY('No recovered requests in this time range')}
             >
               <ReliabilityChart
-                timeseries={props.selfHealedTimeseries!}
+                timeseries={props.recoveredTimeseries!}
                 range={props.range}
                 seriesMode="disposition"
               />

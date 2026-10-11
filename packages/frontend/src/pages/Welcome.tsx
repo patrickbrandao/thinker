@@ -5,12 +5,10 @@ import type { AnimationPlaybackControls, AnimationSequence } from 'motion';
 import {
   For,
   Show,
-  Suspense,
   createEffect,
   createMemo,
   createResource,
   createSignal,
-  lazy,
   onCleanup,
   untrack,
   type Component,
@@ -69,13 +67,6 @@ import '../styles/routing.css';
 import '../styles/routing-providers.css';
 import '../styles/routing-modal.css';
 import '../styles/welcome.css';
-
-// Dev-only gateway tester, same compile-time gating as App.tsx: rollup drops
-// the component and its deps from production/self-hosted bundles. Mounted on
-// the activate step so the first request can be fired without leaving the UI.
-const WingmanDevTools = __DEV_MODE__
-  ? lazy(() => import('../components/WingmanDevTools.jsx'))
-  : null;
 
 type StepId = 'harness' | 'providers' | 'playground' | 'route' | 'activate';
 const STEP_ORDER: StepId[] = ['harness', 'providers', 'playground', 'route', 'activate'];
@@ -274,12 +265,8 @@ const Welcome: Component = () => {
   );
   const [creating, setCreating] = createSignal(false);
   const [harnessError, setHarnessError] = createSignal('');
-  // Both default ON, mirroring the Connect Harness modal — explicit so create
-  // always sends a choice rather than relying on the server-side inherit path
-  // (which is OFF for Autofix on self-hosted). Creating with Autofix on is
-  // itself the consent act (the backend records it), so the form shows the
-  // legal line inline instead of a consent dialog mid-onboarding.
-  const [autofixEnabled, setAutofixEnabled] = createSignal(true);
+  // Defaults ON, mirroring the Connect Harness modal — explicit so create
+  // always sends a choice rather than relying on the server-side default.
   const [logsEnabled, setLogsEnabled] = createSignal(true);
   const harnessCreated = () => !!harnessSlug();
 
@@ -302,7 +289,6 @@ const Welcome: Component = () => {
         name,
         ...(category() ? { agent_category: category()! } : {}),
         ...(platform() ? { agent_platform: platform()! } : {}),
-        autofix_enabled: autofixEnabled(),
         record_messages: logsEnabled(),
       });
       const slug = result?.agent?.name ?? name;
@@ -915,35 +901,6 @@ const Welcome: Component = () => {
                         <div class="model-params__row">
                           <div class="model-params__row-text">
                             <div class="model-params__label-title">
-                              <span>Autofix</span>
-                            </div>
-                            <div class="model-params__label-hint">
-                              Repair eligible failing requests before falling back. Failed requests
-                              are sent to Manifest Autofix for diagnosis; provider authorization
-                              credentials are never sent.
-                            </div>
-                          </div>
-                          <div class="model-params__row-control">
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={autofixEnabled()}
-                              aria-label="Autofix"
-                              class="settings-switch"
-                              classList={{ 'settings-switch--on': autofixEnabled() }}
-                              disabled={creating()}
-                              onClick={() => setAutofixEnabled(!autofixEnabled())}
-                            >
-                              <span class="settings-switch__track">
-                                <span class="settings-switch__thumb" />
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                        <div class="model-params__separator" />
-                        <div class="model-params__row">
-                          <div class="model-params__row-text">
-                            <div class="model-params__label-title">
                               <span>Enable logs</span>
                             </div>
                             <div class="model-params__label-hint">
@@ -971,27 +928,6 @@ const Welcome: Component = () => {
                       </div>
                     </div>
                   </div>
-                  <Show when={autofixEnabled()}>
-                    <p class="autofix-consent__legal welcome__legal">
-                      By enabling Autofix, you agree to Manifest&apos;s{' '}
-                      <a
-                        href="https://manifest.build/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Terms
-                      </a>{' '}
-                      and{' '}
-                      <a
-                        href="https://manifest.build/privacy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Privacy Policy
-                      </a>
-                      .
-                    </p>
-                  </Show>
                   <Show when={harnessError()}>
                     <p
                       id="welcome-harness-error"
@@ -1663,16 +1599,6 @@ const Welcome: Component = () => {
           onOpenProviderModal={() => setStep('providers')}
         />
       </Show>
-
-      {/* Dev-only: fire the first request from the UI instead of a terminal.
-          Hidden once liftoff takes over — the drawer would sit under it anyway. */}
-      {__DEV_MODE__ && WingmanDevTools && (
-        <Show when={step() === 'activate' && !agentRequestSeen()}>
-          <Suspense fallback={null}>
-            <WingmanDevTools />
-          </Suspense>
-        </Show>
-      )}
     </div>
   );
 };

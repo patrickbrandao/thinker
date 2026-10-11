@@ -61,13 +61,11 @@ vi.mock('../../src/components/ProviderIcon.jsx', () => ({
 // (uPlot) and fetches per-provider timeseries; stub both so jsdom doesn't load
 // the real chart (which calls matchMedia).
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
-  totalAttemptsTooltip: (doctor: boolean) =>
-    doctor
-      ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-      : 'Every provider call counts here, including fallback retries. One request can produce several attempts.',
+  TOTAL_ATTEMPTS_TOOLTIP:
+    'Every provider call counts here, including fallback retries. One request can produce several attempts.',
   MODEL_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this model.',
   PROVIDER_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this provider.',
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D:
@@ -90,19 +88,14 @@ vi.mock('../../src/services/api/analytics.js', () => ({
       fallbacked_attempts: { value: 0, previous: 0 },
     }),
   getAttemptTimeseries: () => Promise.resolve({ range: '7d', by: 'metric', keys: [], buckets: [] }),
-  getWorkspaceAutofixStatus: () =>
-    Promise.resolve({ any_enabled: false, enabled_agents: [], consented: true }),
-  getAutofixStats: () => Promise.resolve(null),
-  getAutofixTimeseries: () =>
+  getReliabilityStats: () => Promise.resolve(null),
+  getRequestStatusTimeseries: () =>
     Promise.resolve({ range: '7d', by: 'disposition', keys: [], buckets: [] }),
   getPerProviderReliability: () => Promise.resolve([]),
   getPerModelReliability: () => Promise.resolve([]),
-  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
+  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {} }),
 }));
 
-vi.mock('../../src/services/api/routing.js', () => ({
-  getAutofix: () => Promise.resolve({ enabled: false }),
-}));
 vi.mock('../../src/components/MultiAgentTokenChart.jsx', () => ({
   AGENT_COLORS: ['#111111', '#222222'],
   default: () => <div data-testid="multi-agent-chart" />,

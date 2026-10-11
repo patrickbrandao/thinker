@@ -3,22 +3,18 @@ import { resolve } from 'node:path';
 import { defineConfig, type ProxyOptions } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 import { codecovVitePlugin } from '@codecov/vite-plugin';
-import { resolveWingmanDrawerUrl, wingmanDevProxy } from './wingman-dev-proxy';
 
 // Dial the backend on 127.0.0.1, not `localhost`. The dev backend binds
 // 127.0.0.1 (IPv4), but on dual-stack machines `localhost` can resolve to
 // ::1 (IPv6) first, so proxied requests intermittently hit a port nothing is
-// listening on. A failed proxy hop returns no CORS headers, which the hosted
-// Wingman SPA (cross-origin, public HTTPS → loopback) then reports as a
-// spurious "CORS error".
+// listening on.
 const backendTarget = `http://127.0.0.1:${process.env.VITE_BACKEND_PORT || '3001'}`;
 
 // `nest --watch` restarts the backend on every save, and http-proxy reuses
 // keep-alive sockets that die across a restart. Without this handler Vite
-// answers the blip with a bare 502 carrying no CORS headers, so the
-// cross-origin Wingman drawer surfaces "backend momentarily unreachable" as a
-// misleading CORS failure. Echo the request Origin back on the error response
-// so the failure reads as an honest 502 the moment it happens.
+// answers the blip with a bare 502 carrying no CORS headers, which a
+// cross-origin caller reports as a misleading CORS failure. Echo the request
+// Origin back on the error response so the failure reads as an honest 502.
 const configureDevProxy: NonNullable<ProxyOptions['configure']> = (proxy) => {
   proxy.on('error', (err, req, res) => {
     // Websocket upgrades hand back a raw socket with no `writeHead`; only
@@ -48,33 +44,15 @@ const manifestVersion = (() => {
   }
 })();
 
-// The hosted Wingman SPA, and the loopback port the dev proxy republishes it
-// on. `WINGMAN_PORT` is the same knob the backend reads for its dev CORS
-// allow-list and CSP `frame-src`, so the three stay in step.
-const HOSTED_WINGMAN_URL = 'https://wingman.manifest.build';
-const wingmanUpstream = process.env.VITE_WINGMAN_URL || HOSTED_WINGMAN_URL;
-const wingmanPort = Number(process.env.WINGMAN_PORT || process.env.VITE_WINGMAN_PORT || 3002);
-const wingmanDrawerUrl = resolveWingmanDrawerUrl(wingmanUpstream, wingmanPort);
-
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   define: {
+    // The version shown by the dashboard badge. Read from the canonical
+    // package.json at build time so the dashboard never asks the backend (or
+    // anyone else) for it.
     __MANIFEST_VERSION__: JSON.stringify(manifestVersion),
-    // The Wingman drawer and the orange "Dev" header badge are dev-only
-    // affordances. They ship only when Vite runs in dev mode
-    // (`vite serve`). Any production build — Docker self-hosted, Railway
-    // cloud, anything else — gets `__DEV_MODE__ = false`, so esbuild
-    // dead-code-eliminates the FAB, drawer, and badge.
-    __DEV_MODE__: JSON.stringify(command === 'serve'),
-    // Where the drawer's iframe points. In dev this is the loopback origin the
-    // Wingman dev proxy serves on, so the iframe and the gateway share an
-    // address space — a public HTTPS iframe cannot reach a localhost gateway
-    // (see wingman-dev-proxy.ts). Empty in a production build, where the
-    // drawer is dead-code-eliminated anyway.
-    __WINGMAN_URL__: JSON.stringify(command === 'serve' ? wingmanDrawerUrl : ''),
   },
   plugins: [
     solidPlugin(),
-    wingmanDevProxy({ port: wingmanPort, upstream: wingmanUpstream }),
     codecovVitePlugin({
       enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
       bundleName: 'manifest-frontend',
@@ -84,13 +62,9 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 3000,
     // Disable Vite's built-in CORS handler. Otherwise it short-circuits
-    // OPTIONS preflights for proxied paths (e.g. `/api`, `/v1`) and
-    // strips the backend's headers — including
-    // `Access-Control-Allow-Private-Network`, which Chrome's Private
-    // Network Access enforcement now requires when the hosted Wingman
-    // SPA (https://wingman.manifest.build) calls into a loopback dev
-    // backend. The dashboard itself is same-origin, so it doesn't need
-    // Vite's CORS at all.
+    // OPTIONS preflights for proxied paths (e.g. `/api`, `/v1`) and strips
+    // the backend's own CORS headers. The dashboard itself is same-origin,
+    // so it doesn't need Vite's CORS at all.
     cors: false,
     proxy: {
       '/api': devProxyRoute,
@@ -148,4 +122,4 @@ export default defineConfig(({ command }) => ({
       ],
     },
   },
-}));
+});

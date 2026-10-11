@@ -60,13 +60,11 @@ vi.mock('../../src/services/api.js', async () => {
 });
 
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
-  totalAttemptsTooltip: (doctor: boolean) =>
-    doctor
-      ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-      : 'Every provider call counts here, including fallback retries. One request can produce several attempts.',
+  TOTAL_ATTEMPTS_TOOLTIP:
+    'Every provider call counts here, including fallback retries. One request can produce several attempts.',
   MODEL_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this model.',
   PROVIDER_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this provider.',
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D:
@@ -80,8 +78,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
     'Logical requests from this harness, one per call, whatever the number of attempts.',
   attemptSuccessRate: (row: { attempts: number; succeeded?: number }) =>
     !row.attempts || row.succeeded == null ? null : row.succeeded / row.attempts,
-  selfHealedCount: (row: { autofixed: number; fallback_saves?: number }) =>
-    row.autofixed + (row.fallback_saves ?? 0),
+  recoveredCount: (row: { fallback_saves?: number }) => row.fallback_saves ?? 0,
   successRate: (row: { requests: number; succeeded?: number }) =>
     !row.requests || row.succeeded == null ? null : row.succeeded / row.requests,
   getPerAgentReliability: () =>
@@ -90,8 +87,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
         agent_name: 'demo-agent',
         requests: 18,
         failed: 1,
-        autofixed: 1,
-        fallback_saves: 1,
+        fallback_saves: 2,
         succeeded: 17,
       },
     ]),
@@ -105,10 +101,8 @@ vi.mock('../../src/services/api/analytics.js', () => ({
       fallbacked_attempts: { value: 2, previous: 1 },
     }),
   getAttemptTimeseries: () => Promise.resolve({ range: '7d', by: 'metric', keys: [], buckets: [] }),
-  getWorkspaceAutofixStatus: () =>
-    Promise.resolve({ any_enabled: false, enabled_agents: [], consented: true }),
-  getAutofixStats: () => Promise.resolve(null),
-  getAutofixTimeseries: () =>
+  getReliabilityStats: () => Promise.resolve(null),
+  getRequestStatusTimeseries: () =>
     Promise.resolve({ range: '7d', by: 'disposition', keys: [], buckets: [] }),
   getPerProviderReliability: () =>
     Promise.resolve([
@@ -399,7 +393,7 @@ describe('GlobalOverview filter onUnselectAll', () => {
 
   it('links the recovered-requests count to the scoped Requests log', async () => {
     const { container } = render(() => <GlobalOverview />);
-    const href = '/messages?agent=demo-agent&range=7d&status=ok&trigger=autofix,fallback';
+    const href = '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback';
     const link = await waitFor(() => {
       const found = [...container.querySelectorAll('a')].find(
         (candidate) => candidate.getAttribute('href') === href,

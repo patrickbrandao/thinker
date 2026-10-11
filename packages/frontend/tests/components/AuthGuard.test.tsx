@@ -32,21 +32,10 @@ describe('AuthGuard', () => {
     mockLocation = { pathname: '/', search: '' };
   });
 
-  it('redirects to the discovery step when it is still pending for the user', async () => {
+  it('ignores a leftover discovery marker and renders the app (no post-signup detour)', async () => {
+    // Builds before #13 stored this marker after signup/setup to force a
+    // questionnaire. It must no longer route anyone anywhere.
     localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    render(() => (
-      <AuthGuard>
-        <span>Protected content</span>
-      </AuthGuard>
-    ));
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/discovery?next=%2Fwelcome', { replace: true });
-    });
-  });
-
-  it('does not redirect away from the discovery page itself while pending', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    mockLocation = { pathname: '/discovery', search: '?next=%2Fwelcome' };
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
@@ -56,8 +45,7 @@ describe('AuthGuard', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('lets the MCP consent page through even while onboarding is pending', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+  it('lets the MCP consent page through with an authenticated session', async () => {
     mockLocation = { pathname: '/consent', search: '?client_id=c' };
     render(() => (
       <AuthGuard>
@@ -77,8 +65,8 @@ describe('AuthGuard', () => {
     expect(await screen.findByText('Protected content')).toBeDefined();
   });
 
-  it('does not render children while redirecting to the pending discovery step', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+  it('does not render children while redirecting to login', async () => {
+    mockSessionData = { data: null, isPending: false };
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
@@ -130,6 +118,37 @@ describe('AuthGuard', () => {
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/login?redirect=%2F', { replace: true });
     });
+  });
+
+  it('sends an unauthenticated CLI login to /login with its PKCE query intact', async () => {
+    // Contract with the CLI login: the approval page keeps port, state and the
+    // PKCE challenge through sign-in, or the CLI never receives its code.
+    mockSessionData = { data: null, isPending: false };
+    const search = '?port=53682&state=st4te&code_challenge=abc123&code_challenge_method=S256';
+    mockLocation = { pathname: '/cli/auth', search };
+    render(() => (
+      <AuthGuard>
+        <span>CLI consent</span>
+      </AuthGuard>
+    ));
+    await vi.waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        `/login?redirect=${encodeURIComponent(`/cli/auth${search}`)}`,
+        { replace: true },
+      );
+    });
+    expect(screen.queryByText('CLI consent')).toBeNull();
+  });
+
+  it('renders the CLI consent page for an authenticated session', async () => {
+    mockLocation = { pathname: '/cli/auth', search: '?port=53682&state=st4te' };
+    render(() => (
+      <AuthGuard>
+        <span>CLI consent</span>
+      </AuthGuard>
+    ));
+    expect(await screen.findByText('CLI consent')).toBeDefined();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('preserves the protected path and query when redirecting to login', async () => {

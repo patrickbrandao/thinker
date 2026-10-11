@@ -4,7 +4,6 @@ import { useAgentName } from '../services/routing.js';
 import { authClient } from '../services/auth-client.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { agentPlatformIcon } from '../services/agent-platform-store.js';
-import NotificationBell from './NotificationBell.jsx';
 import {
   connectionBreadcrumbName,
   connectionBreadcrumbProviderId,
@@ -232,7 +231,6 @@ const Header: Component<HeaderProps> = (props) => {
           </svg>
           Docs
         </a>
-        <NotificationBell />
         <div class="header__user" style="position: relative;">
           <button
             class="header__avatar-btn"

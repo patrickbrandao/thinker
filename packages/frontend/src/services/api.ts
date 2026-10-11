@@ -9,7 +9,6 @@ export * from './api/notifications.js';
 export * from './api/oauth.js';
 export * from './api/model-params.js';
 export * from './api/playground.js';
-export * from './api/version.js';
 export {
   getProviders as getGlobalProviders,
   getProviderUsage as getGlobalProviderUsage,

@@ -8,20 +8,11 @@ import {
   onCleanup,
   type Component,
 } from 'solid-js';
-import {
-  getMessageDetails,
-  type AttemptRecording,
-  type AutofixDecision,
-} from '../services/api/messages.js';
-import {
-  AUTOFIX_STATUS_LABELS,
-  isFailedStatus,
-  isSuccessStatus,
-  type AutofixStatus,
-} from 'manifest-shared';
+import { getMessageDetails, type AttemptRecording } from '../services/api/messages.js';
+import { isFailedStatus, isSuccessStatus } from 'manifest-shared';
 import { formatParamValue } from './MessageDetailsSections.jsx';
 import { providerIcon } from './ProviderIcon.jsx';
-import { AutofixIcon, FallbackIcon } from './message-table-cells.jsx';
+import { FallbackIcon } from './message-table-cells.jsx';
 import { authBadgeFor } from './AuthBadge.js';
 import RequestMessages, { type RecordingView } from './RequestMessages.jsx';
 import '../styles/request-drawer.css';
@@ -29,7 +20,6 @@ import '../styles/request-drawer.css';
 export interface RequestDrawerProps {
   messageId: string | null;
   onClose: () => void;
-  onOpenMessage?: (id: string) => void;
 }
 
 type AttemptTab = 'details' | 'messages' | 'tools' | 'raw' | 'headers' | 'params';
@@ -37,7 +27,7 @@ type AttemptTab = 'details' | 'messages' | 'tools' | 'raw' | 'headers' | 'params
 interface Attempt {
   id: string;
   index: number;
-  type: 'initial' | 'fallback' | 'autofix';
+  type: 'initial' | 'fallback';
   status: string;
   provider: string;
   model: string;
@@ -61,11 +51,6 @@ interface Attempt {
   fallback_index?: number;
   request_headers?: Record<string, string>;
   request_params?: Record<string, unknown>;
-  autofix_applied?: boolean;
-  autofix_operations?: any;
-  autofix_decision?: AutofixDecision;
-  autofix_role?: string;
-  autofix_sibling?: any;
   recording?: AttemptRecording | null;
 }
 
@@ -83,7 +68,6 @@ function statusLabel(status: string): string {
   if (status === 'pending') return 'Pending';
   if (status === 'cancelled') return 'Cancelled';
   if (isSuccessStatus(status)) return 'Success';
-  if (status === 'auto_fixed') return 'Autofixed';
   if (status === 'rate_limited') return 'Rate limited';
   return 'Failed';
 }
@@ -121,12 +105,10 @@ function attemptErrorMessage(
   return 'Request failed without an error message.';
 }
 
-function inferType(att: any, index: number, msg: any): Attempt['type'] {
-  if (att.autofix_role === 'retry') return 'autofix';
+function inferType(att: any, index: number): Attempt['type'] {
   if (att.fallback_from_model || att.fallback_index) return 'fallback';
-  // For backend summary attempts (no autofix_role/fallback fields),
-  // use position: first = initial, rest = fallback (unless autofix on the request)
-  if (index > 0 && msg.autofix_applied) return 'autofix';
+  // For backend summary attempts (no fallback fields), use position:
+  // first = initial, rest = fallback.
   if (index > 0) return 'fallback';
   return 'initial';
 }
@@ -137,7 +119,7 @@ function buildAttempts(msg: any): Attempt[] {
     return msg.attempts.map((att: any, i: number) => ({
       id: att.id,
       index: i + 1,
-      type: inferType(att, i, msg),
+      type: inferType(att, i),
       status: att.status,
       provider: att.provider ?? msg.provider,
       model: att.model ?? msg.model ?? msg.model_id,
@@ -161,19 +143,12 @@ function buildAttempts(msg: any): Attempt[] {
       output_tokens: att.output_tokens ?? undefined,
       request_headers: att.request_headers ?? undefined,
       request_params: att.request_params ?? undefined,
-      autofix_applied: att.autofix_applied ?? false,
-      autofix_operations: att.autofix_operations ?? undefined,
-      autofix_decision: att.autofix_decision ?? msg.autofix_decision,
-      autofix_role: att.autofix_role ?? undefined,
-      autofix_sibling: att.autofix_sibling ?? msg.autofix_sibling,
       recording: att.recording ?? null,
     }));
   }
 
   // Fallback: single attempt from the message row itself
-  let type: Attempt['type'] = 'initial';
-  if (msg.fallback_from_model) type = 'fallback';
-  if (msg.autofix_role === 'retry') type = 'autofix';
+  const type: Attempt['type'] = msg.fallback_from_model ? 'fallback' : 'initial';
 
   return [
     {
@@ -203,11 +178,6 @@ function buildAttempts(msg: any): Attempt[] {
       output_tokens: msg.output_tokens,
       request_headers: msg.request_headers,
       request_params: msg.request_params,
-      autofix_applied: msg.autofix_applied,
-      autofix_operations: msg.autofix_operations,
-      autofix_decision: msg.autofix_decision,
-      autofix_role: msg.autofix_role,
-      autofix_sibling: msg.autofix_sibling,
       recording: null,
     },
   ];
@@ -288,12 +258,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
     onCleanup(() => document.removeEventListener('keydown', handler));
   }
 
-  const requestStatus = () => {
-    const msg = m();
-    if (!msg) return 'error';
-    if (msg.autofix_role === 'retry' && isSuccessStatus(msg.status)) return 'success';
-    return msg.status;
-  };
+  const requestStatus = () => m()?.status ?? 'error';
 
   const headerProvider = () => currentAttempt()?.provider ?? m()?.provider;
   const headerAuthType = () => currentAttempt()?.auth_type ?? m()?.auth_type;
@@ -329,16 +294,6 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                   <span class={`drawer-status ${requestStatusClass(requestStatus())}`}>
                     {statusLabel(requestStatus())}
                   </span>
-                  <Show when={msg().autofix_status as AutofixStatus | null}>
-                    {(autofixStatus) => (
-                      <>
-                        <span class="drawer__meta-sep">&middot;</span>
-                        <span class="drawer__meta-text">
-                          Autofix: {AUTOFIX_STATUS_LABELS[autofixStatus()]}
-                        </span>
-                      </>
-                    )}
-                  </Show>
                   <Show when={headerProvider()}>
                     <span class="drawer__meta-sep">&middot;</span>
                     <span
@@ -378,8 +333,6 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                           <span class="attempt-item__icon">
                             {att.type === 'fallback' ? (
                               <FallbackIcon />
-                            ) : att.type === 'autofix' ? (
-                              <AutofixIcon />
                             ) : (
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -568,53 +521,6 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                   Cumulative by design: the error card is never
                                   replaced by a context card. ── */}
 
-                                {/* Origin: this attempt IS the healed Autofix retry */}
-                                <Show when={att().autofix_role === 'retry'}>
-                                  <div class="drawer-context-card drawer-context-card--autofix">
-                                    <div style="margin-bottom: 8px;">
-                                      <span class="trigger-badge trigger-badge--autofix">
-                                        <AutofixIcon />
-                                        autofix
-                                      </span>
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground)); margin-bottom: 8px;">
-                                      {isSuccessStatus(att().status)
-                                        ? 'This Autofix retry recovered the request.'
-                                        : 'Manifest applied a fix and retried, but this attempt failed.'}
-                                    </div>
-                                    <Show when={att().autofix_decision?.explanation?.summary}>
-                                      <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-                                        {att().autofix_decision!.explanation!.summary}
-                                      </div>
-                                    </Show>
-                                    <Show when={att().autofix_operations}>
-                                      <table
-                                        class="error-autofix-row__meta-table"
-                                        style="--meta-table-border: hsl(222 47% 50% / 0.3); margin-top: 0;"
-                                      >
-                                        <tbody>
-                                          <For each={att().autofix_operations as any[]}>
-                                            {(op: any) => (
-                                              <tr>
-                                                <td class="error-autofix-row__meta-label">Fix</td>
-                                                <td>
-                                                  {op.type}
-                                                  {(op.args?.from ?? op.from)
-                                                    ? `: ${op.args?.from ?? op.from}`
-                                                    : ''}
-                                                  {(op.args?.to ?? op.to)
-                                                    ? ` → ${op.args?.to ?? op.to}`
-                                                    : ''}
-                                                </td>
-                                              </tr>
-                                            )}
-                                          </For>
-                                        </tbody>
-                                      </table>
-                                    </Show>
-                                  </div>
-                                </Show>
-
                                 {/* Origin: this attempt IS the fallback recovery */}
                                 <Show when={att().fallback_from_model}>
                                   <div class="drawer-context-card drawer-context-card--fallback">
@@ -651,25 +557,25 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                       }
                                     >
                                       <table
-                                        class="error-autofix-row__meta-table"
+                                        class="error-recovery-row__meta-table"
                                         style="--meta-table-border: hsl(var(--destructive) / 0.25);"
                                       >
                                         <tbody>
                                           <Show when={att().error_origin}>
                                             <tr>
-                                              <td class="error-autofix-row__meta-label">Origin</td>
+                                              <td class="error-recovery-row__meta-label">Origin</td>
                                               <td>{att().error_origin}</td>
                                             </tr>
                                           </Show>
                                           <Show when={att().error_class}>
                                             <tr>
-                                              <td class="error-autofix-row__meta-label">Type</td>
+                                              <td class="error-recovery-row__meta-label">Type</td>
                                               <td>{att().error_class}</td>
                                             </tr>
                                           </Show>
                                           <Show when={att().error_http_status}>
                                             <tr>
-                                              <td class="error-autofix-row__meta-label">
+                                              <td class="error-recovery-row__meta-label">
                                                 HTTP status
                                               </td>
                                               <td>{att().error_http_status}</td>
@@ -681,64 +587,11 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                   </div>
                                 </Show>
 
-                                {/* Consequence: this failed attempt was autofixed
-                                  and retried right after */}
-                                <Show
-                                  when={att().autofix_applied && att().autofix_role !== 'retry'}
-                                >
-                                  <div class="drawer-context-card drawer-context-card--autofix">
-                                    <div style="margin-bottom: 8px;">
-                                      <span class="trigger-badge trigger-badge--autofix">
-                                        <AutofixIcon />
-                                        autofix
-                                      </span>
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground)); margin-bottom: 8px;">
-                                      {`This attempt failed and was autofixed.${
-                                        attempts().length > att().index
-                                          ? ` Retried as attempt ${att().index + 1}.`
-                                          : ''
-                                      }`}
-                                    </div>
-                                    <Show when={att().autofix_decision?.explanation?.summary}>
-                                      <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-                                        {att().autofix_decision!.explanation!.summary}
-                                      </div>
-                                    </Show>
-                                    <Show when={att().autofix_operations}>
-                                      <table
-                                        class="error-autofix-row__meta-table"
-                                        style="--meta-table-border: hsl(222 47% 50% / 0.3); margin-top: 0;"
-                                      >
-                                        <tbody>
-                                          <For each={att().autofix_operations as any[]}>
-                                            {(op: any) => (
-                                              <tr>
-                                                <td class="error-autofix-row__meta-label">Fix</td>
-                                                <td>
-                                                  {op.type}
-                                                  {(op.args?.from ?? op.from)
-                                                    ? `: ${op.args?.from ?? op.from}`
-                                                    : ''}
-                                                  {(op.args?.to ?? op.to)
-                                                    ? ` → ${op.args?.to ?? op.to}`
-                                                    : ''}
-                                                </td>
-                                              </tr>
-                                            )}
-                                          </For>
-                                        </tbody>
-                                      </table>
-                                    </Show>
-                                  </div>
-                                </Show>
-
                                 {/* Consequence: this failed attempt was recovered by
                                   a LATER fallback attempt */}
                                 <Show
                                   when={
                                     isFailedStatus(att().status) &&
-                                    !(att().autofix_applied && att().autofix_role !== 'retry') &&
                                     attempts().length > att().index &&
                                     attempts()[att().index]?.fallback_from_model
                                   }
