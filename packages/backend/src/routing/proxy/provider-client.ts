@@ -9,6 +9,7 @@ import {
   resolveEndpointKey,
 } from './provider-endpoints';
 import { validatePublicUrl } from '../../common/utils/url-validation';
+import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
 import { injectOpenAiMessageCacheControl, injectOpenRouterCacheControl } from './cache-injection';
@@ -453,10 +454,12 @@ export class ProviderClient {
     }
     this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
 
-    // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
-    // subscription resource URLs). Re-check on every actual forward, because DNS
-    // may have rebound since the URL was first validated. LAN destinations are
-    // allowed (local models are a feature); cloud metadata is always refused.
+    // SSRF defense for user-supplied endpoint URLs (custom providers,
+    // subscription resource URLs). This re-check refuses metadata literals,
+    // names and plaintext to public hosts early with a clear message; it cannot
+    // stop DNS rebinding on its own, so the request itself goes through
+    // ssrfSafeFetch, which validates the address it actually connects to.
+    // LAN destinations are allowed (local models are a feature).
     if (endpoint.requiresSsrfRevalidation) {
       try {
         await validatePublicUrl(url, { allowPrivate: true });
@@ -466,15 +469,24 @@ export class ProviderClient {
       }
     }
 
-    const result = await this.executeFetch(url, finalHeaders, requestBody, signal, stream, {
-      isGoogle,
-      isAnthropic,
-      isChatGpt,
-      isResponses,
-      isCodeAssist,
-      responsesTextFormat: textFormat,
-      responsesToolNames: opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
-    });
+    const result = await this.executeFetch(
+      url,
+      finalHeaders,
+      requestBody,
+      signal,
+      stream,
+      {
+        isGoogle,
+        isAnthropic,
+        isChatGpt,
+        isResponses,
+        isCodeAssist,
+        responsesTextFormat: textFormat,
+        responsesToolNames:
+          opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
+      },
+      endpoint.requiresSsrfRevalidation === true,
+    );
     const response =
       !stream &&
       endpoint.format === 'openai' &&
@@ -905,6 +917,8 @@ export class ProviderClient {
       responsesTextFormat?: Record<string, unknown>;
       responsesToolNames?: ResponsesToolNames;
     },
+    // User-supplied destination: pin the connection to a validated address.
+    pinDestination = false,
   ): Promise<ForwardResult> {
     let fetchSignal: AbortSignal;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -925,8 +939,9 @@ export class ProviderClient {
     }
 
     let response: Response;
+    const doFetch = pinDestination ? ssrfSafeFetch : fetch;
     try {
-      response = await fetch(url, {
+      response = await doFetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),

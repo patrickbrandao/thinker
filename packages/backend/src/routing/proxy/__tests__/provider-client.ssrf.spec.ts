@@ -1,3 +1,7 @@
+// Pinned fetch goes through the mocked global fetch here; its own behavior is covered by ssrf-safe-fetch.spec.ts.
+jest.mock('../../../common/utils/ssrf-safe-fetch', () => ({
+  ssrfSafeFetch: jest.fn((url: string, init?: RequestInit) => globalThis.fetch(url, init)),
+}));
 // SSRF revalidation tests for ProviderClient.
 //
 // The provider-client.ts implements a defense-in-depth check
@@ -16,6 +20,8 @@ import { ProviderClient } from '../provider-client';
 import { buildCustomEndpoint, ProviderEndpoint } from '../provider-endpoints';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validatePublicUrl } = require('../../../common/utils/url-validation');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { ssrfSafeFetch } = require('../../../common/utils/ssrf-safe-fetch');
 
 const mockFetch = jest.fn();
 (globalThis as unknown as { fetch: typeof fetch }).fetch = mockFetch;
@@ -32,6 +38,7 @@ describe('ProviderClient — SSRF revalidation for custom endpoints', () => {
     client = new ProviderClient();
     mockFetch.mockReset();
     (validatePublicUrl as jest.Mock).mockReset();
+    (ssrfSafeFetch as jest.Mock).mockClear();
   });
 
   it('re-validates URL through validatePublicUrl when endpoint requires revalidation', async () => {
@@ -160,6 +167,41 @@ describe('ProviderClient — SSRF revalidation for custom endpoints', () => {
     });
 
     expect(validatePublicUrl).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a user-supplied endpoint through the pinned ssrfSafeFetch (DNS rebinding)', async () => {
+    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+    (validatePublicUrl as jest.Mock).mockResolvedValue(undefined);
+
+    await client.forward({
+      provider: 'custom:abc',
+      apiKey: 'sk-cust',
+      model: 'm',
+      body,
+      stream: false,
+      customEndpoint: buildCustomEndpoint('https://upstream.example.com/v1'),
+    });
+
+    expect(ssrfSafeFetch).toHaveBeenCalledTimes(1);
+    expect((ssrfSafeFetch as jest.Mock).mock.calls[0][0]).toBe(
+      'https://upstream.example.com/v1/chat/completions',
+    );
+    expect((ssrfSafeFetch as jest.Mock).mock.calls[0][1]).toMatchObject({ redirect: 'error' });
+  });
+
+  it('keeps built-in provider endpoints on the plain fetch', async () => {
+    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await client.forward({
+      provider: 'openai',
+      apiKey: 'sk-test',
+      model: 'gpt-4o',
+      body,
+      stream: false,
+    });
+
+    expect(ssrfSafeFetch).not.toHaveBeenCalled();
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

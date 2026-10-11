@@ -191,6 +191,34 @@ describe('isCloudMetadataIp', () => {
   it('allows public IPv6', () => {
     expect(isCloudMetadataIp('2001:db8::1')).toBe(false);
   });
+
+  it.each([
+    ['169.254.170.2', 'AWS ECS / Fargate task credentials'],
+    ['169.254.170.23', 'AWS EKS Pod Identity Agent'],
+    ['fd00:ec2::23', 'AWS EKS Pod Identity Agent (IPv6)'],
+    ['FD00:0EC2:0000:0000:0000:0000:0000:0023', 'EKS Pod Identity, uncompressed upper case'],
+    ['fd00:0ec2::0254', 'AWS IPv6 IMDS, zero-padded'],
+    ['::ffff:169.254.170.2', 'IPv4-mapped ECS credentials'],
+  ])('detects %s as cloud metadata (%s)', (ip) => {
+    expect(isCloudMetadataIp(ip)).toBe(true);
+  });
+
+  it.each([
+    ['::a9fe:a9fe', 'IPv4-compatible'],
+    ['::169.254.169.254', 'IPv4-compatible, dotted'],
+    ['64:ff9b::a9fe:a9fe', 'NAT64 well-known prefix'],
+    ['64:ff9b::169.254.169.254', 'NAT64, dotted'],
+    ['2002:a9fe:a9fe::', '6to4'],
+    ['2001:0:4136:e378:8000:63bf:5601:5601', 'Teredo (client 169.254.169.254, obfuscated)'],
+  ])('detects IMDS embedded in IPv6 %s (%s)', (ip) => {
+    expect(isCloudMetadataIp(ip)).toBe(true);
+  });
+
+  it('does not flag ordinary addresses in the embedding prefixes', () => {
+    expect(isCloudMetadataIp('64:ff9b::808:808')).toBe(false);
+    expect(isCloudMetadataIp('2002:808:808::1')).toBe(false);
+    expect(isCloudMetadataIp('::1')).toBe(false);
+  });
 });
 
 describe('isIpLiteral', () => {
@@ -435,11 +463,38 @@ describe('validatePublicUrl', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('treats unresolvable hostnames as non-fatal (LAN-only names, mDNS)', async () => {
+    it('treats a DNS failure as an error, even with allowPrivate (rebinding bypass)', async () => {
+      // A hostile resolver could fail here and answer IMDS at connect time.
       mockLookup.mockRejectedValue(new Error('ENOTFOUND'));
       await expect(
         validatePublicUrl('http://my-lan-box.local/v1', { allowPrivate: true }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow('Failed to resolve hostname');
+      await expect(
+        validatePublicUrl('http://nonexistent-xyz-thinker.invalid/', { allowPrivate: true }),
+      ).rejects.toThrow('Failed to resolve hostname');
+    });
+
+    it.each([
+      'http://169.254.170.2/v2/credentials/abc',
+      'http://169.254.170.23/v1/credentials',
+      'http://[fd00:ec2::23]/v1/credentials',
+      'http://[::ffff:169.254.170.2]/v2/metadata',
+      'http://[::a9fe:a9fe]/latest/meta-data',
+      'http://[64:ff9b::a9fe:a9fe]/latest/meta-data',
+      'http://[64:ff9b::169.254.169.254]/latest/meta-data',
+      'http://[2002:a9fe:a9fe::1]/latest/meta-data',
+      'http://[fd00:0ec2:0000::0254]/latest/meta-data',
+    ])('blocks the metadata endpoint %s even with allowPrivate', async (url) => {
+      await expect(validatePublicUrl(url, { allowPrivate: true })).rejects.toThrow(
+        'cloud metadata',
+      );
+    });
+
+    it('blocks a hostname resolving to a container credential endpoint', async () => {
+      mockLookup.mockResolvedValue([{ address: '169.254.170.2', family: 4 }] as never);
+      await expect(
+        validatePublicUrl('http://creds.example.com/', { allowPrivate: true }),
+      ).rejects.toThrow('cloud metadata');
     });
   });
 });

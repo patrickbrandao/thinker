@@ -1,3 +1,7 @@
+// Pinned fetch goes through the mocked global fetch here; its own behavior is covered by ssrf-safe-fetch.spec.ts.
+jest.mock('../../../common/utils/ssrf-safe-fetch', () => ({
+  ssrfSafeFetch: jest.fn((url: string, init?: RequestInit) => globalThis.fetch(url, init)),
+}));
 import { Buffer } from 'node:buffer';
 import { ProviderClient } from '../provider-client';
 import { buildCustomEndpoint, buildEndpointOverride } from '../provider-endpoints';

@@ -397,8 +397,10 @@ it when it finds `/run/.containerenv`.
 If you run Thinker as one Podman service and your LLM server (llama.cpp,
 Ollama, etc.) as another, point Thinker at the service name on the shared
 network — e.g. `http://llamacpp:8080/v1`. **Add custom provider** accepts
-LAN, loopback and `http://` URLs on any runtime; only cloud metadata
-endpoints (such as `169.254.169.254`) are always refused.
+LAN, loopback and `http://` URLs on any runtime, as long as the hostname
+resolves from inside the Thinker container. Cloud metadata and container
+credential endpoints (such as `169.254.169.254` or `169.254.170.2`) are always
+refused, including when a hostname starts resolving to them after it was saved.
 
 ## Environment variables
 

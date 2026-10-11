@@ -1,3 +1,7 @@
+// Pinned fetch goes through the mocked global fetch here; its own behavior is covered by ssrf-safe-fetch.spec.ts.
+jest.mock('../../common/utils/ssrf-safe-fetch', () => ({
+  ssrfSafeFetch: jest.fn((url: string, init?: RequestInit) => globalThis.fetch(url, init)),
+}));
 jest.mock('../../common/utils/url-validation', () => ({
   validatePublicUrl: jest.fn(),
 }));
@@ -14,6 +18,8 @@ import { IngestEventBusService } from '../../common/services/ingest-event-bus.se
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validatePublicUrl } = require('../../common/utils/url-validation');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { ssrfSafeFetch } = require('../../common/utils/ssrf-safe-fetch');
 
 function makeDeps(overrides: {
   findOneResults?: (CustomProvider | null)[];
@@ -1095,8 +1101,11 @@ describe('CustomProviderService', () => {
           jsonResponse({ data: [{ id: 'm1' }, { id: 'm2' }] }),
         ) as unknown as typeof fetch;
 
+      (ssrfSafeFetch as jest.Mock).mockClear();
       const result = await svc.probeModels('http://host.docker.internal:8000/v1', 'sk-x');
       expect(result).toEqual([{ model_name: 'm1' }, { model_name: 'm2' }]);
+      // The probe goes through the pinned fetch (DNS rebinding guard).
+      expect(ssrfSafeFetch).toHaveBeenCalledTimes(1);
       expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(
         'http://host.docker.internal:8000/v1/models',
       );

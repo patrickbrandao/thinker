@@ -175,6 +175,13 @@ describe('Custom Providers URL validation (e2e)', () => {
       'http://[::ffff:169.254.169.254]/latest/meta-data',
       'http://100.100.100.200/latest/meta-data',
       'http://metadata.google.internal/computeMetadata/v1/',
+      // AWS container credential endpoints (ECS/Fargate, EKS Pod Identity).
+      'http://169.254.170.2/v2/credentials/abc',
+      'http://169.254.170.23/v1/credentials',
+      'http://[fd00:ec2::23]/v1/credentials',
+      // IMDS embedded in IPv6: IPv4-compatible and NAT64.
+      'http://[::a9fe:a9fe]/latest/meta-data',
+      'http://[64:ff9b::a9fe:a9fe]/latest/meta-data',
     ])('rejects the cloud metadata endpoint %s as 400', async (url) => {
       const res = await request(app.getHttpServer())
         .post(`/api/v1/routing/${agentName}/custom-providers`)
