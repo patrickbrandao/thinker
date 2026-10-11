@@ -3,7 +3,9 @@ describe('appConfig', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    // DATABASE_URL has no default in any environment; give the config one so
+    // tests that are not about it can load. Never connected to.
+    process.env = { ...originalEnv, DATABASE_URL: 'postgresql://unit:unit@127.0.0.1:1/unit_test' };
   });
 
   afterAll(() => {
@@ -208,11 +210,16 @@ describe('appConfig', () => {
     await expect(loadConfig()).rejects.toThrow('DATABASE_URL is required');
   });
 
-  it('returns default URL when DATABASE_URL is missing in test mode', async () => {
+  it('throws when DATABASE_URL is missing in test mode (no default database)', async () => {
     delete process.env['DATABASE_URL'];
     process.env['NODE_ENV'] = 'test';
-    const config = await loadConfig();
-    expect(config.databaseUrl).toContain('postgresql://');
+    await expect(loadConfig()).rejects.toThrow('DATABASE_URL is required');
+  });
+
+  it('throws when DATABASE_URL is missing in development', async () => {
+    delete process.env['DATABASE_URL'];
+    process.env['NODE_ENV'] = 'development';
+    await expect(loadConfig()).rejects.toThrow('DATABASE_URL is required');
   });
 
   it('reads EMAIL_PROVIDER from env', async () => {

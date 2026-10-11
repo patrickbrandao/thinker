@@ -8,7 +8,26 @@ describe('computePeriodBoundaries', () => {
   it('returns periodStart and periodEnd as formatted strings', () => {
     const { periodStart, periodEnd } = computePeriodBoundaries('day');
     expect(periodStart).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
-    expect(periodEnd).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(periodEnd).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+  });
+
+  // Regression (#53): periodEnd is an exclusive bound (`timestamp < :end`) set
+  // to "now". Truncated to whole seconds it excluded every message written
+  // earlier in the current second, so a hard limit let a burst through and the
+  // soft-limit check missed fresh usage.
+  it('keeps milliseconds in periodEnd so usage from the current second is counted', () => {
+    const instant = new Date(2026, 5, 10, 11, 16, 0, 987);
+    jest.useFakeTimers().setSystemTime(instant);
+
+    for (const period of ['hour', 'day', 'week', 'month', 'unknown']) {
+      const { periodEnd } = computePeriodBoundaries(period);
+      expect(periodEnd).toBe('2026-06-10 11:16:00.987');
+      // A row stamped 500ms earlier, in the same second, falls inside.
+      const rowTs = new Date(instant.getTime() - 500);
+      expect(rowTs.getTime()).toBeLessThan(parseLocal(periodEnd).getTime());
+    }
+
+    jest.useRealTimers();
   });
 
   it('hour: start is 1 hour before the current local hour', () => {

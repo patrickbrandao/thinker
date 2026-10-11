@@ -172,6 +172,13 @@ export type {
   PlaygroundHistoryRunDetail,
 } from './playground';
 export {
+  PLAYGROUND_BLOCKED_HEADERS,
+  PLAYGROUND_BLOCKED_HEADER_PREFIXES,
+  isPlaygroundHeaderBlocked,
+  isPlaygroundHeaderNameValid,
+  isPlaygroundHeaderValueValid,
+} from './playground-headers';
+export {
   coerceContentToText,
   extractRecordedConversationMessages,
   extractRequestMessages,

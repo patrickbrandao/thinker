@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -76,24 +76,27 @@ jobs:
         env:
           POSTGRES_USER: myuser
           POSTGRES_PASSWORD: mypassword
-          POSTGRES_DB: mydatabase
+          # The e2e guard (#67) only drops a database whose name contains
+          # "test", and only with THINKER_E2E_ALLOW_DROP=1.
+          POSTGRES_DB: thinker_e2e_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U myuser -d mydatabase"
+          --health-cmd "pg_isready -U myuser -d thinker_e2e_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
       # Throwaway values for the disposable service container above.
-      DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/mydatabase
+      DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/thinker_e2e_test
+      THINKER_E2E_ALLOW_DROP: "1"
       BETTER_AUTH_SECRET: ci-test-secret-at-least-32-characters-long!!
       NODE_ENV: test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm

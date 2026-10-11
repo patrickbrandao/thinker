@@ -9,6 +9,7 @@ import {
   buildDevAllowedOrigins,
   buildProdAllowedOrigins,
 } from '../src/cors-csp-config';
+import { listenOnLoopback } from './loopback';
 
 /** An origin an operator opts in with THINKER_CORS_ORIGINS. */
 const OPERATOR_ORIGIN = 'https://tools.acme.dev';
@@ -41,7 +42,7 @@ async function buildApp(allowedOrigins: string[]): Promise<INestApplication> {
     next();
   });
   app.enableCors(buildCorsOptions(allowedOrigins));
-  await app.init();
+  await listenOnLoopback(app);
   return app;
 }
 
