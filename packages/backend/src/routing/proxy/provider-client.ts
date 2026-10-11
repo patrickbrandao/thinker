@@ -54,19 +54,8 @@ import { getBedrockRuntimeCapabilities } from '../bedrock-runtime-capabilities';
 
 export interface ForwardResult {
   response: Response;
-  /** Exact JSON body sent to the resolved provider transport. */
-  wireRequestBody?: Record<string, unknown>;
-  /** Exact URL used by the resolved provider transport. */
-  wireRequestUrl?: string;
   /** Provider-native protocol emitted at the transport boundary. */
   wireFormat?: ProviderWireFormat;
-  /** Provider-facing API shape of {@link wireRequestBody}. */
-  wireApiMode?: ProxyApiMode;
-  /** Re-send a healed wire body through the already-resolved transport. */
-  retryWireBody?: (
-    body: Record<string, unknown>,
-    attempt?: ProviderAttemptRef,
-  ) => Promise<ForwardResult>;
   /** False only when Manifest produced a response without invoking provider transport. */
   providerCallStarted?: boolean;
   /** Persisted provider-call identity, when request tracking is available. */
@@ -88,13 +77,6 @@ export interface ForwardResult {
   /** Internal: original Responses text.format metadata for synthesized Responses bodies. */
   responsesTextFormat?: Record<string, unknown>;
   responsesToolNames?: ResponsesToolNames;
-}
-
-function wireApiMode(endpoint: ProviderEndpoint): ProxyApiMode | undefined {
-  if (endpoint.format === 'openai') return 'chat_completions';
-  if (endpoint.format === 'anthropic') return 'messages';
-  if (endpoint.format === 'chatgpt') return 'responses';
-  return undefined;
 }
 
 function wireFormat(endpoint: ProviderEndpoint): ProviderWireFormat | undefined {
@@ -408,7 +390,6 @@ export class ProviderClient {
     const isChatGpt = endpoint.format === 'chatgpt' && !isResponses;
     const isCodeAssist = !!endpoint.codeAssistEnvelope;
     const textFormat = responsesTextFormat(body, opts.apiMode);
-    const resolvedWireApiMode = wireApiMode(endpoint);
     const resolvedWireFormat = wireFormat(endpoint);
     const needsChatBody =
       opts.apiMode !== undefined &&
@@ -437,9 +418,7 @@ export class ProviderClient {
         isGoogle: false,
         isAnthropic: false,
         isChatGpt: false,
-        wireRequestBody: requestSource,
         wireFormat: 'kiro_chat',
-        wireApiMode: opts.apiMode,
         responsesTextFormat: textFormat,
         responsesToolNames:
           opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
@@ -480,73 +459,55 @@ export class ProviderClient {
       extraHeaders,
     );
 
-    const retryWireBody = async (
-      wireRequestBody: Record<string, unknown>,
-      attempt: ProviderAttemptRef | undefined = opts.attempt,
-    ): Promise<ForwardResult> => {
-      if (resolvedWireFormat) {
-        attempt?.startRecording?.({
-          requestBody: wireRequestBody,
-          wireFormat: resolvedWireFormat,
-        });
-      }
-      this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
-
-      // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
-      // subscription resource URLs). Re-check every actual forward, including
-      // an immediate Autofix retry, because DNS may have rebound in between.
-      if (endpoint.requiresSsrfRevalidation) {
-        try {
-          await validatePublicUrl(url, { allowPrivate: isSelfHosted() });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          throw new Error(`Refusing to forward to disallowed URL: ${message}`);
-        }
-      }
-
-      const result = await this.executeFetch(url, finalHeaders, wireRequestBody, signal, stream, {
-        isGoogle,
-        isAnthropic,
-        isChatGpt,
-        isResponses,
-        isCodeAssist,
-        responsesTextFormat: textFormat,
-        responsesToolNames:
-          opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
-      });
-      const response =
-        !stream &&
-        endpoint.format === 'openai' &&
-        (opts.apiMode === undefined || opts.apiMode === 'chat_completions')
-          ? await qualifyEmptyChatCompletion(result.response, attempt)
-          : result.response;
-      const qualifiedResult =
-        endpointKey === 'openai-subscription'
-          ? {
-              ...result,
-              response: await qualifyChatGptResponse(response, {
-                downstreamFormat: isResponses ? 'responses' : 'chat-completions',
-              }),
-            }
-          : { ...result, response };
-      if (affinity) {
-        this.codexAffinity.capture(
-          affinity.storeKey,
-          qualifiedResult.response,
-          affinity.incarnation,
-        );
-      }
-      return {
-        ...qualifiedResult,
-        wireRequestBody,
-        wireRequestUrl: url,
+    const attempt = opts.attempt;
+    if (resolvedWireFormat) {
+      attempt?.startRecording?.({
+        requestBody,
         wireFormat: resolvedWireFormat,
-        wireApiMode: resolvedWireApiMode,
-        retryWireBody,
-      };
-    };
+      });
+    }
+    this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
 
-    return retryWireBody(requestBody);
+    // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
+    // subscription resource URLs). Re-check on every actual forward, because DNS
+    // may have rebound since the URL was first validated.
+    if (endpoint.requiresSsrfRevalidation) {
+      try {
+        await validatePublicUrl(url, { allowPrivate: isSelfHosted() });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Refusing to forward to disallowed URL: ${message}`);
+      }
+    }
+
+    const result = await this.executeFetch(url, finalHeaders, requestBody, signal, stream, {
+      isGoogle,
+      isAnthropic,
+      isChatGpt,
+      isResponses,
+      isCodeAssist,
+      responsesTextFormat: textFormat,
+      responsesToolNames: opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
+    });
+    const response =
+      !stream &&
+      endpoint.format === 'openai' &&
+      (opts.apiMode === undefined || opts.apiMode === 'chat_completions')
+        ? await qualifyEmptyChatCompletion(result.response, attempt)
+        : result.response;
+    const qualifiedResult =
+      endpointKey === 'openai-subscription'
+        ? {
+            ...result,
+            response: await qualifyChatGptResponse(response, {
+              downstreamFormat: isResponses ? 'responses' : 'chat-completions',
+            }),
+          }
+        : { ...result, response };
+    if (affinity) {
+      this.codexAffinity.capture(affinity.storeKey, qualifiedResult.response, affinity.incarnation);
+    }
+    return { ...qualifiedResult, wireFormat: resolvedWireFormat };
   }
 
   private async resolveEndpoint(

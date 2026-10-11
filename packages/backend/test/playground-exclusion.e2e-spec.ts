@@ -240,7 +240,7 @@ describe('Playground exclusion (behavioural, not SQL-shape)', () => {
 
   it('charts exactly the rows the reference predicate keeps', async () => {
     const res = await auth(
-      api().get('/api/v1/overview/autofix-timeseries?range=24h&by=disposition'),
+      api().get('/api/v1/overview/reliability/timeseries?range=24h&by=disposition'),
     ).expect(200);
     const charted = (res.body.buckets as Array<{ counts: number[] }>).reduce(
       (sum, b) => sum + b.counts.reduce((a, c) => a + Number(c), 0),

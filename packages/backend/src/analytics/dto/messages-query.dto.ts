@@ -37,7 +37,7 @@ export const MESSAGE_STATUS_FILTER_VALUES = [
 ] as const;
 export type MessageStatusFilter = (typeof MESSAGE_STATUS_FILTER_VALUES)[number];
 
-export const MESSAGE_TRIGGER_FILTER_VALUES = ['none', 'fallback', 'autofix'] as const;
+export const MESSAGE_TRIGGER_FILTER_VALUES = ['none', 'fallback'] as const;
 export type MessageTriggerFilter = (typeof MESSAGE_TRIGGER_FILTER_VALUES)[number];
 
 /**
@@ -128,9 +128,9 @@ export class MessagesQueryDto {
   })
   attempts?: string;
 
-  /** One or several (comma-separated) of: none, fallback, autofix. */
+  /** One or several (comma-separated) of: none, fallback. */
   @IsOptional()
-  @Matches(/^(none|fallback|autofix)(,(none|fallback|autofix))*$/, {
+  @Matches(/^(none|fallback)(,(none|fallback))*$/, {
     message: `trigger must be a comma-separated list of: ${MESSAGE_TRIGGER_FILTER_VALUES.join(', ')}`,
   })
   trigger?: string;

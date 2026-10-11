@@ -50,7 +50,7 @@ interface HeaderTierListRow {
 /**
  * The composite readback for everything `agent configure` writes: default
  * route + fallbacks, custom tiers with their triggers and routes, and the
- * autofix/recording toggles. (The backend's /status endpoint only reports the
+ * recording toggle. (The backend's /status endpoint only reports the
  * deprecated complexity-routing flag, so this composes the real config.)
  */
 export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
@@ -58,10 +58,9 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
 
-  const [tiers, customTiers, autofix, recording] = await Promise.all([
+  const [tiers, customTiers, recording] = await Promise.all([
     client.request('GET', agentPath(agent, '/tiers')),
     client.request('GET', agentPath(agent, '/header-tiers')),
-    client.request('GET', agentPath(agent, '/autofix')),
     client.request('GET', agentPath(agent, '/recording')),
   ]);
 
@@ -86,7 +85,6 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       fallbacks: defaultTier?.fallback_routes ?? [],
     },
     custom_tiers: custom,
-    autofix: (autofix as { enabled?: boolean } | null)?.enabled ?? null,
     recording: (recording as { enabled?: boolean } | null)?.enabled ?? null,
   });
 }
@@ -469,7 +467,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
   });
 }
 
-function toggleCommand(feature: 'autofix' | 'recording') {
+function toggleCommand(feature: 'recording') {
   return {
     get: async (io: CliIo, argv: string[]): Promise<void> => {
       const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
@@ -490,7 +488,6 @@ function toggleCommand(feature: 'autofix' | 'recording') {
   };
 }
 
-export const routingAutofix = toggleCommand('autofix');
 export const routingRecording = toggleCommand('recording');
 
 function tierParamsPath(agent: string, tier: string | undefined): string {

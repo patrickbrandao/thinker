@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentMessage } from '../entities/agent-message.entity';
 import { ManifestRequest } from '../entities/request.entity';
 import { Agent } from '../entities/agent.entity';
-import { InstallMetadata } from '../entities/install-metadata.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
 import { TenantProvider } from '../entities/tenant-provider.entity';
@@ -37,10 +36,9 @@ import { ProviderAnalyticsController } from './controllers/provider-analytics.co
 import { ErrorsController } from './controllers/errors.controller';
 import { AttemptAnalyticsController } from './controllers/attempt-analytics.controller';
 import { AttemptStatsService } from './services/attempt-stats.service';
-import { AutofixAnalyticsController } from './controllers/autofix-analytics.controller';
-import { AutofixStatsService } from './services/autofix-stats.service';
+import { ReliabilityAnalyticsController } from './controllers/reliability-analytics.controller';
+import { ReliabilityStatsService } from './services/reliability-stats.service';
 import { RequestVolumeService } from './services/request-volume.service';
-import { AutofixModule } from '../routing/autofix/autofix.module';
 import { AgentUsageDailyService } from './services/agent-usage-daily.service';
 
 @Module({
@@ -49,7 +47,6 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
       AgentMessage,
       ManifestRequest,
       Agent,
-      InstallMetadata,
       Tenant,
       CustomProvider,
       TenantProvider,
@@ -62,7 +59,6 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     OtlpModule,
     RoutingCoreModule,
     ModelPricesModule,
-    AutofixModule,
   ],
   controllers: [
     OverviewController,
@@ -75,7 +71,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     ProviderUsageController,
     ErrorsController,
     AttemptAnalyticsController,
-    AutofixAnalyticsController,
+    ReliabilityAnalyticsController,
   ],
   providers: [
     AggregationService,
@@ -90,7 +86,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     AgentAnalyticsService,
     ProviderUsageService,
     AttemptStatsService,
-    AutofixStatsService,
+    ReliabilityStatsService,
     RequestVolumeService,
     AgentUsageDailyService,
   ],
@@ -100,7 +96,6 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     AgentLifecycleService,
     TimeseriesQueriesService,
     MessagesQueryService,
-    AutofixStatsService,
   ],
 })
 export class AnalyticsModule {}

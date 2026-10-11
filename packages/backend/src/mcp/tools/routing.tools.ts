@@ -86,8 +86,8 @@ function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): bo
 }
 
 /**
- * Routing tools: readiness, default-tier fallbacks, per-agent Autofix/recording
- * switches, and the custom (header) tier lifecycle. "Custom tier" is the CLI's
+ * Routing tools: readiness, default-tier fallbacks, per-agent recording
+ * switch, and the custom (header) tier lifecycle. "Custom tier" is the CLI's
  * name for a header tier — a rule that overrides the route when a request
  * carries a matching header.
  */
@@ -233,44 +233,6 @@ export function registerRoutingTools(
               set: set as Record<string, JsonValue> | undefined,
               unset,
             });
-          })(),
-        ),
-    );
-
-  server.registerTool(
-    'manifest_routing_autofix_get',
-    {
-      title: 'Get Autofix state',
-      description: 'Report whether Autofix is effective for a harness.',
-      inputSchema: z.object({ agent: z.string().min(1) }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ agent: agentName }) =>
-      result(
-        (async () => {
-          const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-          return { enabled: deps.autofix.resolveEnabled(agent.autofix_enabled) };
-        })(),
-      ),
-  );
-
-  if (canWrite)
-    server.registerTool(
-      'manifest_routing_autofix_set',
-      {
-        title: 'Set Autofix state',
-        description: 'Enable or disable Autofix for a harness.',
-        inputSchema: z.object({ agent: z.string().min(1), enabled: z.boolean() }),
-      },
-      async ({ agent: agentName, enabled }) =>
-        result(
-          (async () => {
-            const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-            if (enabled) await deps.autofixStats.recordAutofixConsent();
-            await deps.agentRepo.update(agent.id, { autofix_enabled: enabled });
-            deps.resolveAgent.invalidate(agent.tenant_id, agentName);
-            await deps.cacheManager.del(`${agent.tenant_id}:/api/v1/autofix/status`);
-            return { enabled: deps.autofix.resolveEnabled(enabled) };
           })(),
         ),
     );
@@ -453,7 +415,7 @@ export function registerRoutingTools(
       {
         title: 'Configure an agent',
         description:
-          'Set the default route and fallback chain (or a custom header tier), and/or toggle Autofix and recording. `models` is the full chain: first is the route, the rest are fallbacks.',
+          'Set the default route and fallback chain (or a custom header tier), and/or toggle recording. `models` is the full chain: first is the route, the rest are fallbacks.',
         inputSchema: z.object({
           agent: z.string().min(1),
           models: z.array(z.string().min(1)).min(1).max(6).optional(),
@@ -465,7 +427,6 @@ export function registerRoutingTools(
             .min(1)
             .optional()
             .describe('Upsert this custom header tier instead of the default route.'),
-          autofix: z.boolean().optional(),
           recording: z.boolean().optional(),
           force: z.boolean().optional().describe('Skip the discovered-model check.'),
         }),
@@ -477,7 +438,6 @@ export function registerRoutingTools(
         auth_type,
         key_label,
         tier,
-        autofix,
         recording,
         force,
       }) =>
@@ -490,10 +450,8 @@ export function registerRoutingTools(
               provider !== undefined ||
               auth_type !== undefined ||
               key_label !== undefined;
-            if (!wantsRoute && autofix === undefined && recording === undefined) {
-              throw new Error(
-                'Nothing to configure — pass models + provider, autofix, and/or recording',
-              );
+            if (!wantsRoute && recording === undefined) {
+              throw new Error('Nothing to configure — pass models + provider and/or recording');
             }
             if (tier !== undefined && !wantsRoute)
               throw new Error('tier needs models and provider');
@@ -593,13 +551,6 @@ export function registerRoutingTools(
                   fallbacks,
                 );
               }
-            }
-            if (autofix !== undefined) {
-              if (autofix) await deps.autofixStats.recordAutofixConsent();
-              await deps.agentRepo.update(agent.id, { autofix_enabled: autofix });
-              deps.resolveAgent.invalidate(agent.tenant_id, agentName);
-              await deps.cacheManager.del(`${agent.tenant_id}:/api/v1/autofix/status`);
-              output['autofix'] = { enabled: deps.autofix.resolveEnabled(autofix) };
             }
             if (recording !== undefined) {
               await deps.agentRepo.update(agent.id, { record_messages: recording });

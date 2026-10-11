@@ -796,12 +796,12 @@ describe('MessagesQueryService', () => {
     [
       'failed',
       'at.status IN (:...failedStatuses)',
-      { failedStatuses: ['error', 'fallback_error', 'rate_limited', 'auto_fixed', 'failed'] },
+      { failedStatuses: ['error', 'fallback_error', 'rate_limited', 'failed'] },
     ],
     [
       'errors',
       'at.status IN (:...errorStatuses)',
-      { errorStatuses: ['error', 'fallback_error', 'rate_limited', 'auto_fixed', 'failed'] },
+      { errorStatuses: ['error', 'fallback_error', 'rate_limited', 'failed'] },
     ],
     ['ok', "at.status IN ('ok', 'success')", undefined],
   ])('passes %s status filter through to the query builder', async (status, clause, bindings) => {
@@ -855,23 +855,8 @@ describe('MessagesQueryService', () => {
     return andWhereSpy;
   }
 
-  it('filters autofix trigger rows by retry role', async () => {
-    const andWhereSpy = await runWithTrigger('autofix');
-    const triggerCall = andWhereSpy.mock.calls.find(
-      ([clause]) => clause === 'at.autofix_role = :triggerAutofixRole',
-    );
-    expect(triggerCall).toBeDefined();
-    expect(triggerCall?.[1]).toEqual({ triggerAutofixRole: 'retry' });
-  });
-
-  it('filters fallback trigger rows while preserving autofix precedence', async () => {
+  it('filters fallback trigger rows', async () => {
     const andWhereSpy = await runWithTrigger('fallback');
-    expect(
-      andWhereSpy.mock.calls.find(
-        ([clause]) =>
-          clause === '(at.autofix_role IS NULL OR at.autofix_role != :triggerAutofixRole)',
-      )?.[1],
-    ).toEqual({ triggerAutofixRole: 'retry' });
     expect(
       andWhereSpy.mock.calls.find(
         ([clause]) =>
@@ -882,12 +867,6 @@ describe('MessagesQueryService', () => {
 
   it('filters ordinary rows with no trigger badge', async () => {
     const andWhereSpy = await runWithTrigger('none');
-    expect(
-      andWhereSpy.mock.calls.find(
-        ([clause]) =>
-          clause === '(at.autofix_role IS NULL OR at.autofix_role != :triggerAutofixRole)',
-      )?.[1],
-    ).toEqual({ triggerAutofixRole: 'retry' });
     expect(
       andWhereSpy.mock.calls.find(
         ([clause]) => clause === "(at.fallback_from_model IS NULL OR at.fallback_from_model = '')",
@@ -1118,7 +1097,7 @@ describe('MessagesQueryService', () => {
       range: '24h',
       tenantId: 'test-user',
       limit: 20,
-      triggers: ['fallback'],
+      triggers: ['none'],
       include_filter_options: false,
     });
 
@@ -1131,7 +1110,7 @@ describe('MessagesQueryService', () => {
       range: '24h',
       tenantId: 'test-user',
       limit: 20,
-      triggers: ['autofix'],
+      triggers: ['fallback'],
       cursor: '2026-02-16 10:00:00|msg-1',
       include_filter_options: false,
     });

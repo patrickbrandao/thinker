@@ -8,7 +8,7 @@ interface GroupRow {
   count: string;
 }
 
-function makeQb(groups: GroupRow[], successful: number, autoFixed: number) {
+function makeQb(groups: GroupRow[], successful: number) {
   return {
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
@@ -18,16 +18,12 @@ function makeQb(groups: GroupRow[], successful: number, autoFixed: number) {
     groupBy: jest.fn().mockReturnThis(),
     addGroupBy: jest.fn().mockReturnThis(),
     getRawMany: jest.fn().mockResolvedValue(groups),
-    // querySuccessful resolves first, queryAutoFixed second (Promise.all order).
-    getRawOne: jest
-      .fn()
-      .mockResolvedValueOnce({ count: String(successful) })
-      .mockResolvedValue({ count: String(autoFixed) }),
+    getRawOne: jest.fn().mockResolvedValue({ count: String(successful) }),
   };
 }
 
-function makeService(groups: GroupRow[], successful: number, autoFixed = 0) {
-  const qb = makeQb(groups, successful, autoFixed);
+function makeService(groups: GroupRow[], successful: number) {
+  const qb = makeQb(groups, successful);
   const repo = {
     createQueryBuilder: jest.fn().mockReturnValue(qb),
   } as unknown as Repository<AgentMessage>;
@@ -97,26 +93,23 @@ describe('ErrorBreakdownService', () => {
     expect(result.provider_error_rate).toBeCloseTo(3 / 10, 10);
   });
 
-  it('counts requests whose Autofix retry succeeded, independent of the error groups', async () => {
-    const { service, qb } = makeService(GROUPS, 81, 7);
+  it('returns only the error and success aggregates, with no repair counter', async () => {
+    const { service } = makeService(GROUPS, 81);
     const result = await service.getBreakdown({ tenantId: 't1', range: '7d' });
 
-    expect(result.auto_fixed).toBe(7);
-    // The heal count must not inflate the error totals — it is a view over rows
-    // already inside total_errors, not a new bucket.
-    expect(result.total_errors).toBe(21);
-    const filtersAutoFixed = (qb.andWhere as jest.Mock).mock.calls
-      .flat()
-      .filter((clause): clause is string => typeof clause === 'string')
-      .join(' ');
-    expect(filtersAutoFixed).toContain("r.autofix_status = 'retry_succeeded'");
-    expect(filtersAutoFixed).toContain("retry.status IN ('ok', 'success')");
-  });
-
-  it('reports auto_fixed as 0 when nothing was healed', async () => {
-    const { service } = makeService(GROUPS, 81);
-    const result = await service.getBreakdown({ tenantId: 't1' });
-    expect(result.auto_fixed).toBe(0);
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        'by_class',
+        'by_origin',
+        'manifest_errors',
+        'provider_error_rate',
+        'provider_errors',
+        'range',
+        'successful',
+        'total_errors',
+        'transport_errors',
+      ].sort(),
+    );
   });
 
   it('defaults the range to 30d when none is supplied', async () => {

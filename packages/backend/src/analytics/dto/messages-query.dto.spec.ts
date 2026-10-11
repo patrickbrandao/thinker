@@ -73,7 +73,7 @@ describe('MessagesQueryDto', () => {
   });
 
   it('accepts each known trigger filter value', async () => {
-    for (const trigger of ['none', 'fallback', 'autofix']) {
+    for (const trigger of ['none', 'fallback']) {
       const dto = plainToInstance(MessagesQueryDto, { trigger });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
@@ -102,7 +102,7 @@ describe('MessagesQueryDto', () => {
   });
 
   it('accepts a comma-separated trigger list', async () => {
-    const dto = plainToInstance(MessagesQueryDto, { trigger: 'autofix,fallback' });
+    const dto = plainToInstance(MessagesQueryDto, { trigger: 'none,fallback' });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });

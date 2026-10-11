@@ -45,10 +45,8 @@ interface AttemptCounts {
 
 /**
  * Universal attempt aggregates. Request totals remain on
- * `overview.request_reliability`; Autofix totals remain on the adjacent
- * Autofix/error aggregates. When those surfaces are composed, the canonical
- * Autofixed attempt is the successful `autofix_role='retry'` row. No cohort
- * or eligibility predicate belongs in this service.
+ * `overview.request_reliability`. No cohort or eligibility predicate belongs
+ * in this service.
  */
 @Injectable()
 export class AttemptStatsService {
@@ -160,7 +158,7 @@ export class AttemptStatsService {
    * Attempt-status timeseries scoped to ONE provider connection: every
    * provider call counts where it ran (retries and fallback attempts
    * included), keyed by its OWN outcome. Success = ok, error = everything
-   * else. No healing notion: that belongs to requests.
+   * else. No recovery notion: that belongs to requests.
    */
   async getConnectionStatusTimeseries(params: {
     tenantId: string | null;
@@ -320,8 +318,7 @@ export class AttemptStatsService {
 
   /**
    * The connection's attempt breakdown for the header cards: totals, and the
-   * two retry families with their own outcomes. Fallback retries exist for
-   * everyone; autofixed attempts only exist with the Doctor version.
+   * fallback retries with their own outcome.
    */
   async getConnectionBreakdown(params: {
     tenantId: string | null;
@@ -336,8 +333,6 @@ export class AttemptStatsService {
     failed: number;
     fallback_retries: number;
     fallback_retries_succeeded: number;
-    autofix_attempts: number;
-    autofix_attempts_succeeded: number;
   }> {
     const empty = {
       attempts: 0,
@@ -345,8 +340,6 @@ export class AttemptStatsService {
       failed: 0,
       fallback_retries: 0,
       fallback_retries_succeeded: 0,
-      autofix_attempts: 0,
-      autofix_attempts_succeeded: 0,
     };
     if (!params.tenantId) return empty;
     const range = params.range ?? '7d';
@@ -360,11 +353,6 @@ export class AttemptStatsService {
       .addSelect(
         `COUNT(*) FILTER (WHERE at.fallback_from_model IS NOT NULL AND ${okExpr})`,
         'fallback_retries_succeeded',
-      )
-      .addSelect(`COUNT(*) FILTER (WHERE at.autofix_role = 'retry')`, 'autofix_attempts')
-      .addSelect(
-        `COUNT(*) FILTER (WHERE at.autofix_role = 'retry' AND ${okExpr})`,
-        'autofix_attempts_succeeded',
       )
       .where('at.timestamp >= :cutoff', { cutoff })
       .andWhere(sqlIsCompletedStatus('at.status'));
@@ -381,8 +369,6 @@ export class AttemptStatsService {
       failed: attempts - succeeded,
       fallback_retries: Number(row?.fallback_retries ?? 0),
       fallback_retries_succeeded: Number(row?.fallback_retries_succeeded ?? 0),
-      autofix_attempts: Number(row?.autofix_attempts ?? 0),
-      autofix_attempts_succeeded: Number(row?.autofix_attempts_succeeded ?? 0),
     };
   }
 

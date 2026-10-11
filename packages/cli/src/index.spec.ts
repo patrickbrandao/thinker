@@ -112,9 +112,6 @@ describe('run', () => {
     expect(USAGE).toMatch(/agent key show <name> \[--raw\]/);
     // --enabled belongs to `set`, not `get`.
     expect(USAGE).toContain(
-      'mnfst routing autofix get <agent> | mnfst routing autofix set <agent> --enabled true|false',
-    );
-    expect(USAGE).toContain(
       'mnfst routing recording get <agent> | mnfst routing recording set <agent> --enabled true|false',
     );
     expect(USAGE).toContain('mnfst routing params get <agent> [--tier <t>] [--model <m>]\n');

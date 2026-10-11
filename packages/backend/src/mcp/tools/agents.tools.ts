@@ -22,12 +22,6 @@ export function registerAgentTools(
     if (tenantId) await deps.agentListCache.invalidate(tenantId);
   };
 
-  // The dashboard caches a workspace Autofix verdict under this key; a create or
-  // update that flips Autofix must drop it or the sidebar keeps the old state.
-  const invalidateAutofixStatus = async (tenantId: string | null): Promise<void> => {
-    if (tenantId) await deps.cacheManager.del(`${tenantId}:/api/v1/autofix/status`);
-  };
-
   server.registerTool(
     'manifest_agent_list',
     {
@@ -104,20 +98,15 @@ export function registerAgentTools(
         name: z.string().min(1).max(100),
         agent_category: z.enum(AGENT_CATEGORIES).optional(),
         agent_platform: z.enum(AGENT_PLATFORMS).optional(),
-        autofix_enabled: z.boolean().optional(),
         record_messages: z.boolean().optional(),
       }),
     },
-    async ({ name, agent_category, agent_platform, autofix_enabled, record_messages }) =>
+    async ({ name, agent_category, agent_platform, record_messages }) =>
       result(
         (async () => {
           const slug = slugify(name);
           if (!slug) throw new Error('Agent name produces an empty slug');
           if (slug === PLAYGROUND_AGENT_SLUG) throw new Error('"Playground" is a reserved name');
-          if (autofix_enabled === true) {
-            await deps.autofixStats.recordAutofixConsent();
-            await invalidateAutofixStatus(operator.tenantId);
-          }
           const created = await deps.apiKeys.onboardAgent({
             tenantId: operator.tenantId,
             ownerUserId: operator.userId,
@@ -125,7 +114,6 @@ export function registerAgentTools(
             displayName: name.trim(),
             agentCategory: agent_category,
             agentPlatform: agent_platform,
-            autofixEnabled: autofix_enabled,
             recordMessages: record_messages,
           });
           try {
@@ -141,11 +129,9 @@ export function registerAgentTools(
               // Best effort: the caller sees the provider error either way.
             }
             await invalidate(created.tenantId);
-            await invalidateAutofixStatus(created.tenantId);
             throw error;
           }
           await invalidate(created.tenantId);
-          await invalidateAutofixStatus(created.tenantId);
           deps.eventBus.emit(created.tenantId, 'agent', operator.userId);
           return {
             agent: {
@@ -213,7 +199,6 @@ export function registerAgentTools(
         (async () => {
           await deps.lifecycle.deleteAgent(operator.tenantId, agent);
           await invalidate(operator.tenantId);
-          await invalidateAutofixStatus(operator.tenantId);
           deps.eventBus.emit(operator.tenantId, 'agent', operator.userId);
           return { deleted: true, agent };
         })(),

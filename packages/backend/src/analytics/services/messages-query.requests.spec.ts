@@ -315,19 +315,20 @@ describe('MessagesQueryService request-first queries', () => {
       tenantId: 'tenant-1',
       limit: 10,
       connections: ['conn-1'],
-      triggers: ['autofix', 'fallback'],
+      triggers: ['none', 'fallback'],
       include_total: false,
       include_filter_options: false,
     });
 
     const clause = requestQb.andWhere.mock.calls
       .map((call) => String(call[0]))
-      .find((c) => c.includes('trigger_attempt.autofix_applied'));
+      .find((c) => c.includes('trigger_attempt.fallback_from_model'));
     expect(clause).toBeDefined();
     // Both kinds OR together...
-    expect(clause).toContain('trigger_attempt.fallback_from_model IS NOT NULL');
+    expect(clause).toContain('EXISTS');
+    expect(clause).toContain('NOT EXISTS');
     expect(clause).toContain(' OR ');
-    // ...and each recovery attempt must be ON a selected connection.
+    // ...and the fallback attempt must be ON a selected connection.
     expect(clause).toContain('trigger_attempt.tenant_provider_id');
   });
 
@@ -528,7 +529,7 @@ describe('MessagesQueryService request-first queries', () => {
         tenantId: null,
         status: 'ok' as const,
         origin: 'provider' as const,
-        triggers: ['autofix' as const],
+        triggers: ['none' as const],
       },
     ],
     [
@@ -673,15 +674,14 @@ describe('MessagesQueryService request-first queries', () => {
       expect(clause).not.toContain('requestCutoff');
     });
 
-    it('tests "no recovery attempt" as two anti-joins, one per recovery kind', async () => {
+    it('tests "no recovery attempt" as one anti-join on the fallback attempt', async () => {
       const { requestQb } = await run({ tenantId: 'tenant-1', range: '7d', triggers: ['none'] });
 
       const clause = requestQb.andWhere.mock.calls
         .map((call) => String(call[0]))
         .find((c) => c.includes('trigger_attempt'));
-      expect(clause?.match(/NOT EXISTS/g)).toHaveLength(2);
-      expect(clause).toMatch(/autofix_applied = true\s+\)\s+AND NOT EXISTS/);
-      expect(clause).not.toContain('autofix_applied = true OR');
+      expect(clause?.match(/NOT EXISTS/g)).toHaveLength(1);
+      expect(clause).toContain('trigger_attempt.fallback_from_model IS NOT NULL');
     });
 
     it('resolves the harness to its id first so Postgres plans with the value', async () => {

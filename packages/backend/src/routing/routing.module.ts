@@ -10,7 +10,6 @@ import { OAuthModule } from './oauth/oauth.module';
 import { CustomProviderModule } from './custom-provider/custom-provider.module';
 import { ResolveModule } from './resolve/resolve.module';
 import { HeaderTiersModule } from './header-tiers/header-tiers.module';
-import { AutofixModule } from './autofix/autofix.module';
 import { ProviderController } from './provider.controller';
 import { TierController } from './tier.controller';
 import { ModelController } from './model.controller';
@@ -29,7 +28,6 @@ import { Tenant } from '../entities/tenant.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { HeaderTier } from '../entities/header-tier.entity';
-import { InstallMetadata } from '../entities/install-metadata.entity';
 
 @Module({
   imports: [
@@ -42,7 +40,6 @@ import { InstallMetadata } from '../entities/install-metadata.entity';
       TierAssignment,
       SpecificityAssignment,
       HeaderTier,
-      InstallMetadata,
     ]),
     RoutingCoreModule,
     ModelPricesModule,
@@ -54,7 +51,6 @@ import { InstallMetadata } from '../entities/install-metadata.entity';
     CustomProviderModule,
     ResolveModule,
     HeaderTiersModule,
-    AutofixModule,
     RouteModelParamsModule,
   ],
   controllers: [

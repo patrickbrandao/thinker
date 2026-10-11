@@ -532,20 +532,13 @@ describe('selectMessageRowColumns', () => {
     expect(nameCall).toEqual(['cp.name', 'custom_provider_name']);
   });
 
-  it('projects autofix_applied and autofix_role for Autofix rendering', () => {
+  it('projects no repair columns', () => {
     const { qb, addSelectCalls } = makeMockQb();
     selectMessageRowColumns(qb, 'cost');
 
-    expect(addSelectCalls.find(([, a]) => a === 'autofix_applied')).toEqual([
-      'at.autofix_applied',
-      'autofix_applied',
-    ]);
-    expect(addSelectCalls.find(([, a]) => a === 'autofix_role')).toEqual([
-      'at.autofix_role',
-      'autofix_role',
-    ]);
-    expect(MESSAGE_ROW_SELECT_ALIASES).toContain('autofix_applied');
-    expect(MESSAGE_ROW_SELECT_ALIASES).toContain('autofix_role');
+    const aliases = addSelectCalls.map(([, alias]) => alias);
+    expect(aliases.filter((alias) => String(alias).startsWith('auto'))).toEqual([]);
+    expect(MESSAGE_ROW_SELECT_ALIASES.filter((alias) => alias.startsWith('auto'))).toEqual([]);
   });
 
   it('keys the join on the custom:-prefixed provider id', () => {
@@ -571,13 +564,7 @@ describe('sqlCountMessages', () => {
   });
 
   it('keeps the shared error-status set for request log filters', () => {
-    expect(ERROR_MESSAGE_STATUSES).toEqual([
-      'error',
-      'fallback_error',
-      'rate_limited',
-      'auto_fixed',
-      'failed',
-    ]);
+    expect(ERROR_MESSAGE_STATUSES).toEqual(['error', 'fallback_error', 'rate_limited', 'failed']);
   });
 });
 

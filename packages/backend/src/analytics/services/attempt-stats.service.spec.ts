@@ -63,7 +63,6 @@ describe('AttemptStatsService', () => {
       expect(
         qb.andWhere.mock.calls.some(([clause]) => String(clause).includes('liveAgentName')),
       ).toBe(true);
-      expect(qb.addSelect.mock.calls.flat()).not.toContain('autofix_role');
     }
   });
 
@@ -217,15 +216,13 @@ describe('AttemptStatsService', () => {
     ]);
   });
 
-  it('computes the connection breakdown with both retry families', async () => {
+  it('computes the connection breakdown with its fallback retries', async () => {
     const qb = mockQueryBuilder({
       rawOne: {
         attempts: '216',
         succeeded: '162',
         fallback_retries: '10',
         fallback_retries_succeeded: '8',
-        autofix_attempts: '12',
-        autofix_attempts_succeeded: '10',
       },
     });
     const service = makeService([qb]);
@@ -237,12 +234,10 @@ describe('AttemptStatsService', () => {
       failed: 54,
       fallback_retries: 10,
       fallback_retries_succeeded: 8,
-      autofix_attempts: 12,
-      autofix_attempts_succeeded: 10,
     });
     const selects = qb.addSelect.mock.calls.flat().join(' ');
-    // A fallback is a retry; an autofix produces an attempt (autofix_role).
+    // A fallback is a retry, and the only retry family left.
     expect(selects).toContain('at.fallback_from_model IS NOT NULL');
-    expect(selects).toContain("at.autofix_role = 'retry'");
+    expect(selects).not.toMatch(/auto_?fix/);
   });
 });

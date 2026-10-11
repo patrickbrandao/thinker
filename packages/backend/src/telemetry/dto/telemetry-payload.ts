@@ -50,8 +50,7 @@ export interface TelemetryPayloadV1 {
 
   /**
    * Requests that ended `failed` over the same window. Together with
-   * `errors_by_class` this gives the receiver error visibility for installs
-   * whose failures never reach the Phoenix heal path.
+   * `errors_by_class` this gives the receiver error visibility.
    */
   errors_total?: number;
 

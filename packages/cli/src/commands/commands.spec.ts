@@ -2071,8 +2071,6 @@ describe('requests get', () => {
       header_tier_color: null,
       provider_key_label: null,
       custom_provider_name: null,
-      autofix_applied: false,
-      autofix_role: null,
       cache_read_tokens: '0',
       cache_creation_tokens: '0',
     };
@@ -2103,13 +2101,12 @@ describe('requests get', () => {
     expect(full).toHaveProperty('cache_read_tokens');
   });
 
-  it('keeps meaningful conditionals: custom tier, fallback, autofix', async () => {
+  it('keeps meaningful conditionals: custom tier, fallback', async () => {
     const row = {
       id: 'r2',
       status: 'ok',
       header_tier_name: 'deep',
       fallback_from_model: 'grok-4.5',
-      autofix_applied: true,
       custom_provider_name: 'My LiteLLM',
     };
     const { io } = authedIo([{ status: 200, body: { items: [row], next_cursor: null } }]);
@@ -2117,7 +2114,6 @@ describe('requests get', () => {
     expect((io.lastJson() as { requests: object[] }).requests[0]).toMatchObject({
       header_tier_name: 'deep',
       fallback_from_model: 'grok-4.5',
-      autofix_applied: true,
       custom_provider_name: 'My LiteLLM',
     });
   });
@@ -2188,7 +2184,6 @@ describe('routing commands', () => {
           },
         ],
       },
-      { status: 200, body: { enabled: true } },
       { status: 200, body: { enabled: false } },
     ]);
     expect(await run(io, ['routing', 'status', 'John'])).toBe(0);
@@ -2197,7 +2192,6 @@ describe('routing commands', () => {
       [
         `${HOST}/api/v1/routing/john/tiers`,
         `${HOST}/api/v1/routing/john/header-tiers`,
-        `${HOST}/api/v1/routing/john/autofix`,
         `${HOST}/api/v1/routing/john/recording`,
       ].sort(),
     );
@@ -2216,7 +2210,6 @@ describe('routing commands', () => {
           fallbacks: [],
         },
       ],
-      autofix: true,
       recording: false,
     });
   });
@@ -2225,7 +2218,6 @@ describe('routing commands', () => {
     const { io } = authedIo([
       { status: 200, body: [] },
       { status: 200, body: [] },
-      { status: 200, body: { enabled: false } },
       { status: 200, body: { enabled: false } },
     ]);
     expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
@@ -2493,20 +2485,18 @@ describe('routing commands', () => {
     expect(calls[0].url).toBe(`${HOST}/api/v1/routing/john/tiers/default`);
   });
 
-  it('agent configure toggles autofix/recording, alone or combined', async () => {
-    const { io, calls } = authedIo([
-      { status: 200, body: { enabled: true } },
-      { status: 200, body: { enabled: false } },
-    ]);
-    expect(
-      await run(io, ['agent', 'configure', 'john', '--autofix', 'true', '--recording', 'false']),
-    ).toBe(0);
-    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/john/autofix`);
-    expect(calls[1].url).toBe(`${HOST}/api/v1/routing/john/recording`);
-    expect(io.lastJson()).toMatchObject({
-      autofix: { enabled: true },
-      recording: { enabled: false },
-    });
+  it('agent configure toggles recording alone', async () => {
+    const { io, calls } = authedIo([{ status: 200, body: { enabled: false } }]);
+    expect(await run(io, ['agent', 'configure', 'john', '--recording', 'false'])).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/john/recording`);
+    expect(io.lastJson()).toMatchObject({ recording: { enabled: false } });
+  });
+
+  it('agent configure rejects the removed --autofix flag', async () => {
+    const { io, calls } = authedIo([]);
+    expect(await run(io, ['agent', 'configure', 'john', '--autofix', 'true'])).toBe(1);
+    expect(calls).toHaveLength(0);
   });
 
   it('agent configure validates its input combinations', async () => {
@@ -2515,9 +2505,9 @@ describe('routing commands', () => {
     expect(io.lastJson()).toMatchObject({ error: 'missing_flag' });
 
     const { io: io2 } = authedIo([]);
-    // --autofix keeps the command non-empty so the tier-needs-route rule fires
+    // --recording keeps the command non-empty so the tier-needs-route rule fires
     expect(
-      await run(io2, ['agent', 'configure', 'john', '--tier', 'test', '--autofix', 'true']),
+      await run(io2, ['agent', 'configure', 'john', '--tier', 'test', '--recording', 'true']),
     ).toBe(1);
     expect((io2.lastJson() as { message: string }).message).toContain('--tier needs');
 
@@ -2995,17 +2985,21 @@ describe('routing commands', () => {
     expect(io3.lastJson()).toMatchObject({ error: 'invalid_flag' });
   });
 
-  it('autofix and recording get/set wrap GET/PATCH with a strict boolean', async () => {
+  it('recording get/set wrap GET/PATCH with a strict boolean', async () => {
     const { io, calls } = authedIo([{ status: 200, body: { enabled: true } }]);
-    expect(await run(io, ['routing', 'autofix', 'get', 'a'])).toBe(0);
-    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/a/autofix`);
+    expect(await run(io, ['routing', 'recording', 'get', 'a'])).toBe(0);
+    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/a/recording`);
 
     const { io: io2, calls: calls2 } = authedIo([{ status: 200, body: { enabled: false } }]);
     expect(await run(io2, ['routing', 'recording', 'set', 'a', '--enabled', 'false'])).toBe(0);
     expect(JSON.parse(calls2[0].body!)).toEqual({ enabled: false });
 
     const { io: io3 } = authedIo([]);
-    expect(await run(io3, ['routing', 'autofix', 'set', 'a', '--enabled', 'maybe'])).toBe(1);
+    expect(await run(io3, ['routing', 'recording', 'set', 'a', '--enabled', 'maybe'])).toBe(1);
+
+    const { io: io4, calls: calls4 } = authedIo([]);
+    expect(await run(io4, ['routing', 'autofix', 'get', 'a'])).toBe(1);
+    expect(calls4).toHaveLength(0);
   });
 });
 

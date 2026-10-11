@@ -313,7 +313,6 @@ describe('runRequestBackfill', () => {
 
 describe('request backfill finalization', () => {
   it('only finalizes backfill-created pending parents', () => {
-    expect(FINALIZE_PENDING_REQUESTS_SQL).toContain("r.id LIKE 'legacy-autofix-%'");
     expect(FINALIZE_PENDING_REQUESTS_SQL).toContain("r.id LIKE 'legacy-trace-%'");
     expect(FINALIZE_PENDING_REQUESTS_SQL).toContain('pa.id = r.id');
     expect(FINALIZE_PENDING_REQUESTS_SQL).not.toContain(

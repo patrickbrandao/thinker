@@ -31,18 +31,16 @@ import {
 /** Same ranking as the Requests list: success wins, else the terminal failure. */
 const TERMINAL_RANK = `CASE WHEN ${sqlIsSuccessStatus('pa.status')} THEN 3
        WHEN NOT COALESCE(pa.superseded, false)
-            AND pa.status NOT IN ('fallback_error', 'auto_fixed') THEN 2
+            AND pa.status <> 'fallback_error' THEN 2
        ELSE 1 END`;
 
 const REQUEST_SUCCEEDED = sqlIsSuccessStatus('t.request_status');
 
 /**
- * How the request CONCLUDED. Autofix comes from the request outcome; fallback
- * comes from the terminal attempt. These mark the method that produced the
- * conclusion, never mere attempts along the way.
+ * How the request CONCLUDED. Fallback comes from the terminal attempt: it marks
+ * the method that produced the conclusion, never mere attempts along the way.
  */
 const DISPOSITION_EXPR = `CASE
-    WHEN ${REQUEST_SUCCEEDED} AND t.autofix_status = 'retry_succeeded' THEN 'healed'
     WHEN ${REQUEST_SUCCEEDED} AND t.fallback_from_model IS NOT NULL THEN 'fallback'
     WHEN ${REQUEST_SUCCEEDED} THEN 'success'
     ELSE 'error'
@@ -58,7 +56,6 @@ export interface DispositionRow {
 export interface DispositionTotals {
   total: number;
   success: number;
-  healed: number;
   fallback: number;
   error: number;
 }
@@ -86,8 +83,6 @@ export interface DimensionVolumeRow {
   requests: number;
   failed: number;
   succeeded: number;
-  /** Requests recovered by Autofix (autofix_status = retry_succeeded). */
-  healed: number;
   /** Requests recovered by fallback (terminal ok attempt with a fallback origin). */
   fallback: number;
 }
@@ -129,7 +124,6 @@ export class RequestVolumeService {
           r.id,
           r.timestamp AS ts,
           r.status AS request_status,
-          r.autofix_status,
           r.agent_name,
           pa.provider,
           pa.model,
@@ -158,8 +152,6 @@ export class RequestVolumeService {
           pa.id,
           pa.timestamp,
           pa.status,
-          CASE WHEN pa.autofix_role = 'retry' AND ${sqlIsSuccessStatus('pa.status')}
-            THEN 'retry_succeeded' ELSE NULL END,
           pa.agent_name,
           pa.provider,
           pa.model,
@@ -236,7 +228,6 @@ export class RequestVolumeService {
     const empty = (): DispositionTotals => ({
       total: 0,
       success: 0,
-      healed: 0,
       fallback: 0,
       error: 0,
     });
@@ -272,9 +263,6 @@ export class RequestVolumeService {
       if (r.dim === 'success') {
         current.success += c;
         previous.success += p;
-      } else if (r.dim === 'healed') {
-        current.healed += c;
-        previous.healed += p;
       } else if (r.dim === 'fallback') {
         current.fallback += c;
         previous.fallback += p;
@@ -287,9 +275,9 @@ export class RequestVolumeService {
   }
 
   /**
-   * Request-level disposition timeseries: feeds the "By request status" chart
-   * and the Healed requests tab. One count per request, keyed by how it
-   * concluded (success / healed / fallback / error).
+   * Request-level disposition timeseries: feeds the "By request status" chart.
+   * One count per request, keyed by how it concluded (success / fallback /
+   * error).
    */
   async getDispositionTimeseries(params: {
     tenantId: string | null;
@@ -338,7 +326,7 @@ export class RequestVolumeService {
 
   /**
    * Request-level totals per dimension for the Overview trio tables
-   * (Total requests / Healed / Success rate). `succeeded` counts requests
+   * (Total requests / Recovered / Success rate). `succeeded` counts requests
    * whose terminal outcome is ok (recovered included), so Success rate =
    * succeeded / requests keeps the "success includes rescued" story.
    */
@@ -357,7 +345,6 @@ export class RequestVolumeService {
         COUNT(*)::int AS requests,
         COUNT(*) FILTER (WHERE ${sqlIsFailedStatus('t.request_status')})::int AS failed,
         COUNT(*) FILTER (WHERE ${REQUEST_SUCCEEDED})::int AS succeeded,
-        COUNT(*) FILTER (WHERE ${DISPOSITION_EXPR} = 'healed')::int AS healed,
         COUNT(*) FILTER (WHERE ${DISPOSITION_EXPR} = 'fallback')::int AS fallback
       FROM terminal t
       ${dim === 'provider' ? '' : `WHERE t.${dim} IS NOT NULL`}
@@ -370,7 +357,6 @@ export class RequestVolumeService {
       requests: number;
       failed: number;
       succeeded: number;
-      healed: number;
       fallback: number;
     }>;
     return rows.map((r) => ({
@@ -378,7 +364,6 @@ export class RequestVolumeService {
       requests: Number(r.requests),
       failed: Number(r.failed),
       succeeded: Number(r.succeeded),
-      healed: Number(r.healed),
       fallback: Number(r.fallback),
     }));
   }

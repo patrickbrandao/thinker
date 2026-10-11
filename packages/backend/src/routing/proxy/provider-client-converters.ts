@@ -104,8 +104,8 @@ export type { SignatureLookup, ThinkingBlockLookup } from './proxy-types';
 // This layer keeps unconditional wire-format adaptations: provider-level
 // protocol facts (a field that is simply not part of a given API) and
 // cross-protocol translations. Model- and version-specific corrections — a
-// parameter that some models accept and others reject — stay out of here and
-// belong to Autofix, where the provider error can scope a patch.
+// parameter that some models accept and others reject — stay out of here: the
+// provider error, not a static table, is what can scope such a fix.
 
 /**
  * Providers that use `max_completion_tokens` without a legacy alias rewrite.
@@ -336,7 +336,7 @@ export interface SanitizeOpenAiBodyOptions {
 
 /**
  * Normalize unconditional OpenAI-compatible wire differences. Provider- and
- * model-specific parameter corrections are intentionally left to Autofix.
+ * model-specific parameter corrections are intentionally left out.
  */
 export function sanitizeOpenAiBody(
   body: Record<string, unknown>,
@@ -392,7 +392,7 @@ export function sanitizeOpenAiBody(
     }
     if (OPENAI_ONLY_FIELDS.has(key)) continue;
     // Ollama's OpenAI-compatible endpoint does not accept the Anthropic-style
-    // `thinking` block; other non-passthrough providers are left to Autofix.
+    // `thinking` block; other non-passthrough providers receive it unchanged.
     if (key === 'thinking' && OLLAMA_ENDPOINTS.has(endpointKey.toLowerCase())) continue;
     if (key === 'max_completion_tokens') {
       // Preserve max_completion_tokens for endpoints that require it; otherwise

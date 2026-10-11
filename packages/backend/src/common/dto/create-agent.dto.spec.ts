@@ -106,33 +106,21 @@ describe('CreateAgentDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('accepts boolean autofix_enabled and record_messages', async () => {
+  it('accepts a boolean record_messages', async () => {
     const dto = plainToInstance(CreateAgentDto, {
       name: 'my-agent',
-      autofix_enabled: false,
       record_messages: true,
     });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
-    expect(dto.autofix_enabled).toBe(false);
     expect(dto.record_messages).toBe(true);
   });
 
-  it('allows omitting autofix_enabled and record_messages', async () => {
+  it('allows omitting record_messages', async () => {
     const dto = plainToInstance(CreateAgentDto, { name: 'my-agent' });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
-    expect(dto.autofix_enabled).toBeUndefined();
     expect(dto.record_messages).toBeUndefined();
-  });
-
-  it('rejects non-boolean autofix_enabled', async () => {
-    const dto = plainToInstance(CreateAgentDto, {
-      name: 'my-agent',
-      autofix_enabled: 'yes',
-    });
-    const errors = await validate(dto);
-    expect(errors.some((e) => e.property === 'autofix_enabled')).toBe(true);
   });
 
   it('rejects non-boolean record_messages', async () => {

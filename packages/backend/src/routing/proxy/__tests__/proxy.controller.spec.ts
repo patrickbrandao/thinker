@@ -149,7 +149,6 @@ describe('ProxyController', () => {
   let providerParamSpecs: { getCapabilities: jest.Mock };
   let modelsDevSync: { lookupModelCapabilities: jest.Mock };
   let recorder: ProxyMessageRecorder;
-  let observationReporter: { report: jest.Mock };
   let recordingConfig: { isRecording: jest.Mock };
   let attemptRecording: { available: boolean; save: jest.Mock };
 
@@ -190,7 +189,6 @@ describe('ProxyController', () => {
     };
     providerParamSpecs = { getCapabilities: jest.fn().mockResolvedValue(null) };
     modelsDevSync = { lookupModelCapabilities: jest.fn().mockReturnValue(null) };
-    observationReporter = { report: jest.fn() };
     recordingConfig = { isRecording: jest.fn().mockResolvedValue(false) };
     attemptRecording = {
       available: true,
@@ -225,7 +223,6 @@ describe('ProxyController', () => {
       new ThinkingBlockCache(),
       new ReasoningContentCache(),
       modelDiscovery as never,
-      observationReporter as never,
       providerParamSpecs as never,
       modelsDevSync as never,
       recordingConfig as never,
@@ -617,7 +614,7 @@ describe('ProxyController', () => {
     expect(headers['X-Manifest-Reason']).toBe('scored');
   });
 
-  it('routes a native Phoenix replay through the requested subscription connection', async () => {
+  it('routes on the body model and ignores provider/auth-type routing headers', async () => {
     const responseBody = { choices: [{ message: { content: 'hello' } }] };
     proxyService.proxyRequest.mockResolvedValue({
       forward: {
@@ -644,13 +641,12 @@ describe('ProxyController', () => {
 
     await controller.chatCompletions(req as never, res as never);
 
+    // These headers used to rewrite the routing model for replays from the
+    // removed hosted repair service. They are now plain request headers.
     expect(proxyService.proxyRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         body,
-        routingBody: {
-          model: 'openai/gpt-5.5-subscription',
-          messages: [{ role: 'user', content: 'hi' }],
-        },
+        routingBody: { model: 'gpt-5.5', messages: [{ role: 'user', content: 'hi' }] },
       }),
     );
   });
@@ -810,7 +806,7 @@ describe('ProxyController', () => {
     );
   });
 
-  it('keeps Autofix original and retry payloads on separate Provider Attempts', async () => {
+  it('keeps the payloads of two Provider Attempts on separate recordings', async () => {
     recordingConfig.isRecording.mockResolvedValue(true);
     const originalBody = { model: 'gpt-4o', messages: [], unsupported: true };
     const retryBody = { model: 'gpt-4o', messages: [] };
@@ -854,7 +850,7 @@ describe('ProxyController', () => {
             model: 'gpt-4o',
             provider: 'openai',
             confidence: 0.9,
-            reason: 'auto-fix',
+            reason: 'scored',
             attempt: retry,
           },
         };
@@ -1826,20 +1822,12 @@ describe('ProxyController', () => {
     });
   });
 
-  it('should report the provider-facing body and API mode to Phoenix', async () => {
-    const wireRequestBody = {
-      model: 'claude-opus-4-8',
-      messages: [{ role: 'user', content: 'test' }],
-      thinking: { type: 'adaptive', budget_tokens: 8192 },
-    };
+  it('returns a request-side 400 to the caller and records it once', async () => {
+    const providerSpy = jest.spyOn(recorder, 'recordProviderError');
     proxyService.proxyRequest.mockResolvedValue({
       forward: {
-        response: new Response('{"error":"invalid thinking"}', { status: 400 }),
-        wireRequestBody,
-        wireRequestUrl: 'https://api.anthropic.com/v1/messages',
+        response: new Response('{"error":{"message":"invalid thinking"}}', { status: 400 }),
         wireFormat: 'anthropic_messages',
-        wireApiMode: 'messages',
-        retryWireBody: jest.fn(),
         isGoogle: false,
         isAnthropic: true,
         isChatGpt: false,
@@ -1862,67 +1850,24 @@ describe('ProxyController', () => {
 
     await controller.chatCompletions(req as never, res as never);
 
-    expect(observationReporter.report).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'claude-opus-4-8',
+    expect(proxyService.proxyRequest).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: expect.objectContaining({
+        message: 'invalid thinking',
+        status: 400,
+        source: 'provider',
         provider: 'Anthropic',
-        authType: 'api_key',
-        apiMode: 'messages',
-        requestBody: wireRequestBody,
-        providerWire: {
-          format: 'anthropic_messages',
-          url: 'https://api.anthropic.com/v1/messages',
-          body: wireRequestBody,
-        },
+        model: 'claude-opus-4-8',
       }),
-    );
-    expect(observationReporter.report.mock.calls[0][0]).not.toHaveProperty('resolvedModel');
-  });
-
-  it('reports native Gemini failures with model metadata outside the exact provider body', async () => {
-    const wireRequestBody = {
-      contents: [{ role: 'user', parts: [{ text: 'test' }] }],
-      generationConfig: { maxOutputTokens: 32000, topP: 1, temperature: 1 },
-    };
-    proxyService.proxyRequest.mockResolvedValue({
-      forward: {
-        response: new Response('{"error":{"message":"model unavailable"}}', { status: 404 }),
-        wireRequestBody,
-        wireRequestUrl:
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-        wireFormat: 'google_generate_content',
-        wireApiMode: undefined,
-        isGoogle: true,
-        isAnthropic: false,
-        isChatGpt: false,
-      },
-      meta: {
-        tier: 'standard',
-        model: 'gemini-2.5-flash-lite',
-        provider: 'Gemini',
-        auth_type: 'api_key',
-        confidence: 0.8,
-        reason: 'scored',
-      },
     });
-
-    const req = mockRequest({ model: 'auto', messages: [{ role: 'user', content: 'test' }] });
-    const { res } = mockResponse();
-    await controller.chatCompletions(req as never, res as never);
-
-    expect(observationReporter.report).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-flash-lite',
-        apiMode: 'chat_completions',
-        requestBody: wireRequestBody,
-        providerWire: {
-          format: 'google_generate_content',
-          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-          body: wireRequestBody,
-        },
-      }),
+    expect(providerSpy).toHaveBeenCalledTimes(1);
+    expect(providerSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      400,
+      '{"error":{"message":"invalid thinking"}}',
+      expect.objectContaining({ attemptNumber: 1, provider: 'Anthropic' }),
     );
-    expect(observationReporter.report.mock.calls[0][0].requestBody).not.toHaveProperty('model');
   });
 
   it('should handle 500 errors from proxyService as friendly chat message', async () => {

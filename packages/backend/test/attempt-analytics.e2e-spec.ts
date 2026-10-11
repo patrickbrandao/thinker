@@ -25,22 +25,16 @@ beforeAll(async () => {
   );
   await ds.query(
     `INSERT INTO agent_messages
-       (id, tenant_id, agent_id, agent_name, timestamp, status, model,
-        fallback_from_model, autofix_applied, autofix_group_id, autofix_role)
+       (id, tenant_id, agent_id, agent_name, timestamp, status, model, fallback_from_model)
      VALUES
-       ('attempt-direct', $1, $2, 'test-agent', $3, 'ok', 'model-a', NULL, false, NULL, NULL),
-       ('attempt-fallback-primary', $1, $2, 'test-agent', $3, 'fallback_error', 'model-a',
-        NULL, false, NULL, NULL),
-       ('attempt-fallback-destination', $1, $2, 'test-agent', $3, 'ok', 'model-b',
-        'model-a', false, NULL, NULL),
-       ('attempt-autofix-retry', $1, $2, 'test-agent', $3, 'ok', 'model-a', NULL,
-        true, 'heal-1', 'retry'),
-       ('attempt-previous-primary', $1, $2, 'test-agent', $4, 'fallback_error', 'model-a',
-        NULL, false, NULL, NULL),
-       ('attempt-previous-fallback', $1, $2, 'test-agent', $4, 'ok', 'model-b',
-        'model-a', false, NULL, NULL),
+       ('attempt-direct', $1, $2, 'test-agent', $3, 'ok', 'model-a', NULL),
+       ('attempt-fallback-primary', $1, $2, 'test-agent', $3, 'fallback_error', 'model-a', NULL),
+       ('attempt-fallback-destination', $1, $2, 'test-agent', $3, 'ok', 'model-b', 'model-a'),
+       ('attempt-direct-second', $1, $2, 'test-agent', $3, 'ok', 'model-a', NULL),
+       ('attempt-previous-primary', $1, $2, 'test-agent', $4, 'fallback_error', 'model-a', NULL),
+       ('attempt-previous-fallback', $1, $2, 'test-agent', $4, 'ok', 'model-b', 'model-a'),
        ('attempt-playground-fallback', $1, 'playground-attempt-analytics', 'Playground', $3,
-        'ok', 'model-b', 'model-a', false, NULL, NULL)`,
+        'ok', 'model-b', 'model-a')`,
     [TEST_TENANT_ID, TEST_AGENT_ID, current, previous],
   );
 });

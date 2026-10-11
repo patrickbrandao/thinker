@@ -157,7 +157,7 @@ describe('Anthropic Adapter', () => {
       expect(result.stop_sequences).toEqual(['STOP', 'END']);
     });
 
-    it('preserves adaptive thinking for model-specific Autofix', () => {
+    it('preserves adaptive thinking for the provider to judge', () => {
       const body = {
         messages: [{ role: 'user', content: 'Hi' }],
         thinking: { type: 'adaptive' },
@@ -196,7 +196,7 @@ describe('Anthropic Adapter', () => {
       });
     });
 
-    it('preserves the manual budget for adaptive-thinking Autofix', () => {
+    it('preserves the manual budget alongside adaptive thinking', () => {
       const thinking = { type: 'adaptive', budget_tokens: 8192, display: 'omitted' };
 
       const result = toAnthropicRequest(

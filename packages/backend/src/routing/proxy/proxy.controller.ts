@@ -29,14 +29,12 @@ import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
 import { resolveModelCapabilityMetadata } from '../../model-discovery/model-capabilities';
 import { classifyCaller } from './caller-classifier';
-import { ObservationReporter } from '../autofix/observation-reporter';
-import type { AutofixRecord } from '../autofix/autofix.types';
 import { sanitizeRequestHeaders } from './request-headers';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
   buildOpenAiCompatibleError,
-  currentPrimaryAttemptNumber,
+  PRIMARY_ATTEMPT_NUMBER,
   handleProviderError,
   recordFallbackFailures,
   handleStreamResponse,
@@ -61,7 +59,7 @@ import type {
 import { ResponsesSseError } from './chatgpt-adapter';
 import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
-import { openAiModelId, subscriptionOpenAiModelId } from './openai-model-id';
+import { openAiModelId } from './openai-model-id';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
 import { StreamFailure } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
@@ -135,7 +133,6 @@ export class ProxyController {
     private readonly thinkingCache: ThinkingBlockCache,
     private readonly reasoningCache: ReasoningContentCache,
     private readonly modelDiscovery: ModelDiscoveryService,
-    private readonly observationReporter: ObservationReporter,
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly modelsDevSync: ModelsDevSyncService,
     @Optional()
@@ -350,27 +347,26 @@ export class ProxyController {
       this.rateLimiter.checkIpLimit(req.ip ?? '');
       this.rateLimiter.acquireSlot(tenantId);
       slotAcquired = true;
-      routingBody = redactInlineImageDataUrls(this.routingBody(body, req));
+      routingBody = redactInlineImageDataUrls(body);
       const specificityOverride = req.headers['x-manifest-specificity'] as string | undefined;
-      const { forward, meta, failedFallbacks, autofix, fallbackAutofix } =
-        await this.proxyService.proxyRequest({
-          agentId: req.ingestionContext.agentId,
-          tenantId,
-          // Attribution only — the recorder writes it to agent_messages.user_id.
-          userId: req.ingestionContext.userId,
-          body,
-          routingBody,
-          sessionKey,
-          sessionCacheKey: sessionScope.cacheKey,
-          providerCacheKey: sessionScope.providerCacheKey,
-          sessionMomentumKey: sessionScope.momentumKey,
-          agentName: req.ingestionContext.agentName,
-          signal: clientAbort.signal,
-          specificityOverride,
-          headers: req.headers,
-          apiMode,
-          startProviderAttempt,
-        });
+      const { forward, meta, failedFallbacks } = await this.proxyService.proxyRequest({
+        agentId: req.ingestionContext.agentId,
+        tenantId,
+        // Attribution only — the recorder writes it to agent_messages.user_id.
+        userId: req.ingestionContext.userId,
+        body,
+        routingBody,
+        sessionKey,
+        sessionCacheKey: sessionScope.cacheKey,
+        providerCacheKey: sessionScope.providerCacheKey,
+        sessionMomentumKey: sessionScope.momentumKey,
+        agentName: req.ingestionContext.agentName,
+        signal: clientAbort.signal,
+        specificityOverride,
+        headers: req.headers,
+        apiMode,
+        startProviderAttempt,
+      });
       currentMeta = meta;
 
       this.trackFirstProxyRequest(tenantId);
@@ -382,46 +378,6 @@ export class ProxyController {
       if (!providerResponse.ok) {
         const errorBody = await providerResponse.text();
         await forward.attempt?.finishRecording?.(recordingResponseFromText(errorBody));
-        // Evidence feed (AUTOFIX_REPORT_ALL_4XX). Autofix already hands Phoenix
-        // the full body for the requests it heals; every other request-side 4xx
-        // reaches Phoenix only via Peacock's hourly scrape, which carries the
-        // model-parameter snapshot and not the messages. Report it live instead —
-        // but only for agents that turned Autofix on (the reporter's own gate).
-        //
-        // `traceId` is the `traceparent` id Peacock's scrape reports for the same
-        // row, so a scraped duplicate collapses onto this one in Phoenix's ledger.
-        // Callers that send no `traceparent` get a fresh id, which the scrape
-        // cannot match — those failures are recorded twice until the scrape is
-        // retired for live traffic.
-        //
-        // Autofix reports the PRIMARY attempt itself. The fallback chain runs
-        // after it, so when the response we're about to return came from a
-        // fallback model it is a different provider/model failing and Phoenix has
-        // never seen it — skipping on `autofix` alone would hide it.
-        const alreadyReportedByAutofix = Boolean(autofix) && !meta.fallbackFromModel;
-        const wireRequestBody = forward.wireRequestBody;
-        const wireApiMode = forward.wireApiMode;
-        const wireFormat = forward.wireFormat;
-        if (!alreadyReportedByAutofix && meta.auth_type && wireRequestBody && wireFormat) {
-          this.observationReporter.report({
-            traceId: traceId ?? uuid(),
-            tenantId,
-            agentId: req.ingestionContext.agentId,
-            provider: meta.provider,
-            model: meta.model,
-            authType: meta.auth_type,
-            apiMode: wireApiMode ?? apiMode,
-            requestBody: wireRequestBody,
-            providerWire: {
-              format: wireFormat,
-              ...(forward.wireRequestUrl ? { url: forward.wireRequestUrl } : {}),
-              body: wireRequestBody,
-            },
-            status: providerResponse.status,
-            errorBody,
-            responseTimeMs: Date.now() - startTime,
-          });
-        }
         await handleProviderError(
           res,
           req.ingestionContext,
@@ -434,7 +390,6 @@ export class ProxyController {
           traceId,
           callerAttribution,
           requestHeaders,
-          autofix,
           requestId,
           Date.now() - startTime,
           apiMode,
@@ -449,7 +404,6 @@ export class ProxyController {
         this.recorder,
         callerAttribution,
         requestHeaders,
-        autofix,
         requestId,
       );
 
@@ -502,7 +456,6 @@ export class ProxyController {
           sessionKey,
           callerAttribution,
           requestHeaders,
-          autofix,
           Date.now() - startTime,
           apiMode,
         );
@@ -518,12 +471,10 @@ export class ProxyController {
           startTime,
           callerAttribution,
           requestHeaders,
-          autofix,
           requestId,
-          currentPrimaryAttemptNumber(autofix) +
+          PRIMARY_ATTEMPT_NUMBER +
             (meta.fallbackFromModel ? (failedFallbacks?.length ?? 0) + 1 : 0),
           apiMode,
-          fallbackAutofix,
         );
       }
     } catch (err: unknown) {
@@ -546,7 +497,7 @@ export class ProxyController {
       await (currentMeta?.attempt ?? currentAttempt)?.finishRecording?.();
       if (clientAbort.signal.aborted) {
         // recordCancelledRequest completes only the last attempt. Earlier ones
-        // (a failed primary, failed fallback hops, an Autofix retry) were
+        // (a failed primary, failed fallback hops) were
         // carried in the chain's local state, which the abort threw away. The
         // last one is included too: the pending guard makes it a no-op unless
         // recordCancelledRequest failed to write it.
@@ -555,24 +506,6 @@ export class ProxyController {
     } finally {
       if (slotAcquired) this.rateLimiter.releaseSlot(tenantId);
     }
-  }
-
-  /**
-   * Phoenix replays a provider-native model while naming the original route in
-   * headers. Keep Manifest's public `-subscription` syntax inside Manifest: the
-   * original body remains provider-native and only the routing view is encoded.
-   */
-  private routingBody(
-    body: Record<string, unknown>,
-    req: Request & { ingestionContext: IngestionContext },
-  ): Record<string, unknown> {
-    const provider = req.headers['x-manifest-provider'];
-    const authType = req.headers['x-manifest-auth-type'];
-    const model = body.model;
-    if (typeof provider !== 'string' || authType !== 'subscription' || typeof model !== 'string') {
-      return body;
-    }
-    return { ...body, model: subscriptionOpenAiModelId(provider, model) };
   }
 
   /**
@@ -589,7 +522,6 @@ export class ProxyController {
     sessionKey: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
     requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
-    autofix: AutofixRecord | undefined,
     durationMs: number,
     apiMode: ProxyApiMode,
   ): void {
@@ -606,9 +538,6 @@ export class ProxyController {
         sessionKey,
         callerAttribution,
         requestHeaders,
-        // A failed heal attempt still stamps its Phoenix audit on the M row.
-        autofix,
-        attempt: meta.attempt,
         durationMs,
         apiMode,
       })

@@ -43,7 +43,6 @@ function trimRow(row: unknown): unknown {
   const out: Record<string, unknown> = {};
   for (const f of CORE_FIELDS) if (f in r) out[f] = r[f];
   for (const f of WHEN_SET_FIELDS) if (r[f] !== null && r[f] !== undefined) out[f] = r[f];
-  if (r['autofix_applied'] === true) out['autofix_applied'] = true;
   return out;
 }
 

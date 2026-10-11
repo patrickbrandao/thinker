@@ -2,15 +2,17 @@ import { getMetadataArgsStorage } from 'typeorm';
 import { AgentMessage } from './agent-message.entity';
 
 describe('AgentMessage schema mapping', () => {
-  it('keeps the legacy physical table and Autofix column names', () => {
+  it('keeps the legacy physical table name and maps no repair columns', () => {
     const metadata = getMetadataArgsStorage();
     const table = metadata.tables.find((entry) => entry.target === AgentMessage);
-    const autofixDecision = metadata.columns.find(
-      (entry) => entry.target === AgentMessage && entry.propertyName === 'autofix_decision',
+    const repairColumns = metadata.columns.filter(
+      (entry) =>
+        entry.target === AgentMessage &&
+        /^auto_?fix/i.test(String(entry.options.name ?? entry.propertyName)),
     );
 
     expect(table?.name).toBe('agent_messages');
-    expect(autofixDecision?.options.name).toBe('autofix_phoenix');
+    expect(repairColumns).toEqual([]);
   });
 
   it('keeps the new request linkage nullable for legacy writers', () => {

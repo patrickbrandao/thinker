@@ -26,7 +26,7 @@ function capture(): { server: McpServer; tools: Map<string, Handler> } {
 }
 
 const TENANT = 'tenant-1';
-const AGENT = { id: 'agent-1', tenant_id: TENANT, name: 'demo', autofix_enabled: null };
+const AGENT = { id: 'agent-1', tenant_id: TENANT, name: 'demo' };
 const CONNECTION = {
   id: 'conn-1',
   provider: 'openai',
@@ -53,7 +53,6 @@ function makeDeps(): McpToolDeps {
   return {
     dataSource: {} as never,
     tenantCache: {} as never,
-    cacheManager: { del: jest.fn().mockResolvedValue(undefined) } as never,
     agentListCache: { invalidate: jest.fn().mockResolvedValue(undefined) } as never,
     eventBus: { emit: jest.fn() } as never,
     recording: { isRecording: jest.fn().mockResolvedValue(true) } as never,
@@ -78,7 +77,6 @@ function makeDeps(): McpToolDeps {
       getKeyForAgent: jest.fn().mockResolvedValue({ keyPrefix: 'p', fullKey: 'full' }),
       rotateKey: jest.fn().mockResolvedValue({ apiKey: 'r' }),
     } as never,
-    autofixStats: { recordAutofixConsent: jest.fn().mockResolvedValue(undefined) } as never,
     messages: {
       getMessages: jest
         .fn()
@@ -126,7 +124,6 @@ function makeDeps(): McpToolDeps {
       remove: jest.fn().mockResolvedValue(undefined),
       probeModels: jest.fn().mockResolvedValue([{ model_name: 'm' }]),
     } as never,
-    autofix: { resolveEnabled: jest.fn().mockReturnValue(true) } as never,
     routeModelParams: {
       get: jest.fn().mockResolvedValue({ tier: 'default', params: [] }),
       update: jest.fn().mockResolvedValue({ tier: 'default', params: [] }),
@@ -230,7 +227,7 @@ describe('MCP tools', () => {
         name: 'My Agent',
         agent_platform: 'codex',
         agent_category: 'automation',
-        autofix_enabled: true,
+        record_messages: false,
       });
       expect(data).toMatchObject({ agent: { name: 'my-agent' }, apiKey: 'k' });
     });
@@ -583,15 +580,9 @@ describe('MCP tools', () => {
       expect(tools.has('manifest_routing_params_set')).toBe(false);
     });
 
-    it('reads and writes Autofix and recording', async () => {
+    it('reads and writes recording, and exposes no repair toggle', async () => {
       const tools = registerAll(makeDeps());
-      expect(
-        (await call(tools, 'manifest_routing_autofix_get', { agent: 'demo' })).error,
-      ).toBeFalsy();
-      expect(
-        (await call(tools, 'manifest_routing_autofix_set', { agent: 'demo', enabled: false }))
-          .error,
-      ).toBeFalsy();
+      expect([...tools.keys()].filter((name) => name.includes('auto'))).toEqual([]);
       expect(
         (await call(tools, 'manifest_routing_recording_get', { agent: 'demo' })).error,
       ).toBeFalsy();
@@ -703,7 +694,6 @@ describe('MCP tools', () => {
         (
           await call(tools, 'manifest_agent_configure', {
             agent: 'demo',
-            autofix: false,
             recording: true,
           })
         ).error,
@@ -790,8 +780,13 @@ describe('MCP tools', () => {
       const tools = registerAll(makeDeps());
       // tier with another toggle set reaches the "tier needs models" guard.
       expect(
-        (await call(tools, 'manifest_agent_configure', { agent: 'demo', tier: 'x', autofix: true }))
-          .error,
+        (
+          await call(tools, 'manifest_agent_configure', {
+            agent: 'demo',
+            tier: 'x',
+            recording: true,
+          })
+        ).error,
       ).toBe(true);
 
       const deps = makeDeps();
