@@ -1300,26 +1300,17 @@ describe('ProviderClient', () => {
       expect(sentBody.model).toBe('openrouter/auto');
     });
 
-    it('preserves the Gemini vendor prefix for Gemini Free LiteLLM requests', async () => {
-      process.env['CREDITS_BASE_URL'] = 'https://credits.test';
-      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
-
-      await client.forward({
-        provider: 'gemini-free',
-        apiKey: 'sk-virtual',
-        model: 'gemini/gemini-2.5-flash',
-        body,
-        stream: false,
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://credits.test/v1/chat/completions',
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer sk-virtual' }),
+    it('refuses the removed managed Gemini Free provider without calling out', async () => {
+      await expect(
+        client.forward({
+          provider: 'gemini-free',
+          apiKey: 'sk-virtual',
+          model: 'gemini/gemini-2.5-flash',
+          body,
+          stream: false,
         }),
-      );
-      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(sentBody.model).toBe('gemini/gemini-2.5-flash');
+      ).rejects.toThrow('No endpoint configured for provider: gemini-free');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('builds Nous Portal requests without stripping vendor-prefixed model IDs', async () => {

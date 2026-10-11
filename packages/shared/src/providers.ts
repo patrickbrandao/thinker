@@ -33,8 +33,6 @@ export interface SharedProviderEntry {
   minKeyLength: number;
   /** Placeholder shown in the UI's API-key input. */
   keyPlaceholder: string;
-  /** Whether Manifest provisions this provider through its managed free-provider flow. */
-  managedFree?: boolean;
   /**
    * Local servers whose dashboard tile deep-links into the local-server
    * detail view (LM Studio, llama.cpp). The tile connects them as a custom
@@ -258,19 +256,6 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPrefix: '',
     minKeyLength: 30,
     keyPlaceholder: 'API key',
-  },
-  {
-    id: 'gemini-free',
-    displayName: 'Gemini Free',
-    aliases: ['gemini free'],
-    openRouterPrefixes: [],
-    requiresApiKey: true,
-    localOnly: false,
-    color: '#4285f4',
-    keyPrefix: 'sk-',
-    minKeyLength: 10,
-    keyPlaceholder: 'sk-...',
-    managedFree: true,
   },
   {
     id: 'kiro',

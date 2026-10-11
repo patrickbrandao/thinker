@@ -89,7 +89,6 @@ describe('classifyMessageError', () => {
     ['local_provider_unavailable', 'config', 'local_provider_unavailable'],
     ['key_expired', 'config', 'auth'],
     ['limit_exceeded', 'policy', 'limit_exceeded'],
-    ['plan_request_limit_exceeded', 'policy', 'plan_request_limit_exceeded'],
     ['manifest_rate_limited', 'policy', 'rate_limit'],
     ['manifest_ip_rate_limited', 'policy', 'rate_limit'],
     ['manifest_concurrency_limited', 'policy', 'rate_limit'],
@@ -220,7 +219,7 @@ describe('classifyMessageError', () => {
     ).toEqual({ error_origin: 'config', error_class: 'no_provider_key', superseded: true });
   });
 
-  it('keeps legacy 402 request-quota rows distinct from user-configured limits', () => {
+  it('classifies a 402 limit stub as a user-configured limit (no plan quota class)', () => {
     expect(
       classifyMessageError({
         status: 'error',
@@ -229,9 +228,10 @@ describe('classifyMessageError', () => {
       }),
     ).toEqual({
       error_origin: 'policy',
-      error_class: 'plan_request_limit_exceeded',
+      error_class: 'limit_exceeded',
       superseded: false,
     });
+    expect(ERROR_CLASSES).not.toContain('plan_request_limit_exceeded');
   });
 });
 

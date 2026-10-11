@@ -1,11 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DiscoveredModel, FetcherConfig, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
 import { parseModalities } from './model-capabilities';
-import {
-  getManagedFreeLiteLlmModelsUrl,
-  MANAGED_FREE_PROVIDER_CONFIGS,
-  ManagedFreeProviderConfig,
-} from '../common/constants/managed-free-providers';
 import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../common/constants/ollama';
 import {
   CODEX_CLI_ORIGINATOR,
@@ -223,31 +218,6 @@ const parseBedrockCrisProfiles = createModelParser<BedrockInferenceProfileEntry>
   supportedEndpoints: (entry) => getBedrockRuntimeSupportedEndpoints(entry.inferenceProfileId),
 });
 
-/** Keep only the configured model family and prefer LiteLLM's vendor-prefixed ID. */
-function parseManagedFreeLiteLlm(
-  body: unknown,
-  provider: string,
-  config: ManagedFreeProviderConfig,
-): DiscoveredModel[] {
-  const models = parseOpenAI(body, provider).filter((model) => {
-    const bare = model.id.slice(model.id.lastIndexOf('/') + 1);
-    return !model.id.includes('*') && bare.startsWith(config.catalogModelIdPrefix);
-  });
-  const byBareId = new Map<string, DiscoveredModel>();
-  for (const model of models) {
-    const bare = model.id.slice(model.id.lastIndexOf('/') + 1);
-    const existing = byBareId.get(bare);
-    if (
-      !existing ||
-      (model.id.startsWith(config.preferredModelIdPrefix) &&
-        !existing.id.startsWith(config.preferredModelIdPrefix))
-    ) {
-      byBareId.set(bare, model);
-    }
-  }
-  return Array.from(byBareId.values());
-}
-
 const parsePioneer = createModelParser<PioneerModelEntry>({
   arrayKey: 'data',
   filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
@@ -460,9 +430,6 @@ export const PROVIDER_NON_CHAT: Record<string, RegExp> = {
   // and Veo under their own names.
   vertex:
     /(?:^aqs-|nano-banana|^deep-research|computer-use|^lyria|^imagen|^veo|robotics|flash-lite-preview-\d{2}-\d{4}$)/i,
-  ...Object.fromEntries(
-    MANAGED_FREE_PROVIDER_CONFIGS.map((config) => [config.id, config.nonChatModelPattern]),
-  ),
   mistral:
     /(?:^mistral-ocr|moderation|voxtral-.*-(?:transcribe|realtime)|^labs-|^mistral-vibe-cli)/i,
   'mistral-subscription': /(?:^mistral-ocr|moderation|voxtral-.*-(?:transcribe|realtime)|^labs-)/i,
@@ -896,17 +863,6 @@ const parseOpencodeZen = createModelParser<OpenAIModelEntry>({
 
 /* ── Provider configs ── */
 
-const MANAGED_FREE_FETCHER_CONFIGS: Record<string, FetcherConfig> = Object.fromEntries(
-  MANAGED_FREE_PROVIDER_CONFIGS.map((config) => [
-    config.id,
-    {
-      endpoint: (_key: string) => getManagedFreeLiteLlmModelsUrl(),
-      buildHeaders: bearerHeaders,
-      parse: (body: unknown, provider: string) => parseManagedFreeLiteLlm(body, provider, config),
-    },
-  ]),
-);
-
 export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
   openai: {
     endpoint: 'https://api.openai.com/v1/models',
@@ -1077,7 +1033,6 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: () => ({}),
     parse: parseOpenRouter,
   },
-  ...MANAGED_FREE_FETCHER_CONFIGS,
   ollama: {
     endpoint: `${OLLAMA_HOST}/api/tags`,
     buildHeaders: () => ({}),

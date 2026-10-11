@@ -3,7 +3,7 @@ import type { QueryRunner } from 'typeorm';
 /** An index rebuilt in place: same name, same key, with or without INCLUDE columns. */
 export interface InPlaceIndex {
   table: string;
-  /** Live name; callers such as the CRM metrics check look it up by name. */
+  /** Live name; kept across the rebuild so anything that looks it up by name still finds it. */
   index: string;
   /** Temporary name the replacement is built under before the swap. */
   build: string;

@@ -38,8 +38,6 @@ import { PlaygroundColumn } from '../src/entities/playground-column.entity';
 import { ReasoningContentCacheEntry } from '../src/entities/reasoning-content-cache-entry.entity';
 import { AgentEnabledProvider } from '../src/entities/agent-enabled-provider.entity';
 import { BackfillState } from '../src/entities/backfill-state.entity';
-import { PublicErrorPage } from '../src/entities/public-error-page.entity';
-import { WaitlistClaim } from '../src/entities/waitlist-claim.entity';
 import { CliAuthCode } from '../src/entities/cli-auth-code.entity';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
@@ -52,8 +50,6 @@ import { RoutingModule } from '../src/routing/routing.module';
 import { PlaygroundModule } from '../src/playground/playground.module';
 import { CommonModule } from '../src/common/common.module';
 import { SetupModule } from '../src/setup/setup.module';
-import { WaitlistModule } from '../src/waitlist/waitlist.module';
-import { CrmMetricsModule } from '../src/crm-metrics/crm-metrics.module';
 import { ProviderModelFetcherService } from '../src/model-discovery/provider-model-fetcher.service';
 import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 import { listenOnLoopback } from './loopback';
@@ -86,8 +82,6 @@ const entities = [
   ReasoningContentCacheEntry,
   AgentEnabledProvider,
   BackfillState,
-  PublicErrorPage,
-  WaitlistClaim,
   CliAuthCode,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
@@ -248,8 +242,6 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
         RoutingModule,
         PlaygroundModule,
         SetupModule,
-        WaitlistModule,
-        CrmMetricsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: MockSessionGuard }],
     })
