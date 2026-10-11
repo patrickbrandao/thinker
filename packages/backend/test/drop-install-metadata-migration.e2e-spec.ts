@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { entities, migrations } from '../src/database/data-source-definitions';
 import { DropAutofixSchema1803400000000 } from '../src/database/migrations/1803400000000-DropAutofixSchema';
 import { DropInstallMetadata1803500000000 } from '../src/database/migrations/1803500000000-DropInstallMetadata';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 async function installMetadataColumns(ds: DataSource): Promise<string[]> {
   const rows: Array<{ name: string }> = await ds.query(
@@ -40,8 +41,7 @@ describe('DropInstallMetadata migration (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       // The exact registries the deploy runner uses, not a glob.
       entities,
       migrations,
