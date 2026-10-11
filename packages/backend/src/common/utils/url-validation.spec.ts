@@ -275,14 +275,19 @@ describe('validatePublicUrl', () => {
 
   it('rejects plaintext http scheme (AC-2 passive exfiltration)', async () => {
     await expect(validatePublicUrl('http://example.com/api')).rejects.toThrow(
-      /Only https URLs are allowed in cloud mode/,
+      /Only https URLs are allowed/,
     );
   });
 
-  it('hints at MANIFEST_MODE=selfhosted when http is rejected (issue #1780)', async () => {
-    await expect(validatePublicUrl('http://llamacpp:8080/v1')).rejects.toThrow(
-      /MANIFEST_MODE=selfhosted/,
-    );
+  it.each([
+    'http://metadata.google.internal/computeMetadata/v1/',
+    'http://METADATA.GOOGLE.INTERNAL./computeMetadata/v1/',
+    'http://metadata/computeMetadata/v1/',
+    'http://metadata.goog/',
+    'http://instance-data.ec2.internal/latest/meta-data/',
+  ])('rejects the cloud metadata hostname in %s even with allowPrivate', async (url) => {
+    await expect(validatePublicUrl(url, { allowPrivate: true })).rejects.toThrow('cloud metadata');
+    expect(mockLookup).not.toHaveBeenCalled();
   });
 
   it('rejects IP literal pointing to private network', async () => {

@@ -49,7 +49,6 @@ import {
   MINIMAX_API_KEY_REGION_VALIDATION_MESSAGE,
   isMinimaxRegion,
 } from '../oauth/minimax/minimax-oauth-helpers';
-import { filterProvidersForDeployment } from '../../common/utils/provider-availability';
 
 const MAX_LABEL_LENGTH = 50;
 const DEFAULT_LABEL = 'Default';
@@ -143,13 +142,11 @@ export class ProviderService {
 
   async getProviders(tenantId: string): Promise<TenantProvider[]> {
     const cached = this.routingCache.getProviders(tenantId);
-    if (cached) return filterProvidersForDeployment(cached);
+    if (cached) return cached;
 
     await this.cleanupUnsupportedSubscriptionProviders(tenantId);
-    const providers = filterProvidersForDeployment(
-      (await this.providerRepo.find({ where: { tenant_id: tenantId } })).filter(
-        isManifestUsableProvider,
-      ),
+    const providers = (await this.providerRepo.find({ where: { tenant_id: tenantId } })).filter(
+      isManifestUsableProvider,
     );
     this.routingCache.setProviders(tenantId, providers);
     return providers;

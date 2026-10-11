@@ -499,81 +499,59 @@ describe('auth.instance', () => {
       expect(config.baseURL).toBe('https://manifest.example.com');
     });
 
-    it('keeps both Cloud hosts usable when app is canonical', () => {
+    it('never trusts or binds MCP to the former hosted-service domains', () => {
       process.env['BETTER_AUTH_URL'] = 'https://app.manifest.build';
       process.env['CORS_ORIGIN'] = 'https://app.manifest.build';
       const mod = loadModule();
 
+      // Even an operator whose canonical URL happens to be one of those hosts
+      // gets only what they configured: no implicit sibling host.
       const config = mockBetterAuth.mock.calls[0][0];
-      expect(config.baseURL).toEqual({
-        allowedHosts: expect.arrayContaining(['app.manifest.build', 'gateway.manifest.build']),
-        fallback: 'https://app.manifest.build',
-        protocol: 'https',
-      });
-      expect(config.trustedOrigins).toEqual(
-        expect.arrayContaining(['https://app.manifest.build', 'https://gateway.manifest.build']),
-      );
-      expect(mod.mcpResources).toEqual([
-        'https://app.manifest.build/api/v1/mcp',
-        'https://gateway.manifest.build/api/v1/mcp',
-      ]);
-      expect(mod.mcpResourceForHost('gateway.manifest.build')).toBe(
-        'https://gateway.manifest.build/api/v1/mcp',
-      );
-      expect(mod.mcpResourceForHost('gateway.manifest.build:443')).toBe(
-        'https://gateway.manifest.build/api/v1/mcp',
-      );
-      expect(mod.mcpResourceForHost('gateway.manifest.build:444')).toBe(
-        'https://app.manifest.build/api/v1/mcp',
-      );
-      expect(mod.authIssuerForHost('gateway.manifest.build')).toBe(
-        'https://gateway.manifest.build/api/auth',
-      );
-      expect(mod.mcpResourceForHost('unknown.example')).toBe(
-        'https://app.manifest.build/api/v1/mcp',
-      );
+      expect(config.baseURL).toBe('https://app.manifest.build');
+      expect(config.trustedOrigins).not.toContain('https://gateway.manifest.build');
+      expect(mod.mcpResource).toBe('https://app.manifest.build/api/v1/mcp');
+      expect(mod).not.toHaveProperty('mcpResources');
+      expect(mod).not.toHaveProperty('mcpResourceForHost');
     });
 
     it('resolves per request when the dashboard origin differs from the API origin', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://gateway.manifest.build';
-      process.env['CORS_ORIGIN'] = 'https://app.manifest.build';
+      process.env['BETTER_AUTH_URL'] = 'https://gateway.example.com';
+      process.env['CORS_ORIGIN'] = 'https://app.example.com';
       loadModule();
 
       const config = mockBetterAuth.mock.calls[0][0];
       expect(config.baseURL).toEqual({
-        allowedHosts: expect.arrayContaining(['gateway.manifest.build', 'app.manifest.build']),
-        fallback: 'https://gateway.manifest.build',
+        allowedHosts: expect.arrayContaining(['gateway.example.com', 'app.example.com']),
+        fallback: 'https://gateway.example.com',
         protocol: 'https',
       });
       expect(config.baseURL.allowedHosts).toHaveLength(2);
     });
 
     it('adds extra hosts from BETTER_AUTH_ALLOWED_HOSTS, including wildcards', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://gateway.manifest.build';
+      process.env['BETTER_AUTH_URL'] = 'https://gateway.example.com';
       delete process.env['CORS_ORIGIN'];
-      process.env['BETTER_AUTH_ALLOWED_HOSTS'] =
-        'dashboard.manifest.build, *.preview.manifest.build';
+      process.env['BETTER_AUTH_ALLOWED_HOSTS'] = 'dashboard.example.com, *.preview.example.com';
       loadModule();
 
       const config = mockBetterAuth.mock.calls[0][0];
       expect([...config.baseURL.allowedHosts].sort()).toEqual([
-        '*.preview.manifest.build',
-        'app.manifest.build',
-        'dashboard.manifest.build',
-        'gateway.manifest.build',
+        '*.preview.example.com',
+        'dashboard.example.com',
+        'gateway.example.com',
       ]);
     });
 
     it('ignores malformed allowed-host entries', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://gateway.manifest.build';
-      process.env['CORS_ORIGIN'] = 'https://app.manifest.build';
+      process.env['BETTER_AUTH_URL'] = 'https://gateway.example.com';
+      process.env['CORS_ORIGIN'] = 'https://app.example.com';
       process.env['BETTER_AUTH_ALLOWED_HOSTS'] = ',   ,not a url';
       loadModule();
 
       const config = mockBetterAuth.mock.calls[0][0];
       expect([...config.baseURL.allowedHosts].sort()).toEqual([
-        'app.manifest.build',
-        'gateway.manifest.build',
+        'app.example.com',
+        'gateway.example.com',
       ]);
     });
 
@@ -597,8 +575,8 @@ describe('auth.instance', () => {
     });
 
     it('exports the same base URL passed to betterAuth', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://gateway.manifest.build';
-      process.env['CORS_ORIGIN'] = 'https://app.manifest.build';
+      process.env['BETTER_AUTH_URL'] = 'https://gateway.example.com';
+      process.env['CORS_ORIGIN'] = 'https://app.example.com';
       const mod = loadModule();
 
       expect(mod.authBaseURL).toEqual(mockBetterAuth.mock.calls[0][0].baseURL);
@@ -688,22 +666,21 @@ describe('auth.instance', () => {
       );
     });
 
-    it('registers both Cloud MCP resources for new OAuth clients', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://app.manifest.build';
+    it('registers only the canonical MCP resource, even with extra allowed hosts', () => {
+      process.env['NODE_ENV'] = 'production';
+      process.env['BETTER_AUTH_SECRET'] = 'a]3kF9!xLm2@pQzR7^wYu4&vN6*cE0hT';
+      process.env['BETTER_AUTH_URL'] = 'https://gateway.example.com';
+      process.env['CORS_ORIGIN'] = 'https://app.example.com';
       loadModule();
 
       const { mcp } = jest.requireMock('@better-auth/mcp') as { mcp: jest.Mock };
       const config = mcp.mock.calls[0][0];
-      expect(config.resource).toBe('https://app.manifest.build/api/v1/mcp');
+      expect(config.resource).toBe('https://gateway.example.com/api/v1/mcp');
       expect(
         config.resources.map((resource: { identifier: string }) => resource.identifier),
-      ).toEqual([
-        'https://app.manifest.build/api/v1/mcp',
-        'https://gateway.manifest.build/api/v1/mcp',
-      ]);
+      ).toEqual(['https://gateway.example.com/api/v1/mcp']);
       expect(config.clientRegistrationDefaultResources).toEqual([
-        'https://app.manifest.build/api/v1/mcp',
-        'https://gateway.manifest.build/api/v1/mcp',
+        'https://gateway.example.com/api/v1/mcp',
       ]);
     });
 

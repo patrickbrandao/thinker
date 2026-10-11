@@ -93,7 +93,6 @@ function makeMockRepo() {
 }
 
 describe('ModelDiscoveryService', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
   let service: ModelDiscoveryService;
   let providerRepo: ReturnType<typeof makeMockRepo>;
   let customProviderRepo: ReturnType<typeof makeMockRepo>;
@@ -112,7 +111,6 @@ describe('ModelDiscoveryService', () => {
   let mockCopilotTokenService: { getCopilotToken: jest.Mock };
 
   beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     providerRepo = makeMockRepo();
     customProviderRepo = makeMockRepo();
     fetcher = { fetch: jest.fn().mockResolvedValue([]) };
@@ -154,11 +152,6 @@ describe('ModelDiscoveryService', () => {
     );
   });
 
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
-  });
-
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -166,16 +159,15 @@ describe('ModelDiscoveryService', () => {
   /* ── discoverModels ── */
 
   describe('discoverModels', () => {
-    it('does not contact a built-in local runtime from cloud', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
+    it('discovers a built-in local runtime with no deployment mode configured', async () => {
+      fetcher.fetch.mockResolvedValue([makeModel({ id: 'qwen2.5:0.5b', provider: 'ollama' })]);
 
-      const result = await service.discoverModels(
+      await service.discoverModels(
         makeProvider({ provider: 'ollama', auth_type: 'local', api_key_encrypted: null }),
       );
 
-      expect(result).toEqual([]);
-      expect(fetcher.fetch).not.toHaveBeenCalled();
-      expect(providerRepo.save).not.toHaveBeenCalled();
+      expect(fetcher.fetch).toHaveBeenCalled();
+      expect(fetcher.fetch.mock.calls[0][0]).toBe('ollama');
     });
 
     it('should decrypt key, fetch, enrich, and cache models', async () => {
@@ -733,18 +725,11 @@ describe('ModelDiscoveryService', () => {
   /* ── refreshProvider ── */
 
   describe('refreshProvider', () => {
-    it('rejects built-in local refreshes in cloud before reading the provider row', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
-
+    it('refreshes built-in local providers with no deployment mode configured', async () => {
       const result = await service.refreshProvider('tenant-1', 'ollama', 'local');
 
-      expect(result).toEqual({
-        ok: false,
-        model_count: 0,
-        last_fetched_at: null,
-        error: expect.stringContaining('only available in self-hosted Manifest'),
-      });
-      expect(providerRepo.find).not.toHaveBeenCalled();
+      expect(providerRepo.find).toHaveBeenCalled();
+      expect(result.error ?? '').not.toMatch(/self-hosted|Cloud/);
     });
 
     it('returns Provider not found when no row matches', async () => {
@@ -919,8 +904,7 @@ describe('ModelDiscoveryService', () => {
   /* ── getModelsForAgent ── */
 
   describe('getModelsForAgent', () => {
-    it('hides built-in local models in cloud but keeps tunneled custom models', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
+    it('lists built-in local models alongside custom models', async () => {
       providerRepo.find.mockResolvedValue([
         makeProvider({
           id: 'ollama-row',
@@ -939,8 +923,8 @@ describe('ModelDiscoveryService', () => {
 
       const result = await service.getModelsForAgent('tenant-1');
 
-      expect(result.map((model) => model.id)).toEqual(['custom:cp-1/custom-llm']);
-      expect(result[0].authType).toBe('local');
+      expect(result.map((model) => model.id)).toEqual(['qwen2.5:0.5b', 'custom:cp-1/custom-llm']);
+      expect(result.every((model) => model.authType === 'local')).toBe(true);
     });
 
     it('should merge cached models from providers and custom providers', async () => {

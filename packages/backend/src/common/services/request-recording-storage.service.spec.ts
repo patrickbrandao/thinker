@@ -27,7 +27,6 @@ describe('request recording storage selection', () => {
           'app.requestRecordingS3AccessKeyId': 'access',
           'app.requestRecordingS3SecretAccessKey': 'secret',
         }),
-        true,
       ),
     ).toEqual(
       expect.objectContaining({
@@ -38,7 +37,7 @@ describe('request recording storage selection', () => {
     );
   });
 
-  it('uses filesystem storage for self-hosting without S3 configuration', () => {
+  it('uses filesystem storage in production without S3 configuration', () => {
     expect(
       resolveRecordingStorage(
         config({
@@ -46,23 +45,25 @@ describe('request recording storage selection', () => {
           'app.nodeEnv': 'production',
           'app.requestRecordingFilesystemPath': '/data/request-recordings',
         }),
-        true,
       ),
     ).toEqual({ backend: 'filesystem', path: '/data/request-recordings' });
   });
 
-  it('does not fall back to ephemeral filesystem storage in managed Cloud', () => {
+  it('defaults production to the persistent /data path without any S3 credentials', () => {
     expect(
       resolveRecordingStorage(
         config({
           'app.requestRecordingStorage': 'auto',
           'app.nodeEnv': 'production',
         }),
-        false,
       ),
-    ).toEqual({
-      backend: null,
-      reason: 'Managed Cloud requires S3 recording storage credentials',
+    ).toEqual({ backend: 'filesystem', path: '/data/request-recordings' });
+  });
+
+  it('defaults development to a project-local path', () => {
+    expect(resolveRecordingStorage(config({ 'app.nodeEnv': 'development' }), '/thinker')).toEqual({
+      backend: 'filesystem',
+      path: '/thinker/.data/request-recordings',
     });
   });
 
@@ -76,7 +77,6 @@ describe('request recording storage selection', () => {
           'app.requestRecordingS3Region': 'auto',
           'app.requestRecordingS3AccessKeyId': 'access',
         }),
-        true,
       ),
     ).toEqual(
       expect.objectContaining({
@@ -87,9 +87,7 @@ describe('request recording storage selection', () => {
   });
 
   it('supports explicit disabled, filesystem, and S3 modes', () => {
-    expect(
-      resolveRecordingStorage(config({ 'app.requestRecordingStorage': 'disabled' }), true),
-    ).toEqual({
+    expect(resolveRecordingStorage(config({ 'app.requestRecordingStorage': 'disabled' }))).toEqual({
       backend: null,
       reason: 'Recording storage was explicitly disabled',
     });
@@ -99,7 +97,6 @@ describe('request recording storage selection', () => {
           'app.requestRecordingStorage': 'filesystem',
           'app.nodeEnv': 'development',
         }),
-        false,
         '/manifest',
       ),
     ).toEqual({
@@ -113,7 +110,6 @@ describe('request recording storage selection', () => {
           'app.requestRecordingS3Bucket': 'recordings',
           'app.requestRecordingS3Region': 'eu-west-1',
         }),
-        false,
       ),
     ).toEqual(
       expect.objectContaining({
@@ -126,7 +122,7 @@ describe('request recording storage selection', () => {
 
   it('rejects unknown storage modes', () => {
     expect(
-      resolveRecordingStorage(config({ 'app.requestRecordingStorage': 'somewhere-else' }), true),
+      resolveRecordingStorage(config({ 'app.requestRecordingStorage': 'somewhere-else' })),
     ).toEqual({
       backend: null,
       reason: 'Unknown REQUEST_RECORDING_STORAGE value "somewhere-else"',

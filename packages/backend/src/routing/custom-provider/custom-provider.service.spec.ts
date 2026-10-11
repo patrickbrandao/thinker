@@ -1,9 +1,6 @@
 jest.mock('../../common/utils/url-validation', () => ({
   validatePublicUrl: jest.fn(),
 }));
-jest.mock('../../common/utils/detect-self-hosted', () => ({
-  isSelfHosted: jest.fn().mockReturnValue(false),
-}));
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
@@ -17,8 +14,6 @@ import { IngestEventBusService } from '../../common/services/ingest-event-bus.se
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validatePublicUrl } = require('../../common/utils/url-validation');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { isSelfHosted } = require('../../common/utils/detect-self-hosted');
 
 function makeDeps(overrides: {
   findOneResults?: (CustomProvider | null)[];
@@ -127,8 +122,6 @@ describe('CustomProviderService', () => {
     jest.clearAllMocks();
     (validatePublicUrl as jest.Mock).mockReset();
     (validatePublicUrl as jest.Mock).mockResolvedValue(undefined);
-    (isSelfHosted as jest.Mock).mockReset();
-    (isSelfHosted as jest.Mock).mockReturnValue(false);
   });
 
   describe('static helpers', () => {
@@ -379,7 +372,7 @@ describe('CustomProviderService', () => {
         undefined,
         txManager,
       );
-      expect(validatePublicUrl).toHaveBeenCalledWith(dto.base_url, { allowPrivate: false });
+      expect(validatePublicUrl).toHaveBeenCalledWith(dto.base_url, { allowPrivate: true });
       // Price lookup cache must be refreshed so the proxy can compute cost
       // for messages routed to this provider's models immediately.
       expect(reloadPricing).toHaveBeenCalledTimes(1);
@@ -506,8 +499,7 @@ describe('CustomProviderService', () => {
       );
     });
 
-    it('passes allowPrivate=true in the self-hosted version so private URLs are accepted', async () => {
-      (isSelfHosted as jest.Mock).mockReturnValue(true);
+    it('passes allowPrivate=true so LAN and local URLs are accepted', async () => {
       const selfHostedDto = { ...dto, base_url: 'http://host.docker.internal:11434/v1' };
       const { svc } = makeDeps({ findOneResults: [null] });
       await svc.create('tenant-1', selfHostedDto);
@@ -765,12 +757,11 @@ describe('CustomProviderService', () => {
       } as CustomProvider;
       const { svc } = makeDeps({ findOneResults: [existing] });
       await svc.update('cp1', 'tenant-1', { base_url: 'https://b.example' });
-      expect(validatePublicUrl).toHaveBeenCalledWith('https://b.example', { allowPrivate: false });
+      expect(validatePublicUrl).toHaveBeenCalledWith('https://b.example', { allowPrivate: true });
       expect(existing.base_url).toBe('https://b.example');
     });
 
-    it('passes allowPrivate=true to validatePublicUrl in the self-hosted version', async () => {
-      (isSelfHosted as jest.Mock).mockReturnValue(true);
+    it('passes allowPrivate=true to validatePublicUrl with no deployment mode configured', async () => {
       const existing = { id: 'cp1', name: 'n' } as CustomProvider;
       const { svc } = makeDeps({ findOneResults: [existing] });
       await svc.update('cp1', 'tenant-1', {

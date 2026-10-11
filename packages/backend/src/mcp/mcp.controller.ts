@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import type { Request, Response } from 'express';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { auth, authIssuerForHost, mcpResourceForHost, MCP_READ_SCOPE } from '../auth/auth.instance';
+import { auth, authIssuer, mcpResource, MCP_READ_SCOPE } from '../auth/auth.instance';
 import { Public } from '../common/decorators/public.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
 import { AgentListCacheService } from '../common/services/agent-list-cache.service';
@@ -132,8 +132,8 @@ export class McpController {
   @Public()
   async handle(@Req() req: Request, @Res() res: Response): Promise<void> {
     const deps = this.deps();
-    const resource = mcpResourceForHost(req.headers.host);
-    const issuer = authIssuerForHost(req.headers.host);
+    const resource = mcpResource;
+    const issuer = authIssuer;
     const webRequest = new globalThis.Request(resource, {
       method: req.method,
       headers: fromNodeHeaders(req.headers),

@@ -2,7 +2,6 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
-import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { BackfillState } from '../../entities/backfill-state.entity';
 import {
   BackfillOptions,
@@ -35,8 +34,7 @@ const defaultRunner: BackfillRunner = (dataSource, options) =>
  * Runs the post-deploy agent-message attribution backfill automatically, once,
  * after the app is up — so operators never have to invoke the CLI by hand.
  *
- * - Self-hosted production only; Cloud coordinates it over the direct backfill
- *   connection before starting the request-history backfill.
+ * - Production only (`NODE_ENV=production`).
  * - Fire-and-forget from onApplicationBootstrap: never blocks readiness/health
  *   and never crashes boot.
  * - Single-runner across replicas via a Postgres advisory lock.
@@ -59,9 +57,7 @@ export class MessageProviderBackfillBootService implements OnApplicationBootstra
 
   onApplicationBootstrap(): void {
     // Only on real deploys, and never await — boot must not wait on the backfill.
-    if (process.env['NODE_ENV'] !== 'production' || !isSelfHosted()) {
-      return;
-    }
+    if (process.env['NODE_ENV'] !== 'production') return;
     void this.runUntilComplete().catch((error) => {
       this.logger.error(
         `post-deploy backfill failed: ${error instanceof Error ? error.message : String(error)}`,

@@ -11,10 +11,6 @@ import {
 } from 'manifest-shared';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
-import {
-  CLOUD_LOCAL_PROVIDER_MESSAGE,
-  isProviderAvailableForDeployment,
-} from '../../common/utils/provider-availability';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
@@ -162,9 +158,6 @@ export function registerProviderTools(
             SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
             SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalizeProviderName(normalized));
           if (!known) throw new Error(`Unknown provider: ${provider}`);
-          if (!isProviderAvailableForDeployment(provider)) {
-            throw new Error(CLOUD_LOCAL_PROVIDER_MESSAGE);
-          }
           const upserted = await deps.providers.upsertProvider(
             resolved.id,
             resolved.tenant_id,

@@ -7,17 +7,6 @@ import { DASHBOARD_CACHE_TTL_MS } from '../../common/constants/cache.constants';
 import type { ProviderUsageSummary } from '../services/provider-usage.service';
 
 describe('ProviderUsageController', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
-
-  beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'cloud';
-  });
-
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
-  });
-
   it('caches the expensive 30-day aggregation per tenant', () => {
     expect(Reflect.getMetadata(CACHE_TTL_METADATA, ProviderUsageController)).toBe(
       DASHBOARD_CACHE_TTL_MS,
@@ -62,7 +51,7 @@ describe('ProviderUsageController', () => {
     expect(result).toEqual({ providers: [] });
   });
 
-  it('hides built-in local usage in cloud without hiding custom tunnel usage', async () => {
+  it('reports built-in local usage alongside custom provider usage', async () => {
     const base = {
       auth_type: 'local',
       consumption_tokens: 10,
@@ -81,6 +70,9 @@ describe('ProviderUsageController', () => {
 
     const result = await controller.getUsage({ tenantId: 'tenant-1', userId: 'user-1' });
 
-    expect(result.providers.map((provider) => provider.provider)).toEqual(['custom:runtime-id']);
+    expect(result.providers.map((provider) => provider.provider)).toEqual([
+      'ollama',
+      'custom:runtime-id',
+    ]);
   });
 });

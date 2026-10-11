@@ -41,30 +41,6 @@ export const mcpEnabled = mcpDecision.enabled;
 export const mcpDisabledReason = mcpDecision.reason;
 export { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
 
-const CLOUD_ORIGINS = ['https://app.manifest.build', 'https://gateway.manifest.build'];
-const cloudOrigins = CLOUD_ORIGINS.includes(authOrigin) ? CLOUD_ORIGINS : [];
-export const mcpResources = (cloudOrigins.length ? cloudOrigins : [authOrigin]).map(
-  (origin) => `${origin}/api/v1/mcp`,
-);
-
-/** Keep each Cloud MCP endpoint bound to the host the client connected to. */
-export function authOriginForHost(host: string | undefined): string {
-  const normalizedHost = parseOriginHost(host);
-  return (
-    (cloudOrigins.length ? cloudOrigins : [authOrigin]).find(
-      (origin) => new URL(origin).host === normalizedHost,
-    ) ?? authOrigin
-  );
-}
-
-export function authIssuerForHost(host: string | undefined): string {
-  return `${authOriginForHost(host)}/api/auth`;
-}
-
-export function mcpResourceForHost(host: string | undefined): string {
-  return `${authOriginForHost(host)}/api/v1/mcp`;
-}
-
 /** Host (with optional port) of an origin or bare hostname, or null when junk. */
 function parseOriginHost(value: string | undefined): string | null {
   const raw = value?.trim();
@@ -79,14 +55,13 @@ function parseOriginHost(value: string | undefined): string | null {
 
 /**
  * Better Auth pins the OAuth callback and the session cookie to its `baseURL`.
- * The dashboard and the API can answer on more than one host — the hosted
- * Cloud serves app.manifest.build and gateway.manifest.build from the same
- * service — so a single static origin sends a user who started on host A
+ * The dashboard and the API can answer on more than one host (for example a
+ * LAN name and a public name), so a single static origin sends a user who started on host A
  * through a callback on host B, where the session cookie lands on an origin
  * the dashboard cannot read. When a second host is configured, resolve the
  * base URL from the request host instead, restricted to an allow-list.
  *
- * Hosts come from `BETTER_AUTH_URL` (canonical), both Cloud domains,
+ * Hosts come from `BETTER_AUTH_URL` (canonical),
  * `CORS_ORIGIN` (the dashboard origin already trusted for cross-origin calls),
  * and the optional
  * `BETTER_AUTH_ALLOWED_HOSTS` (comma-separated patterns, `*.` wildcards
@@ -104,7 +79,6 @@ function buildAuthBaseURL():
   };
   add(process.env['BETTER_AUTH_URL']);
   add(process.env['CORS_ORIGIN']);
-  for (const origin of cloudOrigins) add(origin);
   for (const entry of (process.env['BETTER_AUTH_ALLOWED_HOSTS'] ?? '').split(',')) add(entry);
   if (hosts.size <= 1) return authOrigin;
   return {
@@ -146,7 +120,6 @@ function buildTrustedOrigins(): string[] {
   if (process.env['CORS_ORIGIN']) {
     origins.push(process.env['CORS_ORIGIN']);
   }
-  origins.push(...cloudOrigins);
   if (isDev) {
     origins.push(
       `http://localhost:3000`,
@@ -185,7 +158,7 @@ function buildMcpPlugins() {
       consentPage: '/consent',
       resource: mcpResource,
       scopes: [...MCP_SCOPES, 'offline_access'],
-      resources: mcpResources.map((identifier) => ({
+      resources: [mcpResource].map((identifier) => ({
         identifier,
         name: 'Manifest MCP',
         // Short-lived bearer tokens; the refresh token (offline_access) is
@@ -193,7 +166,7 @@ function buildMcpPlugins() {
         accessTokenTtl: 15 * 60,
         allowedScopes: [...MCP_SCOPES, 'offline_access'],
       })),
-      clientRegistrationDefaultResources: mcpResources,
+      clientRegistrationDefaultResources: [mcpResource],
       resourceSeedMode: 'overwrite',
       clientRegistrationDefaultScopes: [MCP_READ_SCOPE],
       clientRegistrationAllowedScopes: [MCP_WRITE_SCOPE, 'offline_access'],

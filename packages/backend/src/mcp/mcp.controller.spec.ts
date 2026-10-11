@@ -7,14 +7,6 @@ jest.mock('../auth/auth.instance', () => ({
   auth: { $context: Promise.resolve({ baseURL: '', internalAdapter: {} }) },
   authIssuer: 'http://localhost:3001/api/auth',
   mcpResource: 'http://localhost:3001/api/v1/mcp',
-  authIssuerForHost: (host: string) =>
-    host === 'gateway.manifest.build'
-      ? 'https://gateway.manifest.build/api/auth'
-      : 'http://localhost:3001/api/auth',
-  mcpResourceForHost: (host: string) =>
-    host === 'gateway.manifest.build'
-      ? 'https://gateway.manifest.build/api/v1/mcp'
-      : 'http://localhost:3001/api/v1/mcp',
   MCP_READ_SCOPE: 'mcp:read',
 }));
 jest.mock('better-auth/node', () => ({ fromNodeHeaders: jest.fn(() => new Headers()) }));
@@ -313,18 +305,18 @@ describe('McpController', () => {
     );
   });
 
-  it('verifies gateway tokens against the gateway issuer and audience', async () => {
+  it('verifies tokens against the canonical issuer and audience whatever the Host header', async () => {
     createMcpProtectedRequestHandler.mockReturnValue(async () => new Response('OK'));
     const res = makeRes();
     await makeController('tenant-1').handle(
-      { ...req, headers: { host: 'gateway.manifest.build' } } as Request,
+      { ...req, headers: { host: 'other.example' } } as Request,
       res as never,
     );
     expect(createMcpProtectedRequestHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        issuer: 'https://gateway.manifest.build/api/auth',
-        audience: 'https://gateway.manifest.build/api/v1/mcp',
-        jwksUrl: 'https://gateway.manifest.build/api/auth/jwks',
+        issuer: 'http://localhost:3001/api/auth',
+        audience: 'http://localhost:3001/api/v1/mcp',
+        jwksUrl: 'http://localhost:3001/api/auth/jwks',
       }),
       expect.any(Function),
     );

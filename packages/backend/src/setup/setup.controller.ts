@@ -12,19 +12,15 @@ export class SetupController {
   async getStatus(): Promise<{
     needsSetup: boolean;
     socialProviders: string[];
-    isSelfHosted: boolean;
     ollamaAvailable: boolean;
     localLlmHost: string;
     emailConfigured: boolean;
     mcpEnabled: boolean;
   }> {
-    const selfHosted = this.setupService.isSelfHosted();
-    const ollamaAvailable = selfHosted ? await this.setupService.isOllamaAvailable() : false;
     return {
       needsSetup: await this.setupService.needsSetup(),
       socialProviders: this.setupService.getEnabledSocialProviders(),
-      isSelfHosted: selfHosted,
-      ollamaAvailable,
+      ollamaAvailable: await this.setupService.isOllamaAvailable(),
       localLlmHost: this.setupService.getLocalLlmHost(),
       emailConfigured: this.setupService.isEmailConfigured(),
       mcpEnabled: this.setupService.isMcpEnabled(),

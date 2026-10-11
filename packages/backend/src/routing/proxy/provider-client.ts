@@ -9,7 +9,6 @@ import {
   resolveEndpointKey,
 } from './provider-endpoints';
 import { validatePublicUrl } from '../../common/utils/url-validation';
-import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
 import { injectOpenAiMessageCacheControl, injectOpenRouterCacheControl } from './cache-injection';
@@ -46,8 +45,6 @@ import { forwardKiroChat } from './kiro-adapter';
 import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
-import { isProviderAvailableForDeployment } from '../../common/utils/provider-availability';
-import { ManifestError } from '../../common/errors/manifest-error';
 import { isBedrockProvider } from '../bedrock-region';
 import { getBedrockRuntimeCapabilities } from '../bedrock-runtime-capabilities';
 
@@ -368,10 +365,6 @@ export class ProviderClient {
       authType,
     } = opts;
 
-    if (!customEndpoint && !isProviderAvailableForDeployment(provider)) {
-      throw new ManifestError('M303', HttpStatus.BAD_REQUEST);
-    }
-
     const { endpoint, endpointKey } = await this.resolveEndpoint(
       customEndpoint,
       provider,
@@ -462,10 +455,11 @@ export class ProviderClient {
 
     // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
     // subscription resource URLs). Re-check on every actual forward, because DNS
-    // may have rebound since the URL was first validated.
+    // may have rebound since the URL was first validated. LAN destinations are
+    // allowed (local models are a feature); cloud metadata is always refused.
     if (endpoint.requiresSsrfRevalidation) {
       try {
-        await validatePublicUrl(url, { allowPrivate: isSelfHosted() });
+        await validatePublicUrl(url, { allowPrivate: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`Refusing to forward to disallowed URL: ${message}`);
