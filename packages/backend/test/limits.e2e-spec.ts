@@ -138,9 +138,11 @@ describe('Limits API', () => {
  * Run the e2e suite under TZ=UTC and a non-UTC zone (e.g. America/Sao_Paulo).
  */
 describe('Limit windows include usage recorded in the current second', () => {
-  const FRESH_AGENT = 'limits-fresh-usage-agent';
-  let tenantId: string;
-  let agentId: string;
+  // One agent per check, so each holds only the row written right before its
+  // own check and neither can pass on usage left by the other.
+  const HARD_AGENT = 'limits-fresh-hard-agent';
+  const SOFT_AGENT = 'limits-fresh-soft-agent';
+  const agents = new Map<string, { tenantId: string; agentId: string }>();
 
   beforeAll(async () => {
     const ds = app.get(DataSource);
@@ -148,32 +150,33 @@ describe('Limit windows include usage recorded in the current second', () => {
     // recipient joins it, and the soft-limit check counts a rule as triggered
     // only after that succeeds.
     await ds.query('CREATE TABLE IF NOT EXISTS "user" (id VARCHAR PRIMARY KEY, email VARCHAR)');
-    await request(app.getHttpServer())
-      .post('/api/v1/agents')
-      .set('x-api-key', TEST_API_KEY)
-      .send({ name: FRESH_AGENT })
-      .expect(201);
-    const rows = await ds.query(`SELECT id, tenant_id FROM agents WHERE name = $1`, [
-      FRESH_AGENT,
-    ]);
-    expect(rows).toHaveLength(1);
-    agentId = rows[0].id;
-    tenantId = rows[0].tenant_id;
+    for (const name of [HARD_AGENT, SOFT_AGENT]) {
+      await request(app.getHttpServer())
+        .post('/api/v1/agents')
+        .set('x-api-key', TEST_API_KEY)
+        .send({ name })
+        .expect(201);
+      const rows = await ds.query(`SELECT id, tenant_id FROM agents WHERE name = $1`, [name]);
+      expect(rows).toHaveLength(1);
+      agents.set(name, { tenantId: rows[0].tenant_id, agentId: rows[0].id });
+    }
   });
 
-  const recordUsageNow = (inputTokens: number, outputTokens: number) =>
-    app.get(DataSource).query(
+  const recordUsageNow = (agentName: string, inputTokens: number, outputTokens: number) => {
+    const { tenantId, agentId } = agents.get(agentName)!;
+    return app.get(DataSource).query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
        VALUES ($1, $2, $3, $4, 'ok', 'test-model', $5, $6, 0, 0, $7, 'test-user-001')`,
-      [uuid(), tenantId, agentId, new Date(), inputTokens, outputTokens, FRESH_AGENT],
+      [uuid(), tenantId, agentId, new Date(), inputTokens, outputTokens, agentName],
     );
+  };
 
   it('hard limit counts a message recorded just before the check', async () => {
     const rule = await request(app.getHttpServer())
       .post('/api/v1/notifications')
       .set('x-api-key', TEST_API_KEY)
       .send({
-        agent_name: FRESH_AGENT,
+        agent_name: HARD_AGENT,
         metric_type: 'tokens',
         threshold: 1,
         period: 'day',
@@ -181,8 +184,10 @@ describe('Limit windows include usage recorded in the current second', () => {
       })
       .expect(201);
 
-    await recordUsageNow(500, 200);
-    const exceeded = await app.get(LimitCheckService).checkLimits(tenantId, FRESH_AGENT);
+    await recordUsageNow(HARD_AGENT, 500, 200);
+    const exceeded = await app
+      .get(LimitCheckService)
+      .checkLimits(agents.get(HARD_AGENT)!.tenantId, HARD_AGENT);
 
     expect(exceeded).not.toBeNull();
     expect(exceeded!.ruleId).toBe(rule.body.id);
@@ -195,11 +200,11 @@ describe('Limit windows include usage recorded in the current second', () => {
   });
 
   it('soft limit check counts a message recorded just before the check', async () => {
-    await request(app.getHttpServer())
+    const rule = await request(app.getHttpServer())
       .post('/api/v1/notifications')
       .set('x-api-key', TEST_API_KEY)
       .send({
-        agent_name: FRESH_AGENT,
+        agent_name: SOFT_AGENT,
         metric_type: 'tokens',
         threshold: 1,
         period: 'hour',
@@ -207,12 +212,20 @@ describe('Limit windows include usage recorded in the current second', () => {
       })
       .expect(201);
 
-    await recordUsageNow(10, 5);
+    await recordUsageNow(SOFT_AGENT, 10, 5);
     const res = await request(app.getHttpServer())
       .post('/api/v1/notifications/trigger-check')
       .set('x-api-key', TEST_API_KEY)
       .expect(201);
 
-    expect(res.body.triggered).toBeGreaterThan(0);
+    expect(res.body.triggered).toBe(1);
+    const logs = await request(app.getHttpServer())
+      .get(`/api/v1/notifications/logs?agent_name=${SOFT_AGENT}`)
+      .set('x-api-key', TEST_API_KEY)
+      .expect(200);
+    expect(logs.body).toHaveLength(1);
+    expect(Number(logs.body[0].actual_value)).toBe(15);
+    expect(logs.body[0].metric_type).toBe('tokens');
+    expect(rule.body.agent_name).toBe(SOFT_AGENT);
   });
 });
