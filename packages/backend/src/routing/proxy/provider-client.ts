@@ -345,6 +345,10 @@ function stripModelPrefix(model: string, endpointKey: string): string {
     endpointKey === 'cline-pass' ||
     endpointKey === 'ollama' ||
     endpointKey === 'ollama-cloud' ||
+    // LM Studio serves hub ids such as `qwen/qwen3-8b`; llama-server echoes
+    // whatever `--alias` or file path it was started with.
+    endpointKey === 'lmstudio' ||
+    endpointKey === 'llamacpp' ||
     endpointKey === 'pioneer'
   )
     return model;
