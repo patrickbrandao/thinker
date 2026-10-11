@@ -32,7 +32,6 @@ import { SetupModule } from './setup/setup.module';
 import { FreeModelsModule } from './free-models/free-models.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
-import { BillingModule } from './billing/billing.module';
 import { DiscoveryModule } from './discovery/discovery.module';
 import { CrmMetricsModule } from './crm-metrics/crm-metrics.module';
 import { McpModule } from './mcp/mcp.module';
@@ -119,7 +118,6 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     TelemetryModule,
     BackfillModule,
     WaitlistModule,
-    BillingModule,
     DiscoveryModule,
     ...mcpImports,
     ...crmMetricsImports,

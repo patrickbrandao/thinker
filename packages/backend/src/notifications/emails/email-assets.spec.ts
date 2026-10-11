@@ -4,7 +4,6 @@ import { ResetPasswordEmail } from './reset-password';
 import { TestEmail } from './test-email';
 import { ThresholdAlertEmail } from './threshold-alert';
 import { DoctorReleaseEmail } from './doctor-release';
-import { PlanUsageEmail, SubscriptionPlanEmail } from '../../billing/emails/billing-plan-email';
 
 const dashboard = 'https://dashboard.example';
 const renderers = {
@@ -22,21 +21,6 @@ const renderers = {
       agentUrl: `${dashboard}/harnesses/demo`,
     }),
   announcement: () => DoctorReleaseEmail({ appUrl: dashboard }),
-  subscription: () =>
-    SubscriptionPlanEmail({
-      kind: 'subscription_confirmed',
-      planName: 'Pro',
-      appUrl: dashboard,
-      manageBillingUrl: `${dashboard}/account`,
-    }),
-  usage: () =>
-    PlanUsageEmail({
-      kind: 'requests_warning',
-      used: 8000,
-      limit: 10000,
-      periodEnd: '2026-10-01',
-      appUrl: dashboard,
-    }),
 };
 
 describe('email image deployment URLs', () => {

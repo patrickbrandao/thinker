@@ -179,20 +179,6 @@ export {
   isPlaygroundHeaderNameValid,
   isPlaygroundHeaderValueValid,
 } from './playground-headers';
-export {
-  PLANS,
-  FREE_PLAN_REQUESTS_PER_MONTH,
-  PLAN_LIMITS,
-  UNLIMITED_PLAN_LIMITS,
-} from './plan-limits';
-export type {
-  BillingEmailPreferences,
-  BillingPlanStatus,
-  BillingPrice,
-  BillingStatus,
-  Plan,
-  PlanLimits,
-} from './plan-limits';
 export { AUTOFIX_STATUSES, AUTOFIX_STATUS_LABELS, deriveAutofixStatus } from './autofix-status';
 export type { AutofixStatus, AutofixStatusChainEntry, AutofixStatusRecord } from './autofix-status';
 export {

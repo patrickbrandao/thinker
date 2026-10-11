@@ -40,7 +40,6 @@ import { AttemptStatsService } from './services/attempt-stats.service';
 import { AutofixAnalyticsController } from './controllers/autofix-analytics.controller';
 import { AutofixStatsService } from './services/autofix-stats.service';
 import { RequestVolumeService } from './services/request-volume.service';
-import { BillingModule } from '../billing/billing.module';
 import { AutofixModule } from '../routing/autofix/autofix.module';
 import { AgentUsageDailyService } from './services/agent-usage-daily.service';
 
@@ -63,7 +62,6 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     OtlpModule,
     RoutingCoreModule,
     ModelPricesModule,
-    BillingModule,
     AutofixModule,
   ],
   controllers: [
