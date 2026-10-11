@@ -28,6 +28,7 @@ import {
 } from './cors-csp-config';
 import { createRateLimitReachedHandler } from './common/middleware/rate-limit-log';
 import { shouldCompress } from './routing/proxy/compression-filter';
+import { checkLocalServerBaseUrls } from './common/constants/local-servers';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -270,6 +271,10 @@ export async function bootstrap() {
         'MANIFEST_DISABLE_HSTS=1 to silence this warning for HTTP-only LAN deployments.',
     );
   }
+
+  // A malformed THINKER_LMSTUDIO_BASE_URL / THINKER_LLAMACPP_BASE_URL is
+  // ignored per request; surface it in the startup log too.
+  checkLocalServerBaseUrls();
 
   return app;
 }
