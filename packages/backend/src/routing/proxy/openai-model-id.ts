@@ -1,7 +1,7 @@
 import { inferProviderFromModel, type ModelRoute } from 'manifest-shared';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { unambiguousRoute } from '../routing-core/route-helpers';
-import { openAiModelId } from '../routing-core/public-model-id';
+import { legacyOpenAiModelId, openAiModelId } from '../routing-core/public-model-id';
 
 export {
   OPENAI_MODEL_ID_AUTO,
@@ -20,8 +20,11 @@ export interface ExplicitModelRouteCandidate {
  * Resolve the `model` field of a proxy request to a route.
  *
  * Matches the provider-qualified id published by `/v1/models`
- * (`openai/gpt-5.4-nano`) first, then the bare provider-native name
- * (`gpt-5.4-nano`) when it names exactly one discovered model.
+ * (`openai/gpt-5.4-nano`) first, then a custom provider's legacy id
+ * (`lmstudio/<model>` for a provider renamed to `lmstudio-custom` once the
+ * alias became reserved), then the bare provider-native name
+ * (`gpt-5.4-nano`) when it names exactly one discovered model. A published
+ * id always wins over a legacy one, so the built-in route keeps its name.
  *
  * Returns null for an unknown name, and for a bare name carried by more than
  * one connection (the same id under both an API key and a subscription) — the
@@ -34,6 +37,15 @@ export function routeForOpenAiModelId(
   for (const model of models) {
     if (!model.authType) continue;
     if (openAiModelId(model) !== modelId) continue;
+    return {
+      provider: model.provider,
+      authType: model.authType,
+      model: model.id,
+    };
+  }
+  for (const model of models) {
+    if (!model.authType) continue;
+    if (legacyOpenAiModelId(model) !== modelId) continue;
     return {
       provider: model.provider,
       authType: model.authType,

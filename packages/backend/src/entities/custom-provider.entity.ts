@@ -40,6 +40,16 @@ export class CustomProvider {
   @Column('varchar', { nullable: true })
   alias!: string | null;
 
+  /**
+   * An alias this provider published under before it became reserved for a
+   * built-in route (set by `ReserveLocalRunnerAliases1803200000000`). The
+   * proxy still accepts `<legacy_alias>/<model_name>` when no published id
+   * matches, so older client configs keep routing; `/v1/models` never lists
+   * it. Not unique and not user-editable.
+   */
+  @Column('varchar', { nullable: true })
+  legacy_alias!: string | null;
+
   @Column('varchar')
   base_url!: string;
 

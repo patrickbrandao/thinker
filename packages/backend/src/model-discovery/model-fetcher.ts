@@ -51,6 +51,13 @@ export interface DiscoveredModel {
    * in which case the internal `custom:<uuid>/<model_name>` id is published.
    */
   providerAlias?: string;
+  /**
+   * Custom providers only: an alias the provider published under before it
+   * was reserved for a built-in route. The proxy still resolves
+   * `<providerLegacyAlias>/<model_name>` to this model when no published id
+   * matches; `/v1/models` never lists it.
+   */
+  providerLegacyAlias?: string;
 }
 
 export interface FetcherConfig {
