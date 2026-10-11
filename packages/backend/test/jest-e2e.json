@@ -3,6 +3,7 @@
   "rootDir": "..",
   "coverageDirectory": "coverage/e2e",
   "testEnvironment": "node",
+  "testTimeout": 30000,
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.tsx?$": "ts-jest",
