@@ -12,7 +12,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { createServer } from 'net';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { DataSource } from 'typeorm';
 
 const FORBIDDEN_DESTINATIONS = [
@@ -22,6 +22,22 @@ const FORBIDDEN_DESTINATIONS = [
   'modelparams.dev',
   'wingman.manifest.build',
   'sentry.io',
+];
+/**
+ * Manifest Cloud's API hosts. A CLI defaulting to one sent the user's key there
+ * whenever no host was configured; nothing may target them by default.
+ */
+const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
+/**
+ * Backend production files that still name a hosted gateway host, none of them
+ * as a request destination: Cloud trusted origins (#18), and the dashboard link
+ * fallback with the OG-tag placeholder it matches in the frontend's index.html
+ * (#22, #25). The list may only shrink.
+ */
+const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
+  'backend/src/auth/auth.instance.ts',
+  'backend/src/common/utils/dashboard-url.ts',
+  'backend/src/common/utils/og-rewrite.ts',
 ];
 const ADR_0003_CATALOG_HOSTS = new Set([
   'openrouter.ai',
@@ -97,6 +113,24 @@ describe('no phone-home egress', () => {
       expect(filesMatching(new RegExp(host.replace(/[.]/g, '\\.')))).toEqual([]);
     },
   );
+
+  it('names no hosted gateway host anywhere in the CLI or shared source, tests included', () => {
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    expect(filesMatching(pattern).filter((file) => /^(cli|shared)[\\/]/.test(file))).toEqual([]);
+  });
+
+  it('adds no backend production file naming a hosted gateway host', () => {
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    const backendFiles = filesMatching(pattern)
+      .map((file) => file.split(sep).join('/'))
+      .filter((file) => file.startsWith('backend/') && !/\.spec\.tsx?$/.test(file));
+    expect(backendFiles.sort()).toEqual(BACKEND_HOSTED_GATEWAY_LEFTOVERS);
+  });
+
+  it('defaults the CLI to a local gateway', () => {
+    const config = readFileSync(join(BACKEND, '..', 'cli', 'src', 'config.ts'), 'utf8');
+    expect(config).toMatch(/export const DEFAULT_URL = 'http:\/\/localhost:2099';/);
+  });
 
   it('ships no telemetry, update check, discovery forwarding, Sentry or Wingman code', () => {
     expect(
@@ -202,7 +236,9 @@ describe('no phone-home egress', () => {
 
     it('makes no request to a phone-home destination', () => {
       const offenders = records.filter((record) =>
-        FORBIDDEN_DESTINATIONS.some((destination) => record.target.includes(destination)),
+        [...FORBIDDEN_DESTINATIONS, ...HOSTED_GATEWAY_HOSTS].some((destination) =>
+          record.target.includes(destination),
+        ),
       );
       expect(offenders).toEqual([]);
     });

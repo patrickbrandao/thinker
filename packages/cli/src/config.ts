@@ -3,7 +3,13 @@ import * as path from 'path';
 import * as os from 'os';
 import { CliError } from './errors';
 
-export const DEFAULT_URL = 'https://app.manifest.build';
+/**
+ * Origin used when no `--url`, `MANIFEST_URL` or stored login selects one: a
+ * Thinker instance on this machine, at its default port. Never a hosted
+ * service, so a key from `MANIFEST_API_KEY` cannot leave the machine by
+ * default (#17).
+ */
+export const DEFAULT_URL = 'http://localhost:2099';
 
 export interface HostConfig {
   apiKey: string;
@@ -32,7 +38,7 @@ export function normalizeOrigin(url: string): string {
     throw new CliError(
       'invalid_url',
       `Not a valid URL: ${url}`,
-      'Pass a full origin like https://app.manifest.build',
+      'Pass a full origin like http://localhost:2099',
     );
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {

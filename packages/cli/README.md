@@ -19,7 +19,7 @@ npx mnfst-gateway-cli --help
 
 ## Quick start
 
-Sign in to the hosted Manifest gateway, then create an agent and connect a provider:
+Sign in to your gateway, then create an agent and connect a provider. With no `--url`, `MANIFEST_URL` or stored login, the CLI targets a gateway on this machine at `http://localhost:2099`; it never falls back to a hosted service.
 
 ```bash
 mnfst login
@@ -33,7 +33,7 @@ mnfst agent setup my-app
 
 Set `OPENAI_API_KEY` in your environment before connecting the provider. Choose a model shown by `mnfst models` if `gpt-4o-mini` is unavailable to your account. `mnfst agent setup` returns wiring instructions with the agent key masked.
 
-For a self-hosted gateway, pass its URL when you sign in:
+For a gateway on another host, pass its URL when you sign in:
 
 ```bash
 mnfst login --url https://gateway.example.com
