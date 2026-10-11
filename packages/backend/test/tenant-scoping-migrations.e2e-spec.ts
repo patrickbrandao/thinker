@@ -15,6 +15,7 @@ import { TenantProviders1792500000000 } from '../src/database/migrations/1792500
 import { TenantScopedConfigs1792600000000 } from '../src/database/migrations/1792600000000-TenantScopedConfigs';
 import { DropUserScopeFromRouting1792700000000 } from '../src/database/migrations/1792700000000-DropUserScopeFromRouting';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const USER = 'mig-user-1';
 const TENANT = 'mig-tenant-1';
@@ -56,9 +57,7 @@ describe('Tenant-canonical scoping migrations — data backfill (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ??
-        'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

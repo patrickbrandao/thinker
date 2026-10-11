@@ -8,11 +8,18 @@ function createDataSource(): DataSource {
   // deploys could still deadlock if migrations ran through the pool. Fall back to
   // DATABASE_URL only for local/self-hosted, where it's already a direct
   // connection (no PgBouncer in front).
+  // `||` (not `??`) so an empty or blank override does not win over DATABASE_URL.
   const databaseUrl =
-    process.env['MIGRATION_DATABASE_URL'] ??
-    process.env['DATABASE_UNPOOLED_URL'] ??
-    process.env['DATABASE_URL'] ??
-    'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+    process.env['MIGRATION_DATABASE_URL']?.trim() ||
+    process.env['DATABASE_UNPOOLED_URL']?.trim() ||
+    process.env['DATABASE_URL']?.trim();
+  // No default URL: migrations must never silently target whatever happens to
+  // listen on localhost:5432 (issue #67).
+  if (!databaseUrl) {
+    throw new Error(
+      'DATABASE_URL (or MIGRATION_DATABASE_URL) is required. Set it in your .env file.',
+    );
+  }
 
   return new DataSource({
     type: 'postgres',

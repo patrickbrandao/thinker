@@ -3,6 +3,7 @@ import { AddCustomProviderFkToUserProviders1792100000000 } from '../src/database
 import { TenantProviders1792500000000 } from '../src/database/migrations/1792500000000-TenantProviders';
 import { TenantScopedConfigs1792600000000 } from '../src/database/migrations/1792600000000-TenantScopedConfigs';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 /**
  * The tenant-canonical chain (which runs AFTER the migration under test) renames
@@ -24,8 +25,7 @@ async function revertTenantCanonicalScoping(ds: DataSource): Promise<void> {
   await providersQr.release();
 }
 
-const DB_URL =
-  process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/manifest_duprepro';
+const DB_URL = resolveE2eDatabaseUrl();
 
 function makeDataSource(): DataSource {
   return new DataSource({

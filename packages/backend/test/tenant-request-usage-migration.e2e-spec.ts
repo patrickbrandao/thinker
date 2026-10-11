@@ -3,6 +3,7 @@ import { AddTenantRequestUsage1801300000000 } from '../src/database/migrations/1
 import { PlanService } from '../src/billing/plan.service';
 import { REQUEST_QUOTA_RESET_AT_ENV } from '../src/billing/request-quota-window';
 import { toLocalSqlTimestamp, toSqlTimestamp } from '../src/common/utils/postgres-sql';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'usage-tenant';
 const AGENT = 'usage-agent';
@@ -119,8 +120,7 @@ describe('AddTenantRequestUsage migration (e2e)', () => {
     process.env[REQUEST_QUOTA_RESET_AT_ENV] = new Date(RESET_AT_MS).toISOString();
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,
@@ -371,8 +371,7 @@ describe('AddTenantRequestUsage self-hosted migration (e2e)', () => {
     process.env['MANIFEST_MODE'] = 'selfhosted';
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

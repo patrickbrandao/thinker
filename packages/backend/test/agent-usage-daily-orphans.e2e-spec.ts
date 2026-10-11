@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { AgentUsageDailyService } from '../src/analytics/services/agent-usage-daily.service';
 import { toLocalSqlTimestamp } from '../src/common/utils/postgres-sql';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'rollup-tenant';
 const AGENT = 'rollup-agent';
@@ -48,8 +49,7 @@ describe('AgentUsageDailyService rollup of rows whose harness is gone (e2e)', ()
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,

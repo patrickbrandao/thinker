@@ -28,6 +28,7 @@ import { AgentEnabledProvider } from '../src/entities/agent-enabled-provider.ent
 import type { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
 import type { ModelPricingCacheService } from '../src/model-prices/model-pricing-cache.service';
 import { encrypt, decrypt, getEncryptionSecret } from '../src/common/utils/crypto.util';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'oauthlock-tenant-1';
 const AGENT = 'oauthlock-agent-1';
@@ -90,8 +91,7 @@ describe('withSubscriptionCredentialLock — real Postgres (e2e)', () => {
 
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      url: resolveE2eDatabaseUrl(),
       entities: ['src/entities/!(*.spec).ts'],
       migrations: ['src/database/migrations/!(*.spec).ts'],
       synchronize: false,
