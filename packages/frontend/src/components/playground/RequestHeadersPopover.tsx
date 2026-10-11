@@ -1,13 +1,12 @@
-import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
-import { isPlaygroundHeaderBlocked } from 'manifest-shared';
+import { Index, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
+import {
+  blankEntry,
+  headerEntryIssue,
+  type HeaderEntry,
+  type HeaderIssue,
+} from '../../services/playground-request-headers.js';
 import { PlusIcon, TrashIcon, XIcon } from './icons.jsx';
-
-export interface HeaderEntry {
-  id: string;
-  key: string;
-  value: string;
-}
 
 interface Props {
   open: boolean;
@@ -16,28 +15,23 @@ interface Props {
   onClose: () => void;
 }
 
-/**
- * Mirrors the server-side blocklist (shared list) so the user sees a warning
- * on exactly the headers the backend drops. The server still enforces it.
- */
-export function isBlockedHeaderKey(key: string): boolean {
-  return isPlaygroundHeaderBlocked(key);
+/** DOM id of a row's warning, referenced by the input's aria-describedby. */
+export function headerWarningId(entryId: string): string {
+  return `playground-header-warning-${entryId}`;
 }
 
-export function toHeaderRecord(entries: HeaderEntry[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const e of entries) {
-    const key = e.key.trim();
-    if (!key || isBlockedHeaderKey(key)) continue;
-    if (!e.value) continue;
-    out[key] = e.value;
+/** Warning shown under a row the server will drop. */
+export function headerIssueMessage(name: string, issue: HeaderIssue): string {
+  switch (issue) {
+    case 'blocked':
+      return `${name} is reserved by Thinker and will be dropped.`;
+    case 'invalid-name':
+      return `${name} is not a valid header name and will be dropped. Use only letters, digits and ! # $ % & ' * + - . ^ _ \` | ~ (no spaces).`;
+    case 'control-chars':
+      return `The value of ${name} contains control characters (such as line breaks), so the header will be dropped.`;
+    case 'unsupported-chars':
+      return `The value of ${name} contains characters a header can't carry (above U+00FF, such as emoji), so the header will be dropped.`;
   }
-  return out;
-}
-
-let nextId = 1;
-export function blankEntry(): HeaderEntry {
-  return { id: `h-${++nextId}-${Date.now().toString(36)}`, key: '', value: '' };
 }
 
 const RequestHeadersPopover: Component<Props> = (props) => {
@@ -59,6 +53,31 @@ const RequestHeadersPopover: Component<Props> = (props) => {
     () => props.open,
     () => panelRef(),
   );
+
+  // Screen-reader announcement for warnings that appear while typing. Only a
+  // row whose issue *changes* to a new problem is announced, so typing more
+  // characters into an already-invalid name doesn't repeat the message. The
+  // first pass (opening with existing rows) is silent: the warning is still
+  // reachable through each input's aria-describedby.
+  const [announcement, setAnnouncement] = createSignal('');
+  let previousIssues: Map<string, HeaderIssue | null> | undefined;
+  createEffect(() => {
+    const next = new Map<string, HeaderIssue | null>();
+    let message = '';
+    let anyIssue = false;
+    for (const e of props.entries) {
+      const issue = headerEntryIssue(e);
+      next.set(e.id, issue);
+      if (!issue) continue;
+      anyIssue = true;
+      if (previousIssues && !message && previousIssues.get(e.id) !== issue) {
+        message = headerIssueMessage(e.key.trim(), issue);
+      }
+    }
+    if (message) setAnnouncement(message);
+    else if (!anyIssue) setAnnouncement('');
+    previousIssues = next;
+  });
 
   const update = (id: string, patch: Partial<HeaderEntry>) => {
     props.onChange(props.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
@@ -94,8 +113,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         </header>
 
         <p class="playground-headers__hint">
-          Added to every provider call for this playground. Manifest-managed headers (Authorization,
-          Content-Type, x-manifest-*) are ignored.
+          Added to every provider call for this playground. Thinker-managed headers (Authorization,
+          Content-Type, x-thinker-*) are ignored. Only header names are saved in this browser;
+          values are kept until you leave the page.
         </p>
 
         <Show when={props.entries.length === 0}>
@@ -103,51 +123,71 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         </Show>
 
         <div class="playground-headers__rows">
-          <For each={props.entries}>
+          {/* Index (not For): rows are updated immutably, and For would
+              recreate the row on every keystroke, dropping input focus. */}
+          <Index each={props.entries}>
             {(entry) => {
-              const blocked = () => isBlockedHeaderKey(entry.key);
+              const issue = () => headerEntryIssue(entry());
+              const nameIssue = () => issue() === 'blocked' || issue() === 'invalid-name';
+              const valueIssue = () =>
+                issue() === 'control-chars' || issue() === 'unsupported-chars';
+              const warningId = () => headerWarningId(entry().id);
               return (
                 <div
                   class="playground-headers__row"
-                  classList={{ 'playground-headers__row--blocked': blocked() }}
+                  classList={{
+                    'playground-headers__row--blocked': issue() === 'blocked',
+                    'playground-headers__row--invalid-name': issue() === 'invalid-name',
+                    'playground-headers__row--invalid-value': valueIssue(),
+                  }}
                 >
                   <input
                     type="text"
                     class="playground-headers__input playground-headers__input--key"
                     placeholder="Header"
-                    value={entry.key}
+                    value={entry().key}
                     aria-label="Header name"
+                    aria-invalid={nameIssue() ? 'true' : undefined}
+                    aria-describedby={nameIssue() ? warningId() : undefined}
                     spellcheck={false}
                     autocomplete="off"
-                    onInput={(e) => update(entry.id, { key: e.currentTarget.value })}
+                    onInput={(e) => update(entry().id, { key: e.currentTarget.value })}
                   />
                   <input
                     type="text"
                     class="playground-headers__input playground-headers__input--value"
                     placeholder="Value"
-                    value={entry.value}
+                    value={entry().value}
                     aria-label="Header value"
+                    aria-invalid={valueIssue() ? 'true' : undefined}
+                    aria-describedby={valueIssue() ? warningId() : undefined}
                     spellcheck={false}
                     autocomplete="off"
-                    onInput={(e) => update(entry.id, { value: e.currentTarget.value })}
+                    onInput={(e) => update(entry().id, { value: e.currentTarget.value })}
                   />
                   <button
                     type="button"
                     class="playground-headers__remove"
-                    aria-label={`Remove ${entry.key || 'header'}`}
-                    onClick={() => remove(entry.id)}
+                    aria-label={`Remove ${entry().key || 'header'}`}
+                    onClick={() => remove(entry().id)}
                   >
                     <TrashIcon size={14} />
                   </button>
-                  <Show when={blocked()}>
-                    <p class="playground-headers__warning">
-                      {entry.key.trim()} is reserved by Thinker and will be dropped.
-                    </p>
+                  <Show when={issue()}>
+                    {(current) => (
+                      <p id={warningId()} class="playground-headers__warning">
+                        {headerIssueMessage(entry().key.trim(), current())}
+                      </p>
+                    )}
                   </Show>
                 </div>
               );
             }}
-          </For>
+          </Index>
+        </div>
+
+        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcement()}
         </div>
 
         <footer class="playground-headers__footer">

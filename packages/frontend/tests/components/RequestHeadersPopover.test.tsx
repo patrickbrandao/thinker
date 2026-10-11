@@ -2,56 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import RequestHeadersPopover, {
-  blankEntry,
-  isBlockedHeaderKey,
-  toHeaderRecord,
-  type HeaderEntry,
+  headerIssueMessage,
+  headerWarningId,
 } from '../../src/components/playground/RequestHeadersPopover';
-
-describe('isBlockedHeaderKey', () => {
-  it('flags Manifest-managed and transport-layer headers case-insensitively', () => {
-    expect(isBlockedHeaderKey('Authorization')).toBe(true);
-    expect(isBlockedHeaderKey('cookie')).toBe(true);
-    expect(isBlockedHeaderKey('Content-Type')).toBe(true);
-    expect(isBlockedHeaderKey('X-Manifest-Trace')).toBe(true);
-  });
-
-  // Issue #64: the dashboard warns on the same credential headers the server drops.
-  it('flags provider credential and tenant-identity headers', () => {
-    expect(isBlockedHeaderKey('X-API-Key')).toBe(true);
-    expect(isBlockedHeaderKey(' x-goog-api-key ')).toBe(true);
-    expect(isBlockedHeaderKey('api-key')).toBe(true);
-    expect(isBlockedHeaderKey('OpenAI-Organization')).toBe(true);
-    expect(isBlockedHeaderKey('ChatGPT-Account-Id')).toBe(true);
-  });
-
-  it('lets normal provider headers through', () => {
-    expect(isBlockedHeaderKey('HTTP-Referer')).toBe(false);
-    expect(isBlockedHeaderKey('X-Title')).toBe(false);
-    expect(isBlockedHeaderKey('anthropic-beta')).toBe(false);
-  });
-
-  it('treats empty / whitespace as not blocked so the warning does not flash on new rows', () => {
-    expect(isBlockedHeaderKey('')).toBe(false);
-    expect(isBlockedHeaderKey('   ')).toBe(false);
-  });
-});
-
-describe('toHeaderRecord', () => {
-  it('drops blocked keys, empty keys, and empty values', () => {
-    const record = toHeaderRecord([
-      { id: '1', key: 'HTTP-Referer', value: 'https://x' },
-      { id: '2', key: 'Authorization', value: 'Bearer' },
-      { id: '3', key: '', value: 'orphan' },
-      { id: '4', key: 'X-Empty', value: '' },
-      { id: '5', key: ' X-Title ', value: 'Trimmed' },
-    ]);
-    expect(record).toEqual({
-      'HTTP-Referer': 'https://x',
-      'X-Title': 'Trimmed',
-    });
-  });
-});
+import { blankEntry, type HeaderEntry } from '../../src/services/playground-request-headers';
 
 describe('RequestHeadersPopover', () => {
   it('renders nothing when closed', () => {
@@ -76,7 +30,7 @@ describe('RequestHeadersPopover', () => {
     expect(entries().length).toBe(2);
   });
 
-  it('shows an inline warning when the user types a Manifest-managed key', () => {
+  it('shows an inline warning when the user types a Thinker-managed key', () => {
     const initial: HeaderEntry = { id: '1', key: 'Authorization', value: 'Bearer x' };
     const { container } = render(() => (
       <RequestHeadersPopover
@@ -89,20 +43,247 @@ describe('RequestHeadersPopover', () => {
     expect(container.querySelector('.playground-headers__warning')?.textContent).toContain(
       'Authorization',
     );
-    expect(
-      container.querySelector('.playground-headers__row--blocked'),
-    ).toBeDefined();
+    expect(container.querySelector('.playground-headers__row--blocked')).not.toBeNull();
+    const key = container.querySelector('.playground-headers__input--key');
+    expect(key?.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  // Issue #105: the server drops invalid names silently; the dashboard warns.
+  it('warns when the header name is not a valid HTTP token', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: '1', key: 'X Title', value: 'v' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    expect(container.querySelector('.playground-headers__warning')?.textContent).toBe(
+      headerIssueMessage('X Title', 'invalid-name'),
+    );
+    expect(container.querySelector('.playground-headers__row--invalid-name')).not.toBeNull();
+    expect(container.querySelector('.playground-headers__row--blocked')).toBeNull();
+    const key = container.querySelector('.playground-headers__input--key');
+    expect(key?.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('warns when the value contains control characters', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: '1', key: 'X-Title', value: 'line\u0001break' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    const warning = container.querySelector('.playground-headers__warning')?.textContent;
+    expect(warning).toContain('X-Title');
+    expect(warning).toContain('control characters');
+    expect(container.querySelector('.playground-headers__row--invalid-value')).not.toBeNull();
+    const value = container.querySelector('.playground-headers__input--value');
+    expect(value?.getAttribute('aria-invalid')).toBe('true');
+    const key = container.querySelector('.playground-headers__input--key');
+    expect(key?.hasAttribute('aria-invalid')).toBe(false);
+  });
+
+  it('warns when the value contains characters above U+00FF', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: '1', key: 'X-Title', value: 'rocket \u{1F680}' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    expect(container.querySelector('.playground-headers__warning')?.textContent).toBe(
+      headerIssueMessage('X-Title', 'unsupported-chars'),
+    );
+  });
+
+  it('shows no warning for a valid header or a fresh blank row', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: '1', key: 'X-Title', value: 'caf\u00e9' }, blankEntry()]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    expect(container.querySelector('.playground-headers__warning')).toBeNull();
+    expect(container.querySelector('[aria-invalid]')).toBeNull();
+    expect(container.querySelector('[aria-describedby]')).toBeNull();
+  });
+
+  it('warns while typing: the warning appears once the name becomes invalid', () => {
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'r1', key: 'X-Title', value: 'a' },
+    ]);
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => {}}
+      />
+    ));
+    expect(container.querySelector('.playground-headers__warning')).toBeNull();
+    const keyInput = container.querySelector('.playground-headers__input--key') as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: 'X-Title:' } });
+    expect(container.querySelector('.playground-headers__warning')?.textContent).toContain(
+      'not a valid header name',
+    );
+  });
+
+  // Review S1 on #106: screen readers must hear why a field is invalid.
+  it('links the invalid name input to its warning with aria-describedby', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: 'row-1', key: 'X Title', value: 'v' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    const key = container.querySelector('.playground-headers__input--key')!;
+    const value = container.querySelector('.playground-headers__input--value')!;
+    expect(key.getAttribute('aria-describedby')).toBe(headerWarningId('row-1'));
+    expect(value.hasAttribute('aria-describedby')).toBe(false);
+    const warning = document.getElementById(headerWarningId('row-1'));
+    expect(warning?.classList.contains('playground-headers__warning')).toBe(true);
+    expect(warning?.textContent).toBe(headerIssueMessage('X Title', 'invalid-name'));
+  });
+
+  it('links a blocked name to its warning', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: 'row-2', key: 'Authorization', value: 'x' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    const key = container.querySelector('.playground-headers__input--key')!;
+    expect(key.getAttribute('aria-describedby')).toBe(headerWarningId('row-2'));
+    expect(document.getElementById(headerWarningId('row-2'))?.textContent).toContain(
+      'reserved by Thinker',
+    );
+  });
+
+  it('links the invalid value input to its warning with aria-describedby', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: 'row-3', key: 'X-Title', value: 'a\nb' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    const key = container.querySelector('.playground-headers__input--key')!;
+    const value = container.querySelector('.playground-headers__input--value')!;
+    expect(value.getAttribute('aria-describedby')).toBe(headerWarningId('row-3'));
+    expect(key.hasAttribute('aria-describedby')).toBe(false);
+    expect(document.getElementById(headerWarningId('row-3'))?.textContent).toBe(
+      headerIssueMessage('X-Title', 'control-chars'),
+    );
+  });
+
+  it('removes aria-describedby and the warning once the row is fixed', () => {
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'row-4', key: 'X Title', value: 'v' },
+    ]);
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => {}}
+      />
+    ));
+    const key = container.querySelector('.playground-headers__input--key') as HTMLInputElement;
+    expect(key.getAttribute('aria-describedby')).toBe(headerWarningId('row-4'));
+    fireEvent.input(key, { target: { value: 'X-Title' } });
+    expect(key.hasAttribute('aria-describedby')).toBe(false);
+    expect(key.hasAttribute('aria-invalid')).toBe(false);
+    expect(document.getElementById(headerWarningId('row-4'))).toBeNull();
+  });
+
+  it('announces a warning once when it appears while typing, not on every keystroke', () => {
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'row-5', key: 'X', value: 'v' },
+    ]);
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => {}}
+      />
+    ));
+    const live = container.querySelector('[role="status"][aria-live="polite"]')!;
+    expect(live.textContent).toBe('');
+    const key = container.querySelector('.playground-headers__input--key') as HTMLInputElement;
+
+    fireEvent.input(key, { target: { value: 'X:' } });
+    expect(live.textContent).toBe(headerIssueMessage('X:', 'invalid-name'));
+
+    // Still the same problem: the live region is not rewritten (no re-announce).
+    fireEvent.input(key, { target: { value: 'X:T' } });
+    expect(live.textContent).toBe(headerIssueMessage('X:', 'invalid-name'));
+
+    // A different problem on the same row is announced.
+    fireEvent.input(key, { target: { value: 'Cookie' } });
+    expect(live.textContent).toBe(headerIssueMessage('Cookie', 'blocked'));
+
+    // Fixed: the region clears, so the same warning can be announced again later.
+    fireEvent.input(key, { target: { value: 'X-Title' } });
+    expect(live.textContent).toBe('');
+  });
+
+  it('does not announce warnings that already exist when the popover opens', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={[{ id: 'row-6', key: 'X Title', value: 'v' }]}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    ));
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('');
+  });
+
+  it('keeps the same input focused while typing', () => {
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'row-7', key: 'X', value: '' },
+    ]);
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => {}}
+      />
+    ));
+    const before = container.querySelector('.playground-headers__input--key') as HTMLInputElement;
+    before.focus();
+    fireEvent.input(before, { target: { value: 'XY' } });
+    const after = container.querySelector('.playground-headers__input--key');
+    expect(after).toBe(before);
+    expect(document.activeElement).toBe(before);
+  });
+
+  it('tells the user that header values are not saved', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover open={true} entries={[]} onChange={() => {}} onClose={() => {}} />
+    ));
+    const hint = container.querySelector('.playground-headers__hint')?.textContent ?? '';
+    expect(hint).toContain('Only header names are saved');
+    expect(hint).toContain('x-thinker-*');
   });
 
   it('calls onClose when the backdrop is clicked', () => {
     const onClose = vi.fn();
     const { container } = render(() => (
-      <RequestHeadersPopover
-        open={true}
-        entries={[]}
-        onChange={() => {}}
-        onClose={onClose}
-      />
+      <RequestHeadersPopover open={true} entries={[]} onChange={() => {}} onClose={onClose} />
     ));
     const backdrop = container.querySelector('.playground-headers__backdrop');
     fireEvent.click(backdrop!);
@@ -218,15 +399,5 @@ describe('RequestHeadersPopover', () => {
     const close = container.querySelector('[aria-label="Close request headers"]') as HTMLElement;
     fireEvent.click(close);
     expect(onClose).toHaveBeenCalled();
-  });
-});
-
-describe('blankEntry', () => {
-  it('returns a fresh entry with empty key/value and a unique id', () => {
-    const a = blankEntry();
-    const b = blankEntry();
-    expect(a.key).toBe('');
-    expect(a.value).toBe('');
-    expect(a.id).not.toBe(b.id);
   });
 });
