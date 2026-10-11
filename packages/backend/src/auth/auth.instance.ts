@@ -131,7 +131,9 @@ function createDatabaseConnection() {
   // Auth at an unrelated local database (issue #67).
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required. Set it in your .env file.');
+    throw new Error(
+      'DATABASE_URL is required. Export it in the environment, or start through the npm scripts that preload .env (dotenv).',
+    );
   }
   // Cap Better Auth's own pool (separate from the TypeORM pool) so the two
   // connection pools don't jointly exhaust Postgres's max_connections. Auth

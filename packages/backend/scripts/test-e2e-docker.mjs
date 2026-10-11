@@ -26,12 +26,17 @@ const DB_USER = 'thinker_e2e';
 const DB_PASSWORD = randomBytes(12).toString('hex');
 const READY_TIMEOUT_MS = 90_000;
 const BACKEND_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CONTAINER = `thinker-e2e-pg-${process.pid}-${randomBytes(4).toString('hex')}`;
+const RUN_ID = randomBytes(8).toString('hex');
+const CONTAINER = `thinker-e2e-pg-${process.pid}-${RUN_ID.slice(0, 8)}`;
+const LABEL = 'thinker.e2e=disposable';
+// Unique per run: cleanup only ever touches the container this run created.
+const RUN_LABEL = `thinker.e2e.run=${RUN_ID}`;
 // Ports that belong to other local databases on developer machines.
 const RESERVED_PORTS = new Set([5432, 5433]);
 
 const jestArgs = process.argv.slice(2);
-let containerStarted = false;
+let runAttempted = false;
+let containerId = null;
 let cleanedUp = false;
 let child = null;
 
@@ -39,19 +44,54 @@ function log(message) {
   process.stderr.write(`[test:e2e:docker] ${message}\n`);
 }
 
+/**
+ * IDs of the containers this run created: the ID `docker run` printed, plus
+ * (for an interrupt before it printed one) whatever matches this run's exact
+ * name AND both of its labels. Never a container this run did not create.
+ */
+function ownedContainerIds() {
+  const ids = new Set(containerId ? [containerId] : []);
+  const found = docker(
+    [
+      'ps',
+      '--all',
+      '--quiet',
+      '--no-trunc',
+      '--filter',
+      `name=^/${CONTAINER}$`,
+      '--filter',
+      `label=${LABEL}`,
+      '--filter',
+      `label=${RUN_LABEL}`,
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  );
+  if (found.status === 0) {
+    for (const id of found.stdout.split(/\s+/).filter(Boolean)) ids.add(id);
+  }
+  return [...ids];
+}
+
+function removeOwnedContainers() {
+  for (const id of ownedContainerIds()) {
+    const result = docker(['rm', '--force', '--volumes', id], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    if (result.status !== 0) {
+      log(
+        `WARNING: could not remove ${CONTAINER} (${id.slice(0, 12)}): ${result.stderr?.trim() || result.error}`,
+      );
+      log(`Remove it by hand: docker rm -f ${id}`);
+    }
+  }
+}
+
 function removeContainer() {
   if (cleanedUp) return;
   cleanedUp = true;
-  if (!containerStarted) return;
+  if (!runAttempted) return;
   log(`Removing container ${CONTAINER}`);
-  const result = spawnSync('docker', ['rm', '--force', '--volumes', CONTAINER], {
-    stdio: ['ignore', 'ignore', 'pipe'],
-    encoding: 'utf8',
-  });
-  if (result.status !== 0) {
-    log(`WARNING: could not remove ${CONTAINER}: ${result.stderr?.trim() || result.error}`);
-    log(`Remove it by hand: docker rm -f ${CONTAINER}`);
-  }
+  removeOwnedContainers();
 }
 
 function onSignal(signal, code) {
@@ -88,10 +128,9 @@ async function startContainer() {
   for (let attempt = 1; attempt <= 5; attempt++) {
     const port = await freePort();
     if (RESERVED_PORTS.has(port)) continue;
-    // Mark as started before `docker run` so an interrupt during the pull or
-    // the start still triggers removal (`docker rm -f` of a missing name is a
-    // harmless warning).
-    containerStarted = true;
+    // Mark before `docker run` so an interrupt during the pull or the start
+    // still looks for this run's container (by exact name and run label).
+    runAttempted = true;
     const result = docker(
       [
         'run',
@@ -99,7 +138,9 @@ async function startContainer() {
         '--name',
         CONTAINER,
         '--label',
-        'thinker.e2e=disposable',
+        LABEL,
+        '--label',
+        RUN_LABEL,
         '--tmpfs',
         '/var/lib/postgresql/data:rw',
         '--publish',
@@ -121,10 +162,14 @@ async function startContainer() {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
-    if (result.status === 0) return port;
+    if (result.status === 0) {
+      containerId = result.stdout.trim().split(/\s+/).pop() || null;
+      return port;
+    }
 
     const stderr = (result.stderr || String(result.error || '')).trim();
-    docker(['rm', '--force', CONTAINER], { stdio: 'ignore' });
+    // A failed `docker run` can leave a created-but-not-started container.
+    removeOwnedContainers();
     if (/port is already allocated|address already in use/i.test(stderr)) {
       log(`Port ${port} was taken meanwhile, retrying (${attempt}/5)`);
       continue;

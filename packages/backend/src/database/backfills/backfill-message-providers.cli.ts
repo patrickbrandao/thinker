@@ -8,8 +8,6 @@ import {
 } from './backfill-message-providers';
 import { TypeOrmBackfillGateway } from './backfill-message-providers.gateway';
 
-const DEFAULT_DATABASE_URL = 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
-
 /** Tunable knobs, read from the environment (all optional). */
 export function readBackfillOptions(env: NodeJS.ProcessEnv): BackfillOptions {
   const num = (raw: string | undefined): number | undefined => {
@@ -31,7 +29,12 @@ export function readBackfillOptions(env: NodeJS.ProcessEnv): BackfillOptions {
 
 /** A no-entity DataSource — the backfill is raw SQL, so it needs no metadata. */
 export function createBackfillDataSource(env: NodeJS.ProcessEnv): DataSource {
-  const url = env['MIGRATION_DATABASE_URL'] ?? env['DATABASE_URL'] ?? DEFAULT_DATABASE_URL;
+  // No default URL: never silently target whatever listens on localhost:5432
+  // (issue #67). Blank values do not count.
+  const url = env['MIGRATION_DATABASE_URL']?.trim() || env['DATABASE_URL']?.trim();
+  if (!url) {
+    throw new Error('DATABASE_URL (or MIGRATION_DATABASE_URL) is required to run the backfill.');
+  }
   return new DataSource({ type: 'postgres', url });
 }
 

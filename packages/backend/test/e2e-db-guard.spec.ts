@@ -17,16 +17,23 @@ describe('checkE2eDatabaseEnv', () => {
     });
   });
 
-  it.each(['thinker_e2e_test', 'test', 'TEST_db', 'my-testing', 'e2e%5Ftest'])(
-    'accepts database name %s',
-    (name) => {
-      const check = checkE2eDatabaseEnv({
-        DATABASE_URL: `postgres://u:p@localhost:6000/${name}`,
-        THINKER_E2E_ALLOW_DROP: '1',
-      });
-      expect(check.ok).toBe(true);
-    },
-  );
+  it.each([
+    'thinker_e2e_test',
+    'test',
+    'test_db',
+    'TEST_db',
+    'my-test-db',
+    'tests',
+    'my-testing',
+    'app.test',
+    'e2e%5Ftest',
+  ])('accepts database name %s', (name) => {
+    const check = checkE2eDatabaseEnv({
+      DATABASE_URL: `postgres://u:p@localhost:6000/${name}`,
+      THINKER_E2E_ALLOW_DROP: '1',
+    });
+    expect(check.ok).toBe(true);
+  });
 
   it('refuses when DATABASE_URL is missing (no default database)', () => {
     expect(reasonOf({ THINKER_E2E_ALLOW_DROP: '1' })).toMatch(/DATABASE_URL is not set/);
@@ -37,17 +44,28 @@ describe('checkE2eDatabaseEnv', () => {
     expect(reasonOf({ DATABASE_URL: '   ', THINKER_E2E_ALLOW_DROP: '1' })).toMatch(/not set/);
   });
 
-  it.each(['mydatabase', 'thinker', 'manifest_duprepro', 'moneyflow', 'tst'])(
-    'refuses non-test database name %s',
-    (name) => {
-      expect(
-        reasonOf({
-          DATABASE_URL: `postgresql://myuser:mypassword@localhost:5432/${name}`,
-          THINKER_E2E_ALLOW_DROP: '1',
-        }),
-      ).toMatch(/does not look like a test database/);
-    },
-  );
+  it.each([
+    'mydatabase',
+    'thinker',
+    'manifest_duprepro',
+    'moneyflow',
+    'tst',
+    'latest',
+    'app_latest',
+    'contest',
+    'attestation',
+    'testament',
+    'e2etest',
+    'test2',
+    'testdb',
+  ])('refuses non-test database name %s', (name) => {
+    expect(
+      reasonOf({
+        DATABASE_URL: `postgresql://myuser:mypassword@localhost:5432/${name}`,
+        THINKER_E2E_ALLOW_DROP: '1',
+      }),
+    ).toMatch(/does not look like a test database/);
+  });
 
   it('does not accept "test" found only in the user, password, host or query', () => {
     expect(

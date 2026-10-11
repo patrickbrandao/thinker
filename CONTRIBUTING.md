@@ -218,7 +218,7 @@ npm run test:e2e:docker --workspace=packages/backend  # needs Docker
 npm test --workspace=packages/frontend
 ```
 
-The backend e2e suite drops the schema of the database it connects to, so it refuses to run unless `DATABASE_URL` names a database containing `test` (e.g. `thinker_e2e_test`) and `THINKER_E2E_ALLOW_DROP=1` is set. `test:e2e:docker` handles both with a disposable container; never point the suite at your development database.
+The backend e2e suite drops the schema of the database it connects to, so it refuses to run unless `DATABASE_URL` names a database with `test` as a separate word (e.g. `thinker_e2e_test` or `test_db`; `latest` or `contest` do not count) and `THINKER_E2E_ALLOW_DROP=1` is set. `test:e2e:docker` handles both with a disposable container; never point the suite at your development database.
 
 6. Verify the production build works:
 

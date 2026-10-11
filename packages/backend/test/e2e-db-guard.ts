@@ -7,7 +7,8 @@
  * before anything connects we require all of:
  *
  *   - `DATABASE_URL` is set (there is no fallback to a default URL);
- *   - its database name matches /test/i (e.g. `thinker_e2e_test`);
+ *   - its database name contains "test" as a whole token (e.g.
+ *     `thinker_e2e_test`, `test_db`; not `latest` or `contest`);
  *   - `THINKER_E2E_ALLOW_DROP=1` is set.
  *
  * `checkE2eDatabaseEnv` is a pure function over the environment so it can be
@@ -17,7 +18,10 @@
 
 export const E2E_ALLOW_DROP_ENV = 'THINKER_E2E_ALLOW_DROP';
 
-const TEST_DATABASE_NAME = /test/i;
+// "test" must be a whole token (optionally "tests"/"testing") delimited by
+// the start/end of the name or a non-alphanumeric character, so names such as
+// "latest", "contest" or "attestation" do not pass.
+const TEST_DATABASE_NAME = /(^|[^a-z0-9])test(s|ing)?([^a-z0-9]|$)/i;
 const POSTGRES_PROTOCOLS = new Set(['postgres:', 'postgresql:']);
 
 export type E2eDatabaseCheck =
@@ -71,7 +75,7 @@ export function checkE2eDatabaseEnv(env: Env): E2eDatabaseCheck {
   if (!TEST_DATABASE_NAME.test(database)) {
     return {
       ok: false,
-      reason: `Database "${database}" does not look like a test database (its name must contain "test", e.g. "thinker_e2e_test").`,
+      reason: `Database "${database}" does not look like a test database (its name must contain "test" as a separate word, e.g. "thinker_e2e_test" or "test_db").`,
     };
   }
 

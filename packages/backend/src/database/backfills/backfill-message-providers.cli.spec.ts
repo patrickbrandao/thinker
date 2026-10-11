@@ -51,7 +51,7 @@ describe('readBackfillOptions', () => {
 describe('createBackfillDataSource', () => {
   const url = (ds: DataSource): unknown => (ds.options as { url?: string }).url;
 
-  it('prefers MIGRATION_DATABASE_URL, then DATABASE_URL, then a local default', () => {
+  it('prefers MIGRATION_DATABASE_URL, then DATABASE_URL', () => {
     expect(
       url(
         createBackfillDataSource({
@@ -63,7 +63,19 @@ describe('createBackfillDataSource', () => {
     expect(url(createBackfillDataSource({ DATABASE_URL: 'postgres://d/y' }))).toBe(
       'postgres://d/y',
     );
-    expect(url(createBackfillDataSource({}))).toContain('localhost:5432');
+  });
+
+  it('ignores a blank MIGRATION_DATABASE_URL', () => {
+    expect(
+      url(
+        createBackfillDataSource({ MIGRATION_DATABASE_URL: '  ', DATABASE_URL: 'postgres://d/y' }),
+      ),
+    ).toBe('postgres://d/y');
+  });
+
+  it('throws instead of falling back to a local default when no URL is set', () => {
+    expect(() => createBackfillDataSource({})).toThrow('DATABASE_URL');
+    expect(() => createBackfillDataSource({ DATABASE_URL: '' })).toThrow('DATABASE_URL');
   });
 });
 
