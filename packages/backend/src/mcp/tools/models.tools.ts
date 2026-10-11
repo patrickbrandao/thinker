@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { SHARED_PROVIDERS } from 'manifest-shared';
+import { SHARED_PROVIDERS } from 'thinker-shared';
 import { McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { result } from '../tool-result';

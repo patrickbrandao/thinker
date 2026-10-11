@@ -1,5 +1,5 @@
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
-import { MANIFEST_ERROR_ORIGINS } from 'manifest-shared';
+import { MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 
 export interface MetricWithTrend {

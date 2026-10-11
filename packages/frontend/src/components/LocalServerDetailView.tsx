@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Show, type Component } from 'solid-js';
-import { LOCAL_SERVER_HINTS, type LocalServerHint } from 'manifest-shared';
+import { LOCAL_SERVER_HINTS, type LocalServerHint } from 'thinker-shared';
 import type { ProviderDef } from '../services/providers.js';
 import {
   createCustomProvider,

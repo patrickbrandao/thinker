@@ -5,7 +5,7 @@ import {
   inferProviderFromModel,
   isSuccessStatus,
   normalizeStatus,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { AgentMessage } from '../entities/agent-message.entity';
 import { ManifestRequest } from '../entities/request.entity';
 

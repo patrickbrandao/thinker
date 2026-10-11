@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { deriveCustomProviderAlias, isReservedCustomProviderAlias } from 'manifest-shared';
+import { deriveCustomProviderAlias, isReservedCustomProviderAlias } from 'thinker-shared';
 
 /**
  * Adds `custom_providers.alias`: the public prefix of a custom provider's

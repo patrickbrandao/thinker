@@ -102,7 +102,7 @@ npm run dev
 
 The frontend runs on `http://localhost:3000` and proxies API requests to the backend on `http://localhost:3001`.
 
-`npm run dev` is filtered to exactly `manifest-frontend` — adding a new workspace with a `dev` script will not silently join the dev set.
+`npm run dev` is filtered to exactly `thinker-frontend` — adding a new workspace with a `dev` script will not silently join the dev set.
 
 5. With `SEED_DATA=true`, you can log in with `admin@manifest.build` / `manifest`.
 
@@ -184,14 +184,14 @@ The backend runs standalone and OpenClaw talks to it as a regular OpenAI-compati
 
 ```bash
 npx changeset
-# → select "manifest"
+# → select "thinker"
 # → choose patch / minor / major
 # → write a one-line summary
 ```
 
-Always target `manifest` — it's the canonical release version for the whole project, and it's the only package changesets will accept. `manifest-backend`, `manifest-frontend`, and `manifest-shared` are ignored regardless of what you pick. Commit the generated `.changeset/*.md` alongside your code. Changesets are optional for internal/tooling changes; skip this step if the change doesn't need a CHANGELOG entry.
+Always target `thinker` — it's the canonical release version for the whole project, and it's the only package changesets will accept. `thinker-backend`, `thinker-frontend`, and `thinker-shared` are ignored regardless of what you pick. Commit the generated `.changeset/*.md` alongside your code. Changesets are optional for internal/tooling changes; skip this step if the change doesn't need a CHANGELOG entry.
 
-See [`packages/manifest/README.md`](packages/manifest/README.md) for why this package exists.
+See [`packages/thinker/README.md`](packages/thinker/README.md) for why this package exists.
 
 5. Run the test suite to make sure everything passes:
 
@@ -216,9 +216,9 @@ npm run build
 
 Manifest ships as the Docker image at [`manifestdotbuild/manifest`](https://hub.docker.com/r/manifestdotbuild/manifest). Releases are manual:
 
-1. After merging PRs with changesets, a `chore: version packages` PR will be open on `main` — merge it to land the version bump in `packages/manifest/package.json` and update `packages/manifest/CHANGELOG.md`.
+1. After merging PRs with changesets, a `chore: version packages` PR will be open on `main` — merge it to land the version bump in `packages/thinker/package.json` and update `packages/thinker/CHANGELOG.md`.
 2. Go to **GitHub Actions → Docker → Run workflow**, leave the `version` input blank, click Run.
-3. The workflow reads the version from `packages/manifest/package.json` and pushes `manifestdotbuild/manifest:{version}` (plus `{major}.{minor}`, `{major}`, and a `sha-<short>` rollback tag).
+3. The workflow reads the version from `packages/thinker/package.json` and pushes `manifestdotbuild/manifest:{version}` (plus `{major}.{minor}`, `{major}`, and a `sha-<short>` rollback tag).
 
 If you need to retag an older commit or publish a version that doesn't match the current `package.json`, pass a semver string in the `version` input and it overrides the auto-detected value.
 

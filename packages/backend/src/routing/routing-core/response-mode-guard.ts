@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { ModelRoute, ResponseMode } from 'manifest-shared';
+import type { ModelRoute, ResponseMode } from 'thinker-shared';
 import { modelSupportsStreaming } from '../../model-discovery/model-capabilities';
 
 export interface EffectiveRoutes {

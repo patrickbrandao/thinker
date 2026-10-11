@@ -8,7 +8,7 @@ import {
   subscriptionPreferredRoute,
   unambiguousRoute,
 } from '../route-helpers';
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import type { DiscoveredModel } from '../../../model-discovery/model-fetcher';
 
 const route = (provider: string, authType: ModelRoute['authType'], model: string): ModelRoute => ({

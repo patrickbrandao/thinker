@@ -3,7 +3,7 @@ import { PricingSyncService, OpenRouterPricingEntry } from '../database/pricing-
 import { ModelsDevSyncService } from '../database/models-dev-sync.service';
 import { ProviderModelRegistryService } from '../model-discovery/provider-model-registry.service';
 import { PROVIDER_BY_ID } from '../common/constants/providers';
-import { normalizeProviderName } from 'manifest-shared';
+import { normalizeProviderName } from 'thinker-shared';
 
 /**
  * A price belongs to a (provider, model) pair, not to a model.

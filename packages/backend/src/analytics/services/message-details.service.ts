@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import type { CallerAttribution } from '../../routing/proxy/caller-classifier';
-import { isSuccessStatus, type RequestParamDefaults } from 'manifest-shared';
+import { isSuccessStatus, type RequestParamDefaults } from 'thinker-shared';
 import { ManifestRequest } from '../../entities/request.entity';
 import type { RecordingResponseBody } from '../../routing/proxy/attempt-recording.types';
 import { RequestRecordingStorageService } from '../../common/services/request-recording-storage.service';

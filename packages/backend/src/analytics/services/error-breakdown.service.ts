@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ERROR_ORIGINS, MANIFEST_ERROR_ORIGINS } from 'manifest-shared';
+import { ERROR_ORIGINS, MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { rangeToInterval } from '../../common/utils/range.util';
 import { computeCutoff } from '../../common/utils/postgres-sql';

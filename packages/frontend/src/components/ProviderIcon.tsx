@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { SHARED_PROVIDER_BY_ID_OR_ALIAS, normalizeProviderName } from 'manifest-shared';
+import { SHARED_PROVIDER_BY_ID_OR_ALIAS, normalizeProviderName } from 'thinker-shared';
 
 /**
  * Returns a branded icon for a given provider ID, or null if no icon exists.

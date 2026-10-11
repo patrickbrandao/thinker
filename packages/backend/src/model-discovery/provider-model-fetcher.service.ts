@@ -42,7 +42,7 @@ import {
   META_MODEL_API_MODEL_BY_ID,
   type ModelCapability,
   type ModelModality,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 const FETCH_TIMEOUT_MS = 5000;
 const ANTHROPIC_DEFAULT_CONTEXT = 200000;

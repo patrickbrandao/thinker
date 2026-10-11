@@ -79,7 +79,7 @@ vi.mock("../../src/services/recent-agents.js", () => ({
   markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
 }));
 
-vi.mock("manifest-shared", () => ({
+vi.mock("thinker-shared", () => ({
   AGENT_CATEGORIES: ["personal", "app", "coding"],
   platformIcon: (plat: string | null, cat: string | null) => {
     if (!plat) return undefined;

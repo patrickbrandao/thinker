@@ -6,7 +6,7 @@ const path = require('node:path');
 
 const { findViolations, parseTargets } = require('./check-changesets.js');
 
-const IGNORE = ['manifest-backend', 'manifest-frontend', 'manifest-shared'];
+const IGNORE = ['thinker-backend', 'thinker-frontend', 'thinker-shared'];
 
 function makeChangesetDir(files, ignore = IGNORE) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'changeset-test-'));
@@ -19,46 +19,46 @@ function makeChangesetDir(files, ignore = IGNORE) {
 
 test('flags a changeset that targets only an ignored package', () => {
   const dir = makeChangesetDir({
-    'bad.md': "---\n'manifest-frontend': patch\n---\n\nSummary.\n",
+    'bad.md': "---\n'thinker-frontend': patch\n---\n\nSummary.\n",
   });
   const violations = findViolations(dir);
   assert.equal(violations.length, 1);
   assert.equal(violations[0].file, 'bad.md');
-  assert.deepEqual(violations[0].ignoredTargets, ['manifest-frontend']);
+  assert.deepEqual(violations[0].ignoredTargets, ['thinker-frontend']);
 });
 
 test('flags a changeset with multiple ignored targets', () => {
   const dir = makeChangesetDir({
     'multi.md':
-      "---\n'manifest-backend': patch\n'manifest-shared': patch\n---\n\nSummary.\n",
+      "---\n'thinker-backend': patch\n'thinker-shared': patch\n---\n\nSummary.\n",
   });
   const violations = findViolations(dir);
   assert.equal(violations.length, 1);
   assert.deepEqual(violations[0].ignoredTargets, [
-    'manifest-backend',
-    'manifest-shared',
+    'thinker-backend',
+    'thinker-shared',
   ]);
 });
 
-test('flags a mix of manifest and an ignored target', () => {
+test('flags a mix of thinker and an ignored target', () => {
   const dir = makeChangesetDir({
     'mixed.md':
-      "---\n'manifest': patch\n'manifest-backend': patch\n---\n\nSummary.\n",
+      "---\n'thinker': patch\n'thinker-backend': patch\n---\n\nSummary.\n",
   });
   const violations = findViolations(dir);
   assert.equal(violations.length, 1);
-  assert.deepEqual(violations[0].ignoredTargets, ['manifest-backend']);
+  assert.deepEqual(violations[0].ignoredTargets, ['thinker-backend']);
 });
 
-test('accepts a changeset that targets manifest', () => {
+test('accepts a changeset that targets thinker', () => {
   const dir = makeChangesetDir({
-    'good.md': "---\n'manifest': patch\n---\n\nSummary.\n",
+    'good.md': "---\n'thinker': patch\n---\n\nSummary.\n",
   });
   assert.deepEqual(findViolations(dir), []);
 });
 
-test('accepts an unquoted manifest target', () => {
-  const dir = makeChangesetDir({ 'good.md': '---\nmanifest: minor\n---\n\nx\n' });
+test('accepts an unquoted thinker target', () => {
+  const dir = makeChangesetDir({ 'good.md': '---\nthinker: minor\n---\n\nx\n' });
   assert.deepEqual(findViolations(dir), []);
 });
 
@@ -69,16 +69,16 @@ test('accepts an empty changeset', () => {
 
 test('ignores README.md even if it looks like a changeset', () => {
   const dir = makeChangesetDir({
-    'README.md': "---\n'manifest-frontend': patch\n---\n\nnot a changeset\n",
+    'README.md': "---\n'thinker-frontend': patch\n---\n\nnot a changeset\n",
   });
   assert.deepEqual(findViolations(dir), []);
 });
 
 test('parseTargets handles quoted, double-quoted and bare names', () => {
-  assert.deepEqual(parseTargets("'manifest': patch"), ['manifest']);
-  assert.deepEqual(parseTargets('"manifest-backend": patch'), [
-    'manifest-backend',
+  assert.deepEqual(parseTargets("'thinker': patch"), ['thinker']);
+  assert.deepEqual(parseTargets('"thinker-backend": patch'), [
+    'thinker-backend',
   ]);
-  assert.deepEqual(parseTargets('manifest: minor'), ['manifest']);
+  assert.deepEqual(parseTargets('thinker: minor'), ['thinker']);
   assert.deepEqual(parseTargets(''), []);
 });

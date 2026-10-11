@@ -1,5 +1,5 @@
 import type { Repository } from 'typeorm';
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import { ResolveService } from '../resolve.service';
 import { Agent } from '../../../entities/agent.entity';
 import type { TierAssignment } from '../../../entities/tier-assignment.entity';

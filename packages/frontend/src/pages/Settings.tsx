@@ -27,7 +27,7 @@ import {
   PLATFORM_LABELS,
   PLATFORMS_BY_CATEGORY,
   platformIcon,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 const Settings: Component = () => {
   const params = useParams<{ agentName: string }>();

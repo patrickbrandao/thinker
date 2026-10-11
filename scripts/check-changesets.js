@@ -3,8 +3,8 @@ const path = require('path');
 
 // Guardrail: every changeset must target a *releasable* package.
 //
-// `.changeset/config.json` ignores manifest-backend / -frontend / -shared and
-// mnfst-gateway-cli (the CLI version tracks the Manifest release), so a
+// `.changeset/config.json` ignores thinker-backend / -frontend / -shared and
+// mnfst-gateway-cli (the CLI version tracks the Thinker release), so a
 // changeset that targets only those is silently dropped by `changeset version`:
 // it produces no version bump, yet still trips changesets/action into pushing an
 // empty `changeset-release/main` branch. Creating the version PR then fails with
@@ -62,12 +62,12 @@ function main() {
     console.error(`  .changeset/${file} -> ${ignoredTargets.join(', ')}`);
   }
   console.error(
-    '\nOnly "manifest" is releasable. manifest-backend / -frontend / -shared\n' +
+    '\nOnly "thinker" is releasable. thinker-backend / -frontend / -shared\n' +
       'and mnfst-gateway-cli are ignored in .changeset/config.json, so\n' +
       '`changeset version` silently drops them. A changeset that targets them\n' +
       'makes versioning a no-op and breaks the Release workflow ("No commits\n' +
       'between main and changeset-release/main").\n\n' +
-      "Fix: change the front matter to `'manifest': patch` (or minor / major).",
+      "Fix: change the front matter to `'thinker': patch` (or minor / major).",
   );
   process.exit(1);
 }

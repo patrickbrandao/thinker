@@ -1,8 +1,9 @@
 name: CI
 
-# Provisional minimal CI (#38): lint, unit tests and backend e2e, still on
-# the inherited workspace names. The full CI with the Thinker names
-# (typecheck, builds, scripts, changeset check) lands in #20.
+# Provisional minimal CI (#38): lint, unit tests and backend e2e. Jobs
+# address workspaces by path (packages/<name>); the npm workspace names are
+# thinker-* since #19. The full CI (typecheck, builds, scripts, changeset
+# check) lands in #20.
 #
 # Every action is pinned to a full commit SHA. When adding one, resolve the
 # tag with `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` (dereference

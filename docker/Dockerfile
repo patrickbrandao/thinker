@@ -21,8 +21,8 @@ FROM deps AS build
 COPY packages/shared packages/shared
 COPY packages/frontend packages/frontend
 COPY packages/backend packages/backend
-COPY packages/manifest packages/manifest
-RUN npx turbo build --filter=manifest-backend --filter=manifest-frontend --filter=manifest-shared
+COPY packages/thinker packages/thinker
+RUN npx turbo build --filter=thinker-backend --filter=thinker-frontend --filter=thinker-shared
 
 # Stage 3: Production dependencies only. npm ci runs with --ignore-scripts
 # so nothing is compiled — all runtime deps are pure JS, making the glibc

@@ -8,7 +8,7 @@ import {
   IsIn,
   IsBoolean,
 } from 'class-validator';
-import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'manifest-shared';
+import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'thinker-shared';
 
 export class CreateAgentDto {
   @IsString()

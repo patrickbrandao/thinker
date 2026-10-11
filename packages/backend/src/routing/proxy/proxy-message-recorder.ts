@@ -9,7 +9,7 @@ import {
   CANCELLED_STATUS,
   PENDING_STATUS,
   type RequestParamDefaults,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ManifestRequest } from '../../entities/request.entity';
 import {

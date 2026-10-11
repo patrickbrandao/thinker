@@ -17,8 +17,8 @@ vi.mock("../../src/services/agent-platform-store.js", () => ({
   agentCategory: () => null,
 }));
 
-vi.mock("manifest-shared", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("manifest-shared")>();
+vi.mock("thinker-shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("thinker-shared")>();
   return { ...actual, platformIcon: () => undefined };
 });
 

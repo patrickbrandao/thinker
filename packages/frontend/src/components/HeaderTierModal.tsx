@@ -1,5 +1,5 @@
 import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
-import { TIER_COLORS, type TierColor } from 'manifest-shared';
+import { TIER_COLORS, type TierColor } from 'thinker-shared';
 import HeaderComboBox, { type HeaderSuggestion } from './HeaderComboBox.js';
 import {
   createHeaderTier,

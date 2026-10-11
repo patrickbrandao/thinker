@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { PLATFORM_API_SURFACES, type JsonValue } from 'manifest-shared';
+import { PLATFORM_API_SURFACES, type JsonValue } from 'thinker-shared';
 import { authOrigin } from '../../auth/auth.instance';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';

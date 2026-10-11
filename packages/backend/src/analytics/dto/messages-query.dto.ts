@@ -17,7 +17,7 @@ import {
   type ErrorClass,
   type MessageTier,
   type SpecificityCategory,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 // `success` / `failed` are the canonical filter values; `ok` and the specific
 // legacy error values (`error` / `rate_limited` / `fallback_error`) plus `errors`

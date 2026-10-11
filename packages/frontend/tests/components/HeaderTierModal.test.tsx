@@ -17,7 +17,7 @@ vi.mock("../../src/services/toast-store.js", () => ({
   toast: { error: (...args: unknown[]) => mockToastError(...args), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock("manifest-shared", () => ({
+vi.mock("thinker-shared", () => ({
   TIER_COLORS: ["indigo", "rose", "amber", "emerald"],
 }));
 

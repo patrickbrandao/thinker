@@ -1,4 +1,4 @@
-import { resolveProviderMetadataIdentity, underlyingGatewayModel } from 'manifest-shared';
+import { resolveProviderMetadataIdentity, underlyingGatewayModel } from 'thinker-shared';
 
 export interface MetadataIdentity {
   provider: string | undefined;

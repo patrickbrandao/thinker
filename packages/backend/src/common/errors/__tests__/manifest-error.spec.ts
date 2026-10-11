@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { classifyMessageError, MANIFEST_ERROR_ORIGINS } from 'manifest-shared';
+import { classifyMessageError, MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
 import { MANIFEST_ERRORS, type ManifestErrorCode } from '../error-codes';
 import {
   MANIFEST_BLOCKED_REQUEST_REASONS,

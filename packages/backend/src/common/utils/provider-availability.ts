@@ -1,4 +1,4 @@
-import { normalizeProviderName, SHARED_PROVIDER_BY_ID_OR_ALIAS } from 'manifest-shared';
+import { normalizeProviderName, SHARED_PROVIDER_BY_ID_OR_ALIAS } from 'thinker-shared';
 
 /**
  * True for built-in providers that run on the operator's own machine or LAN

@@ -48,7 +48,7 @@ vi.mock('../../src/components/AgentTypeSelect.jsx', () => ({
   ),
 }));
 
-vi.mock('manifest-shared', () => ({
+vi.mock('thinker-shared', () => ({
   PLATFORMS_BY_CATEGORY: {
     personal: ['openclaw', 'hermes', 'other'],
     app: ['openai-sdk', 'vercel-ai-sdk', 'langchain', 'other'],

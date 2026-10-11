@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CATALOG_SYNC_ENV, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
-import { normalizeProviderName, type ModelCapability, type ModelModality } from 'manifest-shared';
+import { normalizeProviderName, type ModelCapability, type ModelModality } from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../common/constants/providers';
 import {
   capabilitiesFromModelsDev,

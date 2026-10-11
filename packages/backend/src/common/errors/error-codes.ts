@@ -1,4 +1,4 @@
-import { MANIFEST_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from 'manifest-shared';
+import { MANIFEST_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from 'thinker-shared';
 
 export { MANIFEST_ERRORS_DOCS_BASE };
 

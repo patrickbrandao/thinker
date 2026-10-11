@@ -49,7 +49,7 @@ import {
   type AuthType,
   type AvailableModel,
 } from '../services/api.js';
-import type { RequestParamDefaults } from 'manifest-shared';
+import type { RequestParamDefaults } from 'thinker-shared';
 import { getMessages } from '../services/api/messages.js';
 import { customProviderColor } from '../services/formatters.js';
 import { markAgentCreated } from '../services/recent-agents.js';
@@ -62,7 +62,7 @@ import {
   PLATFORM_LABELS,
   PLATFORMS_BY_CATEGORY,
   manifestErrorDocsUrl,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import '../styles/routing.css';
 import '../styles/routing-providers.css';
 import '../styles/routing-modal.css';

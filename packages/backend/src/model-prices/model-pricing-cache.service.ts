@@ -10,7 +10,7 @@ import {
   PROVIDER_BY_ID,
   PROVIDER_BY_ID_OR_ALIAS,
 } from '../common/constants/providers';
-import { normalizeProviderName } from 'manifest-shared';
+import { normalizeProviderName } from 'thinker-shared';
 import { ProviderModelRegistryService } from '../model-discovery/provider-model-registry.service';
 import { CustomProvider } from '../entities/custom-provider.entity';
 

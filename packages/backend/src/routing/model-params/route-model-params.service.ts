@@ -12,7 +12,7 @@ import {
   type ModelRoute,
   type ProviderParamSpec,
   type RequestParamDefaults,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { TierService } from '../routing-core/tier.service';
 import { HeaderTierService } from '../header-tiers/header-tier.service';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';

@@ -36,7 +36,7 @@ const devProxyRoute: ProxyOptions = { target: backendTarget, configure: configur
 const manifestVersion = (() => {
   try {
     const pkg = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '../manifest/package.json'), 'utf-8'),
+      readFileSync(resolve(import.meta.dirname, '../thinker/package.json'), 'utf-8'),
     ) as { version?: string };
     return pkg.version ?? '';
   } catch {
@@ -55,7 +55,7 @@ export default defineConfig({
     solidPlugin(),
     codecovVitePlugin({
       enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-      bundleName: 'manifest-frontend',
+      bundleName: 'thinker-frontend',
       uploadToken: process.env.CODECOV_TOKEN,
     }),
   ],

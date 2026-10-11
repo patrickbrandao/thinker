@@ -1,5 +1,5 @@
 import { createResource, createSignal, lazy, Show, Suspense, type Component } from 'solid-js';
-import type { ProviderParamSpec } from 'manifest-shared';
+import type { ProviderParamSpec } from 'thinker-shared';
 import type { AuthType, RequestParamDefaults } from '../services/api.js';
 import { getModelParamSpecs } from '../services/api/model-params.js';
 

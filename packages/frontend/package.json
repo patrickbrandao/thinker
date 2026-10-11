@@ -1,5 +1,5 @@
 {
-  "name": "manifest-frontend",
+  "name": "thinker-frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,10 +17,10 @@
     "better-auth": "1.7.7",
     "dompurify": "^3.4.16",
     "highlight.js": "^11.12.0",
-    "manifest-shared": "*",
     "marked": "^18.0.11",
     "motion": "^12.42.2",
     "solid-js": "^1.9.17",
+    "thinker-shared": "*",
     "uplot": "^1.6.31"
   },
   "devDependencies": {

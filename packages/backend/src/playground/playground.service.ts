@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import type { Response as ExpressResponse } from 'express';
-import type { AuthType, PlaygroundStreamEvent } from 'manifest-shared';
+import type { AuthType, PlaygroundStreamEvent } from 'thinker-shared';
 import { AgentMessage } from '../entities/agent-message.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
 import { ProviderClient } from '../routing/proxy/provider-client';

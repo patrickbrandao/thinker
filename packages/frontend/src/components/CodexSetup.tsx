@@ -1,5 +1,5 @@
 import { createSignal, Show, type Component } from 'solid-js';
-import { getCodexConfigSnippet, getCodexKeyExportSnippet } from 'manifest-shared';
+import { getCodexConfigSnippet, getCodexKeyExportSnippet } from 'thinker-shared';
 import CopyButton from './CopyButton.jsx';
 import CodeBlock from './CodeBlock.jsx';
 

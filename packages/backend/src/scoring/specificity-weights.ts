@@ -1,4 +1,4 @@
-import type { SpecificityCategory } from 'manifest-shared';
+import type { SpecificityCategory } from 'thinker-shared';
 
 /**
  * Per-keyword weights used by specificity detection. Keywords not in this map

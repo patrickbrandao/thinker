@@ -1,6 +1,6 @@
-import type { AuthType } from 'manifest-shared';
+import type { AuthType } from 'thinker-shared';
 import type { DiscoveredModel } from '../../../model-discovery/model-fetcher';
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import {
   describeUnresolvedFallback,
   describeUnresolvedModel,

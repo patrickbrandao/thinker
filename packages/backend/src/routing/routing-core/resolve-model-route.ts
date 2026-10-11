@@ -1,4 +1,4 @@
-import type { AuthType, ModelRoute } from 'manifest-shared';
+import type { AuthType, ModelRoute } from 'thinker-shared';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { openAiModelId } from './public-model-id';
 import { routeMatches } from './route-helpers';

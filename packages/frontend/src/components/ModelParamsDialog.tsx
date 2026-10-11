@@ -7,7 +7,7 @@ import {
   type JsonValue,
   type ModelParamGroup,
   type ProviderParamSpec,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { createEffect, createSignal, For, Show, type Component } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import type { RequestParamDefaults } from '../services/api.js';

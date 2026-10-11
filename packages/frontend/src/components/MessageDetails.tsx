@@ -6,7 +6,7 @@ import {
 } from '../services/api.js';
 import { inferProviderName } from '../services/routing-utils.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { manifestErrorDocsUrl, isSuccessStatus } from 'manifest-shared';
+import { manifestErrorDocsUrl, isSuccessStatus } from 'thinker-shared';
 import { formatErrorClass, formatErrorOrigin } from '../services/formatters.js';
 import { ModelParamsSection, RequestHeadersSection } from './MessageDetailsSections.jsx';
 import { routingTierLabel } from './message-table-types.js';

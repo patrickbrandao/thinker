@@ -1,4 +1,4 @@
-import { inferProviderFromModel, type ModelRoute } from 'manifest-shared';
+import { inferProviderFromModel, type ModelRoute } from 'thinker-shared';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { unambiguousRoute } from '../routing-core/route-helpers';
 import { openAiModelId } from '../routing-core/public-model-id';

@@ -5,7 +5,7 @@
  * The CLI's version tracks the Manifest release it ships with, so there is no
  * separate changeset target for it (`mnfst-gateway-cli` stays in the
  * `.changeset/config.json` ignore list). The publish-npm job in release.yml
- * calls this with the version from packages/manifest/package.json before
+ * calls this with the version from packages/thinker/package.json before
  * building and packing.
  *
  * Deliberately NOT called from the root `version-packages` script. Bumping
@@ -15,12 +15,12 @@
  * the action dies with ENOENT, taking the whole Release workflow down with it.
  * The committed CLI version therefore drifts from the Manifest version between
  * releases. That is cosmetic: the published version is stamped here, at publish
- * time, from packages/manifest/package.json.
+ * time, from packages/thinker/package.json.
  *
  * Three files carry the version and must move together, or the next test run
  * turns red: index.spec.ts pins src/version.ts to package.json, and
  * skill-content.spec.ts pins the generated SKILL_VERSION to package.json too.
- * (`npm run gen` also rewrites the generated file, but it needs manifest-shared
+ * (`npm run gen` also rewrites the generated file, but it needs thinker-shared
  * built; this script deliberately does not, so it can run before the build.)
  *
  * Every write is resolved before any of them is performed, so a renamed or
@@ -28,7 +28,7 @@
  * package.json on the new version and the sources on the old one.
  *
  * Usage:
- *   node scripts/set-version.cjs            # read packages/manifest/package.json
+ *   node scripts/set-version.cjs            # read packages/thinker/package.json
  *   node scripts/set-version.cjs 6.24.0     # explicit
  */
 const fs = require('fs');
@@ -47,7 +47,7 @@ function resolveVersion(argv) {
   const explicit = argv[0];
   if (explicit) return explicit;
   const manifestPkg = JSON.parse(
-    fs.readFileSync(path.join(CLI_DIR, '..', 'manifest', 'package.json'), 'utf8'),
+    fs.readFileSync(path.join(CLI_DIR, '..', 'thinker', 'package.json'), 'utf8'),
   );
   return manifestPkg.version;
 }

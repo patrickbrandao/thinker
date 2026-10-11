@@ -1,4 +1,4 @@
-import { isPlaygroundHeaderBlocked } from 'manifest-shared';
+import { isPlaygroundHeaderBlocked } from 'thinker-shared';
 
 /** One row of the Playground "Request headers" editor. */
 export interface HeaderEntry {

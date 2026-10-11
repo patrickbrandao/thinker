@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
-import type { ModelRoute, ResponseMode, OutputModality } from 'manifest-shared';
+import type { ModelRoute, ResponseMode, OutputModality } from 'thinker-shared';
 import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
 
 @Entity('specificity_assignments')

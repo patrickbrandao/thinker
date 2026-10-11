@@ -4,7 +4,7 @@ import {
   type AgentPlatform,
   PLATFORM_LABELS,
   PLATFORM_ICONS,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import AgentTypeGrid from './AgentTypeGrid.jsx';
 
 interface Props {

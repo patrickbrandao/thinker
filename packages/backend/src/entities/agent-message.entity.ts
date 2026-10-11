@@ -104,7 +104,7 @@ export class AgentMessage {
    * 'internal' | 'request'. NULL on successful rows. Separates a provider's own
    * error (a reliability event) from Manifest's own config/policy/internal
    * rejections and the caller's malformed requests (`request`) — none of which
-   * are provider failures. Derived by classifyMessageError() in manifest-shared,
+   * are provider failures. Derived by classifyMessageError() in thinker-shared,
    * the single source of truth shared with the backfill migration.
    */
   @Column('varchar', { nullable: true })

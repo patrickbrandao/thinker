@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { PLATFORM_SETUP_SNIPPETS } from 'manifest-shared';
+import { PLATFORM_SETUP_SNIPPETS } from 'thinker-shared';
 import { authOrigin } from '../../auth/auth.instance';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
@@ -14,7 +14,7 @@ function maskedKeyRef(slug: string): string {
 }
 
 /**
- * Render a platform's setup instructions. Templates come from manifest-shared —
+ * Render a platform's setup instructions. Templates come from thinker-shared —
  * the same source the dashboard and CLI render — so the wiring guidance cannot
  * drift between surfaces. Platforms with no first-class snippet get generic
  * OpenAI-compatible guidance.

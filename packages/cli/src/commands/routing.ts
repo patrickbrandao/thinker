@@ -247,7 +247,7 @@ const TEST_TIMEOUT_MS = 120_000;
 
 /**
  * Which proxy surface a platform's real traffic uses — read from the
- * generated catalog (source of truth: manifest-shared PLATFORM_API_SURFACES),
+ * generated catalog (source of truth: thinker-shared PLATFORM_API_SURFACES),
  * so a platform added in Manifest gets the right test surface automatically.
  */
 const SURFACE_BY_PLATFORM = new Map(PLATFORM_CATALOG.map((p) => [p.id, p.surface]));

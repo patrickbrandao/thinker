@@ -1,5 +1,5 @@
 import { Repository } from 'typeorm';
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import { ProxyFallbackService } from '../proxy-fallback.service';
 import { ReasoningContentCache } from '../reasoning-content-cache';
 import { ProviderKeyService } from '../../routing-core/provider-key.service';

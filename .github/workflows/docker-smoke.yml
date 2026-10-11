@@ -28,6 +28,7 @@ on:
       - "packages/backend/**"
       - "packages/frontend/**"
       - "packages/shared/**"
+      - "packages/thinker/**"
       - "package.json"
       - "package-lock.json"
       - "turbo.json"
@@ -201,11 +202,11 @@ jobs:
           test -s /tmp/index.html
           grep -q '<title>Manifest</title>' /tmp/index.html
 
-      - name: Verify public error pages are gated off by default
+      - name: Verify the removed public error pages endpoint returns 404
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:2099/api/v1/public/error-pages)
           if [[ "$status" != "404" ]]; then
-            echo "expected 404 for /public/error-pages when MANIFEST_PUBLIC_STATS is unset, got $status" >&2
+            echo "expected 404 for the removed /public/error-pages endpoint, got $status" >&2
             exit 1
           fi
 
