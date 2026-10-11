@@ -5,6 +5,7 @@ import { authOrigin } from '../../auth/auth.instance';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { result } from '../tool-result';
+import { isCatalogSyncEnabled } from '../../common/utils/catalog-sync';
 import {
   describeUnresolvedModel,
   matchesModelName,
@@ -111,7 +112,9 @@ export function registerRoutingTools(
           const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
           const providers = await deps.providers.getProviders(agent.tenant_id);
           if (providers.length === 0) return { enabled: false, reason: 'no_provider' };
-          if (deps.pricingSync.getAll().size === 0)
+          // Empty by design with THINKER_CATALOG_SYNC=false, which does not
+          // stop routing.
+          if (isCatalogSyncEnabled() && deps.pricingSync.getAll().size === 0)
             return { enabled: false, reason: 'pricing_cache_empty' };
           const routable = await deps.tiers.hasRoutableTier(agent.id);
           return { enabled: routable, reason: routable ? null : 'no_routable_models' };

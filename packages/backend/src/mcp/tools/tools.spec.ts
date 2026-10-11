@@ -520,6 +520,19 @@ describe('MCP tools', () => {
         (await call(registerAll(noPricing), 'manifest_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'pricing_cache_empty' });
 
+      // With THINKER_CATALOG_SYNC=false the cache is empty by design and does
+      // not stop routing.
+      const previous = process.env['THINKER_CATALOG_SYNC'];
+      process.env['THINKER_CATALOG_SYNC'] = 'false';
+      try {
+        expect(
+          (await call(registerAll(noPricing), 'manifest_routing_status', { agent: 'demo' })).data,
+        ).toMatchObject({ enabled: true, reason: null });
+      } finally {
+        if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
+        else process.env['THINKER_CATALOG_SYNC'] = previous;
+      }
+
       const notRoutable = makeDeps();
       (notRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
       expect(

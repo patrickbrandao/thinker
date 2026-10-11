@@ -18,6 +18,7 @@ import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.de
 import { ProviderService } from './routing-core/provider.service';
 import { CustomProviderService } from './custom-provider/custom-provider.service';
 import { ResolveAgentService } from './routing-core/resolve-agent.service';
+import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { TierService } from './routing-core/tier.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { OllamaSyncService } from '../database/ollama-sync.service';
@@ -88,7 +89,9 @@ export class ProviderController {
     if (!hasRoutableTier) {
       // No tier resolves to a model. If the OpenRouter pricing cache is empty
       // (e.g. first-boot fetch failed), surface that as a more actionable hint.
-      const pricingCacheEmpty = this.pricingSync.getAll().size === 0;
+      // With THINKER_CATALOG_SYNC=false the cache is empty by design, so the
+      // hint would point at the wrong cause.
+      const pricingCacheEmpty = isCatalogSyncEnabled() && this.pricingSync.getAll().size === 0;
       return {
         enabled: false,
         reason: pricingCacheEmpty

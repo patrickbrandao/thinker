@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PROVIDER_BY_ID } from '../common/constants/providers';
+import { CATALOG_SYNC_ENV, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
+import { TenantProvider } from '../entities/tenant-provider.entity';
 
 export interface OpencodeGoCatalogEntry {
   /** Bare model ID as listed in the docs (e.g. "glm-5.1"). */
@@ -24,6 +29,15 @@ const ERROR_BACKOFF_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
 /**
+ * Every spelling a `tenant_providers.provider` row can carry for OpenCode Go
+ * (the registry id plus its aliases), lowercased.
+ */
+const OPENCODE_GO_PROVIDER_KEYS: readonly string[] = [
+  'opencode-go',
+  ...(PROVIDER_BY_ID.get('opencode-go')?.aliases ?? []),
+].map((key) => key.toLowerCase());
+
+/**
  * Published 5-hour quota in USD for an OpenCode Go subscription. The docs
  * express per-model usage as "requests per 5 hour", so dividing that dollar
  * value by the request count gives the dollar cost the docs attribute to a
@@ -39,6 +53,14 @@ export const OPENCODE_GO_BUDGET_5H_USD = 12;
  * in the markdown docs file the website renders from. We parse the
  * Endpoints table (for model IDs + API format) and the Usage Limits
  * table (for per-request cost) and cache the merged result in memory.
+ *
+ * ADR 0003: the doc lives on raw.githubusercontent.com, so it is fetched only
+ * for an instance that has an OpenCode Go provider registered, and never with
+ * `THINKER_CATALOG_SYNC=false`. Every caller of `list()` / `refresh()` /
+ * `resolve*()` other than the boot warmup is already scoped to an OpenCode Go
+ * provider (its discovery, its proxied requests, its models in the picker), so
+ * the boot warmup is the only path that has to check the database itself.
+ * Registering a provider runs its discovery, which loads the doc lazily.
  */
 @Injectable()
 export class OpencodeGoCatalogService implements OnModuleInit {
@@ -55,6 +77,12 @@ export class OpencodeGoCatalogService implements OnModuleInit {
    */
   private inflight: Promise<OpencodeGoCatalogEntry[]> | null = null;
 
+  constructor(
+    @Optional()
+    @Inject(getRepositoryToken(TenantProvider))
+    private readonly providerRepo: Repository<TenantProvider> | null = null,
+  ) {}
+
   /**
    * Warm the catalog in the background at boot so the per-request cost index
    * is populated before the proxy hot path runs. Discovery typically warms it
@@ -62,14 +90,50 @@ export class OpencodeGoCatalogService implements OnModuleInit {
    * against an empty index — the recorder treats a missing entry as $0,
    * which is the original bug. Fire-and-forget; failures fall through to the
    * existing fetch-on-demand path in `list()`.
+   *
+   * Skipped unless an OpenCode Go provider is registered (ADR 0003), so a
+   * default instance never reaches raw.githubusercontent.com at boot.
    */
   onModuleInit(): void {
-    void this.list().catch(() => {
+    void this.warmIfProviderRegistered().catch(() => {
       // `list()` already logs failures and arms the error-backoff window.
     });
   }
 
+  private async warmIfProviderRegistered(): Promise<void> {
+    if (!isCatalogSyncEnabled()) return;
+    if (!(await this.hasOpencodeGoProvider())) return;
+    await this.list();
+  }
+
+  /**
+   * Whether any tenant has an OpenCode Go provider registered, active or not.
+   * Without a repository (unit tests that build the service by hand) or when
+   * the lookup fails, answers false: a skipped warmup only delays the doc to
+   * its first real use, while a wrong true is an outbound call nobody needed.
+   */
+  private async hasOpencodeGoProvider(): Promise<boolean> {
+    if (!this.providerRepo) return false;
+    try {
+      const count = await this.providerRepo
+        .createQueryBuilder('p')
+        .where('LOWER(p.provider) IN (:...keys)', { keys: OPENCODE_GO_PROVIDER_KEYS })
+        .getCount();
+      return count > 0;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not check for OpenCode Go providers, skipping warmup: ${message}`);
+      return false;
+    }
+  }
+
+  /**
+   * The cached catalog, fetching it when the cache is cold or expired. Empty,
+   * without a fetch, when `THINKER_CATALOG_SYNC=false`: callers then price
+   * OpenCode Go requests at $0 and pick the API format from the model family.
+   */
   async list(): Promise<OpencodeGoCatalogEntry[]> {
+    if (!isCatalogSyncEnabled()) return [];
     const now = Date.now();
     if (this.cache && this.cache.expiresAt > now) {
       return this.cache.entries;
@@ -88,6 +152,10 @@ export class OpencodeGoCatalogService implements OnModuleInit {
    * models without restarting the backend.
    */
   async refresh(): Promise<OpencodeGoCatalogEntry[]> {
+    if (!isCatalogSyncEnabled()) {
+      this.logger.log(`${CATALOG_SYNC_ENV}=false: OpenCode Go docs catalog not fetched`);
+      return [];
+    }
     return this.startFetch(Date.now());
   }
 

@@ -415,6 +415,7 @@ refused, including when a hostname starts resolving to them after it was saved.
 | `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
 | `MANIFEST_DISABLE_HSTS`            | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
+| `THINKER_CATALOG_SYNC`             | No          | `true`                                       | Set `false` to stop fetching the public model catalogs (see [No telemetry](#no-telemetry)). Costs then come from the bundled data only, so most models show $0                                                |
 | `DB_POOL_MAX` / `AUTH_DB_POOL_MAX` | No          | `10` / `5`                                   | PostgreSQL pool sizes (app pool, Better Auth pool)                                                                                                                                                         |
 
 `NODE_ENV` and `SEED_DATA` are deliberately fixed by the compose file and are
@@ -429,8 +430,19 @@ Full env var reference:
 
 The container makes no outbound call of its own: no usage telemetry, no update
 check, no error reporting. It only reaches the inference providers you
-configure and the public model catalogs (openrouter.ai, models.dev and, for
-OpenCode Go, raw.githubusercontent.com).
+configure and these public model catalogs:
+
+| Destination                                    | When                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `openrouter.ai` (`/api/v1/models`)             | at boot and once a day                                       |
+| `models.dev` (`/api.json`)                     | at boot and once a day                                       |
+| `raw.githubusercontent.com` (OpenCode Go docs) | only when an OpenCode Go provider is registered, cached 1 h  |
+
+Set `THINKER_CATALOG_SYNC=false` to turn all three off, for example on an
+air-gapped host. Prices and capabilities then come only from the data bundled
+in the image, which covers few models: requests to most models are recorded
+without a known price and show as $0, OpenCode Go requests show $0, and the
+pricing refresh endpoint reports `sync_enabled: false`.
 
 ## Links
 

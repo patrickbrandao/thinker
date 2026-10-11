@@ -146,6 +146,11 @@ services:
       # Extra browser origins allowed to call the gateway (comma-separated).
       # None by default: the dashboard is same-origin.
       - THINKER_CORS_ORIGINS=${THINKER_CORS_ORIGINS:-}
+      # Public model/price catalogs (ADR 0003): openrouter.ai and models.dev at
+      # boot and daily, plus the OpenCode Go doc only when an OpenCode Go
+      # provider exists. Set false for air-gapped installs; costs then come
+      # from the bundled data only and most models show $0.
+      - THINKER_CATALOG_SYNC=${THINKER_CATALOG_SYNC:-true}
       # Daily Harness usage rollup. Reads stay off until backfill parity passes.
       - AGENT_USAGE_DAILY_WORKER=${AGENT_USAGE_DAILY_WORKER:-}
       - AGENT_USAGE_DAILY_READS=${AGENT_USAGE_DAILY_READS:-}

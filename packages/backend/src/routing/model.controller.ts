@@ -9,6 +9,7 @@ import { OllamaSyncService } from '../database/ollama-sync.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelsDevSyncService } from '../database/models-dev-sync.service';
 import { RoutingCacheService } from './routing-core/routing-cache.service';
+import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { resolveProviderMetadataIdentity } from 'manifest-shared';
 import {
   inputModalitiesFromCapabilities,
@@ -72,16 +73,19 @@ export class ModelController {
     return {
       model_count: this.pricingSync.getAll().size,
       last_fetched_at: this.pricingSync.getLastFetchedAt()?.toISOString() ?? null,
+      sync_enabled: isCatalogSyncEnabled(),
     };
   }
 
   @Post('pricing/refresh')
   async refreshPricing() {
+    // With THINKER_CATALOG_SYNC=false this reaches nothing and reports ok: false.
     const modelCount = await this.pricingSync.refreshCache();
     return {
       ok: modelCount > 0,
       model_count: modelCount,
       last_fetched_at: this.pricingSync.getLastFetchedAt()?.toISOString() ?? null,
+      sync_enabled: isCatalogSyncEnabled(),
     };
   }
 

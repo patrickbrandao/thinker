@@ -20,6 +20,9 @@ function record(kind, target) {
   fs.appendFileSync(logFile, JSON.stringify({ kind, target }) + '\n');
 }
 
+// Proves the recorder is loaded even when a run makes no outbound call at all.
+record('boot', String(process.pid));
+
 function notFound(hostname) {
   return Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), {
     code: 'ENOTFOUND',
