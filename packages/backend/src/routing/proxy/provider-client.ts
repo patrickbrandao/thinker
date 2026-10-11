@@ -12,6 +12,7 @@ import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
+import { mergeExtraHeaders } from './extra-headers';
 import { injectOpenAiMessageCacheControl, injectOpenRouterCacheControl } from './cache-injection';
 import {
   applyAnthropicAutomaticCacheControl,
@@ -472,10 +473,13 @@ export class ProviderClient {
       endpointKey === 'openai-subscription'
         ? this.codexAffinity.prepare(apiKey, requestBody)
         : undefined;
-    // Affinity headers are routing-critical and must win over caller-supplied
-    // extraHeaders (provider-side observability hints), so they spread last.
-    const finalHeaders =
-      affinity || extraHeaders ? { ...headers, ...extraHeaders, ...affinity?.headers } : headers;
+    // Affinity headers are routing-critical and count as adapter headers.
+    // Caller-supplied extraHeaders (provider-side session hints, Playground
+    // headers) never replace or duplicate any of them — see mergeExtraHeaders.
+    const finalHeaders = mergeExtraHeaders(
+      affinity ? { ...headers, ...affinity.headers } : headers,
+      extraHeaders,
+    );
 
     const retryWireBody = async (
       wireRequestBody: Record<string, unknown>,

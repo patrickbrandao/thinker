@@ -127,7 +127,12 @@ export class RunPlaygroundDto {
    * Extra HTTP headers to attach to the outgoing provider request.
    * Sanitized server-side: credential, tenant-identity, gateway-managed and
    * transport-layer headers are silently dropped (see
-   * `PLAYGROUND_BLOCKED_HEADERS` in manifest-shared).
+   * `PLAYGROUND_BLOCKED_HEADERS` in manifest-shared), as are invalid names and
+   * values fetch refuses: C0 controls other than tab, DEL, or code points above
+   * U+00FF. A header the
+   * provider adapter sets itself always keeps the adapter's value
+   * (`mergeExtraHeaders`); `anthropic-beta` flags are appended to the
+   * adapter's instead.
    */
   @IsOptional()
   @IsObject()

@@ -125,6 +125,48 @@ describe('sanitizeRequestHeaders', () => {
     expect(out).toEqual({ 'X-Good': 'ok' });
   });
 
+  // Issue #105: any of these makes fetch throw, which used to fail the run
+  // with a 502. The header is dropped and the run goes ahead.
+  it.each([
+    ['SOH', 'a\x01b'],
+    ['backspace', 'a\x08b'],
+    ['vertical tab', 'a\x0bb'],
+    ['form feed', 'a\x0cb'],
+    ['unit separator', 'a\x1fb'],
+    ['DEL', 'a\x7fb'],
+    ['U+0100', 'aĀb'],
+    ['euro sign', 'price €'],
+    ['line separator', 'a b'],
+    ['emoji', 'hi \u{1F600}'],
+  ])('drops a value containing %s', (_label, value) => {
+    expect(sanitizeRequestHeaders({ 'X-Bad': value, 'X-Good': 'ok' })).toEqual({
+      'X-Good': 'ok',
+    });
+  });
+
+  it('keeps horizontal tab, printable ASCII and U+0080-U+00FF values', () => {
+    const values = {
+      'X-Tab': 'a\tb',
+      // C1 controls are obs-text: fetch sends them, as the dashboard assumes.
+      'X-C1': 'a\x85b\x9f',
+      'X-Ascii': ' !"#$%&\'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~',
+      'X-Latin1': 'café  ÿ',
+    };
+    expect(sanitizeRequestHeaders(values)).toEqual(values);
+  });
+
+  it('keeps exactly tab, printable ASCII and U+0080-U+00FF among U+0000-U+02FF', () => {
+    const keptCodes: number[] = [];
+    for (let code = 0; code <= 0x2ff; code++) {
+      const out = sanitizeRequestHeaders({ 'X-C': `a${String.fromCharCode(code)}b` });
+      if (out) keptCodes.push(code);
+    }
+    const expected = [0x09];
+    for (let code = 0x20; code <= 0x7e; code++) expected.push(code);
+    for (let code = 0x80; code <= 0xff; code++) expected.push(code);
+    expect(keptCodes).toEqual(expected);
+  });
+
   describe('case-insensitive deduplication', () => {
     it('keeps only the first encountered case variant when keys differ in casing', () => {
       const out = sanitizeRequestHeaders({

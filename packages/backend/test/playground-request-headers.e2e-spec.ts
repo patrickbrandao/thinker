@@ -171,7 +171,13 @@ describe('Playground extra request headers (e2e)', () => {
     }
   });
 
-  async function runPlayground(kind: 'openai' | 'anthropic'): Promise<Json[]> {
+  async function runPlayground(
+    kind: 'openai' | 'anthropic',
+    requestHeaders: Record<string, string> = {
+      ...BLOCKED_REQUEST_HEADERS,
+      'X-Custom-Trace': 'trace-123',
+    },
+  ): Promise<Json[]> {
     const res = await api()
       .post('/api/v1/playground/run')
       .set('x-api-key', TEST_API_KEY)
@@ -181,7 +187,7 @@ describe('Playground extra request headers (e2e)', () => {
         model: `custom:${providerIds[kind]}/mock-model`,
         authType: 'api_key',
         messages: [{ role: 'user', content: 'say hi' }],
-        requestHeaders: { ...BLOCKED_REQUEST_HEADERS, 'X-Custom-Trace': 'trace-123' },
+        requestHeaders,
       })
       .buffer(true)
       .parse((r, cb) => {
@@ -231,5 +237,73 @@ describe('Playground extra request headers (e2e)', () => {
     expect(call.headers['x-api-key']).toBe(STORED_ANTHROPIC_KEY);
     expect(call.headers.authorization).toBeUndefined();
     expectOnlyAllowedHeaders(call.headers, (mock.server.address() as AddressInfo).port);
+  });
+
+  // Issue #105: the adapter's own headers win even for a name the blocklist
+  // does not cover. `anthropic-version` is set by the Anthropic-kind adapter
+  // and is not blocked, so it stands in for any credential header a future
+  // adapter might add without updating the list.
+  it('keeps the adapter value of a non-blocklisted header it sets, in any casing', async () => {
+    const events = await runPlayground('anthropic', {
+      'Anthropic-Version': '2099-01-01',
+      'X-Custom-Trace': 'trace-123',
+    });
+    expect(events.find((e) => e.type === 'done')?.content).toBe('hello anthropic');
+
+    expect(mock.received).toHaveLength(1);
+    const [call] = mock.received;
+    // Not replaced, and not comma-merged with the client's copy either.
+    expect(call.headers['anthropic-version']).toBe('2023-06-01');
+    expect(call.headers['x-api-key']).toBe(STORED_ANTHROPIC_KEY);
+    expect(call.headers['x-custom-trace']).toBe('trace-123');
+    expect(JSON.stringify(call.headers)).not.toContain('2099-01-01');
+  });
+
+  it('forwards sanitized anthropic-beta flags through the beta merge', async () => {
+    await runPlayground('anthropic', {
+      'Anthropic-Beta': 'context-management-2025-06-27, Not-A-Flag',
+    });
+
+    expect(mock.received).toHaveLength(1);
+    expect(mock.received[0].headers['anthropic-beta']).toBe('context-management-2025-06-27');
+  });
+
+  it('drops values fetch would refuse and still completes the run', async () => {
+    const events = await runPlayground('openai', {
+      'X-Control': 'a\x01b',
+      'X-Del': 'a\x7fb',
+      'X-Wide': 'price \u20ac',
+      'X-Emoji': 'hi \u{1F600}',
+      'X-Latin1': 'caf\u00e9',
+      'X-Custom-Trace': 'trace-123',
+    });
+    // No 502: the run streams to completion without the bad headers.
+    expect(events.find((e) => e.type === 'error')).toBeUndefined();
+    expect(events.find((e) => e.type === 'done')?.content).toBe('hello openai');
+
+    expect(mock.received).toHaveLength(1);
+    const { headers } = mock.received[0];
+    expect(headers['x-control']).toBeUndefined();
+    expect(headers['x-del']).toBeUndefined();
+    expect(headers['x-wide']).toBeUndefined();
+    expect(headers['x-emoji']).toBeUndefined();
+    // Latin-1 is a valid header byte; Node reads it back as latin1.
+    expect(headers['x-latin1']).toBe('caf\u00e9');
+    expect(headers['x-custom-trace']).toBe('trace-123');
+  });
+
+  it('does not let the client renegotiate the response format or encoding', async () => {
+    const events = await runPlayground('openai', {
+      Accept: 'application/x-attacker',
+      'Accept-Encoding': 'x-attacker-encoding',
+      'X-Custom-Trace': 'trace-123',
+    });
+    expect(events.find((e) => e.type === 'done')?.content).toBe('hello openai');
+
+    expect(mock.received).toHaveLength(1);
+    const { headers } = mock.received[0];
+    expect(headers.accept).not.toContain('x-attacker');
+    expect(headers['accept-encoding']).not.toContain('x-attacker');
+    expect(headers['x-custom-trace']).toBe('trace-123');
   });
 });
