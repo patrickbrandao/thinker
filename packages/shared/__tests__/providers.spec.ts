@@ -158,14 +158,10 @@ describe('SHARED_PROVIDER_BY_ID', () => {
     expect(groq!.openRouterPrefixes).toEqual([]);
   });
 
-  it('registers Gemini Free separately from the Google provider', () => {
-    const provider = SHARED_PROVIDER_BY_ID.get('gemini-free');
-    expect(provider).toBeDefined();
-    expect(provider!.displayName).toBe('Gemini Free');
-    expect(provider!.aliases).toEqual(['gemini free']);
-    expect(provider!.openRouterPrefixes).toEqual([]);
-    expect(provider!.keyPlaceholder).toBe('sk-...');
-    expect(provider!.managedFree).toBe(true);
+  it('does not register the removed managed Gemini Free provider', () => {
+    expect(SHARED_PROVIDER_BY_ID.get('gemini-free')).toBeUndefined();
+    expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get('gemini free')).toBeUndefined();
+    expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get('gemini-free')).toBeUndefined();
   });
 
   it('nvidia has no openRouter prefixes (native NIM /models is authoritative)', () => {

@@ -96,12 +96,6 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     authTypes: ['api_key', 'subscription'],
   },
   {
-    id: 'gemini-free',
-    displayName: 'Gemini Free',
-    aliases: ['gemini free'],
-    authTypes: ['api_key'],
-  },
-  {
     id: 'kiro',
     displayName: 'Kiro',
     authTypes: ['subscription'],

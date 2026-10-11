@@ -24,8 +24,6 @@ import { PlaygroundRun } from '../entities/playground-run.entity';
 import { PlaygroundColumn } from '../entities/playground-column.entity';
 import { ReasoningContentCacheEntry } from '../entities/reasoning-content-cache-entry.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
-import { PublicErrorPage } from '../entities/public-error-page.entity';
-import { WaitlistClaim } from '../entities/waitlist-claim.entity';
 import { CliAuthCode } from '../entities/cli-auth-code.entity';
 import { AgentUsageDaily } from '../entities/agent-usage-daily.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
@@ -57,6 +55,7 @@ import { AddAgentMessagesDirectUsageIndex1802900000000 } from './migrations/1802
 import { CoverRequestsLogFilters1803000000000 } from './migrations/1803000000000-CoverRequestsLogFilters';
 import { CoverHarnessRequestsIndex1803100000000 } from './migrations/1803100000000-CoverHarnessRequestsIndex';
 import { DropBillingSchema1803200000000 } from './migrations/1803200000000-DropBillingSchema';
+import { DropSaasFeatureSchema1803300000000 } from './migrations/1803300000000-DropSaasFeatureSchema';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -198,8 +197,6 @@ export const entities = [
   ReasoningContentCacheEntry,
   AgentEnabledProvider,
   BackfillState,
-  PublicErrorPage,
-  WaitlistClaim,
   CliAuthCode,
   AgentUsageDaily,
 ];
@@ -352,4 +349,5 @@ export const migrations = [
   CoverRequestsLogFilters1803000000000,
   CoverHarnessRequestsIndex1803100000000,
   DropBillingSchema1803200000000,
+  DropSaasFeatureSchema1803300000000,
 ];

@@ -150,7 +150,6 @@ export const ERROR_CLASSES = [
   'subscription_credentials_unusable',
   'local_provider_unavailable',
   'limit_exceeded',
-  'plan_request_limit_exceeded',
   'internal',
 ] as const;
 export type ErrorClass = (typeof ERROR_CLASSES)[number];
@@ -181,10 +180,6 @@ const MANIFEST_REASON_TO_CLASSIFICATION: Record<
   },
   key_expired: { origin: 'config', errorClass: 'auth' },
   limit_exceeded: { origin: 'policy', errorClass: 'limit_exceeded' },
-  plan_request_limit_exceeded: {
-    origin: 'policy',
-    errorClass: 'plan_request_limit_exceeded',
-  },
   // Three distinct limits (per-user / per-IP / concurrency) that used to
   // collapse into `manifest_rate_limited`. That legacy reason stays mapped so
   // rows written before the split keep classifying.
@@ -263,13 +258,6 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
     ? MANIFEST_REASON_TO_CLASSIFICATION[signals.routingReason]
     : undefined;
   if (manifest) {
-    if (signals.routingReason === 'limit_exceeded' && signals.errorHttpStatus === 402) {
-      return {
-        error_origin: 'policy',
-        error_class: 'plan_request_limit_exceeded',
-        superseded,
-      };
-    }
     return { error_origin: manifest.origin, error_class: manifest.errorClass, superseded };
   }
 

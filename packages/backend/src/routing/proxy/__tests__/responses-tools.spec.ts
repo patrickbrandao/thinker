@@ -14,7 +14,7 @@ const fn = {
 };
 const tools = [
   fn,
-  { type: 'namespace', name: 'crm', tools: [fn] },
+  { type: 'namespace', name: 'contacts', tools: [fn] },
   { type: 'namespace', name: 'billing', tools: [fn] },
   { type: 'web_search' },
 ];
@@ -31,7 +31,7 @@ describe('Responses namespace tools', () => {
       expect(tool.function.name).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
     }
     expect([...names.values()]).toEqual([
-      { name: 'lookup', namespace: 'crm' },
+      { name: 'lookup', namespace: 'contacts' },
       { name: 'lookup', namespace: 'billing' },
       { name: 'lookup' },
     ]);
@@ -42,7 +42,7 @@ describe('Responses namespace tools', () => {
     const wireName = [...names.keys()][0];
     const call = {
       type: 'function_call',
-      namespace: 'crm',
+      namespace: 'contacts',
       name: 'lookup',
       call_id: 'call1',
       arguments: '{}',
@@ -55,7 +55,7 @@ describe('Responses namespace tools', () => {
         { type: 'function_call_output', call_id: 'call1', output: 'one' },
         { type: 'function_call_output', call_id: 'call2', output: 'two' },
       ],
-      tool_choice: { type: 'function', namespace: 'crm', name: 'lookup' },
+      tool_choice: { type: 'function', namespace: 'contacts', name: 'lookup' },
     };
     const chat = toChatCompletionsRequest(body) as any;
     expect(chat.tool_choice).toEqual({ type: 'function', function: { name: wireName } });
@@ -76,11 +76,14 @@ describe('Responses namespace tools', () => {
   });
 
   it('keeps aliases stable for reordered tools and historical calls', () => {
-    const name = chatToolName({ namespace: 'crm', name: 'lookup' }, responsesToolNames(tools));
+    const name = chatToolName({ namespace: 'contacts', name: 'lookup' }, responsesToolNames(tools));
     expect(
-      chatToolName({ namespace: 'crm', name: 'lookup' }, responsesToolNames([...tools].reverse())),
+      chatToolName(
+        { namespace: 'contacts', name: 'lookup' },
+        responsesToolNames([...tools].reverse()),
+      ),
     ).toBe(name);
-    expect(chatToolName({ namespace: 'crm', name: 'lookup' }, new Map())).toBe(name);
+    expect(chatToolName({ namespace: 'contacts', name: 'lookup' }, new Map())).toBe(name);
   });
 
   it('avoids collisions with top-level names and handles long namespace names', () => {
@@ -96,10 +99,10 @@ describe('Responses namespace tools', () => {
     const invalid = [
       null,
       { type: 'namespace' },
-      { type: 'namespace', name: 'crm' },
+      { type: 'namespace', name: 'contacts' },
       {
         type: 'namespace',
-        name: 'crm',
+        name: 'contacts',
         tools: [null, { type: 'web_search' }, { type: 'function' }],
       },
     ];
@@ -109,7 +112,7 @@ describe('Responses namespace tools', () => {
         [
           null,
           { type: 'namespace' },
-          { type: 'namespace', name: 'crm', tools: [null, { type: 'web_search' }] },
+          { type: 'namespace', name: 'contacts', tools: [null, { type: 'web_search' }] },
         ],
         new Map(),
       ),

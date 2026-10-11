@@ -50,9 +50,7 @@ import {
   isMinimaxRegion,
 } from '../oauth/minimax/minimax-oauth-helpers';
 import { filterProvidersForDeployment } from '../../common/utils/provider-availability';
-import { getManagedFreeProviderConfig } from '../../common/constants/managed-free-providers';
 
-const MAX_KEYS_MANAGED_FREE_PROVIDER = 1;
 const MAX_LABEL_LENGTH = 50;
 const DEFAULT_LABEL = 'Default';
 // Bounds for withSubscriptionCredentialLock's critical section (the provider
@@ -495,13 +493,9 @@ export class ProviderService {
     }
 
     const activeCount = existingRows.filter((r) => r.is_active).length;
-    const managedFreeConfig = getManagedFreeProviderConfig(provider);
-    const maxKeys = managedFreeConfig ? MAX_KEYS_MANAGED_FREE_PROVIDER : MAX_KEYS_PER_PROVIDER;
-    if (activeCount >= maxKeys) {
+    if (activeCount >= MAX_KEYS_PER_PROVIDER) {
       throw new BadRequestException(
-        maxKeys === 1
-          ? `You can connect at most 1 key for ${managedFreeConfig!.displayName}`
-          : `You can connect at most ${maxKeys} keys per provider`,
+        `You can connect at most ${MAX_KEYS_PER_PROVIDER} keys per provider`,
       );
     }
 

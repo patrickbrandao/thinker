@@ -64,7 +64,7 @@ describe('Responses streaming tool calls', () => {
 
   it('restores namespaces on every item and keeps tool-before-text ordering', () => {
     const names = responsesToolNames([
-      { type: 'namespace', name: 'crm', tools: [{ type: 'function', name: 'lookup' }] },
+      { type: 'namespace', name: 'contacts', tools: [{ type: 'function', name: 'lookup' }] },
     ]);
     const name = [...names.keys()][0];
     const t = createResponsesStreamTransformer('auto', { toolNames: names });
@@ -75,9 +75,9 @@ describe('Responses streaming tool calls', () => {
     ].join('');
     const output = collectResponsesSseResponse(sse).output as any[];
     expect(output.map((i) => i.type)).toEqual(['function_call', 'message']);
-    expect(output[0]).toMatchObject({ name: 'lookup', namespace: 'crm', arguments: '{}' });
+    expect(output[0]).toMatchObject({ name: 'lookup', namespace: 'contacts', arguments: '{}' });
     for (const e of events(sse).filter((e) => e.item?.type === 'function_call')) {
-      expect(e.item).toMatchObject({ name: 'lookup', namespace: 'crm' });
+      expect(e.item).toMatchObject({ name: 'lookup', namespace: 'contacts' });
     }
   });
 
