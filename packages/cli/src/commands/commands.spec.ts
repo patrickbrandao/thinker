@@ -3321,7 +3321,7 @@ describe('doctor', () => {
 
   it('calls an unreachable host by its name, and skips auth rather than blaming the key', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key', MANIFEST_TELEMETRY_DISABLED: '1' },
+      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
       fetchImpl: (async () => {
         throw new Error('ECONNREFUSED');
       }) as typeof fetch,
@@ -3339,7 +3339,7 @@ describe('doctor', () => {
 
   it('stringifies a non-Error transport failure', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k', MANIFEST_TELEMETRY_DISABLED: '1' },
+      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' },
       fetchImpl: (() => Promise.reject('dns exploded')) as unknown as typeof fetch,
     });
     expect(await run(io, ['doctor'])).toBe(1);
@@ -3357,7 +3357,7 @@ describe('doctor', () => {
     });
 
     const io2 = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k', MANIFEST_TELEMETRY_DISABLED: '1' },
+      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' },
       fetchImpl: (async () =>
         new Response('<html>gateway</html>', { status: 502 })) as typeof fetch,
     });

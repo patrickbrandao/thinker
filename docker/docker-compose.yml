@@ -148,27 +148,14 @@ services:
       # anywhere reachable from the internet.
       - MANIFEST_DISABLE_HSTS=${MANIFEST_DISABLE_HSTS:-}
       # Extra browser origins allowed to call the gateway (comma-separated).
-      - WINGMAN_CORS_ORIGINS=${WINGMAN_CORS_ORIGINS:-}
-      # Error monitoring (opt-in). Sentry stays completely uninitialised
-      # unless SENTRY_DSN is set.
-      - SENTRY_DSN=${SENTRY_DSN:-}
-      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
-      # Anonymous usage telemetry (opt-out). Set MANIFEST_TELEMETRY_DISABLED=1
-      # to disable, or point TELEMETRY_ENDPOINT at your own collector. See
-      # https://manifest.build/llm-gateway/docs/self-hosted/#telemetry for the payload shape.
-      - MANIFEST_TELEMETRY_DISABLED=${MANIFEST_TELEMETRY_DISABLED:-0}
-      - TELEMETRY_ENDPOINT=${TELEMETRY_ENDPOINT:-}
+      # None by default: the dashboard is same-origin.
+      - THINKER_CORS_ORIGINS=${THINKER_CORS_ORIGINS:-}
       # Daily Harness usage rollup. Reads stay off until backfill parity passes.
       - AGENT_USAGE_DAILY_WORKER=${AGENT_USAGE_DAILY_WORKER:-}
       - AGENT_USAGE_DAILY_READS=${AGENT_USAGE_DAILY_READS:-}
       - AGENT_USAGE_DAILY_READ_TENANTS=${AGENT_USAGE_DAILY_READ_TENANTS:-}
       - AGENT_USAGE_DAILY_BATCH_SIZE=${AGENT_USAGE_DAILY_BATCH_SIZE:-}
       - AGENT_USAGE_DAILY_RUN_BUDGET_MS=${AGENT_USAGE_DAILY_RUN_BUDGET_MS:-}
-      # Update check (opt-out). Once a day the dashboard asks GitHub for the
-      # latest Manifest release so it can show a "new version available"
-      # badge. Set MANIFEST_UPDATE_CHECK_DISABLED=1 on air-gapped installs.
-      - MANIFEST_UPDATE_CHECK_DISABLED=${MANIFEST_UPDATE_CHECK_DISABLED:-0}
     depends_on:
       postgres:
         condition: service_healthy

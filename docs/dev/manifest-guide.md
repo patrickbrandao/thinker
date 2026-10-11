@@ -2,13 +2,13 @@
 > Thinker is a self-hosted-only fork. While this file is being rewritten, apply these overrides to everything below:
 >
 > - **Ignore every "Cloud Mode Always" / `MANIFEST_MODE=cloud` directive.** Thinker has no cloud mode; use the self-hosted mode.
-> - **The dashboard has no Wingman drawer, update check, Discovery step or Autofix UI** (#13), and the backend has no Autofix (#16). Remaining backend leftovers go in #17.
+> - **The dashboard has no Wingman drawer, update check, Discovery step or Autofix UI** (#13), the backend has no Autofix (#16), and neither the backend nor the CLI phones home (#17, see [No phone-home](#no-phone-home)).
 > - **Never call `app.manifest.build` or any other Manifest-hosted endpoint.**
 > - **Do not use the `mnfst` CLI against Manifest's cloud.** The CLI becomes `thinker` and only talks to a Thinker instance.
 
 # Manifest Development Guidelines
 
-Last updated: 2026-09-14
+Last updated: 2026-10-11
 
 ## What Manifest Is
 
@@ -20,7 +20,7 @@ Manifest is a smart model router for **AI agents**. It sits between an agent and
 
 **Supported agents**: see `AGENT_PLATFORMS` in `packages/shared/src/agent-type.ts` for the current list (OpenClaw, Hermes, Claude Code, OpenCode, generic OpenAI/Anthropic SDK slots, and others — don't duplicate the list here, it grows independently of this doc). OpenClaw remains the deepest integration, but no new code or copy should frame Manifest as OpenClaw-only. When adding examples, prefer "AI agent" as the noun and pick OpenClaw as the worked example rather than the sole target. Manifest is consumed as a generic OpenAI-compatible HTTP endpoint — there are no first-party OpenClaw plugins in this repo anymore.
 
-The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "new version" check (the version badge reads the build-time `__MANIFEST_VERSION__` constant from `vite.config.ts`), no post-signup Discovery questionnaire, and no Autofix UI. Setup and signup go straight to the dashboard (`/` and `/welcome`). The backend `wingman`/CORS, `version/` and `discovery/` modules still exist until #17 removes them; the dashboard no longer calls them. Autofix is gone from the backend too (#16, see [Autofix removed](#autofix-removed)); the generic reliability analytics the dashboard reads live under `/api/v1/overview/reliability/*` (see `RELIABILITY_PATHS` in `packages/frontend/src/services/api/analytics.ts`).
+The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "new version" check (the version badge reads the build-time `__MANIFEST_VERSION__` constant from `vite.config.ts`), no post-signup Discovery questionnaire, and no Autofix UI. Setup and signup go straight to the dashboard (`/` and `/welcome`). The backend side went in #17 (see [No phone-home](#no-phone-home)). Autofix is gone from the backend too (#16, see [Autofix removed](#autofix-removed)); the generic reliability analytics the dashboard reads live under `/api/v1/overview/reliability/*` (see `RELIABILITY_PATHS` in `packages/frontend/src/services/api/analytics.ts`).
 
 **Three management surfaces share one REST API.** The dashboard, the `mnfst` CLI (`packages/cli/`), and the remote MCP server (`packages/backend/src/mcp/`) all drive the same `/api/v1/*` services with the same tenant scoping. Add a capability to the service layer once, then expose it on whichever surfaces need it; never fork logic per surface. See [CLI login](#cli-login-mnfst-login) and [Remote MCP server](#remote-mcp-server) below.
 
@@ -79,7 +79,6 @@ The `AgentKeyAuthGuard` accepts any non-`mnfst_*` token from loopback IPs in the
 packages/
 ├── backend/
 │   ├── src/
-│   │   ├── instrument.ts                    # Sentry init, imported first (before any other import)
 │   │   ├── main.ts                          # Bootstrap: Helmet, ValidationPipe, Better Auth mount, CORS
 │   │   ├── app.module.ts                    # Root module (guards: ApiKey, Session, Throttler)
 │   │   ├── config/app.config.ts             # Environment variable config
@@ -139,11 +138,7 @@ packages/
 │   │   ├── sse/                             # Server-Sent Events for real-time updates
 │   │   ├── setup/                           # First-run admin setup wizard
 │   │   ├── model-discovery/                 # Per-provider model fetching + fallback
-│   │   ├── discovery/                       # Self-hosted discovery onboarding (forwarded to Peacock)
-│   │   ├── cors-csp-config.ts               # Wingman CORS/CSP origin allowlists
-│   │   ├── sentry/                          # Sentry init-options builder (SENTRY_DSN-gated)
-│   │   ├── telemetry/                       # Anonymous self-hosted telemetry
-│   │   ├── version/                         # GET /api/v1/version — self-hosted "new version available" check
+│   │   ├── cors-csp-config.ts               # CORS allow-lists (THINKER_CORS_ORIGINS), frame-ancestors parsing
 │   │   └── mcp/                             # Remote MCP server (OAuth 2.1 bearer, stateless per-POST, tools/ per domain)
 │   └── test/                                # E2E tests (supertest)
 ├── frontend/
@@ -418,7 +413,6 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET                       | `/api/v1/provider-analytics/*`                  | Session/API Key                     | Per-provider analytics                                                                                      |
 | GET                       | `/api/v1/errors/breakdown`                      | Session/API Key                     | Error breakdown analytics                                                                                   |
 | GET                       | `/api/v1/overview/reliability/*`                | Session/API Key                     | Request reliability (`stats`, `timeseries`, `per-agent`, `per-provider`, `per-model`)                       |
-| POST                      | `/api/v1/discovery/complete`                    | Session/API Key                     | Best-effort self-hosted discovery submission forwarded to Peacock                                           |
 | GET/PUT/DELETE            | `/api/v1/agents/:agentName/enabled-providers*`  | Session/API Key                     | Per-agent provider enable/disable + impact preview                                                          |
 | GET/POST/PATCH/DELETE     | `/api/v1/notifications/*`                       | Session/API Key                     | Notification rules CRUD + email provider config                                                             |
 | GET/POST/PUT/PATCH/DELETE | `/api/v1/routing/:agentName/*`                  | Session/API Key                     | Routing config (tiers, providers, model-params, header-tiers, custom-providers, specificity, recording, etc.) |
@@ -439,7 +433,6 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | ALL                       | `/otlp/v1/*`, `/v1/{traces,metrics,logs}`       | Public                              | Structured **410 Gone** — OTLP ingest is removed (`otlp-deprecated.controller.ts`)                          |
 | GET/POST/PATCH            | `/api/v1/playground/*`                          | Session/API Key                     | Playground runs (run, list, star, mark best)                                                                |
 | GET                       | `/api/v1/events`                                | Session                             | SSE real-time events                                                                                        |
-| GET                       | `/api/v1/version`                               | Session/API Key                     | Running version + latest GitHub release for the self-hosted update badge (24h cache; off in cloud)          |
 | GET                       | `/api/v1/me`                                    | Session/API Key (tenant required)   | Identity probe for CLI/API clients: `{ tenantId, userId, authMethod, expiresAt }`; env `API_KEY` gets 401    |
 | POST                      | `/api/v1/cli/authorize`                         | Session only                        | Browser side of `mnfst login`: mints a PKCE-bound short-lived code                                          |
 | POST/DELETE               | `/api/v1/cli/token`                             | Public (code + verifier) / API Key  | Exchange the code for a `cli` PAT; DELETE revokes the calling PAT on logout                                 |
@@ -456,9 +449,9 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `MANIFEST_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption always tries `MANIFEST_ENCRYPTION_KEY`, then this, then `BETTER_AUTH_SECRET`, so old rows stay readable. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `MANIFEST_ENCRYPTION_KEY` and `MANIFEST_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Introducing a dedicated key on an install that used the `BETTER_AUTH_SECRET` fallback: set `MANIFEST_ENCRYPTION_KEY` (old rows keep decrypting via the session secret); to move them onto the new key, set `PREVIOUS` to the session secret's value for one deploy. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
 - `PORT` — Server port. Default: `3001`
 - `BIND_ADDRESS` — Bind address. Default: `127.0.0.1` (use `0.0.0.0` for Railway/Docker)
-- `NODE_ENV` — `development` or `production`. Dev allows broad CORS (local dashboard + Wingman); production allows the hosted Wingman origin plus any `WINGMAN_CORS_ORIGINS` entries.
+- `NODE_ENV` — `development` or `production`. Dev allows the Vite dashboard origin (`CORS_ORIGIN`); production allows no cross-origin browser caller beyond `THINKER_CORS_ORIGINS`.
 - `CORS_ORIGIN` — Allowed CORS origin (dev). Default: `http://localhost:3000`
-- `WINGMAN_CORS_ORIGINS` — Production only. Extra browser origins allowed to call the gateway (comma-separated). The hosted Wingman (`https://wingman.manifest.build`) is always allowed.
+- `THINKER_CORS_ORIGINS` — Extra browser origins allowed to call the gateway (comma-separated, exact match, trailing slash ignored), in dev and production. Empty by default: the dashboard is same-origin. Replaces upstream's `WINGMAN_CORS_ORIGINS` (#17).
 - `BETTER_AUTH_URL` — Base URL for Better Auth. Default: `http://localhost:{PORT}`
 - `FRONTEND_PORT` — Extra trusted origin port for Better Auth.
 - `MCP_ENABLED` — Set `false` to run without the remote MCP server. MCP needs an HTTPS `BETTER_AUTH_URL` (loopback HTTP is fine in dev) because `@better-auth/mcp` validates its protected-resource URL as the plugin is built; a plain-HTTP LAN or tailnet origin turns MCP off **automatically**, so this variable is only for switching it off on an install that could otherwise serve it. See [Remote MCP server](#remote-mcp-server).
@@ -470,7 +463,6 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `DB_POOL_MAX` — PostgreSQL connection pool size. Default: `10`
 - `RUN_MIGRATIONS_ON_BOOT` — Whether the app runs pending migrations at startup. Default: `true`; set `false` for multi-replica deploys where only one instance should migrate.
 - `MANIFEST_MIGRATION_FORCE` — Set `1` to let the tenant-scoping migrations (`1792500000000`, `1792600000000`) delete pre-tenant rows with a NULL `tenant_id` instead of aborting boot with instructions. One-off upgrade escape hatch; never set it permanently.
-- `MODELPARAMS_API_URL` / `MODELPARAMS_API_DISABLED` — Live refresh of the modelparams provider-parameter catalog (`routing-core/provider-param-spec.service.ts`) from `https://modelparams.dev/api/v1/models.json`, fire-and-forget on boot. Override the URL, or set `DISABLED=true` to stay on the vendored `modelparams` package data (air-gapped installs).
 - `MANIFEST_FRONTEND_DIR` / `MANIFEST_EMBEDDED` — Internal. Custom path to the built frontend (`common/utils/frontend-path.ts`), and a flag that skips the auto `bootstrap()` in `main.ts` when the backend is embedded by another process.
 - `ANNOUNCE_APP_URL` / `DOCTOR_TUTORIAL_URL` — Inputs to the release-announcement React Email template only; the sending tool lives outside this repo. Not read by the server.
 - `PLUGIN_OTLP_ENDPOINT` — Dead. Still listed in `.env.example` but no code reads it since OTLP ingest was removed; safe to delete.
@@ -491,12 +483,6 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` — Discord OAuth (optional)
 - `SEED_DATA` — Set `true` to seed demo data on startup. Dev/test only — ignored when `NODE_ENV=production` (use the first-run setup wizard instead).
 - `MANIFEST_MODE` — `selfhosted` or `cloud` (default: `cloud`; auto-detected as `selfhosted` inside Docker via `/.dockerenv` or Podman via `/run/.containerenv`). Self-hosted mode allows custom-provider URLs with `http://` / private IPs. `local` is accepted as a legacy alias for `selfhosted`.
-- `MANIFEST_TELEMETRY_DISABLED` — Set `1` to opt out of anonymous telemetry (self-hosted only).
-- `MANIFEST_UPDATE_CHECK_DISABLED` — Set `1` to stop the self-hosted dashboard's daily "new version available" check against GitHub Releases (`GET /api/v1/version`, `version/` module). Separate from the telemetry opt-out: air-gapped installs want no outbound calls at all. Never runs in cloud mode.
-- `TELEMETRY_ENDPOINT` — Where self-hosted installs POST the anonymous usage report. Default: `https://telemetry.manifest.build/v1/report`. See [Telemetry](#anonymous-usage-telemetry-self-hosted).
-- `DISCOVERY_ENDPOINT` — Optional override for the discovery submission endpoint. Default: `https://blue.manifest.build/v1/self-hosted/discovery`.
-- `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_RELEASE` — Opt-in Sentry error monitoring. Unset `SENTRY_DSN` disables Sentry entirely; `SENTRY_ENVIRONMENT` defaults to `NODE_ENV`. See [Error Monitoring](#error-monitoring-sentry-opt-in).
-- `WINGMAN_PORT` — Dev-only. Port a locally-running Wingman build listens on, allowed through CSP `frame-src` and CORS alongside the hosted Wingman origin. Default: backend `PORT` + 1.
 - `AUTH_DB_POOL_MAX` — Connection pool size for Better Auth's own `pg.Pool`, separate from `DB_POOL_MAX`. Default: `5`.
 - `OLLAMA_HOST` — Ollama endpoint for the built-in tile. Defaults to `http://localhost:11434` outside Docker and `http://host.docker.internal:11434` inside the bundled `docker/docker-compose.yml`.
 - `REQUEST_RECORDING_STORAGE` / `REQUEST_RECORDING_FILESYSTEM_PATH` / `REQUEST_RECORDING_S3_*` / `REQUEST_RECORDING_RETENTION_DAYS` — Provider Attempt body recording storage + retention. See [Request Recording](#request-recording-provider-attempt-bodies).
@@ -580,90 +566,18 @@ To add a new font or icon library:
 3. Reference the local CSS in `index.html` (e.g. `<link href="/fonts/..." />`)
 4. Do **not** add external domains to the CSP directives
 
-## Anonymous Usage Telemetry (self-hosted)
+## No phone-home
 
-Self-hosted installs (Docker / `node dist/main.js` with `NODE_ENV=production`)
-send one aggregate usage report per 24h to `TELEMETRY_ENDPOINT` (default
-`https://telemetry.manifest.build/v1/report`). The module lives at
-`packages/backend/src/telemetry/`.
+Thinker makes no outbound call of its own (#17). Upstream Manifest had six, all removed from the backend and the CLI along with their variables:
 
-**Payload fields (v1) — keep this list minimal**:
+- **Usage telemetry**: the backend's daily report to `telemetry.manifest.build` (`telemetry/`, `InstallIdService`, `MANIFEST_TELEMETRY_DISABLED`, `TELEMETRY_ENDPOINT`) and the CLI's spooled usage events (`packages/cli/src/telemetry.ts`, `MANIFEST_CLI_TELEMETRY_ENDPOINT`). `DropInstallMetadata1803500000000` drops the `install_metadata` table that held the anonymous install id (`lock_timeout`, `IF EXISTS`; `down()` recreates it empty).
+- **Update check**: `version/` and `GET /api/v1/version` (daily GitHub releases lookup, `MANIFEST_UPDATE_CHECK_*`). The dashboard's version badge reads the build-time constant (#13). It does not come back, not even pointing at Thinker.
+- **Discovery**: `discovery/` and `POST /api/v1/discovery/complete`, which forwarded the setup questionnaire to `blue.manifest.build` (`DISCOVERY_ENDPOINT`).
+- **Sentry**: `instrument.ts`, `sentry/`, `SentryModule`/`SentryGlobalFilter`, the `@sentry/nestjs` dependency and `SENTRY_*`. Open observability (v0.5) will be pull/export configured by the operator, never a push to a third party.
+- **Hosted Wingman origin**: CORS no longer always allows `wingman.manifest.build`, and CSP `frame-src` is `'self'` in every mode (`WINGMAN_PORT` is gone). `WINGMAN_CORS_ORIGINS` became `THINKER_CORS_ORIGINS`, with the same meaning.
+- **modelparams.dev**: `ProviderParamSpecService` serves only the snapshot of the bundled `modelparams` package, loaded synchronously at construction. There is no boot fetch, no hourly cron and no `MODELPARAMS_API_*`; the snapshot moves forward with dependency updates.
 
-- `schema_version`, `install_id` (random UUIDv4, persisted once in
-  `install_metadata`), `manifest_version`
-- Last 24h aggregates from `agent_messages` (payload field names remain legacy for protocol compatibility): `messages_total`,
-  `messages_by_provider` (bucketed via `PROVIDER_BY_ID_OR_ALIAS` — unknown
-  values collapse to `"custom"`, NULL to `"unknown"`), `messages_by_tier`
-  (`simple` / `standard` / `complex` / `reasoning`, NULL → `"unknown"`),
-  `messages_by_auth_type` (`api_key` / `subscription`), `tokens_input_total`,
-  `tokens_output_total`, `cost_usd_total`, `cost_usd_by_provider` (rounded to
-  cents)
-- Configuration: `agents_total`, `agents_by_platform`
-- Management surfaces (all read from existing tables at send time — there is
-  deliberately no per-call counter and no new table): `cli_keys_total` /
-  `cli_keys_active_7d` (rows of `api_keys` named `cli`, i.e. `mnfst login`
-  PATs, active = `last_used_at` within 7 days); `mcp_clients_total`,
-  `mcp_consents_total`, `mcp_tokens_issued_24h`, `mcp_clients_active_24h`
-  (from the Better Auth OAuth tables `oauthClient` / `oauthConsent` /
-  `oauthAccessToken`; access tokens live 15 min, so tokens-per-24h is the MCP
-  activity proxy), `mcp_clients_by_name` (declared client name whitelisted to
-  known MCP hosts, else `"other"`, NULL → `"unknown"`). Missing OAuth tables
-  degrade to zeros, never a failed report. The CLI itself reports from the
-  user's machine (`packages/cli/src/telemetry.ts`), **not per command**: each
-  command appends one anonymous event to a local spool
-  (`~/.config/manifest/telemetry-spool.jsonl`, mode 0600, capped at 500) and the
-  spool ships as one envelope per install per day to `/v1/cli-report` on the
-  telemetry host (the very first command flushes immediately; a failed send is
-  retried at most hourly). The envelope carries `schema_version`, `anon_id`,
-  `cli_version`, `os`, `target` (`cloud` | `self-hosted` — the class of Manifest
-  the install points at, never the URL) and an `events[]` array of
-  `{command, ok, duration_ms, agent_runtime?, at}`. Same
-  `MANIFEST_TELEMETRY_DISABLED=1` opt-out.
-- Runtime: `platform` (`process.platform`), `arch` (`process.arch`)
-
-User-facing spec: https://manifest.build/llm-gateway/docs/self-hosted/#telemetry
-
-**Explicitly never sent**: tenant/user IDs, emails, API keys, prompts,
-message contents, model names, custom provider URLs, OAuth client IDs,
-raw IPs.
-
-**Opt-out**: `MANIFEST_TELEMETRY_DISABLED=1`. Also auto-disabled when
-`NODE_ENV !== 'production'` so dev instances never report.
-
-**Cadence**: `@Cron(CronExpression.EVERY_HOUR)` fires once an hour but
-short-circuits unless the last send was ≥24h ago (and the first-send jitter
-window has elapsed). Hourly tick + timestamp check beats a daily cron
-because it survives restarts without missing windows.
-
-**Extending the payload**: bump `TELEMETRY_SCHEMA_VERSION` and add fields
-additively — the ingest (peacock-backend) rejects unknown `schema_version`
-values with 400, so downgrades stay safe.
-
-## Error Monitoring (Sentry, opt-in)
-
-The backend integrates the Sentry NestJS SDK for optional error monitoring. It
-is disabled unless the process environment provides `SENTRY_DSN`. This applies
-equally to Cloud and self-hosted deployments; the bundled self-hosted
-configuration simply leaves it unset by default.
-
-- **Init**: `packages/backend/src/instrument.ts` is imported on the very first
-  line of `main.ts` (before any other import). It calls
-  `Sentry.init(buildSentryInitOptions(process.env))` only when the builder
-  returns non-null. The option-building logic lives in
-  `src/sentry/sentry-options.ts` (fully unit-tested); `instrument.ts` is a thin
-  boot shell excluded from coverage like `main.ts`.
-- **Scope**: error monitoring only. Performance tracing is explicitly disabled
-  and the profiling package is not installed. Request headers, cookies, query
-  parameters, bodies, user data, GenAI inputs/outputs, local variables, and
-  breadcrumbs are disabled through the SDK's `dataCollection` options.
-- **Error capture**: when enabled, `SentryModule.forRoot()` and
-  `SentryGlobalFilter` are registered in `app.module.ts` for otherwise-unhandled
-  errors. When disabled, neither is part of the Nest application.
-- **Setup check**: when Sentry is enabled outside production,
-  `GET /api/v1/debug-sentry` throws a test error. The controller is not
-  registered in production.
-- **Optional tags**: `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` may be supplied
-  alongside `SENTRY_DSN`.
+The only outbound destinations left are the providers the operator configures and the public catalogs of ADR 0003 (openrouter.ai, models.dev, and raw.githubusercontent.com for OpenCode Go). `test/no-phonehome-egress.e2e-spec.ts` fails if the backend, CLI or shared source names a removed destination again, or if a production-mode boot fetches anything outside that list.
 
 ## Architecture Notes
 

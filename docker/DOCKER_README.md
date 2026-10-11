@@ -312,8 +312,6 @@ docker compose up -d
 
 Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific major version (e.g. `manifestdotbuild/manifest:6`) in `docker-compose.yml` if you want control over when major upgrades happen.
 
-The dashboard checks GitHub once a day for the latest release and shows a "new version available" badge linking to the [changelog](https://manifest.build/changelog/). The check only reads the public release list and sends nothing about your install. To turn it off (for example on an air-gapped host), set `MANIFEST_UPDATE_CHECK_DISABLED=1` in `.env`.
-
 ## Backup & persistence
 
 PostgreSQL state lives in the `mnfst_pgdata` named volume mounted at `/var/lib/postgresql/data` in the `postgres` service. The Compose install also stores local request recordings in the `mnfst_recordings` volume mounted at `/data/request-recordings`; those recordings are not included in a PostgreSQL dump. For ephemeral hosts or multiple instances, configure durable S3-compatible storage instead.
@@ -416,9 +414,6 @@ sets this automatically).
 | `MANIFEST_DISABLE_HSTS`            | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
 | `DB_POOL_MAX` / `AUTH_DB_POOL_MAX` | No          | `10` / `5`                                   | PostgreSQL pool sizes (app pool, Better Auth pool)                                                                                                                                                         |
-| `SENTRY_DSN`                       | No          | unset                                        | Opt-in error monitoring. Sentry is not initialised unless set                                                                                                                                              |
-| `MANIFEST_TELEMETRY_DISABLED`      | No          | `0`                                          | Set `1` to disable anonymous usage telemetry                                                                                                                                                               |
-| `TELEMETRY_ENDPOINT`               | No          | `https://telemetry.manifest.build/v1/report` | Send the usage report to your own collector instead                                                                                                                                                        |
 
 `NODE_ENV` and `SEED_DATA` are deliberately fixed by the compose file and are
 not knobs here: the image is a production artifact, and the demo-data seeder
@@ -428,18 +423,12 @@ first-run setup wizard to create your admin account.
 Full env var reference:
 [manifest.build/llm-gateway/docs/reference/environment-variables](https://manifest.build/llm-gateway/docs/reference/environment-variables/)
 
-## Anonymous usage telemetry
+## No telemetry
 
-Manifest sends a small anonymous usage report once per 24h so the maintainers
-can see how the project is being used. Aggregates only — no prompts, no
-message contents, no API keys, nothing that identifies a user. The report is
-a random install UUID (generated once, no PII), the Manifest version, and
-aggregate counters grouped by provider, routing tier, auth type, agent
-platform, OS, and arch.
-
-To disable, set `MANIFEST_TELEMETRY_DISABLED=1` in your `.env` file and
-restart the container. The full field list is published at
-[manifest.build/llm-gateway/docs/self-hosted#telemetry](https://manifest.build/llm-gateway/docs/self-hosted/#telemetry).
+The container makes no outbound call of its own: no usage telemetry, no update
+check, no error reporting. It only reaches the inference providers you
+configure and the public model catalogs (openrouter.ai, models.dev and, for
+OpenCode Go, raw.githubusercontent.com).
 
 ## Links
 

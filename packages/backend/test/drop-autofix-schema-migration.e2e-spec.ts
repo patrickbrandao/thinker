@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { entities, migrations } from '../src/database/data-source-definitions';
 import { DropAutofixSchema1803400000000 } from '../src/database/migrations/1803400000000-DropAutofixSchema';
+import { DropInstallMetadata1803500000000 } from '../src/database/migrations/1803500000000-DropInstallMetadata';
 
 /** Every Autofix column the migration drops, as `table.column`. */
 const AUTOFIX_COLUMNS = [
@@ -84,6 +85,14 @@ describe('DropAutofixSchema migration (e2e)', () => {
     });
     await ds.initialize();
     await ds.runMigrations({ transaction: 'each' });
+    // #17 drops `install_metadata` after this migration. Revert in the order the
+    // runner would, so the table this migration's revert touches exists again.
+    const queryRunner = ds.createQueryRunner();
+    try {
+      await new DropInstallMetadata1803500000000().down(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
   }, 120_000);
 
   afterAll(async () => {

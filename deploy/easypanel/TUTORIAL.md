@@ -61,7 +61,6 @@ DB_POOL_MAX=10
 AUTH_DB_POOL_MAX=5
 REQUEST_RECORDING_STORAGE=filesystem
 REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings
-MANIFEST_TELEMETRY_DISABLED=0
 ```
 
 Generate secrets locally:
@@ -107,7 +106,6 @@ Before publishing a template, smoke test the full first-run flow:
 - Back up the PostgreSQL service through Easypanel or your server provider.
 - Use a real HTTPS domain before enabling OAuth providers.
 - Keep `BETTER_AUTH_SECRET` and `MANIFEST_ENCRYPTION_KEY` as separate values.
-- Set `MANIFEST_TELEMETRY_DISABLED=1` to disable anonymous self-hosted telemetry.
 - If you deploy more than one Manifest replica, lower database pool sizes or upgrade PostgreSQL connection capacity.
 
 Relevant Easypanel docs:

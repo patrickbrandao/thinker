@@ -21,6 +21,7 @@ function buildApp() {
           connectSrc: ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
+          frameSrc: ["'self'"],
           frameAncestors: parseFrameAncestors(process.env['FRAME_ANCESTORS']),
           upgradeInsecureRequests: null,
         },
@@ -57,6 +58,14 @@ describe('CSP header', () => {
     expect(csp).toContain("connect-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
+  });
+
+  it("frames only 'self' and names no hosted third-party origin (#17)", async () => {
+    const res = await request(server).get('/').expect(200);
+    const csp = res.headers['content-security-policy'] as string;
+    expect(csp.split(';')).toContain("frame-src 'self'");
+    expect(csp).not.toMatch(/https?:\/\//);
+    expect(csp).not.toMatch(/localhost|127\.0\.0\.1/);
   });
 
   it('honors a configured FRAME_ANCESTORS and drops the bare wildcard', async () => {
