@@ -1,14 +1,14 @@
 import { fetchJson } from './core.js';
 
-export type PivotedTimeseries = Promise<{
+export type KeyedTimeseries = Promise<{
   agents: string[];
   timeseries: Array<Record<string, number | string>>;
 }>;
 
 export type UsageTimeseries = Promise<{
-  tokenUsage: Awaited<PivotedTimeseries>;
-  messageUsage: Awaited<PivotedTimeseries>;
-  costUsage: Awaited<PivotedTimeseries>;
+  tokenUsage: Awaited<KeyedTimeseries>;
+  messageUsage: Awaited<KeyedTimeseries>;
+  costUsage: Awaited<KeyedTimeseries>;
 }>;
 
 export function getProviderAnalytics(
@@ -43,14 +43,14 @@ export function getPerAgentTimeseries(
   range = '24h',
   label?: string,
   connectionId?: string,
-): PivotedTimeseries {
+): KeyedTimeseries {
   return fetchJson('/provider-analytics/per-agent-timeseries', {
     auth_type: authType,
     provider,
     range,
     ...(label !== undefined ? { label } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
 /**
@@ -141,14 +141,14 @@ export function getPerAgentMessageTimeseries(
   range = '24h',
   label?: string,
   connectionId?: string,
-): PivotedTimeseries {
+): KeyedTimeseries {
   return fetchJson('/provider-analytics/per-agent-message-timeseries', {
     auth_type: authType,
     provider,
     range,
     ...(label !== undefined ? { label } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
 export function getPerAgentCostTimeseries(
@@ -157,86 +157,83 @@ export function getPerAgentCostTimeseries(
   range = '24h',
   label?: string,
   connectionId?: string,
-): PivotedTimeseries {
+): KeyedTimeseries {
   return fetchJson('/provider-analytics/per-agent-cost-timeseries', {
     auth_type: authType,
     provider,
     range,
     ...(label !== undefined ? { label } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
 export function getConnectionDetail(connectionId: string) {
   return fetchJson('/provider-analytics/connection-detail', { connection_id: connectionId });
 }
 
-export function getGlobalPerAgentTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-agent-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerAgentTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-agent-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerAgentMessageTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-agent-message-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerAgentMessageTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-agent-message-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerAgentCostTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-agent-cost-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerAgentCostTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-agent-cost-timeseries', { range }) as KeyedTimeseries;
 }
 
 export function getOverviewAgentUsage(range = '24h'): UsageTimeseries {
   return fetchJson('/overview/agents/usage', { range }) as UsageTimeseries;
 }
 
-export function getGlobalPerProviderTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-provider-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerProviderTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-provider-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerProviderMessageTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-provider-message-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerProviderMessageTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-provider-message-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerProviderCostTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-provider-cost-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerProviderCostTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-provider-cost-timeseries', { range }) as KeyedTimeseries;
 }
 
 export function getOverviewProviderUsage(range = '24h'): UsageTimeseries {
   return fetchJson('/overview/providers/usage', { range }) as UsageTimeseries;
 }
 
-export function getGlobalPerModelTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-model-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerModelTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-model-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerModelMessageTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-model-message-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerModelMessageTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-model-message-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getGlobalPerModelCostTimeseries(range = '24h'): PivotedTimeseries {
-  return fetchJson('/overview/per-model-cost-timeseries', { range }) as PivotedTimeseries;
+export function getGlobalPerModelCostTimeseries(range = '24h'): KeyedTimeseries {
+  return fetchJson('/overview/per-model-cost-timeseries', { range }) as KeyedTimeseries;
 }
 
-export function getPerProviderTimeseries(agentName: string, range = '24h'): PivotedTimeseries {
+export function getPerProviderTimeseries(agentName: string, range = '24h'): KeyedTimeseries {
   return fetchJson('/overview/per-provider-timeseries', {
     agent_name: agentName,
     range,
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
-export function getPerProviderMessageTimeseries(
-  agentName: string,
-  range = '24h',
-): PivotedTimeseries {
+export function getPerProviderMessageTimeseries(agentName: string, range = '24h'): KeyedTimeseries {
   return fetchJson('/overview/per-provider-message-timeseries', {
     agent_name: agentName,
     range,
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
-export function getPerProviderCostTimeseries(agentName: string, range = '24h'): PivotedTimeseries {
+export function getPerProviderCostTimeseries(agentName: string, range = '24h'): KeyedTimeseries {
   return fetchJson('/overview/per-provider-cost-timeseries', {
     agent_name: agentName,
     range,
-  }) as PivotedTimeseries;
+  }) as KeyedTimeseries;
 }
 
 export function getOverview(range = '24h', agentName?: string, fast = false) {

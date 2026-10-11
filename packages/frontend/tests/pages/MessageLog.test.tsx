@@ -152,8 +152,6 @@ vi.mock('../../src/components/MultiSelect.jsx', () => ({
   ),
 }));
 
-import { resetPlanStore } from '../../src/services/plan-store';
-
 vi.mock('../../src/services/sse.js', () => ({
   pingCount: () => 0,
   messagePing: () => pingBox.read(),
@@ -179,11 +177,6 @@ vi.mock('../../src/services/formatters.js', () => ({
   customProviderColor: vi.fn(() => '#6366f1'),
   sortedHeaderEntries: (h: Record<string, string> | null | undefined) =>
     Object.entries(h ?? {}).sort(([a], [b]) => a.localeCompare(b)),
-}));
-
-const mockCheckIsSelfHosted = vi.fn(() => Promise.resolve(false));
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => mockCheckIsSelfHosted(),
 }));
 
 vi.mock('../../src/components/SetupModal.jsx', () => ({
@@ -337,7 +330,6 @@ describe('MessageLog', () => {
     const [ping, setPing] = createSignal(0);
     pingBox.read = ping;
     pingBox.set = setPing;
-    resetPlanStore({ enabled: false, plan: 'free' });
   });
 
   it('renders Requests heading', () => {
@@ -754,22 +746,17 @@ describe('MessageLog', () => {
     expect(mockSetSearchParams).toHaveBeenCalledWith({ range: '7d' }, { replace: true });
   });
 
-  it('clamps a Pro-range deep link before loading data for a free plan', async () => {
+  it('honours a long-range deep link as is, with no plan clamp', async () => {
     mockSearchParams = { range: '365d' };
-    // The plan store is resolved by AuthGuard before any page mounts, so the
-    // clamp is synchronous — no fetch ever goes out at the PRO range.
-    resetPlanStore({ enabled: true, plan: 'free' });
     mockGetMessages.mockResolvedValue(messagesData);
 
     render(() => <MessageLog />);
 
     await vi.waitFor(() => {
-      expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ range: '7d' }));
+      expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ range: '365d' }));
     });
-    expect(mockGetMessages).not.toHaveBeenCalledWith(expect.objectContaining({ range: '365d' }));
-    await vi.waitFor(() => {
-      expect(mockSetSearchParams).toHaveBeenCalledWith({ range: '7d' }, { replace: true });
-    });
+    expect(mockGetMessages).not.toHaveBeenCalledWith(expect.objectContaining({ range: '7d' }));
+    expect(mockSetSearchParams).not.toHaveBeenCalledWith({ range: '7d' }, { replace: true });
   });
 
   it('filters messages by attempt status (plain select, URL-synced)', async () => {

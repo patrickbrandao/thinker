@@ -21,21 +21,9 @@ describe("Help", () => {
     expect(screen.getByText("Help & Support")).toBeDefined();
   });
 
-  it("shows Schedule a Call section", () => {
-    render(() => <Help />);
-    expect(screen.getByText("Schedule a Call")).toBeDefined();
-  });
-
   it("shows Email Support section", () => {
     render(() => <Help />);
     expect(screen.getByText("Email Support")).toBeDefined();
-  });
-
-  it("has Book link", () => {
-    render(() => <Help />);
-    const links = screen.getAllByRole("link");
-    const bookLink = links.find((l) => l.textContent?.includes("Book"));
-    expect(bookLink).toBeDefined();
   });
 
   it("has Contact link", () => {
@@ -43,23 +31,6 @@ describe("Help", () => {
     const links = screen.getAllByRole("link");
     const contactLink = links.find((l) => l.textContent?.includes("Contact"));
     expect(contactLink).toBeDefined();
-  });
-
-  it("Calendly link has correct href", () => {
-    render(() => <Help />);
-    const links = screen.getAllByRole("link");
-    const bookLink = links.find((l) => l.textContent?.includes("Book"));
-    expect(bookLink?.getAttribute("href")).toBe(
-      "https://calendly.com/sebastien-manifest/15min",
-    );
-  });
-
-  it("Calendly link opens in new tab with noopener noreferrer", () => {
-    render(() => <Help />);
-    const links = screen.getAllByRole("link");
-    const bookLink = links.find((l) => l.textContent?.includes("Book"));
-    expect(bookLink?.getAttribute("target")).toBe("_blank");
-    expect(bookLink?.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
   it("Email link is mailto", () => {
@@ -86,13 +57,6 @@ describe("Help", () => {
     ).toBeDefined();
   });
 
-  it("describes the call duration in the Schedule a Call section", () => {
-    render(() => <Help />);
-    expect(
-      screen.getByText(/Book a 15-min call with us to get help setting things up\./),
-    ).toBeDefined();
-  });
-
   it("shows the support email address with the response window", () => {
     render(() => <Help />);
     expect(
@@ -103,9 +67,11 @@ describe("Help", () => {
     ).toBeDefined();
   });
 
-  it("renders exactly two action links (Book and Contact)", () => {
+  it("renders a single action link (Contact) and no call booking", () => {
     render(() => <Help />);
     const links = screen.getAllByRole("link");
-    expect(links.length).toBe(2);
+    expect(links.length).toBe(1);
+    expect(screen.queryByText("Schedule a Call")).toBeNull();
+    expect(links.some((l) => l.getAttribute("href")?.includes("calendly"))).toBe(false);
   });
 });

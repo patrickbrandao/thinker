@@ -1,7 +1,6 @@
 import { Title } from '@solidjs/meta';
 import { toggleScrollFade } from '../../services/scroll-fade.js';
 import { A, useNavigate, useParams } from '@solidjs/router';
-import { getBillingStatus } from '../../services/api/billing.js';
 import {
   createEffect,
   createMemo,
@@ -117,7 +116,6 @@ interface AnalyticsResponse {
   attempts: { total: number; successful: number; success_rate: number };
 }
 
-const PRO_RANGES_CD = new Set(['30d', '90d', '365d']);
 const CD_RANGE_OPTIONS = [
   { label: 'Last 24 hours', value: '24h' },
   { label: 'Last 7 days', value: '7d' },
@@ -129,26 +127,6 @@ const CD_RANGE_OPTIONS = [
 const ConnectionDetail: Component = () => {
   const params = useParams<{ connectionId: string }>();
   const navigate = useNavigate();
-  const [billing] = createResource(async () => {
-    try {
-      return await getBillingStatus();
-    } catch {
-      return null;
-    }
-  });
-  const isFreePlan = () => billing()?.enabled && billing()?.plan === 'free';
-  const proBadge = () => (
-    <span class="pro-range-badge" aria-label="Pro plan required">
-      PRO
-    </span>
-  );
-  const cdRangeOptions = () =>
-    CD_RANGE_OPTIONS.map((opt) =>
-      isFreePlan() && PRO_RANGES_CD.has(opt.value)
-        ? { ...opt, disabled: true, badge: proBadge() }
-        : opt,
-    );
-
   const [detail, { refetch: refetchDetail }] = createResource(
     () => params.connectionId,
     (id) => getConnectionDetail(id) as Promise<DetailResponse>,
@@ -800,11 +778,8 @@ const ConnectionDetail: Component = () => {
                   </Show>
                   <Select
                     value={chartRange()}
-                    onChange={(v) => {
-                      if (isFreePlan() && PRO_RANGES_CD.has(v)) return;
-                      setChartRange(v);
-                    }}
-                    options={cdRangeOptions()}
+                    onChange={setChartRange}
+                    options={CD_RANGE_OPTIONS}
                   />
                   <button class="btn btn--outline btn--sm" onClick={openManageModal}>
                     Manage

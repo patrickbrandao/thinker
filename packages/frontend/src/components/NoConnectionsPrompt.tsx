@@ -1,6 +1,5 @@
 import { A } from '@solidjs/router';
-import { createResource, Show, type Component } from 'solid-js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
+import type { Component } from 'solid-js';
 
 const SubscriptionIcon = () => (
   <svg
@@ -51,8 +50,6 @@ const LocalIcon = () => (
 );
 
 const NoConnectionsPrompt: Component = () => {
-  const [selfHosted] = createResource(checkIsSelfHosted);
-
   return (
     <div class="no-connections-prompt">
       <div class="no-connections-prompt__header">
@@ -94,27 +91,22 @@ const NoConnectionsPrompt: Component = () => {
             Connect provider
           </button>
         </A>
-        <Show when={selfHosted()}>
-          <A
-            href="/providers/local"
-            class="no-connections-prompt__card"
-            style="text-decoration: none;"
-          >
-            <span class="no-connections-prompt__card-icon">
-              <LocalIcon />
-            </span>
-            <span class="no-connections-prompt__card-title">Local</span>
-            <span class="no-connections-prompt__card-desc">
-              Connect to LLM servers running on your machine.
-            </span>
-            <button
-              class="btn btn--primary btn--sm"
-              style="margin-top: auto; pointer-events: none;"
-            >
-              Connect provider
-            </button>
-          </A>
-        </Show>
+        <A
+          href="/providers/local"
+          class="no-connections-prompt__card"
+          style="text-decoration: none;"
+        >
+          <span class="no-connections-prompt__card-icon">
+            <LocalIcon />
+          </span>
+          <span class="no-connections-prompt__card-title">Local</span>
+          <span class="no-connections-prompt__card-desc">
+            Connect to LLM servers running on your machine.
+          </span>
+          <button class="btn btn--primary btn--sm" style="margin-top: auto; pointer-events: none;">
+            Connect provider
+          </button>
+        </A>
       </div>
     </div>
   );

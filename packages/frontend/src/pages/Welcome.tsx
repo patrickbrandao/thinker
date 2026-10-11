@@ -57,7 +57,6 @@ import { customProviderColor } from '../services/formatters.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { useRightSidebar } from '../services/right-sidebar.jsx';
 import { hasOnboardingBeenDone, markOnboardingDone } from '../services/onboarding.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import {
   type AgentCategory,
   type AgentPlatform,
@@ -165,8 +164,6 @@ const Welcome: Component = () => {
     }
   };
   // ── Shared resources ─────────────────────────────────────────────────
-  const [selfHosted] = createResource(checkIsSelfHosted);
-
   // The Playground agent gives provider connections an agent context before
   // the user's own harness exists (providers are tenant-global anyway).
   const [agent] = createResource(() => getPlaygroundAgent());
@@ -220,9 +217,7 @@ const Welcome: Component = () => {
   const handleProviderTabKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
-    const order: Array<'api_key' | 'subscription' | 'local'> = selfHosted()
-      ? ['api_key', 'subscription', 'local']
-      : ['api_key', 'subscription'];
+    const order: Array<'api_key' | 'subscription' | 'local'> = ['api_key', 'subscription', 'local'];
     const idx = order.indexOf(tab() as 'api_key' | 'subscription' | 'local');
     const next =
       event.key === 'ArrowRight'
@@ -719,16 +714,10 @@ const Welcome: Component = () => {
 
   // Never trap users: setup resumes from server state on the next visit, so
   // skipping only skips the guidance, not the work.
-  const skipOnboarding = () => {
+  const leaveOnboarding = () => {
     const uid = userId();
     if (uid) markOnboardingDone(uid);
-    navigate('/register?step=plan');
-  };
-
-  const openOnboardingPaywall = () => {
-    const uid = userId();
-    if (uid) markOnboardingDone(uid);
-    navigate('/register?step=plan');
+    navigate('/');
   };
 
   // Which steps are completed, for the sidebar checkmarks. Steps without
@@ -828,7 +817,7 @@ const Welcome: Component = () => {
         </section>
 
         <div class="welcome__sidebar-footer">
-          <button type="button" class="btn btn--ghost btn--sm" onClick={skipOnboarding}>
+          <button type="button" class="btn btn--ghost btn--sm" onClick={leaveOnboarding}>
             Skip setup for now
           </button>
         </div>
@@ -959,11 +948,7 @@ const Welcome: Component = () => {
                             </div>
                             <div class="model-params__label-hint">
                               See exactly what your agent sends on every attempt, and debug it
-                              faster.{' '}
-                              {selfHosted.state === 'ready' &&
-                                (selfHosted()
-                                  ? 'Logs stay in your own database.'
-                                  : 'Logs are stored in your Manifest workspace.')}
+                              faster. Logs stay in your own database.
                             </div>
                           </div>
                           <div class="model-params__row-control">
@@ -1102,32 +1087,30 @@ const Welcome: Component = () => {
                   </svg>
                   Subscriptions
                 </button>
-                <Show when={selfHosted()}>
-                  <button
-                    id="welcome-provider-tab-local"
-                    class="panel__tab"
-                    classList={{ 'panel__tab--active': tab() === 'local' }}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab() === 'local'}
-                    aria-controls="welcome-provider-panel-local"
-                    tabindex={tab() === 'local' ? 0 : -1}
-                    onClick={() => selectProviderTab('local')}
-                    onKeyDown={handleProviderTabKeyDown}
+                <button
+                  id="welcome-provider-tab-local"
+                  class="panel__tab"
+                  classList={{ 'panel__tab--active': tab() === 'local' }}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab() === 'local'}
+                  aria-controls="welcome-provider-panel-local"
+                  tabindex={tab() === 'local' ? 0 : -1}
+                  onClick={() => selectProviderTab('local')}
+                  onKeyDown={handleProviderTabKeyDown}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    style="color: #F72585"
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                      style="color: #F72585"
-                    >
-                      <path d="m13.18 6.75 2.66-4.22-1.69-1.07L12 4.87 9.85 1.46 8.16 2.53l2.66 4.22-8.67 13.72A1.006 1.006 0 0 0 3 22.01h18c.36 0 .7-.2.88-.52s.16-.71-.03-1.02zM10.24 20 12 16.98 13.76 20zm5.83 0-3.21-5.5c-.36-.62-1.37-.62-1.73 0L7.92 20H4.81L12 8.62 19.19 20h-3.11Z" />
-                    </svg>
-                    Local
-                  </button>
-                </Show>
+                    <path d="m13.18 6.75 2.66-4.22-1.69-1.07L12 4.87 9.85 1.46 8.16 2.53l2.66 4.22-8.67 13.72A1.006 1.006 0 0 0 3 22.01h18c.36 0 .7-.2.88-.52s.16-.71-.03-1.02zM10.24 20 12 16.98 13.76 20zm5.83 0-3.21-5.5c-.36-.62-1.37-.62-1.73 0L7.92 20H4.81L12 8.62 19.19 20h-3.11Z" />
+                  </svg>
+                  Local
+                </button>
               </div>
 
               <Show
@@ -1426,7 +1409,7 @@ const Welcome: Component = () => {
                   Back to routing
                 </button>
                 <Show when={agentRequestSeen()}>
-                  <button class="btn btn--primary" onClick={openOnboardingPaywall}>
+                  <button class="btn btn--primary" onClick={leaveOnboarding}>
                     Go to dashboard
                     <svg
                       width="14"
@@ -1611,7 +1594,7 @@ const Welcome: Component = () => {
             <button
               ref={(element) => (liftoffAction = element)}
               class="welcome__liftoff-action btn btn--primary"
-              onClick={openOnboardingPaywall}
+              onClick={leaveOnboarding}
             >
               Go to dashboard
               <svg

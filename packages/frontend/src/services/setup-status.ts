@@ -6,7 +6,6 @@
 interface SetupStatusResponse {
   needsSetup: boolean;
   socialProviders?: string[];
-  isSelfHosted?: boolean;
   ollamaAvailable?: boolean;
   localLlmHost?: string;
   emailConfigured?: boolean;
@@ -16,7 +15,6 @@ interface SetupStatusResponse {
 interface SetupStatusResult {
   needsSetup: boolean;
   socialProviders: string[];
-  isSelfHosted: boolean;
   ollamaAvailable: boolean;
   localLlmHost: string;
   emailConfigured: boolean;
@@ -35,7 +33,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
       return {
         needsSetup: false,
         socialProviders: [],
-        isSelfHosted: false,
         ollamaAvailable: false,
         localLlmHost: 'localhost',
         emailConfigured: true,
@@ -45,7 +42,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
     return {
       needsSetup: data.needsSetup === true,
       socialProviders: data.socialProviders ?? [],
-      isSelfHosted: data.isSelfHosted === true,
       ollamaAvailable: data.ollamaAvailable === true,
       localLlmHost: data.localLlmHost || 'localhost',
       // Assume available unless the backend explicitly says otherwise, so a
@@ -58,7 +54,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
     return {
       needsSetup: false,
       socialProviders: [],
-      isSelfHosted: false,
       ollamaAvailable: false,
       localLlmHost: 'localhost',
       emailConfigured: true,
@@ -80,10 +75,6 @@ export async function checkNeedsSetup(): Promise<boolean> {
 
 export async function checkSocialProviders(): Promise<string[]> {
   return (await getSetupStatus()).socialProviders;
-}
-
-export async function checkIsSelfHosted(): Promise<boolean> {
-  return (await getSetupStatus()).isSelfHosted;
 }
 
 export async function checkIsOllamaAvailable(): Promise<boolean> {

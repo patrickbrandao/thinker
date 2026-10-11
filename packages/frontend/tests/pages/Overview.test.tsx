@@ -77,11 +77,6 @@ vi.mock('../../src/services/formatters.js', () => ({
   customProviderColor: vi.fn(() => '#6366f1'),
 }));
 
-const mockCheckIsSelfHosted = vi.fn(() => Promise.resolve(false));
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => mockCheckIsSelfHosted(),
-}));
-
 // The per-agent Overview renders ProviderChartCard → MultiAgentTokenChart.
 // Stub the chart to a marker exposing its series, and the per-view provider
 // timeseries endpoints to a controllable resolver.
@@ -134,7 +129,6 @@ vi.mock('../../src/services/api/routing.js', () => ({
   getAutofix: () => Promise.resolve({ enabled: false }),
 }));
 
-import { resetPlanStore } from '../../src/services/plan-store';
 
 vi.mock('../../src/components/MultiAgentTokenChart.jsx', () => ({
   AGENT_COLORS: ['#111111', '#222222', '#333333'],
@@ -198,7 +192,6 @@ vi.mock('../../src/components/Select.jsx', () => ({
       {props.options?.map((o: any) => (
         <option value={o.value} disabled={o.disabled}>
           {o.label}
-          {o.badge ? ' - PRO' : ''}
         </option>
       ))}
     </select>
@@ -294,7 +287,6 @@ describe('Overview', () => {
     });
     mockGetCustomProviders.mockResolvedValue([]);
     mockPerProvider.mockResolvedValue({ agents: [], timeseries: [] });
-    resetPlanStore({ enabled: false, plan: 'free' });
   });
 
   it('renders Overview heading with agent name', () => {
@@ -1104,29 +1096,25 @@ describe('Overview', () => {
       });
     });
 
-    it('limits Free users to 7-day dashboard ranges and labels longer ranges as Pro-only', async () => {
+    it('offers every range, long windows included, with no plan lock', async () => {
       localStorage.setItem('manifest_chart_range', '365d');
-      resetPlanStore({ enabled: true, plan: 'free' });
       mockGetOverview.mockResolvedValue(overviewData);
 
       const { container } = render(() => <Overview />);
 
       await vi.waitFor(() => {
-        expect(mockGetOverview).toHaveBeenCalledWith('7d', 'test-agent', true);
-      });
-      await vi.waitFor(() => {
-        expect(localStorage.getItem('manifest_chart_range')).toBe('7d');
+        expect(mockGetOverview).toHaveBeenCalledWith('365d', 'test-agent', true);
+        expect(container.querySelector('[data-testid="select"]')).not.toBeNull();
       });
 
       const select = container.querySelector('[data-testid="select"]') as HTMLSelectElement;
-      const lockedOptions = Array.from(select.options).filter((option) =>
+      const longOptions = Array.from(select.options).filter((option) =>
         ['30d', '90d', '365d'].includes(option.value),
       );
-      expect(lockedOptions.map((option) => option.disabled)).toEqual([true, true, true]);
-      expect(select.textContent).toContain('Last 30 days - PRO');
+      expect(longOptions.map((option) => option.disabled)).toEqual([false, false, false]);
 
       fireEvent.change(select, { target: { value: '90d' } });
-      expect(localStorage.getItem('manifest_chart_range')).toBe('7d');
+      expect(localStorage.getItem('manifest_chart_range')).toBe('90d');
     });
   });
 

@@ -1416,20 +1416,6 @@ table.msg-detail__table td {
   line-height: 1.4;
 }
 
-.error-autofix-row__upgrade {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  margin-top: var(--gap-md);
-  font-size: var(--font-size-xs);
-  color: hsl(var(--foreground));
-}
-
-.error-autofix-row__upgrade .btn {
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
 .msg-detail__fallback-banner {
   font-size: var(--font-size-xs);
   padding: 6px 12px;
@@ -1452,86 +1438,4 @@ table.msg-detail__table td {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-/* ── Free Models accordion ────────────────────────── */
-.free-models-accordion {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 300ms ease,
-    opacity 250ms ease;
-}
-
-.free-models-accordion > * {
-  overflow: hidden;
-}
-
-.free-models-accordion--open {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
-.free-models-base-url-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dark .free-models-caret {
-  filter: invert(1);
-}
-
-.free-models-logo-dark {
-  display: none;
-}
-
-.dark .free-models-logo-light {
-  display: none;
-}
-
-.dark .free-models-logo-dark {
-  display: block;
-}
-
-.free-models-disabled-btn {
-  display: inline-flex;
-  align-items: center;
-  position: relative;
-  padding: 6px 16px;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--muted-foreground));
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.free-models-disabled-btn::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  background: hsl(var(--foreground));
-  color: hsl(var(--background));
-  font-size: var(--tooltip-font-size);
-  font-weight: 400;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 150ms ease;
-}
-
-.free-models-disabled-btn:hover::after {
-  opacity: 1;
-}
-
-@media (max-width: 640px) {
-  .free-models-base-url-row {
-    flex-wrap: wrap;
-  }
 }

@@ -12,7 +12,6 @@ import {
   type RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
-import { checkIsSelfHosted } from '../services/setup-status.js';
 import { customProviderColor } from '../services/formatters.js';
 import type { ProviderDef } from '../services/providers.js';
 import type { CustomProviderPrefill } from '../services/routing-params.js';
@@ -99,7 +98,6 @@ const CustomProviderForm: Component<Props> = (props) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [probeBusy, setProbeBusy] = createSignal(false);
   const [probeError, setProbeError] = createSignal<string | null>(null);
-  const [isSelfHosted] = createResource(() => checkIsSelfHosted());
 
   // In edit mode an API-key provider manages its keys the way native providers
   // do: each key is a connection, added, renamed, replaced and removed on the
@@ -447,16 +445,14 @@ const CustomProviderForm: Component<Props> = (props) => {
               {probeBusy() ? <span class="spinner" /> : 'Fetch models'}
             </button>
           </div>
-          <Show when={isSelfHosted()}>
-            <div
-              class="provider-detail__hint"
-              style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;"
-            >
-              For local servers use <code>http://host.docker.internal:&lt;port&gt;</code> (Docker),{' '}
-              <code>http://host.containers.internal:&lt;port&gt;</code> (Podman), or{' '}
-              <code>http://localhost:&lt;port&gt;</code> (native). HTTPS required for public URLs.
-            </div>
-          </Show>
+          <div
+            class="provider-detail__hint"
+            style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;"
+          >
+            For local servers use <code>http://host.docker.internal:&lt;port&gt;</code> (Docker),{' '}
+            <code>http://host.containers.internal:&lt;port&gt;</code> (Podman), or{' '}
+            <code>http://localhost:&lt;port&gt;</code> (native). HTTPS required for public URLs.
+          </div>
           <Show when={probeError()}>
             <div class="provider-detail__error" role="alert" style="margin-top: 4px;">
               {probeError()}

@@ -1,6 +1,6 @@
 import { Title } from '@solidjs/meta';
 import { toggleScrollFade } from '../services/scroll-fade.js';
-import { A, useNavigate, useSearchParams } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import {
   createResource,
   createSignal,
@@ -12,9 +12,6 @@ import {
   type Component,
 } from 'solid-js';
 import AddAgentModal from '../components/AddAgentModal.jsx';
-import UpgradeSuccessModal from '../components/UpgradeSuccessModal.jsx';
-import { markPlanChosen } from '../services/plan-selection.js';
-import { authClient } from '../services/auth-client.js';
 import {
   getAgents,
   getGlobalProviders,
@@ -30,7 +27,6 @@ import {
   getOverviewAgentUsage,
   getOverviewProviderUsage,
 } from '../services/api/analytics.js';
-import { usePlanRangeLock } from '../services/plan-range-lock.js';
 import { formatNumber, formatCost } from '../services/formatters.js';
 import { providerIcon } from '../components/ProviderIcon.jsx';
 import { preloadModelDisplayNames } from '../services/model-display.js';
@@ -140,7 +136,6 @@ const RANGE_OPTIONS = [
   { label: 'Last 90 days', value: '90d' },
   { label: 'Last 365 days', value: '365d' },
 ];
-const PRO_DASHBOARD_RANGES = new Set(['30d', '90d', '365d']);
 
 const RANGE_STORAGE_KEY = 'manifest_global_range';
 const GROUP_STORAGE_KEY = 'manifest_global_group';
@@ -157,34 +152,11 @@ function loadRange(): string {
 
 const GlobalOverview: Component = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const session = authClient.useSession();
-  const isUpgraded = searchParams.upgraded === '1';
-  if (isUpgraded) {
-    const uid = session()?.data?.user?.id;
-    if (uid) markPlanChosen(uid);
-  }
-  const [upgradeModalOpen, setUpgradeModalOpen] = createSignal(isUpgraded);
-
-  const closeUpgradeModal = () => {
-    setUpgradeModalOpen(false);
-    window.history.replaceState(null, '', '/overview');
-    if (hasNoAgents() && !sessionStorage.getItem(ONBOARDING_DISMISSED_KEY)) {
-      setAddAgentOpen(true);
-    }
-  };
-
   preloadModelDisplayNames();
 
   // ── Range state (persisted in localStorage) ──────────────────────────
   const [chartRange, setChartRangeRaw] = createSignal(loadRange());
-  const {
-    isFreePlan,
-    isProRangeLocked,
-    effectiveRange: effectiveChartRange,
-  } = usePlanRangeLock(chartRange, PRO_DASHBOARD_RANGES, '7d');
   const setChartRange = (v: string) => {
-    if (isFreePlan() && PRO_DASHBOARD_RANGES.has(v)) return;
     setChartRangeRaw(v);
     try {
       localStorage.setItem(RANGE_STORAGE_KEY, v);
@@ -218,24 +190,9 @@ const GlobalOverview: Component = () => {
     'requests',
   );
 
-  const proBadge = () => (
-    <span class="pro-range-badge" aria-label="Pro plan required">
-      PRO
-    </span>
-  );
-  const rangeOptions = () =>
-    RANGE_OPTIONS.map((option) =>
-      isProRangeLocked(option.value) ? { ...option, disabled: true, badge: proBadge() } : option,
-    );
-  createEffect(() => {
-    if (isFreePlan() && PRO_DASHBOARD_RANGES.has(chartRange())) {
-      setChartRange('7d');
-    }
-  });
-
   // ── Data resources (5 parallel) ──────────────────────────────────────
   const [overviewResult] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     async (p) => ({
       range: p.range,
       data: (await getOverview(p.range, undefined, true)) as OverviewResponse,
@@ -257,9 +214,9 @@ const GlobalOverview: Component = () => {
   }));
   const overviewDetails = () => {
     const result = overviewDetailsResult();
-    return result?.range === effectiveChartRange() ? result.data : undefined;
+    return result?.range === chartRange() ? result.data : undefined;
   };
-  const rangeChanging = () => overviewResult.loading && loadedRange() !== effectiveChartRange();
+  const rangeChanging = () => overviewResult.loading && loadedRange() !== chartRange();
 
   const [agents] = createResource(
     () => ({ _agentPing: agentPing(), _analyticsPing: analyticsPing() }),
@@ -304,7 +261,7 @@ const GlobalOverview: Component = () => {
   );
 
   // ── Autofix resources ─────────────────────────────────
-  const autofixScope = createMemo(() => ({ range: effectiveChartRange() }));
+  const autofixScope = createMemo(() => ({ range: chartRange() }));
   const [autofixStatsResult] = createResource(
     () => ({ scope: autofixScope(), _ping: analyticsPing() }),
     async (p) => ({ scope: p.scope, data: await getAutofixStats(p.scope.range) }),
@@ -317,7 +274,7 @@ const GlobalOverview: Component = () => {
   // Disposition timeseries: feeds the "By request status" chart view AND the
   // Self-healed requests tab (recovered subset: healed + fallback series).
   const [requestStatusTs] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     (p) => getAutofixTimeseries(p.range, 'disposition'),
   );
   const selfHealedTs = () => {
@@ -339,7 +296,7 @@ const GlobalOverview: Component = () => {
   // Harness table usage, driven by the page range selector (the workspace
   // agents endpoint is a fixed window; this table must follow the filter).
   const [harnessUsage] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     (p) => getOverviewAgentUsage(p.range) as Promise<UsageTSResult>,
   );
   const harnessUsageFor = (agentName: string) => {
@@ -356,17 +313,17 @@ const GlobalOverview: Component = () => {
   };
 
   const [agentReliability] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     (p) => getPerAgentReliability(p.range),
   );
 
   const [providerReliability] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     (p) => getPerProviderReliability(p.range),
   );
 
   const [modelReliability] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
     (p) => getPerModelReliability(p.range),
   );
 
@@ -390,7 +347,7 @@ const GlobalOverview: Component = () => {
   };
 
   const [usageTimeseries] = createResource(
-    () => ({ range: effectiveChartRange(), group: groupBy(), _ping: analyticsPing() }),
+    () => ({ range: chartRange(), group: groupBy(), _ping: analyticsPing() }),
     (p) => usageFetcher(p.range, p.group),
   );
 
@@ -577,7 +534,7 @@ const GlobalOverview: Component = () => {
     on(
       () => hasNoAgents(),
       (empty) => {
-        if (empty && !sessionStorage.getItem(ONBOARDING_DISMISSED_KEY) && !upgradeModalOpen()) {
+        if (empty && !sessionStorage.getItem(ONBOARDING_DISMISSED_KEY)) {
           setAddAgentOpen(true);
         }
       },
@@ -591,7 +548,6 @@ const GlobalOverview: Component = () => {
 
       {/* Add Harness Modal */}
       <AddAgentModal open={addAgentOpen()} onClose={dismissAddAgent} />
-      <UpgradeSuccessModal open={upgradeModalOpen()} onClose={closeUpgradeModal} />
 
       {/* ── 1. Page Header ──────────────────────────────────────────── */}
       <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
@@ -601,7 +557,7 @@ const GlobalOverview: Component = () => {
         </div>
         <Show when={!hasNoAgents() || !hasNoProviders()}>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <Select value={chartRange()} onChange={setChartRange} options={rangeOptions()} />
+            <Select value={chartRange()} onChange={setChartRange} options={RANGE_OPTIONS} />
           </div>
         </Show>
       </div>
@@ -681,7 +637,7 @@ const GlobalOverview: Component = () => {
         }
       >
         {/* ── Autofix KPI cards ── */}
-        <AutofixKpiCards stats={autofixStats()} range={effectiveChartRange()} />
+        <AutofixKpiCards stats={autofixStats()} range={chartRange()} />
 
         {/* ── 2. Unified Chart Card ─────────────────────────────────── */}
         {(() => {
@@ -715,7 +671,7 @@ const GlobalOverview: Component = () => {
               costInfoTooltip="Actual API key costs only. Subscription usage is not included."
               tokensValue={o().summary.tokens_today.value}
               tokensTrendPct={o().summary.tokens_today.trend_pct}
-              range={effectiveChartRange()}
+              range={chartRange()}
               requestStatusTimeseries={requestsGroup() === 'status' ? requestStatusTs() : undefined}
               agentRequestTimeseries={
                 requestsGroup() === 'agent'
@@ -1100,7 +1056,7 @@ const GlobalOverview: Component = () => {
                                   return (
                                     <a
                                       class="count-link"
-                                      href={`/messages?connections=${encodeURIComponent(connection.id)}&range=${effectiveChartRange()}&attempts=has_failed`}
+                                      href={`/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange()}&attempts=has_failed`}
                                       title="View the requests holding these failed attempts"
                                       onClick={(e) => {
                                         // The row navigates to the connection; this cell
@@ -1108,7 +1064,7 @@ const GlobalOverview: Component = () => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         navigate(
-                                          `/messages?connections=${encodeURIComponent(connection.id)}&range=${effectiveChartRange()}&attempts=has_failed`,
+                                          `/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange()}&attempts=has_failed`,
                                         );
                                       }}
                                     >
@@ -1215,7 +1171,7 @@ const GlobalOverview: Component = () => {
                             const rel = agentReliability()?.find(
                               (r) => r.agent_name === agent.agent_name,
                             );
-                            const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${effectiveChartRange()}`;
+                            const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}`;
                             return (
                               <a
                                 class="count-link"
@@ -1242,7 +1198,7 @@ const GlobalOverview: Component = () => {
                                   {(() => {
                                     // Recovered = successful requests holding a
                                     // recovery attempt (autofix or fallback).
-                                    const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${effectiveChartRange()}&status=ok&trigger=autofix,fallback`;
+                                    const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}&status=ok&trigger=autofix,fallback`;
                                     return (
                                       <a
                                         class="count-link"

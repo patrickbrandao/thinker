@@ -13,7 +13,6 @@ vi.mock("@solidjs/meta", () => ({
 
 let mockRules: any[] = [];
 let mockRoutingStatus = { enabled: false };
-let mockIsSelfHosted = false;
 let mockEmailProvider: any = null;
 let mockRemoveFails = false;
 let mockProviderFetchFails = false;
@@ -32,7 +31,6 @@ vi.mock("../../src/services/api.js", () => ({
 }));
 
 vi.mock("../../src/services/setup-status.js", () => ({
-  checkIsSelfHosted: vi.fn(() => Promise.resolve(mockIsSelfHosted)),
   checkEmailConfigured: vi.fn(() => Promise.resolve(true)),
 }));
 
@@ -81,25 +79,12 @@ vi.mock("../../src/components/LimitRuleModal.js", () => ({
   ),
 }));
 
-vi.mock("../../src/components/CloudEmailInfo.js", () => ({
-  default: (props: any) => (
-    <div data-testid="cloud-email-info">CloudEmailInfo: {props.email}</div>
-  ),
-}));
-
-vi.mock("../../src/services/auth-client.js", () => ({
-  authClient: {
-    useSession: () => () => ({ data: { user: { email: "user@example.com" } } }),
-  },
-}));
-
 import Limits from "../../src/pages/Limits";
 
 describe("Limits page", () => {
   beforeEach(() => {
     mockRules = [];
     mockRoutingStatus = { enabled: false };
-    mockIsSelfHosted = false;
     mockEmailProvider = null;
     mockRemoveFails = false;
     mockProviderFetchFails = false;
@@ -169,22 +154,6 @@ describe("Limits page", () => {
     await vi.waitFor(() => {
       expect(container.textContent).not.toContain("Connect a provider to set hard limits");
       expect(container.textContent).not.toContain("Enable routing to set hard limits");
-    });
-  });
-
-  it("shows cloud email info", async () => {
-    render(() => <Limits />);
-    // The email block waits for the deployment mode, so the cloud card only
-    // appears once checkIsSelfHosted() has resolved.
-    await waitFor(() => {
-      expect(screen.getByTestId("cloud-email-info")).toBeDefined();
-    });
-  });
-
-  it("passes session email to cloud email info", async () => {
-    const { container } = render(() => <Limits />);
-    await waitFor(() => {
-      expect(container.textContent).toContain("user@example.com");
     });
   });
 
@@ -580,9 +549,7 @@ describe("Limits page", () => {
     });
   });
 
-
-  it("shows the email provider section instead of the cloud card on self-hosted", async () => {
-    mockIsSelfHosted = true;
+  it("always shows the email provider section, never a cloud email card", async () => {
     render(() => <Limits />);
     await waitFor(() => {
       expect(screen.getByTestId("email-provider-section")).toBeDefined();
@@ -590,17 +557,7 @@ describe("Limits page", () => {
     expect(screen.queryByTestId("cloud-email-info")).toBeNull();
   });
 
-  it("keeps the cloud email card on cloud", async () => {
-    mockIsSelfHosted = false;
-    render(() => <Limits />);
-    await waitFor(() => {
-      expect(screen.getByTestId("cloud-email-info")).toBeDefined();
-    });
-    expect(screen.queryByTestId("email-provider-section")).toBeNull();
-  });
-
   it("opens the edit modal with the saved provider's details and closes it", async () => {
-    mockIsSelfHosted = true;
     mockEmailProvider = { provider: "mailgun", keyPrefix: "key-", domain: "mg.example.com", notificationEmail: "ops@example.com" };
     render(() => <Limits />);
     await waitFor(() => {
@@ -619,7 +576,6 @@ describe("Limits page", () => {
   });
 
   it("refetches the provider after the modal saves or the setup completes", async () => {
-    mockIsSelfHosted = true;
     render(() => <Limits />);
     await waitFor(() => {
       expect(screen.getByTestId("email-provider-section")).toBeDefined();
@@ -638,7 +594,6 @@ describe("Limits page", () => {
   });
 
   it("removes the provider, warns about email rules, and closes the confirm dialog", async () => {
-    mockIsSelfHosted = true;
     mockEmailProvider = { provider: "resend" };
     mockRules = [{ id: "r1", metric_type: "tokens", threshold: 100, period: "day", action: "notify", is_active: true, trigger_count: 0 }];
     render(() => <Limits />);
@@ -665,7 +620,6 @@ describe("Limits page", () => {
   });
 
   it("keeps the confirm dialog open and recovers when the removal fails", async () => {
-    mockIsSelfHosted = true;
     mockEmailProvider = { provider: "resend" };
     mockRemoveFails = true;
     render(() => <Limits />);
@@ -693,7 +647,6 @@ describe("Limits page", () => {
   it("keeps the page up when the provider config fails to load", async () => {
     // Reading an errored Solid resource re-throws. Every read goes through the
     // guarded accessor, so a failed fetch reads as "no provider saved".
-    mockIsSelfHosted = true;
     mockProviderFetchFails = true;
     render(() => <Limits />);
     // data-has-provider is also "false" while the fetch is still in flight, so
@@ -707,7 +660,6 @@ describe("Limits page", () => {
   });
 
   it("stays up when the refresh after a successful removal fails", async () => {
-    mockIsSelfHosted = true;
     mockEmailProvider = { provider: "resend", keyPrefix: "re_abc" };
     render(() => <Limits />);
     await waitFor(() => {

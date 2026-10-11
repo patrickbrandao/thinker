@@ -17,7 +17,6 @@ const apiMocks = vi.hoisted(() => ({
   getOverviewDetails: vi.fn(),
   getOverviewAgentUsage: vi.fn(),
   getOverviewProviderUsage: vi.fn(),
-  getBillingStatus: vi.fn(),
   navigate: vi.fn(),
 }));
 
@@ -34,7 +33,6 @@ let filterSelectProps: {
   items: string[];
 } | null = null;
 let providerChartProps: Record<string, unknown> | null = null;
-let mockSearchParams: Record<string, string | undefined> = {};
 
 vi.mock('@solidjs/meta', () => ({
   Title: (props: { children: unknown }) => <title>{props.children}</title>,
@@ -47,7 +45,6 @@ vi.mock('@solidjs/router', () => ({
     </a>
   ),
   useNavigate: () => apiMocks.navigate,
-  useSearchParams: () => [mockSearchParams],
 }));
 
 vi.mock('../../src/services/api.js', async () => {
@@ -125,10 +122,6 @@ vi.mock('../../src/services/api/analytics.js', () => ({
     ]),
   getPerModelReliability: () => Promise.resolve([]),
   getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
-}));
-
-vi.mock('../../src/services/api/billing.js', () => ({
-  getBillingStatus: (...args: unknown[]) => apiMocks.getBillingStatus(...args),
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
@@ -261,11 +254,6 @@ vi.mock('manifest-shared', () => ({
   platformIcon: () => 'robot',
 }));
 
-let mockIsSelfHosted = false;
-vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsSelfHosted: () => Promise.resolve(mockIsSelfHosted),
-}));
-
 import GlobalOverview from '../../src/pages/GlobalOverview';
 
 const overviewResponse = {
@@ -338,10 +326,8 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   localStorage.setItem('manifest_global_group', 'provider');
-  mockIsSelfHosted = false;
   filterSelectProps = null;
   providerChartProps = null;
-  mockSearchParams = {};
   sseMocks.reset?.();
 
   apiMocks.getAgents.mockResolvedValue(agentsResponse);
@@ -351,14 +337,6 @@ beforeEach(() => {
   apiMocks.getOverviewDetails.mockResolvedValue({});
   apiMocks.getOverviewAgentUsage.mockResolvedValue(providerUsageTimeseries);
   apiMocks.getOverviewProviderUsage.mockResolvedValue(providerUsageTimeseries);
-  apiMocks.getBillingStatus.mockResolvedValue({
-    enabled: false,
-    plan: 'free',
-    priceMonthly: { amount: null, currency: null, interval: null },
-    requests: { used: null, limit: null, periodEnd: null },
-    cancelAtPeriodEnd: false,
-    subscriptionPeriodEnd: null,
-  });
 });
 
 afterEach(() => {
@@ -448,26 +426,5 @@ describe('GlobalOverview filter onUnselectAll', () => {
         '/messages?connections=conn-openai&range=7d&attempts=has_failed',
       );
     });
-  });
-
-  it('opens the Pro success modal when upgraded=1 is present', async () => {
-    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
-    mockSearchParams = { upgraded: '1' };
-
-    try {
-      render(() => <GlobalOverview />);
-
-      await waitFor(() => expect(localStorage.getItem('manifest_plan_chosen_u1')).toBe('1'));
-      await waitFor(() =>
-        expect(document.body.textContent).toContain("You're now on the Pro plan"),
-      );
-
-      await waitFor(() => expect(document.querySelector('.modal-backdrop')).not.toBeNull());
-      fireEvent.click(document.querySelector('.modal-backdrop')!);
-
-      expect(replaceState).toHaveBeenCalledWith(null, '', '/overview');
-    } finally {
-      replaceState.mockRestore();
-    }
   });
 });

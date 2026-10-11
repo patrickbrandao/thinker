@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   checkNeedsSetup,
   checkSocialProviders,
-  checkIsSelfHosted,
   checkIsOllamaAvailable,
   checkLocalLlmHost,
   checkEmailConfigured,
@@ -117,66 +116,25 @@ describe('setup-status service', () => {
     });
   });
 
-  describe('checkIsSelfHosted', () => {
-    it('returns true when backend reports isSelfHosted=true', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false, isSelfHosted: true }),
-        }),
-      );
-      expect(await checkIsSelfHosted()).toBe(true);
-    });
-
-    it('returns false when backend reports isSelfHosted=false', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false, isSelfHosted: false }),
-        }),
-      );
-      expect(await checkIsSelfHosted()).toBe(false);
-    });
-
-    it('returns false when backend omits isSelfHosted', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false }),
-        }),
-      );
-      expect(await checkIsSelfHosted()).toBe(false);
-    });
-
-    it('returns false on fetch failure', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-      expect(await checkIsSelfHosted()).toBe(false);
-    });
-
+  describe('shared status cache', () => {
     it('shares cache with checkNeedsSetup (single fetch)', async () => {
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           needsSetup: true,
-          isSelfHosted: true,
           socialProviders: ['google'],
           ollamaAvailable: true,
         }),
       });
       vi.stubGlobal('fetch', fetchMock);
 
-      const [needs, selfHosted, social, ollama] = await Promise.all([
+      const [needs, social, ollama] = await Promise.all([
         checkNeedsSetup(),
-        checkIsSelfHosted(),
         checkSocialProviders(),
         checkIsOllamaAvailable(),
       ]);
 
       expect(needs).toBe(true);
-      expect(selfHosted).toBe(true);
       expect(social).toEqual(['google']);
       expect(ollama).toBe(true);
       expect(fetchMock).toHaveBeenCalledTimes(1);
