@@ -1,14 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@solidjs/testing-library';
 import {
-  AutofixIcon,
   FallbackIcon,
   HeartbeatIcon,
   ModelCell,
   AgentCell,
   StatusCell,
   AttemptsCell,
-  SelfHealCell,
+  RecoveryCell,
 } from '../../src/components/message-table-cells';
 import { fireEvent } from '@solidjs/testing-library';
 import type { MessageRow } from '../../src/components/message-table-types';
@@ -92,15 +91,6 @@ describe('HeartbeatIcon', () => {
   });
 });
 
-describe('AutofixIcon', () => {
-  it('renders with aria-hidden', () => {
-    const { container } = render(() => <AutofixIcon />);
-    const svg = container.querySelector('svg');
-    expect(svg).not.toBeNull();
-    expect(svg!.getAttribute('aria-hidden')).toBe('true');
-  });
-});
-
 describe('AttemptsCell', () => {
   function renderCell(row: MessageRow) {
     return render(() => (
@@ -112,50 +102,35 @@ describe('AttemptsCell', () => {
     ));
   }
 
-  it('renders just the attempt count (no icons) for a row with autofix_applied', () => {
-    const { container } = renderCell(baseRow({ attempt_count: 2, autofix_applied: true }));
-    expect(container.querySelector('td')!.textContent).toContain('2');
-    // Icons moved to SelfHealCell
-    expect(container.querySelector('[title="Autofix"]')).toBeNull();
-  });
-
   it('renders just the attempt count (no icons) when fallback_from_model is set', () => {
     const { container } = renderCell(baseRow({ fallback_from_model: 'gpt-4o', attempt_count: 2 }));
     expect(container.querySelector('td')!.textContent).toContain('2');
-    // Icons moved to SelfHealCell
+    // Icons live in RecoveryCell
     expect(container.querySelector('[title="Fallback"]')).toBeNull();
   });
 
-  it('renders only the count with no badges when neither autofix nor fallback applies', () => {
+  it('renders only the count with no badges when no fallback applies', () => {
     const { container } = renderCell(baseRow({ attempt_count: 1 }));
     expect(container.querySelector('[title]')).toBeNull();
     expect(container.querySelector('td')!.textContent).toContain('1');
   });
 });
 
-describe('SelfHealCell', () => {
+describe('RecoveryCell', () => {
   function renderCell(row: MessageRow) {
     return render(() => (
       <table>
         <tbody>
-          <tr>{SelfHealCell(row)}</tr>
+          <tr>{RecoveryCell(row)}</tr>
         </tbody>
       </table>
     ));
   }
 
-  it('renders a dash when neither autofix nor fallback applies', () => {
+  it('renders a dash when no fallback applies', () => {
     const { container } = renderCell(baseRow());
     expect(container.querySelector('td')!.textContent).toContain('\u2014');
     expect(container.querySelector('[title]')).toBeNull();
-  });
-
-  it('renders autofix badge with icon and text when autofix_applied', () => {
-    const { container } = renderCell(baseRow({ autofix_applied: true }));
-    const badge = container.querySelector('[title="Autofix"]') as HTMLElement;
-    expect(badge).not.toBeNull();
-    expect(badge.className).toContain('trigger-badge--autofix');
-    expect(badge.textContent).toContain('autofix');
   });
 
   it('renders fallback badge with icon and text when fallback_from_model is set', () => {
@@ -166,12 +141,13 @@ describe('SelfHealCell', () => {
     expect(badge.textContent).toContain('fallback');
   });
 
-  it('renders both badges when both autofix and fallback apply', () => {
-    const { container } = renderCell(
-      baseRow({ autofix_applied: true, fallback_from_model: 'gpt-4o' }),
-    );
-    expect(container.querySelector('[title="Autofix"]')).not.toBeNull();
-    expect(container.querySelector('[title="Fallback"]')).not.toBeNull();
+  it('ignores legacy autofix flags on the row', () => {
+    const { container } = renderCell({
+      ...baseRow(),
+      autofix_applied: true,
+    } as MessageRow & { autofix_applied: boolean });
+    expect(container.querySelector('td')!.textContent).toContain('\u2014');
+    expect(container.textContent).not.toMatch(/autofix/i);
   });
 });
 

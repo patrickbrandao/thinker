@@ -49,25 +49,8 @@ describe('GuestGuard', () => {
     });
   });
 
-  it('redirects to the discovery step when it is still pending for the user', async () => {
+  it('ignores a leftover discovery marker and sends the user home', async () => {
     localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    mockSessionData = {
-      data: { user: { id: 'u1', name: 'Test' } },
-      isPending: false,
-    };
-    render(() => (
-      <GuestGuard>
-        <span>Guest content</span>
-      </GuestGuard>
-    ));
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/discovery?next=%2Fwelcome', { replace: true });
-    });
-  });
-
-  it('ignores a pending discovery step already marked done', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    localStorage.setItem('manifest_discovery_done_u1', '1');
     mockSessionData = {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
@@ -80,6 +63,9 @@ describe('GuestGuard', () => {
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
+    for (const [path] of mockNavigate.mock.calls) {
+      expect(path).not.toContain('/discovery');
+    }
   });
 
   it('redirects to home when session exists', async () => {
@@ -117,7 +103,6 @@ describe('GuestGuard', () => {
 
   it('preserves signed MCP authorization during the authenticated redirect', async () => {
     vi.stubGlobal('location', { assign: mockLocationAssign });
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
     mockSessionData = {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,

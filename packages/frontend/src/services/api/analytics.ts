@@ -64,14 +64,14 @@ export function getConnectionAttemptStatusTimeseries(
   range = '24h',
   label?: string,
   connectionId?: string,
-): Promise<AutofixTimeseries> {
+): Promise<StatusTimeseries> {
   return fetchJson('/provider-analytics/attempt-status-timeseries', {
     auth_type: authType,
     provider,
     range,
     ...(label !== undefined ? { label } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
-  }) as Promise<AutofixTimeseries>;
+  }) as Promise<StatusTimeseries>;
 }
 
 /** Attempts by HTTP status over time for ONE connection. */
@@ -81,14 +81,14 @@ export function getConnectionAttemptHttpStatusTimeseries(
   range = '24h',
   label?: string,
   connectionId?: string,
-): Promise<AutofixTimeseries> {
+): Promise<StatusTimeseries> {
   return fetchJson('/provider-analytics/attempt-http-status-timeseries', {
     auth_type: authType,
     provider,
     range,
     ...(label !== undefined ? { label } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
-  }) as Promise<AutofixTimeseries>;
+  }) as Promise<StatusTimeseries>;
 }
 
 export interface ConnectionAttemptBreakdown {
@@ -97,8 +97,6 @@ export interface ConnectionAttemptBreakdown {
   failed: number;
   fallback_retries: number;
   fallback_retries_succeeded: number;
-  autofix_attempts: number;
-  autofix_attempts_succeeded: number;
 }
 
 /** Header-card breakdown for ONE connection (totals + retry families). */
@@ -271,45 +269,35 @@ export interface AttemptTimeseries {
 }
 
 // ---------------------------------------------------------------------------
-// Autofix analytics
+// Request reliability
 // ---------------------------------------------------------------------------
 
-export interface AutofixStatus {
-  any_enabled: boolean;
-  enabled_agents: string[];
-  /** Agents effectively running without Autofix after deployment-mode defaults. */
-  disabled_agents: string[];
-  /** True only when legacy/unconfigured agents need the fleet enable action. */
-  needs_enable_all: boolean;
-  /** Self-hosted consent-once; cloud always true. */
-  consented: boolean;
-}
+/**
+ * Request-reliability endpoints. The backend still serves these generic
+ * metrics (success rate, fallback recoveries, per-harness/provider/model
+ * reliability, request status over time) under the legacy Autofix paths
+ * inherited from upstream. #16 moves them to neutral paths when it removes
+ * Autofix from the backend; keeping them here makes that a one-place change.
+ */
+const RELIABILITY_PATHS = {
+  stats: '/overview/autofix-stats',
+  requestStatusTimeseries: '/overview/autofix-timeseries',
+  perAgent: '/overview/autofix-per-agent',
+  perProvider: '/overview/autofix-per-provider',
+  perModel: '/overview/autofix-per-model',
+} as const;
 
-export interface AutofixStats {
+export interface ReliabilityStats {
   success_rate: { value: number; previous: number };
-  autofix_saves: { value: number; previous: number };
-  /** Requests recovered by a successful fallback attempt (additive field). */
+  /** Requests recovered by a successful fallback attempt. */
   fallback_saves: { value: number; previous: number };
-  /** Window total — denominator for the self-healed share (additive field). */
+  /** Window total — denominator for the recovered-requests share. */
   total_requests: { value: number; previous: number };
   errors_remaining: { value: number; previous: number };
-  coverage: { rate: number; previous_rate: number };
-  dispositions: {
-    healed: number;
-    no_fix_found: number;
-    resolving: number;
-    ineffective: number;
-  };
-  needs_attention: Array<{
-    error_message: string;
-    provider: string;
-    model: string;
-    count: number;
-    phoenix_issue_id: string | null;
-  }>;
 }
 
-export interface AutofixTimeseries {
+/** A keyed bucket series: `counts[i]` is the value of `keys[i]` in that bucket. */
+export interface StatusTimeseries {
   range: string;
   by: string;
   keys: string[];
@@ -330,29 +318,26 @@ export function getAttemptTimeseries(range = '7d', agentName?: string): Promise<
   }) as Promise<AttemptTimeseries>;
 }
 
-export function getWorkspaceAutofixStatus(): Promise<AutofixStatus> {
-  return fetchJson('/autofix/status') as Promise<AutofixStatus>;
-}
-
-export function getAutofixStats(range = '7d', agentName?: string): Promise<AutofixStats> {
-  return fetchJson('/overview/autofix-stats', {
+export function getReliabilityStats(range = '7d', agentName?: string): Promise<ReliabilityStats> {
+  return fetchJson(RELIABILITY_PATHS.stats, {
     range,
     ...(agentName ? { agent_name: agentName } : {}),
-  }) as Promise<AutofixStats>;
+  }) as Promise<ReliabilityStats>;
 }
 
-export function getAutofixTimeseries(
+/**
+ * Logical requests over time by final status (`success`, `fallback`,
+ * `error`): the "By request status" chart and its recovered subset.
+ */
+export function getRequestStatusTimeseries(
   range = '7d',
-  by = 'disposition',
   agentName?: string,
-  failedOnly?: boolean,
-): Promise<AutofixTimeseries> {
-  return fetchJson('/overview/autofix-timeseries', {
+): Promise<StatusTimeseries> {
+  return fetchJson(RELIABILITY_PATHS.requestStatusTimeseries, {
     range,
-    by,
+    by: 'disposition',
     ...(agentName ? { agent_name: agentName } : {}),
-    ...(failedOnly ? { failed_only: 'true' } : {}),
-  }) as Promise<AutofixTimeseries>;
+  }) as Promise<StatusTimeseries>;
 }
 
 /**
@@ -371,12 +356,11 @@ export interface ProviderReliabilityRow {
 }
 
 /** One-line definition surfaced by the ⓘ tooltips next to "Recovered requests". */
-export const RECOVERED_REQUESTS_TOOLTIP =
-  'Successful requests that were recovered by Autofix or fallback.';
+export const RECOVERED_REQUESTS_TOOLTIP = 'Successful requests that were recovered by fallback.';
 
-/** Self-healed = recovered by Autofix + recovered by fallback. */
-export function selfHealedCount(row: { autofixed: number; fallback_saves?: number }): number {
-  return row.autofixed + (row.fallback_saves ?? 0);
+/** Recovered = requests that succeeded on a fallback attempt. */
+export function recoveredCount(row: { fallback_saves?: number }): number {
+  return row.fallback_saves ?? 0;
 }
 
 /** Request success rate over the row's window; null when there is no traffic. */
@@ -391,16 +375,9 @@ export function attemptSuccessRate(row: { attempts: number; succeeded?: number }
   return row.succeeded / row.attempts;
 }
 
-/**
- * Total attempts ⓘ: the Doctor version (Autofix) owns the autofixed
- * vocabulary, so tenants without it get the same sentence minus Autofix.
- * House vocabulary: a FALLBACK is a retry; an AUTOFIX produces an attempt.
- */
-export function totalAttemptsTooltip(doctorAvailable: boolean): string {
-  return doctorAvailable
-    ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-    : 'Every provider call counts here, including fallback retries. One request can produce several attempts.';
-}
+/** Total attempts ⓘ. House vocabulary: a FALLBACK is a retry. */
+export const TOTAL_ATTEMPTS_TOOLTIP =
+  'Every provider call counts here, including fallback retries. One request can produce several attempts.';
 
 /** Success rate ⓘ texts, one per surface grain. */
 export const MODEL_SUCCESS_RATE_TOOLTIP = 'Successful attempts over all attempts for this model.';
@@ -423,7 +400,7 @@ export function getPerProviderReliability(
   range = '7d',
   agentName?: string,
 ): Promise<ProviderReliabilityRow[]> {
-  return fetchJson('/overview/autofix-per-provider', {
+  return fetchJson(RELIABILITY_PATHS.perProvider, {
     range,
     ...(agentName ? { agent_name: agentName } : {}),
   }) as Promise<ProviderReliabilityRow[]>;
@@ -433,18 +410,17 @@ export interface AgentReliabilityRow {
   agent_name: string;
   requests: number;
   failed: number;
-  autofixed: number;
-  /** Requests recovered by a successful fallback attempt (additive field). */
+  /** Requests recovered by a successful fallback attempt. */
   fallback_saves: number;
   /** Same success definition as the global Success rate KPI (additive field). */
   succeeded: number;
 }
 
 export function getPerAgentReliability(range = '7d'): Promise<AgentReliabilityRow[]> {
-  return fetchJson('/overview/autofix-per-agent', { range }) as Promise<AgentReliabilityRow[]>;
+  return fetchJson(RELIABILITY_PATHS.perAgent, { range }) as Promise<AgentReliabilityRow[]>;
 }
 
-/** Attempt-world reliability for a model: a model is not healed, it acts. */
+/** Attempt-world reliability for a model: every call it served, by outcome. */
 export interface ModelReliabilityRow {
   model: string;
   attempts: number;
@@ -456,7 +432,7 @@ export function getPerModelReliability(
   range = '7d',
   agentName?: string,
 ): Promise<ModelReliabilityRow[]> {
-  return fetchJson('/overview/autofix-per-model', {
+  return fetchJson(RELIABILITY_PATHS.perModel, {
     range,
     ...(agentName ? { agent_name: agentName } : {}),
   }) as Promise<ModelReliabilityRow[]>;
@@ -469,7 +445,6 @@ export interface ErrorBreakdownResponse {
   provider_errors: number;
   transport_errors: number;
   manifest_errors: number;
-  auto_fixed: number;
   by_origin: Record<string, number>;
   by_class: Record<string, number>;
   provider_error_rate: number;

@@ -21,8 +21,6 @@ const mockDeleteAgent = vi.fn();
 const mockRenameAgent = vi.fn();
 const mockRotateAgentKey = vi.fn();
 const mockUpdateAgent = vi.fn();
-const mockGetAutofix = vi.fn(() => Promise.resolve({ enabled: false }));
-const mockUpdateAutofix = vi.fn(() => Promise.resolve({ enabled: false }));
 const mockGetRecording = vi.fn(() => Promise.resolve({ enabled: false }));
 const mockUpdateRecording = vi.fn(() => Promise.resolve({ enabled: false }));
 vi.mock("../../src/services/api.js", () => ({
@@ -32,8 +30,6 @@ vi.mock("../../src/services/api.js", () => ({
   renameAgent: (...args: unknown[]) => mockRenameAgent(...args),
   rotateAgentKey: (...args: unknown[]) => mockRotateAgentKey(...args),
   updateAgent: (...args: unknown[]) => mockUpdateAgent(...args),
-  getAutofix: (...args: unknown[]) => mockGetAutofix(...args),
-  updateAutofix: (...args: unknown[]) => mockUpdateAutofix(...args),
   getRecording: (...args: unknown[]) => mockGetRecording(...args),
   updateRecording: (...args: unknown[]) => mockUpdateRecording(...args),
 }));
@@ -190,6 +186,12 @@ describe("Settings", () => {
   it("renders Setup section", () => {
     render(() => <Settings />);
     expect(screen.getByText("Setup")).toBeDefined();
+  });
+
+  it("has no Autofix section or third-party terms link", () => {
+    const { container } = render(() => <Settings />);
+    expect(container.textContent).not.toMatch(/autofix/i);
+    expect(container.querySelector('a[href^="https://manifest.build"]')).toBeNull();
   });
 
   it("renders Danger zone", () => {

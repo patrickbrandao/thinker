@@ -120,18 +120,17 @@ describe('Setup page', () => {
     });
   });
 
-  it('redirects new admins to the discovery step after setup', async () => {
+  it('sends new admins straight to the dashboard home after setup', async () => {
     mockSignInEmail.mockResolvedValue({ data: { user: { id: 'admin1' } } });
-    localStorage.removeItem('manifest_discovery_pending_admin1');
     const { container } = await renderSetup();
     fillValidForm();
     fireEvent.submit(container.querySelector('form')!);
 
     await waitFor(() => {
-      expect(window.location.href).toBe('/discovery');
+      expect(window.location.href).toBe('/');
     });
-    expect(localStorage.getItem('manifest_discovery_pending_admin1')).toBe('/');
-    localStorage.removeItem('manifest_discovery_pending_admin1');
+    // No questionnaire marker is left behind for the guards to act on.
+    expect(localStorage.getItem('manifest_discovery_pending_admin1')).toBeNull();
   });
 
   it('surfaces server errors from createFirstAdmin', async () => {
@@ -145,17 +144,14 @@ describe('Setup page', () => {
     });
   });
 
-  it('preserves discovery through a manual login if auto-sign-in fails after setup', async () => {
+  it('falls back to the login page if auto-sign-in fails after setup', async () => {
     mockSignInEmail.mockResolvedValue({ error: { message: 'session failed' } });
     const { container } = await renderSetup();
     fillValidForm();
     fireEvent.submit(container.querySelector('form')!);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        '/login?redirect=%2Fdiscovery%3Fnext%3D%252F%26signup%3D1',
-        { replace: true },
-      );
+      expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true });
     });
   });
 

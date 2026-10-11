@@ -89,20 +89,18 @@ describe('analytics API client', () => {
     expect(url).toContain('agent_name=demo');
   });
 
-  it('calls the Autofix analytics routes with their optional scopes', async () => {
+  it('calls the request-reliability routes with their optional scopes', async () => {
     let fetchMock = setupFetch({});
-    await analytics.getWorkspaceAutofixStatus();
-    expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/autofix/status');
-
-    fetchMock = setupFetch({});
-    await analytics.getAutofixStats('30d', 'demo');
+    await analytics.getReliabilityStats('30d', 'demo');
     expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/overview/autofix-stats');
+    expect(fetchMock.mock.calls[0][0]).toContain('range=30d');
     expect(fetchMock.mock.calls[0][0]).toContain('agent_name=demo');
 
     fetchMock = setupFetch({});
-    await analytics.getAutofixTimeseries('24h', 'autofix', 'demo', true);
+    await analytics.getRequestStatusTimeseries('24h', 'demo');
     expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/overview/autofix-timeseries');
-    expect(fetchMock.mock.calls[0][0]).toContain('failed_only=true');
+    expect(fetchMock.mock.calls[0][0]).toContain('by=disposition');
+    expect(fetchMock.mock.calls[0][0]).toContain('agent_name=demo');
 
     fetchMock = setupFetch({});
     await analytics.getPerProviderReliability('7d', 'demo');
@@ -114,15 +112,19 @@ describe('analytics API client', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/overview/autofix-per-agent');
 
     fetchMock = setupFetch({});
+    await analytics.getPerModelReliability('7d', 'demo');
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/overview/autofix-per-model');
+
+    fetchMock = setupFetch({});
     await analytics.getErrorBreakdown('30d', 'demo');
     expect(fetchMock.mock.calls[0][0]).toContain('/api/v1/errors/breakdown');
     expect(fetchMock.mock.calls[0][0]).toContain('agent_name=demo');
   });
 
-  it('uses Autofix analytics defaults without optional filters', async () => {
+  it('uses request-reliability defaults without optional filters', async () => {
     const calls = [
-      () => analytics.getAutofixStats(),
-      () => analytics.getAutofixTimeseries(),
+      () => analytics.getReliabilityStats(),
+      () => analytics.getRequestStatusTimeseries(),
       () => analytics.getPerProviderReliability(),
       () => analytics.getErrorBreakdown(),
     ];
@@ -133,6 +135,22 @@ describe('analytics API client', () => {
       expect(url).not.toContain('agent_name=');
       expect(url).not.toContain('failed_only=');
     }
+  });
+
+  it('counts recovered requests from fallback saves only', () => {
+    expect(analytics.recoveredCount({ fallback_saves: 4 })).toBe(4);
+    expect(analytics.recoveredCount({})).toBe(0);
+    expect(analytics.TOTAL_ATTEMPTS_TOOLTIP).toContain('fallback retries');
+    expect(analytics.RECOVERED_REQUESTS_TOOLTIP).toBe(
+      'Successful requests that were recovered by fallback.',
+    );
+  });
+
+  it('no longer exposes the Autofix status, stats or timeseries clients', () => {
+    const exported = Object.keys(analytics);
+    expect(exported).not.toContain('getWorkspaceAutofixStatus');
+    expect(exported).not.toContain('getAutofixStats');
+    expect(exported).not.toContain('getAutofixTimeseries');
   });
 
   it('getHealth GETs /health', async () => {

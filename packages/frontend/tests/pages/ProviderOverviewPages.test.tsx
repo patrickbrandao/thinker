@@ -74,13 +74,11 @@ vi.mock('../../src/services/api/routing.js', () => ({
 }));
 
 vi.mock('../../src/services/api/analytics.js', () => ({
-  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by Autofix or fallback.',
+  RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
   REQUEST_SUCCESS_RATE_TOOLTIP:
     'Successful requests over all requests. Recovered requests count as successful.',
-  totalAttemptsTooltip: (doctor: boolean) =>
-    doctor
-      ? 'Every provider call counts here, including fallback retries and autofixed attempts. One request can produce several attempts.'
-      : 'Every provider call counts here, including fallback retries. One request can produce several attempts.',
+  TOTAL_ATTEMPTS_TOOLTIP:
+    'Every provider call counts here, including fallback retries. One request can produce several attempts.',
   MODEL_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this model.',
   PROVIDER_SUCCESS_RATE_TOOLTIP: 'Successful attempts over all attempts for this provider.',
   CONNECTION_SUCCESS_RATE_TOOLTIP_30D:
@@ -112,17 +110,14 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   getConnectionAttemptsByAgentTimeseries: (...args: unknown[]) =>
     apiMocks.getConnectionAttemptsByAgentTimeseries(...args),
   getPerAgentCostTimeseries: (...args: unknown[]) => apiMocks.getPerAgentCostTimeseries(...args),
-  getWorkspaceAutofixStatus: () =>
-    Promise.resolve({ any_enabled: false, enabled_agents: [], consented: true }),
-  getAutofixStats: () => Promise.resolve(null),
-  getAutofixTimeseries: () =>
+  getReliabilityStats: () => Promise.resolve(null),
+  getRequestStatusTimeseries: () =>
     Promise.resolve({ range: '7d', by: 'disposition', keys: [], buckets: [] }),
   getPerProviderReliability: () => Promise.resolve([]),
   getPerModelReliability: () => Promise.resolve([]),
   getPerAgentReliability: () => Promise.resolve([]),
-  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
+  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {} }),
 }));
-
 
 vi.mock('../../src/services/providers.js', () => ({
   PROVIDERS: [
@@ -164,8 +159,8 @@ vi.mock('../../src/components/ProviderChartCard.jsx', () => ({
     agentRequestTimeseries?: { agents: string[]; timeseries: unknown[] };
     agentCostTimeseries?: { agents: string[]; timeseries: unknown[] };
     requestStatusTimeseries?: { keys: string[] };
-    selfHealedTimeseries?: { keys: string[] };
-    selfHealedValue?: number;
+    recoveredTimeseries?: { keys: string[] };
+    recoveredValue?: number;
     seriesFilters?: unknown;
     colorMap?: Record<string, string>;
   }) => (
@@ -186,8 +181,8 @@ vi.mock('../../src/components/ProviderChartCard.jsx', () => ({
       <span data-testid="cost-agents">{props.agentCostTimeseries?.agents.join(',') ?? ''}</span>
       <span data-testid="color-keys">{Object.keys(props.colorMap ?? {}).join(',')}</span>
       <span data-testid="status-keys">{props.requestStatusTimeseries?.keys.join(',') ?? ''}</span>
-      <span data-testid="healed-keys">{props.selfHealedTimeseries?.keys.join(',') ?? ''}</span>
-      <span data-testid="healed-value">{props.selfHealedValue ?? ''}</span>
+      <span data-testid="recovered-keys">{props.recoveredTimeseries?.keys.join(',') ?? ''}</span>
+      <span data-testid="recovered-value">{props.recoveredValue ?? ''}</span>
       <div data-testid="series-filters">{props.seriesFilters as any}</div>
     </div>
   ),
@@ -215,8 +210,8 @@ vi.mock('../../src/components/UnifiedChartCard.jsx', () => ({
     agentRequestTimeseries?: { agents: string[]; timeseries: unknown[] };
     agentCostTimeseries?: { agents: string[]; timeseries: unknown[] };
     requestStatusTimeseries?: { keys: string[] };
-    selfHealedTimeseries?: { keys: string[] };
-    selfHealedValue?: number;
+    recoveredTimeseries?: { keys: string[] };
+    recoveredValue?: number;
     seriesFilters?: unknown;
     colorMap?: Record<string, string>;
   }) => (
@@ -241,8 +236,8 @@ vi.mock('../../src/components/UnifiedChartCard.jsx', () => ({
       <span data-testid="cost-agents">{props.agentCostTimeseries?.agents.join(',') ?? ''}</span>
       <span data-testid="color-keys">{Object.keys(props.colorMap ?? {}).join(',')}</span>
       <span data-testid="status-keys">{props.requestStatusTimeseries?.keys.join(',') ?? ''}</span>
-      <span data-testid="healed-keys">{props.selfHealedTimeseries?.keys.join(',') ?? ''}</span>
-      <span data-testid="healed-value">{props.selfHealedValue ?? ''}</span>
+      <span data-testid="recovered-keys">{props.recoveredTimeseries?.keys.join(',') ?? ''}</span>
+      <span data-testid="recovered-value">{props.recoveredValue ?? ''}</span>
       <div data-testid="series-filters">{props.seriesFilters as any}</div>
     </div>
   ),
@@ -759,8 +754,6 @@ beforeEach(() => {
     failed: 3,
     fallback_retries: 10,
     fallback_retries_succeeded: 8,
-    autofix_attempts: 5,
-    autofix_attempts_succeeded: 4,
   });
 });
 
@@ -955,7 +948,9 @@ describe('ConnectionDetail (analytics)', () => {
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     expect(screen.getAllByText('Harnesses').length).toBeGreaterThan(0);
     expect(screen.getAllByText('gpt-5').length).toBeGreaterThan(0);
-    expect(screen.getByTestId('requests-info-tooltip').textContent).toContain('autofixed attempts');
+    expect(screen.getByTestId('requests-info-tooltip').textContent).toContain(
+      'including fallback retries.',
+    );
     // Recent messages table renders model and token data (description is no longer displayed).
     expect(screen.getByText('Recent Requests')).toBeDefined();
     // BYOK connection → cost columns present
@@ -989,7 +984,7 @@ describe('ConnectionDetail (analytics)', () => {
     expect(sessionStorage.getItem('chart-view:conn-openai')).toBe('requests');
   });
 
-  it('shows the Attempts tab, By HTTP status default, and no Healed tab', async () => {
+  it('shows the Attempts tab, By HTTP status default, and no Recovered tab', async () => {
     render(() => <ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByText('Requests chart'));
@@ -1012,8 +1007,8 @@ describe('ConnectionDetail (analytics)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('status-keys').textContent).toBe('success,error'),
     );
-    // The healed tab is gone: healing belongs to requests, not connections.
-    expect(screen.getByTestId('healed-keys').textContent).toBe('');
+    // No Recovered tab: recovery belongs to requests, not connections.
+    expect(screen.getByTestId('recovered-keys').textContent).toBe('');
 
     // Scoped fetch to this exact connection.
     expect(apiMocks.getConnectionAttemptStatusTimeseries).toHaveBeenCalledWith(
@@ -1064,11 +1059,12 @@ describe('ConnectionDetail (analytics)', () => {
     // badge class so the phone breakpoint can size them as a matched pair.
     expect(container.querySelector('.connection-detail__badge')?.textContent).toBe('Active');
     const stats = container.querySelector('.overview-stats');
-    expect(stats?.classList.contains('overview-stats--5')).toBe(true);
+    // Four cards use the base four-column grid, no five-card modifier.
+    expect(stats?.classList.contains('overview-stats--5')).toBe(false);
     expect((stats as HTMLElement).style.gridTemplateColumns).toBe('');
   });
 
-  it('shows the attempt cards row: rate, counts and both retry families', async () => {
+  it('shows the attempt cards row: rate, counts and fallback retries', async () => {
     const { container } = render(() => <ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     await waitFor(() => {
@@ -1084,13 +1080,10 @@ describe('ConnectionDetail (analytics)', () => {
       expect(fb).toContain('10');
       expect(fb).toContain('8 succeeded');
     });
-    await waitFor(() => {
-      const card = [...container.querySelectorAll('.overview-stat-card')].find((c) =>
-        c.textContent?.includes('Autofixed attempts'),
-      );
-      expect(card?.textContent).toContain('5');
-      expect(card?.textContent).toContain('4 succeeded');
-    });
+    // Four attempt cards; no Autofix card.
+    const cards = container.querySelectorAll('.overview-stat-card');
+    expect(cards).toHaveLength(4);
+    expect(container.textContent).not.toMatch(/autofix/i);
   });
 
   it.each([
@@ -1111,22 +1104,6 @@ describe('ConnectionDetail (analytics)', () => {
     // Scoped to THIS connection and the card's window, never the whole provider.
     expect(routerState.navigate).toHaveBeenCalledWith(
       `/messages?connections=conn-openai&range=7d${extra}`,
-    );
-  });
-
-  it('links the Autofixed attempts card', async () => {
-    const { container } = render(() => <ConnectionDetail />);
-    await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
-    const card = await waitFor(() => {
-      const found = [...container.querySelectorAll('.overview-stat-card')].find((c) =>
-        c.textContent?.includes('Autofixed attempts'),
-      );
-      expect(found).toBeDefined();
-      return found!;
-    });
-    fireEvent.click(card);
-    expect(routerState.navigate).toHaveBeenCalledWith(
-      '/messages?connections=conn-openai&range=7d&trigger=autofix',
     );
   });
 

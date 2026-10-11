@@ -2,7 +2,7 @@
 > Thinker is a self-hosted-only fork. While this file is being rewritten, apply these overrides to everything below:
 >
 > - **Ignore every "Cloud Mode Always" / `MANIFEST_MODE=cloud` directive.** Thinker has no cloud mode; use the self-hosted mode.
-> - **Ignore the Wingman drawer requirement** (the dev-mode iframe check against `wingman.manifest.build`).
+> - **The dashboard has no Wingman drawer, update check, Discovery step or Autofix UI** (#13). Backend leftovers go in #16/#17.
 > - **Never call `app.manifest.build` or any other Manifest-hosted endpoint.**
 > - **Do not use the `mnfst` CLI against Manifest's cloud.** The CLI becomes `thinker` and only talks to a Thinker instance.
 
@@ -20,9 +20,7 @@ Manifest is a smart model router for **AI agents**. It sits between an agent and
 
 **Supported agents**: see `AGENT_PLATFORMS` in `packages/shared/src/agent-type.ts` for the current list (OpenClaw, Hermes, Claude Code, OpenCode, generic OpenAI/Anthropic SDK slots, and others — don't duplicate the list here, it grows independently of this doc). OpenClaw remains the deepest integration, but no new code or copy should frame Manifest as OpenClaw-only. When adding examples, prefer "AI agent" as the noun and pick OpenClaw as the worked example rather than the sole target. Manifest is consumed as a generic OpenAI-compatible HTTP endpoint — there are no first-party OpenClaw plugins in this repo anymore.
 
-Wingman — the gateway tester for sending requests against a Manifest backend while impersonating any of the supported agents (useful for routing/header-classifier reproductions) — lives in its own repo at [`mnfst/wingman`](https://github.com/mnfst/wingman) and is hosted at [`wingman.manifest.build`](https://wingman.manifest.build). The dashboard embeds it as an iframe drawer **in dev mode only** — it is dead-code-eliminated from production / self-hosted bundles via `__DEV_MODE__`. The backend allows the hosted Wingman origin through CORS in both dev and production (production also honors `WINGMAN_CORS_ORIGINS`), while the CSP `frame-src` that permits the drawer iframe stays dev-only; both are wired in `packages/backend/src/cors-csp-config.ts`.
-
-**Whenever working in dev mode (`/serve`, `npm run dev`, etc.), the Wingman drawer is expected to be available** — open the FAB at the bottom-right of the dashboard (or hit ⌘/Ctrl+Shift+W) and confirm the iframe loads `https://wingman.manifest.build` cleanly. The drawer is part of the dev surface area, so a broken iframe means the dev environment is broken. `/serve` is **dev-only** — never use it to validate production behavior.
+The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "new version" check (the version badge reads the build-time `__MANIFEST_VERSION__` constant from `vite.config.ts`), no post-signup Discovery questionnaire, and no Autofix UI. Setup and signup go straight to the dashboard (`/` and `/welcome`). The backend `wingman`/CORS, `version/`, `discovery/` and Autofix modules still exist until #16/#17 remove them; the dashboard no longer calls them, except the generic reliability analytics still served under the legacy `/api/v1/overview/autofix-*` paths (see `RELIABILITY_PATHS` in `packages/frontend/src/services/api/analytics.ts`).
 
 **Three management surfaces share one REST API.** The dashboard, the `mnfst` CLI (`packages/cli/`), and the remote MCP server (`packages/backend/src/mcp/`) all drive the same `/api/v1/*` services with the same tenant scoping. Add a capability to the service layer once, then expose it on whichever surfaces need it; never fork logic per surface. See [CLI login](#cli-login-mnfst-login) and [Remote MCP server](#remote-mcp-server) below.
 
@@ -174,14 +172,13 @@ packages/
 │   │   │   ├── AgentDetail.tsx, AgentProviders.tsx   # Per-harness detail shell (tabs) + provider connections
 │   │   │   ├── MessageLog.tsx               # Paginated Requests log (legacy filename)
 │   │   │   ├── Account.tsx                  # User profile (session data)
-│   │   │   ├── Settings.tsx, SettingsAutofixSection.tsx, SettingsRecordingSection.tsx # Harness settings + Autofix + request-recording toggles
+│   │   │   ├── Settings.tsx, SettingsRecordingSection.tsx # Harness settings + request-recording toggle
 │   │   │   ├── Routing.tsx, RoutingPanels.tsx, RoutingActions.tsx, RoutingDefaultTierSection.tsx, RoutingHeaderTiersSection.tsx, RoutingSpecificitySection.tsx, RoutingTierCard.tsx # LLM routing config (split by concern)
 │   │   │   ├── Limits.tsx                   # Alert rule management — mounted at /harnesses/:agentName/guardrails ("Guardrails" tab)
 │   │   │   ├── ModelPrices.tsx              # Model pricing table
 │   │   │   ├── Playground.tsx               # Prompt playground
 │   │   │   ├── ConnectProvider.tsx          # Provider connection flow
 │   │   │   ├── providers/                   # Subscriptions.tsx, Byok.tsx, Local.tsx, ConnectionDetail.tsx, ProviderConnectionsPage.tsx (/providers/* pages)
-│   │   │   ├── Discovery.tsx                # Self-hosted discovery form (one-time, post-signup)
 │   │   │   ├── Welcome.tsx                  # Post-signup welcome flow (+ welcome-helpers.ts)
 │   │   │   ├── Setup.tsx                    # First-run setup wizard
 │   │   │   ├── Help.tsx                     # Help page
@@ -772,11 +769,11 @@ The id is minted lazily by `InstallIdService.getOrCreate()` (exported from `Tele
 
 **Recording separates the request verdict from attempt audit.** `requests.autofix_status` is the one outcome for the logical request; only `retry_succeeded` means the request was recovered by Autofix. Actual provider calls remain `agent_messages` rows with their own `status`. When Manifest sends a patched retry, the related attempt rows use `autofix_applied`, `autofix_group_id`, `autofix_role`, and `autofix_operations`; Phoenix's decision metadata is exposed by the entity as `autofix_decision` (`{status,issueId,patchId,healAttemptId,explanation}`) and mapped to the retained physical column `autofix_phoenix`. A Phoenix consultation that produces no patched retry must not create a fake provider attempt.
 
-**Frontend:** `pages/SettingsAutofixSection.tsx` — a single on/off toggle in the per-agent **Settings** page (shown for every agent; `services/api/routing.ts` `getAutofix`/`updateAutofix`; `.settings-switch` styling). `components/MessageDetails.tsx` renders the Autofix panel + sibling link.
+**Frontend:** none. The dashboard's Autofix UI (Settings toggle, create-time switch, KPI card, badges, filters, Phoenix panels and the notification bell) was removed in #13; agents are created without `autofix_enabled`, so the self-hosted default (off) applies.
 
 **Self-hosted consent is once, and rides on the per-agent enable.** On self-hosted, consent is remembered via `install_metadata.autofix_consented_at` — a single nullable column on the existing telemetry singleton. Consent is recorded by **any** enable path: the per-agent `PATCH …/autofix` with `enabled: true` (a disable never mints it), the enable-all endpoint, and the Autofix switch on first agent creation. The singleton row is upserted, minting an `install_id` if telemetry never did — so consent alone never starts telemetry.
 
-**The sidebar carries no Autofix card.** The Autofix enablement card duplicated what notifications already cover, and the cards promoting the self-healing product are gone. The sidebar carries no cards. The per-harness **Settings** toggle (`SettingsAutofixSection.tsx`) is the enablement path in the dashboard.
+**The dashboard has no Autofix enablement path** (#13).
 
 `POST /api/v1/autofix/enable-all` remains as an API-level fleet backfill (no dashboard caller): it runs `UPDATE agents SET autofix_enabled = true` for every live, non-playground agent in the tenant (**including any previously turned off**), invalidates the per-tenant config cache, records consent, and returns the refreshed workspace status. Soft-deleted agents are left alone so resurrecting one doesn't silently arrive with Autofix on.
 

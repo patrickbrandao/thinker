@@ -440,7 +440,7 @@ h6 {
   font-size: var(--font-size-sm);
 }
 
-/* Trailing reliability columns (Total requests · Healed · Success rate):
+/* Trailing reliability columns (Total requests · Recovered · Success rate):
    fixed width + right alignment so consecutive tables line up and the trio
    reads as one continuous block down the page. */
 .data-table th.rel-col,
@@ -1570,7 +1570,7 @@ h6 {
 .data-table th[data-col='attempts'] {
   width: 72px;
 }
-.data-table th[data-col='selfheal'] {
+.data-table th[data-col='recovery'] {
   width: 138px;
 }
 .data-table th[data-col] {

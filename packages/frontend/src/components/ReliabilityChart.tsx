@@ -19,28 +19,19 @@ import {
   isMultiDayRange,
   fillDailyGaps,
 } from '../services/chart-utils.js';
-import type { AutofixTimeseries } from '../services/api/analytics.js';
+import type { StatusTimeseries } from '../services/api/analytics.js';
 
 // ---------------------------------------------------------------------------
 // Colors per series mode
 // ---------------------------------------------------------------------------
 const OUTCOME_COLORS: Record<string, string> = {
   success: '#1cc4bf', // --success teal — direct success
-  healed: '#2632ef', // blue — recovered by Autofix (must not read as success)
-  autofix: '#2632ef', // blue — recovered by autofix
   fallback: '#f2c79c', // warm yellow — recovered by fallback
   error: '#EF4444', // --destructive red
-  no_fix_found: '#F59E0B', // amber
-  resolving: '#D1D5DB',
-  ineffective: '#DC2626',
 };
 
 function colorFor(key: string, mode: string, idx: number): string {
   if (mode === 'disposition') return OUTCOME_COLORS[key] ?? '#888';
-  if (mode === 'autofix') {
-    if (key === 'auto-fixed') return '#1cc4bf';
-    return '#EF4444';
-  }
   if (mode === 'http_status') {
     if (key.startsWith('2')) return '#1cc4bf'; // success teal, like every chart
     if (key.startsWith('4')) return '#F59E0B';
@@ -65,11 +56,7 @@ function colorFor(key: string, mode: string, idx: number): string {
 function keyLabel(key: string): string {
   if (key === 'none') return 'No error';
   if (key === 'success') return 'Success';
-  if (key === 'healed') return 'Success - recovered by Autofix';
   if (key === 'error') return 'Error';
-  if (key === 'no_fix_found') return 'No fix found';
-  if (key === 'autofix') return 'Success - recovered by Autofix';
-  if (key === 'auto-fixed') return 'Autofixed';
   if (key === 'fallback') return 'Success - recovered by Fallback';
   return key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
@@ -78,25 +65,23 @@ function keyLabel(key: string): string {
 // Component
 // ---------------------------------------------------------------------------
 export interface ReliabilityChartProps {
-  timeseries: AutofixTimeseries;
+  timeseries: StatusTimeseries;
   range: string;
   seriesMode: string;
 }
 
 /**
  * Fixed reading order for the disposition series — legend AND bar stacking
- * (bottom to top): Success, then healed via Autofix, then healed via
- * Fallback, then Error. Unknown keys keep their incoming order, after these.
+ * (bottom to top): Success, then recovered via Fallback, then Error.
+ * Unknown keys keep their incoming order, after these.
  */
 const SERIES_ORDER: Record<string, number> = {
   success: 0,
-  healed: 1,
-  autofix: 1,
-  fallback: 2,
-  error: 3,
+  fallback: 1,
+  error: 2,
 };
 
-function orderTimeseries(d: AutofixTimeseries | undefined): AutofixTimeseries | undefined {
+function orderTimeseries(d: StatusTimeseries | undefined): StatusTimeseries | undefined {
   if (!d) return d;
   const picked = d.keys
     .map((k, i) => ({ k, i }))
@@ -205,7 +190,7 @@ const ReliabilityChart: Component<ReliabilityChartProps> = (props) => {
                   return;
                 }
                 // One row per series, in the fixed legend/stacking order
-                // (Success, healed via Autofix, via Fallback, Error) — NOT
+                // (Success, recovered via Fallback, Error) — NOT
                 // value-sorted like the per-agent charts.
                 const entries: HoverTooltipState['entries'] = [];
                 let total = 0;

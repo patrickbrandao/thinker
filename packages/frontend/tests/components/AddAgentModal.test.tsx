@@ -84,30 +84,18 @@ describe('AddAgentModal', () => {
     expect(container.textContent).toContain('Name your harness to start tracking');
   });
 
-  it('creates directly with the legal line as the consent act (no dialog)', async () => {
+  it('offers only the logs toggle, with no Autofix switch or third-party legal line', async () => {
     const { input, createBtn } = renderOpen();
-    // Autofix defaults on, so the Terms/Privacy legal line is visible.
-    expect(document.body.textContent).toContain('you agree to Manifest');
-    expect(document.querySelector('a[href="https://manifest.build/terms"]')).not.toBeNull();
-    expect(document.querySelector('a[href="https://manifest.build/privacy"]')).not.toBeNull();
+    const switches = document.querySelectorAll('.settings-switch');
+    expect(switches.length).toBe(1);
+    expect(switches[0]!.getAttribute('aria-label')).toBe('Enable logs');
+    expect(document.body.textContent).not.toContain('Autofix');
+    expect(document.querySelector('a[href^="https://manifest.build"]')).toBeNull();
 
     fireEvent.input(input, { target: { value: 'first-agent' } });
     fireEvent.click(createBtn);
     await vi.waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
-    expect(screen.queryByText('Enable hosted Autofix?')).toBeNull();
-  });
-
-  it('hides the legal line when Autofix is toggled off and still creates', async () => {
-    const { container, input, createBtn } = renderOpen();
-    fireEvent.click(container.querySelector('.settings-switch')!);
-    expect(document.body.textContent).not.toContain('you agree to Manifest');
-
-    fireEvent.input(input, { target: { value: 'disabled-agent' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
-    expect(mockCreateAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ autofix_enabled: false }),
-    );
+    expect(mockCreateAgent.mock.calls[0]![0]).not.toHaveProperty('autofix_enabled');
   });
 
   describe('create races', () => {
@@ -152,7 +140,6 @@ describe('AddAgentModal', () => {
 
       expect(mockNavigate).not.toHaveBeenCalled();
     });
-
   });
 
   it('keeps Create disabled until a non-blank name is entered', () => {
@@ -259,22 +246,19 @@ describe('AddAgentModal', () => {
         name: 'typed',
         agent_category: 'app',
         agent_platform: 'langchain',
-        autofix_enabled: true,
         record_messages: true,
       });
     });
   });
 
-  it('sends toggled-off Autofix and recording when the user flips them', async () => {
+  it('sends toggled-off recording when the user flips it', async () => {
     const { input, createBtn } = renderOpen();
-    // Both switches default on; flip each off before creating.
+    // The logs switch defaults on; flip it off before creating.
     const switches = Array.from(
       document.querySelectorAll('.settings-switch'),
     ) as HTMLButtonElement[];
-    // Order in the modal: Autofix, then Enable logs.
-    expect(switches.length).toBeGreaterThanOrEqual(2);
+    expect(switches.length).toBe(1);
     fireEvent.click(switches[0]!);
-    fireEvent.click(switches[1]!);
     fireEvent.input(input, { target: { value: 'typed' } });
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
@@ -282,7 +266,6 @@ describe('AddAgentModal', () => {
         name: 'typed',
         agent_category: 'personal',
         agent_platform: expect.any(String),
-        autofix_enabled: false,
         record_messages: false,
       });
     });

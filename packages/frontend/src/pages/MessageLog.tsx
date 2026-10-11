@@ -20,7 +20,7 @@ import MultiSelect, { type MultiSelectOption } from '../components/MultiSelect.j
 import { getProviders as getProviderConnections } from '../services/api/providers.js';
 import SetupModal from '../components/SetupModal.jsx';
 import { DETAILED_COLUMNS, type MessageRow } from '../components/message-table-types.js';
-import { AutofixIcon, FallbackIcon } from '../components/message-table-cells.jsx';
+import { FallbackIcon } from '../components/message-table-cells.jsx';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
 import {
@@ -78,7 +78,7 @@ const HEADER_TIER_FILTER_PREFIX = 'header:';
 const MESSAGE_STATUS_FILTERS = ['ok', 'failed', 'cancelled'] as const;
 type MessageStatusFilter = (typeof MESSAGE_STATUS_FILTERS)[number];
 type MessageStatusFilterValue = '' | MessageStatusFilter;
-const MESSAGE_TRIGGER_FILTERS = ['none', 'fallback', 'autofix'] as const;
+const MESSAGE_TRIGGER_FILTERS = ['none', 'fallback'] as const;
 type MessageTriggerFilter = (typeof MESSAGE_TRIGGER_FILTERS)[number];
 
 const isMessageStatusFilter = (value: unknown): value is MessageStatusFilter =>
@@ -104,7 +104,7 @@ const normalizeTriggerFilters = (value: unknown): MessageTriggerFilter[] =>
   typeof value === 'string' ? value.split(',').filter(isMessageTriggerFilter) : [];
 
 /** The recovery select's states: default, any kind, one kind, or none at all. */
-const TRIGGER_CHOICES = ['any', 'autofix', 'fallback', 'none'] as const;
+const TRIGGER_CHOICES = ['fallback', 'none'] as const;
 type TriggerChoice = '' | (typeof TRIGGER_CHOICES)[number];
 
 const isTriggerChoice = (value: unknown): value is TriggerChoice =>
@@ -243,19 +243,13 @@ const MessageLog: Component = () => {
     );
   });
   // A plain select over the useful recovery readings. The wire stays a comma
-  // list (?trigger=autofix,fallback), so 'any' folds both kinds and existing
-  // deep links keep working.
+  // list (?trigger=fallback); unknown kinds in an old deep link are ignored.
   const triggerListToChoice = (list: MessageTriggerFilter[]): TriggerChoice => {
-    if (list.includes('autofix') && list.includes('fallback')) return 'any';
-    if (list.includes('autofix')) return 'autofix';
     if (list.includes('fallback')) return 'fallback';
     if (list.includes('none')) return 'none';
     return '';
   };
-  const triggerChoiceToParam = (choice: TriggerChoice): string | undefined => {
-    if (choice === 'any') return 'autofix,fallback';
-    return choice || undefined;
-  };
+  const triggerChoiceToParam = (choice: TriggerChoice): string | undefined => choice || undefined;
   const [triggerFilter, setTriggerFilter] = createSignal<TriggerChoice>(
     triggerListToChoice(normalizeTriggerFilters(searchParams.trigger)),
   );
@@ -632,26 +626,6 @@ const MessageLog: Component = () => {
   const triggerOptions = [
     { label: 'All attempts', value: '' },
     {
-      label: 'With any recovery attempt',
-      value: 'any',
-      icon: (
-        <span class="recovery-opt-icon" aria-hidden="true">
-          <AutofixIcon />
-          <span class="recovery-opt-icon__plus">+</span>
-          <FallbackIcon />
-        </span>
-      ),
-    },
-    {
-      label: 'With an autofix attempt',
-      value: 'autofix',
-      icon: (
-        <span class="recovery-opt-icon" aria-hidden="true">
-          <AutofixIcon />
-        </span>
-      ),
-    },
-    {
       label: 'With a fallback attempt',
       value: 'fallback',
       icon: (
@@ -673,15 +647,6 @@ const MessageLog: Component = () => {
     { label: 'Transport', value: 'transport' },
   ];
 
-  // Jump to a linked message (the Autofix sibling of an expanded row).
-  const scrollToMessage = (id: string) => {
-    const el = document.getElementById(`msg-${id}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('msg-highlight');
-    setTimeout(() => el.classList.remove('msg-highlight'), 2000);
-  };
-
   // Drawer state. `?request=<id>` deep-links a request into the side panel
   // (the Recent Requests lists navigate here instead of expanding inline).
   const [selectedMessageId, setSelectedMessageId] = createSignal<string | null>(
@@ -692,11 +657,6 @@ const MessageLog: Component = () => {
     setSelectedMessageId(null);
     if (searchParams.request) setSearchParams({ request: undefined });
   };
-  const handleOpenMessageInDrawer = (id: string) => {
-    closeDrawer();
-    setTimeout(() => openDrawer(id), 100);
-  };
-
   // Close drawer when clicking outside the table (not on a message row)
   const handlePageClick = (e: MouseEvent) => {
     if (!selectedMessageId()) return;
@@ -975,7 +935,6 @@ const MessageLog: Component = () => {
                   agentName={params.agentName}
                   customProviderName={() => undefined}
                   agentPlatformLookup={(name) => agentPlatformMap().get(name)}
-                  onOpenMessage={scrollToMessage}
                   onRowSelect={openDrawer}
                   selectedRowId={selectedMessageId()}
                   rowIdPrefix="msg-"
@@ -1006,11 +965,7 @@ const MessageLog: Component = () => {
           onClose={() => setSetupOpen(false)}
         />
       </Show>
-      <RequestDrawer
-        messageId={selectedMessageId()}
-        onClose={closeDrawer}
-        onOpenMessage={handleOpenMessageInDrawer}
-      />
+      <RequestDrawer messageId={selectedMessageId()} onClose={closeDrawer} />
     </div>
   );
 };

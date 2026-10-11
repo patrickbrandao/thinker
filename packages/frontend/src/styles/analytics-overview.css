@@ -109,34 +109,17 @@
   top: -5px;
 }
 
-/* Accent variants: each recovery KPI wears its chart series colour (blue =
-   recovered by Autofix, teal green = recovered by fallback) and the failed
-   card reads destructive, label included.
+/* Accent variants: the recovery KPI wears its chart series colour (teal
+   green = recovered by fallback) and the failed card reads destructive,
+   label included.
 
    The backgrounds are three layers in one `background-image` (the house recipe —
-   the autofix/fallback icon squares are built the same way, card-sized):
+   the fallback icon square is built the same way, card-sized):
    1. a diagonal fade of the card's colour toward transparent,
    2. a denser, darker glow anchored in the top-right corner (the "blurred
       shape" — a radial does it without an extra node or a GPU blur),
    3. a faint echo in the opposite corner for mesh-like depth.
    The glow sits opposite the text, so values keep their contrast. */
-.overview-stat-card--autofix {
-  background-color: hsl(var(--card));
-  background-image:
-    radial-gradient(ellipse 90% 95% at 100% 0%, rgba(21, 30, 180, 0.2), transparent 55%),
-    radial-gradient(ellipse 70% 80% at 0% 100%, rgba(38, 50, 239, 0.07), transparent 50%),
-    linear-gradient(135deg, rgba(38, 50, 239, 0.13), rgba(38, 50, 239, 0));
-  border-color: rgba(38, 50, 239, 0.25);
-}
-
-.overview-stat-card--autofix:hover {
-  border-color: rgba(38, 50, 239, 0.45);
-}
-
-.overview-stat-card--autofix .overview-stat-card__value {
-  color: #2632ef;
-}
-
 .overview-stat-card--fallback {
   background-color: hsl(var(--card));
   background-image:
@@ -173,19 +156,6 @@
 
 /* Dark mode: quieter fades (the dark card does the work), brighter glows
    (on a dark ground it is the glow that carries the colour). */
-.dark .overview-stat-card--autofix {
-  background-color: hsl(var(--card));
-  background-image:
-    radial-gradient(ellipse 90% 95% at 100% 0%, rgba(80, 95, 255, 0.28), transparent 55%),
-    radial-gradient(ellipse 70% 80% at 0% 100%, rgba(38, 50, 239, 0.1), transparent 50%),
-    linear-gradient(135deg, rgba(38, 50, 239, 0.16), rgba(38, 50, 239, 0));
-  border-color: rgba(99, 112, 255, 0.35);
-}
-
-.dark .overview-stat-card--autofix .overview-stat-card__value {
-  color: #8f9bff;
-}
-
 .dark .overview-stat-card--fallback {
   background-color: hsl(var(--card));
   background-image:

@@ -44,23 +44,6 @@ export function HeartbeatIcon(): JSX.Element {
   );
 }
 
-export function AutofixIcon(): JSX.Element {
-  return (
-    <span class="autofix-icon">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="12"
-        height="12"
-        fill="currentColor"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path d="m21.45 11.11-3-1.5-2.68-1.34-.03-.03-1.34-2.68-1.5-3c-.34-.68-1.45-.68-1.79 0l-1.5 3-1.34 2.68-.03.03-2.68 1.34-3 1.5c-.34.17-.55.52-.55.89s.21.72.55.89l3 1.5 2.68 1.34.03.03 1.34 2.68 1.5 3c.17.34.52.55.89.55s.72-.21.89-.55l1.5-3 1.34-2.68.03-.03 2.68-1.34 3-1.5c.34-.17.55-.52.55-.89s-.21-.72-.55-.89Z" />
-      </svg>
-    </span>
-  );
-}
-
 export function FallbackIcon(): JSX.Element {
   return (
     <span class="fallback-icon">
@@ -90,7 +73,7 @@ const HEADER_LABELS: Record<MessageColumnKey, string> = {
   duration: 'Latency',
   status: 'Status',
   attempts: 'Attempts',
-  selfheal: 'Recovery attempts',
+  recovery: 'Recovery attempts',
   agent: 'Harness',
 };
 
@@ -341,35 +324,20 @@ export function AttemptsCell(item: MessageRow): JSX.Element {
   return <td style={MONO_XS}>{item.attempt_count ?? 1}</td>;
 }
 
-export function SelfHealCell(item: MessageRow): JSX.Element {
-  const hasAutofix = !!item.autofix_applied;
-  const hasFallback = !!item.fallback_from_model;
-
-  if (!hasAutofix && !hasFallback) return <td style={MONO_XS}>{'\u2014'}</td>;
+export function RecoveryCell(item: MessageRow): JSX.Element {
+  if (!item.fallback_from_model) return <td style={MONO_XS}>{'\u2014'}</td>;
 
   return (
     <td>
       <span style="display: inline-flex; align-items: center; gap: 4px;">
-        {hasAutofix && (
-          <span
-            class="trigger-badge trigger-badge--autofix"
-            title="Autofix"
-            style="padding: 1px 3px;"
-          >
-            <AutofixIcon />
-            autofix
-          </span>
-        )}
-        {hasFallback && (
-          <span
-            class="trigger-badge trigger-badge--fallback"
-            title="Fallback"
-            style="padding: 1px 3px;"
-          >
-            <FallbackIcon />
-            fallback
-          </span>
-        )}
+        <span
+          class="trigger-badge trigger-badge--fallback"
+          title="Fallback"
+          style="padding: 1px 3px;"
+        >
+          <FallbackIcon />
+          fallback
+        </span>
       </span>
     </td>
   );
@@ -488,8 +456,8 @@ export function renderCell(
       return StatusCell(item, ctx.agentName);
     case 'attempts':
       return AttemptsCell(item);
-    case 'selfheal':
-      return SelfHealCell(item);
+    case 'recovery':
+      return RecoveryCell(item);
     case 'agent':
       return AgentCell(item, ctx.agentPlatformLookup);
   }

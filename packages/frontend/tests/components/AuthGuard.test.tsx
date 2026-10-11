@@ -32,21 +32,10 @@ describe('AuthGuard', () => {
     mockLocation = { pathname: '/', search: '' };
   });
 
-  it('redirects to the discovery step when it is still pending for the user', async () => {
+  it('ignores a leftover discovery marker and renders the app (no post-signup detour)', async () => {
+    // Builds before #13 stored this marker after signup/setup to force a
+    // questionnaire. It must no longer route anyone anywhere.
     localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    render(() => (
-      <AuthGuard>
-        <span>Protected content</span>
-      </AuthGuard>
-    ));
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/discovery?next=%2Fwelcome', { replace: true });
-    });
-  });
-
-  it('does not redirect away from the discovery page itself while pending', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
-    mockLocation = { pathname: '/discovery', search: '?next=%2Fwelcome' };
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
@@ -56,8 +45,7 @@ describe('AuthGuard', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('lets the MCP consent page through even while onboarding is pending', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+  it('lets the MCP consent page through with an authenticated session', async () => {
     mockLocation = { pathname: '/consent', search: '?client_id=c' };
     render(() => (
       <AuthGuard>
@@ -77,8 +65,8 @@ describe('AuthGuard', () => {
     expect(await screen.findByText('Protected content')).toBeDefined();
   });
 
-  it('does not render children while redirecting to the pending discovery step', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+  it('does not render children while redirecting to login', async () => {
+    mockSessionData = { data: null, isPending: false };
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
