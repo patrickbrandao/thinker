@@ -22,6 +22,11 @@ import { getBedrockRuntimeCapabilities } from '../bedrock-runtime-capabilities';
 import { getQwenCompatibleBaseUrl } from '../qwen-region';
 import { getXiaomiTokenPlanBaseUrl } from '../xiaomi-region';
 import { getZaiCodingPlanBaseUrl } from '../zai-region';
+import {
+  buildLocalServerHeaders,
+  getLocalServerBaseUrl,
+  type LocalServerId,
+} from '../../common/constants/local-servers';
 import { buildKiroHeaders, KIRO_BASE_URL, KIRO_CHAT_TARGET } from './kiro-adapter';
 
 export interface ProviderEndpoint {
@@ -86,6 +91,22 @@ const pioneerHeaders = (apiKey: string) => ({
 });
 
 const openaiPath = () => '/v1/chat/completions';
+
+/**
+ * LM Studio and llama-server speak OpenAI Chat Completions under `/v1`. The
+ * base URL is a getter so `THINKER_<ID>_BASE_URL` and the container host
+ * alias are read when the request is forwarded, not at import time.
+ */
+const localServerEndpoint = (id: LocalServerId): ProviderEndpoint => ({
+  get baseUrl() {
+    return getLocalServerBaseUrl(id);
+  },
+  buildHeaders: buildLocalServerHeaders,
+  buildPath: openaiPath,
+  format: 'openai',
+  ...openaiStreamUsage,
+});
+
 const BEDROCK_OPENAI_MODEL_RE = /(?:^|\.)openai\./i;
 // Bedrock rejects `/v1/responses` for the numbered GPT families from GPT-5 on
 // (gpt-5.x, gpt-6-*, ...); they need the namespaced path. GPT OSS stays on the
@@ -586,6 +607,8 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     format: 'openai',
     ...openaiStreamUsage,
   },
+  lmstudio: localServerEndpoint('lmstudio'),
+  llamacpp: localServerEndpoint('llamacpp'),
   kiro: {
     baseUrl: KIRO_BASE_URL,
     buildHeaders: (apiKey: string) => buildKiroHeaders(apiKey, KIRO_CHAT_TARGET),
