@@ -31,7 +31,7 @@ export const MANIFEST_ERRORS = {
   M006: {
     title: 'Conflicting API keys',
     template:
-      'The request carries two different keys, one in "Authorization: Bearer" and another in "x-api-key". Send only one of them, or the same key in both.',
+      'The Authorization and x-api-key headers carry different credentials. Send your key in only one of them, or the same key in both.',
   },
   M100: {
     title: 'Provider API key missing',

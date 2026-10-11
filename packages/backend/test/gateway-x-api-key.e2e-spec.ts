@@ -7,7 +7,8 @@
  * AgentKeyAuthGuard, ProxyExceptionFilter, routing, credential resolution and
  * the provider client — with only the provider transport stubbed, and assert:
  *
- *   - every gateway route accepts the key on `x-api-key`;
+ *   - every route behind AgentKeyAuthGuard accepts the key on `x-api-key`
+ *     (`/v1/*`, `/api/v1/agent/*`, `/api/v1/routing/*`);
  *   - two different keys on one request are refused with M006;
  *   - the caller's key never crosses to the provider: the upstream request
  *     carries the provider's own credential and nothing else;
@@ -27,6 +28,7 @@ import { encrypt, getEncryptionSecret } from '../src/common/utils/crypto.util';
 import { ModelPricingCacheService } from '../src/model-prices/model-pricing-cache.service';
 import { PricingSyncService } from '../src/database/pricing-sync.service';
 import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
+import { API_KEY_PREFIX } from '../src/common/constants/api-key.constants';
 
 let app: INestApplication;
 let ds: DataSource;
@@ -46,7 +48,8 @@ const ANTHROPIC_HOST = 'api.anthropic.com';
 const OPENAI_HOST = 'api.openai.com';
 const ANTHROPIC_PROVIDER_KEY = 'fake-anthropic-provider-key';
 const OPENAI_PROVIDER_KEY = 'sk-fake-openai-provider-key';
-const OTHER_AGENT_KEY = 'mnfst_some-other-agent-key-0001';
+/** Well-formed, but belongs to no agent. */
+const OTHER_AGENT_KEY = `${API_KEY_PREFIX}some-other-agent-key-0001`;
 
 const api = () => request(app.getHttpServer());
 
@@ -401,6 +404,49 @@ describe('x-api-key on the gateway routes (e2e)', () => {
     });
   });
 
+  describe('agent API routes outside /v1', () => {
+    it('GET /api/v1/agent/usage accepts x-api-key', async () => {
+      const res = await api()
+        .get('/api/v1/agent/usage')
+        .set('x-api-key', TEST_OTLP_KEY)
+        .expect(200);
+
+      expect(res.body).toBeDefined();
+    });
+
+    it('POST /api/v1/routing/resolve accepts x-api-key', async () => {
+      const res = await api()
+        .post('/api/v1/routing/resolve')
+        .set('x-api-key', TEST_OTLP_KEY)
+        .send({ messages: [{ role: 'user', content: 'hello' }] })
+        .expect(200);
+
+      expect(res.body.tier).toBeDefined();
+    });
+
+    it('refuses conflicting keys there with a plain 401 (no gateway M006 envelope)', async () => {
+      const res = await api()
+        .get('/api/v1/agent/usage')
+        .set('Authorization', `Bearer ${TEST_OTLP_KEY}`)
+        .set('x-api-key', OTHER_AGENT_KEY)
+        .expect(401);
+
+      expect(res.body.message).toBe('Conflicting API key headers');
+      expect(JSON.stringify(res.body)).not.toContain(TEST_OTLP_KEY);
+      expect(JSON.stringify(res.body)).not.toContain(OTHER_AGENT_KEY);
+    });
+
+    it('refuses an unknown x-api-key there with a plain 401', async () => {
+      const res = await api()
+        .post('/api/v1/routing/resolve')
+        .set('x-api-key', OTHER_AGENT_KEY)
+        .send({ messages: [{ role: 'user', content: 'hello' }] })
+        .expect(401);
+
+      expect(res.body.message).toBe('Invalid API key');
+    });
+  });
+
   it('never persists the x-api-key header in recorded request headers', async () => {
     await api()
       .post('/v1/messages')
@@ -414,23 +460,26 @@ describe('x-api-key on the gateway routes (e2e)', () => {
       })
       .expect(200);
 
-    // Wait for the fire-and-forget recorder to land the marked rows.
-    const deadline = Date.now() + 5000;
-    let rows: Array<{ headers: string }> = [];
-    while (Date.now() < deadline) {
-      rows = (await ds.query(
-        `SELECT request_headers::text AS headers FROM requests
-          WHERE request_headers::text LIKE '%x-xak-marker%'
-         UNION ALL
-         SELECT request_headers::text AS headers FROM agent_messages
+    // The recorder is fire-and-forget: wait until BOTH the Request row and its
+    // provider-attempt row have landed, so neither table is skipped.
+    const markedRows = async (table: 'requests' | 'agent_messages') =>
+      (await ds.query(
+        `SELECT request_headers::text AS headers FROM ${table}
           WHERE request_headers::text LIKE '%x-xak-marker%'`,
       )) as Array<{ headers: string }>;
-      if (rows.length > 0) break;
+    const deadline = Date.now() + 5000;
+    let requestRows: Array<{ headers: string }> = [];
+    let attemptRows: Array<{ headers: string }> = [];
+    while (Date.now() < deadline) {
+      requestRows = await markedRows('requests');
+      attemptRows = await markedRows('agent_messages');
+      if (requestRows.length > 0 && attemptRows.length > 0) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
+    expect(requestRows.length).toBeGreaterThan(0);
+    expect(attemptRows.length).toBeGreaterThan(0);
+    for (const row of [...requestRows, ...attemptRows]) {
       expect(row.headers).toContain('anthropic-version');
       expect(row.headers.toLowerCase()).not.toContain('x-api-key');
       expect(row.headers).not.toContain(TEST_OTLP_KEY);

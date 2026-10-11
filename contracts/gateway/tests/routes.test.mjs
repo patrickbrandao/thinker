@@ -113,11 +113,12 @@ test('POST /v1/messages reads the agent key from x-api-key', async () => {
   });
 
   assertAuthenticationRequired('/v1/messages', result);
-  // The key was read and checked, not reported as missing (M001).
-  assert.doesNotMatch(
+  // The key was read and looked up (M005 "key not recognized"), not reported
+  // as missing (M001) or malformed (M003).
+  assert.match(
     result.body.error.message,
-    /\bM001\b/,
-    `/v1/messages ignored the x-api-key header: ${result.text}`,
+    /\bM005\b/,
+    `/v1/messages did not check the x-api-key header: ${result.text}`,
   );
 });
 

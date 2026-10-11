@@ -126,7 +126,7 @@ describe('ProxyExceptionFilter', () => {
       expect(res.status).toHaveBeenCalledWith(200);
       const content = res.json.mock.calls[0][0].choices[0].message.content;
       expect(content).toContain('[🦚 Manifest M006]');
-      expect(content).toContain('two different keys');
+      expect(content).toContain('Authorization and x-api-key headers carry different credentials');
     });
   });
 
