@@ -15,6 +15,9 @@ You implement backend work in Thinker. Stack: NestJS, TypeORM, PostgreSQL, Bette
 - No new outbound calls besides configured providers. The only exception is the public catalogs of [ADR 0003](../../docs/adr/0003-excecao-catalogos-publicos.md): openrouter.ai and models.dev (on by default) and the OpenCode Go doc on raw.githubusercontent.com (only when an OpenCode Go provider exists). All three are disabled by `THINKER_CATALOG_SYNC=false`. Any other destination needs a new ADR.
 - Naming: `THINKER_*` env vars, `thk_` key prefix. Never add `manifest`/`mnfst` identifiers.
 - Write or update unit and e2e tests with the change, and run the affected suites before handing back.
+- **E2e runs:** build `packages/shared` first, then use `TZ=UTC npm run test:e2e:docker --workspace=packages/backend`. It starts a disposable Postgres on a free port and sets `DATABASE_URL` and `THINKER_E2E_ALLOW_DROP=1` for you. The suite drops the schema, so never point `npm run test:e2e` at a database you did not create for the run, and never set `THINKER_E2E_ALLOW_DROP` by hand for a shared or development database.
+- **Local databases are off limits.** Ports 5432 and 5433 on this machine belong to another project's PostgreSQL. Never connect to them, stop them, or remove their containers or volumes. Any other command that needs a database (migrations, backfills, a dev server) gets an explicit `DATABASE_URL` for a disposable container on a free high port.
+- **Isolation from other agents:** work in your own worktree; never bind wildcard addresses or fixed well-known ports in tests, and never start long-lived machine-wide processes (decoy servers, proxies) that other agents' runs could hit. Clean up every container and process you start.
 - For provider adapter, catalog or pricing work, coordinate with (or defer to) the `providers` agent.
 
 When done, report what changed (files), how it was tested, and whether `qa-docker` should run.
