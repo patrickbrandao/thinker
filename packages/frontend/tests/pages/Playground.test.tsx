@@ -221,8 +221,9 @@ vi.mock('../../src/components/playground/PlaygroundHistoryDrawer.jsx', () => ({
   ),
 }));
 
-// Real header helpers (blankEntry/isBlockedHeaderKey/toHeaderRecord) but a
-// stubbed popover component so we can drive open/close + onChange.
+// The header helpers and storage (services/playground-request-headers) stay
+// real; only the popover component is stubbed so we can drive open/close +
+// onChange.
 vi.mock('../../src/components/playground/RequestHeadersPopover.jsx', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -750,7 +751,7 @@ describe('Playground page', () => {
   });
 
   describe('request headers (real helpers)', () => {
-    it('opens/closes the popover and seeds a blank entry, persisting active header count', async () => {
+    it('opens/closes the popover, counts active headers and persists names only', async () => {
       render(() => <Playground />);
       await find('prompt');
       const trigger = document.querySelector('[aria-label="Request headers"]') as HTMLElement;
@@ -758,13 +759,18 @@ describe('Playground page', () => {
       await waitFor(() =>
         expect(document.querySelector('[data-testid="headers-open"]')?.textContent).toBe('open'),
       );
-      // onChange with a real header → persisted via persistHeaders + counted.
+      // onChange with a real header: the name is persisted, the value is not.
       fireEvent.click(await find('headers-change'));
       await waitFor(() =>
-        expect(lsStore['manifest.playground.requestHeaders']).toContain('X-Custom'),
+        expect(lsStore['thinker.playground.requestHeaderNames']).toBe('["X-Custom"]'),
       );
-      // A blocked + empty header contributes 0 to activeHeaderCount.
+      expect(JSON.stringify(lsStore)).not.toContain('v1');
+      expect(document.querySelector('.playground-prompt__headers-badge')?.textContent).toBe('1');
+      // A blocked + empty header contributes 0 and leaves nothing to persist.
       fireEvent.click(await find('headers-change-blocked'));
+      await waitFor(() => expect(lsStore['thinker.playground.requestHeaderNames']).toBeUndefined());
+      expect(JSON.stringify(lsStore)).not.toContain('secret');
+      expect(document.querySelector('.playground-prompt__headers-badge')).toBeNull();
       // Close via the popover and via the toggle.
       fireEvent.click(await find('headers-close'));
       await waitFor(() =>
@@ -775,33 +781,65 @@ describe('Playground page', () => {
       expect(document.querySelector('[data-testid="headers-open"]')?.textContent).toBe('closed');
     });
 
-    it('restores persisted header entries on mount (loadStoredHeaders parse path)', async () => {
+    it('restores saved header names on mount, with empty values', async () => {
+      lsStore['thinker.playground.requestHeaderNames'] = JSON.stringify(['X-A', 'X-B']);
+      render(() => <Playground />);
+      await find('prompt');
+      expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('2');
+      // No values are restored, so nothing is active yet.
+      expect(document.querySelector('.playground-prompt__headers-badge')).toBeNull();
+    });
+
+    // Issue #105: earlier builds stored values (even for blocked names) in plain text.
+    it('migrates legacy stored entries on mount and wipes their values', async () => {
       lsStore['manifest.playground.requestHeaders'] = JSON.stringify([
         { id: 'h1', key: 'X-A', value: '1' },
-        { id: 'h2', key: 'X-B', value: '2' },
+        { id: 'h2', key: 'Authorization', value: 'Bearer sk-secret' },
+        { id: 'h3', key: 'X-B', value: 'tok-secret' },
         'not-an-entry',
       ]);
       render(() => <Playground />);
       await find('prompt');
-      // The badge reflects the 2 valid persisted headers (count > 0 branch).
-      await waitFor(() => {
-        const badge = document.querySelector('.playground-prompt__headers-badge');
-        expect(badge?.textContent).toBe('2');
-      });
+      expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('2');
+      expect(lsStore['manifest.playground.requestHeaders']).toBeUndefined();
+      expect(lsStore['thinker.playground.requestHeaderNames']).toBe('["X-A","X-B"]');
+      expect(JSON.stringify(lsStore)).not.toContain('secret');
+      expect(document.querySelector('.playground-prompt__headers-badge')).toBeNull();
     });
 
     it('falls back to no entries when stored headers JSON is malformed', async () => {
       lsStore['manifest.playground.requestHeaders'] = '{not json';
+      lsStore['thinker.playground.requestHeaderNames'] = '{not json';
       render(() => <Playground />);
       await find('prompt');
-      expect(document.querySelector('.playground-prompt__headers-badge')).toBeNull();
+      expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
+      expect(lsStore['manifest.playground.requestHeaders']).toBeUndefined();
+      expect(lsStore['thinker.playground.requestHeaderNames']).toBeUndefined();
     });
 
     it('falls back to no entries when stored headers is not an array', async () => {
-      lsStore['manifest.playground.requestHeaders'] = JSON.stringify({ not: 'array' });
+      lsStore['thinker.playground.requestHeaderNames'] = JSON.stringify({ not: 'array' });
       render(() => <Playground />);
       await find('prompt');
-      expect(document.querySelector('.playground-prompt__headers-badge')).toBeNull();
+      expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
+    });
+
+    it('mounts with no entries when reading localStorage throws', async () => {
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => {
+          if (k.includes('requestHeader')) throw new Error('SecurityError');
+          return lsStore[k] ?? null;
+        },
+        setItem: (k: string, v: string) => {
+          lsStore[k] = v;
+        },
+        removeItem: (k: string) => {
+          delete lsStore[k];
+        },
+      });
+      render(() => <Playground />);
+      await find('prompt');
+      expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
     });
 
     it('silently ignores a localStorage write failure when persisting headers', async () => {
@@ -820,7 +858,7 @@ describe('Playground page', () => {
           delete lsStore[k];
         },
       });
-      // onChange triggers updateHeaders → persistHeaders → swallowed throw.
+      // onChange triggers updateHeaders → persistHeaderNames → swallowed throw.
       expect(() =>
         fireEvent.click(document.querySelector('[data-testid="headers-change"]') as HTMLElement),
       ).not.toThrow();

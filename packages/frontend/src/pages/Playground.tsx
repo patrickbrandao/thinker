@@ -32,12 +32,15 @@ import PlaygroundSummaryTable from '../components/playground/PlaygroundSummaryTa
 import PlaygroundModelPicker from '../components/playground/PlaygroundModelPicker.jsx';
 import PlaygroundEmptyState from '../components/playground/PlaygroundEmptyState.jsx';
 import PlaygroundRecentSidebar from '../components/playground/PlaygroundHistoryDrawer.jsx';
-import RequestHeadersPopover, {
+import RequestHeadersPopover from '../components/playground/RequestHeadersPopover.jsx';
+import {
+  activeHeaderCount,
   blankEntry,
-  isBlockedHeaderKey,
+  loadStoredHeaderEntries,
+  persistHeaderNames,
   toHeaderRecord,
   type HeaderEntry,
-} from '../components/playground/RequestHeadersPopover.jsx';
+} from '../services/playground-request-headers.js';
 import { CodeIcon } from '../components/playground/icons.jsx';
 import { useRightSidebar } from '../services/right-sidebar.jsx';
 
@@ -46,48 +49,6 @@ import { useRightSidebar } from '../services/right-sidebar.jsx';
 // its `routing-modal__*` and capability-badge classes.
 import '../styles/playground.css';
 import '../styles/routing.css';
-
-const REQUEST_HEADERS_STORAGE_KEY = 'manifest.playground.requestHeaders';
-
-function loadStoredHeaders(): HeaderEntry[] {
-  try {
-    const raw = localStorage.getItem(REQUEST_HEADERS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (e): e is HeaderEntry =>
-          typeof e === 'object' &&
-          e !== null &&
-          typeof (e as HeaderEntry).id === 'string' &&
-          typeof (e as HeaderEntry).key === 'string' &&
-          typeof (e as HeaderEntry).value === 'string',
-      )
-      .slice(0, 20);
-  } catch {
-    return [];
-  }
-}
-
-function persistHeaders(entries: HeaderEntry[]): void {
-  try {
-    localStorage.setItem(REQUEST_HEADERS_STORAGE_KEY, JSON.stringify(entries));
-  } catch {
-    /* quota / private mode — silently ignore */
-  }
-}
-
-function activeHeaderCount(entries: HeaderEntry[]): number {
-  let n = 0;
-  for (const e of entries) {
-    const k = e.key.trim();
-    if (!k || !e.value) continue;
-    if (isBlockedHeaderKey(k)) continue;
-    n++;
-  }
-  return n;
-}
 
 function findDisplayName(
   available: { model_name: string; display_name?: string | null }[],
@@ -183,7 +144,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   const [completedResults, setCompletedResults] = createSignal<
     import('../services/playground-store.js').PlaygroundColumn[] | null
   >(null);
-  const [headerEntries, setHeaderEntries] = createSignal<HeaderEntry[]>(loadStoredHeaders());
+  const [headerEntries, setHeaderEntries] = createSignal<HeaderEntry[]>(loadStoredHeaderEntries());
   const [headersOpen, setHeadersOpen] = createSignal(false);
   // Best pick for a run shown read-only as an overlay (store isn't loaded in
   // that path, so its best state is tracked separately).
@@ -273,7 +234,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
 
   const updateHeaders = (entries: HeaderEntry[]) => {
     setHeaderEntries(entries);
-    persistHeaders(entries);
+    persistHeaderNames(entries);
   };
 
   const openHeaders = () => {

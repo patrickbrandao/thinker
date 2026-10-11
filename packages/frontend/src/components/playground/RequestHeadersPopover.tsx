@@ -1,13 +1,12 @@
 import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
-import { isPlaygroundHeaderBlocked } from 'manifest-shared';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
+import {
+  blankEntry,
+  headerEntryIssue,
+  type HeaderEntry,
+  type HeaderIssue,
+} from '../../services/playground-request-headers.js';
 import { PlusIcon, TrashIcon, XIcon } from './icons.jsx';
-
-export interface HeaderEntry {
-  id: string;
-  key: string;
-  value: string;
-}
 
 interface Props {
   open: boolean;
@@ -16,28 +15,18 @@ interface Props {
   onClose: () => void;
 }
 
-/**
- * Mirrors the server-side blocklist (shared list) so the user sees a warning
- * on exactly the headers the backend drops. The server still enforces it.
- */
-export function isBlockedHeaderKey(key: string): boolean {
-  return isPlaygroundHeaderBlocked(key);
-}
-
-export function toHeaderRecord(entries: HeaderEntry[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const e of entries) {
-    const key = e.key.trim();
-    if (!key || isBlockedHeaderKey(key)) continue;
-    if (!e.value) continue;
-    out[key] = e.value;
+/** Warning shown under a row the server will drop. */
+export function headerIssueMessage(name: string, issue: HeaderIssue): string {
+  switch (issue) {
+    case 'blocked':
+      return `${name} is reserved by Thinker and will be dropped.`;
+    case 'invalid-name':
+      return `${name} is not a valid header name and will be dropped. Use only letters, digits and ! # $ % & ' * + - . ^ _ \` | ~ (no spaces).`;
+    case 'control-chars':
+      return `The value of ${name} contains control characters (such as line breaks), so the header will be dropped.`;
+    case 'unsupported-chars':
+      return `The value of ${name} contains characters a header can't carry (above U+00FF, such as emoji), so the header will be dropped.`;
   }
-  return out;
-}
-
-let nextId = 1;
-export function blankEntry(): HeaderEntry {
-  return { id: `h-${++nextId}-${Date.now().toString(36)}`, key: '', value: '' };
 }
 
 const RequestHeadersPopover: Component<Props> = (props) => {
@@ -94,8 +83,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         </header>
 
         <p class="playground-headers__hint">
-          Added to every provider call for this playground. Manifest-managed headers (Authorization,
-          Content-Type, x-manifest-*) are ignored.
+          Added to every provider call for this playground. Thinker-managed headers (Authorization,
+          Content-Type, x-thinker-*) are ignored. Only header names are saved in this browser;
+          values are kept until you leave the page.
         </p>
 
         <Show when={props.entries.length === 0}>
@@ -105,11 +95,18 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         <div class="playground-headers__rows">
           <For each={props.entries}>
             {(entry) => {
-              const blocked = () => isBlockedHeaderKey(entry.key);
+              const issue = () => headerEntryIssue(entry);
+              const nameIssue = () => issue() === 'blocked' || issue() === 'invalid-name';
+              const valueIssue = () =>
+                issue() === 'control-chars' || issue() === 'unsupported-chars';
               return (
                 <div
                   class="playground-headers__row"
-                  classList={{ 'playground-headers__row--blocked': blocked() }}
+                  classList={{
+                    'playground-headers__row--blocked': issue() === 'blocked',
+                    'playground-headers__row--invalid-name': issue() === 'invalid-name',
+                    'playground-headers__row--invalid-value': valueIssue(),
+                  }}
                 >
                   <input
                     type="text"
@@ -117,6 +114,7 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                     placeholder="Header"
                     value={entry.key}
                     aria-label="Header name"
+                    aria-invalid={nameIssue() ? 'true' : undefined}
                     spellcheck={false}
                     autocomplete="off"
                     onInput={(e) => update(entry.id, { key: e.currentTarget.value })}
@@ -127,6 +125,7 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                     placeholder="Value"
                     value={entry.value}
                     aria-label="Header value"
+                    aria-invalid={valueIssue() ? 'true' : undefined}
                     spellcheck={false}
                     autocomplete="off"
                     onInput={(e) => update(entry.id, { value: e.currentTarget.value })}
@@ -139,10 +138,12 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   >
                     <TrashIcon size={14} />
                   </button>
-                  <Show when={blocked()}>
-                    <p class="playground-headers__warning">
-                      {entry.key.trim()} is reserved by Thinker and will be dropped.
-                    </p>
+                  <Show when={issue()}>
+                    {(current) => (
+                      <p class="playground-headers__warning">
+                        {headerIssueMessage(entry.key.trim(), current())}
+                      </p>
+                    )}
                   </Show>
                 </div>
               );

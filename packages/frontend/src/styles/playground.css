@@ -934,7 +934,9 @@
   border-color: hsl(var(--ring));
 }
 
-.playground-headers__row--blocked .playground-headers__input--key {
+.playground-headers__row--blocked .playground-headers__input--key,
+.playground-headers__row--invalid-name .playground-headers__input--key,
+.playground-headers__row--invalid-value .playground-headers__input--value {
   border-color: hsl(var(--destructive));
   color: hsl(var(--destructive));
 }
