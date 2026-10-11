@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { entities, migrations } from '../src/database/data-source-definitions';
 import { DropSaasFeatureSchema1803300000000 } from '../src/database/migrations/1803300000000-DropSaasFeatureSchema';
 import { toLocalSqlTimestamp } from '../src/common/utils/postgres-sql';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const TENANT = 'saas-drop-tenant';
 const OTHER_TENANT = 'saas-drop-other-tenant';
@@ -67,8 +68,8 @@ describe('DropSaasFeatureSchema migration (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({
       type: 'postgres',
-      url:
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+      // Goes through the e2e guard: dropSchema below wipes the database.
+      url: resolveE2eDatabaseUrl(),
       // The exact registries the deploy runner uses, not a glob.
       entities,
       migrations,
