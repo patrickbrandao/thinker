@@ -113,6 +113,19 @@ export function toLocalSqlTimestamp(d: Date = new Date()): string {
 }
 
 /**
+ * Millisecond-precision variant of {@link toLocalSqlTimestamp}:
+ * `YYYY-MM-DD HH:MM:SS.mmm` in the Node process's local timezone.
+ *
+ * Use it for an exclusive upper bound set to "now" (e.g. `periodEnd`).
+ * `agent_messages.timestamp` keeps milliseconds, so a bound truncated to whole
+ * seconds with `timestamp < :end` drops every row written earlier in the
+ * current second, and consumption lags by up to a second.
+ */
+export function toLocalSqlTimestampMs(d: Date = new Date()): string {
+  return `${toLocalSqlTimestamp(d)}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+}
+
+/**
  * Format a Date as a local-time ISO-8601 string without timezone suffix.
  * Matches the format PostgreSQL stores for `timestamp without time zone`
  * when the pg driver serialises JS Dates in the Node process's local TZ.

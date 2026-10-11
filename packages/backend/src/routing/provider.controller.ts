@@ -39,10 +39,6 @@ import {
   MINIMAX_API_KEY_REGION_VALIDATION_MESSAGE,
   isMinimaxRegion,
 } from './oauth/minimax/minimax-oauth-helpers';
-import {
-  CLOUD_LOCAL_PROVIDER_MESSAGE,
-  isProviderAvailableForDeployment,
-} from '../common/utils/provider-availability';
 
 @Controller('api/v1/routing')
 export class ProviderController {
@@ -148,12 +144,6 @@ export class ProviderController {
     const label = isCustomProvider
       ? await this.customConnectionLabel(agent.tenant_id, lowerProvider, body)
       : body.label;
-    if (
-      !isProviderAvailableForDeployment(lowerProvider) ||
-      (body.authType === 'local' && !isProviderAvailableForDeployment('ollama'))
-    ) {
-      throw new BadRequestException(CLOUD_LOCAL_PROVIDER_MESSAGE);
-    }
     const isQwenProvider = lowerProvider === 'qwen' || lowerProvider === 'alibaba';
     const isMinimaxApiKey =
       lowerProvider === 'minimax' && (body.authType ?? 'api_key') === 'api_key';

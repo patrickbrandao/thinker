@@ -4,7 +4,11 @@ import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService, formatNotificationTimestamp } from './notification-log.service';
 import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
-import { computePeriodBoundaries, computePeriodResetDate } from '../../common/utils/period.util';
+import {
+  computePeriodBoundaries,
+  computePeriodResetDate,
+  PeriodBoundaries,
+} from '../../common/utils/period.util';
 
 interface BlockRule {
   id: string;
@@ -42,10 +46,20 @@ export class LimitCheckService {
     const rules = await this.rulesService.getActiveBlockRules(tenantId, agentName);
     if (rules.length === 0) return null;
 
+    // Fix each period's window once per request. periodEnd is "now" with
+    // millisecond precision, so recomputing it after an awaited query would
+    // give every rule a different window and defeat the consumption reuse.
+    const boundariesByPeriod = new Map<string, PeriodBoundaries>();
+    for (const rule of rules) {
+      if (!boundariesByPeriod.has(rule.period)) {
+        boundariesByPeriod.set(rule.period, computePeriodBoundaries(rule.period));
+      }
+    }
+
     const consumptionByMetricAndPeriod = new Map<string, number>();
     for (const rule of rules) {
-      const { periodStart, periodEnd } = computePeriodBoundaries(rule.period);
-      const consumptionKey = `${rule.metric_type}:${periodStart}:${periodEnd}`;
+      const { periodStart, periodEnd } = boundariesByPeriod.get(rule.period)!;
+      const consumptionKey = `${rule.metric_type}:${rule.period}`;
       let actual = consumptionByMetricAndPeriod.get(consumptionKey);
       if (actual === undefined) {
         actual = await this.rulesService.getConsumption(

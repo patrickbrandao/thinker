@@ -3,7 +3,9 @@
   "rootDir": "..",
   "coverageDirectory": "coverage/e2e",
   "testEnvironment": "node",
+  "testTimeout": 30000,
   "testRegex": ".e2e-spec.ts$",
+  "globalSetup": "<rootDir>/test/e2e-global-setup.ts",
   "transform": {
     "^.+\\.tsx?$": "ts-jest",
     "^.+\\.mjs$": "ts-jest"

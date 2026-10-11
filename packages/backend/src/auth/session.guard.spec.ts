@@ -169,18 +169,7 @@ describe('SessionGuard', () => {
     expect(request['authMethod']).toBeUndefined();
   });
 
-  describe('cloud mode (default) — no loopback fallback', () => {
-    const originalEnv = process.env['MANIFEST_MODE'];
-
-    beforeEach(() => {
-      delete process.env['MANIFEST_MODE'];
-    });
-
-    afterEach(() => {
-      if (originalEnv === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = originalEnv;
-    });
-
+  describe('loopback requests — no synthetic user', () => {
     it('does NOT inject synthetic user for loopback IP without session', async () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
       (auth.api.getSession as jest.Mock).mockResolvedValue(null);
@@ -206,8 +195,8 @@ describe('SessionGuard', () => {
     it('attaches real user when Better Auth session is valid (loopback IP)', async () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
       const mockSession = {
-        user: { id: 'cloud-user-1', name: 'Cloud User', email: 'cloud@example.com' },
-        session: { id: 'session-cloud' },
+        user: { id: 'user-1', name: 'User One', email: 'user1@example.com' },
+        session: { id: 'session-loopback' },
       };
       (auth.api.getSession as jest.Mock).mockResolvedValue(mockSession);
       const { context, request } = createMockContext({ ip: '127.0.0.1' });
@@ -217,32 +206,9 @@ describe('SessionGuard', () => {
       expect(request['user']).toEqual(mockSession.user);
       expect(request['authMethod']).toBe('session');
     });
-
-    it('does NOT inject synthetic user when MANIFEST_MODE is "cloud"', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
-      (auth.api.getSession as jest.Mock).mockResolvedValue(null);
-      const { context, request } = createMockContext({ ip: '127.0.0.1' });
-
-      await guard.canActivate(context);
-
-      expect(request['user']).toBeUndefined();
-      expect(request['authMethod']).toBeUndefined();
-    });
   });
 
-  describe('self-hosted mode — no loopback auto-login', () => {
-    const originalEnv = process.env['MANIFEST_MODE'];
-
-    beforeEach(() => {
-      process.env['MANIFEST_MODE'] = 'selfhosted';
-    });
-
-    afterEach(() => {
-      if (originalEnv === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = originalEnv;
-    });
-
+  describe('loopback requests — no auto-login', () => {
     it('uses real session when Better Auth session exists (preserves per-user isolation)', async () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
       const mockSession = {

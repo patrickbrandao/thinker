@@ -56,7 +56,6 @@ const makeRepo = (agents: AgentRow[] = ['agent-1']) => ({
 });
 
 describe('ProviderService — route-only cleanup paths', () => {
-  const previousMode = process.env['MANIFEST_MODE'];
   let providerRepo: ReturnType<typeof makeRepo>;
   let tierRepo: ReturnType<typeof makeRepo>;
   let specRepo: ReturnType<typeof makeRepo>;
@@ -71,7 +70,6 @@ describe('ProviderService — route-only cleanup paths', () => {
   let svc: ProviderService;
 
   beforeEach(() => {
-    process.env['MANIFEST_MODE'] = 'selfhosted';
     providerRepo = makeRepo();
     tierRepo = makeRepo();
     specRepo = makeRepo();
@@ -93,11 +91,6 @@ describe('ProviderService — route-only cleanup paths', () => {
       pricingCache as unknown as ModelPricingCacheService,
       routingCache as unknown as RoutingCacheService,
     );
-  });
-
-  afterAll(() => {
-    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
-    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   describe('removeProvider — route guards', () => {
@@ -1095,8 +1088,7 @@ describe('ProviderService — route-only cleanup paths', () => {
       expect(providerRepo.find).not.toHaveBeenCalled();
     });
 
-    it('filters legacy built-in local providers from cloud routing', async () => {
-      process.env['MANIFEST_MODE'] = 'cloud';
+    it('routes to built-in local providers with no deployment mode configured', async () => {
       providerRepo.find.mockResolvedValue([
         { id: 'p1', provider: 'ollama', auth_type: 'local', is_active: true },
         { id: 'p2', provider: 'custom:runtime-id', auth_type: 'local', is_active: true },
@@ -1104,7 +1096,7 @@ describe('ProviderService — route-only cleanup paths', () => {
 
       const result = await svc.getProviders('tenant-1');
 
-      expect(result.map((provider) => provider.provider)).toEqual(['custom:runtime-id']);
+      expect(result.map((provider) => provider.provider)).toEqual(['ollama', 'custom:runtime-id']);
       expect(routingCache.setProviders).toHaveBeenCalledWith('tenant-1', result);
     });
   });

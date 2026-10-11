@@ -6,8 +6,20 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { request, type RequestOptions } from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
 import { Readable } from 'node:stream';
-import { isSelfHosted } from '../common/utils/detect-self-hosted';
 import { isCloudMetadataIp } from '../common/utils/url-validation';
+
+/**
+ * Whether a CIMD `client_id` URL may resolve to a private or loopback address.
+ *
+ * The URL comes from an unauthenticated MCP client during OAuth, so allowing
+ * private hosts would let anyone make the server fetch from its internal
+ * network (SSRF). Off by default; operators who host MCP clients on their LAN
+ * opt in with `THINKER_CIMD_ALLOW_PRIVATE=true`. Read per call so the setting
+ * follows the environment without a restart in tests.
+ */
+export function cimdAllowsPrivateHosts(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env['THINKER_CIMD_ALLOW_PRIVATE']?.trim().toLowerCase() === 'true';
+}
 
 const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
@@ -70,25 +82,25 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
   }
 
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  // A literal address bypasses DNS pinning, and in self-hosted mode the
-  // private-host allowance would let a client reach an arbitrary local service.
+  // A literal address bypasses DNS pinning, and with the opt-in private-host
+  // allowance it would let a client reach an arbitrary local service.
   // Require a hostname.
   if (isIP(hostname) !== 0) {
     throw new TypeError('CIMD Node transport requires a hostname, not an IP literal');
   }
-  // Self-hosted operators control their network, so a CIMD document on a private
-  // or loopback host is legitimate there. Cloud installs keep the strict gate.
-  const allowPrivate = isSelfHosted();
+  // Public addresses only, unless the operator opted in to LAN-hosted clients.
+  const allowPrivate = cimdAllowsPrivateHosts();
   let addresses: LookupAddress[] | undefined;
   try {
     addresses = await lookup(hostname, { all: true, verbatim: true });
   } catch (error) {
-    // A self-hosted operator may use a LAN name its own resolver handles; let
-    // the request try to resolve it rather than failing before the fetch.
+    // With the opt-in, the operator may use a LAN name its own resolver
+    // handles; let the request try to resolve it rather than failing before the
+    // fetch. By default a DNS failure is an error.
     if (!allowPrivate) throw error;
   }
-  // Address validation always runs, even when the local-mode lookup failed: a
-  // cloud-metadata answer must never be reached.
+  // Address validation always runs when the lookup succeeded: a cloud-metadata
+  // answer must never be reached.
   const pinnedAddress = addresses ? selectPinnedAddress(addresses, allowPrivate) : undefined;
   const headers = Object.fromEntries(webRequest.headers.entries());
   headers.host = url.host;

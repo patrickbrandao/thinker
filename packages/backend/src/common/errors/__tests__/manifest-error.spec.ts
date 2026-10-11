@@ -47,7 +47,7 @@ describe('every documented error code is accounted for', () => {
   });
 
   it('only the pre-authentication auth failures are unrecordable', () => {
-    expect(UNRECORDABLE_MANIFEST_CODES).toEqual(['M001', 'M002', 'M003', 'M005']);
+    expect(UNRECORDABLE_MANIFEST_CODES).toEqual(['M001', 'M002', 'M003', 'M005', 'M006']);
     // M004 resolves an agent before rejecting, so it must stay recordable.
     expect(isRecordableManifestCode('M004')).toBe(true);
   });
@@ -92,10 +92,10 @@ describe('every documented error code is accounted for', () => {
     expect(error_class).toBe('not_found');
   });
 
-  it('puts a cloud-inaccessible local provider on the config origin', () => {
+  it('still classifies historical local_provider_unavailable rows on the config origin', () => {
     const { error_origin, error_class } = classifyMessageError({
       status: 'error',
-      routingReason: MANIFEST_CODE_TO_REASON.M303,
+      routingReason: 'local_provider_unavailable',
     });
 
     expect(error_origin).toBe('config');

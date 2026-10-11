@@ -858,6 +858,36 @@ describe('kiro-adapter', () => {
     expect(await response.text()).toContain('"content":"hello"');
   });
 
+  it('never lets extra headers replace or duplicate the Kiro adapter headers', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(streamFrom([eventFrame('assistantResponseEvent', { content: 'hi' })]), {
+        status: 200,
+      }),
+    );
+
+    await forwardKiroChat({
+      apiKey: 'ksk_stored',
+      model: 'auto',
+      body: { messages: [{ role: 'user', content: 'Hello' }] },
+      stream: true,
+      timeoutMs: 1000,
+      extraHeaders: {
+        authorization: 'Bearer attacker',
+        'X-Amz-Target': 'AmazonCodeWhispererService.Other',
+        'X-AMZN-KIRO-AGENT-MODE': 'AUTONOMOUS',
+        'x-extra': '1',
+      },
+    });
+
+    expect(mockFetch.mock.calls[0][1].headers).toEqual({
+      Authorization: 'Bearer ksk_stored',
+      'Content-Type': 'application/x-amz-json-1.0',
+      'x-amz-target': KIRO_CHAT_TARGET,
+      'x-amzn-kiro-agent-mode': 'SUPERVISED',
+      'x-extra': '1',
+    });
+  });
+
   it('forwards non-streaming Kiro chat and returns OpenAI-compatible JSON', async () => {
     mockFetch.mockResolvedValue(
       new Response(

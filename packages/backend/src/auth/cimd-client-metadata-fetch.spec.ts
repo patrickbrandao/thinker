@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
-import { fetchClientMetadataResource } from './cimd-client-metadata-fetch';
+import { isPrivateIp } from '../common/utils/url-validation';
+import { cimdAllowsPrivateHosts, fetchClientMetadataResource } from './cimd-client-metadata-fetch';
 
 jest.mock('@better-auth/core/utils/host', () => ({
   isPublicRoutableHost: jest.fn(() => true),
@@ -36,10 +37,21 @@ function fakeRequest(
 }
 
 describe('fetchClientMetadataResource', () => {
+  const previousAllowPrivate = process.env['THINKER_CIMD_ALLOW_PRIVATE'];
+
   beforeEach(() => {
+    // Behavior must not depend on the host environment (issue #46): start every
+    // case from the default, public-only policy.
+    delete process.env['THINKER_CIMD_ALLOW_PRIVATE'];
+    isPublicRoutableHost.mockReset();
     isPublicRoutableHost.mockReturnValue(true);
     lookup.mockReset();
     request.mockReset();
+  });
+
+  afterAll(() => {
+    if (previousAllowPrivate === undefined) delete process.env['THINKER_CIMD_ALLOW_PRIVATE'];
+    else process.env['THINKER_CIMD_ALLOW_PRIVATE'] = previousAllowPrivate;
   });
 
   it('fetches and returns a metadata document', async () => {
@@ -184,80 +196,106 @@ describe('fetchClientMetadataResource', () => {
     expect(await response.text()).toBe('');
   });
 
-  it('allows a private host in self-hosted mode regardless of the public gate', async () => {
-    const previous = process.env['MANIFEST_MODE'];
-    process.env['MANIFEST_MODE'] = 'selfhosted';
-    try {
-      isPublicRoutableHost.mockReturnValue(false);
-      lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+  describe('private and loopback hosts (THINKER_CIMD_ALLOW_PRIVATE)', () => {
+    beforeEach(() => {
+      // Better Auth's classifier is ESM-only and cannot load under Jest's CJS
+      // runtime, so stand in with the shared private-range classifier. The e2e
+      // suite exercises the real one.
+      isPublicRoutableHost.mockImplementation((address: string) => !isPrivateIp(address));
       request.mockImplementation((_url, _opts, cb) => fakeRequest(cb));
-      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
+    });
+
+    it.each([
+      ['10.0.0.5', 4],
+      ['192.168.1.20', 4],
+      ['127.0.0.1', 4],
+      ['::1', 6],
+      ['fd12:3456::1', 6],
+    ])('refuses a host resolving to %s by default', async (address, family) => {
+      lookup.mockResolvedValue([{ address, family }]);
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
+        /public-routable/,
+      );
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('refuses a mixed public/private answer by default', async () => {
+      lookup.mockResolvedValue([
+        { address: '93.184.216.34', family: 4 },
+        { address: '10.0.0.5', family: 4 },
+      ]);
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
+        /public-routable/,
+      );
+    });
+
+    it('treats a DNS failure as an error by default', async () => {
+      lookup.mockRejectedValue(new Error('ENOTFOUND'));
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
+        /ENOTFOUND/,
+      );
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('does not treat values other than "true" as an opt-in', async () => {
+      for (const value of ['1', 'yes', 'false', '']) {
+        process.env['THINKER_CIMD_ALLOW_PRIVATE'] = value;
+        expect(cimdAllowsPrivateHosts()).toBe(false);
+      }
+      process.env['THINKER_CIMD_ALLOW_PRIVATE'] = ' TRUE ';
+      expect(cimdAllowsPrivateHosts()).toBe(true);
+    });
+
+    it('accepts private and loopback hosts with THINKER_CIMD_ALLOW_PRIVATE=true', async () => {
+      process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
+      lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+      expect((await fetchClientMetadataResource('https://lan.example/meta')).status).toBe(200);
+
+      lookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+      expect((await fetchClientMetadataResource('https://lan.example/meta')).status).toBe(200);
 
       // A host.containers.internal-style link-local address is allowed too.
       lookup.mockResolvedValue([{ address: '169.254.1.2', family: 4 }]);
-      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
-    } finally {
-      if (previous === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = previous;
-    }
-  });
+      expect((await fetchClientMetadataResource('https://lan.example/meta')).status).toBe(200);
+    });
 
-  it('blocks cloud-metadata addresses even in self-hosted mode', async () => {
-    const previous = process.env['MANIFEST_MODE'];
-    process.env['MANIFEST_MODE'] = 'selfhosted';
-    try {
+    it('blocks cloud-metadata addresses even with the opt-in', async () => {
+      process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
       lookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
-      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
         /cloud metadata/,
       );
 
-      // Alibaba/OCI IMDS, covered by the shared classifier.
+      // Alibaba/OCI IMDS and the AWS IPv6 IMDS, covered by the shared classifier.
       lookup.mockResolvedValue([{ address: '100.100.100.200', family: 4 }]);
-      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
         /cloud metadata/,
       );
-    } finally {
-      if (previous === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = previous;
-    }
-  });
-
-  it('blocks a private host in cloud mode', async () => {
-    const previous = process.env['MANIFEST_MODE'];
-    process.env['MANIFEST_MODE'] = 'cloud';
-    try {
-      lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
-      isPublicRoutableHost.mockReturnValueOnce(false);
-      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
-        /public-routable/,
+      lookup.mockResolvedValue([{ address: 'fd00:ec2::254', family: 6 }]);
+      await expect(fetchClientMetadataResource('https://lan.example/meta')).rejects.toThrow(
+        /cloud metadata/,
       );
-    } finally {
-      if (previous === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = previous;
-    }
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('lets a lookup failure fall through to the request resolver with the opt-in', async () => {
+      process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
+      lookup.mockRejectedValue(new Error('ENOTFOUND'));
+      request.mockImplementation((_url, opts, cb) => {
+        expect((opts as { lookup?: unknown }).lookup).toBeUndefined();
+        return fakeRequest(cb);
+      });
+      expect((await fetchClientMetadataResource('https://lan.example/meta')).status).toBe(200);
+    });
   });
 
   it('rejects a direct IP literal', async () => {
     await expect(fetchClientMetadataResource('https://127.0.0.1/meta')).rejects.toThrow(
       /IP literal/,
     );
+    process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
+    await expect(fetchClientMetadataResource('https://[::1]/meta')).rejects.toThrow(/IP literal/);
     expect(lookup).not.toHaveBeenCalled();
-  });
-
-  it('lets a self-hosted lookup failure fall through to the request resolver', async () => {
-    const previous = process.env['MANIFEST_MODE'];
-    process.env['MANIFEST_MODE'] = 'selfhosted';
-    try {
-      lookup.mockRejectedValue(new Error('ENOTFOUND'));
-      request.mockImplementation((_url, opts, cb) => {
-        expect((opts as { lookup?: unknown }).lookup).toBeUndefined();
-        return fakeRequest(cb);
-      });
-      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
-    } finally {
-      if (previous === undefined) delete process.env['MANIFEST_MODE'];
-      else process.env['MANIFEST_MODE'] = previous;
-    }
   });
 
   it('rejects a protocol upgrade and destroys its socket', async () => {

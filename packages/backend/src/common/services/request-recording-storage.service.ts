@@ -8,7 +8,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
-import { isSelfHosted } from '../utils/detect-self-hosted';
 
 export type RecordingStorageBackend = 'filesystem' | 's3';
 
@@ -45,7 +44,6 @@ interface RecordingStorageConfigSource {
 
 export function resolveRecordingStorage(
   config: RecordingStorageConfigSource,
-  selfHosted = isSelfHosted(),
   cwd = process.cwd(),
 ): ResolvedRecordingStorage {
   const requested = (config.get<string>('app.requestRecordingStorage') ?? 'auto').toLowerCase();
@@ -97,13 +95,7 @@ export function resolveRecordingStorage(
     };
   }
   if (bucket || region || hasPartialCredentials || endpoint) return s3();
-  if (selfHosted || nodeEnv !== 'production') {
-    return { backend: 'filesystem', path: filesystemPath };
-  }
-  return {
-    backend: null,
-    reason: 'Managed Cloud requires S3 recording storage credentials',
-  };
+  return { backend: 'filesystem', path: filesystemPath };
 }
 
 class FilesystemRecordingStorage implements RecordingStorage {

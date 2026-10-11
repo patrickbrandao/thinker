@@ -2,7 +2,6 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { toLocalSqlTimestamp } from '../../common/utils/postgres-sql';
-import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { BackfillState } from '../../entities/backfill-state.entity';
 import {
   runRequestBackfill,
@@ -11,18 +10,14 @@ import {
 } from './backfill-requests';
 import { DEFAULT_BACKFILL_OPTIONS } from './backfill-message-providers';
 import { TypeOrmRequestBackfillGateway } from './backfill-requests.gateway';
-import {
-  MESSAGE_PROVIDER_BACKFILL_LOCK_KEY,
-  MessageProviderBackfillBootService,
-} from './message-provider-backfill.boot.service';
-import { createRequestBackfillDataSource } from './request-backfill.datasource';
+import { MESSAGE_PROVIDER_BACKFILL_LOCK_KEY } from './message-provider-backfill.boot.service';
 
 /** Initial historical pass marker; legacy-writer delta is tracked by unlinked rows. */
 export const REQUEST_BACKFILL_NAME = 'requests_agent_messages_v1';
 /** Post-reader cleanup and deferred constraint-validation marker. */
 export const REQUEST_TRANSITION_FINALIZATION_NAME = 'requests_agent_messages_v2';
 // Both post-deploy jobs update agent_messages. Sharing the lock guarantees
-// that Cloud never runs their batches concurrently; a contending job releases
+// that their batches never run concurrently; a contending job releases
 // its connection and retries until both completion markers exist.
 export const REQUEST_BACKFILL_LOCK_KEY = MESSAGE_PROVIDER_BACKFILL_LOCK_KEY;
 
@@ -65,16 +60,16 @@ const defaultTransitionFinalizer: RequestTransitionFinalizer = async (dataSource
 };
 
 /**
- * Runs historical regrouping without blocking application readiness. Self-hosted
- * reuses its DATABASE_URL-backed app connection. Cloud opens a separate direct
- * connection so session locks and temporary tables never cross PgBouncer.
+ * Runs historical regrouping without blocking application readiness, on the
+ * application's DATABASE_URL-backed connection. The standalone worker in
+ * `request-backfill.cli.ts` remains for operators who front Postgres with a
+ * transaction-mode pooler and need a direct connection.
  */
 @Injectable()
 export class RequestBackfillBootService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(RequestBackfillBootService.name);
   private tailTimer: ReturnType<typeof setInterval> | undefined;
   private stopping = false;
-  private ownedDataSource: DataSource | undefined;
   private readonly transitionReadyAt = Date.now() + REQUEST_BACKFILL_GENERIC_GRACE_MS;
 
   constructor(
@@ -92,33 +87,16 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
   async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
     this.stopTailSweep();
-    const ownedDataSource = this.ownedDataSource;
-    this.ownedDataSource = undefined;
-    if (ownedDataSource?.isInitialized) await ownedDataSource.destroy();
   }
 
-  /**
-   * Self-hosted reuses its DATABASE_URL-backed application DataSource. Cloud
-   * creates a separate direct pool so advisory locks and temporary staging
-   * tables never cross transaction-mode PgBouncer.
-   */
   private async runManagedBackfill(): Promise<void> {
     while (!this.stopping) {
       try {
-        const selfHosted = isSelfHosted();
-        const coordinator = selfHosted ? this : await this.createCloudCoordinator();
-        if (!coordinator || this.stopping) return;
-        await coordinator.runUntilComplete();
+        await this.runUntilComplete();
         if (this.stopping) return;
-        if (selfHosted) {
-          await coordinator.startTailSweep();
-          return;
-        }
-        // Cloud catch-up runs explicitly after the new deployment is healthy.
-        await this.releaseCloudCoordinator();
+        await this.startTailSweep();
         return;
       } catch (error) {
-        await this.releaseCloudCoordinator();
         if (this.stopping) return;
         this.logger.error(
           `post-deploy request backfill failed: ${error instanceof Error ? error.message : String(error)}; retrying in ${REQUEST_BACKFILL_LOCK_RETRY_MS / 1000}s`,
@@ -126,27 +104,6 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
         await wait(REQUEST_BACKFILL_LOCK_RETRY_MS);
       }
     }
-  }
-
-  private async createCloudCoordinator(): Promise<RequestBackfillBootService | null> {
-    const dataSource = createRequestBackfillDataSource(process.env);
-    await dataSource.initialize();
-    if (this.stopping) {
-      await dataSource.destroy();
-      return null;
-    }
-    this.ownedDataSource = dataSource;
-    const stateRepo = dataSource.getRepository(BackfillState);
-    // The older provider-attribution task uses the same direct connection in
-    // Cloud. Its session advisory lock must never cross transaction PgBouncer.
-    await new MessageProviderBackfillBootService(dataSource, stateRepo).runUntilComplete();
-    return new RequestBackfillBootService(dataSource, stateRepo);
-  }
-
-  private async releaseCloudCoordinator(): Promise<void> {
-    const dataSource = this.ownedDataSource;
-    this.ownedDataSource = undefined;
-    if (dataSource?.isInitialized) await dataSource.destroy().catch(() => undefined);
   }
 
   private stopTailSweep(): void {

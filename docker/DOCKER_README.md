@@ -389,16 +389,18 @@ If Ollama runs on a different host on your LAN, set `OLLAMA_HOST` in `.env` to t
 
 ### Podman / rootless containers
 
-Podman doesn't ship `/.dockerenv` or `host.docker.internal`. Manifest still
-auto-detects Podman via `/run/.containerenv` and treats the install as
-self-hosted, but the canonical hostname for reaching the host from inside
-a Podman container is `host.containers.internal` (Podman 4+ exposes this
-by default; older versions need `--add-host=host.containers.internal:host-gateway`).
-If you run Manifest as one Podman service and your LLM server (llama.cpp,
-Ollama, etc.) as another, point Manifest at the service name on the shared
-network — e.g. `http://llamacpp:8080/v1` — and **Add custom provider** will
-accept it as long as `MANIFEST_MODE=selfhosted` (the bundled compose file
-sets this automatically).
+Podman doesn't ship `/.dockerenv` or `host.docker.internal`. The canonical
+hostname for reaching the host from inside a Podman container is
+`host.containers.internal` (Podman 4+ exposes this by default; older versions
+need `--add-host=host.containers.internal:host-gateway`), and Thinker suggests
+it when it finds `/run/.containerenv`.
+If you run Thinker as one Podman service and your LLM server (llama.cpp,
+Ollama, etc.) as another, point Thinker at the service name on the shared
+network — e.g. `http://llamacpp:8080/v1`. **Add custom provider** accepts
+LAN, loopback and `http://` URLs on any runtime, as long as the hostname
+resolves from inside the Thinker container. Cloud metadata and container
+credential endpoints (such as `169.254.169.254` or `169.254.170.2`) are always
+refused, including when a hostname starts resolving to them after it was saved.
 
 ## Environment variables
 
@@ -410,7 +412,7 @@ sets this automatically).
 | `BETTER_AUTH_URL`                  | No          | `http://localhost:${PORT}`                   | Public URL. Must match the URL in the browser                                                                                                                                                              |
 | `PORT`                             | No          | `2099`                                       | Dashboard port — sets both the published host port and the internal listener                                                                                                                               |
 | `OLLAMA_HOST`                      | No          | `http://host.docker.internal:11434`          | Ollama endpoint for the built-in tile. Override to point at a LAN-hosted Ollama.                                                                                                                           |
-| `MANIFEST_MODE`                    | No          | auto (Docker → selfhosted)                   | `selfhosted` or `cloud`. `local` is a legacy alias. Self-hosted mode allows private/http URLs for custom providers.                                                                                        |
+| `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
 | `MANIFEST_DISABLE_HSTS`            | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
 | `THINKER_CATALOG_SYNC`             | No          | `true`                                       | Set `false` to stop fetching the public model catalogs (see [No telemetry](#no-telemetry)). Costs then come from the bundled data only, so most models show $0                                                |

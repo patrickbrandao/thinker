@@ -16,6 +16,7 @@ import { createServer } from 'net';
 import { tmpdir } from 'os';
 import { join, sep } from 'path';
 import { DataSource } from 'typeorm';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const FORBIDDEN_DESTINATIONS = [
   'telemetry.manifest.build',
@@ -32,12 +33,11 @@ const FORBIDDEN_DESTINATIONS = [
 const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
 /**
  * Backend production files that still name a hosted gateway host, none of them
- * as a request destination: Cloud trusted origins (#18), and the dashboard link
- * fallback with the OG-tag placeholder it matches in the frontend's index.html
- * (#22, #25). The list may only shrink.
+ * as a request destination: the dashboard link fallback with the OG-tag
+ * placeholder it matches in the frontend's index.html (#22, #25). The list may
+ * only shrink.
  */
 const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
-  'backend/src/auth/auth.instance.ts',
   'backend/src/common/utils/dashboard-url.ts',
   'backend/src/common/utils/og-rewrite.ts',
 ];
@@ -100,13 +100,15 @@ async function waitForHealth(base: string, child: ChildProcess, output: () => st
   throw new Error(`server did not become healthy:\n${output()}`);
 }
 
+/** Escapes every RegExp metacharacter so a host name matches literally. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 interface EgressRecord {
   kind: 'boot' | 'fetch' | 'dns';
   target: string;
 }
-
-const DATABASE_URL =
-  process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
 
 /** Hostnames of the remote (non-loopback) fetches in a run. */
 function remoteFetchHosts(records: EgressRecord[]): string[] {
@@ -116,8 +118,13 @@ function remoteFetchHosts(records: EgressRecord[]): string[] {
     .filter((host) => !LOCAL_HOSTS.has(host));
 }
 
+/**
+ * Opens a connection to the e2e database. The URL goes through the e2e guard
+ * (#67) on every call, so `dropSchema` can only ever wipe a disposable test
+ * database.
+ */
 async function withDatabase(run: (db: DataSource) => Promise<void>, dropSchema = false) {
-  const db = new DataSource({ type: 'postgres', url: DATABASE_URL, dropSchema });
+  const db = new DataSource({ type: 'postgres', url: resolveE2eDatabaseUrl(), dropSchema });
   await db.initialize();
   try {
     await run(db);
@@ -157,7 +164,7 @@ async function bootServer(extraEnv: NodeJS.ProcessEnv = {}): Promise<BootedServe
   }
   Object.assign(env, {
     NODE_ENV: 'production',
-    DATABASE_URL,
+    DATABASE_URL: resolveE2eDatabaseUrl(),
     PORT: String(port),
     BIND_ADDRESS: '127.0.0.1',
     BETTER_AUTH_URL: base,
@@ -213,17 +220,17 @@ describe('no phone-home egress', () => {
   it.each(FORBIDDEN_DESTINATIONS)(
     'names %s nowhere in the backend, CLI or shared source',
     (host) => {
-      expect(filesMatching(new RegExp(host.replace(/[.]/g, '\\.')))).toEqual([]);
+      expect(filesMatching(new RegExp(escapeRegExp(host)))).toEqual([]);
     },
   );
 
   it('names no hosted gateway host anywhere in the CLI or shared source, tests included', () => {
-    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map(escapeRegExp).join('|'));
     expect(filesMatching(pattern).filter((file) => /^(cli|shared)[\\/]/.test(file))).toEqual([]);
   });
 
   it('adds no backend production file naming a hosted gateway host', () => {
-    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map(escapeRegExp).join('|'));
     const backendFiles = filesMatching(pattern)
       .map((file) => file.split(sep).join('/'))
       .filter((file) => file.startsWith('backend/') && !/\.spec\.tsx?$/.test(file));

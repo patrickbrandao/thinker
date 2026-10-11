@@ -8,9 +8,6 @@
 jest.mock('../../common/utils/url-validation', () => ({
   validatePublicUrl: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../../common/utils/detect-self-hosted', () => ({
-  isSelfHosted: jest.fn().mockReturnValue(false),
-}));
 
 import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';

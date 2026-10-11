@@ -9,9 +9,6 @@
 jest.mock('../../common/utils/url-validation', () => ({
   validatePublicUrl: jest.fn(),
 }));
-jest.mock('../../common/utils/detect-self-hosted', () => ({
-  isSelfHosted: jest.fn().mockReturnValue(false),
-}));
 
 import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
@@ -24,8 +21,6 @@ import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validatePublicUrl } = require('../../common/utils/url-validation');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { isSelfHosted } = require('../../common/utils/detect-self-hosted');
 
 function makeDeps(overrides: {
   findOneResults?: (CustomProvider | null)[];
@@ -86,8 +81,6 @@ describe('CustomProviderService edge cases', () => {
     jest.clearAllMocks();
     (validatePublicUrl as jest.Mock).mockReset();
     (validatePublicUrl as jest.Mock).mockResolvedValue(undefined);
-    (isSelfHosted as jest.Mock).mockReset();
-    (isSelfHosted as jest.Mock).mockReturnValue(false);
   });
 
   describe('canonicalizeAgentMessageKeys with stale references', () => {
@@ -188,22 +181,22 @@ describe('CustomProviderService edge cases', () => {
       await expect(svc.create('user-1', baseDto)).rejects.toThrow(/Invalid URL format/);
     });
 
-    it('rejects http URLs in cloud mode on create (cleartext credentials risk)', async () => {
+    it('rejects http URLs to public hosts on create (cleartext credentials risk)', async () => {
       (validatePublicUrl as jest.Mock).mockRejectedValue(
-        new Error('Only https URLs are allowed in cloud mode.'),
+        new Error('http:// is only allowed for private hosts'),
       );
       const { svc } = makeDeps({ findOneResults: [null] });
       await expect(
         svc.create('user-1', { ...baseDto, base_url: 'http://api.example.com' }),
-      ).rejects.toThrow(/Only https URLs are allowed/);
-      // allowPrivate must be false in non-self-hosted runs — the validator
-      // can't make that decision on its own without this option.
+      ).rejects.toThrow(/only allowed for private hosts/);
+      // Custom providers always validate with allowPrivate (LAN models are a
+      // feature); the validator still refuses plaintext to public hosts.
       expect(validatePublicUrl).toHaveBeenLastCalledWith('http://api.example.com', {
-        allowPrivate: false,
+        allowPrivate: true,
       });
     });
 
-    it('rejects private-IP URLs in cloud mode on create (SSRF guard)', async () => {
+    it('wraps a validator rejection on create as BadRequest (SSRF guard)', async () => {
       (validatePublicUrl as jest.Mock).mockRejectedValue(
         new Error('URLs pointing to private or internal networks are not allowed'),
       );
@@ -213,11 +206,10 @@ describe('CustomProviderService edge cases', () => {
       ).rejects.toThrow(/private or internal networks/);
     });
 
-    it('rejects cloud-metadata URLs on create even in self-hosted mode', async () => {
+    it('rejects cloud-metadata URLs on create even with allowPrivate', async () => {
       // Cloud metadata is the one destination that's always blocked, even
       // when allowPrivate is on — the validator throws and the service
       // must still wrap it as a BadRequestException.
-      (isSelfHosted as jest.Mock).mockReturnValue(true);
       (validatePublicUrl as jest.Mock).mockRejectedValue(
         new Error('URLs pointing to cloud metadata endpoints are not allowed'),
       );
@@ -243,7 +235,7 @@ describe('CustomProviderService edge cases', () => {
       );
     });
 
-    it('rejects private-IP URLs on update in cloud mode', async () => {
+    it('wraps a validator rejection on update as BadRequest', async () => {
       (validatePublicUrl as jest.Mock).mockRejectedValue(
         new Error('URLs pointing to private or internal networks are not allowed'),
       );
@@ -272,8 +264,7 @@ describe('CustomProviderService edge cases', () => {
       );
     });
 
-    it('passes allowPrivate=true to probeModels in self-hosted mode but still blocks bad URLs', async () => {
-      (isSelfHosted as jest.Mock).mockReturnValue(true);
+    it('passes allowPrivate=true to probeModels but still blocks bad URLs', async () => {
       (validatePublicUrl as jest.Mock).mockRejectedValue(
         new Error('Only http and https URLs are allowed'),
       );

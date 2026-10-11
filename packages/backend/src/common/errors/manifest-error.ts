@@ -17,6 +17,8 @@ export const MANIFEST_BLOCKED_REQUEST_REASONS = [
   'manifest_ip_rate_limited',
   'manifest_concurrency_limited',
   'manifest_invalid_request',
+  // No longer raised (it was the M303 cloud-only rejection), but kept so rows
+  // recorded before the single self-hosted mode still classify.
   'local_provider_unavailable',
   'model_not_available',
   'manifest_internal_error',
@@ -32,7 +34,7 @@ export type ManifestBlockedRequestReason = (typeof MANIFEST_BLOCKED_REQUEST_REAS
  * `M004` (expired key) is deliberately NOT here — that key does resolve to an
  * agent, so its rejection is recordable.
  */
-export const UNRECORDABLE_MANIFEST_CODES = ['M001', 'M002', 'M003', 'M005'] as const;
+export const UNRECORDABLE_MANIFEST_CODES = ['M001', 'M002', 'M003', 'M005', 'M006'] as const;
 export type UnrecordableManifestCode = (typeof UNRECORDABLE_MANIFEST_CODES)[number];
 
 /** A documented Manifest error that can be attributed to an agent, and so recorded. */
@@ -55,7 +57,6 @@ export const MANIFEST_CODE_TO_REASON: Record<RecordableManifestCode, ManifestBlo
     M203: 'manifest_concurrency_limited',
     M300: 'manifest_invalid_request',
     M302: 'model_not_available',
-    M303: 'local_provider_unavailable',
     M500: 'manifest_internal_error',
   };
 
