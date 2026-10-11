@@ -102,6 +102,11 @@ async function waitForHealth(base: string, child: ChildProcess, output: () => st
   throw new Error(`server did not become healthy:\n${output()}`);
 }
 
+/** Escapes every RegExp metacharacter so a host name matches literally. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 interface EgressRecord {
   kind: 'fetch' | 'dns';
   target: string;
@@ -111,17 +116,17 @@ describe('no phone-home egress', () => {
   it.each(FORBIDDEN_DESTINATIONS)(
     'names %s nowhere in the backend, CLI or shared source',
     (host) => {
-      expect(filesMatching(new RegExp(host.replace(/[.]/g, '\\.')))).toEqual([]);
+      expect(filesMatching(new RegExp(escapeRegExp(host)))).toEqual([]);
     },
   );
 
   it('names no hosted gateway host anywhere in the CLI or shared source, tests included', () => {
-    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map(escapeRegExp).join('|'));
     expect(filesMatching(pattern).filter((file) => /^(cli|shared)[\\/]/.test(file))).toEqual([]);
   });
 
   it('adds no backend production file naming a hosted gateway host', () => {
-    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map((h) => h.replace(/[.]/g, '\\.')).join('|'));
+    const pattern = new RegExp(HOSTED_GATEWAY_HOSTS.map(escapeRegExp).join('|'));
     const backendFiles = filesMatching(pattern)
       .map((file) => file.split(sep).join('/'))
       .filter((file) => file.startsWith('backend/') && !/\.spec\.tsx?$/.test(file));
