@@ -10,6 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:docker": "node scripts/test-e2e-docker.mjs",
     "lint": "eslint src/",
     "contract:refresh": "node scripts/refresh-phoenix-contract.mjs",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/datasource.ts",
@@ -94,6 +95,10 @@
       "tsx"
     ],
     "rootDir": "src",
+    "roots": [
+      "<rootDir>",
+      "<rootDir>/../test"
+    ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.tsx?$": "ts-jest"

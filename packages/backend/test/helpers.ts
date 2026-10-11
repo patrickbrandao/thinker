@@ -56,6 +56,7 @@ import { SetupModule } from '../src/setup/setup.module';
 import { WaitlistModule } from '../src/waitlist/waitlist.module';
 import { CrmMetricsModule } from '../src/crm-metrics/crm-metrics.module';
 import { ProviderModelFetcherService } from '../src/model-discovery/provider-model-fetcher.service';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 export const TEST_USER_ID = 'test-user-001';
 export const TEST_API_KEY = 'test-api-key-001';
@@ -157,7 +158,7 @@ export interface CreateTestAppOptions {
 function buildTypeOrmConfig(options: CreateTestAppOptions): TypeOrmModuleOptions {
   return {
     type: 'postgres' as const,
-    url: process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase',
+    url: resolveE2eDatabaseUrl(),
     entities,
     synchronize: true,
     dropSchema: options.dropSchema ?? true,

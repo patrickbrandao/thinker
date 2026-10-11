@@ -127,8 +127,12 @@ export const authBaseURL = buildAuthBaseURL();
 function createDatabaseConnection() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require('pg');
-  const databaseUrl =
-    process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+  // No default URL: a silent fallback to localhost:5432 could point Better
+  // Auth at an unrelated local database (issue #67).
+  const databaseUrl = process.env['DATABASE_URL'];
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required. Set it in your .env file.');
+  }
   // Cap Better Auth's own pool (separate from the TypeORM pool) so the two
   // connection pools don't jointly exhaust Postgres's max_connections. Auth
   // traffic is light relative to ingest, hence a smaller default than the app
