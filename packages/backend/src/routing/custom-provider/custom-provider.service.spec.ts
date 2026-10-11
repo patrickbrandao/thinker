@@ -425,6 +425,28 @@ describe('CustomProviderService', () => {
         );
       });
 
+      it.each(['lmstudio', 'llamacpp', 'ollama'])(
+        'rejects the native local runner id %s as an explicit alias',
+        async (alias) => {
+          const { svc } = makeDeps({ findOneResults: [null] });
+          await expect(svc.create('tenant-1', { ...dto, alias })).rejects.toBeInstanceOf(
+            BadRequestException,
+          );
+        },
+      );
+
+      it('leaves the default alias empty for a name that derives to lmstudio', async () => {
+        const { svc } = makeDeps({ findOneResults: [null] });
+        const cp = await svc.create('tenant-1', { ...dto, name: 'LMStudio' });
+        expect(cp.alias).toBeNull();
+      });
+
+      it('keeps deriving lm-studio for the dashboard tile name', async () => {
+        const { svc } = makeDeps({ findOneResults: [null] });
+        const cp = await svc.create('tenant-1', { ...dto, name: 'LM Studio' });
+        expect(cp.alias).toBe('lm-studio');
+      });
+
       it('rejects an explicit alias another provider of the tenant already uses', async () => {
         const { svc } = makeDeps({
           findResult: [{ id: 'other', name: 'Other', alias: 'Vercel' } as CustomProvider],
@@ -722,6 +744,18 @@ describe('CustomProviderService', () => {
           BadRequestException,
         );
       });
+
+      it.each(['lmstudio', 'llamacpp'])(
+        'rejects switching to the native local runner id %s',
+        async (alias) => {
+          const existing = { id: 'cp1', name: 'LMStudio', alias: null } as CustomProvider;
+          const { svc, save } = makeDeps({ findOneResults: [existing] });
+          await expect(svc.update('cp1', 'tenant-1', { alias })).rejects.toBeInstanceOf(
+            BadRequestException,
+          );
+          expect(save).not.toHaveBeenCalled();
+        },
+      );
 
       it('turns a lost race on the alias unique index into a 409', async () => {
         const existing = { id: 'cp1', name: 'old', alias: null } as CustomProvider;
