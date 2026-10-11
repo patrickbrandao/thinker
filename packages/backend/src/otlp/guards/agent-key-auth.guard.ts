@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createHash } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import {
@@ -25,6 +25,34 @@ const MIN_TOKEN_LENGTH = 12;
 function cacheKey(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
+
+/**
+ * Read one request header as a single non-empty string. Node joins repeated
+ * custom headers with ", " already; the array branch only covers callers that
+ * hand us a pre-split header map. An empty value counts as absent.
+ */
+function headerValue(raw: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(raw) ? raw.join(', ') : raw;
+  return value ? value : undefined;
+}
+
+/**
+ * Constant-time equality for two caller-supplied secrets. Hashing first gives
+ * timingSafeEqual the equal-length buffers it needs without leaking either
+ * value's length through an early return.
+ */
+function sameSecret(a: string, b: string): boolean {
+  return timingSafeEqual(
+    createHash('sha256').update(a).digest(),
+    createHash('sha256').update(b).digest(),
+  );
+}
+
+/**
+ * Guard message for a request that carries two different agent keys. Mapped to
+ * a documented error code by ProxyExceptionFilter (AUTH_ERROR_CODES).
+ */
+export const CONFLICTING_API_KEY_HEADERS = 'Conflicting API key headers';
 
 interface CachedKey {
   keyId: string;
@@ -116,20 +144,48 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const authHeader = request.headers['authorization'];
+    // The agent key arrives on one of two transports: `Authorization: Bearer
+    // <key>` (OpenAI SDKs and most harnesses; a raw `<key>` with no scheme is
+    // accepted too) or `x-api-key: <key>` (the Anthropic SDK default, and
+    // Claude Code with ANTHROPIC_API_KEY). Both feed the exact same validation
+    // below — same prefix/length checks, same caches, same dev-loopback rule.
+    const authHeader = headerValue(request.headers['authorization']);
+    const apiKeyHeader = headerValue(request.headers['x-api-key']);
 
     // Use socket.remoteAddress (TCP peer) — request.ip honors X-Forwarded-For
     // and is spoofable when `trust proxy` is enabled.
     const isDevLoopback =
       this.configService.get<string>('app.nodeEnv') === 'development' && isLoopbackPeer(request);
 
-    if (!authHeader) {
+    if (authHeader === undefined && apiKeyHeader === undefined) {
       if (await this.handleDevLoopback(request, isDevLoopback)) return true;
       this.logger.warn(`Request without auth from ${request.ip}`);
       throw new UnauthorizedException('Authorization header required');
     }
 
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    const bearerToken =
+      authHeader === undefined
+        ? undefined
+        : authHeader.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : authHeader;
+
+    // Two different keys on one request is ambiguous: picking either one would
+    // silently bill the request to an agent the caller may not have meant.
+    // Reject it outright (before the dev-loopback shortcut, so the answer does
+    // not depend on where the caller sits). The same key in both is fine —
+    // some clients set both headers from one variable. Neither value is
+    // logged.
+    if (
+      bearerToken !== undefined &&
+      apiKeyHeader !== undefined &&
+      !sameSecret(bearerToken, apiKeyHeader)
+    ) {
+      this.logger.warn(`Rejected request with conflicting agent key headers from ${request.ip}`);
+      throw new UnauthorizedException(CONFLICTING_API_KEY_HEADERS);
+    }
+
+    const token = bearerToken ?? apiKeyHeader;
 
     if (!token) {
       throw new UnauthorizedException('Empty token');
@@ -277,8 +333,8 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
 
     if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
       // An expired key still identifies its agent, so this rejection is the one
-      // auth failure Manifest can attribute and record (M004). The other four
-      // (M001–M003, M005) never resolve a tenant and stay unrecorded — see
+      // auth failure Manifest can attribute and record (M004). The others
+      // (M001–M003, M005, M006) never resolve a tenant and stay unrecorded — see
       // UNRECORDABLE_MANIFEST_CODES.
       (request as Request & RequestWithManifestErrorContext).manifestErrorContext = {
         tenantId: keyRecord.tenant_id,

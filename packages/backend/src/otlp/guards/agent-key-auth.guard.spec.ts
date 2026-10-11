@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
-import { AgentKeyAuthGuard } from './agent-key-auth.guard';
+import { AgentKeyAuthGuard, CONFLICTING_API_KEY_HEADERS } from './agent-key-auth.guard';
 import { hashKey } from '../../common/utils/hash.util';
 
 function testCacheKey(token: string): string {
@@ -1002,6 +1002,222 @@ describe('AgentKeyAuthGuard', () => {
 
       guard.clearCache();
       expect(negCache.size).toBe(0);
+    });
+  });
+
+  describe('x-api-key transport (Anthropic SDK)', () => {
+    const VALID = 'mnfst_x-api-key-valid';
+    const OTHER = 'mnfst_x-api-key-other';
+
+    function seedValidKey(token = VALID) {
+      mockGetMany.mockResolvedValue([
+        {
+          id: 'key-xak',
+          tenant_id: 'tenant-xak',
+          agent_id: 'agent-xak',
+          key_hash: hashKey(token),
+          expires_at: null,
+          agent: { name: 'xak-agent' },
+          tenant: { owner_user_id: 'user-xak' },
+        },
+      ]);
+    }
+
+    const EXPECTED_CONTEXT = {
+      tenantId: 'tenant-xak',
+      agentId: 'agent-xak',
+      agentName: 'xak-agent',
+      userId: 'user-xak',
+    };
+
+    function warnSpy(g: AgentKeyAuthGuard): jest.SpyInstance {
+      const logger = (g as unknown as { logger: { warn: jest.Mock } }).logger;
+      return jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    }
+
+    function loggedText(spy: jest.SpyInstance): string {
+      return spy.mock.calls.map((args) => args.map(String).join(' ')).join('\n');
+    }
+
+    it('accepts Bearer only', async () => {
+      seedValidKey();
+      const { ctx, req } = makeContext({ authorization: `Bearer ${VALID}` });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(req.ingestionContext).toEqual(EXPECTED_CONTEXT);
+    });
+
+    it('accepts x-api-key only', async () => {
+      seedValidKey();
+      const { ctx, req } = makeContext({ 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(req.ingestionContext).toEqual(EXPECTED_CONTEXT);
+    });
+
+    it('accepts both headers when they carry the same key', async () => {
+      seedValidKey();
+      const { ctx, req } = makeContext({ authorization: `Bearer ${VALID}`, 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(req.ingestionContext).toEqual(EXPECTED_CONTEXT);
+      expect(mockGetMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts a raw Authorization value equal to x-api-key', async () => {
+      seedValidKey();
+      const { ctx } = makeContext({ authorization: VALID, 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it('rejects both headers with different keys before touching the DB', async () => {
+      seedValidKey();
+      const spy = warnSpy(guard);
+      const { ctx, req } = makeContext({ authorization: `Bearer ${VALID}`, 'x-api-key': OTHER });
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+      await expect(guard.canActivate(ctx)).rejects.toThrow(CONFLICTING_API_KEY_HEADERS);
+      expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
+      expect(req.ingestionContext).toBeUndefined();
+      const logged = loggedText(spy);
+      expect(logged).toContain('conflicting');
+      expect(logged).not.toContain(VALID);
+      expect(logged).not.toContain(OTHER);
+    });
+
+    it('rejects conflicting headers in either order', async () => {
+      seedValidKey();
+      const { ctx } = makeContext({ authorization: `Bearer ${OTHER}`, 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).rejects.toThrow(CONFLICTING_API_KEY_HEADERS);
+    });
+
+    it('does not cache a conflict, so a later single-header request still works', async () => {
+      seedValidKey();
+      const { ctx: conflicting } = makeContext({
+        authorization: `Bearer ${OTHER}`,
+        'x-api-key': VALID,
+      });
+      await expect(guard.canActivate(conflicting)).rejects.toThrow(CONFLICTING_API_KEY_HEADERS);
+
+      const { ctx } = makeContext({ 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it('rejects a request with neither header', async () => {
+      const { ctx } = makeContext({});
+      await expect(guard.canActivate(ctx)).rejects.toThrow('Authorization header required');
+    });
+
+    it('treats an empty x-api-key as absent', async () => {
+      const { ctx } = makeContext({ 'x-api-key': '' });
+      await expect(guard.canActivate(ctx)).rejects.toThrow('Authorization header required');
+    });
+
+    it('rejects an unknown key sent via x-api-key without logging it', async () => {
+      mockGetMany.mockResolvedValue([]);
+      const spy = warnSpy(guard);
+      const { ctx } = makeContext({ 'x-api-key': OTHER });
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
+      expect(loggedText(spy)).not.toContain(OTHER);
+    });
+
+    it('applies the same format checks to x-api-key', async () => {
+      const { ctx: noPrefix } = makeContext({ 'x-api-key': 'sk-ant-not-a-gateway-key' });
+      await expect(guard.canActivate(noPrefix)).rejects.toThrow('Invalid API key format');
+
+      const { ctx: tooShort } = makeContext({ 'x-api-key': 'mnfst_ab' });
+      await expect(guard.canActivate(tooShort)).rejects.toThrow('Invalid API key format');
+      expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('shares the positive cache across transports', async () => {
+      seedValidKey();
+      const { ctx: viaBearer } = makeContext({ authorization: `Bearer ${VALID}` });
+      await guard.canActivate(viaBearer);
+      expect(mockGetMany).toHaveBeenCalledTimes(1);
+
+      mockGetMany.mockClear();
+      const { ctx: viaHeader, req } = makeContext({ 'x-api-key': VALID });
+      await expect(guard.canActivate(viaHeader)).resolves.toBe(true);
+      expect(mockGetMany).not.toHaveBeenCalled();
+      expect(mockExistsBy).toHaveBeenCalledWith({ id: 'key-xak', is_active: true });
+      expect(req.ingestionContext).toEqual(EXPECTED_CONTEXT);
+    });
+
+    it('shares the negative cache across transports', async () => {
+      mockGetMany.mockResolvedValue([]);
+      const { ctx: viaHeader } = makeContext({ 'x-api-key': OTHER });
+      await expect(guard.canActivate(viaHeader)).rejects.toThrow('Invalid API key');
+      expect(mockGetMany).toHaveBeenCalledTimes(1);
+
+      const { ctx: viaBearer } = makeContext({ authorization: `Bearer ${OTHER}` });
+      await expect(guard.canActivate(viaBearer)).rejects.toThrow('Invalid API key');
+      expect(mockGetMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an expired key sent via x-api-key and keeps it attributable (M004)', async () => {
+      mockGetMany.mockResolvedValue([
+        {
+          id: 'key-xak-exp',
+          tenant_id: 'tenant-xak',
+          agent_id: 'agent-xak',
+          key_hash: hashKey(VALID),
+          expires_at: new Date(Date.now() - 1000).toISOString(),
+          agent: { name: 'xak-agent' },
+          tenant: { owner_user_id: 'user-xak' },
+        },
+      ]);
+      const { ctx, req } = makeContext({ 'x-api-key': VALID });
+      await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired');
+      expect(req.manifestErrorContext).toEqual(EXPECTED_CONTEXT);
+    });
+
+    describe('dev loopback', () => {
+      const DEV_KEY_ROW = {
+        tenant_id: 'dev-tenant',
+        agent_id: 'dev-agent',
+        agent: { name: 'demo-agent' },
+        tenant: { owner_user_id: 'dev-user' },
+      };
+
+      beforeEach(() => {
+        guard.onModuleDestroy();
+        guard = createGuard({ 'app.nodeEnv': 'development' });
+      });
+
+      it('allows a non-mnfst x-api-key from loopback, like Bearer', async () => {
+        mockFindOne.mockResolvedValue(DEV_KEY_ROW);
+        const { ctx, req } = makeContext({ 'x-api-key': 'dev-no-auth' }, '127.0.0.1');
+        await expect(guard.canActivate(ctx)).resolves.toBe(true);
+        expect(req.ingestionContext).toEqual({
+          tenantId: 'dev-tenant',
+          agentId: 'dev-agent',
+          agentName: 'demo-agent',
+          userId: 'dev-user',
+        });
+      });
+
+      it('rejects a non-mnfst x-api-key from a non-loopback peer', async () => {
+        mockFindOne.mockResolvedValue(DEV_KEY_ROW);
+        const { ctx } = makeContext({ 'x-api-key': 'dev-no-auth' }, '192.168.1.100');
+        await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
+      });
+
+      it('still rejects conflicting headers from loopback', async () => {
+        mockFindOne.mockResolvedValue(DEV_KEY_ROW);
+        const { ctx } = makeContext(
+          { authorization: 'Bearer dev-a', 'x-api-key': 'dev-b' },
+          '127.0.0.1',
+        );
+        await expect(guard.canActivate(ctx)).rejects.toThrow(CONFLICTING_API_KEY_HEADERS);
+        expect(mockFindOne).not.toHaveBeenCalled();
+      });
+
+      it('rejects a non-mnfst x-api-key from loopback outside development', async () => {
+        guard.onModuleDestroy();
+        guard = createGuard({ 'app.nodeEnv': 'production' });
+        mockFindOne.mockResolvedValue(DEV_KEY_ROW);
+        const { ctx } = makeContext({ 'x-api-key': 'dev-no-auth' }, '127.0.0.1');
+        await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
+      });
     });
   });
 });
