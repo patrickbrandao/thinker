@@ -4,6 +4,7 @@ import { Request, Response as ExpressResponse } from 'express';
 import { formatManifestError, ManifestErrorCode } from '../../common/errors/error-codes';
 import { MANIFEST_CODE_TO_REASON } from '../../common/errors/manifest-error';
 import type { RequestWithManifestErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
+import { CONFLICTING_API_KEY_HEADERS } from '../../otlp/guards/agent-key-auth.guard';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
 import { sanitizeRequestHeaders } from './request-headers';
 import { getDashboardUrl, sendFriendlyResponse } from './proxy-friendly-response';
@@ -15,6 +16,7 @@ const AUTH_ERROR_CODES: Record<string, ManifestErrorCode> = {
   'Invalid API key format': 'M003',
   'API key expired': 'M004',
   'Invalid API key': 'M005',
+  [CONFLICTING_API_KEY_HEADERS]: 'M006',
 };
 
 /** Status codes that should pass through as normal HTTP errors. */

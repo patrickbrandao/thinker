@@ -47,7 +47,7 @@ describe('every documented error code is accounted for', () => {
   });
 
   it('only the pre-authentication auth failures are unrecordable', () => {
-    expect(UNRECORDABLE_MANIFEST_CODES).toEqual(['M001', 'M002', 'M003', 'M005']);
+    expect(UNRECORDABLE_MANIFEST_CODES).toEqual(['M001', 'M002', 'M003', 'M005', 'M006']);
     // M004 resolves an agent before rejecting, so it must stay recordable.
     expect(isRecordableManifestCode('M004')).toBe(true);
   });

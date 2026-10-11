@@ -710,7 +710,7 @@ export class ProxyController {
     // socket that dies after streaming starts is thrown as StreamFailure.
     // Other non-HTTP throws are Manifest's own bugs (M500).
     //
-    // An unrecordable ManifestError (M001–M003, M005) writes NOTHING: it has no
+    // An unrecordable ManifestError (M001–M003, M005, M006) writes NOTHING: it has no
     // tenant to attribute, and falling through to recordProviderError would blame
     // the provider for someone presenting a bad key.
     if (err instanceof ManifestError) {
