@@ -349,6 +349,13 @@ describe('OpencodeGoCatalogService', () => {
         status: 200,
         text: async () => SAMPLE_MDX,
       } as Response);
+      // The warmup only runs when an OpenCode Go provider is registered.
+      const providerRepo = {
+        createQueryBuilder: () => ({
+          where: () => ({ getCount: async () => 1 }),
+        }),
+      };
+      service = new OpencodeGoCatalogService(providerRepo as never);
       service.onModuleInit();
       // onModuleInit is fire-and-forget; flush the pending list() promise.
       await new Promise((r) => setImmediate(r));

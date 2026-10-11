@@ -389,6 +389,29 @@ describe('ModelsDevSyncService', () => {
     fetchSpy.mockRestore();
   });
 
+  describe('THINKER_CATALOG_SYNC=false', () => {
+    const previous = process.env['THINKER_CATALOG_SYNC'];
+    beforeEach(() => {
+      process.env['THINKER_CATALOG_SYNC'] = 'false';
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
+      else process.env['THINKER_CATALOG_SYNC'] = previous;
+    });
+
+    it('skips the boot fetch and resolves whenInitialized() at once', async () => {
+      service.onModuleInit();
+      await service.whenInitialized();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(service.getLastFetchedAt()).toBeNull();
+    });
+
+    it('makes the cron and the manual refresh a no-op', async () => {
+      await expect(service.refreshCache()).resolves.toBe(0);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('refreshCache', () => {
     it('should fetch, parse, and cache models from api.json', async () => {
       fetchSpy.mockResolvedValue({

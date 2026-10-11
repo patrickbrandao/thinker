@@ -7,6 +7,8 @@
  *
  * The only outbound catalog destinations allowed are the ones in ADR 0003
  * (openrouter.ai, models.dev, and raw.githubusercontent.com for OpenCode Go).
+ * #39 tightens that: the OpenCode Go doc is fetched only when an OpenCode Go
+ * provider is registered, and THINKER_CATALOG_SYNC=false silences all three.
  */
 import { spawn, type ChildProcess } from 'child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
@@ -39,11 +41,8 @@ const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
   'backend/src/common/utils/dashboard-url.ts',
   'backend/src/common/utils/og-rewrite.ts',
 ];
-const ADR_0003_CATALOG_HOSTS = new Set([
-  'openrouter.ai',
-  'models.dev',
-  'raw.githubusercontent.com',
-]);
+const OPENCODE_GO_DOC_HOST = 'raw.githubusercontent.com';
+const ADR_0003_CATALOG_HOSTS = new Set(['openrouter.ai', 'models.dev', OPENCODE_GO_DOC_HOST]);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 const BACKEND = join(__dirname, '..');
@@ -102,8 +101,112 @@ async function waitForHealth(base: string, child: ChildProcess, output: () => st
 }
 
 interface EgressRecord {
-  kind: 'fetch' | 'dns';
+  kind: 'boot' | 'fetch' | 'dns';
   target: string;
+}
+
+const DATABASE_URL =
+  process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+
+/** Hostnames of the remote (non-loopback) fetches in a run. */
+function remoteFetchHosts(records: EgressRecord[]): string[] {
+  return records
+    .filter((record) => record.kind === 'fetch')
+    .map((record) => new URL(record.target).hostname)
+    .filter((host) => !LOCAL_HOSTS.has(host));
+}
+
+async function withDatabase(run: (db: DataSource) => Promise<void>, dropSchema = false) {
+  const db = new DataSource({ type: 'postgres', url: DATABASE_URL, dropSchema });
+  await db.initialize();
+  try {
+    await run(db);
+  } finally {
+    await db.destroy();
+  }
+}
+
+interface BootedServer {
+  base: string;
+  output: () => string;
+  records: EgressRecord[];
+  stop: () => Promise<void>;
+}
+
+/**
+ * Boots the real server (`src/main.ts`, every module of AppModule) in its own
+ * process, in production mode and with none of upstream's opt-out variables,
+ * with `test/support/egress-recorder.cjs` preloaded to record every fetch and
+ * DNS lookup while keeping the process off the network. Returns what it
+ * recorded once health passed and the fire-and-forget boot work had started.
+ */
+async function bootServer(extraEnv: NodeJS.ProcessEnv = {}): Promise<BootedServer> {
+  const workDir = mkdtempSync(join(tmpdir(), 'thinker-egress-'));
+  const egressLog = join(workDir, 'egress.jsonl');
+  writeFileSync(egressLog, '');
+  const port = await freePort();
+  const base = `http://127.0.0.1:${port}`;
+
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (
+      !/TELEMETRY|UPDATE_CHECK|DISCOVERY|SENTRY|MODELPARAMS|WINGMAN|EMBEDDED|CATALOG_SYNC/.test(key)
+    ) {
+      env[key] = value;
+    }
+  }
+  Object.assign(env, {
+    NODE_ENV: 'production',
+    DATABASE_URL,
+    PORT: String(port),
+    BIND_ADDRESS: '127.0.0.1',
+    BETTER_AUTH_URL: base,
+    BETTER_AUTH_SECRET:
+      process.env['BETTER_AUTH_SECRET'] ?? 'test-secret-for-e2e-at-least-32chars!!',
+    SHUTDOWN_DRAIN_MS: '0',
+    EGRESS_LOG: egressLog,
+    ...extraEnv,
+  });
+
+  let output = '';
+  const child: ChildProcess = spawn(
+    process.execPath,
+    [
+      '-r',
+      require.resolve('ts-node/register/transpile-only'),
+      '-r',
+      join(__dirname, 'support', 'egress-recorder.cjs'),
+      join('src', 'main.ts'),
+    ],
+    { cwd: BACKEND, env, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  child.stdout?.on('data', (chunk: Buffer) => (output += chunk.toString()));
+  child.stderr?.on('data', (chunk: Buffer) => (output += chunk.toString()));
+
+  const stop = async () => {
+    if (child.exitCode === null) {
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill('SIGTERM');
+      const timer = setTimeout(() => child.kill('SIGKILL'), 10_000);
+      await exited;
+      clearTimeout(timer);
+    }
+    rmSync(workDir, { recursive: true, force: true });
+  };
+
+  try {
+    await waitForHealth(base, child, () => output);
+    // Let fire-and-forget onModuleInit / onApplicationBootstrap work start.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  } catch (err) {
+    await stop();
+    throw err;
+  }
+  const records = readFileSync(egressLog, 'utf8')
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as EgressRecord);
+  return { base, output: () => output, records, stop };
 }
 
 describe('no phone-home egress', () => {
@@ -150,92 +253,31 @@ describe('no phone-home egress', () => {
   });
 
   /**
-   * Boots the real server (`src/main.ts`, every module of AppModule) in its own
-   * process, in production mode and with none of upstream's opt-out variables,
-   * with `test/support/egress-recorder.cjs` preloaded to record every fetch and
-   * DNS lookup while keeping the process off the network.
+   * Each block boots the real server against the same database, in order: the
+   * first starts from an empty schema (the server migrates on boot), and the
+   * later ones register an OpenCode Go provider in it.
    */
   describe('at boot (production mode, no opt-out variable)', () => {
-    let child: ChildProcess | undefined;
-    let workDir: string;
-    let base: string;
-    let output = '';
-    let records: EgressRecord[] = [];
+    let server: BootedServer | undefined;
 
     beforeAll(async () => {
-      const databaseUrl =
-        process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
       // Start from an empty schema: the real server migrates on boot, and
       // earlier suites leave a synchronize()-built schema behind.
-      const reset = new DataSource({ type: 'postgres', url: databaseUrl, dropSchema: true });
-      await reset.initialize();
-      await reset.destroy();
-
-      workDir = mkdtempSync(join(tmpdir(), 'thinker-egress-'));
-      const egressLog = join(workDir, 'egress.jsonl');
-      writeFileSync(egressLog, '');
-      const port = await freePort();
-      base = `http://127.0.0.1:${port}`;
-
-      const env: NodeJS.ProcessEnv = {};
-      for (const [key, value] of Object.entries(process.env)) {
-        if (!/TELEMETRY|UPDATE_CHECK|DISCOVERY|SENTRY|MODELPARAMS|WINGMAN|EMBEDDED/.test(key)) {
-          env[key] = value;
-        }
-      }
-      Object.assign(env, {
-        NODE_ENV: 'production',
-        DATABASE_URL: databaseUrl,
-        PORT: String(port),
-        BIND_ADDRESS: '127.0.0.1',
-        BETTER_AUTH_URL: base,
-        BETTER_AUTH_SECRET:
-          process.env['BETTER_AUTH_SECRET'] ?? 'test-secret-for-e2e-at-least-32chars!!',
-        SHUTDOWN_DRAIN_MS: '0',
-        EGRESS_LOG: egressLog,
-      });
-
-      child = spawn(
-        process.execPath,
-        [
-          '-r',
-          require.resolve('ts-node/register/transpile-only'),
-          '-r',
-          join(__dirname, 'support', 'egress-recorder.cjs'),
-          join('src', 'main.ts'),
-        ],
-        { cwd: BACKEND, env, stdio: ['ignore', 'pipe', 'pipe'] },
-      );
-      child.stdout?.on('data', (chunk: Buffer) => (output += chunk.toString()));
-      child.stderr?.on('data', (chunk: Buffer) => (output += chunk.toString()));
-
-      await waitForHealth(base, child, () => output);
-      // Let fire-and-forget onModuleInit / onApplicationBootstrap work start.
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      records = readFileSync(egressLog, 'utf8')
-        .split('\n')
-        .filter((line) => line.length > 0)
-        .map((line) => JSON.parse(line) as EgressRecord);
+      await withDatabase(async () => undefined, true);
+      server = await bootServer();
     }, 180_000);
 
     afterAll(async () => {
-      if (child && child.exitCode === null) {
-        const exited = new Promise((resolve) => child!.once('exit', resolve));
-        child.kill('SIGTERM');
-        const timer = setTimeout(() => child!.kill('SIGKILL'), 10_000);
-        await exited;
-        clearTimeout(timer);
-      }
-      if (workDir) rmSync(workDir, { recursive: true, force: true });
+      await server?.stop();
     }, 30_000);
 
     it('boots and runs the egress recorder', () => {
-      expect(output).toContain('Server running on');
-      expect(records.length).toBeGreaterThan(0);
+      expect(server!.output()).toContain('Server running on');
+      expect(server!.records.some((record) => record.kind === 'boot')).toBe(true);
     });
 
     it('makes no request to a phone-home destination', () => {
-      const offenders = records.filter((record) =>
+      const offenders = server!.records.filter((record) =>
         [...FORBIDDEN_DESTINATIONS, ...HOSTED_GATEWAY_HOSTS].some((destination) =>
           record.target.includes(destination),
         ),
@@ -244,15 +286,22 @@ describe('no phone-home egress', () => {
     });
 
     it('fetches nothing outside the ADR 0003 catalogs', () => {
-      const remote = records
-        .filter((record) => record.kind === 'fetch')
-        .map((record) => new URL(record.target).hostname)
-        .filter((host) => !LOCAL_HOSTS.has(host));
+      const remote = remoteFetchHosts(server!.records);
       expect(remote.filter((host) => !ADR_0003_CATALOG_HOSTS.has(host))).toEqual([]);
     });
 
+    it('syncs the OpenRouter and models.dev catalogs by default', () => {
+      const remote = new Set(remoteFetchHosts(server!.records));
+      expect(remote.has('openrouter.ai')).toBe(true);
+      expect(remote.has('models.dev')).toBe(true);
+    });
+
+    it('does not fetch the OpenCode Go doc without an OpenCode Go provider', () => {
+      expect(remoteFetchHosts(server!.records)).not.toContain(OPENCODE_GO_DOC_HOST);
+    });
+
     it('resolves no remote hostname, so nothing bypasses fetch to reach the network', () => {
-      const remote = records
+      const remote = server!.records
         .filter((record) => record.kind === 'dns')
         .map((record) => record.target)
         .filter((host) => !LOCAL_HOSTS.has(host));
@@ -260,14 +309,70 @@ describe('no phone-home egress', () => {
     });
 
     it('no longer serves the update-check or discovery routes', async () => {
-      const version = await fetch(`${base}/api/v1/version`);
-      const discovery = await fetch(`${base}/api/v1/discovery/complete`, {
+      const version = await fetch(`${server!.base}/api/v1/version`);
+      const discovery = await fetch(`${server!.base}/api/v1/discovery/complete`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{}',
       });
       expect(version.status).toBe(404);
       expect(discovery.status).toBe(404);
+    });
+  });
+
+  describe('with an OpenCode Go provider registered', () => {
+    beforeAll(async () => {
+      // The schema exists: the boot above migrated it.
+      await withDatabase(async (db) => {
+        await db.query(
+          `INSERT INTO tenants (id, name) VALUES ('egress-tenant', 'egress-tenant')
+           ON CONFLICT (id) DO NOTHING`,
+        );
+        await db.query(
+          `INSERT INTO tenant_providers (id, tenant_id, provider, auth_type, label)
+           VALUES ('egress-opencode-go', 'egress-tenant', 'opencode-go', 'api_key', 'Default')
+           ON CONFLICT (id) DO NOTHING`,
+        );
+      });
+    }, 30_000);
+
+    describe('and THINKER_CATALOG_SYNC=false', () => {
+      let server: BootedServer | undefined;
+
+      beforeAll(async () => {
+        server = await bootServer({ THINKER_CATALOG_SYNC: 'false' });
+      }, 180_000);
+
+      afterAll(async () => {
+        await server?.stop();
+      }, 30_000);
+
+      it('boots and runs the egress recorder', () => {
+        expect(server!.output()).toContain('Server running on');
+        expect(server!.records.some((record) => record.kind === 'boot')).toBe(true);
+      });
+
+      it('fetches no catalog at all, nor anything else remote', () => {
+        expect(remoteFetchHosts(server!.records)).toEqual([]);
+      });
+    });
+
+    describe('and catalog sync on (default)', () => {
+      let server: BootedServer | undefined;
+
+      beforeAll(async () => {
+        server = await bootServer();
+      }, 180_000);
+
+      afterAll(async () => {
+        await server?.stop();
+      }, 30_000);
+
+      it('warms the OpenCode Go doc, and fetches nothing outside the ADR 0003 catalogs', () => {
+        const remote = remoteFetchHosts(server!.records);
+        expect(remote).toContain(OPENCODE_GO_DOC_HOST);
+        expect(remote.filter((host) => !ADR_0003_CATALOG_HOSTS.has(host))).toEqual([]);
+      });
     });
   });
 });

@@ -577,7 +577,23 @@ Thinker makes no outbound call of its own (#17). Upstream Manifest had six, all 
 - **Hosted Wingman origin**: CORS no longer always allows `wingman.manifest.build`, and CSP `frame-src` is `'self'` in every mode (`WINGMAN_PORT` is gone). `WINGMAN_CORS_ORIGINS` became `THINKER_CORS_ORIGINS`, with the same meaning.
 - **modelparams.dev**: `ProviderParamSpecService` serves only the snapshot of the bundled `modelparams` package, loaded synchronously at construction. There is no boot fetch, no hourly cron and no `MODELPARAMS_API_*`; the snapshot moves forward with dependency updates.
 
-The only outbound destinations left are the providers the operator configures and the public catalogs of ADR 0003 (openrouter.ai, models.dev, and raw.githubusercontent.com for OpenCode Go). `test/no-phonehome-egress.e2e-spec.ts` fails if the backend, CLI or shared source names a removed destination again, or if a production-mode boot fetches anything outside that list.
+The only outbound destinations left are the providers the operator configures and the public catalogs of [ADR 0003](../adr/0003-excecao-catalogos-publicos.md) (#39):
+
+| Destination | Service | When |
+|---|---|---|
+| `openrouter.ai/api/v1/models` | `PricingSyncService` | boot (fire-and-forget) and daily at 03:00 |
+| `models.dev/api.json` | `ModelsDevSyncService` | boot (fire-and-forget) and daily at 04:00, plus manual model refreshes |
+| `raw.githubusercontent.com/.../go.mdx` | `OpencodeGoCatalogService` | only when an OpenCode Go provider is registered: the boot warmup checks `tenant_providers` first, and every other caller (that provider's discovery, its proxied requests and playground runs, its models in the picker) is already scoped to OpenCode Go; cached 1 h |
+
+**`THINKER_CATALOG_SYNC=false`** (also `0`, `no`, `off`; read at call time by `isCatalogSyncEnabled()` in `common/utils/catalog-sync.ts`) turns all three off: no boot fetch, the crons and `POST /api/v1/routing/pricing/refresh` become no-ops, and the OpenCode Go catalog returns `[]` without fetching. `GET /api/v1/routing/pricing-health` and the refresh endpoint report `sync_enabled`, and the routing status (REST and the MCP `manifest_routing_status` tool) no longer blames the empty OpenRouter cache for an unroutable agent, since that cache is empty by design.
+
+What the operator loses with the sync off, as ADR 0003 accepted:
+
+- **Recorded cost.** `ModelPricingCacheService` is built from the OpenRouter and models.dev caches plus custom providers' own prices. With both caches empty, a request to a non-custom, non-local model is recorded with `cost_usd` NULL ("price unknown"), unless the provider reports its own cost in the response usage (OpenRouter-style `usage.cost`). The dashboard shows NULL as $0.00 and totals sum it as 0. Subscriptions stay $0 as before, local providers stay $0, and custom providers keep their configured prices.
+- **OpenCode Go.** No docs catalog, so the per-request cost is $0, discovery lists only what OpenCode Go's own `/models` returns, and the API format comes from the model-family heuristic in `provider-client.ts`.
+- **Model metadata.** Discovery falls back to `known-model-prices.ts` (three prefixes today) for prices and to `known-model-modalities.ts` for modalities. Most models show no price in the picker, capability flags from models.dev are missing, and providers whose model list comes from the catalogs when their own API cannot (for example a Gemini subscription, or a provider whose `/models` is unreachable) may list no models.
+
+`test/no-phonehome-egress.e2e-spec.ts` fails if the backend, CLI or shared source names a removed destination again, or if a production-mode boot fetches anything outside that list. It boots the real server three times against the same database: with no OpenCode Go provider (openrouter.ai and models.dev are fetched, raw.githubusercontent.com is not), with an OpenCode Go provider and `THINKER_CATALOG_SYNC=false` (no remote fetch at all), and with that provider and the default (the OpenCode Go doc is warmed).
 
 ## Architecture Notes
 

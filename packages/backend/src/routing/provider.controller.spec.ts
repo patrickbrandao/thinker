@@ -244,6 +244,24 @@ describe('ProviderController', () => {
       const result = await controller.getStatus(mockCtx, mockAgentName);
       expect(result).toEqual({ enabled: false, reason: 'pricing_cache_empty' });
     });
+
+    it('does not blame the empty pricing cache when THINKER_CATALOG_SYNC=false', async () => {
+      const previous = process.env['THINKER_CATALOG_SYNC'];
+      process.env['THINKER_CATALOG_SYNC'] = 'false';
+      try {
+        mockProviderService.getProviders.mockResolvedValue([
+          { id: 'p1', provider: 'openai', is_active: true },
+        ]);
+        mockTierService.hasRoutableTier.mockResolvedValue(false);
+        mockPricingSync.getAll.mockReturnValue(new Map());
+
+        const result = await controller.getStatus(mockCtx, mockAgentName);
+        expect(result).toEqual({ enabled: false, reason: 'no_routable_models' });
+      } finally {
+        if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
+        else process.env['THINKER_CATALOG_SYNC'] = previous;
+      }
+    });
   });
 
   /* ── getProviders ── */

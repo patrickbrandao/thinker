@@ -123,6 +123,7 @@ describe('ModelController', () => {
       expect(result).toEqual({
         model_count: 2,
         last_fetched_at: '2026-04-12T10:00:00.000Z',
+        sync_enabled: true,
       });
     });
 
@@ -132,7 +133,24 @@ describe('ModelController', () => {
 
       const result = controller.pricingHealth();
 
-      expect(result).toEqual({ model_count: 0, last_fetched_at: null });
+      expect(result).toEqual({ model_count: 0, last_fetched_at: null, sync_enabled: true });
+    });
+
+    it('reports sync_enabled: false when THINKER_CATALOG_SYNC=false', () => {
+      const previous = process.env['THINKER_CATALOG_SYNC'];
+      process.env['THINKER_CATALOG_SYNC'] = 'false';
+      try {
+        mockPricingSync.getAll.mockReturnValue(new Map());
+        mockPricingSync.getLastFetchedAt.mockReturnValue(null);
+        expect(controller.pricingHealth()).toEqual({
+          model_count: 0,
+          last_fetched_at: null,
+          sync_enabled: false,
+        });
+      } finally {
+        if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
+        else process.env['THINKER_CATALOG_SYNC'] = previous;
+      }
     });
   });
 
@@ -150,6 +168,7 @@ describe('ModelController', () => {
         ok: true,
         model_count: 150,
         last_fetched_at: '2026-04-13T12:00:00.000Z',
+        sync_enabled: true,
       });
     });
 
@@ -159,7 +178,12 @@ describe('ModelController', () => {
 
       const result = await controller.refreshPricing();
 
-      expect(result).toEqual({ ok: false, model_count: 0, last_fetched_at: null });
+      expect(result).toEqual({
+        ok: false,
+        model_count: 0,
+        last_fetched_at: null,
+        sync_enabled: true,
+      });
     });
   });
 
