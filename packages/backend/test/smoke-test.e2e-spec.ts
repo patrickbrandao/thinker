@@ -156,8 +156,11 @@ describe('ST-03: Seed agent data', () => {
       [agentId],
     );
 
-    // Use a timestamp 60s in the past so period boundary comparisons are safe
-    const past = new Date(Date.now() - 60_000).toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+    // Use a timestamp 60s in the past so period boundary comparisons are safe.
+    // Pass a Date (not a UTC string): the pg driver serialises it in the Node
+    // process's local time, the same wall clock the proxy writes and the limit
+    // windows read. A UTC string would land hours off the window outside UTC.
+    const past = new Date(Date.now() - 60_000);
 
     await ds.query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
