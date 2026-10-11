@@ -66,7 +66,63 @@ describe('sanitizeRequestHeaders', () => {
   it('isBlockedHeaderName is case-insensitive and covers prefixes', () => {
     expect(isBlockedHeaderName('AUTHORIZATION')).toBe(true);
     expect(isBlockedHeaderName('X-Manifest-Anything')).toBe(true);
+    expect(isBlockedHeaderName('X-Thinker-Anything')).toBe(true);
     expect(isBlockedHeaderName('X-Title')).toBe(false);
+  });
+
+  // Issue #64: every header a provider adapter authenticates with, or that
+  // picks the account/org/project a stored credential acts on.
+  it('drops provider credential and tenant-identity headers in any casing', () => {
+    const out = sanitizeRequestHeaders({
+      'X-API-Key': 'sk-ant-attacker',
+      'api-key': 'azure-attacker',
+      'X-Goog-Api-Key': 'goog-attacker',
+      'x-goog-user-project': 'other-project',
+      'Proxy-Authorization': 'Basic Zm9vOmJhcg==',
+      'Ocp-Apim-Subscription-Key': 'apim-attacker',
+      'OpenAI-Organization': 'org-other',
+      'OpenAI-Project': 'proj-other',
+      'ChatGPT-Account-Id': 'acct-other',
+      'Session-Id': 'sess',
+      'thread-id': 'thr',
+      'x-codex-turn-state': 'state',
+      'X-Amz-Target': 'AmazonCodeWhispererService.Other',
+      'X-Amz-Security-Token': 'token',
+      'X-Forwarded-Host': 'attacker.example',
+      Forwarded: 'host=attacker.example',
+      'Content-Encoding': 'gzip',
+      'X-Custom-Trace': 'kept',
+    });
+    expect(out).toEqual({ 'X-Custom-Trace': 'kept' });
+  });
+
+  it('blocks names after trimming surrounding whitespace', () => {
+    const out = sanitizeRequestHeaders({
+      '  x-api-key ': 'sk-attacker',
+      ' Authorization': 'Bearer attacker',
+      ' X-Title ': 'kept',
+    });
+    expect(out).toEqual({ 'X-Title': 'kept' });
+  });
+
+  it('drops names that are not valid HTTP tokens', () => {
+    const out = sanitizeRequestHeaders({
+      'X Bad': 'space',
+      'X-Bad:Colon': 'colon',
+      ':authority': 'pseudo',
+      'X-Bad\r\nInjected': 'crlf',
+      'X-Good': 'ok',
+    });
+    expect(out).toEqual({ 'X-Good': 'ok' });
+  });
+
+  it('drops values carrying CR, LF or NUL', () => {
+    const out = sanitizeRequestHeaders({
+      'X-Split': 'a\r\nAuthorization: Bearer attacker',
+      'X-Nul': 'a\0b',
+      'X-Good': 'ok',
+    });
+    expect(out).toEqual({ 'X-Good': 'ok' });
   });
 
   describe('case-insensitive deduplication', () => {

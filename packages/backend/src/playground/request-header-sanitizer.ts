@@ -1,32 +1,20 @@
-/**
- * Headers Manifest manages itself — providing these from the client would
- * hijack auth, break routing, or mask our telemetry. Compared case-insensitively.
- */
-const BLOCKED_EXACT = new Set<string>([
-  'authorization',
-  'proxy-authorization',
-  'cookie',
-  'set-cookie',
-  'host',
-  'content-length',
-  'content-type',
-  'connection',
-  'transfer-encoding',
-  'upgrade',
-  'te',
-  'trailer',
-]);
-
-const BLOCKED_PREFIXES = ['x-manifest-'];
+import { isPlaygroundHeaderBlocked } from 'manifest-shared';
 
 const MAX_HEADERS = 20;
 const MAX_VALUE_LENGTH = 2_000;
 
-/** Public for testing — exposed as a function so callers can log or display it. */
+/** RFC 9110 `token`. Anything else is not a valid header name and makes fetch throw. */
+const HEADER_NAME_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+/** CR, LF and NUL are rejected by fetch and would allow header injection. */
+const FORBIDDEN_VALUE_CHARS_RE = /[\r\n\0]/;
+
+/**
+ * Credential, tenant-identity, gateway-managed and transport headers a client
+ * may not set. The list lives in `manifest-shared` so the dashboard warns on
+ * exactly what the server drops. Compared case-insensitively after trimming.
+ */
 export function isBlockedHeaderName(name: string): boolean {
-  const lower = name.toLowerCase();
-  if (BLOCKED_EXACT.has(lower)) return true;
-  return BLOCKED_PREFIXES.some((p) => lower.startsWith(p));
+  return isPlaygroundHeaderBlocked(name);
 }
 
 /**
@@ -48,12 +36,14 @@ export function sanitizeRequestHeaders(
     if (Object.keys(out).length >= MAX_HEADERS) break;
     if (typeof rawKey !== 'string' || typeof rawValue !== 'string') continue;
     const key = rawKey.trim();
-    if (!key) continue;
+    if (!key || !HEADER_NAME_RE.test(key)) continue;
     if (isBlockedHeaderName(key)) continue;
+    const value = rawValue.slice(0, MAX_VALUE_LENGTH);
+    if (FORBIDDEN_VALUE_CHARS_RE.test(value)) continue;
     const lower = key.toLowerCase();
     if (seenLower.has(lower)) continue;
     seenLower.add(lower);
-    out[key] = rawValue.slice(0, MAX_VALUE_LENGTH);
+    out[key] = value;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }

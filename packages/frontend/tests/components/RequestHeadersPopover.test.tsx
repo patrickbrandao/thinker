@@ -16,10 +16,19 @@ describe('isBlockedHeaderKey', () => {
     expect(isBlockedHeaderKey('X-Manifest-Trace')).toBe(true);
   });
 
+  // Issue #64: the dashboard warns on the same credential headers the server drops.
+  it('flags provider credential and tenant-identity headers', () => {
+    expect(isBlockedHeaderKey('X-API-Key')).toBe(true);
+    expect(isBlockedHeaderKey(' x-goog-api-key ')).toBe(true);
+    expect(isBlockedHeaderKey('api-key')).toBe(true);
+    expect(isBlockedHeaderKey('OpenAI-Organization')).toBe(true);
+    expect(isBlockedHeaderKey('ChatGPT-Account-Id')).toBe(true);
+  });
+
   it('lets normal provider headers through', () => {
     expect(isBlockedHeaderKey('HTTP-Referer')).toBe(false);
     expect(isBlockedHeaderKey('X-Title')).toBe(false);
-    expect(isBlockedHeaderKey('OpenAI-Organization')).toBe(false);
+    expect(isBlockedHeaderKey('anthropic-beta')).toBe(false);
   });
 
   it('treats empty / whitespace as not blocked so the warning does not flash on new rows', () => {

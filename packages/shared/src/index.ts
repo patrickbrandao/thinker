@@ -173,6 +173,11 @@ export type {
   PlaygroundHistoryRunDetail,
 } from './playground';
 export {
+  PLAYGROUND_BLOCKED_HEADERS,
+  PLAYGROUND_BLOCKED_HEADER_PREFIXES,
+  isPlaygroundHeaderBlocked,
+} from './playground-headers';
+export {
   PLANS,
   FREE_PLAN_REQUESTS_PER_MONTH,
   PLAN_LIMITS,
