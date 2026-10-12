@@ -768,7 +768,7 @@ Thinker's CI (#20) is five workflows. Every action is pinned to a commit SHA, ev
 | `ci.yml` | every PR to `main`, every push to `main` | `Lint`, `Typecheck`, `Build`, `Unit (backend)`, `Unit (frontend)`, `Unit (shared)`, `Unit (cli)`, `Backend e2e (PostgreSQL 16, TZ=UTC)`, `Backend e2e (PostgreSQL 16, TZ=America/Sao_Paulo)`, `Scripts`, `Changeset check` |
 | `docker.yml` | PRs that touch the image inputs | `Docker build (linux/amd64)`, `Docker build (linux/arm64)` |
 | `docker-smoke.yml` | PRs that touch the image or the compose files | `Compose smoke test (read-only)`, `install.sh end-to-end` |
-| `codeql.yml` | PRs and pushes (except docs and changesets), weekly | `CodeQL (javascript-typescript)`, `CodeQL (actions)` |
+| `codeql.yml` | PRs and pushes (except docs and changesets), weekly | `CodeQL`, `CodeQL (actions)` |
 | `dependency-review.yml` | every PR | `dependency-review` |
 
 - **Lint:** ESLint over each package's `src/` plus `packages/backend/test/`, and `design:registry:check`.
