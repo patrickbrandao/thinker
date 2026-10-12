@@ -1,0 +1,28 @@
+// Fixture for e2e-db-guard-scan.spec.ts (issue #108): the pattern that
+// #52, #60 and #66 brought in before the guard existed. Never run.
+import { DataSource } from 'typeorm';
+
+const DB_URL =
+  process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
+
+describe('legacy migration spec', () => {
+  let ds: DataSource;
+
+  beforeAll(async () => {
+    ds = new DataSource({
+      type: 'postgres',
+      url: DB_URL,
+      dropSchema: true,
+      synchronize: false,
+    });
+    await ds.initialize();
+  });
+
+  afterAll(async () => {
+    await ds.destroy();
+  });
+
+  it('runs', () => {
+    expect(ds.isInitialized).toBe(true);
+  });
+});

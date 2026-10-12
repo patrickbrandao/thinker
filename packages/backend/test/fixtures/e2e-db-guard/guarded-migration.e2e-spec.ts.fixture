@@ -1,0 +1,28 @@
+// Fixture for e2e-db-guard-scan.spec.ts (issue #108): the accepted pattern.
+// The comment below must not count as a violation:
+//   url: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/mydatabase', dropSchema: true
+import { DataSource } from 'typeorm';
+import { resolveE2eDatabaseUrl } from './e2e-db-guard';
+
+describe('guarded migration spec', () => {
+  let ds: DataSource;
+
+  beforeAll(async () => {
+    ds = new DataSource({
+      type: 'postgres',
+      url: resolveE2eDatabaseUrl(),
+      dropSchema: true,
+      synchronize: false,
+    });
+    await ds.initialize();
+    await ds.query('DROP SCHEMA IF EXISTS scratch CASCADE');
+  });
+
+  afterAll(async () => {
+    await ds.destroy();
+  });
+
+  it('runs', () => {
+    expect(ds.isInitialized).toBe(true);
+  });
+});

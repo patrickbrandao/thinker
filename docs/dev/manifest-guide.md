@@ -297,6 +297,14 @@ The e2e suite connects with `dropSchema: true` (helpers and the migration specs)
 
 To use a Postgres you manage yourself, point it at a database dedicated to tests: `DATABASE_URL=postgresql://user:pass@host:port/thinker_e2e_test THINKER_E2E_ALLOW_DROP=1 npm run test:e2e --workspace=packages/backend`. Never point it at a development database or at a port owned by another project.
 
+New specs can't skip the guard either (issue #108). `test/e2e-db-guard-scan.spec.ts` runs in the unit suite (`npm test`). It parses every `.ts` file under `packages/backend/test` with the TypeScript AST, so comments don't count, and fails on any of these:
+
+- `unguarded-drop`: a file wipes the database without calling `resolveE2eDatabaseUrl()` or `createTestApp()`. Wiping means `dropSchema` set to anything but a literal `false`, `DROP SCHEMA`/`DROP DATABASE` in a string, `.dropDatabase()` or `.synchronize(true)`.
+- `database-url-fallback`: `process.env.DATABASE_URL ?? ...` or `|| ...`.
+- `default-database`: a string naming `localhost:5432` or `mydatabase`.
+
+`e2e-db-guard.spec.ts` may contain those strings, because it proves the guard refuses them. The scanner's own spec isn't scanned. Its negative cases live in `test/fixtures/e2e-db-guard/*.fixture`, whose extension keeps them out of the scan and out of Jest.
+
 ### Database Migrations
 
 TypeORM migrations run automatically on app startup by default (gated by `RUN_MIGRATIONS_ON_BOOT`, default `true`). Schema sync (`synchronize`) is permanently disabled — all schema changes must go through migrations.

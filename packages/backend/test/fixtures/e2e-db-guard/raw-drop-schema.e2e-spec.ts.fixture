@@ -1,0 +1,13 @@
+// Fixture for e2e-db-guard-scan.spec.ts (issue #108): wipes the schema with
+// raw SQL on a connection that never went through the guard. Never run.
+import { DataSource } from 'typeorm';
+
+describe('raw schema reset', () => {
+  it('resets the database', async () => {
+    const ds = new DataSource({ type: 'postgres', url: process.env.DATABASE_URL || undefined });
+    await ds.initialize();
+    await ds.query(`DROP SCHEMA public CASCADE`);
+    await ds.query('CREATE SCHEMA public');
+    await ds.destroy();
+  });
+});
