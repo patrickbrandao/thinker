@@ -331,7 +331,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('rejects an expired key with 401', async () => {
-    const rawKey = 'mnfst_pat_expired';
+    const rawKey = 'thk_pat_expired';
     mockFind.mockResolvedValueOnce([
       {
         id: 'k1',
@@ -369,7 +369,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('surfaces the re-login hint when the key is expired', async () => {
-    const rawKey = 'mnfst_pat_expired2';
+    const rawKey = 'thk_pat_expired2';
     mockFind.mockResolvedValueOnce([
       {
         id: 'k1b',
@@ -386,7 +386,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('slides expires_at forward on successful auth for expiring keys', async () => {
-    const rawKey = 'mnfst_pat_live';
+    const rawKey = 'thk_pat_live';
     mockFind.mockResolvedValueOnce([
       {
         id: 'k2',
@@ -416,7 +416,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('rejects a key past its absolute ceiling even when the sliding window is live', async () => {
-    const rawKey = 'mnfst_pat_at-ceiling';
+    const rawKey = 'thk_pat_at-ceiling';
     mockFind.mockResolvedValueOnce([
       {
         id: 'k-ceiling',
@@ -446,7 +446,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('caps the sliding renewal at the absolute ceiling', async () => {
-    const rawKey = 'mnfst_pat_capped';
+    const rawKey = 'thk_pat_capped';
     const ceiling = Date.now() + 2 * 86_400_000;
     mockFind.mockResolvedValueOnce([
       {
@@ -488,7 +488,7 @@ describe('ApiKeyGuard', () => {
   });
 
   it('attaches the refreshed apiKeyExpiresAt to the request', async () => {
-    const rawKey = 'mnfst_pat_live2';
+    const rawKey = 'thk_pat_live2';
     const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
     mockFind.mockResolvedValueOnce([
       {

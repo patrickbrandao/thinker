@@ -148,36 +148,36 @@ describe('AgentKeyAuthGuard', () => {
     await expect(guard.canActivate(ctx)).rejects.toThrow('Empty token');
   });
 
-  it('rejects token without mnfst_ prefix', async () => {
+  it('rejects token without thk_ prefix', async () => {
     const { ctx } = makeContext({ authorization: 'Bearer osk_some_old_key' });
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
   });
 
-  it('rejects mnfst_ token shorter than minimum length', async () => {
-    const { ctx } = makeContext({ authorization: 'Bearer mnfst_ab' });
+  it('rejects thk_ token shorter than minimum length', async () => {
+    const { ctx } = makeContext({ authorization: 'Bearer thk_ab' });
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
   });
 
-  it('rejects bare mnfst_ prefix with no suffix', async () => {
-    const { ctx } = makeContext({ authorization: 'Bearer mnfst_' });
+  it('rejects bare thk_ prefix with no suffix', async () => {
+    const { ctx } = makeContext({ authorization: 'Bearer thk_' });
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
   });
 
   it('throws UnauthorizedException when API key is not found in DB', async () => {
     mockGetMany.mockResolvedValue([]);
-    const { ctx } = makeContext({ authorization: 'Bearer mnfst_unknown-key' });
+    const { ctx } = makeContext({ authorization: 'Bearer thk_unknown-key' });
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
   });
 
   it('returns true and attaches ingestionContext when key is valid', async () => {
-    const token = 'mnfst_valid-key';
+    const token = 'thk_valid-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-1',
@@ -203,7 +203,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('returns true when raw token (no Bearer prefix) matches', async () => {
-    const token = 'mnfst_raw-key-test';
+    const token = 'thk_raw-key-test';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-2',
@@ -229,7 +229,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('throws UnauthorizedException when API key is expired', async () => {
-    const token = 'mnfst_expired-key-test';
+    const token = 'thk_expired-key-test';
     const pastDate = new Date(Date.now() - 86400000).toISOString();
     mockGetMany.mockResolvedValue([
       {
@@ -249,7 +249,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('uses cached context after verifying that the key row is still active', async () => {
-    const token = 'mnfst_cached-key-test';
+    const token = 'thk_cached-key-test';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-4',
@@ -279,7 +279,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('rejects a cached key deactivated by another replica', async () => {
-    const token = 'mnfst_cross-replica-revocation';
+    const token = 'thk_cross-replica-revocation';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-revoked',
@@ -304,7 +304,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('fails closed when the cached-key activity recheck cannot reach the database', async () => {
-    const token = 'mnfst_cached-key-db-error';
+    const token = 'thk_cached-key-db-error';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-db-error',
@@ -333,7 +333,7 @@ describe('AgentKeyAuthGuard', () => {
     // A key that expires (or is set to expire) while still cached must not keep
     // authenticating until the 5-min cache TTL lapses. The fast path reads the
     // key's own expires_at, not just the cache entry's TTL.
-    const token = 'mnfst_soon-expiring-key';
+    const token = 'thk_soon-expiring-key';
     const keyHash = hashKey(token);
     mockGetMany.mockResolvedValue([
       {
@@ -382,7 +382,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('stores the key own expires_at on the cached entry for non-expiring keys', async () => {
-    const token = 'mnfst_no-expiry-key';
+    const token = 'thk_no-expiry-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-noexp',
@@ -418,7 +418,7 @@ describe('AgentKeyAuthGuard', () => {
       guard = createGuard({ 'app.nodeEnv': 'development' });
     });
 
-    it('allows loopback with non-mnfst token in dev mode by resolving first active key', async () => {
+    it('allows loopback with non-thk token in dev mode by resolving first active key', async () => {
       mockFindOne.mockResolvedValue({
         tenant_id: 'dev-tenant',
         agent_id: 'dev-agent',
@@ -466,25 +466,25 @@ describe('AgentKeyAuthGuard', () => {
       await expect(guard.canActivate(ctx)).rejects.toThrow('Authorization header required');
     });
 
-    it('rejects non-mnfst token when no active keys exist in DB', async () => {
+    it('rejects non-thk token when no active keys exist in DB', async () => {
       mockFindOne.mockResolvedValue(null);
       const { ctx } = makeContext({ authorization: 'Bearer dev-no-auth' }, '127.0.0.1');
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     });
 
-    it('rejects non-mnfst token from non-loopback IP in dev mode', async () => {
+    it('rejects non-thk token from non-loopback IP in dev mode', async () => {
       const { ctx } = makeContext({ authorization: 'Bearer dev-no-auth' }, '192.168.1.100');
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     });
 
-    it('rejects loopback with non-mnfst token in production mode', async () => {
+    it('rejects loopback with non-thk token in production mode', async () => {
       guard.onModuleDestroy();
       guard = createGuard({ 'app.nodeEnv': 'production' });
       const { ctx } = makeContext({ authorization: 'Bearer dev-no-auth' }, '127.0.0.1');
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     });
 
-    it('rejects loopback with non-mnfst token in test mode', async () => {
+    it('rejects loopback with non-thk token in test mode', async () => {
       guard.onModuleDestroy();
       guard = createGuard({ 'app.nodeEnv': 'test' });
       const { ctx } = makeContext({ authorization: 'Bearer dev-no-auth' }, '127.0.0.1');
@@ -521,7 +521,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('does not throw when last_used_at update fails', async () => {
-    const token = 'mnfst_update-fail-key';
+    const token = 'thk_update-fail-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-5',
@@ -546,9 +546,9 @@ describe('AgentKeyAuthGuard', () => {
   it('evicts the first cache entry when cache reaches MAX_CACHE_SIZE', async () => {
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
 
-    const firstFillerHash = testCacheKey('mnfst_filler-0');
+    const firstFillerHash = testCacheKey('thk_filler-0');
     for (let i = 0; i < 10_000; i++) {
-      internalCache.set(testCacheKey(`mnfst_filler-${i}`), {
+      internalCache.set(testCacheKey(`thk_filler-${i}`), {
         tenantId: 't',
         agentId: 'a',
         agentName: 'n',
@@ -558,7 +558,7 @@ describe('AgentKeyAuthGuard', () => {
     }
     expect(internalCache.size).toBe(10_000);
 
-    const token = 'mnfst_overflow-key';
+    const token = 'thk_overflow-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-max',
@@ -582,8 +582,8 @@ describe('AgentKeyAuthGuard', () => {
   it('evictExpired removes entries whose expiresAt has passed', async () => {
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
 
-    const expiredHash = testCacheKey('mnfst_expired-cache');
-    const validHash = testCacheKey('mnfst_valid-cache');
+    const expiredHash = testCacheKey('thk_expired-cache');
+    const validHash = testCacheKey('thk_valid-cache');
     internalCache.set(expiredHash, {
       tenantId: 't',
       agentId: 'a',
@@ -601,7 +601,7 @@ describe('AgentKeyAuthGuard', () => {
 
     expect(internalCache.size).toBe(2);
 
-    const evictToken = 'mnfst_trigger-evict-key';
+    const evictToken = 'thk_trigger-evict-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-evict',
@@ -629,7 +629,7 @@ describe('AgentKeyAuthGuard', () => {
     const timedGuard = new AgentKeyAuthGuard(repo, createMockConfig());
 
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
-    internalCache.set(testCacheKey('mnfst_stale'), {
+    internalCache.set(testCacheKey('thk_stale'), {
       tenantId: 't',
       agentId: 'a',
       agentName: 'n',
@@ -654,7 +654,7 @@ describe('AgentKeyAuthGuard', () => {
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
     timedGuard.onModuleDestroy();
 
-    internalCache.set(testCacheKey('mnfst_leftover'), {
+    internalCache.set(testCacheKey('thk_leftover'), {
       tenantId: 't',
       agentId: 'a',
       agentName: 'n',
@@ -673,7 +673,7 @@ describe('AgentKeyAuthGuard', () => {
     const internalCache = (AgentKeyAuthGuard as unknown as { cache: Map<string, unknown> }).cache;
     const negativeCache = (AgentKeyAuthGuard as unknown as { negativeCache: Map<string, number> })
       .negativeCache;
-    internalCache.set(testCacheKey('mnfst_survivor'), {
+    internalCache.set(testCacheKey('thk_survivor'), {
       tenantId: 't',
       agentId: 'a',
       agentName: 'n',
@@ -681,7 +681,7 @@ describe('AgentKeyAuthGuard', () => {
       expiresAt: Date.now() + 60_000,
       keyExpiresAt: null,
     });
-    negativeCache.set(testCacheKey('mnfst_rejected'), Date.now() + 60_000);
+    negativeCache.set(testCacheKey('thk_rejected'), Date.now() + 60_000);
 
     destroyedGuard.onModuleDestroy();
 
@@ -690,8 +690,8 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('does not store plaintext tokens in either cache', async () => {
-    const token = 'mnfst_plaintext-check-key';
-    const rejected = 'mnfst_plaintext-check-rejected';
+    const token = 'thk_plaintext-check-key';
+    const rejected = 'thk_plaintext-check-rejected';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-pt',
@@ -724,7 +724,7 @@ describe('AgentKeyAuthGuard', () => {
     for (const key of allKeys) {
       expect(key).not.toContain(token);
       expect(key).not.toContain(rejected);
-      expect(key).not.toContain('mnfst_');
+      expect(key).not.toContain('thk_');
     }
   });
 
@@ -733,14 +733,14 @@ describe('AgentKeyAuthGuard', () => {
       .CACHE_FINGERPRINT_SALT;
     expect(salt).toBeInstanceOf(Buffer);
     expect(salt.length).toBe(16);
-    expect(testCacheKey('mnfst_same-token')).toBe(testCacheKey('mnfst_same-token'));
-    expect(scryptFingerprint('mnfst_same-token', Buffer.alloc(16))).not.toBe(
-      testCacheKey('mnfst_same-token'),
+    expect(testCacheKey('thk_same-token')).toBe(testCacheKey('thk_same-token'));
+    expect(scryptFingerprint('thk_same-token', Buffer.alloc(16))).not.toBe(
+      testCacheKey('thk_same-token'),
     );
   });
 
   it('invalidateCache drops the fingerprinted entries for a raw key', async () => {
-    const token = 'mnfst_invalidate-fingerprint';
+    const token = 'thk_invalidate-fingerprint';
     mockGetMany.mockResolvedValue([]);
     const { ctx } = makeContext({ authorization: `Bearer ${token}` });
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
@@ -753,7 +753,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('rejects an over-long token before it can reach the caches', async () => {
-    const token = `mnfst_${'a'.repeat(600)}`;
+    const token = `thk_${'a'.repeat(600)}`;
     const { ctx } = makeContext({ 'x-api-key': token });
     await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
@@ -763,7 +763,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('caches entries for the configured 5 minute TTL', async () => {
-    const token = 'mnfst_ttl-check-key';
+    const token = 'thk_ttl-check-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-ttl',
@@ -789,7 +789,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('LRU touch on cache hit moves entry to tail of insertion order', async () => {
-    const token = 'mnfst_lru-touch-key';
+    const token = 'thk_lru-touch-key';
     mockGetMany.mockResolvedValue([
       {
         id: 'key-lru',
@@ -806,7 +806,7 @@ describe('AgentKeyAuthGuard', () => {
     await guard.canActivate(ctx);
 
     const internalCache = (AgentKeyAuthGuard as any).cache as Map<string, unknown>;
-    internalCache.set(testCacheKey('mnfst_other-1'), {
+    internalCache.set(testCacheKey('thk_other-1'), {
       tenantId: 't',
       agentId: 'a',
       agentName: 'n',
@@ -823,7 +823,7 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   it('invalidateCache removes a specific key from cache', async () => {
-    const token = 'mnfst_inv-key-test';
+    const token = 'thk_inv-key-test';
     const storedHash = hashKey(token);
     mockGetMany.mockResolvedValue([
       {
@@ -889,7 +889,7 @@ describe('AgentKeyAuthGuard', () => {
       const logger = (guard as unknown as { logger: { warn: jest.Mock } }).logger;
       const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
 
-      const { ctx: ctx1 } = makeContext({ authorization: 'Bearer mnfst_bad-key-storm' });
+      const { ctx: ctx1 } = makeContext({ authorization: 'Bearer thk_bad-key-storm' });
       await expect(guard.canActivate(ctx1)).rejects.toThrow('Invalid API key');
       // First miss pays the DB lookup and logs once.
       expect(mockGetMany).toHaveBeenCalledTimes(1);
@@ -899,7 +899,7 @@ describe('AgentKeyAuthGuard', () => {
       mockGetMany.mockClear();
       warnSpy.mockClear();
 
-      const { ctx: ctx2 } = makeContext({ authorization: 'Bearer mnfst_bad-key-storm' });
+      const { ctx: ctx2 } = makeContext({ authorization: 'Bearer thk_bad-key-storm' });
       await expect(guard.canActivate(ctx2)).rejects.toThrow('Invalid API key');
       // The repeat is served from the negative cache: no DB query, no log line.
       expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
@@ -907,7 +907,7 @@ describe('AgentKeyAuthGuard', () => {
     });
 
     it('records a rejected unknown key for the configured TTL', async () => {
-      const token = 'mnfst_record-bad-key';
+      const token = 'thk_record-bad-key';
       const { ctx } = makeContext({ authorization: `Bearer ${token}` });
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
 
@@ -921,21 +921,21 @@ describe('AgentKeyAuthGuard', () => {
     });
 
     it('LRU-touches a negative entry on a cache hit (moves it to the tail)', async () => {
-      const { ctx } = makeContext({ authorization: 'Bearer mnfst_neg-lru-key' });
+      const { ctx } = makeContext({ authorization: 'Bearer thk_neg-lru-key' });
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
 
       const negCache = negativeCacheOf(guard);
-      negCache.set(testCacheKey('mnfst_neg-other'), Date.now() + 999_999);
-      expect(Array.from(negCache.keys())[0]).toBe(testCacheKey('mnfst_neg-lru-key'));
+      negCache.set(testCacheKey('thk_neg-other'), Date.now() + 999_999);
+      expect(Array.from(negCache.keys())[0]).toBe(testCacheKey('thk_neg-lru-key'));
 
-      const { ctx: ctx2 } = makeContext({ authorization: 'Bearer mnfst_neg-lru-key' });
+      const { ctx: ctx2 } = makeContext({ authorization: 'Bearer thk_neg-lru-key' });
       await expect(guard.canActivate(ctx2)).rejects.toThrow('Invalid API key');
       // After the touch the rejected key sits behind the other entry.
-      expect(Array.from(negCache.keys())[1]).toBe(testCacheKey('mnfst_neg-lru-key'));
+      expect(Array.from(negCache.keys())[1]).toBe(testCacheKey('thk_neg-lru-key'));
     });
 
     it('drops a stale negative entry and re-checks the DB so a since-created key works', async () => {
-      const token = 'mnfst_was-bad-now-good';
+      const token = 'thk_was-bad-now-good';
       const negCache = negativeCacheOf(guard);
       // An already-expired negative entry from an earlier rejection.
       negCache.set(testCacheKey(token), Date.now() - 1000);
@@ -961,13 +961,13 @@ describe('AgentKeyAuthGuard', () => {
 
     it('evicts the oldest negative entry when the negative cache is full', async () => {
       const negCache = negativeCacheOf(guard);
-      const firstHash = testCacheKey('mnfst_neg-filler-0');
+      const firstHash = testCacheKey('thk_neg-filler-0');
       for (let i = 0; i < 10_000; i++) {
-        negCache.set(testCacheKey(`mnfst_neg-filler-${i}`), Date.now() + 999_999);
+        negCache.set(testCacheKey(`thk_neg-filler-${i}`), Date.now() + 999_999);
       }
       expect(negCache.size).toBe(10_000);
 
-      const token = 'mnfst_neg-overflow-key';
+      const token = 'thk_neg-overflow-key';
       const { ctx } = makeContext({ authorization: `Bearer ${token}` });
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
 
@@ -978,14 +978,14 @@ describe('AgentKeyAuthGuard', () => {
 
     it('evictExpired also sweeps expired negative-cache entries but keeps live ones', async () => {
       const negCache = negativeCacheOf(guard);
-      const expiredHash = testCacheKey('mnfst_neg-expired');
-      const liveHash = testCacheKey('mnfst_neg-live');
+      const expiredHash = testCacheKey('thk_neg-expired');
+      const liveHash = testCacheKey('thk_neg-live');
       negCache.set(expiredHash, Date.now() - 1000);
       negCache.set(liveHash, Date.now() + 999_999);
 
       // A successful validation runs evictExpired() before caching, which now
       // sweeps the negative cache too.
-      const token = 'mnfst_valid-triggers-evict';
+      const token = 'thk_valid-triggers-evict';
       mockGetMany.mockResolvedValue([
         {
           id: 'key-ev',
@@ -1005,7 +1005,7 @@ describe('AgentKeyAuthGuard', () => {
     });
 
     it('invalidateCache removes the negative entry so a re-created key is not stuck', async () => {
-      const token = 'mnfst_inv-neg-key';
+      const token = 'thk_inv-neg-key';
       const { ctx } = makeContext({ authorization: `Bearer ${token}` });
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
 
@@ -1021,7 +1021,7 @@ describe('AgentKeyAuthGuard', () => {
       // module, so rotate-key clears a DIFFERENT guard instance than the one
       // authenticating proxy traffic. The caches are static so a clear issued
       // through ANY instance revokes the warm entry every instance sees.
-      const token = 'mnfst_cross-instance-key';
+      const token = 'thk_cross-instance-key';
       const firstGetMany = mockGetMany;
       firstGetMany.mockResolvedValue([
         {
@@ -1047,7 +1047,7 @@ describe('AgentKeyAuthGuard', () => {
     });
 
     it('clearCache empties the negative cache', async () => {
-      const token = 'mnfst_clear-neg-key';
+      const token = 'thk_clear-neg-key';
       const { ctx } = makeContext({ authorization: `Bearer ${token}` });
       await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key');
 
@@ -1060,8 +1060,8 @@ describe('AgentKeyAuthGuard', () => {
   });
 
   describe('x-api-key transport (Anthropic SDK)', () => {
-    const VALID = 'mnfst_x-api-key-valid';
-    const OTHER = 'mnfst_x-api-key-other';
+    const VALID = 'thk_x-api-key-valid';
+    const OTHER = 'thk_x-api-key-other';
 
     function seedValidKey(token = VALID) {
       mockGetMany.mockResolvedValue([
@@ -1229,7 +1229,7 @@ describe('AgentKeyAuthGuard', () => {
       const { ctx: noPrefix } = makeContext({ 'x-api-key': 'sk-ant-not-a-gateway-key' });
       await expect(guard.canActivate(noPrefix)).rejects.toThrow('Invalid API key format');
 
-      const { ctx: tooShort } = makeContext({ 'x-api-key': 'mnfst_ab' });
+      const { ctx: tooShort } = makeContext({ 'x-api-key': 'thk_ab' });
       await expect(guard.canActivate(tooShort)).rejects.toThrow('Invalid API key format');
       expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
     });
@@ -1289,7 +1289,7 @@ describe('AgentKeyAuthGuard', () => {
         guard = createGuard({ 'app.nodeEnv': 'development' });
       });
 
-      it('allows a non-mnfst x-api-key from loopback, like Bearer', async () => {
+      it('allows a non-thk x-api-key from loopback, like Bearer', async () => {
         mockFindOne.mockResolvedValue(DEV_KEY_ROW);
         const { ctx, req } = makeContext({ 'x-api-key': 'dev-no-auth' }, '127.0.0.1');
         await expect(guard.canActivate(ctx)).resolves.toBe(true);
@@ -1301,7 +1301,7 @@ describe('AgentKeyAuthGuard', () => {
         });
       });
 
-      it('rejects a non-mnfst x-api-key from a non-loopback peer', async () => {
+      it('rejects a non-thk x-api-key from a non-loopback peer', async () => {
         mockFindOne.mockResolvedValue(DEV_KEY_ROW);
         const { ctx } = makeContext({ 'x-api-key': 'dev-no-auth' }, '192.168.1.100');
         await expect(guard.canActivate(ctx)).rejects.toThrow('Invalid API key format');
@@ -1317,7 +1317,7 @@ describe('AgentKeyAuthGuard', () => {
         expect(mockFindOne).not.toHaveBeenCalled();
       });
 
-      it('rejects a non-mnfst x-api-key from loopback outside development', async () => {
+      it('rejects a non-thk x-api-key from loopback outside development', async () => {
         guard.onModuleDestroy();
         guard = createGuard({ 'app.nodeEnv': 'production' });
         mockFindOne.mockResolvedValue(DEV_KEY_ROW);

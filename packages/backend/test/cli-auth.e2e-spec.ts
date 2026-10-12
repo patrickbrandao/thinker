@@ -47,7 +47,7 @@ describe('CLI browser login (e2e)', () => {
       .post('/api/v1/cli/token')
       .send({ code, state: STATE, code_verifier: VERIFIER })
       .expect(200);
-    expect(res.body.token).toMatch(/^mnfst_pat_/);
+    expect(res.body.token).toMatch(/^thk_pat_/);
 
     // Exactly one key, not two: a `LIMIT 1` row-shape check would pass a
     // double-mint just as happily.

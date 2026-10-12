@@ -31,7 +31,7 @@ import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
 import { ProviderService } from '../routing-core/provider.service';
 import { extractManifestErrorCode, type ManifestErrorCode } from '../../common/errors/error-codes';
 import {
-  MANIFEST_CODE_TO_REASON,
+  THINKER_CODE_TO_REASON,
   isRecordableManifestCode,
   type ManifestBlockedRequestReason,
 } from '../../common/errors/manifest-error';
@@ -332,7 +332,7 @@ function classifyRow(row: Partial<AgentMessage>): {
   // routing_reason keeps the tier reason for display.
   const code = row.error_code as ManifestErrorCode | null | undefined;
   const codeReason =
-    code && isRecordableManifestCode(code) ? MANIFEST_CODE_TO_REASON[code] : undefined;
+    code && isRecordableManifestCode(code) ? THINKER_CODE_TO_REASON[code] : undefined;
   return classifyMessageError({
     status: row.status ?? 'ok',
     errorHttpStatus: row.error_http_status,

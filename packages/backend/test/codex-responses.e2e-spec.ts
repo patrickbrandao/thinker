@@ -120,7 +120,7 @@ describe('Codex Responses tool loop (e2e)', () => {
       .expect(201);
     apiKey = created.body.apiKey;
     agentId = created.body.agent.id;
-    expect(apiKey).toMatch(/^mnfst_/);
+    expect(apiKey).toMatch(/^thk_/);
     const provider = await request(app.getHttpServer())
       .post('/api/v1/routing/codex-e2e/custom-providers')
       .set('x-api-key', TEST_API_KEY)
@@ -173,7 +173,7 @@ describe('Codex Responses tool loop (e2e)', () => {
     await request(app.getHttpServer()).post('/v1/responses').send({ input: 'Hello' }).expect(401);
     await request(app.getHttpServer())
       .post('/v1/responses')
-      .set('Authorization', 'Bearer mnfst_invalid')
+      .set('Authorization', 'Bearer thk_invalid')
       .send({ input: 'Hello' })
       .expect(401);
     expect(received).toHaveLength(0);
@@ -313,21 +313,21 @@ describe('Codex Responses tool loop (e2e)', () => {
           '-c',
           'model="auto"',
           '-c',
-          'model_provider="manifest"',
+          'model_provider="thinker"',
           '-c',
-          'model_providers.manifest.name="Manifest"',
+          'model_providers.thinker.name="Thinker"',
           '-c',
-          `model_providers.manifest.base_url="${url}/v1"`,
+          `model_providers.thinker.base_url="${url}/v1"`,
           '-c',
-          'model_providers.manifest.env_key="MANIFEST_CODEX_TEST_KEY"',
+          'model_providers.thinker.env_key="THINKER_CODEX_TEST_KEY"',
           '-c',
-          'model_providers.manifest.wire_api="responses"',
+          'model_providers.thinker.wire_api="responses"',
           'Create codex-e2e.txt containing codex-e2e-ok, using exec_command.',
         ];
         const result = await new Promise<{ code: number | null; output: string }>(
           (resolve, reject) => {
             const child = spawn(codexCli, args, {
-              env: { ...process.env, MANIFEST_CODEX_TEST_KEY: apiKey },
+              env: { ...process.env, THINKER_CODEX_TEST_KEY: apiKey },
               stdio: ['ignore', 'pipe', 'pipe'],
             });
             let output = '';

@@ -60,7 +60,6 @@ export const PLAYGROUND_BLOCKED_HEADERS: readonly string[] = [
  */
 export const PLAYGROUND_BLOCKED_HEADER_PREFIXES: readonly string[] = [
   'x-thinker-',
-  'x-manifest-',
   'x-amz-',
   'x-amzn-',
   'x-forwarded-',

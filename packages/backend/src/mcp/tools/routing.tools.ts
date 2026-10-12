@@ -358,7 +358,7 @@ export function registerRoutingTools(
                   Authorization: `Bearer ${key.fullKey}`,
                   'Content-Type': 'application/json',
                   ...(surface === 'messages' ? { 'anthropic-version': '2023-06-01' } : {}),
-                  ...(tier ? { 'x-manifest-tier': tier } : {}),
+                  ...(tier ? { 'x-thinker-tier': tier } : {}),
                 },
                 body: JSON.stringify(body),
                 signal: controller.signal,
@@ -505,7 +505,7 @@ export function registerRoutingTools(
                   hit ??
                   (await deps.headerTiers.create(agent.id, agent.tenant_id, {
                     name: tier,
-                    header_key: 'x-manifest-tier',
+                    header_key: 'x-thinker-tier',
                     header_value: tier,
                     badge_color: 'indigo' as never,
                   }));

@@ -1,6 +1,6 @@
 /**
  * Per-platform setup snippets — the single source of truth for "how do I
- * point this platform at Manifest". Consumed by the dashboard setup panels
+ * point this platform at Thinker". Consumed by the dashboard setup panels
  * directly and by the CLI via build-time template generation (functions are
  * invoked with {{ORIGIN}} placeholders and emitted as data).
  */
@@ -21,10 +21,10 @@ export function getOpenClawSnippet(baseUrl: string, apiKey: string): string {
     baseUrl,
     api: 'openai-completions',
     apiKey,
-    models: [{ id: 'auto', name: 'Manifest Auto' }],
+    models: [{ id: 'auto', name: 'Thinker Auto' }],
   });
-  return `openclaw config set models.providers.manifest '${providerJson}'
-openclaw config set agents.defaults.model.primary manifest/auto
+  return `openclaw config set models.providers.thinker '${providerJson}'
+openclaw config set agents.defaults.model.primary thinker/auto
 openclaw gateway restart`;
 }
 
@@ -32,7 +32,7 @@ openclaw gateway restart`;
  * The JSON block to paste into ~/.claude/settings.json. Claude Code reads
  * `env` keys from settings.json on every startup, so this is the persistent
  * configuration path — no shell rc edits, no Node required, no command-line
- * gymnastics. Pin the default model to Manifest's `auto` route so Claude
+ * gymnastics. Pin the default model to Thinker's `auto` route so Claude
  * Code does not send its built-in Anthropic model IDs to the gateway.
  * Anthropic SDK auto-appends /v1/messages to baseURL, so we strip a trailing
  * /v1 from the rendered URL.
@@ -73,17 +73,17 @@ export function getNanobotConfigSnippet(baseUrl: string, apiKey: string): string
 /** The `~/.codex/config.toml` block. Codex CLI and Desktop both read this file. */
 export function getCodexConfigSnippet(baseUrl: string): string {
   return `model = "auto"
-model_provider = "manifest"
+model_provider = "thinker"
 
-[model_providers.manifest]
-name = "Manifest"
+[model_providers.thinker]
+name = "Thinker"
 base_url = "${baseUrl}"
-env_key = "MANIFEST_API_KEY"
+env_key = "THINKER_API_KEY"
 wire_api = "responses"`;
 }
 
 export function getCodexKeyExportSnippet(apiKey: string): string {
-  return `export MANIFEST_API_KEY="${apiKey}"`;
+  return `export THINKER_API_KEY="${apiKey}"`;
 }
 
 /** CLI-facing combined Codex setup (config block + key export). */
@@ -100,9 +100,9 @@ ${getCodexKeyExportSnippet(apiKey)}`;
  * fields; the CLI emits the same values as a pasteable comment block.
  */
 function getN8nSnippet(baseUrl: string, apiKey: string): string {
-  return `# In n8n, install the n8n-nodes-manifest community node, then add the Manifest
-# Chat Model node to your AI Agent / Basic LLM Chain (or the Manifest node for
-# direct calls). Create Manifest credentials with:
+  return `# In n8n, install the n8n-nodes-thinker community node, then add the Thinker
+# Chat Model node to your AI Agent / Basic LLM Chain (or the Thinker node for
+# direct calls). Create Thinker credentials with:
 #   Base URL: ${stripV1Suffix(baseUrl)}
 #   API Key:  ${apiKey}
 #   Model:    auto`;

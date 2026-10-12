@@ -1026,7 +1026,7 @@ describe('MCP tools', () => {
     it('returns env lines and the guide', async () => {
       const tools = registerAll(makeDeps());
       const env = await call(tools, 'manifest_agent_env', { agent: 'demo', export: true });
-      expect((env.data as { lines: string[] }).lines[0]).toContain('export MANIFEST_AGENT_KEY=');
+      expect((env.data as { lines: string[] }).lines[0]).toContain('export THINKER_AGENT_KEY=');
       expect((await call(tools, 'manifest_guide')).data).toHaveProperty('workflow');
 
       const deps = makeDeps();

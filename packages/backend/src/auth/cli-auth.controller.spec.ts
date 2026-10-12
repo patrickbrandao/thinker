@@ -5,7 +5,7 @@ import { CliAuthController } from './cli-auth.controller';
 function makeController() {
   const service = {
     createAuthorization: jest.fn().mockResolvedValue({ code: 'c1' }),
-    exchange: jest.fn().mockResolvedValue({ token: 'mnfst_pat_x', expiresAt: 'e' }),
+    exchange: jest.fn().mockResolvedValue({ token: 'thk_pat_x', expiresAt: 'e' }),
     revokeByRawKey: jest.fn().mockResolvedValue({ revoked: true }),
   };
   return { controller: new CliAuthController(service as never), service };
@@ -64,7 +64,7 @@ describe('CliAuthController', () => {
         state: 'state-abcdef1234567890',
         code_verifier: VERIFIER,
       }),
-    ).resolves.toEqual({ token: 'mnfst_pat_x', expiresAt: 'e' });
+    ).resolves.toEqual({ token: 'thk_pat_x', expiresAt: 'e' });
     expect(service.exchange).toHaveBeenCalledWith(
       'rawcode-abcdefghijklmnop',
       'state-abcdef1234567890',
@@ -75,9 +75,9 @@ describe('CliAuthController', () => {
   it('revoke uses the raw X-API-Key header', async () => {
     const { controller, service } = makeController();
     await expect(
-      controller.revoke(req({ headers: { 'x-api-key': 'mnfst_pat_abc' } })),
+      controller.revoke(req({ headers: { 'x-api-key': 'thk_pat_abc' } })),
     ).resolves.toEqual({ revoked: true });
-    expect(service.revokeByRawKey).toHaveBeenCalledWith('mnfst_pat_abc');
+    expect(service.revokeByRawKey).toHaveBeenCalledWith('thk_pat_abc');
   });
 
   it('revoke without a key header is a no-op', async () => {

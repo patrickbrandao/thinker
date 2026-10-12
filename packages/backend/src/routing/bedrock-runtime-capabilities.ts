@@ -96,7 +96,7 @@ const CLAUDE_MESSAGES_MODEL_IDS = new Set(
   BEDROCK_RUNTIME_CLAUDE_MESSAGES_MODELS.map((entry) => entry.modelId),
 );
 
-const MANIFEST_ENDPOINT_BY_API: Record<BedrockRuntimeApi, string> = {
+const THINKER_ENDPOINT_BY_API: Record<BedrockRuntimeApi, string> = {
   chat_completions: '/v1/chat/completions',
   responses: '/v1/responses',
 };
@@ -129,6 +129,6 @@ export function isBedrockRuntimeClaudeProfile(model: string): boolean {
 export function getBedrockRuntimeSupportedEndpoints(model: string): string[] {
   if (isBedrockRuntimeClaudeProfile(model)) return [...CLAUDE_PROFILE_ENDPOINTS];
   return (
-    getBedrockRuntimeCapabilities(model)?.apis.map((api) => MANIFEST_ENDPOINT_BY_API[api]) ?? []
+    getBedrockRuntimeCapabilities(model)?.apis.map((api) => THINKER_ENDPOINT_BY_API[api]) ?? []
   );
 }

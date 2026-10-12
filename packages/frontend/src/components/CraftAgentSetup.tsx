@@ -41,7 +41,7 @@ const CraftAgentSetup: Component<Props> = (props) => {
   const [keyRevealed, setKeyRevealed] = createSignal(false);
 
   const hasFullKey = () => !!props.apiKey;
-  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'mnfst_YOUR_KEY');
+  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'thk_YOUR_KEY');
   const copyKey = () => props.apiKey ?? masked();
   const visibleKey = () => (keyRevealed() && props.apiKey ? props.apiKey : masked());
 

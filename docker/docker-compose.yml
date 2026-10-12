@@ -63,7 +63,7 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
       # Optional dedicated at-rest encryption key for stored provider/OAuth
       # credentials. When unset, the backend falls back to BETTER_AUTH_SECRET.
-      - MANIFEST_ENCRYPTION_KEY=${MANIFEST_ENCRYPTION_KEY:-}
+      - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The
       # OAuth callback and session cookie follow the request host, so set this
@@ -77,10 +77,10 @@ services:
       - STREAM_WARMUP_MS=${STREAM_WARMUP_MS:-15000}
       - CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS=${CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS:-60000}
       # Per-tenant concurrent in-flight request limit for this backend process.
-      - MANIFEST_CONCURRENCY_MAX=${MANIFEST_CONCURRENCY_MAX:-10}
+      - THINKER_CONCURRENCY_MAX=${THINKER_CONCURRENCY_MAX:-10}
       # Per-tenant (M201) and per-IP (M202) requests/minute for this backend process.
-      - MANIFEST_RATE_MAX_REQUESTS=${MANIFEST_RATE_MAX_REQUESTS:-200}
-      - MANIFEST_IP_RATE_MAX_REQUESTS=${MANIFEST_IP_RATE_MAX_REQUESTS:-500}
+      - THINKER_RATE_MAX_REQUESTS=${THINKER_RATE_MAX_REQUESTS:-200}
+      - THINKER_IP_RATE_MAX_REQUESTS=${THINKER_IP_RATE_MAX_REQUESTS:-500}
       # Both are deliberately hardcoded, not `${VAR:-default}`. The image is a
       # production artifact: NODE_ENV=production is what makes it one, and the
       # seeder refuses to run under it anyway (database-seeder.service.ts logs
@@ -122,7 +122,7 @@ services:
       - OPENAI_OAUTH_CLIENT_ID=${OPENAI_OAUTH_CLIENT_ID:-}
       - MINIMAX_OAUTH_CLIENT_ID=${MINIMAX_OAUTH_CLIENT_ID:-}
       # Programmatic API access via the X-API-Key header. Optional — the
-      # dashboard uses cookie sessions and agents use their own mnfst_* keys.
+      # dashboard uses cookie sessions and agents use their own thk_* keys.
       - API_KEY=${API_KEY:-}
       # Rate limiting. Window in ms + max requests per window per client.
       - THROTTLE_TTL=${THROTTLE_TTL:-60000}
@@ -142,7 +142,7 @@ services:
       # Suppresses the boot warning about HSTS on plain-HTTP deployments. Set
       # to 1 for HTTP-only LAN installs; prefer a real https:// BETTER_AUTH_URL
       # anywhere reachable from the internet.
-      - MANIFEST_DISABLE_HSTS=${MANIFEST_DISABLE_HSTS:-}
+      - THINKER_DISABLE_HSTS=${THINKER_DISABLE_HSTS:-}
       # Extra browser origins allowed to call the gateway (comma-separated).
       # None by default: the dashboard is same-origin.
       - THINKER_CORS_ORIGINS=${THINKER_CORS_ORIGINS:-}

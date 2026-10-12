@@ -34,7 +34,7 @@ interface EncryptedColumn {
  * - `tenant_providers.api_key_encrypted` covers provider API keys, OAuth /
  *   subscription token blobs, and custom-provider credentials (custom
  *   providers are stored as `provider = 'custom:<id>'` rows on this table).
- * - `agent_api_keys.key` is the recoverable copy of an agent's `mnfst_*`
+ * - `agent_api_keys.key` is the recoverable copy of an agent's `thk_*`
  *   ingest key (`key_hash` is the auth path and is not encrypted).
  * - `email_provider_configs.api_key_encrypted` is the tenant's transactional
  *   email provider key.
@@ -62,15 +62,15 @@ interface TableResult {
 /**
  * Rewrites at-rest ciphertext onto the current encryption secret at boot.
  *
- * Manifest derives its AES-256-GCM key from `MANIFEST_ENCRYPTION_KEY`, falling
+ * Manifest derives its AES-256-GCM key from `THINKER_ENCRYPTION_KEY`, falling
  * back to `BETTER_AUTH_SECRET`. Changing that secret used to brick every stored
  * provider key and OAuth token: the ciphertext carries no key id, and the read
  * paths swallow a decrypt failure as "provider not connected", so the damage
- * was silent. `MANIFEST_ENCRYPTION_KEY_PREVIOUS` makes the old secret readable
+ * was silent. `THINKER_ENCRYPTION_KEY_PREVIOUS` makes the old secret readable
  * for one deploy, and this pass moves every row onto the new one so the
  * operator can drop it again.
  *
- * The pass only runs while `MANIFEST_ENCRYPTION_KEY_PREVIOUS` is set, so a
+ * The pass only runs while `THINKER_ENCRYPTION_KEY_PREVIOUS` is set, so a
  * normal boot never touches the tables: the session secret is always a decrypt
  * candidate, and a dedicated key alone would otherwise trigger a full scan
  * (one scrypt per row) on every restart. It runs after bootstrap rather than
@@ -93,7 +93,7 @@ export class SecretReencryptionService implements OnApplicationBootstrap {
   }
 
   async run(): Promise<void> {
-    const previous = process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+    const previous = process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
     if (!previous || previous.length < 32) return;
 
     let secrets: string[];
@@ -142,7 +142,7 @@ export class SecretReencryptionService implements OnApplicationBootstrap {
       // current secret: a skipped row may still be under PREVIOUS's predecessor.
       if (totalRewritten === 0 && totalSkipped === 0 && !failed) {
         this.logger.log(
-          'Nothing left under an older secret — MANIFEST_ENCRYPTION_KEY_PREVIOUS can be removed.',
+          'Nothing left under an older secret — THINKER_ENCRYPTION_KEY_PREVIOUS can be removed.',
         );
       }
     } catch (err) {

@@ -1,18 +1,18 @@
 import {
   extractManifestErrorCode,
   formatManifestError,
-  MANIFEST_ERRORS,
-  MANIFEST_ERRORS_DOCS_BASE,
+  THINKER_ERRORS,
+  THINKER_ERRORS_DOCS_BASE,
   ManifestErrorCode,
 } from '../error-codes';
 
-describe('MANIFEST_ERRORS registry', () => {
+describe('THINKER_ERRORS registry', () => {
   it('exposes the public docs base URL', () => {
-    expect(MANIFEST_ERRORS_DOCS_BASE).toBe('https://manifest.build/llm-gateway/docs/errors');
+    expect(THINKER_ERRORS_DOCS_BASE).toBe('https://manifest.build/llm-gateway/docs/errors');
   });
 
   it('every code has a non-empty title and template', () => {
-    for (const [code, entry] of Object.entries(MANIFEST_ERRORS)) {
+    for (const [code, entry] of Object.entries(THINKER_ERRORS)) {
       expect(entry.title).toBeTruthy();
       expect(entry.template).toBeTruthy();
       expect(code).toMatch(/^M\d{3}$/);
@@ -20,7 +20,7 @@ describe('MANIFEST_ERRORS registry', () => {
   });
 
   it('every code is unique', () => {
-    const codes = Object.keys(MANIFEST_ERRORS);
+    const codes = Object.keys(THINKER_ERRORS);
     expect(new Set(codes).size).toBe(codes.length);
   });
 });
@@ -75,10 +75,10 @@ describe('formatManifestError', () => {
   });
 
   it('produces a stable output for every registered code', () => {
-    for (const code of Object.keys(MANIFEST_ERRORS) as ManifestErrorCode[]) {
+    for (const code of Object.keys(THINKER_ERRORS) as ManifestErrorCode[]) {
       const out = formatManifestError(code);
       expect(out.startsWith(`[🦚 Manifest ${code}]`)).toBe(true);
-      expect(out.endsWith(`See ${MANIFEST_ERRORS_DOCS_BASE}/${code}/`)).toBe(true);
+      expect(out.endsWith(`See ${THINKER_ERRORS_DOCS_BASE}/${code}/`)).toBe(true);
     }
   });
 });
@@ -118,7 +118,7 @@ describe('extractManifestErrorCode', () => {
   });
 
   it('round-trips every registered code', () => {
-    for (const code of Object.keys(MANIFEST_ERRORS) as ManifestErrorCode[]) {
+    for (const code of Object.keys(THINKER_ERRORS) as ManifestErrorCode[]) {
       expect(extractManifestErrorCode(formatManifestError(code))).toBe(code);
     }
   });

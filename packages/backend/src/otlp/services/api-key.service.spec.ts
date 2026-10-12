@@ -36,8 +36,8 @@ const mockedUuidv4 = uuidv4 as jest.Mock;
 const mockedRandomBytes = randomBytes as jest.Mock;
 
 describe('API_KEY_PREFIX constant', () => {
-  it('equals mnfst_ (catches accidental revert)', () => {
-    expect(API_KEY_PREFIX).toBe('mnfst_');
+  it('equals thk_ (catches accidental revert)', () => {
+    expect(API_KEY_PREFIX).toBe('thk_');
   });
 });
 
@@ -230,7 +230,7 @@ describe('ApiKeyGeneratorService', () => {
       await service.onboardAgent(defaultParams);
 
       const insertCall = mockKeyInsert.mock.calls[0][0];
-      const expectedRawKey = 'mnfst_' + Buffer.from('a'.repeat(32), 'utf8').toString('base64url');
+      const expectedRawKey = 'thk_' + Buffer.from('a'.repeat(32), 'utf8').toString('base64url');
 
       expect(insertCall.key).not.toBeNull();
       expect(decrypt(insertCall.key, TEST_SECRET)).toBe(expectedRawKey);
@@ -257,7 +257,7 @@ describe('ApiKeyGeneratorService', () => {
 
       expect(result.tenantId).toBe('uuid-tenant-1');
       expect(result.agentId).toBe('uuid-agent-1');
-      expect(result.apiKey).toMatch(/^mnfst_/);
+      expect(result.apiKey).toMatch(/^thk_/);
     });
 
     it('should pass optional organization and email when creating tenant', async () => {
@@ -352,12 +352,12 @@ describe('ApiKeyGeneratorService', () => {
       expect(mockKeyInsert).toHaveBeenCalledWith(expect.objectContaining({ is_active: true }));
     });
 
-    it('should generate a key starting with mnfst_ prefix', async () => {
+    it('should generate a key starting with thk_ prefix', async () => {
       mockTenantFindOne.mockResolvedValue(null);
 
       const result = await service.onboardAgent(defaultParams);
 
-      expect(result.apiKey).toMatch(/^mnfst_/);
+      expect(result.apiKey).toMatch(/^thk_/);
       expect(result.apiKey.length).toBeGreaterThan(4);
     });
 
@@ -385,13 +385,13 @@ describe('ApiKeyGeneratorService', () => {
   describe('getKeyForAgent', () => {
     it('should return keyPrefix when an active key exists', async () => {
       mockKeyGetOne.mockResolvedValue({
-        key_prefix: 'mnfst_abc12345',
+        key_prefix: 'thk_abc12345',
         key_hash: 'somehash',
       });
 
       const result = await service.getKeyForAgent('tenant-1', 'agent-a');
 
-      expect(result).toEqual({ keyPrefix: 'mnfst_abc12345' });
+      expect(result).toEqual({ keyPrefix: 'thk_abc12345' });
     });
 
     it('should throw NotFoundException when no active key is found', async () => {
@@ -406,7 +406,7 @@ describe('ApiKeyGeneratorService', () => {
     });
 
     it('should query by tenantId and agentName with is_active filter', async () => {
-      mockKeyGetOne.mockResolvedValue({ key_prefix: 'mnfst_xxx' });
+      mockKeyGetOne.mockResolvedValue({ key_prefix: 'thk_xxx' });
 
       await service.getKeyForAgent('tenant-99', 'bot-x');
 
@@ -423,43 +423,43 @@ describe('ApiKeyGeneratorService', () => {
 
     it('should return fullKey when encrypted key is stored', async () => {
       const { encrypt } = jest.requireActual('../../common/utils/crypto.util');
-      const encryptedKey = encrypt('mnfst_decrypted_key', TEST_SECRET);
+      const encryptedKey = encrypt('thk_decrypted_key', TEST_SECRET);
       mockKeyGetOne.mockResolvedValue({
-        key_prefix: 'mnfst_partia',
+        key_prefix: 'thk_partia',
         key_hash: 'secret-hash',
         key: encryptedKey,
       });
 
       const result = await service.getKeyForAgent('tenant-1', 'agent-a');
 
-      expect(result).toEqual({ keyPrefix: 'mnfst_partia', fullKey: 'mnfst_decrypted_key' });
+      expect(result).toEqual({ keyPrefix: 'thk_partia', fullKey: 'thk_decrypted_key' });
       expect(result).not.toHaveProperty('key');
       expect(result).not.toHaveProperty('key_hash');
     });
 
     it('should return only keyPrefix when key is null (legacy)', async () => {
       mockKeyGetOne.mockResolvedValue({
-        key_prefix: 'mnfst_legacy_',
+        key_prefix: 'thk_legacy_',
         key_hash: 'secret-hash',
         key: null,
       });
 
       const result = await service.getKeyForAgent('tenant-1', 'agent-a');
 
-      expect(result).toEqual({ keyPrefix: 'mnfst_legacy_' });
+      expect(result).toEqual({ keyPrefix: 'thk_legacy_' });
       expect(result).not.toHaveProperty('fullKey');
     });
 
     it('should fall back to keyPrefix when decryption fails', async () => {
       mockKeyGetOne.mockResolvedValue({
-        key_prefix: 'mnfst_broken_',
+        key_prefix: 'thk_broken_',
         key_hash: 'secret-hash',
         key: 'invalid-encrypted-data',
       });
 
       const result = await service.getKeyForAgent('tenant-1', 'agent-a');
 
-      expect(result).toEqual({ keyPrefix: 'mnfst_broken_' });
+      expect(result).toEqual({ keyPrefix: 'thk_broken_' });
       expect(result).not.toHaveProperty('fullKey');
     });
   });
@@ -500,7 +500,7 @@ describe('ApiKeyGeneratorService', () => {
       await service.rotateKey('tenant-1', 'my-agent');
 
       const insertCall = mockKeyInsert.mock.calls[0][0];
-      const expectedRawKey = 'mnfst_' + Buffer.from('a'.repeat(32), 'utf8').toString('base64url');
+      const expectedRawKey = 'thk_' + Buffer.from('a'.repeat(32), 'utf8').toString('base64url');
 
       expect(insertCall.key).not.toBeNull();
       expect(decrypt(insertCall.key, TEST_SECRET)).toBe(expectedRawKey);
@@ -528,7 +528,7 @@ describe('ApiKeyGeneratorService', () => {
 
       const result = await service.rotateKey('tenant-1', 'my-agent');
 
-      expect(result.apiKey).toMatch(/^mnfst_/);
+      expect(result.apiKey).toMatch(/^thk_/);
       expect(result.apiKey.length).toBeGreaterThan(4);
     });
 

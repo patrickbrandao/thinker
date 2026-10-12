@@ -1,8 +1,8 @@
-const ORIGINAL_ENCRYPTION_KEY = process.env['MANIFEST_ENCRYPTION_KEY'];
-process.env['MANIFEST_ENCRYPTION_KEY'] ??= 'test-recording-secret-at-least-32-characters';
+const ORIGINAL_ENCRYPTION_KEY = process.env['THINKER_ENCRYPTION_KEY'];
+process.env['THINKER_ENCRYPTION_KEY'] ??= 'test-recording-secret-at-least-32-characters';
 afterAll(() => {
-  if (ORIGINAL_ENCRYPTION_KEY === undefined) delete process.env['MANIFEST_ENCRYPTION_KEY'];
-  else process.env['MANIFEST_ENCRYPTION_KEY'] = ORIGINAL_ENCRYPTION_KEY;
+  if (ORIGINAL_ENCRYPTION_KEY === undefined) delete process.env['THINKER_ENCRYPTION_KEY'];
+  else process.env['THINKER_ENCRYPTION_KEY'] = ORIGINAL_ENCRYPTION_KEY;
 });
 
 import { keyPrefix, verifyKey } from '../common/utils/hash.util';
@@ -360,8 +360,8 @@ describe('DatabaseSeederService', () => {
       const insertCall = mockAgentKeyRepo.insert.mock.calls[0][0];
       expect(insertCall.id).toBe('seed-otlp-key-001');
       expect(insertCall.key).toBeNull();
-      expect(verifyKey('mnfst_dev-otlp-key-001', insertCall.key_hash)).toBe(true);
-      expect(insertCall.key_prefix).toBe(keyPrefix('mnfst_dev-otlp-key-001'));
+      expect(verifyKey('thk_dev-otlp-key-001', insertCall.key_hash)).toBe(true);
+      expect(insertCall.key_prefix).toBe(keyPrefix('thk_dev-otlp-key-001'));
       expect(insertCall.label).toBe('Demo OTLP ingest key');
       expect(insertCall.tenant_id).toBe('seed-tenant-001');
       expect(insertCall.agent_id).toBe('seed-agent-001');
@@ -374,7 +374,7 @@ describe('DatabaseSeederService', () => {
       await service.onModuleInit();
 
       const insertCall = mockAgentKeyRepo.insert.mock.calls[0][0];
-      expect(insertCall.key_prefix).toBe('mnfst_dev-ot');
+      expect(insertCall.key_prefix).toBe('thk_dev-otlp');
     });
 
     it('should skip inserts when admin user is not found', async () => {

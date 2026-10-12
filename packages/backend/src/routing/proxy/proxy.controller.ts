@@ -46,7 +46,7 @@ import { ProxyExceptionFilter, isChatRenderingClient } from './proxy-exception.f
 import { sendFriendlyResponse } from './proxy-friendly-response';
 import { formatManifestError, type ManifestErrorCode } from '../../common/errors/error-codes';
 import {
-  MANIFEST_CODE_TO_REASON,
+  THINKER_CODE_TO_REASON,
   ManifestError,
   isRecordableManifestCode,
 } from '../../common/errors/manifest-error';
@@ -162,7 +162,7 @@ export class ProxyController {
         id: 'auto',
         object: 'model',
         created: MODEL_CREATED_UNKNOWN,
-        owned_by: 'manifest',
+        owned_by: 'thinker',
       },
     ];
     const seen = new Set(data.map((model) => model.id));
@@ -348,7 +348,7 @@ export class ProxyController {
       this.rateLimiter.acquireSlot(tenantId);
       slotAcquired = true;
       routingBody = redactInlineImageDataUrls(body);
-      const specificityOverride = req.headers['x-manifest-specificity'] as string | undefined;
+      const specificityOverride = req.headers['x-thinker-specificity'] as string | undefined;
       const { forward, meta, failedFallbacks } = await this.proxyService.proxyRequest({
         agentId: req.ingestionContext.agentId,
         tenantId,
@@ -532,7 +532,7 @@ export class ProxyController {
         requestId,
         errorMessage: meta.manifest_error_message ?? formatManifestError(code),
         errorCode: code,
-        reason: MANIFEST_CODE_TO_REASON[code],
+        reason: THINKER_CODE_TO_REASON[code],
         model: this.extractRequestedModel(req.body as Record<string, unknown> | undefined),
         traceId,
         sessionKey,
@@ -607,7 +607,7 @@ export class ProxyController {
           traceId,
           callerAttribution,
           requestHeaders,
-          MANIFEST_CODE_TO_REASON[err.code],
+          THINKER_CODE_TO_REASON[err.code],
           apiMode,
           status,
           err.code,
@@ -628,7 +628,7 @@ export class ProxyController {
         traceId,
         callerAttribution,
         requestHeaders,
-        MANIFEST_CODE_TO_REASON.M500,
+        THINKER_CODE_TO_REASON.M500,
         apiMode,
         status,
         'M500',
@@ -844,9 +844,9 @@ export class ProxyController {
         requestHeaders,
         durationMs,
         apiMode,
-        // A friendly stub's meta is a placeholder (provider 'manifest', tier
+        // A friendly stub's meta is a placeholder (provider 'thinker', tier
         // 'simple'), not a routing decision, so only a real route stamps tiers.
-        ...(meta && meta.provider !== 'manifest'
+        ...(meta && meta.provider !== 'thinker'
           ? {
               routing: {
                 tier: meta.tier,

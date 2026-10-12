@@ -327,8 +327,8 @@ const response = await client.responses.create({
 }
 
 export function getOpenClawDisableSnippet(model: string): string {
-  return `openclaw config unset models.providers.manifest
-openclaw config unset agents.defaults.models.manifest/auto
+  return `openclaw config unset models.providers.thinker
+openclaw config unset agents.defaults.models.thinker/auto
 openclaw config set agents.defaults.model.primary ${model}
 openclaw gateway restart`;
 }

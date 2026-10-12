@@ -35,7 +35,7 @@ const BLOCKED_REQUEST_HEADERS: Record<string, string> = {
   'X-Amz-Target': 'AmazonCodeWhispererService.Other',
   'X-Forwarded-Host': 'attacker.example',
   'X-Thinker-Tier': 'reasoning',
-  'X-Manifest-Tier': 'reasoning',
+  'x-thinker-specificity': 'coding',
 };
 const BLOCKED_LOWER = Object.keys(BLOCKED_REQUEST_HEADERS).map((k) => k.trim().toLowerCase());
 

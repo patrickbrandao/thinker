@@ -75,7 +75,7 @@ describe("HermesSetup", () => {
 
   it("shows masked key placeholder when no apiKey or keyPrefix", () => {
     const { container } = render(() => <HermesSetup {...defaultProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("shows key prefix when keyPrefix provided", () => {

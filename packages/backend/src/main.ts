@@ -237,11 +237,11 @@ export async function bootstrap() {
     host !== '127.0.0.1' &&
     host !== 'localhost' &&
     host !== '::1' &&
-    process.env['MANIFEST_DISABLE_HSTS'] !== '1'
+    process.env['THINKER_DISABLE_HSTS'] !== '1'
   ) {
     logger.warn(
       'HSTS is disabled. Set BETTER_AUTH_URL to your https:// origin to enable it, or set ' +
-        'MANIFEST_DISABLE_HSTS=1 to silence this warning for HTTP-only LAN deployments.',
+        'THINKER_DISABLE_HSTS=1 to silence this warning for HTTP-only LAN deployments.',
     );
   }
 
@@ -253,7 +253,7 @@ export async function bootstrap() {
 }
 
 // Only auto-start when run directly (not when embedded)
-if (!process.env['MANIFEST_EMBEDDED']) {
+if (!process.env['THINKER_EMBEDDED']) {
   bootstrap().catch((err) => {
     // The server never came up. The most common cause is a failed database
     // migration — TypeORM logs the specific "Migration X failed, error: ..."
@@ -263,7 +263,7 @@ if (!process.env['MANIFEST_EMBEDDED']) {
     new Logger('Bootstrap').fatal(
       'Manifest failed to start — see the error above. A failed database migration is the most ' +
         'common cause; if it reports provider/config rows that "cannot be re-scoped", back up your ' +
-        'database and re-run with MANIFEST_MIGRATION_FORCE=1.',
+        'database and re-run with THINKER_MIGRATION_FORCE=1.',
       err instanceof Error ? err.stack : String(err),
     );
     process.exit(1);

@@ -5,7 +5,7 @@ import { MessagesQueryService } from './messages-query.service';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 import { HeaderTier } from '../../entities/header-tier.entity';
-import { MANIFEST_ORIGIN_PREDICATE } from './query-helpers';
+import { THINKER_ORIGIN_PREDICATE } from './query-helpers';
 import type { MessageStatusFilter, MessageTriggerFilter } from '../dto/messages-query.dto';
 
 describe('MessagesQueryService', () => {
@@ -894,7 +894,7 @@ describe('MessagesQueryService', () => {
     const andWhereSpy = await runWithOrigin({});
     // No origin predicate of any kind: the log is the complete event listing.
     expect(
-      andWhereSpy.mock.calls.find(([clause]) => clause === MANIFEST_ORIGIN_PREDICATE),
+      andWhereSpy.mock.calls.find(([clause]) => clause === THINKER_ORIGIN_PREDICATE),
     ).toBeUndefined();
     expect(
       andWhereSpy.mock.calls.find(([clause]) => clause === 'at.error_origin = :originFilter'),
@@ -909,7 +909,7 @@ describe('MessagesQueryService', () => {
   it('shows only Manifest-originated errors when origin=manifest', async () => {
     const andWhereSpy = await runWithOrigin({ origin: 'manifest' });
     expect(
-      andWhereSpy.mock.calls.find(([clause]) => clause === MANIFEST_ORIGIN_PREDICATE),
+      andWhereSpy.mock.calls.find(([clause]) => clause === THINKER_ORIGIN_PREDICATE),
     ).toBeDefined();
   });
 

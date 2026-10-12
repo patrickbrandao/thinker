@@ -106,7 +106,7 @@ describe('Proxy E2E — /v1/models', () => {
     expect(res.body).toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         { id: 'openai/gpt-4o-mini', object: 'model', created: 0, owned_by: 'openai' },
       ],
     });
@@ -240,16 +240,16 @@ describe('Proxy E2E — /v1/chat/completions', () => {
     expect([200, 400, 401, 403, 429, 500, 502, 503, 504]).toContain(res.status);
 
     // The AgentKeyAuthGuard rejects requests BEFORE the proxy resolves a model,
-    // so guard-emitted responses never carry X-Manifest-* headers. If the
+    // so guard-emitted responses never carry X-Thinker-* headers. If the
     // status is in the 4xx range that the guard could plausibly emit (401/403),
     // we must prove that this response came from the provider — i.e., the
     // proxy successfully passed auth and forwarded — by asserting that the
     // routing meta headers are present. A guard rejection here would mean the
     // setup in beforeAll is broken (TEST_OTLP_KEY no longer valid).
     if (res.status === 401 || res.status === 403) {
-      expect(res.headers['x-manifest-tier']).toBeDefined();
-      expect(res.headers['x-manifest-model']).toBeDefined();
-      expect(res.headers['x-manifest-provider']).toBeDefined();
+      expect(res.headers['x-thinker-tier']).toBeDefined();
+      expect(res.headers['x-thinker-model']).toBeDefined();
+      expect(res.headers['x-thinker-provider']).toBeDefined();
       // Body shape from handleProviderError() with the forwarded status and
       // source echoed in the error. Provider-defined error types are preserved,
       // so `source` discriminates this path from the guard's Manifest error.
@@ -257,16 +257,16 @@ describe('Proxy E2E — /v1/chat/completions', () => {
       expect(res.body?.error?.source).toBe('provider');
     } else if (res.status >= 500) {
       // Two failure modes converge here:
-      //  - handleProviderError (provider returned 5xx)  → type: 'server_error', X-Manifest-* present
-      //  - handleProxyError    (network/throw in proxy) → type: 'server_error', no X-Manifest-* headers
+      //  - handleProviderError (provider returned 5xx)  → type: 'server_error', X-Thinker-* present
+      //  - handleProxyError    (network/throw in proxy) → type: 'server_error', no X-Thinker-* headers
       // Whichever path fires, the envelope must be one of the two known shapes —
       // a 5xx with no `error` object would indicate a regression.
       expect(res.body?.error?.type).toBe('server_error');
     } else if (res.status === 200) {
       // Unlikely in CI (the fake key would be rejected), but if it succeeds
       // we still expect the routing meta headers on the response.
-      expect(res.headers['x-manifest-tier']).toBeDefined();
-      expect(res.headers['x-manifest-model']).toBeDefined();
+      expect(res.headers['x-thinker-tier']).toBeDefined();
+      expect(res.headers['x-thinker-model']).toBeDefined();
     }
   });
 
@@ -291,7 +291,7 @@ describe('Proxy E2E — /v1/chat/completions', () => {
     }
   });
 
-  it('includes X-Manifest-* headers when forwarding', async () => {
+  it('includes X-Thinker-* headers when forwarding', async () => {
     const res = await bearer(api().post('/v1/chat/completions')).send({
       messages: [{ role: 'user', content: 'hello' }],
       stream: false,
@@ -299,10 +299,10 @@ describe('Proxy E2E — /v1/chat/completions', () => {
 
     // Skip assertion if proxy returned 400 (no model) or 500 (network error)
     if (res.status !== 500 && res.status !== 400) {
-      expect(res.headers['x-manifest-tier']).toBeDefined();
-      expect(res.headers['x-manifest-model']).toBeDefined();
-      expect(res.headers['x-manifest-provider']).toBeDefined();
-      expect(res.headers['x-manifest-confidence']).toBeDefined();
+      expect(res.headers['x-thinker-tier']).toBeDefined();
+      expect(res.headers['x-thinker-model']).toBeDefined();
+      expect(res.headers['x-thinker-provider']).toBeDefined();
+      expect(res.headers['x-thinker-confidence']).toBeDefined();
     }
   });
 

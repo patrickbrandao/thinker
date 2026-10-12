@@ -1,14 +1,14 @@
-import { MANIFEST_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from 'thinker-shared';
+import { THINKER_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from 'thinker-shared';
 
-export { MANIFEST_ERRORS_DOCS_BASE };
+export { THINKER_ERRORS_DOCS_BASE };
 
 const PEACOCK = '🦚';
 
-export const MANIFEST_ERRORS = {
+export const THINKER_ERRORS = {
   M001: {
     title: 'Missing Authorization header',
     template:
-      'Missing the Authorization header. Send your key as "Authorization: Bearer mnfst_<your-key>" or "x-api-key: mnfst_<your-key>".',
+      'Missing the Authorization header. Send your key as "Authorization: Bearer thk_<your-key>" or "x-api-key: thk_<your-key>".',
   },
   M002: {
     title: 'Empty Bearer token',
@@ -17,7 +17,7 @@ export const MANIFEST_ERRORS = {
   M003: {
     title: 'Invalid key format',
     template:
-      'That doesn\'t look right. Manifest keys start with "mnfst_". Grab yours from the dashboard.',
+      'That doesn\'t look right. Thinker keys start with "thk_". Grab yours from the dashboard.',
   },
   M004: {
     title: 'Key expired',
@@ -79,19 +79,19 @@ export const MANIFEST_ERRORS = {
   },
 } as const;
 
-export type ManifestErrorCode = keyof typeof MANIFEST_ERRORS;
+export type ManifestErrorCode = keyof typeof THINKER_ERRORS;
 
 // Matches the peacock prefix written by formatManifestError, e.g. `[🦚 Manifest M102]`.
 // The 🦚 is REQUIRED: only Manifest emits it, so a provider error body that merely
 // echoes the text "Manifest M100" can never be mis-extracted into a Manifest code
 // (which would then misclassify a provider round-trip as a Manifest config error).
-const MANIFEST_ERROR_CODE_RE = /\[\s*🦚\s*Manifest\s+(M\d{3})\s*\]/;
+const THINKER_ERROR_CODE_RE = /\[\s*🦚\s*Manifest\s+(M\d{3})\s*\]/;
 
 export function formatManifestError(
   code: ManifestErrorCode,
   vars: Record<string, string | number> = {},
 ): string {
-  const entry = MANIFEST_ERRORS[code];
+  const entry = THINKER_ERRORS[code];
   const interpolated = entry.template.replace(/\{(\w+)\}/g, (match, key: string) => {
     const value = vars[key];
     return value === undefined ? match : String(value);
@@ -108,8 +108,8 @@ export function extractManifestErrorCode(
   text: string | null | undefined,
 ): ManifestErrorCode | null {
   if (!text) return null;
-  const match = text.match(MANIFEST_ERROR_CODE_RE);
+  const match = text.match(THINKER_ERROR_CODE_RE);
   if (!match) return null;
   const code = match[1] as ManifestErrorCode;
-  return code in MANIFEST_ERRORS ? code : null;
+  return code in THINKER_ERRORS ? code : null;
 }

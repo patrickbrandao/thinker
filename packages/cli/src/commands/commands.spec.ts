@@ -691,7 +691,7 @@ describe('agent commands', () => {
       await run(io, ['agent', 'create', '--name', 'kept', '--platform', 'curl', '--if-absent']),
     ).toBe(0);
     expect((io.lastJson() as { setup: string }).setup).toContain(
-      'openclaw config set models.providers.manifest',
+      'openclaw config set models.providers.thinker',
     );
   });
 
@@ -780,7 +780,7 @@ describe('agent commands', () => {
     ]);
     expect(await run(io, ['agent', 'setup', 'bot'])).toBe(0);
     const out = io.lastJson() as { setup: string; hint?: string };
-    expect(out.setup).toContain('openclaw config set models.providers.manifest');
+    expect(out.setup).toContain('openclaw config set models.providers.thinker');
     expect(out.setup).toContain(`${HOST}/v1`);
     expect(out.setup).toContain(
       `<MNFST_AGENT_KEY — run: mnfst agent key show bot --raw --url ${HOST}>`,

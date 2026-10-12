@@ -2,7 +2,7 @@ import { ExceptionFilter, Catch, ArgumentsHost, HttpException, Injectable } from
 import { ConfigService } from '@nestjs/config';
 import { Request, Response as ExpressResponse } from 'express';
 import { formatManifestError, ManifestErrorCode } from '../../common/errors/error-codes';
-import { MANIFEST_CODE_TO_REASON } from '../../common/errors/manifest-error';
+import { THINKER_CODE_TO_REASON } from '../../common/errors/manifest-error';
 import type { RequestWithManifestErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { CONFLICTING_API_KEY_HEADERS } from '../../otlp/guards/agent-key-auth.guard';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
@@ -72,7 +72,7 @@ export class ProxyExceptionFilter implements ExceptionFilter {
         httpStatus: 401,
         errorMessage: content,
         errorCode: 'M004',
-        reason: MANIFEST_CODE_TO_REASON.M004,
+        reason: THINKER_CODE_TO_REASON.M004,
         model,
         requestHeaders: sanitizeRequestHeaders(req.headers),
       })

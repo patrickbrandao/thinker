@@ -38,7 +38,7 @@ export type { AuthType } from './auth-types';
 export {
   ERROR_ORIGINS,
   ERROR_CLASSES,
-  MANIFEST_ERROR_ORIGINS,
+  THINKER_ERROR_ORIGINS,
   OK_STATUS,
   RATE_LIMITED_STATUS,
   SUPERSEDED_STATUS,
@@ -69,7 +69,7 @@ export type {
 } from './error-taxonomy';
 export { isAnthropicExtraUsageError } from './provider-error-semantics';
 export type { ProviderErrorSignals } from './provider-error-semantics';
-export { MANIFEST_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from './manifest-error-docs';
+export { THINKER_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from './manifest-error-docs';
 export { DEFAULT_RESPONSE_MODE, RESPONSE_MODES, isResponseMode } from './response-mode';
 export type { ResponseMode } from './response-mode';
 export { DEFAULT_OUTPUT_MODALITY, OUTPUT_MODALITIES, isOutputModality } from './output-modality';

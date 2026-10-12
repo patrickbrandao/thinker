@@ -1,8 +1,8 @@
-const ORIGINAL_ENCRYPTION_KEY = process.env['MANIFEST_ENCRYPTION_KEY'];
-process.env['MANIFEST_ENCRYPTION_KEY'] ??= 'test-recording-secret-at-least-32-characters';
+const ORIGINAL_ENCRYPTION_KEY = process.env['THINKER_ENCRYPTION_KEY'];
+process.env['THINKER_ENCRYPTION_KEY'] ??= 'test-recording-secret-at-least-32-characters';
 afterAll(() => {
-  if (ORIGINAL_ENCRYPTION_KEY === undefined) delete process.env['MANIFEST_ENCRYPTION_KEY'];
-  else process.env['MANIFEST_ENCRYPTION_KEY'] = ORIGINAL_ENCRYPTION_KEY;
+  if (ORIGINAL_ENCRYPTION_KEY === undefined) delete process.env['THINKER_ENCRYPTION_KEY'];
+  else process.env['THINKER_ENCRYPTION_KEY'] = ORIGINAL_ENCRYPTION_KEY;
 });
 
 import { Test, TestingModule } from '@nestjs/testing';

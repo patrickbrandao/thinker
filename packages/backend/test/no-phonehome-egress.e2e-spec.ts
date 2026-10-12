@@ -245,7 +245,7 @@ describe('no phone-home egress', () => {
   it('ships no telemetry, update check, discovery forwarding, Sentry or Wingman code', () => {
     expect(
       filesMatching(
-        /TelemetryService|InstallIdService|VersionCheckService|DiscoverySyncService|@sentry\/|SENTRY_DSN|MANIFEST_TELEMETRY|TELEMETRY_ENDPOINT|UPDATE_CHECK|DISCOVERY_ENDPOINT|MODELPARAMS_API|WINGMAN_/,
+        /TelemetryService|InstallIdService|VersionCheckService|DiscoverySyncService|@sentry\/|SENTRY_DSN|THINKER_TELEMETRY|TELEMETRY_ENDPOINT|UPDATE_CHECK|DISCOVERY_ENDPOINT|MODELPARAMS_API|WINGMAN_/,
       ),
     ).toEqual([]);
   });

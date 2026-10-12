@@ -67,22 +67,22 @@ function deriveKey(secret: string, salt: Buffer): Buffer {
 }
 
 export function getEncryptionSecret(): string {
-  const dedicated = process.env['MANIFEST_ENCRYPTION_KEY'];
+  const dedicated = process.env['THINKER_ENCRYPTION_KEY'];
   if (dedicated && dedicated.length >= 32) {
     return dedicated;
   }
 
   // Falling back to BETTER_AUTH_SECRET means a single secret leak compromises
   // both session signing and stored provider/OAuth keys. Warn once at boot so
-  // operators have a clear remediation path: set MANIFEST_ENCRYPTION_KEY to a
+  // operators have a clear remediation path: set THINKER_ENCRYPTION_KEY to a
   // separate 32+ char secret.
   const sessionSecret = process.env['BETTER_AUTH_SECRET'];
   if (sessionSecret && sessionSecret.length >= 32) {
     if (!warnedAboutSecretReuse && process.env['NODE_ENV'] === 'production') {
       warnedAboutSecretReuse = true;
       logger.warn(
-        'MANIFEST_ENCRYPTION_KEY not set — falling back to BETTER_AUTH_SECRET for at-rest ' +
-          'encryption. Set MANIFEST_ENCRYPTION_KEY to a separate 32+ char secret so a session-' +
+        'THINKER_ENCRYPTION_KEY not set — falling back to BETTER_AUTH_SECRET for at-rest ' +
+          'encryption. Set THINKER_ENCRYPTION_KEY to a separate 32+ char secret so a session-' +
           'signing leak does not also decrypt stored provider/OAuth keys.',
       );
     }
@@ -90,7 +90,7 @@ export function getEncryptionSecret(): string {
   }
 
   throw new Error(
-    'Encryption secret required. Set MANIFEST_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
+    'Encryption secret required. Set THINKER_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
   );
 }
 
@@ -102,9 +102,9 @@ export function getEncryptionSecret(): string {
  * current key" and anything greater means "written under an older key and due
  * for a rewrite".
  *
- * Order: the dedicated key, then MANIFEST_ENCRYPTION_KEY_PREVIOUS (set during
+ * Order: the dedicated key, then THINKER_ENCRYPTION_KEY_PREVIOUS (set during
  * a rotation), then BETTER_AUTH_SECRET. Keeping the session secret last is
- * what lets an operator introduce MANIFEST_ENCRYPTION_KEY on an install that
+ * what lets an operator introduce THINKER_ENCRYPTION_KEY on an install that
  * had been encrypting with the session secret: old ciphertext still decrypts
  * without any PREVIOUS value.
  */
@@ -117,7 +117,7 @@ export function getDecryptionSecrets(): string[] {
       secrets.push(candidate);
     }
   };
-  add(process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS']);
+  add(process.env['THINKER_ENCRYPTION_KEY_PREVIOUS']);
   add(process.env['BETTER_AUTH_SECRET']);
   return secrets;
 }

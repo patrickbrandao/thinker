@@ -4,15 +4,15 @@ import { decodeRequestRecording, encodeRequestRecording } from './request-record
 const TEST_SECRET = 'recording-codec-secret-at-least-32-characters';
 
 describe('request recording codec', () => {
-  const originalKey = process.env['MANIFEST_ENCRYPTION_KEY'];
+  const originalKey = process.env['THINKER_ENCRYPTION_KEY'];
 
   beforeEach(() => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = TEST_SECRET;
+    process.env['THINKER_ENCRYPTION_KEY'] = TEST_SECRET;
   });
 
   afterAll(() => {
-    if (originalKey === undefined) delete process.env['MANIFEST_ENCRYPTION_KEY'];
-    else process.env['MANIFEST_ENCRYPTION_KEY'] = originalKey;
+    if (originalKey === undefined) delete process.env['THINKER_ENCRYPTION_KEY'];
+    else process.env['THINKER_ENCRYPTION_KEY'] = originalKey;
   });
 
   it('round-trips versioned request and response payloads through gzip', async () => {
@@ -127,7 +127,7 @@ describe('request recording codec', () => {
       response_body: null,
     });
 
-    process.env['MANIFEST_ENCRYPTION_KEY'] = 'a-totally-different-secret-32-chars-long';
+    process.env['THINKER_ENCRYPTION_KEY'] = 'a-totally-different-secret-32-chars-long';
 
     await expect(decodeRequestRecording(encoded)).rejects.toThrow();
   });

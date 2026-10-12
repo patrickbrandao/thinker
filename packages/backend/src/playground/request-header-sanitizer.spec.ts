@@ -28,10 +28,10 @@ describe('sanitizeRequestHeaders', () => {
     expect(out).toEqual({ 'HTTP-Referer': 'https://kept.example' });
   });
 
-  it('drops x-manifest-* headers from the client regardless of casing', () => {
+  it('drops x-thinker-* headers from the client regardless of casing', () => {
     const out = sanitizeRequestHeaders({
-      'X-Manifest-Specificity': 'trading',
-      'x-manifest-tier': 'reasoning',
+      'X-Thinker-Specificity': 'trading',
+      'x-thinker-tier': 'reasoning',
       'X-Title': 'ok',
     });
     expect(out).toEqual({ 'X-Title': 'ok' });
@@ -65,8 +65,9 @@ describe('sanitizeRequestHeaders', () => {
 
   it('isBlockedHeaderName is case-insensitive and covers prefixes', () => {
     expect(isBlockedHeaderName('AUTHORIZATION')).toBe(true);
-    expect(isBlockedHeaderName('X-Manifest-Anything')).toBe(true);
     expect(isBlockedHeaderName('X-Thinker-Anything')).toBe(true);
+    // The legacy upstream namespace is read by nothing in Thinker (#21).
+    expect(isBlockedHeaderName('X-Manifest-Anything')).toBe(false);
     expect(isBlockedHeaderName('X-Title')).toBe(false);
   });
 
