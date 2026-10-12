@@ -169,11 +169,13 @@ jobs:
       # what broke, but its failure no longer fails the job. The label has to
       # be on the PR before the run starts (push again after adding it).
       - name: Run baseline gateway contracts
+        id: baseline-contracts
         if: github.event_name == 'pull_request'
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'contract-break') }}
         env:
           THINKER_BASE_URL: http://127.0.0.1:2099
           # Base commits from before #21 read the URL under its old name.
+          # TODO(#31): drop this line once no open PR has a base before #21.
           MANIFEST_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
@@ -183,6 +185,13 @@ jobs:
             exit 0
           fi
           node --test "${tests[@]}"
+
+      - name: Flag baseline contract failures accepted by contract-break
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.baseline-contracts.outcome == 'failure'
+        run: |
+          echo "::warning title=Baseline contracts failed::The base commit's gateway contracts failed and the job continued only because this PR carries the contract-break label. Check that every failure is an approved contract change."
 
       - name: Run candidate gateway contracts
         env:

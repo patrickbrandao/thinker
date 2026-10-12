@@ -463,6 +463,8 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 
 See `packages/backend/.env.example` for all variables. Key ones:
 
+Thinker reads only `THINKER_*` names (#21); the upstream-era names are not aliases. At boot, before migrations, `common/utils/legacy-env.ts` logs one warning naming every upstream-prefixed variable that is set (names only, never values) with its `THINKER_*` replacement, or says it no longer exists. It warns separately when the old encryption-key name is set without `THINKER_ENCRYPTION_KEY`, because the backend then falls back to `BETTER_AUTH_SECRET`. The Compose file only passes the variables it lists, so an old name left in `docker/.env` never reaches the container and is not reported.
+
 - `BETTER_AUTH_SECRET` — **Required.** Secret for Better Auth session signing (min 32 chars). Generate with `openssl rand -hex 32`.
 - `DATABASE_URL` — **Required** in every environment, `NODE_ENV=test` included (there is no default URL, see "Backend e2e database safety"). The app, Better Auth, the migration runner and the message-provider backfill CLI throw if it is unset (a blank `MIGRATION_DATABASE_URL`/`DATABASE_UNPOOLED_URL` does not override it). Format: `postgresql://user:password@host:port/database`.
 - `THINKER_E2E_ALLOW_DROP` — Test-only. Must be `1` for the backend e2e suite to run (together with a `DATABASE_URL` whose database name has `test` as a separate token), because the suite drops the schema. Never set it outside a disposable test database.
