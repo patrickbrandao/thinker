@@ -26,7 +26,7 @@ import {
   CONNECTION_SUCCESS_RATE_TOOLTIP,
   CONNECTION_HARNESS_SUCCESS_RATE_TOOLTIP,
 } from '../../services/api/analytics.js';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 import { PROVIDERS } from '../../services/providers.js';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import FilterSelect from '../../components/FilterSelect.jsx';

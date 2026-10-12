@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { getProviderParamSpecs, type ProviderParamSpecCatalog } from 'manifest-shared';
+import { getProviderParamSpecs, type ProviderParamSpecCatalog } from 'thinker-shared';
 import { RouteModelParamsService } from '../route-model-params.service';
 
 const AGENT = 'agent-1';

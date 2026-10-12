@@ -5,7 +5,7 @@ import {
   providerParamValueIsValid,
   type ProviderParamSpec,
   type RequestParamDefaults,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 /**
  * Provider/key compatibility gate, driven by the single MPS provider

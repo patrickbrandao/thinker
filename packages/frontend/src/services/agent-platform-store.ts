@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 
 const [platform, setPlatformSignal] = createSignal<string | null>(null);
 const [category, setCategorySignal] = createSignal<string | null>(null);

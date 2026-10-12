@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { Show } from 'solid-js';
-import { FREE_PLAN_REQUESTS_PER_MONTH } from 'manifest-shared';
+import { FREE_PLAN_REQUESTS_PER_MONTH } from 'thinker-shared';
 
 const routerState = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -349,7 +349,7 @@ const { MOCK_FREE_PLAN_REQUESTS_PER_MONTH } = vi.hoisted(() => ({
   MOCK_FREE_PLAN_REQUESTS_PER_MONTH: 10_000,
 }));
 
-vi.mock('manifest-shared', () => ({
+vi.mock('thinker-shared', () => ({
   FREE_PLAN_REQUESTS_PER_MONTH: MOCK_FREE_PLAN_REQUESTS_PER_MONTH,
   PLAN_LIMITS: {
     free: { requestsPerMonth: MOCK_FREE_PLAN_REQUESTS_PER_MONTH },

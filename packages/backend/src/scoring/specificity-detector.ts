@@ -1,6 +1,6 @@
 import { TrieMatch } from './keyword-trie';
 import { ScorerTool, extractToolName } from './types';
-import { SpecificityCategory, SPECIFICITY_CATEGORIES } from 'manifest-shared';
+import { SpecificityCategory, SPECIFICITY_CATEGORIES } from 'thinker-shared';
 import { ACTIVATION_THRESHOLDS, weightFor } from './specificity-weights';
 import { computeSignalBoosts } from './specificity-signals';
 

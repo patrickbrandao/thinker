@@ -9,7 +9,7 @@ import { CATEGORY_CATALOG, PLATFORM_CATALOG, SETUP_TEMPLATES } from '../provider
 const URL_ONLY = { strings: ['url'] } as const;
 
 /**
- * Platforms come from the generated catalog (manifest-shared is the source of
+ * Platforms come from the generated catalog (thinker-shared is the source of
  * truth; `npm run gen` refreshes it at build, a drift spec pins it) — a new
  * platform in Manifest lands in the CLI on the next build, never by hand.
  */
@@ -37,7 +37,7 @@ function requirePlatform(args: ParsedArgs): string {
 
 /**
  * Categories are validated client-side against the generated catalog (source
- * of truth: manifest-shared AGENT_CATEGORIES) so a typo fails before any
+ * of truth: thinker-shared AGENT_CATEGORIES) so a typo fails before any
  * network call, with the valid values in the message.
  */
 function validateCategory(args: ParsedArgs): string | undefined {
@@ -66,7 +66,7 @@ function maskedKeyRef(slug: string, origin: string): string {
 
 /**
  * Render the platform's setup instructions. Templates come from
- * manifest-shared (the dashboard shows the same content); platforms without
+ * thinker-shared (the dashboard shows the same content); platforms without
  * a first-class snippet get generic OpenAI-compatible wiring guidance.
  * The key is masked by default so setup text is safe to log; `keyRef` carries
  * the real key on --reveal.

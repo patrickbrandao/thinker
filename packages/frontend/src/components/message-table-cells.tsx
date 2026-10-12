@@ -19,7 +19,7 @@ import { PROVIDERS } from '../services/providers.js';
 import { getModelDisplayName } from '../services/model-display.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.jsx';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
-import { platformIcon, isSuccessStatus } from 'manifest-shared';
+import { platformIcon, isSuccessStatus } from 'thinker-shared';
 
 const MONO = 'font-family: var(--font-mono);';
 const MONO_XS =

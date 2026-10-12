@@ -10,7 +10,7 @@ import { toast } from '../services/toast-store.js';
 import { formatCost, formatNumber, formatTime } from '../services/formatters.js';
 import Sparkline from '../components/Sparkline.jsx';
 import { agentPing, analyticsPing } from '../services/sse.js';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 
 interface Agent {
   agent_name: string;

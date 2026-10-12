@@ -17,8 +17,8 @@ import {
   isReservedCustomProviderAlias,
   normalizeCustomProviderAlias,
   normalizeProviderName,
-} from 'manifest-shared';
-import type { AuthType } from 'manifest-shared';
+} from 'thinker-shared';
+import type { AuthType } from 'thinker-shared';
 import {
   CustomProvider,
   CustomProviderApiKind,

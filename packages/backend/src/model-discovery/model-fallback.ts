@@ -10,7 +10,7 @@ import {
   META_MODEL_API_CONTEXT_WINDOW,
   META_MODEL_API_MODEL_BY_ID,
   type SubscriptionCapabilities,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { normalizeAnthropicShortModelId } from '../common/utils/anthropic-model-id';
 import { GOOGLE_VARIANT_RE } from '../model-prices/model-name-normalizer';
 

@@ -2,14 +2,14 @@ import {
   isPlaygroundHeaderBlocked,
   isPlaygroundHeaderNameValid,
   isPlaygroundHeaderValueValid,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 const MAX_HEADERS = 20;
 const MAX_VALUE_LENGTH = 2_000;
 
 /**
  * Credential, tenant-identity, gateway-managed and transport headers a client
- * may not set. The list lives in `manifest-shared` so the dashboard warns on
+ * may not set. The list lives in `thinker-shared` so the dashboard warns on
  * exactly what the server drops. Compared case-insensitively after trimming.
  */
 export function isBlockedHeaderName(name: string): boolean {

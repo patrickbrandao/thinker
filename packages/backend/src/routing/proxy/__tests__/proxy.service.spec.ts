@@ -5,7 +5,7 @@ import {
   type AuthType,
   type ModelRoute,
   type ProviderParamSpecCatalog,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { ProxyService } from '../proxy.service';
 import type { ResolveService } from '../../resolve/resolve.service';
 import type { ProviderKeyService } from '../../routing-core/provider-key.service';

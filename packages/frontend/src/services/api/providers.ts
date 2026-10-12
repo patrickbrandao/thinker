@@ -1,4 +1,4 @@
-import type { AuthType } from 'manifest-shared';
+import type { AuthType } from 'thinker-shared';
 import { fetchJson } from './core.js';
 
 export interface TenantProviderConnection {

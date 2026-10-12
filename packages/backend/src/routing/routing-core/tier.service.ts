@@ -6,13 +6,13 @@ import { RoutingCacheService } from './routing-cache.service';
 import { ProviderService } from './provider.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { randomUUID } from 'crypto';
-import type { AuthType, ModelRoute, ResponseMode } from 'manifest-shared';
+import type { AuthType, ModelRoute, ResponseMode } from 'thinker-shared';
 import {
   DEFAULT_RESPONSE_MODE,
   DEFAULT_OUTPUT_MODALITY,
   TIER_SLOTS,
   TierSlot,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { effectiveRoute, readFallbackRoutes, routeMatches } from './route-helpers';
 import {
   describeUnresolvedFallback,

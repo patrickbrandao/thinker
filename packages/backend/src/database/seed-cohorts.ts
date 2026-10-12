@@ -1,6 +1,6 @@
 import { DataSource, Repository } from 'typeorm';
 import { Logger } from '@nestjs/common';
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import { auth } from '../auth/auth.instance';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';

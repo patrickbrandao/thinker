@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'manifest-shared';
+import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'thinker-shared';
 import { PLAYGROUND_AGENT_SLUG } from '../../common/constants/playground.constants';
 import { slugify } from '../../common/utils/slugify';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';

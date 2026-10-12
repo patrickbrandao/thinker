@@ -11,20 +11,20 @@ const {
   deriveSetupTemplates: (shared: unknown) => unknown;
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const shared = require('manifest-shared');
+const shared = require('thinker-shared');
 
 describe('provider catalog', () => {
-  it('committed generated file matches manifest-shared (drift guard)', () => {
+  it('committed generated file matches thinker-shared (drift guard)', () => {
     // Same derivation the generator runs at build time — if this fails,
     // run `npm run gen --workspace=packages/cli` and commit the result.
     expect(JSON.parse(JSON.stringify(PROVIDER_CATALOG))).toEqual(deriveCatalog(shared));
   });
 
-  it('committed setup templates match manifest-shared (drift guard)', () => {
+  it('committed setup templates match thinker-shared (drift guard)', () => {
     expect(JSON.parse(JSON.stringify(SETUP_TEMPLATES))).toEqual(deriveSetupTemplates(shared));
   });
 
-  it('committed category catalog matches manifest-shared (drift guard)', () => {
+  it('committed category catalog matches thinker-shared (drift guard)', () => {
     expect([...CATEGORY_CATALOG]).toEqual(deriveCategories(shared));
   });
 

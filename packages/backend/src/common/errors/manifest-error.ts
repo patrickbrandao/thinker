@@ -4,7 +4,7 @@ import { formatManifestError, MANIFEST_ERRORS, type ManifestErrorCode } from './
 /**
  * `routing_reason` values the proxy stamps on a Manifest-originated row. Each
  * one classifies to an `{ error_origin, error_class }` pair via
- * `classifyMessageError` in `manifest-shared` — the two lists are kept in
+ * `classifyMessageError` in `thinker-shared` — the two lists are kept in
  * lock-step by `__tests__/manifest-error.spec.ts`.
  */
 export const MANIFEST_BLOCKED_REQUEST_REASONS = [

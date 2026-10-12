@@ -1,5 +1,5 @@
 import { createResource, createSignal, Index, Show, type Component } from 'solid-js';
-import { deriveCustomProviderAlias, normalizeCustomProviderAlias } from 'manifest-shared';
+import { deriveCustomProviderAlias, normalizeCustomProviderAlias } from 'thinker-shared';
 import {
   createCustomProvider,
   deleteCustomProvider,

@@ -1,27 +1,27 @@
 {
-  "name": "manifest",
+  "name": "thinker",
   "private": true,
-  "description": "Open-source observability for AI agents — track costs, tokens, messages, and performance",
-  "homepage": "https://manifest.build",
+  "description": "Open-source LLM gateway for AI agents — route each request to the right model and track cost, tokens and full request logs",
+  "homepage": "https://github.com/patrickbrandao/thinker",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mnfst/llm-gateway"
+    "url": "https://github.com/patrickbrandao/thinker"
   },
   "bugs": {
-    "url": "https://github.com/mnfst/llm-gateway/issues"
+    "url": "https://github.com/patrickbrandao/thinker/issues"
   },
-  "author": "MNFST Inc.",
+  "author": "Patrick Brandão and Thinker contributors",
   "license": "MIT",
   "keywords": [
-    "ai-observability",
+    "llm-gateway",
+    "llm-router",
     "ai-agent",
-    "llm-monitoring",
-    "opentelemetry",
-    "otlp",
+    "llm-proxy",
+    "openai-compatible",
+    "anthropic-compatible",
+    "self-hosted",
     "cost-tracking",
     "token-tracking",
-    "observability",
-    "telemetry",
     "nestjs",
     "solidjs"
   ],
@@ -30,11 +30,11 @@
     "packages/shared",
     "packages/frontend",
     "packages/backend",
-    "packages/manifest",
+    "packages/thinker",
     "packages/cli"
   ],
   "scripts": {
-    "dev": "turbo dev --filter=manifest-frontend",
+    "dev": "turbo dev --filter=thinker-frontend",
     "build": "turbo build",
     "test": "turbo test",
     "start": "node packages/backend/dist/main.js",
@@ -42,7 +42,6 @@
     "check:changesets": "node scripts/check-changesets.js",
     "design:registry": "node design-system/generate-registry.mjs",
     "design:registry:check": "node design-system/generate-registry.mjs --check",
-    "railway:http-logs": "node scripts/railway-http-logs.js",
     "test:scripts": "node --test scripts/*.test.js",
     "lint": "eslint packages/shared/src packages/backend/src packages/frontend/src packages/cli/src",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx,css}'",

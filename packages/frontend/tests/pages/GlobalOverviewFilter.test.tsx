@@ -244,7 +244,7 @@ vi.mock('../../src/services/routing-utils.js', () => ({
   stripCustomPrefix: (m: string) => m.replace(/^custom:[^/]+\//, ''),
 }));
 
-vi.mock('manifest-shared', () => ({
+vi.mock('thinker-shared', () => ({
   platformIcon: () => 'robot',
 }));
 

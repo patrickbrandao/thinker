@@ -1,4 +1,4 @@
-import type { SpecificityCategory } from 'manifest-shared';
+import type { SpecificityCategory } from 'thinker-shared';
 import { ScorerTool, extractToolName } from './types';
 
 /**

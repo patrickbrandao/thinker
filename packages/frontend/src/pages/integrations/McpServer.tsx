@@ -1,6 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
 import { Title, Meta } from '@solidjs/meta';
-import { PLATFORM_ICONS } from 'manifest-shared';
+import { PLATFORM_ICONS } from 'thinker-shared';
 import CodeBlock from '../../components/CodeBlock.jsx';
 import { mcpEndpoint } from '../../services/install-endpoints.js';
 import { checkMcpEnabled } from '../../services/setup-status.js';

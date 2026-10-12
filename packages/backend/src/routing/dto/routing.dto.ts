@@ -1,4 +1,4 @@
-import type { AuthType } from 'manifest-shared';
+import type { AuthType } from 'thinker-shared';
 import {
   IsString,
   IsIn,
@@ -15,7 +15,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
-import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'manifest-shared';
+import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 
 const KNOWN_PROVIDER_IDS: readonly string[] = Array.from(PROVIDER_BY_ID_OR_ALIAS.keys());

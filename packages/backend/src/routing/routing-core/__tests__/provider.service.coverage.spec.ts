@@ -1,4 +1,4 @@
-import type { ModelRoute } from 'manifest-shared';
+import type { ModelRoute } from 'thinker-shared';
 import { ProviderService } from '../provider.service';
 import { TenantProvider } from '../../../entities/tenant-provider.entity';
 import { TierAssignment } from '../../../entities/tier-assignment.entity';

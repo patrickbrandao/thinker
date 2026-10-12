@@ -21,7 +21,7 @@ import {
   CUSTOM_PROVIDER_ALIAS_MESSAGE,
   CUSTOM_PROVIDER_ALIAS_PATTERN,
   normalizeCustomProviderAlias,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 /**
  * Public prefix of the provider's model ids (`<alias>/<model_name>`).

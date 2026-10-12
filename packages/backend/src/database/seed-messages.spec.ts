@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { classifyMessageError } from 'manifest-shared';
+import { classifyMessageError } from 'thinker-shared';
 import { getSeedConnections, seedAgentMessages, seedConnectionId } from './seed-messages';
 
 function makeMockRepo() {

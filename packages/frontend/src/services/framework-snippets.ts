@@ -1,10 +1,10 @@
-// Platform setup snippets moved to manifest-shared so the CLI consumes the
+// Platform setup snippets moved to thinker-shared so the CLI consumes the
 // same setup truth; re-exported here to keep existing imports working.
 import {
   getOpenClawSnippet,
   getClaudeCodeSettingsSnippet,
   getNanobotConfigSnippet,
-} from 'manifest-shared';
+} from 'thinker-shared';
 export { getOpenClawSnippet, getClaudeCodeSettingsSnippet, getNanobotConfigSnippet };
 
 export type FrameworkId = 'python' | 'typescript' | 'openclaw' | 'curl';

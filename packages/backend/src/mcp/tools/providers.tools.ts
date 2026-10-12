@@ -8,7 +8,7 @@ import {
   SUPPORTED_SUBSCRIPTION_PROVIDER_IDS,
   normalizeProviderName,
   type ModelRoute,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
@@ -20,7 +20,7 @@ const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 /**
  * Provider connection tools. Providers are tenant-global; an agent only decides
  * which connection performs a discovery call. The catalog comes from
- * manifest-shared — the same registry the CLI and dashboard use — so "what can
+ * thinker-shared — the same registry the CLI and dashboard use — so "what can
  * I connect?" cannot drift between surfaces.
  */
 /**

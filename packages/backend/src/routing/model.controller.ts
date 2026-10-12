@@ -10,7 +10,7 @@ import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelsDevSyncService } from '../database/models-dev-sync.service';
 import { RoutingCacheService } from './routing-core/routing-cache.service';
 import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
-import { resolveProviderMetadataIdentity } from 'manifest-shared';
+import { resolveProviderMetadataIdentity } from 'thinker-shared';
 import {
   inputModalitiesFromCapabilities,
   resolveModelCapabilityMetadata,

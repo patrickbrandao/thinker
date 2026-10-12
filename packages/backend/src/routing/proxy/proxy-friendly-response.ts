@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { Response as ExpressResponse } from 'express';
 import { Tier } from '../../scoring/types';
-import type { ResponseMode } from 'manifest-shared';
+import type { ResponseMode } from 'thinker-shared';
 import type { ManifestErrorCode } from '../../common/errors/error-codes';
 
 export interface FriendlyForward {

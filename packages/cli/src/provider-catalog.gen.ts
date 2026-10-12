@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: manifest-shared (SHARED_PROVIDERS + SUPPORTED_SUBSCRIPTION_PROVIDER_IDS).
+// Source: thinker-shared (SHARED_PROVIDERS + SUPPORTED_SUBSCRIPTION_PROVIDER_IDS).
 // Refresh with: npm run gen (runs automatically in npm run build).
 
 export interface ProviderCatalogEntry {
@@ -266,10 +266,10 @@ export const PLATFORM_CATALOG: readonly PlatformCatalogEntry[] = [
   },
 ];
 
-/** Valid --category values (source: manifest-shared AGENT_CATEGORIES). */
+/** Valid --category values (source: thinker-shared AGENT_CATEGORIES). */
 export const CATEGORY_CATALOG: readonly string[] = ['personal', 'automation', 'app', 'coding'];
 
-/** Setup snippets with {{ORIGIN}} / {{API_KEY}} placeholders, rendered from manifest-shared. */
+/** Setup snippets with {{ORIGIN}} / {{API_KEY}} placeholders, rendered from thinker-shared. */
 export const SETUP_TEMPLATES: Readonly<Record<string, string>> = {
   openclaw:
     'openclaw config set models.providers.manifest \'{"baseUrl":"{{ORIGIN}}/v1","api":"openai-completions","apiKey":"{{API_KEY}}","models":[{"id":"auto","name":"Manifest Auto"}]}\'\nopenclaw config set agents.defaults.model.primary manifest/auto\nopenclaw gateway restart',

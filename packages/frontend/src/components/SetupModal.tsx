@@ -1,7 +1,7 @@
 import { createResource, Show, type Component } from 'solid-js';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 import ErrorState from './ErrorState.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
 

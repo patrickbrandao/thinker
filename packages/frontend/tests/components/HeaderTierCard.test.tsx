@@ -200,7 +200,7 @@ vi.mock('../../src/components/HeaderTierSnippetModal.js', () => ({
 }));
 
 import HeaderTierCard from '../../src/components/HeaderTierCard';
-import type { ProviderParamSpecCatalog } from 'manifest-shared';
+import type { ProviderParamSpecCatalog } from 'thinker-shared';
 import { getModelParamSpecs } from '../../src/services/api/model-params.js';
 import type { HeaderTier } from '../../src/services/api/header-tiers';
 import type { AvailableModel, CustomProviderData, RoutingProvider } from '../../src/services/api';

@@ -4,7 +4,7 @@ import {
   META_MODEL_API_MODELS,
   SHARED_PROVIDER_BY_ID,
   type SharedProviderEntry,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 export interface SubscriptionEndpointRegion {
   value: string;

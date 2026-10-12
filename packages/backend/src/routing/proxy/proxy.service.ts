@@ -21,14 +21,14 @@ import type {
   OutputModality,
   SpecificityCategory,
   TierSlot,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import {
   DEFAULT_RESPONSE_MODE,
   SPECIFICITY_CATEGORIES,
   modelParamsScopeForRouting,
   routeEquals,
   snapshotRequestParams,
-} from 'manifest-shared';
+} from 'thinker-shared';
 import type { ParamMergeContext } from './proxy-fallback.service';
 import {
   ProxyFallbackService,

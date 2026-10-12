@@ -20,7 +20,7 @@ import {
   ERROR_MESSAGE_STATUSES,
   MANIFEST_ORIGIN_PREDICATE,
 } from './query-helpers';
-import { MANIFEST_ERROR_ORIGINS } from 'manifest-shared';
+import { MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
 import { SelectQueryBuilder } from 'typeorm';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 

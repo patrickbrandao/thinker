@@ -18,7 +18,7 @@ import {
   type AuthType,
   type JsonValue,
   type RequestParamDefaults,
-} from 'manifest-shared';
+} from 'thinker-shared';
 
 export type ModelParamsBodyDto = RequestParamDefaults;
 

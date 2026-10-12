@@ -1,6 +1,6 @@
 import { fetchJson, fetchMutate, routingPath } from './core.js';
 import type { AuthType, ModelRoute, ResponseMode, OutputModality } from './routing.js';
-import type { TierColor } from 'manifest-shared';
+import type { TierColor } from 'thinker-shared';
 
 export interface HeaderTier {
   id: string;

@@ -552,9 +552,9 @@ describe('agent commands', () => {
     expect(stub.calls).toHaveLength(0);
   });
 
-  it('CLI platform catalog matches manifest-shared, surfaces included (drift guard)', () => {
+  it('CLI platform catalog matches thinker-shared, surfaces included (drift guard)', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const shared = require('manifest-shared') as {
+    const shared = require('thinker-shared') as {
       AGENT_PLATFORMS: readonly string[];
       PLATFORM_API_SURFACES: Record<string, string>;
     };

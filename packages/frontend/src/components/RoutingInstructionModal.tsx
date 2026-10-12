@@ -5,7 +5,7 @@ import SetupStepAddProvider from './SetupStepAddProvider.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 
 interface Props {
   open: boolean;

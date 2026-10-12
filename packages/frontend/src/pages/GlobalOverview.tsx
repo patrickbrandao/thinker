@@ -39,7 +39,7 @@ import Sparkline from '../components/Sparkline.jsx';
 import FilterSelect from '../components/FilterSelect.jsx';
 import Select from '../components/Select.jsx';
 import { authLabel, authBadgeFor } from '../components/AuthBadge.jsx';
-import { platformIcon } from 'manifest-shared';
+import { platformIcon } from 'thinker-shared';
 import GlobalOverviewSkeleton from '../components/GlobalOverviewSkeleton.jsx';
 import MessageTable from '../components/MessageTable.jsx';
 import {

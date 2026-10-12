@@ -9,7 +9,7 @@
  * Keep new credential failure kinds here — callers should not re-implement
  * selectProviderKey → resolveApiKey or invent parallel error text.
  */
-import type { AuthType } from 'manifest-shared';
+import type { AuthType } from 'thinker-shared';
 import {
   ProviderKeyService,
   SYNTHETIC_OLLAMA_PROVIDER_ID,

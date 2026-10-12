@@ -9,7 +9,7 @@ import {
   type Component,
 } from 'solid-js';
 import { getMessageDetails, type AttemptRecording } from '../services/api/messages.js';
-import { isFailedStatus, isSuccessStatus } from 'manifest-shared';
+import { isFailedStatus, isSuccessStatus } from 'thinker-shared';
 import { formatParamValue } from './MessageDetailsSections.jsx';
 import { providerIcon } from './ProviderIcon.jsx';
 import { FallbackIcon } from './message-table-cells.jsx';

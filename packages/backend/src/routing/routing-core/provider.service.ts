@@ -27,7 +27,7 @@ import {
   isManifestUsableProvider,
   isSupportedSubscriptionProvider,
 } from '../../common/utils/subscription-support';
-import { MAX_KEYS_PER_PROVIDER, type AuthType, type ModelRoute } from 'manifest-shared';
+import { MAX_KEYS_PER_PROVIDER, type AuthType, type ModelRoute } from 'thinker-shared';
 import {
   QWEN_REGION_VALIDATION_MESSAGE,
   detectQwenRegion,
