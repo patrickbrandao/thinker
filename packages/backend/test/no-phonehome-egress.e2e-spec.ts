@@ -9,10 +9,12 @@
  * (openrouter.ai, models.dev, and raw.githubusercontent.com for OpenCode Go).
  * #39 tightens that: the OpenCode Go doc is fetched only when an OpenCode Go
  * provider is registered, and THINKER_CATALOG_SYNC=false silences all three.
+ * #109: with no provider configured, the setup status route no longer probes a
+ * local runner (Ollama, LM Studio, llama.cpp).
  */
 import { spawn, type ChildProcess } from 'child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
-import { createServer } from 'net';
+import { createServer, type Server } from 'net';
 import { tmpdir } from 'os';
 import { join, sep } from 'path';
 import { DataSource } from 'typeorm';
@@ -133,10 +135,45 @@ async function withDatabase(run: (db: DataSource) => Promise<void>, dropSchema =
   }
 }
 
+/**
+ * A TCP listener on an ephemeral loopback port standing in for a local model
+ * runner (Ollama, LM Studio, llama.cpp). It accepts and drops every
+ * connection, so it sees one whether it comes from `fetch` or a raw socket.
+ */
+interface RunnerTrap {
+  name: string;
+  url: string;
+  connections: () => number;
+  close: () => Promise<void>;
+}
+
+async function openRunnerTrap(name: string): Promise<RunnerTrap> {
+  let connections = 0;
+  const server: Server = createServer((socket) => {
+    connections++;
+    socket.destroy();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (typeof address !== 'object' || !address) throw new Error('no port');
+  return {
+    name,
+    url: `http://127.0.0.1:${address.port}`,
+    connections: () => connections,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
+}
+
 interface BootedServer {
   base: string;
   output: () => string;
+  /** What the recorder saw up to health plus the boot grace period. */
   records: EgressRecord[];
+  /** What the recorder has seen so far, re-read on each call. */
+  readRecords: () => EgressRecord[];
   stop: () => Promise<void>;
 }
 
@@ -209,11 +246,12 @@ async function bootServer(extraEnv: NodeJS.ProcessEnv = {}): Promise<BootedServe
     await stop();
     throw err;
   }
-  const records = readFileSync(egressLog, 'utf8')
-    .split('\n')
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as EgressRecord);
-  return { base, output: () => output, records, stop };
+  const readRecords = () =>
+    readFileSync(egressLog, 'utf8')
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as EgressRecord);
+  return { base, output: () => output, records: readRecords(), readRecords, stop };
 }
 
 describe('no phone-home egress', () => {
@@ -266,16 +304,28 @@ describe('no phone-home egress', () => {
    */
   describe('at boot (production mode, no opt-out variable)', () => {
     let server: BootedServer | undefined;
+    let runners: RunnerTrap[] = [];
 
     beforeAll(async () => {
       // Start from an empty schema: the real server migrates on boot, and
       // earlier suites leave a synchronize()-built schema behind.
       await withDatabase(async () => undefined, true);
-      server = await bootServer();
+      // Point every local runner at a trap, so a probe is seen however it is
+      // made, and never reaches a runner that happens to run on this machine.
+      runners = await Promise.all(
+        ['ollama', 'lmstudio', 'llamacpp'].map((name) => openRunnerTrap(name)),
+      );
+      const [ollama, lmstudio, llamacpp] = runners;
+      server = await bootServer({
+        OLLAMA_HOST: ollama!.url,
+        THINKER_LMSTUDIO_BASE_URL: lmstudio!.url,
+        THINKER_LLAMACPP_BASE_URL: llamacpp!.url,
+      });
     }, 180_000);
 
     afterAll(async () => {
       await server?.stop();
+      await Promise.all(runners.map((runner) => runner.close()));
     }, 30_000);
 
     it('boots and runs the egress recorder', () => {
@@ -313,6 +363,37 @@ describe('no phone-home egress', () => {
         .map((record) => record.target)
         .filter((host) => !LOCAL_HOSTS.has(host));
       expect(remote).toEqual([]);
+    });
+
+    it('answers /setup/status without probing a local runner (#109)', async () => {
+      // The dashboard calls this public route on first load. It used to ping
+      // OLLAMA_HOST/api/tags inline (3 s timeout) on every call, with no
+      // Ollama provider configured.
+      for (let i = 0; i < 2; i++) {
+        const res = await fetch(`${server!.base}/api/v1/setup/status`);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as Record<string, unknown>;
+        expect(body['needsSetup']).toBe(true);
+        expect(body).not.toHaveProperty('ollamaAvailable');
+      }
+      // Leave room for anything the route might have fired and forgotten.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      expect(runners.map((runner) => [runner.name, runner.connections()])).toEqual([
+        ['ollama', 0],
+        ['lmstudio', 0],
+        ['llamacpp', 0],
+      ]);
+      const runnerOrigins = runners.map((runner) => runner.url);
+      const probes = server!
+        .readRecords()
+        .filter(
+          (record) =>
+            record.kind === 'fetch' &&
+            (runnerOrigins.some((origin) => record.target.startsWith(origin)) ||
+              /:11434\b|host\.(docker|containers)\.internal/.test(record.target)),
+        );
+      expect(probes).toEqual([]);
     });
 
     it('no longer serves the update-check or discovery routes', async () => {

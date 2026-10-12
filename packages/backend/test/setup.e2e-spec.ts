@@ -37,13 +37,12 @@ describe('First-run setup wizard', () => {
     it('returns needsSetup=true when user table is empty', async () => {
       const res = await request(app.getHttpServer()).get('/api/v1/setup/status').expect(200);
       expect(res.body).toMatchObject({ needsSetup: true });
-      // No deployment-mode flag any more (#18): exactly these fields.
+      // No deployment-mode flag (#18) and no Ollama probe (#109): exactly these fields.
       expect(Object.keys(res.body).sort()).toEqual([
         'emailConfigured',
         'localLlmHost',
         'mcpEnabled',
         'needsSetup',
-        'ollamaAvailable',
         'socialProviders',
       ]);
     });
