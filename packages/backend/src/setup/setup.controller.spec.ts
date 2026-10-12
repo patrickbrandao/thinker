@@ -11,7 +11,6 @@ describe('SetupController', () => {
   let mockNeedsSetup: jest.Mock;
   let mockCreateFirstAdmin: jest.Mock;
   let mockGetEnabledSocialProviders: jest.Mock;
-  let mockIsOllamaAvailable: jest.Mock;
   let mockGetLocalLlmHost: jest.Mock;
   let mockIsEmailConfigured: jest.Mock;
   let mockIsMcpEnabled: jest.Mock;
@@ -20,7 +19,6 @@ describe('SetupController', () => {
     mockNeedsSetup = jest.fn();
     mockCreateFirstAdmin = jest.fn();
     mockGetEnabledSocialProviders = jest.fn().mockReturnValue([]);
-    mockIsOllamaAvailable = jest.fn().mockResolvedValue(false);
     mockGetLocalLlmHost = jest.fn().mockReturnValue('localhost');
     mockIsEmailConfigured = jest.fn().mockReturnValue(true);
     mockIsMcpEnabled = jest.fn().mockReturnValue(true);
@@ -34,7 +32,6 @@ describe('SetupController', () => {
             needsSetup: mockNeedsSetup,
             createFirstAdmin: mockCreateFirstAdmin,
             getEnabledSocialProviders: mockGetEnabledSocialProviders,
-            isOllamaAvailable: mockIsOllamaAvailable,
             getLocalLlmHost: mockGetLocalLlmHost,
             isEmailConfigured: mockIsEmailConfigured,
             isMcpEnabled: mockIsMcpEnabled,
@@ -60,7 +57,6 @@ describe('SetupController', () => {
       expect(result).toEqual({
         needsSetup: true,
         socialProviders: [],
-        ollamaAvailable: false,
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
@@ -73,7 +69,6 @@ describe('SetupController', () => {
       expect(result).toEqual({
         needsSetup: false,
         socialProviders: [],
-        ollamaAvailable: false,
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
@@ -87,45 +82,23 @@ describe('SetupController', () => {
       expect(result).toEqual({
         needsSetup: false,
         socialProviders: ['google', 'github'],
-        ollamaAvailable: false,
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
       });
     });
 
-    it('no longer reports a deployment mode', async () => {
+    it('reports no deployment mode and no Ollama availability', async () => {
       mockNeedsSetup.mockResolvedValue(false);
       const result = await controller.getStatus();
-      // The status carries no mode flag: exactly these fields, nothing else.
+      // No mode flag and no Ollama probe result (#109): exactly these fields.
       expect(Object.keys(result).sort()).toEqual([
         'emailConfigured',
         'localLlmHost',
         'mcpEnabled',
         'needsSetup',
-        'ollamaAvailable',
         'socialProviders',
       ]);
-    });
-
-    it('always probes Ollama, with no container or mode detection', async () => {
-      mockNeedsSetup.mockResolvedValue(false);
-      await controller.getStatus();
-      expect(mockIsOllamaAvailable).toHaveBeenCalledTimes(1);
-    });
-
-    it('returns ollamaAvailable=true when Ollama is reachable', async () => {
-      mockNeedsSetup.mockResolvedValue(false);
-      mockIsOllamaAvailable.mockResolvedValue(true);
-      const result = await controller.getStatus();
-      expect(result).toEqual({
-        needsSetup: false,
-        socialProviders: [],
-        ollamaAvailable: true,
-        localLlmHost: 'localhost',
-        emailConfigured: true,
-        mcpEnabled: true,
-      });
     });
 
     it('returns host.docker.internal as localLlmHost when running inside Docker', async () => {

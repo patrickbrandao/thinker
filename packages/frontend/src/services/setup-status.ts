@@ -6,7 +6,6 @@
 interface SetupStatusResponse {
   needsSetup: boolean;
   socialProviders?: string[];
-  ollamaAvailable?: boolean;
   localLlmHost?: string;
   emailConfigured?: boolean;
   mcpEnabled?: boolean;
@@ -15,7 +14,6 @@ interface SetupStatusResponse {
 interface SetupStatusResult {
   needsSetup: boolean;
   socialProviders: string[];
-  ollamaAvailable: boolean;
   localLlmHost: string;
   emailConfigured: boolean;
   mcpEnabled: boolean;
@@ -33,7 +31,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
       return {
         needsSetup: false,
         socialProviders: [],
-        ollamaAvailable: false,
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
@@ -42,7 +39,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
     return {
       needsSetup: data.needsSetup === true,
       socialProviders: data.socialProviders ?? [],
-      ollamaAvailable: data.ollamaAvailable === true,
       localLlmHost: data.localLlmHost || 'localhost',
       // Assume available unless the backend explicitly says otherwise, so a
       // transient status glitch never hides the email reset form.
@@ -54,7 +50,6 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
     return {
       needsSetup: false,
       socialProviders: [],
-      ollamaAvailable: false,
       localLlmHost: 'localhost',
       emailConfigured: true,
       mcpEnabled: true,
@@ -75,10 +70,6 @@ export async function checkNeedsSetup(): Promise<boolean> {
 
 export async function checkSocialProviders(): Promise<string[]> {
   return (await getSetupStatus()).socialProviders;
-}
-
-export async function checkIsOllamaAvailable(): Promise<boolean> {
-  return (await getSetupStatus()).ollamaAvailable;
 }
 
 export async function checkLocalLlmHost(): Promise<string> {
