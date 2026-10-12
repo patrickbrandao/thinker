@@ -1,5 +1,5 @@
-import dns = require('dns');
-import net = require('net');
+import dns from 'dns';
+import net from 'net';
 import { fetch as undiciFetch } from 'undici';
 import { closeServer, serveOnLoopback } from './loopback';
 import {

@@ -22,10 +22,10 @@
  * raw.githubusercontent.com) or a cloud provider must mock those hosts: stub
  * `global.fetch`, or serve the provider on 127.0.0.1.
  */
-// `import x = require()` binds the real module objects: `import * as` would
-// patch an esModuleInterop copy and leave the modules untouched.
-import dns = require('dns');
-import net = require('net');
+// Default imports bind the real module objects (esModuleInterop wraps them as
+// `.default`); `import * as` would patch a copy and leave them untouched.
+import dns from 'dns';
+import net from 'net';
 
 export interface AllowedEndpoint {
   host: string;
