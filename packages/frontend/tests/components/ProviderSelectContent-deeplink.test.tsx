@@ -11,7 +11,6 @@ vi.mock('../../src/services/api.js', () => ({
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
-  checkIsOllamaAvailable: vi.fn().mockResolvedValue(false),
   checkLocalLlmHost: vi.fn().mockResolvedValue('localhost'),
 }));
 

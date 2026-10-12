@@ -84,65 +84,8 @@ describe('SetupService', () => {
     });
   });
 
-  describe('isOllamaAvailable', () => {
-    const originalFetch = global.fetch;
-
-    afterEach(() => {
-      global.fetch = originalFetch;
-    });
-
-    it('returns true when Ollama responds OK', async () => {
-      global.fetch = jest.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
-      expect(await service.isOllamaAvailable()).toBe(true);
-    });
-
-    it('returns false when Ollama responds with error status', async () => {
-      global.fetch = jest.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch;
-      expect(await service.isOllamaAvailable()).toBe(false);
-    });
-
-    it('returns false when fetch throws (Ollama unreachable)', async () => {
-      global.fetch = jest
-        .fn()
-        .mockRejectedValue(new Error('ECONNREFUSED')) as unknown as typeof fetch;
-      expect(await service.isOllamaAvailable()).toBe(false);
-    });
-
-    it('returns false when fetch is aborted (timeout)', async () => {
-      global.fetch = jest
-        .fn()
-        .mockRejectedValue(new DOMException('aborted', 'AbortError')) as unknown as typeof fetch;
-      expect(await service.isOllamaAvailable()).toBe(false);
-    });
-
-    it('aborts via AbortController when the 3s timeout fires', async () => {
-      // Capture the timeout callback registered by the service so we can
-      // invoke it explicitly rather than trying to coordinate jest's fake
-      // timers with async AbortController listeners.
-      const realSetTimeout = global.setTimeout;
-      let fired: (() => void) | null = null;
-      global.setTimeout = ((cb: () => void) => {
-        fired = cb;
-        return 0 as unknown as NodeJS.Timeout;
-      }) as unknown as typeof setTimeout;
-
-      try {
-        global.fetch = jest.fn().mockImplementation((_url, init) => {
-          return new Promise((_resolve, reject) => {
-            (init as RequestInit).signal?.addEventListener('abort', () => {
-              reject(new DOMException('aborted', 'AbortError'));
-            });
-          });
-        }) as unknown as typeof fetch;
-
-        const pending = service.isOllamaAvailable();
-        expect(fired).not.toBeNull();
-        fired!(); // trigger controller.abort() from setup.service.ts:49
-        expect(await pending).toBe(false);
-      } finally {
-        global.setTimeout = realSetTimeout;
-      }
-    });
+  it('has no Ollama probe: setup status must not reach a local runner (#109)', () => {
+    expect((service as unknown as Record<string, unknown>)['isOllamaAvailable']).toBeUndefined();
   });
 
   describe('getEnabledSocialProviders', () => {

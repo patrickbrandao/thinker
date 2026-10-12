@@ -1,7 +1,6 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateAdminDto } from './dto/create-admin.dto';
-import { OLLAMA_HOST } from '../common/constants/ollama';
 import { getContainerHostAlias } from '../common/utils/container-host';
 import { isEmailConfigured } from '../notifications/services/email-providers/send-email';
 import { mcpAvailability } from '../auth/mcp-availability';
@@ -63,21 +62,6 @@ export class SetupService {
    */
   isMcpEnabled(): boolean {
     return mcpAvailability().enabled;
-  }
-
-  /**
-   * Pings the Ollama server and returns true if it responds.
-   */
-  async isOllamaAvailable(): Promise<boolean> {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeout);
-      return res.ok;
-    } catch {
-      return false;
-    }
   }
 
   /**
