@@ -78,16 +78,16 @@ jobs:
         run: |
           set -euo pipefail
           platform=$(docker image inspect thinker:ci --format '{{.Os}}/{{.Architecture}}')
-          user=$(docker image inspect thinker:ci --format '{{.Config.User}}')
-          echo "platform=$platform user=$user"
+          echo "platform=$platform"
           test "$platform" = "$EXPECTED_PLATFORM"
-          # Distroless :nonroot runs as UID 65532; never root.
-          case "$user" in
-            "" | 0 | root | 0:0 | root:root)
-              echo "::error::The runtime image runs as root (user='$user')." >&2
-              exit 1
-              ;;
-          esac
+          # Distroless :nonroot runs as UID 65532. Assert the effective UID
+          # inside the container rather than parsing Config.User.
+          uid=$(docker run --rm thinker:ci -p 'process.getuid()')
+          echo "uid=$uid"
+          if [[ ! "$uid" =~ ^[0-9]+$ || "$uid" == "0" ]]; then
+            echo "::error::The runtime image must run as a non-root UID (got '$uid')." >&2
+            exit 1
+          fi
           # The image's node (the ENTRYPOINT) runs natively on this runner.
           arch=$(docker run --rm thinker:ci -p 'process.arch')
           echo "node arch=$arch"

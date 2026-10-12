@@ -761,7 +761,7 @@ All pricing comes from a single source:
 
 ## Continuous integration
 
-Thinker's CI (#20) is five workflows. Every action is pinned to a commit SHA, every workflow runs with a read-only token, and none of them uses a secret or calls an outside service.
+Thinker's CI (#20) is five workflows. Every action is pinned to a commit SHA, every workflow defaults to a read-only token (only the CodeQL jobs add `security-events: write` to upload results), no workflow uses a repository secret, and none publishes anything. The jobs do reach the npm registry, Docker Hub and gcr.io (base images), and GitHub's own code-scanning and cache services.
 
 | Workflow | Trigger | Check names |
 | --- | --- | --- |
@@ -771,13 +771,13 @@ Thinker's CI (#20) is five workflows. Every action is pinned to a commit SHA, ev
 | `codeql.yml` | PRs and pushes (except docs and changesets), weekly | `CodeQL`, `CodeQL (actions)` |
 | `dependency-review.yml` | every PR | `dependency-review` |
 
-- **Lint:** ESLint over each package's `src/` plus `packages/backend/test/`, and `design:registry:check`.
+- **Lint:** ESLint over each package's `src/` plus `packages/backend/test/` and `packages/backend/scripts/*.mjs`, and `design:registry:check`.
 - **Typecheck:** `npm run typecheck --workspaces --if-present`, which runs each workspace's own `tsc --noEmit` (TypeScript 5.9; the root TypeScript is a different major, see #82). The backend uses `tsconfig.test.json`, which covers `src/` and `test/`.
 - **Build:** `nest build`, `vite build` and the CLI build, then fails if the build changed any tracked file or left an untracked one (for example a stale `*.gen.ts` in the CLI).
 - **Unit:** one job per workspace; the backend suite runs a second time with `TZ=America/Sao_Paulo`.
 - **Backend e2e:** against a `postgres:16` service, once with `TZ=UTC` and once with `TZ=America/Sao_Paulo` (the PostgreSQL container stays on UTC). It uses the e2e guard conventions: `DATABASE_URL` points at `thinker_e2e_test` and `THINKER_E2E_ALLOW_DROP=1`.
 - **Scripts** runs `npm run test:scripts`; **Changeset check** runs `npm run check:changesets`.
-- **Docker build** builds `docker/Dockerfile` per architecture on native runners (`ubuntu-24.04`, `ubuntu-24.04-arm`) without pushing, then checks the image's platform, its non-root user and that node runs the expected architecture. Publishing to `tmsoftbrasil/thinker` is #31.
+- **Docker build** builds `docker/Dockerfile` per architecture on native runners (`ubuntu-24.04`, `ubuntu-24.04-arm`) without pushing, then checks the image's platform, that the process runs with a non-zero UID and that node runs the expected architecture. Publishing to `tmsoftbrasil/thinker` is #31.
 
 Only the `ci.yml` checks can be required on `main`. The others are path-filtered, so a PR that does not touch their paths never reports them, and a required check that never reports blocks the merge.
 
