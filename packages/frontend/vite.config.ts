@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, type ProxyOptions } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
-import { codecovVitePlugin } from '@codecov/vite-plugin';
 
 // Dial the backend on 127.0.0.1, not `localhost`. The dev backend binds
 // 127.0.0.1 (IPv4), but on dual-stack machines `localhost` can resolve to
@@ -51,14 +50,7 @@ export default defineConfig({
     // anyone else) for it.
     __MANIFEST_VERSION__: JSON.stringify(manifestVersion),
   },
-  plugins: [
-    solidPlugin(),
-    codecovVitePlugin({
-      enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-      bundleName: 'thinker-frontend',
-      uploadToken: process.env.CODECOV_TOKEN,
-    }),
-  ],
+  plugins: [solidPlugin()],
   server: {
     port: 3000,
     // Disable Vite's built-in CORS handler. Otherwise it short-circuits

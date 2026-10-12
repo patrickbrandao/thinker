@@ -1,17 +1,22 @@
 name: Docker Smoke
 
 # Boots the production compose stack with `read_only: true` and verifies the
-# app comes up cleanly and answers /api/v1/health. Catches regressions from
-# code that silently writes outside /tmp at boot, which would crash users on
-# the locked-down default deployment.
+# app comes up cleanly and answers /api/v1/health, then exercises the admin
+# setup, a chat completion through a custom provider (the mock in
+# .github/scripts/mock-openai-provider.py), the gateway contracts in
+# contracts/gateway and request recordings across a container recreation.
+# Catches regressions from code that silently writes outside /tmp at boot,
+# which would crash users on the locked-down default deployment.
 #
-# Provisional (#38): the image is built locally as `thinker:ci` and never
-# pulled from a registry. Until #26 rebrands docker/docker-compose.yml, the
-# jobs point Compose at that image without editing docker/: the `smoke` job
-# layers a generated Compose override through COMPOSE_FILE, and the
-# `install-script` job serves install.sh a patched temporary copy of the
-# Compose file. The full rewrite with the Thinker names is #20; the upgrade
-# test returns in v0.2 against the first published tmsoftbrasil/thinker.
+# The image is built locally as `thinker:ci` and never pulled from a registry.
+# Until #26 rebrands docker/docker-compose.yml (service, project, volume and
+# image names), the jobs point Compose at that image without editing docker/:
+# the `smoke` job layers a generated Compose override through COMPOSE_FILE,
+# and the `install-script` job serves install.sh a patched temporary copy of
+# the Compose file. Both go away in #26. The upgrade test returns in v0.2,
+# against the first published tmsoftbrasil/thinker.
+#
+# Path-filtered, so these checks must not be required on main.
 
 on:
   pull_request:
@@ -66,8 +71,8 @@ jobs:
           load: true
           tags: thinker:ci
           platforms: linux/amd64
-          cache-from: type=gha,scope=smoke-amd64
-          cache-to: type=gha,mode=max,scope=smoke-amd64
+          cache-from: type=gha,scope=image-amd64
+          cache-to: type=gha,mode=max,scope=image-amd64
 
       - name: Point Compose at the local thinker:ci image
         run: |
@@ -78,22 +83,15 @@ jobs:
           printf 'services:\n  manifest:\n    image: thinker:ci\n' > "$override"
           echo "COMPOSE_FILE=$GITHUB_WORKSPACE/docker/docker-compose.yml:$override" >> "$GITHUB_ENV"
 
-      - name: Prepare .env from .env.example
+      - name: Prepare .env from .env.example with a generated secret
         working-directory: docker
         run: |
           cp .env.example .env
-          # Generate a real secret so BETTER_AUTH_SECRET=${VAR:?…} succeeds.
+          # A fresh secret per run, so BETTER_AUTH_SECRET=${VAR:?…} succeeds.
+          # It never leaves the runner and is not printed.
           secret=$(openssl rand -hex 32)
-          # Replace the empty `BETTER_AUTH_SECRET=` line.
-          new=""
-          while IFS= read -r line || [[ -n "$line" ]]; do
-            if [[ "$line" == "BETTER_AUTH_SECRET=" ]]; then
-              new+="BETTER_AUTH_SECRET=${secret}"$'\n'
-            else
-              new+="$line"$'\n'
-            fi
-          done < .env
-          printf '%s' "$new" > .env
+          sed -i "s/^BETTER_AUTH_SECRET=\$/BETTER_AUTH_SECRET=${secret}/" .env
+          grep -Eq '^BETTER_AUTH_SECRET=[0-9a-f]{64}$' .env
 
       - name: Verify self-host configuration wiring
         working-directory: docker
@@ -374,8 +372,8 @@ jobs:
           load: true
           tags: thinker:ci
           platforms: linux/amd64
-          cache-from: type=gha,scope=smoke-amd64
-          cache-to: type=gha,mode=max,scope=smoke-amd64
+          cache-from: type=gha,scope=image-amd64
+          cache-to: type=gha,mode=max,scope=image-amd64
 
       - name: Serve a patched copy of the PR's docker/ files on a local HTTP port
         run: |

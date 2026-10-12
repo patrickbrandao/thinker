@@ -9,6 +9,15 @@
 # one is validated by qa-docker; a major the ecosystem does not support yet
 # is documented and deferred. Remove the `semver-major` ignores below only
 # as part of that work.
+#
+# uuid: its newer majors are ESM-only, and the CommonJS backend cannot
+# require() them (upstream CI broke this way). Do not take a uuid major while
+# the backend is CommonJS; #90 removes the dependency instead.
+#
+# The `applies-to: security-updates` groups below only take effect while
+# Dependabot security updates are enabled for the repository. They are off
+# today (automated-security-fixes disabled); turning them on is a maintainer
+# decision proposed in #20, now that CI validates every Dependabot PR.
 
 version: 2
 updates:
