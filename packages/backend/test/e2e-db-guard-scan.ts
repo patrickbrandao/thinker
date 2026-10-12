@@ -112,8 +112,11 @@ export function scanSource(
     if (ts.isCallExpression(node)) {
       const name = calleeName(node.expression);
       if (name && GUARD_CALLS.has(name)) callsGuard = true;
-      if (name === 'dropDatabase' && ts.isPropertyAccessExpression(node.expression)) {
-        drops.push({ line: lineOf(node), what: '.dropDatabase()' });
+      if (
+        (name === 'dropDatabase' || name === 'dropSchema') &&
+        ts.isPropertyAccessExpression(node.expression)
+      ) {
+        drops.push({ line: lineOf(node), what: `.${name}()` });
       }
       if (
         name === 'synchronize' &&

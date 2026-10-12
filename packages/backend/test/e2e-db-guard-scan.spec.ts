@@ -132,6 +132,9 @@ describe('e2e database guard scan (issue #108)', () => {
 
     it('flags other ways to wipe the database', () => {
       expect(scan(`await ds.dropDatabase();`)).toEqual(['unguarded-drop']);
+      expect(scan(`await queryRunner.dropSchema('public', true, true);`)).toEqual([
+        'unguarded-drop',
+      ]);
       expect(scan(`await ds.synchronize(true);`)).toEqual(['unguarded-drop']);
       expect(scan(`await ds.synchronize();`)).toEqual([]);
       expect(scan('await ds.query(`drop  schema public cascade`);')).toEqual(['unguarded-drop']);
