@@ -10,6 +10,7 @@ export default [
     files: [
       'packages/shared/src/**/*.ts',
       'packages/backend/src/**/*.ts',
+      'packages/backend/test/**/*.ts',
       'packages/frontend/src/**/*.ts',
       'packages/frontend/src/**/*.tsx',
       'packages/cli/src/**/*.ts',

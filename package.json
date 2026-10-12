@@ -43,7 +43,7 @@
     "design:registry": "node design-system/generate-registry.mjs",
     "design:registry:check": "node design-system/generate-registry.mjs --check",
     "test:scripts": "node --test scripts/*.test.js",
-    "lint": "eslint packages/shared/src packages/backend/src packages/frontend/src packages/cli/src",
+    "lint": "eslint packages/shared/src packages/backend/src packages/backend/test packages/frontend/src packages/cli/src",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx,css}'",
     "changeset": "changeset",
     "version-packages": "changeset version",

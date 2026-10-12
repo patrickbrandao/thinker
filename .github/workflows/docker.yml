@@ -1,0 +1,100 @@
+name: Docker
+
+# Pull-request validation of the production image: docker/Dockerfile is built
+# for linux/amd64 and linux/arm64, each on a native runner (no QEMU), and the
+# result is checked for the expected architecture and a non-root user.
+#
+# Nothing is pushed and no secret is used: the token is read-only and the jobs
+# never log in to a registry. Publishing to Docker Hub (tmsoftbrasil/thinker,
+# multi-arch manifest, tags and signing) is the release workflow of #31, the
+# only one allowed to use DOCKERHUB_USERNAME / DOCKERHUB_TOKEN.
+#
+# Path-filtered, so these checks must not be required on main.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/docker.yml"
+      - "docker/Dockerfile"
+      - ".dockerignore"
+      - "packages/backend/**"
+      - "packages/frontend/**"
+      - "packages/shared/**"
+      - "packages/thinker/**"
+      - "package.json"
+      - "package-lock.json"
+      - "turbo.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Docker build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: x64
+            runner: ubuntu-24.04
+            # Shared with docker-smoke.yml, which builds the same amd64 image.
+            cache-scope: image-amd64
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            cache-scope: image-arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the ${{ matrix.platform }} image (no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: false
+          load: true
+          tags: thinker:ci
+          cache-from: type=gha,scope=${{ matrix.cache-scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }}
+
+      - name: Verify architecture, user and contents
+        env:
+          EXPECTED_PLATFORM: ${{ matrix.platform }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          platform=$(docker image inspect thinker:ci --format '{{.Os}}/{{.Architecture}}')
+          user=$(docker image inspect thinker:ci --format '{{.Config.User}}')
+          echo "platform=$platform user=$user"
+          test "$platform" = "$EXPECTED_PLATFORM"
+          # Distroless :nonroot runs as UID 65532; never root.
+          case "$user" in
+            "" | 0 | root | 0:0 | root:root)
+              echo "::error::The runtime image runs as root (user='$user')." >&2
+              exit 1
+              ;;
+          esac
+          # The image's node (the ENTRYPOINT) runs natively on this runner.
+          arch=$(docker run --rm thinker:ci -p 'process.arch')
+          echo "node arch=$arch"
+          test "$arch" = "$EXPECTED_ARCH"
+          # The backend bundle and the dashboard are where the app expects them.
+          docker run --rm thinker:ci -e \
+            "for (const f of ['packages/backend/dist/main.js', 'packages/frontend/dist/index.html']) require('fs').accessSync(f)"
+
+      - name: Image size
+        run: docker image ls thinker:ci --format '{{.Repository}}:{{.Tag}} {{.Size}}'

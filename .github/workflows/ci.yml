@@ -1,9 +1,13 @@
 name: CI
 
-# Provisional minimal CI (#38): lint, unit tests and backend e2e. Jobs
-# address workspaces by path (packages/<name>); the npm workspace names are
-# thinker-* since #19. The full CI (typecheck, builds, scripts, changeset
-# check) lands in #20.
+# Full CI (#20): lint, typecheck, build (with generated-file drift check),
+# unit tests per workspace, backend e2e against PostgreSQL in two time zones,
+# the root scripts' tests and the changeset guard. Jobs address workspaces by
+# path (packages/<name>); the npm workspace names are thinker-* since #19.
+#
+# None of these jobs is path-filtered, so every one of them can be a required
+# check on main. The Docker image build (docker.yml), the Compose smoke test
+# (docker-smoke.yml) and CodeQL are path-filtered and must not be required.
 #
 # Every action is pinned to a full commit SHA. When adding one, resolve the
 # tag with `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` (dereference
@@ -19,14 +23,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Superseded PR runs are cancelled; every commit on main is tested.
+  # A PR run is superseded by the next push to the same PR. Pushes to main are
+  # grouped per commit, so a newer push never cancels (or replaces, while
+  # still pending) the run of an older one: every commit on main is tested.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # No phone-home from CI tooling.
   DO_NOT_TRACK: "1"
   TURBO_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_UPDATE_NOTIFIER: "false"
 
 jobs:
   lint:
@@ -42,7 +49,63 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # ESLint over every package's src/ plus packages/backend/test.
       - run: npm run lint
+      - name: Design-system registry is up to date
+        run: npm run design:registry:check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # The other workspaces resolve thinker-shared's types from its build
+      # output, so it is built first.
+      - run: npm run build --workspace=packages/shared
+      # `tsc --noEmit` with each workspace's own TypeScript (5.9). The root
+      # one is a different major (see #82). The backend run covers src/ and
+      # test/ (tsconfig.test.json).
+      - run: npm run typecheck --workspaces --if-present
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=packages/shared
+      - name: Build backend (nest build)
+        run: npm run build --workspace=packages/backend
+      - name: Build frontend (vite build)
+        run: npm run build --workspace=packages/frontend
+      # Regenerates src/provider-catalog.gen.ts and src/skill-content.gen.ts
+      # before compiling.
+      - name: Build CLI
+        run: npm run build --workspace=packages/cli
+      - name: Generated files are committed and up to date
+        run: |
+          changes=$(git status --porcelain --untracked-files=all)
+          if [[ -n "$changes" ]]; then
+            echo "::error::The build changed tracked files or left untracked files. Run the builds locally and commit the result."
+            echo "$changes"
+            git --no-pager diff
+            exit 1
+          fi
 
   unit:
     name: Unit (${{ matrix.workspace }})
@@ -65,11 +128,26 @@ jobs:
       # output, so it is built first.
       - run: npm run build --workspace=packages/shared
       - run: npm test --workspace=packages/${{ matrix.workspace }}
+      # GitHub runners are on UTC, where UTC and local formatting agree. Some
+      # backend specs assume the host zone, so run them once more outside UTC
+      # (the bug class of #53).
+      - name: Backend unit tests with TZ=America/Sao_Paulo
+        if: matrix.workspace == 'backend'
+        run: npm test --workspace=packages/backend
+        env:
+          TZ: America/Sao_Paulo
 
   backend-e2e:
-    name: Backend e2e (PostgreSQL 16)
+    name: Backend e2e (PostgreSQL 16, TZ=${{ matrix.tz }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Node side reads and writes `timestamp without time zone` in the
+        # local zone, so the suite runs in UTC and outside it (#53). The
+        # PostgreSQL container stays on UTC.
+        tz: [UTC, America/Sao_Paulo]
     services:
       postgres:
         # Same major as docker/docker-compose.yml. PostgreSQL 18 lands in v0.2.
@@ -93,6 +171,7 @@ jobs:
       THINKER_E2E_ALLOW_DROP: "1"
       BETTER_AUTH_SECRET: ci-test-secret-at-least-32-characters-long!!
       NODE_ENV: test
+      TZ: ${{ matrix.tz }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,3 +185,33 @@ jobs:
       - name: Run migrations
         run: npm run migration:run --workspace=packages/backend
       - run: npm run test:e2e --workspace=packages/backend
+
+  scripts:
+    name: Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # node:test over scripts/*.test.js. They use Node built-ins only, so no
+      # npm install is needed.
+      - run: npm run test:scripts
+
+  changeset-check:
+    name: Changeset check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # Every changeset must target the releasable `thinker` package, never
+      # the workspaces ignored in .changeset/config.json.
+      - run: npm run check:changesets

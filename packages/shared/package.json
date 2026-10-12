@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest"
   },
   "devDependencies": {
