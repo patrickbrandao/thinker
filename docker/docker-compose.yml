@@ -45,7 +45,7 @@ name: mnfst
 
 services:
   manifest:
-    image: manifestdotbuild/manifest:${MANIFEST_VERSION:-latest}
+    image: tmsoftbrasil/thinker:${THINKER_VERSION:-latest}
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-${PORT:-2099}}:${PORT:-2099}"
     # Lets the container reach LLM servers running on the host (Ollama,

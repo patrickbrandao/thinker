@@ -25,10 +25,11 @@ import {
 import { createRateLimitReachedHandler } from './common/middleware/rate-limit-log';
 import { shouldCompress } from './routing/proxy/compression-filter';
 import { checkLocalServerBaseUrls } from './common/constants/local-servers';
-import { warnLegacyEnvVars } from './common/utils/legacy-env';
+import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
+  assertLegacyEncryptionKeyMigrated(process.env);
 
   // Before the app (and its migrations) start: name any upstream-era
   // variables that are set and ignored, so a stale .env doesn't fail silently.

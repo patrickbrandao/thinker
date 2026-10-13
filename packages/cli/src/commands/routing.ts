@@ -143,7 +143,7 @@ export const routingCustom = {
 
   /**
    * Create a custom tier and route it in one command. The tier triggers on
-   * `<header-key>: <header-value>` (defaults: x-manifest-tier: <name>), so a
+   * `<header-key>: <header-value>` (defaults: x-thinker-tier: <name>), so a
    * caller opts in per request with a single header.
    *
    * Models are validated against the agent's discovered set — the same gate
@@ -188,7 +188,7 @@ export const routingCustom = {
     const tier = (await client.request('POST', agentPath(agent, '/header-tiers'), {
       body: {
         name,
-        header_key: args.strings['header-key'] ?? 'x-manifest-tier',
+        header_key: args.strings['header-key'] ?? 'x-thinker-tier',
         header_value: args.strings['header-value'] ?? name,
         badge_color: 'indigo',
       },
@@ -393,7 +393,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
         // gateway's caller_attribution. Same value ApiClient sends.
         'User-Agent': CLI_USER_AGENT,
         ...(surface === 'messages' ? { 'anthropic-version': '2023-06-01' } : {}),
-        ...(args.strings['tier'] ? { 'x-manifest-tier': args.strings['tier'] } : {}),
+        ...(args.strings['tier'] ? { 'x-thinker-tier': args.strings['tier'] } : {}),
       },
       body: JSON.stringify(requestBody),
       signal: controller.signal,

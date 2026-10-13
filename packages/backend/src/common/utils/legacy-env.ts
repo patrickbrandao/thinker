@@ -57,15 +57,6 @@ export function legacyEnvWarnings(env: NodeJS.ProcessEnv = process.env): string[
   const removed = found.filter((v) => v.replacement === null);
   const lines: string[] = [];
 
-  const legacyKey = `${LEGACY_PREFIX}ENCRYPTION_KEY`;
-  const currentKey = `${CURRENT_PREFIX}ENCRYPTION_KEY`;
-  if (found.some((v) => v.name === legacyKey) && (env[currentKey] ?? '') === '') {
-    lines.push(
-      `${legacyKey} is set but ${currentKey} is not: the old name is ignored, so stored ` +
-        `provider credentials encrypted with it will not decrypt and new ones are encrypted ` +
-        `under BETTER_AUTH_SECRET. Rename it to ${currentKey} (same value) and restart.`,
-    );
-  }
   if (renamed.length > 0) {
     lines.push(
       'Ignoring legacy environment variables (Thinker reads only THINKER_* names): ' +
@@ -81,6 +72,24 @@ export function legacyEnvWarnings(env: NodeJS.ProcessEnv = process.env): string[
     );
   }
   return lines;
+}
+
+/**
+ * Refuses to boot when the legacy encryption key is set without its Thinker
+ * replacement: the old name is never read, so stored provider credentials
+ * would fail to decrypt and new ones would be encrypted under a different key.
+ * The error names the variables only, never their values.
+ */
+export function assertLegacyEncryptionKeyMigrated(env: NodeJS.ProcessEnv = process.env): void {
+  const legacyKey = `${LEGACY_PREFIX}ENCRYPTION_KEY`;
+  const currentKey = `${CURRENT_PREFIX}ENCRYPTION_KEY`;
+  if ((env[legacyKey] ?? '') !== '' && (env[currentKey] ?? '') === '') {
+    throw new Error(
+      `${legacyKey} is set but ${currentKey} is not. Thinker reads only ${currentKey}; ` +
+        `starting without it would leave stored provider credentials undecryptable. ` +
+        `Rename ${legacyKey} to ${currentKey} (same value) and restart.`,
+    );
+  }
 }
 
 /** Logs the legacy-variable warnings once, at boot. */

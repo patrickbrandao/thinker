@@ -1,4 +1,6 @@
-import { findLegacyEnvVars, legacyEnvWarnings, warnLegacyEnvVars } from './legacy-env';
+import {
+  assertLegacyEncryptionKeyMigrated,
+  findLegacyEnvVars, legacyEnvWarnings, warnLegacyEnvVars } from './legacy-env';
 
 // Built from parts so the acceptance grep for legacy names (#21) stays clean.
 const OLD = ['MANIFEST', ''].join('_');
@@ -27,15 +29,27 @@ describe('legacy env vars', () => {
     ]);
   });
 
-  it('warns loudly when only the legacy encryption key is set', () => {
-    const lines = legacyEnvWarnings({ [`${OLD}ENCRYPTION_KEY`]: 'super-secret-value-123' });
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toContain(`${OLD}ENCRYPTION_KEY is set but THINKER_ENCRYPTION_KEY is not`);
-    expect(lines[0]).toContain('BETTER_AUTH_SECRET');
-    expect(lines[1]).toContain(`${OLD}ENCRYPTION_KEY -> THINKER_ENCRYPTION_KEY`);
+  it('fails fast, naming only the variables, when only the legacy encryption key is set', () => {
+    const env = { [`${OLD}ENCRYPTION_KEY`]: 'super-secret-value-123' };
+    let err: Error | undefined;
+    try {
+      assertLegacyEncryptionKeyMigrated(env);
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err?.message).toContain(`${OLD}ENCRYPTION_KEY is set but THINKER_ENCRYPTION_KEY is not`);
+    expect(err?.message).not.toContain('super-secret-value-123');
   });
 
-  it('skips the encryption-key alarm when THINKER_ENCRYPTION_KEY is also set', () => {
+  it('boots when THINKER_ENCRYPTION_KEY is set or the legacy key is absent/empty', () => {
+    expect(() =>
+      assertLegacyEncryptionKeyMigrated({ [`${OLD}ENCRYPTION_KEY`]: 'old', THINKER_ENCRYPTION_KEY: 'new' }),
+    ).not.toThrow();
+    expect(() => assertLegacyEncryptionKeyMigrated({ [`${OLD}ENCRYPTION_KEY`]: '' })).not.toThrow();
+    expect(() => assertLegacyEncryptionKeyMigrated({})).not.toThrow();
+  });
+
+  it('lists renamed variables in one warning', () => {
     const lines = legacyEnvWarnings({
       [`${OLD}ENCRYPTION_KEY`]: 'old',
       THINKER_ENCRYPTION_KEY: 'new',
@@ -54,7 +68,7 @@ describe('legacy env vars', () => {
       },
       { warn },
     );
-    expect(warn).toHaveBeenCalledTimes(3);
+    expect(warn).toHaveBeenCalledTimes(2);
     const logged = warn.mock.calls.map((c) => String(c[0])).join('\n');
     expect(logged).not.toContain('super-secret-value-123');
     expect(logged).not.toContain('previous-secret-456');
