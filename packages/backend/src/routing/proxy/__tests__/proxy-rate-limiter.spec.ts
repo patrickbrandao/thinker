@@ -3,19 +3,19 @@ import { ProxyRateLimiter } from '../proxy-rate-limiter';
 
 describe('ProxyRateLimiter', () => {
   let limiter: ProxyRateLimiter;
-  const originalConcurrencyMax = process.env.MANIFEST_CONCURRENCY_MAX;
+  const originalConcurrencyMax = process.env.THINKER_CONCURRENCY_MAX;
 
   beforeEach(() => {
-    delete process.env.MANIFEST_CONCURRENCY_MAX;
+    delete process.env.THINKER_CONCURRENCY_MAX;
     limiter = new ProxyRateLimiter();
   });
 
   afterEach(() => {
     limiter.onModuleDestroy();
     if (originalConcurrencyMax === undefined) {
-      delete process.env.MANIFEST_CONCURRENCY_MAX;
+      delete process.env.THINKER_CONCURRENCY_MAX;
     } else {
-      process.env.MANIFEST_CONCURRENCY_MAX = originalConcurrencyMax;
+      process.env.THINKER_CONCURRENCY_MAX = originalConcurrencyMax;
     }
   });
 
@@ -288,9 +288,9 @@ describe('ProxyRateLimiter', () => {
   });
 
   describe('acquireSlot / releaseSlot', () => {
-    it('uses MANIFEST_CONCURRENCY_MAX when it is a positive integer', () => {
+    it('uses THINKER_CONCURRENCY_MAX when it is a positive integer', () => {
       limiter.onModuleDestroy();
-      process.env.MANIFEST_CONCURRENCY_MAX = '40';
+      process.env.THINKER_CONCURRENCY_MAX = '40';
       limiter = new ProxyRateLimiter();
 
       for (let i = 0; i < 40; i++) {
@@ -310,9 +310,9 @@ describe('ProxyRateLimiter', () => {
       '0b101',
       '2e1',
       ' 40 ',
-    ])('falls back to 10 when MANIFEST_CONCURRENCY_MAX is %p', (configuredValue) => {
+    ])('falls back to 10 when THINKER_CONCURRENCY_MAX is %p', (configuredValue) => {
       limiter.onModuleDestroy();
-      process.env.MANIFEST_CONCURRENCY_MAX = configuredValue;
+      process.env.THINKER_CONCURRENCY_MAX = configuredValue;
       limiter = new ProxyRateLimiter();
 
       for (let i = 0; i < 10; i++) {
@@ -460,8 +460,8 @@ describe('ProxyRateLimiter', () => {
       }
     };
 
-    it('honors MANIFEST_RATE_MAX_REQUESTS', () => {
-      withEnv({ MANIFEST_RATE_MAX_REQUESTS: '3' }, (l) => {
+    it('honors THINKER_RATE_MAX_REQUESTS', () => {
+      withEnv({ THINKER_RATE_MAX_REQUESTS: '3' }, (l) => {
         l.checkLimit('user-env');
         l.checkLimit('user-env');
         l.checkLimit('user-env');
@@ -469,8 +469,8 @@ describe('ProxyRateLimiter', () => {
       });
     });
 
-    it('honors MANIFEST_IP_RATE_MAX_REQUESTS', () => {
-      withEnv({ MANIFEST_IP_RATE_MAX_REQUESTS: '2' }, (l) => {
+    it('honors THINKER_IP_RATE_MAX_REQUESTS', () => {
+      withEnv({ THINKER_IP_RATE_MAX_REQUESTS: '2' }, (l) => {
         l.checkIpLimit('10.0.0.9');
         l.checkIpLimit('10.0.0.9');
         expect(() => l.checkIpLimit('10.0.0.9')).toThrow(HttpException);
@@ -479,7 +479,7 @@ describe('ProxyRateLimiter', () => {
 
     it('keeps the default when the override is not a plain positive integer', () => {
       for (const bad of ['0', '-5', 'abc', '2.5', '', '1e3', '0x10']) {
-        withEnv({ MANIFEST_RATE_MAX_REQUESTS: bad, MANIFEST_IP_RATE_MAX_REQUESTS: bad }, (l) => {
+        withEnv({ THINKER_RATE_MAX_REQUESTS: bad, THINKER_IP_RATE_MAX_REQUESTS: bad }, (l) => {
           for (let i = 0; i < 200; i++) l.checkLimit('tenant-bad');
           expect(() => l.checkLimit('tenant-bad')).toThrow(HttpException);
           for (let i = 0; i < 500; i++) l.checkIpLimit('10.0.0.10');

@@ -77,8 +77,8 @@ describe('proxy-friendly-response', () => {
       expect(result.forward.isGoogle).toBe(false);
       expect(result.forward.isAnthropic).toBe(false);
       expect(result.forward.isChatGpt).toBe(false);
-      expect(result.meta.model).toBe('manifest');
-      expect(result.meta.provider).toBe('manifest');
+      expect(result.meta.model).toBe('thinker');
+      expect(result.meta.provider).toBe('thinker');
       expect(result.meta.confidence).toBe(1);
       expect(result.meta.reason).toBe('manifest_internal_error');
       // The rendered text rides on meta so the recorder can persist it verbatim

@@ -327,6 +327,29 @@ export function registerRoutingTools(
             const key = await deps.apiKeys.getKeyForAgent(operator.tenantId, info.agent_name);
             if (!key.fullKey) throw new Error('No active key for this agent');
 
+            // Send the header rule the tier actually stores. A tier created by
+            // the dashboard, the CLI or another harness may use any header key,
+            // so a hard-coded name would miss it and the test would silently
+            // exercise the default route instead.
+            let tierHeader: { key: string; value: string } | undefined;
+            if (tier) {
+              const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
+              const tiers = await deps.headerTiers.list(agent.id);
+              const wanted = tier.toLowerCase();
+              const hit = tiers.find((t) => t.name.toLowerCase() === wanted);
+              if (!hit) {
+                const names = tiers.map((t) => t.name).join(', ');
+                throw new Error(
+                  `Custom tier "${tier}" not found for "${agentName}"` +
+                    (names ? ` (custom tiers: ${names})` : ' (it has no custom tiers)'),
+                );
+              }
+              if (!hit.enabled) {
+                throw new Error(`Custom tier "${hit.name}" is disabled; enable it first`);
+              }
+              tierHeader = { key: hit.header_key, value: hit.header_value };
+            }
+
             const endpoint =
               surface === 'messages'
                 ? `${authOrigin}/v1/messages`
@@ -358,7 +381,7 @@ export function registerRoutingTools(
                   Authorization: `Bearer ${key.fullKey}`,
                   'Content-Type': 'application/json',
                   ...(surface === 'messages' ? { 'anthropic-version': '2023-06-01' } : {}),
-                  ...(tier ? { 'x-manifest-tier': tier } : {}),
+                  ...(tierHeader ? { [tierHeader.key]: tierHeader.value } : {}),
                 },
                 body: JSON.stringify(body),
                 signal: controller.signal,
@@ -403,6 +426,7 @@ export function registerRoutingTools(
               ...(platform ? { platform } : {}),
               requested_model: requestedModel,
               ...(tier ? { tier } : {}),
+              ...(tierHeader ? { tier_header: `${tierHeader.key}: ${tierHeader.value}` } : {}),
               served_model: surfaceResult.servedModel,
               duration_ms: durationMs,
               ...(surfaceResult.tokens !== undefined ? { tokens: surfaceResult.tokens } : {}),
@@ -505,7 +529,7 @@ export function registerRoutingTools(
                   hit ??
                   (await deps.headerTiers.create(agent.id, agent.tenant_id, {
                     name: tier,
-                    header_key: 'x-manifest-tier',
+                    header_key: 'x-thinker-tier',
                     header_value: tier,
                     badge_color: 'indigo' as never,
                   }));

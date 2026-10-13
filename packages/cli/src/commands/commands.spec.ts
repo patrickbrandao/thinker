@@ -691,7 +691,7 @@ describe('agent commands', () => {
       await run(io, ['agent', 'create', '--name', 'kept', '--platform', 'curl', '--if-absent']),
     ).toBe(0);
     expect((io.lastJson() as { setup: string }).setup).toContain(
-      'openclaw config set models.providers.manifest',
+      'openclaw config set models.providers.thinker',
     );
   });
 
@@ -780,7 +780,7 @@ describe('agent commands', () => {
     ]);
     expect(await run(io, ['agent', 'setup', 'bot'])).toBe(0);
     const out = io.lastJson() as { setup: string; hint?: string };
-    expect(out.setup).toContain('openclaw config set models.providers.manifest');
+    expect(out.setup).toContain('openclaw config set models.providers.thinker');
     expect(out.setup).toContain(`${HOST}/v1`);
     expect(out.setup).toContain(
       `<MNFST_AGENT_KEY — run: mnfst agent key show bot --raw --url ${HOST}>`,
@@ -1829,7 +1829,7 @@ describe('routing test', () => {
         'grok-4.5',
       ]),
     ).toBe(0);
-    expect(calls[0].headers['x-manifest-tier']).toBe('thorough');
+    expect(calls[0].headers['x-thinker-tier']).toBe('thorough');
     const body = JSON.parse(calls[0].body!);
     expect(body.model).toBe('grok-4.5');
     expect(body.messages[0].content).toBe('custom ping');
@@ -2176,7 +2176,7 @@ describe('routing commands', () => {
           {
             id: 'ht-1',
             name: 'deep',
-            header_key: 'x-manifest-tier',
+            header_key: 'x-thinker-tier',
             header_value: 'deep',
             enabled: true,
             override_route: { model: 'grok-4.5' },
@@ -2204,7 +2204,7 @@ describe('routing commands', () => {
       custom_tiers: [
         {
           name: 'deep',
-          trigger: 'x-manifest-tier: deep',
+          trigger: 'x-thinker-tier: deep',
           enabled: true,
           route: { model: 'grok-4.5' },
           fallbacks: [],
@@ -2320,7 +2320,7 @@ describe('routing commands', () => {
     ).toBe(0);
     expect(JSON.parse(calls2[2].body!)).toEqual({
       name: 'heavy',
-      header_key: 'x-manifest-tier',
+      header_key: 'x-thinker-tier',
       header_value: 'heavy',
       badge_color: 'indigo',
     });
@@ -2570,7 +2570,7 @@ describe('routing commands', () => {
     expect(calls[1].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
     expect(JSON.parse(calls[1].body!)).toEqual({
       name: 'test',
-      header_key: 'x-manifest-tier',
+      header_key: 'x-thinker-tier',
       header_value: 'test',
       badge_color: 'indigo',
     });

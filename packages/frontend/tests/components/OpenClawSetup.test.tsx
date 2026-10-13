@@ -18,9 +18,9 @@ describe("OpenClawSetup", () => {
     vi.clearAllMocks();
   });
 
-  it("renders description with manifest/auto model", () => {
+  it("renders description with thinker/auto model", () => {
     const { container } = render(() => <OpenClawSetup {...defaultProps} />);
-    expect(container.textContent).toContain("manifest/auto");
+    expect(container.textContent).toContain("thinker/auto");
   });
 
   it("renders CLI and Interactive wizard tabs", () => {
@@ -54,7 +54,7 @@ describe("OpenClawSetup", () => {
 
   it("shows masked key placeholder when no apiKey or keyPrefix", () => {
     const { container } = render(() => <OpenClawSetup {...defaultProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("shows key prefix when keyPrefix provided", () => {
@@ -130,7 +130,7 @@ describe("OpenClawSetup", () => {
     expect(fields[3].textContent).toContain("Model ID");
     expect(fields[3].textContent).toContain("auto");
     expect(fields[4].textContent).toContain("Endpoint ID");
-    expect(fields[4].textContent).toContain("manifest");
+    expect(fields[4].textContent).toContain("thinker");
   });
 
   it("shows eye toggle on wizard API Key field when apiKey provided", () => {

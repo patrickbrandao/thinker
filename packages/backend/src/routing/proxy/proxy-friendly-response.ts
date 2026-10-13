@@ -58,8 +58,8 @@ export function buildFriendlyResponse(
 
   const meta: FriendlyResult['meta'] = {
     tier: 'simple' as Tier,
-    model: 'manifest',
-    provider: 'manifest',
+    model: 'thinker',
+    provider: 'thinker',
     confidence: 1,
     reason,
     response_mode: stream ? 'stream' : 'buffered',
@@ -72,7 +72,7 @@ export function buildFriendlyResponse(
       id,
       object: 'chat.completion.chunk',
       created,
-      model: 'manifest',
+      model: 'thinker',
       choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }],
     };
     const ssePayload = `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`;
@@ -101,7 +101,7 @@ export function buildFriendlyResponse(
     id,
     object: 'chat.completion',
     created,
-    model: 'manifest',
+    model: 'thinker',
     choices: [
       {
         index: 0,
@@ -139,7 +139,7 @@ export function sendFriendlyResponse(res: ExpressResponse, content: string, stre
       id,
       object: 'chat.completion.chunk',
       created,
-      model: 'manifest',
+      model: 'thinker',
       choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }],
     };
     const ssePayload = `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`;
@@ -152,7 +152,7 @@ export function sendFriendlyResponse(res: ExpressResponse, content: string, stre
       id,
       object: 'chat.completion',
       created,
-      model: 'manifest',
+      model: 'thinker',
       choices: [
         {
           index: 0,

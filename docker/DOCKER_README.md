@@ -6,7 +6,7 @@
   </picture>
 </p>
 <p align="center">
-  <a href="https://hub.docker.com/r/manifestdotbuild/manifest"><img src="https://img.shields.io/docker/pulls/manifestdotbuild/manifest?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
+  <a href="https://hub.docker.com/r/tmsoftbrasil/thinker"><img src="https://img.shields.io/docker/pulls/tmsoftbrasil/thinker?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
   &nbsp;
   <a href="https://github.com/mnfst/llm-gateway/stargazers"><img src="https://img.shields.io/github/stars/mnfst/llm-gateway?style=flat" alt="GitHub stars" /></a>
   &nbsp;
@@ -121,14 +121,14 @@ cp .env.example .env
 ```
 
 2. Open `.env` in your editor and set `BETTER_AUTH_SECRET` and
-   `MANIFEST_ENCRYPTION_KEY` to two **different** random strings. Generate each with:
+   `THINKER_ENCRYPTION_KEY` to two **different** random strings. Generate each with:
 
 ```bash
 openssl rand -hex 32
 ```
 
-`MANIFEST_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
-request recordings Manifest stores; the rest of the database is not encrypted
+`THINKER_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
+request recordings Thinker stores; the rest of the database is not encrypted
 by it. Left unset it falls back to `BETTER_AUTH_SECRET`, which means one leaked
 session-signing secret also decrypts every stored credential and recording.
 Set it before first boot.
@@ -170,7 +170,7 @@ docker run -d \
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest \
   -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
   -e BETTER_AUTH_URL=http://localhost:2099 \
-  manifestdotbuild/manifest
+  tmsoftbrasil/thinker
 ```
 
 </details>
@@ -186,7 +186,7 @@ docker run -d `
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest `
   -e BETTER_AUTH_SECRET=$secret `
   -e BETTER_AUTH_URL=http://localhost:2099 `
-  manifestdotbuild/manifest
+  tmsoftbrasil/thinker
 ```
 
 </details>
@@ -202,7 +202,7 @@ docker run -d ^
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest ^
   -e BETTER_AUTH_SECRET=<your-64-char-secret> ^
   -e BETTER_AUTH_URL=http://localhost:2099 ^
-  manifestdotbuild/manifest
+  tmsoftbrasil/thinker
 ```
 
 </details>
@@ -246,7 +246,7 @@ three you are most likely to hit on a fresh install.
 Published images are signed with cosign keyless signing (Sigstore). Verify before pulling:
 
 ```bash
-cosign verify manifestdotbuild/manifest:<version> \
+cosign verify tmsoftbrasil/thinker:<version> \
   --certificate-identity-regexp="^https://github.com/mnfst/llm-gateway/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 ```
@@ -310,7 +310,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific major version (e.g. `manifestdotbuild/manifest:6`) in `docker-compose.yml` if you want control over when major upgrades happen.
+Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific minor version (e.g. `tmsoftbrasil/thinker:0.1`) in `docker-compose.yml` if you want control over when upgrades happen.
 
 ## Backup & persistence
 
@@ -408,12 +408,12 @@ refused, including when a hostname starts resolving to them after it was saved.
 | ---------------------------------- | ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                     | Yes         | --                                           | PostgreSQL connection string                                                                                                                                                                               |
 | `BETTER_AUTH_SECRET`               | Yes         | --                                           | Session signing secret (min 32 chars)                                                                                                                                                                      |
-| `MANIFEST_ENCRYPTION_KEY`          | Recommended | falls back to `BETTER_AUTH_SECRET`           | Separate 32+ char key encrypting stored provider keys and OAuth tokens. The install script generates one; set it before first boot, since introducing it later means re-encrypting what is already stored. |
+| `THINKER_ENCRYPTION_KEY`          | Recommended | falls back to `BETTER_AUTH_SECRET`           | Separate 32+ char key encrypting stored provider keys and OAuth tokens. The install script generates one; set it before first boot, since introducing it later means re-encrypting what is already stored. |
 | `BETTER_AUTH_URL`                  | No          | `http://localhost:${PORT}`                   | Public URL. Must match the URL in the browser                                                                                                                                                              |
 | `PORT`                             | No          | `2099`                                       | Dashboard port — sets both the published host port and the internal listener                                                                                                                               |
 | `OLLAMA_HOST`                      | No          | `http://host.docker.internal:11434`          | Ollama endpoint for the built-in tile. Override to point at a LAN-hosted Ollama.                                                                                                                           |
 | `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
-| `MANIFEST_DISABLE_HSTS`            | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
+| `THINKER_DISABLE_HSTS`             | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
 | `THINKER_CATALOG_SYNC`             | No          | `true`                                       | Set `false` to stop fetching the public model catalogs (see [No telemetry](#no-telemetry)). Costs then come from the bundled data only, so most models show $0                                                |
 | `DB_POOL_MAX` / `AUTH_DB_POOL_MAX` | No          | `10` / `5`                                   | PostgreSQL pool sizes (app pool, Better Auth pool)                                                                                                                                                         |

@@ -115,7 +115,7 @@ describe('CliAuthService', () => {
     const { service, codeRepo, apiKeyRepo } = makeService();
     codeRepo.findOne.mockResolvedValue(storedRow());
     const { token, expiresAt } = await service.exchange('rawcode', 's1-abcdef1234567890', VERIFIER);
-    expect(token).toMatch(/^mnfst_pat_/);
+    expect(token).toMatch(/^thk_pat_/);
     expect(codeRepo.delete).toHaveBeenCalledWith(expect.anything(), { id: 'row1' });
     const key = apiKeyRepo.insert.mock.calls[0][1];
     expect(key.name).toBe('cli');
@@ -221,11 +221,11 @@ describe('CliAuthService', () => {
   it('revokeByRawKey deletes only a matching cli-named key', async () => {
     const { service, apiKeyRepo } = makeService();
     apiKeyRepo.find.mockResolvedValue([
-      { id: 'k1', key_hash: hashKey('mnfst_pat_abc'), name: 'cli' },
+      { id: 'k1', key_hash: hashKey('thk_pat_abc'), name: 'cli' },
     ]);
-    await expect(service.revokeByRawKey('mnfst_pat_abc')).resolves.toEqual({ revoked: true });
+    await expect(service.revokeByRawKey('thk_pat_abc')).resolves.toEqual({ revoked: true });
     expect(apiKeyRepo.find).toHaveBeenCalledWith({
-      where: { key_prefix: 'mnfst_pat_ab', name: 'cli' },
+      where: { key_prefix: 'thk_pat_abc', name: 'cli' },
     });
     expect(apiKeyRepo.delete).toHaveBeenCalledWith({ id: 'k1' });
   });
@@ -233,7 +233,7 @@ describe('CliAuthService', () => {
   it('revokeByRawKey is a no-op for unknown keys', async () => {
     const { service, apiKeyRepo } = makeService();
     apiKeyRepo.find.mockResolvedValue([]);
-    await expect(service.revokeByRawKey('mnfst_pat_zzz')).resolves.toEqual({ revoked: false });
+    await expect(service.revokeByRawKey('thk_pat_zzz')).resolves.toEqual({ revoked: false });
     expect(apiKeyRepo.delete).not.toHaveBeenCalled();
   });
 });

@@ -43,8 +43,21 @@ describe('scrubSecrets', () => {
     expect(out).toContain('[REDACTED]');
   });
 
-  it('redacts Manifest mnfst_ keys', () => {
-    const out = scrubSecrets('bad token mnfst_abcdefghij12345');
+  it('redacts Thinker thk_ agent keys', () => {
+    const out = scrubSecrets('bad token thk_abcdefghij12345');
+    expect(out).not.toContain('abcdefghij12345');
+    expect(out).toContain('[REDACTED]');
+  });
+
+  it('redacts a generated thk_ key (43 base64url chars) embedded in prose', () => {
+    const key = 'thk_' + 'Ab3-_'.repeat(8) + 'xyz';
+    const out = scrubSecrets(`Incorrect API key provided: ${key}. Check your key.`);
+    expect(out).not.toContain(key.slice(4));
+    expect(out).toBe('Incorrect API key provided: [REDACTED]. Check your key.');
+  });
+
+  it('redacts CLI thk_pat_ personal access tokens', () => {
+    const out = scrubSecrets('token=thk_pat_abcdefghij12345 rejected');
     expect(out).not.toContain('abcdefghij12345');
     expect(out).toContain('[REDACTED]');
   });

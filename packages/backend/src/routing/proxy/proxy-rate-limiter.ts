@@ -20,13 +20,13 @@ export class ProxyRateLimiter implements OnModuleDestroy {
   private readonly ipRates = new Map<string, RateEntry>();
   private readonly concurrency = new Map<string, number>();
   private readonly concurrencyMax =
-    optionalPositiveInteger(process.env.MANIFEST_CONCURRENCY_MAX) ?? DEFAULT_CONCURRENCY_MAX;
+    optionalPositiveInteger(process.env.THINKER_CONCURRENCY_MAX) ?? DEFAULT_CONCURRENCY_MAX;
   // Operator overrides must be plain positive integers; anything else keeps
   // the default so a typo in .env can never disable a guardrail.
   private readonly rateMaxRequests =
-    optionalPositiveInteger(process.env.MANIFEST_RATE_MAX_REQUESTS) ?? DEFAULT_RATE_MAX_REQUESTS;
+    optionalPositiveInteger(process.env.THINKER_RATE_MAX_REQUESTS) ?? DEFAULT_RATE_MAX_REQUESTS;
   private readonly ipRateMaxRequests =
-    optionalPositiveInteger(process.env.MANIFEST_IP_RATE_MAX_REQUESTS) ??
+    optionalPositiveInteger(process.env.THINKER_IP_RATE_MAX_REQUESTS) ??
     DEFAULT_IP_RATE_MAX_REQUESTS;
   private readonly cleanupTimer: ReturnType<typeof setInterval>;
 

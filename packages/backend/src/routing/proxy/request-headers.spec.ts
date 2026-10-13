@@ -8,7 +8,7 @@ describe('sanitizeRequestHeaders', () => {
   it('returns null when every header is empty or sensitive', () => {
     expect(
       sanitizeRequestHeaders({
-        authorization: 'Bearer mnfst_secret',
+        authorization: 'Bearer thk_secret',
         cookie: 'session=abc',
         'x-blank': '   ',
       }),
@@ -31,7 +31,7 @@ describe('sanitizeRequestHeaders', () => {
 
   it('drops sensitive headers regardless of casing', () => {
     const result = sanitizeRequestHeaders({
-      Authorization: 'Bearer mnfst_secret',
+      Authorization: 'Bearer thk_secret',
       Cookie: 'session=abc',
       'Set-Cookie': 'x=y',
       'Proxy-Authorization': 'Basic xxx',

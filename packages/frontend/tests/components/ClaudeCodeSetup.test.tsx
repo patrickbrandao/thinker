@@ -62,9 +62,9 @@ describe("ClaudeCodeSetup", () => {
     expect(container.querySelector('[aria-label="Hide API key"]')).toBeNull();
   });
 
-  it("uses 'mnfst_YOUR_KEY' placeholder when neither full key nor prefix is set", () => {
+  it("uses 'thk_YOUR_KEY' placeholder when neither full key nor prefix is set", () => {
     const { container } = render(() => <ClaudeCodeSetup {...baseProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("toggles the API key reveal when the eye button is clicked", () => {

@@ -1004,7 +1004,7 @@ export class ProxyService {
     }
 
     // All fallbacks exhausted — preserve the primary provider's real HTTP status.
-    // The gateway uses the X-Manifest-Fallback-Exhausted header (set by the
+    // The gateway uses the X-Thinker-Fallback-Exhausted header (set by the
     // response handler) to detect this case.
     const safeHeaders = new Headers(forward.response.headers);
     safeHeaders.delete('content-encoding');

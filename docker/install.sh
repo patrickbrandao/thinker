@@ -2,7 +2,7 @@
 # Manifest — self-host install and upgrade helper
 #
 # Downloads the Docker Compose file and the `.env.example` template,
-# generates a BETTER_AUTH_SECRET and a MANIFEST_ENCRYPTION_KEY, writes them
+# generates a BETTER_AUTH_SECRET and a THINKER_ENCRYPTION_KEY, writes them
 # into a local `.env`, then brings up the stack. Designed for first-time
 # self-hosters who want a one-command setup. Give it a couple of minutes —
 # Docker needs to pull the app image and Postgres on a cold cache.
@@ -280,12 +280,12 @@ else
       || die "Failed to download .env.example"
   fi
 
-  log "Generating BETTER_AUTH_SECRET and MANIFEST_ENCRYPTION_KEY"
+  log "Generating BETTER_AUTH_SECRET and THINKER_ENCRYPTION_KEY"
   if [[ "$DRY_RUN" -eq 1 ]]; then
     SECRET="<generated-at-install-time>"
     ENCRYPTION_KEY="<generated-at-install-time>"
     printf '    \033[2m$ openssl rand -hex 32   # BETTER_AUTH_SECRET\033[0m\n'
-    printf '    \033[2m$ openssl rand -hex 32   # MANIFEST_ENCRYPTION_KEY\033[0m\n'
+    printf '    \033[2m$ openssl rand -hex 32   # THINKER_ENCRYPTION_KEY\033[0m\n'
   else
     SECRET="$(gen_secret)"
     # A second, independent key. Left unset the backend falls back to
@@ -300,13 +300,13 @@ else
   log "Writing secrets into .env"
   if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '    \033[2m$ replace "BETTER_AUTH_SECRET=" → "BETTER_AUTH_SECRET=<generated>" in %s\033[0m\n' "$ENV_PATH"
-    printf '    \033[2m$ replace "# MANIFEST_ENCRYPTION_KEY=" → "MANIFEST_ENCRYPTION_KEY=<generated>" in %s\033[0m\n' "$ENV_PATH"
+    printf '    \033[2m$ replace "# THINKER_ENCRYPTION_KEY=" → "THINKER_ENCRYPTION_KEY=<generated>" in %s\033[0m\n' "$ENV_PATH"
   else
     if ! grep -qE '^BETTER_AUTH_SECRET=$' "$ENV_PATH"; then
       die "Expected empty BETTER_AUTH_SECRET= line not found in $ENV_PATH — refusing to proceed."
     fi
-    if ! grep -qE '^# MANIFEST_ENCRYPTION_KEY=$' "$ENV_PATH"; then
-      die "Expected commented # MANIFEST_ENCRYPTION_KEY= line not found in $ENV_PATH — refusing to proceed."
+    if ! grep -qE '^# THINKER_ENCRYPTION_KEY=$' "$ENV_PATH"; then
+      die "Expected commented # THINKER_ENCRYPTION_KEY= line not found in $ENV_PATH — refusing to proceed."
     fi
     # Line-based rewrite — no sed, no quoting edge cases. openssl rand -hex
     # produces only [0-9a-f], so interpolation into the line is safe.
@@ -314,8 +314,8 @@ else
     while IFS= read -r line || [[ -n "$line" ]]; do
       if [[ "$line" == "BETTER_AUTH_SECRET=" ]]; then
         new_content+="BETTER_AUTH_SECRET=$SECRET"$'\n'
-      elif [[ "$line" == "# MANIFEST_ENCRYPTION_KEY=" ]]; then
-        new_content+="MANIFEST_ENCRYPTION_KEY=$ENCRYPTION_KEY"$'\n'
+      elif [[ "$line" == "# THINKER_ENCRYPTION_KEY=" ]]; then
+        new_content+="THINKER_ENCRYPTION_KEY=$ENCRYPTION_KEY"$'\n'
       else
         new_content+="$line"$'\n'
       fi
@@ -386,7 +386,7 @@ EOF
   Next:   1. Create your admin account — the first visit walks you through it.
           2. Connect a provider: Providers → Usage-based (API key) or
              Subscriptions, in the dashboard sidebar.
-          3. Copy your agent's mnfst_ key and point your agent at
+          3. Copy your agent's thk_ key and point your agent at
              http://localhost:${HOST_PORT}/v1
 
   Config: $INSTALL_DIR/.env  (secrets, OAuth keys, email provider)

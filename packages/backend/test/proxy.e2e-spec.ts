@@ -188,7 +188,7 @@ describe('Proxy E2E — /v1/models', () => {
     expect(res.body).toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         { id: 'openai/gpt-4o-mini', object: 'model', created: 0, owned_by: 'openai' },
       ],
     });
@@ -315,9 +315,9 @@ describe('Proxy E2E — /v1/chat/completions', () => {
       .expect(200);
 
     expect(res.body.choices[0].message.content).toBe('Hello from the loopback mock.');
-    expect(res.headers['x-manifest-tier']).toBeDefined();
-    expect(res.headers['x-manifest-model']).toBe('gpt-4o-mini');
-    expect(res.headers['x-manifest-provider']).toBe('openai');
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBe('gpt-4o-mini');
+    expect(res.headers['x-thinker-provider']).toBe('openai');
 
     const forwarded = upstreamCalls.filter((c) => c.path === '/v1/chat/completions');
     expect(forwarded).toHaveLength(1);
@@ -342,7 +342,7 @@ describe('Proxy E2E — /v1/chat/completions', () => {
     expect(res.body?.error).toBeUndefined();
   });
 
-  it('includes X-Manifest-* headers when forwarding', async () => {
+  it('includes X-Thinker-* headers when forwarding', async () => {
     const res = await bearer(api().post('/v1/chat/completions'))
       .send({
         messages: [{ role: 'user', content: 'hello' }],
@@ -350,10 +350,10 @@ describe('Proxy E2E — /v1/chat/completions', () => {
       })
       .expect(200);
 
-    expect(res.headers['x-manifest-tier']).toBeDefined();
-    expect(res.headers['x-manifest-model']).toBeDefined();
-    expect(res.headers['x-manifest-provider']).toBeDefined();
-    expect(res.headers['x-manifest-confidence']).toBeDefined();
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBeDefined();
+    expect(res.headers['x-thinker-provider']).toBeDefined();
+    expect(res.headers['x-thinker-confidence']).toBeDefined();
   });
 
   it('accepts X-Session-Key header without error', async () => {
@@ -383,9 +383,9 @@ describe('Proxy E2E — /v1/chat/completions', () => {
       })
       .expect(401);
 
-    expect(res.headers['x-manifest-tier']).toBeDefined();
-    expect(res.headers['x-manifest-model']).toBe('gpt-4o-mini');
-    expect(res.headers['x-manifest-provider']).toBe('openai');
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBe('gpt-4o-mini');
+    expect(res.headers['x-thinker-provider']).toBe('openai');
     expect(res.body?.error?.status).toBe(401);
     expect(res.body?.error?.source).toBe('provider');
     expect(res.body?.error?.type).not.toBe('auth_error');

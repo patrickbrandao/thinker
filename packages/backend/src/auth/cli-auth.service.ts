@@ -11,7 +11,7 @@ import { toLocalSqlTimestamp } from '../common/utils/postgres-sql';
 
 export const CLI_KEY_NAME = 'cli';
 export const CODE_TTL_MS = 5 * 60 * 1000;
-const PAT_PREFIX = 'mnfst_pat_';
+const PAT_PREFIX = 'thk_pat_';
 
 const INVALID_CODE = 'Invalid or expired authorization code';
 

@@ -86,7 +86,7 @@ const STICKY_BIAS = 2;
  *
  * @param allMatches        Trie matches from the scoring pipeline
  * @param tools             Tool definitions from the request (optional)
- * @param headerOverride    Explicit category from x-manifest-specificity header
+ * @param headerOverride    Explicit category from x-thinker-specificity header
  * @param thresholdOverride Uniform threshold override (mainly for tests)
  * @param text              Raw user text used for structural signal detection
  */

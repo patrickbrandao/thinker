@@ -1114,7 +1114,7 @@ describe('ProxyService — orchestration', () => {
       await svc.proxyRequest(
         baseOpts({
           body: { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }] },
-          headers: { 'x-manifest-tag': 'groceries' },
+          headers: { 'x-thinker-tag': 'groceries' },
         }),
       );
 
@@ -1131,7 +1131,7 @@ describe('ProxyService — orchestration', () => {
       await svc.proxyRequest(
         baseOpts({
           body: { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }] },
-          headers: { 'x-manifest-tag': 'unmatched' },
+          headers: { 'x-thinker-tag': 'unmatched' },
         }),
       );
 

@@ -1,11 +1,11 @@
 import { HttpStatus } from '@nestjs/common';
-import { classifyMessageError, MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
-import { MANIFEST_ERRORS, type ManifestErrorCode } from '../error-codes';
+import { classifyMessageError, THINKER_ERROR_ORIGINS } from 'thinker-shared';
+import { THINKER_ERRORS, type ManifestErrorCode } from '../error-codes';
 import {
-  MANIFEST_BLOCKED_REQUEST_REASONS,
-  MANIFEST_CODE_TO_REASON,
+  THINKER_BLOCKED_REQUEST_REASONS,
+  THINKER_CODE_TO_REASON,
   ManifestError,
-  UNRECORDABLE_MANIFEST_CODES,
+  UNRECORDABLE_THINKER_CODES,
   isRecordableManifestCode,
 } from '../manifest-error';
 
@@ -32,41 +32,41 @@ describe('ManifestError', () => {
 });
 
 describe('every documented error code is accounted for', () => {
-  const allCodes = Object.keys(MANIFEST_ERRORS) as ManifestErrorCode[];
+  const allCodes = Object.keys(THINKER_ERRORS) as ManifestErrorCode[];
 
   // The guardrail: a new M### either maps to a recorder reason or is explicitly
   // declared unrecordable. Neither is a silent option.
   it.each(allCodes)('%s is either recordable or explicitly unrecordable', (code) => {
     const recordable = isRecordableManifestCode(code);
-    const declaredUnrecordable = (UNRECORDABLE_MANIFEST_CODES as readonly string[]).includes(code);
+    const declaredUnrecordable = (UNRECORDABLE_THINKER_CODES as readonly string[]).includes(code);
 
     expect(recordable || declaredUnrecordable).toBe(true);
     if (recordable) {
-      expect(MANIFEST_CODE_TO_REASON[code]).toBeDefined();
+      expect(THINKER_CODE_TO_REASON[code]).toBeDefined();
     }
   });
 
   it('only the pre-authentication auth failures are unrecordable', () => {
-    expect(UNRECORDABLE_MANIFEST_CODES).toEqual(['M001', 'M002', 'M003', 'M005', 'M006']);
+    expect(UNRECORDABLE_THINKER_CODES).toEqual(['M001', 'M002', 'M003', 'M005', 'M006']);
     // M004 resolves an agent before rejecting, so it must stay recordable.
     expect(isRecordableManifestCode('M004')).toBe(true);
   });
 
   it('maps every recordable code onto a declared reason', () => {
-    for (const reason of Object.values(MANIFEST_CODE_TO_REASON)) {
-      expect(MANIFEST_BLOCKED_REQUEST_REASONS).toContain(reason);
+    for (const reason of Object.values(THINKER_CODE_TO_REASON)) {
+      expect(THINKER_BLOCKED_REQUEST_REASONS).toContain(reason);
     }
   });
 
   it('classifies every reason as a Manifest origin, never a provider fault', () => {
-    for (const reason of MANIFEST_BLOCKED_REQUEST_REASONS) {
+    for (const reason of THINKER_BLOCKED_REQUEST_REASONS) {
       const { error_origin, error_class } = classifyMessageError({
         status: 'error',
         routingReason: reason,
       });
 
       expect(error_origin).not.toBeNull();
-      expect(MANIFEST_ERROR_ORIGINS).toContain(error_origin!);
+      expect(THINKER_ERROR_ORIGINS).toContain(error_origin!);
       expect(error_class).not.toBeNull();
     }
   });
@@ -75,7 +75,7 @@ describe('every documented error code is accounted for', () => {
     const { error_origin, error_class } = classifyMessageError({
       status: 'error',
       errorHttpStatus: 400,
-      routingReason: MANIFEST_CODE_TO_REASON.M300,
+      routingReason: THINKER_CODE_TO_REASON.M300,
     });
 
     expect(error_origin).toBe('request');
@@ -85,7 +85,7 @@ describe('every documented error code is accounted for', () => {
   it('puts an unavailable explicit model on the request origin, not config', () => {
     const { error_origin, error_class } = classifyMessageError({
       status: 'error',
-      routingReason: MANIFEST_CODE_TO_REASON.M302,
+      routingReason: THINKER_CODE_TO_REASON.M302,
     });
 
     expect(error_origin).toBe('request');
@@ -106,21 +106,21 @@ describe('every documented error code is accounted for', () => {
     const { error_origin } = classifyMessageError({
       status: 'error',
       errorHttpStatus: 500,
-      routingReason: MANIFEST_CODE_TO_REASON.M500,
+      routingReason: THINKER_CODE_TO_REASON.M500,
     });
 
     expect(error_origin).toBe('internal');
   });
 
   it('separates the three rate limits instead of collapsing them', () => {
-    expect(MANIFEST_CODE_TO_REASON.M201).toBe('manifest_rate_limited');
-    expect(MANIFEST_CODE_TO_REASON.M202).toBe('manifest_ip_rate_limited');
-    expect(MANIFEST_CODE_TO_REASON.M203).toBe('manifest_concurrency_limited');
+    expect(THINKER_CODE_TO_REASON.M201).toBe('manifest_rate_limited');
+    expect(THINKER_CODE_TO_REASON.M202).toBe('manifest_ip_rate_limited');
+    expect(THINKER_CODE_TO_REASON.M203).toBe('manifest_concurrency_limited');
 
     const reasons = [
-      MANIFEST_CODE_TO_REASON.M201,
-      MANIFEST_CODE_TO_REASON.M202,
-      MANIFEST_CODE_TO_REASON.M203,
+      THINKER_CODE_TO_REASON.M201,
+      THINKER_CODE_TO_REASON.M202,
+      THINKER_CODE_TO_REASON.M203,
     ];
     expect(new Set(reasons).size).toBe(3);
     for (const reason of reasons) {
@@ -137,7 +137,7 @@ describe('every documented error code is accounted for', () => {
     const { error_origin, error_class } = classifyMessageError({
       status: 'error',
       errorHttpStatus: 401,
-      routingReason: MANIFEST_CODE_TO_REASON.M004,
+      routingReason: THINKER_CODE_TO_REASON.M004,
     });
 
     expect(error_origin).toBe('config');

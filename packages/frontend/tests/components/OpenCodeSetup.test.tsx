@@ -26,7 +26,7 @@ describe("OpenCodeSetup", () => {
     expect(container.textContent).toContain("~/.config/opencode/opencode.json");
     expect(container.textContent).not.toContain("project root");
     expect(container.textContent).toContain('"baseURL": "http://localhost:38240/v1"');
-    expect(container.textContent).toContain('"apiKey": "mnfst_YOUR_KEY"');
+    expect(container.textContent).toContain('"apiKey": "thk_YOUR_KEY"');
     expect(container.textContent).not.toContain('"apiKey": "mnfst_live..."');
     expect(container.textContent).toContain('"model": "manifest/auto"');
     expect(screen.queryByLabelText("Reveal API key")).toBeNull();
@@ -37,7 +37,7 @@ describe("OpenCodeSetup", () => {
     expect(copyConfig).not.toBeNull();
     fireEvent.click(copyConfig!);
     await vi.waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "mnfst_YOUR_KEY"'));
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "thk_YOUR_KEY"'));
     });
     expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining("mnfst_live..."));
   });

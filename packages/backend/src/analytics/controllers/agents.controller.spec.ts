@@ -45,10 +45,10 @@ describe('AgentsController', () => {
     mockOnboardAgent = jest.fn().mockResolvedValue({
       tenantId: 'tenant-123',
       agentId: 'new-agent-id',
-      apiKey: 'mnfst_new_agent_key',
+      apiKey: 'thk_new_agent_key',
     });
-    mockGetKeyForAgent = jest.fn().mockResolvedValue({ keyPrefix: 'mnfst_test1234' });
-    mockRotateKey = jest.fn().mockResolvedValue({ apiKey: 'mnfst_new_key_123' });
+    mockGetKeyForAgent = jest.fn().mockResolvedValue({ keyPrefix: 'thk_test1234' });
+    mockRotateKey = jest.fn().mockResolvedValue({ apiKey: 'thk_new_key_123' });
     mockConfigGet = jest.fn().mockReturnValue('');
     mockDeleteAgent = jest.fn().mockResolvedValue(undefined);
     mockRenameAgent = jest.fn().mockResolvedValue(undefined);
@@ -61,7 +61,7 @@ describe('AgentsController', () => {
       agentId: 'new-id',
       agentName: 'bot-copy',
       displayName: 'bot-copy',
-      apiKey: 'mnfst_new',
+      apiKey: 'thk_new',
       copied: {
         providers: 1,
         tierAssignments: 2,
@@ -184,35 +184,35 @@ describe('AgentsController', () => {
   it('returns agent key prefix', async () => {
     const result = await controller.getAgentKey(ctx as never, 'bot-1');
 
-    expect(result).toMatchObject({ keyPrefix: 'mnfst_test1234' });
+    expect(result).toMatchObject({ keyPrefix: 'thk_test1234' });
     expect(mockGetKeyForAgent).toHaveBeenCalledWith('tenant-123', 'bot-1');
   });
 
   it('returns full apiKey when service returns fullKey', async () => {
     mockGetKeyForAgent.mockResolvedValueOnce({
-      keyPrefix: 'mnfst_test1234',
-      fullKey: 'mnfst_full_decrypted',
+      keyPrefix: 'thk_test1234',
+      fullKey: 'thk_full_decrypted',
     });
     const result = await controller.getAgentKey(ctx as never, 'bot-1');
 
-    expect(result).toMatchObject({ keyPrefix: 'mnfst_test1234', apiKey: 'mnfst_full_decrypted' });
+    expect(result).toMatchObject({ keyPrefix: 'thk_test1234', apiKey: 'thk_full_decrypted' });
   });
 
   it('returns full apiKey when service returns fullKey (persistent mock)', async () => {
     mockGetKeyForAgent.mockResolvedValue({
-      keyPrefix: 'mnfst_test1234',
-      fullKey: 'mnfst_full_decrypted',
+      keyPrefix: 'thk_test1234',
+      fullKey: 'thk_full_decrypted',
     });
     const result = await controller.getAgentKey(ctx as never, 'bot-1');
 
-    expect(result).toMatchObject({ keyPrefix: 'mnfst_test1234', apiKey: 'mnfst_full_decrypted' });
+    expect(result).toMatchObject({ keyPrefix: 'thk_test1234', apiKey: 'thk_full_decrypted' });
   });
 
   it('does not return apiKey when service returns no fullKey', async () => {
-    mockGetKeyForAgent.mockResolvedValue({ keyPrefix: 'mnfst_test1234' });
+    mockGetKeyForAgent.mockResolvedValue({ keyPrefix: 'thk_test1234' });
     const result = await controller.getAgentKey(ctx as never, 'bot-1');
 
-    expect(result).toMatchObject({ keyPrefix: 'mnfst_test1234' });
+    expect(result).toMatchObject({ keyPrefix: 'thk_test1234' });
     expect(result).not.toHaveProperty('apiKey');
   });
 
@@ -227,7 +227,7 @@ describe('AgentsController', () => {
   it('rotates agent key and returns new raw key', async () => {
     const result = await controller.rotateAgentKey(ctx as never, 'bot-1');
 
-    expect(result).toEqual({ apiKey: 'mnfst_new_key_123' });
+    expect(result).toEqual({ apiKey: 'thk_new_key_123' });
     expect(mockRotateKey).toHaveBeenCalledWith('tenant-123', 'bot-1');
   });
 
@@ -283,7 +283,7 @@ describe('AgentsController', () => {
     const mockOnboard = jest.fn().mockResolvedValue({
       tenantId: 't1',
       agentId: 'a1',
-      apiKey: 'mnfst_key',
+      apiKey: 'thk_key',
     });
     const module: TestingModule = await Test.createTestingModule({
       imports: [CacheModule.register()],
@@ -344,7 +344,7 @@ describe('AgentsController', () => {
     const mockOnboard = jest.fn().mockResolvedValue({
       tenantId: 't1',
       agentId: 'a1',
-      apiKey: 'mnfst_key',
+      apiKey: 'thk_key',
     });
     const module: TestingModule = await Test.createTestingModule({
       imports: [CacheModule.register()],
@@ -402,7 +402,7 @@ describe('AgentsController', () => {
     const mockOnboard = jest.fn().mockResolvedValue({
       tenantId: 't1',
       agentId: 'a1',
-      apiKey: 'mnfst_key',
+      apiKey: 'thk_key',
     });
     const module: TestingModule = await Test.createTestingModule({
       imports: [CacheModule.register()],
@@ -452,7 +452,7 @@ describe('AgentsController', () => {
     const mockOnboard = jest.fn().mockResolvedValue({
       tenantId: 't1',
       agentId: 'a1',
-      apiKey: 'mnfst_key',
+      apiKey: 'thk_key',
     });
     const mockDelete = jest.fn().mockResolvedValue(undefined);
     const enableErr = new Error('enable boom');
@@ -511,7 +511,7 @@ describe('AgentsController', () => {
     const mockOnboard = jest.fn().mockResolvedValue({
       tenantId: 't1',
       agentId: 'a1',
-      apiKey: 'mnfst_key',
+      apiKey: 'thk_key',
     });
     const module: TestingModule = await Test.createTestingModule({
       imports: [CacheModule.register()],
@@ -658,7 +658,7 @@ describe('AgentsController', () => {
     } as never);
 
     expect(result.agent.name).toBe('bot-copy');
-    expect(result.apiKey).toBe('mnfst_new');
+    expect(result.apiKey).toBe('thk_new');
     expect(result.copied.providers).toBe(1);
     expect(mockDuplicate).toHaveBeenCalledWith('tenant-123', 'bot-1', {
       name: 'bot-copy',

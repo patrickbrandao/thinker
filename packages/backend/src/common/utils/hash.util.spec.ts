@@ -61,7 +61,7 @@ describe('verifyKey', () => {
 
 describe('keyPrefix', () => {
   it('returns first 12 characters', () => {
-    expect(keyPrefix('mnfst_abcdefghij')).toBe('mnfst_abcdef');
+    expect(keyPrefix('thk_abcdefghij')).toBe('thk_abcdefgh');
   });
 
   it('returns full string when shorter than 12 chars', () => {

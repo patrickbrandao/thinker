@@ -58,7 +58,7 @@ describe('isPlaygroundHeaderBlocked', () => {
 
   it.each([
     'X-Thinker-Tier',
-    'X-Manifest-Specificity',
+    'X-Thinker-Specificity',
     'X-Amz-Target',
     'X-Amz-Security-Token',
     'x-amzn-kiro-agent-mode',

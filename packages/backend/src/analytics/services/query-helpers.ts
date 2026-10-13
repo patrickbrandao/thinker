@@ -1,5 +1,5 @@
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
-import { MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
+import { THINKER_ERROR_ORIGINS } from 'thinker-shared';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 
 export interface MetricWithTrend {
@@ -91,7 +91,7 @@ export function sqlCountMessages(alias = 'at'): string {
 }
 
 /** Comma-quoted list of Manifest-originated error origins, e.g. `'config', 'policy', …`. */
-const MANIFEST_ORIGIN_SQL_LIST = MANIFEST_ERROR_ORIGINS.map((o) => `'${o}'`).join(', ');
+const THINKER_ORIGIN_SQL_LIST = THINKER_ERROR_ORIGINS.map((o) => `'${o}'`).join(', ');
 
 /**
  * SQL predicate matching Manifest-originated errors (config / policy / internal
@@ -106,7 +106,7 @@ const MANIFEST_ORIGIN_SQL_LIST = MANIFEST_ERROR_ORIGINS.map((o) => `'${o}'`).joi
  * filter anywhere to bring it back. Every origin is now listed by default;
  * callers narrow with `?origin=`.
  */
-export const MANIFEST_ORIGIN_PREDICATE = `at.error_origin IN (${MANIFEST_ORIGIN_SQL_LIST})`;
+export const THINKER_ORIGIN_PREDICATE = `at.error_origin IN (${THINKER_ORIGIN_SQL_LIST})`;
 
 export function downsample(data: number[], targetLen: number): number[] {
   if (data.length <= targetLen) return data;

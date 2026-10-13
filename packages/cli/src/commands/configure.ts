@@ -146,7 +146,7 @@ async function upsertCustomTier(
   const created = (await client.request('POST', agentPath(agent, '/header-tiers'), {
     body: {
       name,
-      header_key: 'x-manifest-tier',
+      header_key: 'x-thinker-tier',
       header_value: name,
       badge_color: 'indigo',
     },

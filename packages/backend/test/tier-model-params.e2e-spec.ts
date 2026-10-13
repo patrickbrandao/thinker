@@ -26,7 +26,7 @@ beforeAll(async () => {
   );
   await ds.query(
     `INSERT INTO header_tiers (id, tenant_id, agent_id, name, header_key, header_value, badge_color, override_route)
-     VALUES ('ht-deep', $1, $2, 'Deep', 'x-manifest-tier', 'deep', 'indigo', $3::jsonb)`,
+     VALUES ('ht-deep', $1, $2, 'Deep', 'x-thinker-tier', 'deep', 'indigo', $3::jsonb)`,
     [TEST_TENANT_ID, TEST_AGENT_ID, JSON.stringify(FALLBACK)],
   );
   app.get(RoutingCacheService).invalidateAgent(TEST_AGENT_ID);

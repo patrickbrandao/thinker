@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const baseUrl = process.env.MANIFEST_BASE_URL;
+const baseUrl = process.env.THINKER_BASE_URL;
 
 if (!baseUrl) {
-  throw new Error('MANIFEST_BASE_URL is required');
+  throw new Error('THINKER_BASE_URL is required');
 }
 
 async function request(path, { method = 'GET', body, headers = {} } = {}) {
@@ -96,8 +96,8 @@ test('POST /v1/messages remains available', async () => {
 
 // Keys that are well-formed but belong to no agent. They exercise header
 // handling only; no contract run ever holds a real key.
-const UNKNOWN_KEY_A = 'mnfst_contract-unknown-key-a';
-const UNKNOWN_KEY_B = 'mnfst_contract-unknown-key-b';
+const UNKNOWN_KEY_A = 'thk_contract-unknown-key-a';
+const UNKNOWN_KEY_B = 'thk_contract-unknown-key-b';
 
 const MESSAGES_BODY = {
   model: 'auto',

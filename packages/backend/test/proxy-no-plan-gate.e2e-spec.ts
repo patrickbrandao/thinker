@@ -166,7 +166,7 @@ describe('Proxy without a plan paywall (e2e)', () => {
         .expect(200);
 
       expect(res.body.choices[0].message.content).toBe('pong');
-      expect(res.headers['x-manifest-model']).toBe(MODEL);
+      expect(res.headers['x-thinker-model']).toBe(MODEL);
     }
 
     expect(providerCalls).toHaveLength(3);

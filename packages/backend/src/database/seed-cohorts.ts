@@ -17,7 +17,7 @@ const OLD_USER_PASSWORD = 'manifest';
 const OLD_TENANT_ID = 'seed-tenant-old-001';
 const OLD_AGENT_ID = 'seed-agent-old-001';
 const OLD_OTLP_KEY_ID = 'seed-otlp-key-old-001';
-const OLD_OTLP_KEY = 'mnfst_dev-otlp-key-old-001';
+const OLD_OTLP_KEY = 'thk_dev-otlp-key-old-001';
 
 /** Public so tests / logs / docs share one source of truth for the cohort logins. */
 export const COHORT_SEED = {

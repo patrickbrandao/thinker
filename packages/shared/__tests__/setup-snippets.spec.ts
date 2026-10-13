@@ -9,11 +9,12 @@ import {
 
 describe('setup snippets', () => {
   const URL = 'https://app.manifest.build/v1';
-  const KEY = 'mnfst_test_key';
+  const KEY = 'thk_test_key';
 
   it('openclaw snippet wires the provider and restarts the gateway', () => {
     const s = getOpenClawSnippet(URL, KEY);
-    expect(s).toContain('models.providers.manifest');
+    expect(s).toContain('models.providers.thinker');
+    expect(s).toContain('agents.defaults.model.primary thinker/auto');
     expect(s).toContain(URL);
     expect(s).toContain(KEY);
     expect(s).toContain('openclaw gateway restart');
@@ -38,13 +39,17 @@ describe('setup snippets', () => {
     const config = getCodexConfigSnippet(URL);
     expect(config).toContain('wire_api = "responses"');
     expect(config).toContain(`base_url = "${URL}"`);
-    expect(getCodexKeyExportSnippet(KEY)).toBe(`export MANIFEST_API_KEY="${KEY}"`);
+    expect(config).toContain('model_provider = "thinker"');
+    expect(config).toContain('[model_providers.thinker]');
+    expect(config).toContain('env_key = "THINKER_API_KEY"');
+    expect(getCodexKeyExportSnippet(KEY)).toBe(`export THINKER_API_KEY="${KEY}"`);
   });
 
   it('registry maps platforms to their renderers', () => {
     expect(PLATFORM_SETUP_SNIPPETS['openclaw']('u', 'k')).toContain('openclaw');
     expect(PLATFORM_SETUP_SNIPPETS['codex']('u/v1', 'k')).toContain('wire_api = "responses"');
     expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('Base URL: u');
+    expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('n8n-nodes-thinker');
     expect(Object.keys(PLATFORM_SETUP_SNIPPETS).sort()).toEqual([
       'claude-code',
       'codex',

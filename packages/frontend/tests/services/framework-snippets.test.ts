@@ -327,8 +327,8 @@ describe("getNanobotConfigSnippet", () => {
 describe("getOpenClawSnippet", () => {
   it("includes openclaw config set commands", () => {
     const snippet = getOpenClawSnippet("http://localhost/v1", "mnfst_key");
-    expect(snippet).toContain("openclaw config set models.providers.manifest");
-    expect(snippet).toContain("openclaw config set agents.defaults.model.primary manifest/auto");
+    expect(snippet).toContain("openclaw config set models.providers.thinker");
+    expect(snippet).toContain("openclaw config set agents.defaults.model.primary thinker/auto");
     expect(snippet).toContain("openclaw gateway restart");
   });
 
@@ -344,7 +344,7 @@ describe("getOpenClawSnippet", () => {
 describe("getOpenClawDisableSnippet", () => {
   it("includes unset commands and selected model", () => {
     const snippet = getOpenClawDisableSnippet("openai/gpt-4o");
-    expect(snippet).toContain("openclaw config unset models.providers.manifest");
+    expect(snippet).toContain("openclaw config unset models.providers.thinker");
     expect(snippet).toContain("openclaw config set agents.defaults.model.primary openai/gpt-4o");
     expect(snippet).toContain("openclaw gateway restart");
   });

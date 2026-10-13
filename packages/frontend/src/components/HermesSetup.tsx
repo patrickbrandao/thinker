@@ -62,7 +62,7 @@ const HermesSetup: Component<Props> = (props) => {
   const [wizKeyRevealed, setWizKeyRevealed] = createSignal(false);
 
   const hasFullKey = () => !!props.apiKey;
-  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'mnfst_YOUR_KEY');
+  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'thk_YOUR_KEY');
   const copyKey = () => props.apiKey ?? masked();
   const cliKey = () => (cliKeyRevealed() && props.apiKey ? props.apiKey : masked());
   const wizKey = () => (wizKeyRevealed() && props.apiKey ? props.apiKey : masked());

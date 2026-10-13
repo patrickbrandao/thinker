@@ -126,8 +126,8 @@ export type ErrorOrigin = (typeof ERROR_ORIGINS)[number];
  * (`policy`), nor a Manifest bug (`internal`) — but it is still not a provider
  * failure, so it belongs here to stay out of `provider_error_rate`.
  */
-export const MANIFEST_ERROR_ORIGINS = ['config', 'policy', 'internal', 'request'] as const;
-export type ManifestErrorOrigin = (typeof MANIFEST_ERROR_ORIGINS)[number];
+export const THINKER_ERROR_ORIGINS = ['config', 'policy', 'internal', 'request'] as const;
+export type ManifestErrorOrigin = (typeof THINKER_ERROR_ORIGINS)[number];
 
 export const ERROR_CLASSES = [
   // provider (HTTP-derived)
@@ -162,7 +162,7 @@ export type ErrorClass = (typeof ERROR_CLASSES)[number];
  * maps onto exactly one reason here — `manifest-error.spec.ts` fails if a new
  * code ships without one.
  */
-const MANIFEST_REASON_TO_CLASSIFICATION: Record<
+const THINKER_REASON_TO_CLASSIFICATION: Record<
   string,
   { origin: ManifestErrorOrigin; errorClass: ErrorClass }
 > = {
@@ -252,7 +252,7 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
   const superseded = SUPERSEDED_STATUSES.includes(signals.status);
 
   const manifest = signals.routingReason
-    ? MANIFEST_REASON_TO_CLASSIFICATION[signals.routingReason]
+    ? THINKER_REASON_TO_CLASSIFICATION[signals.routingReason]
     : undefined;
   if (manifest) {
     return { error_origin: manifest.origin, error_class: manifest.errorClass, superseded };
@@ -287,11 +287,11 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
 
 /**
  * True when an origin is Manifest's own — config, policy, internal, or request —
- * rather than a provider round-trip. Reads MANIFEST_ERROR_ORIGINS, so a new
+ * rather than a provider round-trip. Reads THINKER_ERROR_ORIGINS, so a new
  * origin added there is covered without touching this guard.
  */
 export function isManifestErrorOrigin(
   origin: string | null | undefined,
 ): origin is ManifestErrorOrigin {
-  return origin != null && (MANIFEST_ERROR_ORIGINS as readonly string[]).includes(origin);
+  return origin != null && (THINKER_ERROR_ORIGINS as readonly string[]).includes(origin);
 }

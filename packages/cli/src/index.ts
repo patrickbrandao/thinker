@@ -98,7 +98,7 @@ Agents
   mnfst agent create --name <name> --platform <p> [--category <${CATEGORY_CATALOG.join('|')}>] [--key-file <path>] [--if-absent]
   mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--recording true|false] [--force]
     (--models is the full chain: first = route, rest = fallbacks, one entry clears fallbacks;
-     default route unless --tier names a custom tier, upserted on "x-manifest-tier: <name>";
+     default route unless --tier names a custom tier, upserted on "x-thinker-tier: <name>";
      models are checked against the agent's discovered set — --force writes them anyway)
   mnfst agent env <name> [--export]                     (dotenv/shell lines: KEY + URL; append to .env or eval)
   mnfst agent setup <name> [--reveal]                   (platform setup instructions, same content as the dashboard)

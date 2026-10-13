@@ -242,7 +242,7 @@ describe('ProxyController', () => {
           id: 'auto',
           object: 'model',
           created: 0,
-          owned_by: 'manifest',
+          owned_by: 'thinker',
         },
       ],
     });
@@ -277,7 +277,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never)).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         { id: 'openai/gpt-4o', object: 'model', created: 0, owned_by: 'openai' },
         { id: 'openrouter/gpt-4o', object: 'model', created: 0, owned_by: 'openrouter' },
         {
@@ -325,7 +325,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never)).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         { id: 'openai/gpt-4o', object: 'model', created: 0, owned_by: 'openai' },
       ],
     });
@@ -345,7 +345,7 @@ describe('ProxyController', () => {
     ).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         {
           id: 'opencode-go/glm-5.1-subscription',
           object: 'model',
@@ -374,7 +374,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never, 'true')).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         {
           id: 'openai/gpt-5.4-mini-subscription',
           object: 'model',
@@ -411,7 +411,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never, undefined, 'true')).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         {
           id: 'openai/gpt-5.4-mini-subscription',
           object: 'model',
@@ -451,7 +451,7 @@ describe('ProxyController', () => {
 
     const withCosts = await controller.models(mockRequest({}) as never, undefined, 'true');
     expect(withCosts.data).toEqual([
-      { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+      { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
       {
         id: 'openai/input-only',
         object: 'model',
@@ -488,7 +488,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never, 'true')).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         { id: 'kiro/mystery-model', object: 'model', created: 0, owned_by: 'kiro' },
         {
           id: 'openai/gpt-5.3-codex-spark-subscription',
@@ -526,7 +526,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never, 'true')).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         {
           id: 'openai/gpt-4o',
           object: 'model',
@@ -560,7 +560,7 @@ describe('ProxyController', () => {
     await expect(controller.models(mockRequest({}) as never, 'true', 'true')).resolves.toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
         {
           id: 'openai/gpt-4o',
           object: 'model',
@@ -607,11 +607,11 @@ describe('ProxyController', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(responseBody);
-    expect(headers['X-Manifest-Tier']).toBe('simple');
-    expect(headers['X-Manifest-Model']).toBe('gpt-4o');
-    expect(headers['X-Manifest-Provider']).toBe('OpenAI');
-    expect(headers['X-Manifest-Confidence']).toBe('0.9');
-    expect(headers['X-Manifest-Reason']).toBe('scored');
+    expect(headers['X-Thinker-Tier']).toBe('simple');
+    expect(headers['X-Thinker-Model']).toBe('gpt-4o');
+    expect(headers['X-Thinker-Provider']).toBe('OpenAI');
+    expect(headers['X-Thinker-Confidence']).toBe('0.9');
+    expect(headers['X-Thinker-Reason']).toBe('scored');
   });
 
   it('routes on the body model and ignores provider/auth-type routing headers', async () => {
@@ -634,8 +634,8 @@ describe('ProxyController', () => {
     });
     const body = { model: 'gpt-5.5', messages: [{ role: 'user', content: 'hi' }] };
     const req = mockRequest(body, 'user-1', {
-      'x-manifest-provider': 'openai',
-      'x-manifest-auth-type': 'subscription',
+      'x-thinker-provider': 'openai',
+      'x-thinker-auth-type': 'subscription',
     });
     const { res } = mockResponse();
 
@@ -1550,8 +1550,8 @@ describe('ProxyController', () => {
     it("does not stamp a friendly stub's placeholder tier", async () => {
       failAfterRouting({
         tier: 'simple',
-        model: 'manifest',
-        provider: 'manifest',
+        model: 'thinker',
+        provider: 'thinker',
         confidence: 1,
         reason: 'manifest_internal_error',
       });
@@ -2412,8 +2412,8 @@ describe('ProxyController', () => {
         },
         meta: {
           tier: 'simple',
-          model: 'manifest',
-          provider: 'manifest',
+          model: 'thinker',
+          provider: 'thinker',
           confidence: 1,
           reason: 'no_provider',
           manifest_error_code: 'M101',
@@ -2449,8 +2449,8 @@ describe('ProxyController', () => {
         },
         meta: {
           tier: 'simple',
-          model: 'manifest',
-          provider: 'manifest',
+          model: 'thinker',
+          provider: 'thinker',
           confidence: 1,
           reason: 'no_provider_key',
           manifest_error_code: 'M100',
@@ -3048,7 +3048,7 @@ describe('ProxyController', () => {
         }),
       });
       // Meta headers should still be set
-      expect(headers['X-Manifest-Provider']).toBe('OpenAI');
+      expect(headers['X-Thinker-Provider']).toBe('OpenAI');
     });
 
     it('records success when the caller closes after finish_reason but before upstream EOF', async () => {
@@ -3728,7 +3728,7 @@ describe('ProxyController', () => {
       await controller.chatCompletions(req as never, res as never);
 
       expect(headers['Content-Type']).toBe('text/event-stream');
-      expect(headers['X-Manifest-Tier']).toBe('standard');
+      expect(headers['X-Thinker-Tier']).toBe('standard');
       expect(written.length).toBeGreaterThan(0);
     });
 
@@ -3921,9 +3921,9 @@ describe('ProxyController', () => {
 
       await controller.chatCompletions(req as never, res as never);
 
-      expect(headers['X-Manifest-Fallback-From']).toBe('gpt-4o');
-      expect(headers['X-Manifest-Fallback-Index']).toBe('0');
-      expect(headers['X-Manifest-Model']).toBe('claude-sonnet-4');
+      expect(headers['X-Thinker-Fallback-From']).toBe('gpt-4o');
+      expect(headers['X-Thinker-Fallback-Index']).toBe('0');
+      expect(headers['X-Thinker-Model']).toBe('claude-sonnet-4');
     });
 
     it('should not set fallback headers when meta has no fallbackFromModel', async () => {
@@ -3954,8 +3954,8 @@ describe('ProxyController', () => {
 
       await controller.chatCompletions(req as never, res as never);
 
-      expect(headers['X-Manifest-Fallback-From']).toBeUndefined();
-      expect(headers['X-Manifest-Fallback-Index']).toBeUndefined();
+      expect(headers['X-Thinker-Fallback-From']).toBeUndefined();
+      expect(headers['X-Thinker-Fallback-Index']).toBeUndefined();
     });
 
     it('should record primary failure and fallback success when fallback was used', async () => {
@@ -4224,7 +4224,7 @@ describe('ProxyController', () => {
           error_message: 'auth fail',
         }),
       ]);
-      expect(headers['X-Manifest-Fallback-Exhausted']).toBe('true');
+      expect(headers['X-Thinker-Fallback-Exhausted']).toBe('true');
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.objectContaining({
@@ -4502,7 +4502,7 @@ describe('ProxyController', () => {
     );
   });
 
-  it('should return primary error status with fallback_exhausted flag and X-Manifest-Fallback-Exhausted header', async () => {
+  it('should return primary error status with fallback_exhausted flag and X-Thinker-Fallback-Exhausted header', async () => {
     const mockProviderResp = new Response('primary error', {
       status: 502,
       headers: { 'Content-Type': 'text/plain' },
@@ -4541,7 +4541,7 @@ describe('ProxyController', () => {
     await controller.chatCompletions(req as never, res as never);
 
     expect(res.status).toHaveBeenCalledWith(502);
-    expect(headers['X-Manifest-Fallback-Exhausted']).toBe('true');
+    expect(headers['X-Thinker-Fallback-Exhausted']).toBe('true');
     expect(res.json).toHaveBeenCalledWith({
       error: expect.objectContaining({
         type: 'server_error',
@@ -4559,7 +4559,7 @@ describe('ProxyController', () => {
     });
   });
 
-  it('should NOT set X-Manifest-Fallback-Exhausted when error has no failed fallbacks', async () => {
+  it('should NOT set X-Thinker-Fallback-Exhausted when error has no failed fallbacks', async () => {
     const mockProviderResp = new Response('bad request', {
       status: 400,
       headers: { 'Content-Type': 'text/plain' },
@@ -4582,7 +4582,7 @@ describe('ProxyController', () => {
     await controller.chatCompletions(req as never, res as never);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(headers['X-Manifest-Fallback-Exhausted']).toBeUndefined();
+    expect(headers['X-Thinker-Fallback-Exhausted']).toBeUndefined();
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: expect.objectContaining({ type: 'invalid_request_error', code: null }),
@@ -4590,7 +4590,7 @@ describe('ProxyController', () => {
     );
   });
 
-  it('should NOT set X-Manifest-Fallback-Exhausted when a fallback succeeded', async () => {
+  it('should NOT set X-Thinker-Fallback-Exhausted when a fallback succeeded', async () => {
     const responseBody = { choices: [{ message: { content: 'hello' } }] };
     const mockProviderResp = new Response(JSON.stringify(responseBody), {
       status: 200,
@@ -4618,6 +4618,6 @@ describe('ProxyController', () => {
     await controller.chatCompletions(req as never, res as never);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(headers['X-Manifest-Fallback-Exhausted']).toBeUndefined();
+    expect(headers['X-Thinker-Fallback-Exhausted']).toBeUndefined();
   });
 });

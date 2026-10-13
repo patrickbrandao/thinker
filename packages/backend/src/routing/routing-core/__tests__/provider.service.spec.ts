@@ -1930,16 +1930,16 @@ describe('ProviderService — symmetric provider↔agent auto-connect', () => {
 });
 
 describe('ProviderService — getFreshSubscriptionCredential', () => {
-  const PREV_KEY = process.env.MANIFEST_ENCRYPTION_KEY;
+  const PREV_KEY = process.env.THINKER_ENCRYPTION_KEY;
   let providerRepo: ReturnType<typeof makeRepo>;
   let svc: ProviderService;
 
   beforeAll(() => {
-    process.env.MANIFEST_ENCRYPTION_KEY = 'unit-test-encryption-key-1234567890';
+    process.env.THINKER_ENCRYPTION_KEY = 'unit-test-encryption-key-1234567890';
   });
   afterAll(() => {
-    if (PREV_KEY === undefined) delete process.env.MANIFEST_ENCRYPTION_KEY;
-    else process.env.MANIFEST_ENCRYPTION_KEY = PREV_KEY;
+    if (PREV_KEY === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+    else process.env.THINKER_ENCRYPTION_KEY = PREV_KEY;
   });
 
   beforeEach(() => {

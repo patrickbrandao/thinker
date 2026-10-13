@@ -53,7 +53,7 @@ const N8nSetup: Component<Props> = (props) => {
 
   const credentialBaseUrl = () => props.baseUrl.replace(/\/v1\/?$/, '');
   const hasFullKey = () => !!props.apiKey;
-  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'mnfst_YOUR_KEY');
+  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'thk_YOUR_KEY');
   const copyKey = () => props.apiKey ?? masked();
   const visibleKey = () => (keyRevealed() && props.apiKey ? props.apiKey : masked());
 

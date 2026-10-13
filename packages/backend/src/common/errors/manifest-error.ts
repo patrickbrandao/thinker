@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { formatManifestError, MANIFEST_ERRORS, type ManifestErrorCode } from './error-codes';
+import { formatManifestError, THINKER_ERRORS, type ManifestErrorCode } from './error-codes';
 
 /**
  * `routing_reason` values the proxy stamps on a Manifest-originated row. Each
@@ -7,7 +7,7 @@ import { formatManifestError, MANIFEST_ERRORS, type ManifestErrorCode } from './
  * `classifyMessageError` in `thinker-shared` — the two lists are kept in
  * lock-step by `__tests__/manifest-error.spec.ts`.
  */
-export const MANIFEST_BLOCKED_REQUEST_REASONS = [
+export const THINKER_BLOCKED_REQUEST_REASONS = [
   'no_provider',
   'no_provider_key',
   'subscription_credentials_unusable',
@@ -23,7 +23,7 @@ export const MANIFEST_BLOCKED_REQUEST_REASONS = [
   'model_not_available',
   'manifest_internal_error',
 ] as const;
-export type ManifestBlockedRequestReason = (typeof MANIFEST_BLOCKED_REQUEST_REASONS)[number];
+export type ManifestBlockedRequestReason = (typeof THINKER_BLOCKED_REQUEST_REASONS)[number];
 
 /**
  * Error codes that can never become an `agent_messages` row: they are raised by
@@ -34,18 +34,18 @@ export type ManifestBlockedRequestReason = (typeof MANIFEST_BLOCKED_REQUEST_REAS
  * `M004` (expired key) is deliberately NOT here — that key does resolve to an
  * agent, so its rejection is recordable.
  */
-export const UNRECORDABLE_MANIFEST_CODES = ['M001', 'M002', 'M003', 'M005', 'M006'] as const;
-export type UnrecordableManifestCode = (typeof UNRECORDABLE_MANIFEST_CODES)[number];
+export const UNRECORDABLE_THINKER_CODES = ['M001', 'M002', 'M003', 'M005', 'M006'] as const;
+export type UnrecordableManifestCode = (typeof UNRECORDABLE_THINKER_CODES)[number];
 
 /** A documented Manifest error that can be attributed to an agent, and so recorded. */
 export type RecordableManifestCode = Exclude<ManifestErrorCode, UnrecordableManifestCode>;
 
 /**
  * The one mapping from a documented error code to the reason persisted on its
- * message row. Adding a code to `MANIFEST_ERRORS` without adding it here (or to
- * `UNRECORDABLE_MANIFEST_CODES`) fails the guardrail spec.
+ * message row. Adding a code to `THINKER_ERRORS` without adding it here (or to
+ * `UNRECORDABLE_THINKER_CODES`) fails the guardrail spec.
  */
-export const MANIFEST_CODE_TO_REASON: Record<RecordableManifestCode, ManifestBlockedRequestReason> =
+export const THINKER_CODE_TO_REASON: Record<RecordableManifestCode, ManifestBlockedRequestReason> =
   {
     M004: 'key_expired',
     M100: 'no_provider_key',
@@ -61,7 +61,7 @@ export const MANIFEST_CODE_TO_REASON: Record<RecordableManifestCode, ManifestBlo
   };
 
 export function isRecordableManifestCode(code: ManifestErrorCode): code is RecordableManifestCode {
-  return !(UNRECORDABLE_MANIFEST_CODES as readonly string[]).includes(code);
+  return !(UNRECORDABLE_THINKER_CODES as readonly string[]).includes(code);
 }
 
 /**
@@ -82,6 +82,6 @@ export class ManifestError extends HttpException {
 
   /** Human title from the catalogue, e.g. "Missing messages array". */
   get title(): string {
-    return MANIFEST_ERRORS[this.code].title;
+    return THINKER_ERRORS[this.code].title;
   }
 }

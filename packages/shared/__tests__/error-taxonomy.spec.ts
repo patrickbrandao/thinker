@@ -4,7 +4,7 @@ import {
   isManifestErrorOrigin,
   ERROR_CLASSES,
   ERROR_ORIGINS,
-  MANIFEST_ERROR_ORIGINS,
+  THINKER_ERROR_ORIGINS,
   TRANSPORT_NETWORK_HTTP_STATUS,
   TRANSPORT_TIMEOUT_HTTP_STATUS,
   REQUEST_STATUSES,
@@ -26,15 +26,15 @@ describe('error-taxonomy constants', () => {
   });
 
   it('keeps every manifest origin inside the origin set', () => {
-    for (const origin of MANIFEST_ERROR_ORIGINS) {
+    for (const origin of THINKER_ERROR_ORIGINS) {
       expect(ERROR_ORIGINS).toContain(origin);
     }
   });
 
   it('counts a caller-malformed request as Manifest-originated, not a provider fault', () => {
-    // `request` must live in MANIFEST_ERROR_ORIGINS: that membership is what keeps
+    // `request` must live in THINKER_ERROR_ORIGINS: that membership is what keeps
     // it out of provider_error_rate and inside the `origin=manifest` shorthand.
-    expect(MANIFEST_ERROR_ORIGINS).toContain('request');
+    expect(THINKER_ERROR_ORIGINS).toContain('request');
     expect(ERROR_ORIGINS).toContain('request');
   });
 

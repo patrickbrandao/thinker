@@ -117,20 +117,20 @@ function thinkingRouteContext(meta: RoutingMeta): ThinkingBlockRouteContext {
 
 export function buildMetaHeaders(meta: RoutingMeta): Record<string, string> {
   const headers: Record<string, string> = {
-    'X-Manifest-Tier': meta.tier,
-    'X-Manifest-Model': meta.model,
-    'X-Manifest-Provider': meta.provider,
-    'X-Manifest-Confidence': String(meta.confidence),
-    'X-Manifest-Reason': meta.reason,
-    'X-Manifest-Output-Modality': meta.output_modality ?? 'text',
-    'X-Manifest-Response-Mode': meta.response_mode ?? 'buffered',
+    'X-Thinker-Tier': meta.tier,
+    'X-Thinker-Model': meta.model,
+    'X-Thinker-Provider': meta.provider,
+    'X-Thinker-Confidence': String(meta.confidence),
+    'X-Thinker-Reason': meta.reason,
+    'X-Thinker-Output-Modality': meta.output_modality ?? 'text',
+    'X-Thinker-Response-Mode': meta.response_mode ?? 'buffered',
   };
   if (meta.specificity_category) {
-    headers['X-Manifest-Specificity'] = meta.specificity_category;
+    headers['X-Thinker-Specificity'] = meta.specificity_category;
   }
   if (meta.fallbackFromModel) {
-    headers['X-Manifest-Fallback-From'] = meta.fallbackFromModel;
-    headers['X-Manifest-Fallback-Index'] = String(meta.fallbackIndex ?? 0);
+    headers['X-Thinker-Fallback-From'] = meta.fallbackFromModel;
+    headers['X-Thinker-Fallback-Index'] = String(meta.fallbackIndex ?? 0);
   }
   return headers;
 }
@@ -139,7 +139,7 @@ function setHeaders(res: ExpressResponse, headers: Record<string, string>): void
   for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
 }
 
-type OpenAiErrorSource = 'provider' | 'manifest';
+type OpenAiErrorSource = 'provider' | 'thinker';
 
 export function buildOpenAiCompatibleError(
   status: number,
@@ -339,7 +339,7 @@ function handleFallbackExhausted(
   logger.warn(`Fallback chain exhausted: ${scrubSecrets(errorBody).slice(0, 200)}`);
   res.status(errorStatus);
   setHeaders(res, metaHeaders);
-  res.setHeader('X-Manifest-Fallback-Exhausted', 'true');
+  res.setHeader('X-Thinker-Fallback-Exhausted', 'true');
   const attempted = attemptedFallbackEntries(failedFallbacks, apiMode);
   // Every attempt reached a provider, so the error is provider-authored: the
   // exhaustion is a routing outcome (the boolean + header), not an error class,

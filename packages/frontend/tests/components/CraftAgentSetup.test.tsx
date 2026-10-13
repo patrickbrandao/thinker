@@ -27,7 +27,7 @@ describe("CraftAgentSetup", () => {
 
   it("renders the API key", () => {
     const { container } = render(() => <CraftAgentSetup {...baseProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("masks the API key when only a prefix is available", () => {

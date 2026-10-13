@@ -16,7 +16,7 @@ describe('getEncryptionSecret', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env['MANIFEST_ENCRYPTION_KEY'];
+    delete process.env['THINKER_ENCRYPTION_KEY'];
     delete process.env['BETTER_AUTH_SECRET'];
   });
 
@@ -24,9 +24,9 @@ describe('getEncryptionSecret', () => {
     process.env = originalEnv;
   });
 
-  it('returns MANIFEST_ENCRYPTION_KEY when it is >= 32 chars', () => {
+  it('returns THINKER_ENCRYPTION_KEY when it is >= 32 chars', () => {
     const key = 'a'.repeat(32);
-    process.env['MANIFEST_ENCRYPTION_KEY'] = key;
+    process.env['THINKER_ENCRYPTION_KEY'] = key;
     expect(getEncryptionSecret()).toBe(key);
   });
 
@@ -34,7 +34,7 @@ describe('getEncryptionSecret', () => {
     jest.resetModules();
     process.env['NODE_ENV'] = 'production';
     process.env['BETTER_AUTH_SECRET'] = 'b'.repeat(48);
-    delete process.env['MANIFEST_ENCRYPTION_KEY'];
+    delete process.env['THINKER_ENCRYPTION_KEY'];
     let warnSpy: jest.SpyInstance | undefined;
     jest.isolateModules(() => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -47,23 +47,23 @@ describe('getEncryptionSecret', () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  it('returns BETTER_AUTH_SECRET when MANIFEST_ENCRYPTION_KEY is not set and secret is >= 32 chars', () => {
+  it('returns BETTER_AUTH_SECRET when THINKER_ENCRYPTION_KEY is not set and secret is >= 32 chars', () => {
     const secret = 'b'.repeat(64);
     process.env['BETTER_AUTH_SECRET'] = secret;
     expect(getEncryptionSecret()).toBe(secret);
   });
 
-  it('prefers MANIFEST_ENCRYPTION_KEY over BETTER_AUTH_SECRET', () => {
+  it('prefers THINKER_ENCRYPTION_KEY over BETTER_AUTH_SECRET', () => {
     const encKey = 'e'.repeat(32);
     const authSecret = 'a'.repeat(64);
-    process.env['MANIFEST_ENCRYPTION_KEY'] = encKey;
+    process.env['THINKER_ENCRYPTION_KEY'] = encKey;
     process.env['BETTER_AUTH_SECRET'] = authSecret;
     expect(getEncryptionSecret()).toBe(encKey);
   });
 
   it('throws when no key is set', () => {
     expect(() => getEncryptionSecret()).toThrow(
-      'Encryption secret required. Set MANIFEST_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
+      'Encryption secret required. Set THINKER_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
     );
   });
 
@@ -187,8 +187,8 @@ describe('getDecryptionSecrets', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env['MANIFEST_ENCRYPTION_KEY'];
-    delete process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+    delete process.env['THINKER_ENCRYPTION_KEY'];
+    delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
     delete process.env['BETTER_AUTH_SECRET'];
   });
 
@@ -197,8 +197,8 @@ describe('getDecryptionSecrets', () => {
   });
 
   it('lists the dedicated key first, then PREVIOUS, then the session secret', () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = KEY;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = KEY;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     process.env['BETTER_AUTH_SECRET'] = SESSION;
     expect(getDecryptionSecrets()).toEqual([KEY, PREVIOUS, SESSION]);
   });
@@ -209,8 +209,8 @@ describe('getDecryptionSecrets', () => {
   });
 
   it('drops short and duplicate candidates', () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = KEY;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = 'too-short';
+    process.env['THINKER_ENCRYPTION_KEY'] = KEY;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = 'too-short';
     process.env['BETTER_AUTH_SECRET'] = KEY;
     expect(getDecryptionSecrets()).toEqual([KEY]);
   });

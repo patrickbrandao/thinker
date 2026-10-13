@@ -74,8 +74,8 @@ describe('SecretReencryptionService', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env['MANIFEST_ENCRYPTION_KEY'];
-    delete process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+    delete process.env['THINKER_ENCRYPTION_KEY'];
+    delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
     delete process.env['BETTER_AUTH_SECRET'];
     log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -96,7 +96,7 @@ describe('SecretReencryptionService', () => {
   });
 
   it('skips with a warning when PREVIOUS is set but no current secret is configured', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({});
     await new SecretReencryptionService(ds.dataSource).onApplicationBootstrap();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Skipping secret re-encryption'));
@@ -104,7 +104,7 @@ describe('SecretReencryptionService', () => {
   });
 
   it('is a no-op on a normal boot, even though the session secret is a decrypt candidate', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
     process.env['BETTER_AUTH_SECRET'] = PREVIOUS;
     const ds = buildDataSource({});
     await new SecretReencryptionService(ds.dataSource).run();
@@ -113,8 +113,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('ignores a PREVIOUS shorter than 32 chars', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = 'short';
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = 'short';
     const ds = buildDataSource({});
     await new SecretReencryptionService(ds.dataSource).run();
     expect(ds.createQueryRunner).not.toHaveBeenCalled();
@@ -138,8 +138,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('moves on without scanning when another replica holds the lock', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({ acquired: false });
     await new SecretReencryptionService(ds.dataSource).run();
     expect(ds.query).toHaveBeenCalledTimes(1);
@@ -148,8 +148,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('rewrites rows under an older secret and leaves the rest alone', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const underPrevious = encrypt('sk-old', PREVIOUS);
     const underCurrent = encrypt('sk-new', CURRENT);
     const underUnknown = encrypt('sk-lost', UNKNOWN);
@@ -163,7 +163,7 @@ describe('SecretReencryptionService', () => {
             { id: 'd', value: underUnknown },
           ],
         ],
-        agent_api_keys: [[{ id: 'k1', value: encrypt('mnfst_x', PREVIOUS) }]],
+        agent_api_keys: [[{ id: 'k1', value: encrypt('thk_x', PREVIOUS) }]],
       },
     });
 
@@ -176,7 +176,7 @@ describe('SecretReencryptionService', () => {
     expect(first.params[2]).toBe(underPrevious);
     expect(decrypt(first.params[0] as string, CURRENT)).toBe('sk-old');
     expect(second.table).toBe('agent_api_keys');
-    expect(decrypt(second.params[0] as string, CURRENT)).toBe('mnfst_x');
+    expect(decrypt(second.params[0] as string, CURRENT)).toBe('thk_x');
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('row d'));
     expect(log).toHaveBeenCalledWith(
@@ -190,9 +190,9 @@ describe('SecretReencryptionService', () => {
   });
 
   it('moves rows off the session secret when PREVIOUS names it', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
     process.env['BETTER_AUTH_SECRET'] = PREVIOUS;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       pages: { email_provider_configs: [[{ id: 'e', value: encrypt('re_123', PREVIOUS) }]] },
     });
@@ -203,11 +203,11 @@ describe('SecretReencryptionService', () => {
   });
 
   it('does not count a rewrite another process won', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       updateAffected: 0,
-      pages: { agent_api_keys: [[{ id: 'k', value: encrypt('mnfst_z', PREVIOUS) }]] },
+      pages: { agent_api_keys: [[{ id: 'k', value: encrypt('thk_z', PREVIOUS) }]] },
     });
     await new SecretReencryptionService(ds.dataSource).run();
     expect(ds.updates).toHaveLength(1);
@@ -215,8 +215,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('withholds the removal hint while any row is undecryptable', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       pages: { tenant_providers: [[{ id: 'u', value: encrypt('sk-lost', UNKNOWN) }]] },
     });
@@ -226,8 +226,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('pages through full batches with the last id as the cursor', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const full = Array.from({ length: BATCH_SIZE }, (_, i) => ({
       id: `id-${String(i).padStart(4, '0')}`,
       value: 'plain',
@@ -243,11 +243,11 @@ describe('SecretReencryptionService', () => {
   });
 
   it('keeps going when one table fails and reports it in the summary', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       failSelectFor: 'tenant_providers',
-      pages: { agent_api_keys: [[{ id: 'k', value: encrypt('mnfst_y', PREVIOUS) }]] },
+      pages: { agent_api_keys: [[{ id: 'k', value: encrypt('thk_y', PREVIOUS) }]] },
     });
     await new SecretReencryptionService(ds.dataSource).run();
     expect(ds.updates).toHaveLength(1);
@@ -258,8 +258,8 @@ describe('SecretReencryptionService', () => {
   });
 
   it('logs and swallows a failure to connect, then still releases the runner', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       connectError: new Error('db down'),
       releaseError: new Error('x'),
@@ -271,16 +271,16 @@ describe('SecretReencryptionService', () => {
   });
 
   it('ignores an unlock failure', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({ unlockError: new Error('unlock'), pages: {} });
     await expect(new SecretReencryptionService(ds.dataSource).run()).resolves.toBeUndefined();
     expect(error).not.toHaveBeenCalled();
   });
 
   it('reports non-Error throwables by their string form', async () => {
-    process.env['MANIFEST_ENCRYPTION_KEY'] = CURRENT;
-    process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
+    process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({});
     ds.connect.mockRejectedValueOnce('plain string');
     await new SecretReencryptionService(ds.dataSource).run();

@@ -80,7 +80,7 @@ describe("SetupStepAddProvider", () => {
     const agentTabs = container.querySelectorAll(".panel__tab");
     fireEvent.click(agentTabs[3]); // Craft Agent
     expect(container.textContent).toContain("Manifest provider preset");
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("shows OpenCode setup when OpenCode tab clicked", () => {
@@ -97,7 +97,7 @@ describe("SetupStepAddProvider", () => {
     fireEvent.click(agentTabs[6]);
     expect(container.textContent).toContain("~/.codex/config.toml");
     expect(container.textContent).toContain('wire_api = "responses"');
-    expect(container.textContent).toContain('model_provider = "manifest"');
+    expect(container.textContent).toContain('model_provider = "thinker"');
   });
 
   it("defaults to OpenClaw agent tab", () => {
@@ -116,7 +116,7 @@ describe("SetupStepAddProvider", () => {
   it("shows Agents card when OpenClaw selected", () => {
     const { container } = render(() => <SetupStepAddProvider {...defaultProps} />);
     expect(container.querySelector(".setup-agents-card")).not.toBeNull();
-    expect(container.textContent).toContain("manifest/auto");
+    expect(container.textContent).toContain("thinker/auto");
   });
 
   it("shows Hermes setup when Hermes Agent selected", () => {
@@ -131,7 +131,7 @@ describe("SetupStepAddProvider", () => {
     const agentTabs = container.querySelectorAll(".panel__tab");
     fireEvent.click(agentTabs[1]); // Hermes
     fireEvent.click(agentTabs[0]); // OpenClaw
-    expect(container.textContent).toContain("manifest/auto");
+    expect(container.textContent).toContain("thinker/auto");
     expect(container.textContent).not.toContain("Point Hermes at the Manifest endpoint");
   });
 
@@ -186,7 +186,7 @@ describe("SetupStepAddProvider", () => {
     expect(fields[3].textContent).toContain("Model ID");
     expect(fields[3].textContent).toContain("auto");
     expect(fields[4].textContent).toContain("Endpoint ID");
-    expect(fields[4].textContent).toContain("manifest");
+    expect(fields[4].textContent).toContain("thinker");
   });
 
   it("shows eye toggle on CLI sub-tab when apiKey provided", () => {
@@ -249,7 +249,7 @@ describe("SetupStepAddProvider", () => {
 
   it("shows placeholder when no apiKey or keyPrefix", () => {
     const { container } = render(() => <SetupStepAddProvider {...defaultProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
   it("has copy buttons", () => {
@@ -336,7 +336,7 @@ describe("SetupStepAddProvider", () => {
         <SetupStepAddProvider {...defaultProps} platform="craft" />
       ));
       expect(container.textContent).toContain("Manifest provider preset");
-      expect(container.textContent).toContain("mnfst_YOUR_KEY");
+      expect(container.textContent).toContain("thk_YOUR_KEY");
       // No top-level Agents/Toolkits tabs in filtered mode.
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });

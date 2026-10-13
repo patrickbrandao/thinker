@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ERROR_ORIGINS, MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
+import { ERROR_ORIGINS, THINKER_ERROR_ORIGINS } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { rangeToInterval } from '../../common/utils/range.util';
 import { computeCutoff } from '../../common/utils/postgres-sql';
@@ -111,7 +111,7 @@ export class ErrorBreakdownService {
       total += g.count;
     }
     const provider = by_origin['provider'] ?? 0;
-    const manifest = MANIFEST_ERROR_ORIGINS.reduce((sum, o) => sum + (by_origin[o] ?? 0), 0);
+    const manifest = THINKER_ERROR_ORIGINS.reduce((sum, o) => sum + (by_origin[o] ?? 0), 0);
     const denom = provider + successful;
     return {
       range,

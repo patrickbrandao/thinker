@@ -21,7 +21,7 @@ import { getSeedConnections, seedAgentMessages, seedConnectionId } from './seed-
 import { seedRoutingCohorts } from './seed-cohorts';
 
 const SEED_API_KEY = 'dev-api-key-manifest-001';
-const SEED_OTLP_KEY = 'mnfst_dev-otlp-key-001';
+const SEED_OTLP_KEY = 'thk_dev-otlp-key-001';
 const SEED_TENANT_ID = 'seed-tenant-001';
 const SEED_AGENT_ID = 'seed-agent-001';
 const SEED_RECORDED_REQUEST_ID = 'seed-req-recording-001';

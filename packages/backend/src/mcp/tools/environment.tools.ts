@@ -84,7 +84,7 @@ export function registerEnvironmentTools(
     {
       title: 'Agent environment variables',
       description:
-        'Return the dotenv/shell lines that point a harness at Manifest (MANIFEST_AGENT_KEY + MANIFEST_AGENT_URL).',
+        'Return the dotenv/shell lines that point a harness at Manifest (THINKER_AGENT_KEY + THINKER_AGENT_URL).',
       inputSchema: z.object({ agent: z.string().min(1), export: z.boolean().optional() }),
     },
     async ({ agent: agentName, export: useExport }) =>
@@ -97,11 +97,11 @@ export function registerEnvironmentTools(
           const prefix = useExport ? 'export ' : '';
           return {
             agent: info.agent_name,
-            MANIFEST_AGENT_KEY: key.fullKey,
-            MANIFEST_AGENT_URL: `${authOrigin}/v1`,
+            THINKER_AGENT_KEY: key.fullKey,
+            THINKER_AGENT_URL: `${authOrigin}/v1`,
             lines: [
-              `${prefix}MANIFEST_AGENT_KEY=${key.fullKey}`,
-              `${prefix}MANIFEST_AGENT_URL=${authOrigin}/v1`,
+              `${prefix}THINKER_AGENT_KEY=${key.fullKey}`,
+              `${prefix}THINKER_AGENT_URL=${authOrigin}/v1`,
             ],
           };
         })(),

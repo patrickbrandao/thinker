@@ -56,14 +56,14 @@ PORT=38238 BIND_ADDRESS=127.0.0.1 \
   node -r dotenv/config packages/backend/dist/main.js
 
 # 2. Configure OpenClaw to use the dev server as a generic OpenAI-compatible provider
-openclaw config set models.providers.manifest '{"baseUrl":"http://localhost:38238/v1","api":"openai-completions","apiKey":"mnfst_YOUR_KEY","models":[{"id":"auto","name":"Manifest Auto"}]}'
+openclaw config set models.providers.thinker '{"baseUrl":"http://localhost:38238/v1","api":"openai-completions","apiKey":"thk_YOUR_KEY","models":[{"id":"auto","name":"Thinker Auto"}]}'
 openclaw config set agents.defaults.model.primary manifest/auto
 
 # 3. Restart the gateway
 openclaw gateway restart
 ```
 
-The `AgentKeyAuthGuard` accepts any non-`mnfst_*` token from loopback IPs in the self-hosted version, so loopback-only testing works even without a valid key. After restarting the backend, also restart the OpenClaw gateway — it doesn't reconnect automatically.
+The `AgentKeyAuthGuard` accepts any non-`thk_*` token from loopback IPs in the self-hosted version, so loopback-only testing works even without a valid key. After restarting the backend, also restart the OpenClaw gateway — it doesn't reconnect automatically.
 
 ## Active Technologies
 
@@ -101,7 +101,7 @@ packages/
 │   │   ├── entities/                        # TypeORM entities (25 entities)
 │   │   │   ├── tenant.entity.ts             # Multi-tenant root
 │   │   │   ├── agent.entity.ts              # Agent (belongs to tenant)
-│   │   │   ├── agent-api-key.entity.ts      # OTLP ingest keys (mnfst_*)
+│   │   │   ├── agent-api-key.entity.ts      # OTLP ingest keys (thk_*)
 │   │   │   ├── cli-auth-code.entity.ts      # Short-lived PKCE codes for `mnfst login`
 │   │   │   └── ...                          # request, agent-message (provider attempt), tenant-provider, tier-assignment, header-tier, etc.
 │   │   ├── common/
@@ -362,7 +362,7 @@ async handler(@CurrentUser() user: AuthUser) {
 
 ### CLI login (`mnfst login`)
 
-`packages/cli/` is the `mnfst` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `mnfst_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package publishes to npm as `mnfst-gateway-cli` (`npm i -g mnfst-gateway-cli`, command still `mnfst`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/mnfst.js`. `packages/cli/README.md` is the user-facing reference. The CLI embeds an agent skill whose source is `packages/cli/skill/SKILL.md`. It used to live in `.claude/skills/mnfst-cli/` and was moved out so that it isn't auto-loaded in this repo; #23 recreates it as `.claude/skills/thinker-cli/`.
+`packages/cli/` is the `mnfst` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `thk_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package publishes to npm as `mnfst-gateway-cli` (`npm i -g mnfst-gateway-cli`, command still `mnfst`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/mnfst.js`. `packages/cli/README.md` is the user-facing reference. The CLI embeds an agent skill whose source is `packages/cli/skill/SKILL.md`. It used to live in `.claude/skills/mnfst-cli/` and was moved out so that it isn't auto-loaded in this repo; #23 recreates it as `.claude/skills/thinker-cli/`.
 
 The default login is a browser flow, PKCE-protected so an intercepted code is useless without the verifier:
 
@@ -390,14 +390,14 @@ The CLI refuses HTTP redirects (so the key cannot leak cross-origin) and strips 
 ## Multi-Tenancy Model
 
 ```
-User (Better Auth) ──→ Tenant ──→ Agent ──→ AgentApiKey (mnfst_*)
+User (Better Auth) ──→ Tenant ──→ Agent ──→ AgentApiKey (thk_*)
                                     │
                                     └──→ requests ──→ agent_messages (telemetry data)
 ```
 
 - **Tenant** (`tenants` table): Created automatically on first agent creation. `tenant.owner_user_id` = `user.id` is the ONLY user→tenant link (resolved through `TenantCacheService`); `tenant.name` mirrors it for display until repurposed as a slug.
 - **Agent** (`agents` table): Belongs to a tenant. Unique constraint on `[tenant_id, name]`.
-- **AgentApiKey** (`agent_api_keys` table): One-to-one with agent. `mnfst_*` format key for OTLP ingestion.
+- **AgentApiKey** (`agent_api_keys` table): One-to-one with agent. `thk_*` format key for OTLP ingestion.
 - **ApiKey** (`api_keys` table): A separate, tenant-scoped credential (not per-agent) used for dashboard/API access — the primary key `ApiKeyGuard` checks. Distinct from `AgentApiKey`. `mnfst login` PATs are rows of this table named `cli`.
 - **Onboarding flow**: `ApiKeyGeneratorService.onboardAgent()` creates tenant (if new) + agent + API key via three sequential inserts.
 
@@ -463,11 +463,13 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 
 See `packages/backend/.env.example` for all variables. Key ones:
 
+Thinker reads only `THINKER_*` names (#21); the upstream-era names are not aliases. At boot, before migrations, `common/utils/legacy-env.ts` logs one warning naming every upstream-prefixed variable that is set (names only, never values) with its `THINKER_*` replacement, or says it no longer exists. When the old encryption-key name is set without `THINKER_ENCRYPTION_KEY`, `assertLegacyEncryptionKeyMigrated()` refuses to boot with an error naming both variables, because the backend would otherwise fall back to `BETTER_AUTH_SECRET` and fail to decrypt stored credentials. The Compose file only passes the variables it lists, so an old name left in `docker/.env` never reaches the container and is not reported.
+
 - `BETTER_AUTH_SECRET` — **Required.** Secret for Better Auth session signing (min 32 chars). Generate with `openssl rand -hex 32`.
 - `DATABASE_URL` — **Required** in every environment, `NODE_ENV=test` included (there is no default URL, see "Backend e2e database safety"). The app, Better Auth, the migration runner and the message-provider backfill CLI throw if it is unset (a blank `MIGRATION_DATABASE_URL`/`DATABASE_UNPOOLED_URL` does not override it). Format: `postgresql://user:password@host:port/database`.
 - `THINKER_E2E_ALLOW_DROP` — Test-only. Must be `1` for the backend e2e suite to run (together with a `DATABASE_URL` whose database name has `test` as a separate token), because the suite drops the schema. Never set it outside a disposable test database.
-- `MANIFEST_ENCRYPTION_KEY` — Recommended. AES-256-GCM key (min 32 chars) for encrypting stored provider API keys and OAuth tokens. Defaults to `BETTER_AUTH_SECRET` if unset — set this independently so a session-cookie leak doesn't also expose provider credentials.
-- `MANIFEST_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption always tries `MANIFEST_ENCRYPTION_KEY`, then this, then `BETTER_AUTH_SECRET`, so old rows stay readable. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `MANIFEST_ENCRYPTION_KEY` and `MANIFEST_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Introducing a dedicated key on an install that used the `BETTER_AUTH_SECRET` fallback: set `MANIFEST_ENCRYPTION_KEY` (old rows keep decrypting via the session secret); to move them onto the new key, set `PREVIOUS` to the session secret's value for one deploy. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
+- `THINKER_ENCRYPTION_KEY` — Recommended. AES-256-GCM key (min 32 chars) for encrypting stored provider API keys and OAuth tokens. Defaults to `BETTER_AUTH_SECRET` if unset — set this independently so a session-cookie leak doesn't also expose provider credentials.
+- `THINKER_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption always tries `THINKER_ENCRYPTION_KEY`, then this, then `BETTER_AUTH_SECRET`, so old rows stay readable. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `THINKER_ENCRYPTION_KEY` and `THINKER_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Introducing a dedicated key on an install that used the `BETTER_AUTH_SECRET` fallback: set `THINKER_ENCRYPTION_KEY` (old rows keep decrypting via the session secret); to move them onto the new key, set `PREVIOUS` to the session secret's value for one deploy. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
 - `PORT` — Server port. Default: `3001`
 - `BIND_ADDRESS` — Bind address. Default: `127.0.0.1` (use `0.0.0.0` for Railway/Docker)
 - `NODE_ENV` — `development` or `production`. Dev allows the Vite dashboard origin (`CORS_ORIGIN`); production allows no cross-origin browser caller beyond `THINKER_CORS_ORIGINS`.
@@ -483,8 +485,8 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `THROTTLE_LIMIT` — Max requests per window. Default: `100`
 - `DB_POOL_MAX` — PostgreSQL connection pool size. Default: `10`
 - `RUN_MIGRATIONS_ON_BOOT` — Whether the app runs pending migrations at startup. Default: `true`; set `false` for multi-replica deploys where only one instance should migrate.
-- `MANIFEST_MIGRATION_FORCE` — Set `1` to let the tenant-scoping migrations (`1792500000000`, `1792600000000`) delete pre-tenant rows with a NULL `tenant_id` instead of aborting boot with instructions. One-off upgrade escape hatch; never set it permanently.
-- `MANIFEST_FRONTEND_DIR` / `MANIFEST_EMBEDDED` — Internal. Custom path to the built frontend (`common/utils/frontend-path.ts`), and a flag that skips the auto `bootstrap()` in `main.ts` when the backend is embedded by another process.
+- `THINKER_MIGRATION_FORCE` — Set `1` to let the tenant-scoping migrations (`1792500000000`, `1792600000000`) delete pre-tenant rows with a NULL `tenant_id` instead of aborting boot with instructions. One-off upgrade escape hatch; never set it permanently.
+- `THINKER_FRONTEND_DIR` / `THINKER_EMBEDDED` — Internal. Custom path to the built frontend (`common/utils/frontend-path.ts`), and a flag that skips the auto `bootstrap()` in `main.ts` when the backend is embedded by another process.
 - `ANNOUNCE_APP_URL` / `DOCTOR_TUTORIAL_URL` — Inputs to the release-announcement React Email template only; the sending tool lives outside this repo. Not read by the server.
 - `PLUGIN_OTLP_ENDPOINT` — Dead. Still listed in `.env.example` but no code reads it since OTLP ingest was removed; safe to delete.
 - `MIGRATION_DATABASE_URL` / `BACKFILL_DATABASE_URL` — Direct (non-PgBouncer) database URLs for migrations and the standalone `request-backfill.cli.ts` worker. The boot-time backfills always use the app's `DATABASE_URL` connection (#18).
@@ -492,8 +494,8 @@ See `packages/backend/.env.example` for all variables. Key ones:
 - `STREAM_WARMUP_MS` — Timeout (ms) to wait for the first chunk of a streaming response before trying a fallback. Default: `15000`
 - `STREAM_IDLE_TIMEOUT_MS` — Max silence (ms) between upstream streaming events before the attempt is failed with HTTP 504. Default: `180000`
 - `CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS` — Timeout (ms) to wait for deliverable ChatGPT Codex text or tool output. Default: `60000`
-- `MANIFEST_CONCURRENCY_MAX` — Per-tenant concurrent in-flight request limit for each backend process. Accepts a plain positive integer; invalid values fall back to `10`.
-- `MANIFEST_RATE_MAX_REQUESTS` / `MANIFEST_IP_RATE_MAX_REQUESTS` — Per-tenant (M201) and per-IP (M202) requests-per-minute caps on `/v1` proxy traffic for each backend process. Accept a plain positive integer; invalid values fall back to `200` / `500`.
+- `THINKER_CONCURRENCY_MAX` — Per-tenant concurrent in-flight request limit for each backend process. Accepts a plain positive integer; invalid values fall back to `10`.
+- `THINKER_RATE_MAX_REQUESTS` / `THINKER_IP_RATE_MAX_REQUESTS` — Per-tenant (M201) and per-IP (M202) requests-per-minute caps on `/v1` proxy traffic for each backend process. Accept a plain positive integer; invalid values fall back to `200` / `500`.
 - `EMAIL_PROVIDER` — Unified email provider: `resend` (recommended), `mailgun`, or `sendgrid`. Used for Better Auth transactional emails and threshold alerts.
 - `EMAIL_API_KEY` — API key for the configured `EMAIL_PROVIDER`.
 - `EMAIL_DOMAIN` — Sending domain (required for Mailgun).
@@ -545,13 +547,13 @@ This rule exists because the Overview and Messages pages previously drifted and 
 
 ## Manifest's own errors (`M###`)
 
-Every failure Manifest itself produces — as opposed to one a provider returned — carries a documented code from `MANIFEST_ERRORS` in `packages/backend/src/common/errors/error-codes.ts`, published at `https://manifest.build/llm-gateway/docs/errors/<code>`.
+Every failure Manifest itself produces — as opposed to one a provider returned — carries a documented code from `THINKER_ERRORS` in `packages/backend/src/common/errors/error-codes.ts`, published at `https://manifest.build/llm-gateway/docs/errors/<code>`.
 
 **Raise them with `ManifestError`** (`common/errors/manifest-error.ts`), never a bare `HttpException`. The type is what lets `proxy.controller.ts` tell "Manifest refused this request" from "the provider returned a 4xx". Before it existed, a malformed body (M300) and a Manifest bug (M500) were both recorded as _provider_ errors and counted against `provider_error_rate`.
 
-**Every code is recorded on a Manifest Request**, with five exceptions. `M001`, `M002`, `M003`, `M005`, and `M006` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_MANIFEST_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.manifestErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/manifest-error.spec.ts` fails if a new code is neither mapped in `MANIFEST_CODE_TO_REASON` nor declared unrecordable.
+**Every code is recorded on a Manifest Request**, with five exceptions. `M001`, `M002`, `M003`, `M005`, and `M006` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_THINKER_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.manifestErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/manifest-error.spec.ts` fails if a new code is neither mapped in `THINKER_CODE_TO_REASON` nor declared unrecordable.
 
-**`ProxyMessageRecorder.recordManifestBlockedRequest()` is the only writer of Manifest-authored rejected requests.** It creates one `requests` row, stamps `requests.error_code` plus the _rendered_ message (the `[🦚 Manifest M100] No anthropic API key yet. Add one here: …` text the caller saw — not a generic stand-in), and creates zero `agent_messages` rows because no provider was contacted. Do not route these through `recordSuccessMessage` or manufacture a `provider='manifest'` attempt.
+**`ProxyMessageRecorder.recordManifestBlockedRequest()` is the only writer of Manifest-authored rejected requests.** It creates one `requests` row, stamps `requests.error_code` plus the _rendered_ message (the `[🦚 Manifest M100] No anthropic API key yet. Add one here: …` text the caller saw — not a generic stand-in), and creates zero `agent_messages` rows because no provider was contacted. Do not route these through `recordSuccessMessage` or manufacture a `provider='thinker'` attempt.
 
 `M500` is the deliberate exception to "store what the caller saw": the caller gets the friendly "Something broke on our end", while the row stores the raw internal error message. The dashboard is where you go to find out what actually broke, so don't "fix" it to match.
 
@@ -561,11 +563,11 @@ Every failure Manifest itself produces — as opposed to one a provider returned
 
 `ERROR_ORIGINS` (in `packages/shared/src/error-taxonomy.ts`) has six values. `request` means the caller sent a body Manifest could not route — not the operator's setup (`config`), not a limit they set (`policy`), and not a Manifest bug (`internal`).
 
-`request` is a member of `MANIFEST_ERROR_ORIGINS`. Do not confuse the error-origin value with the `requests` table: it classifies who caused an error. That membership is load-bearing because it keeps caller-caused failures out of provider reliability metrics and inside the `origin=manifest` filter shorthand. Any new origin that is not a provider round-trip belongs there too.
+`request` is a member of `THINKER_ERROR_ORIGINS`. Do not confuse the error-origin value with the `requests` table: it classifies who caused an error. That membership is load-bearing because it keeps caller-caused failures out of provider reliability metrics and inside the `origin=manifest` filter shorthand. Any new origin that is not a provider round-trip belongs there too.
 
 ### Fallback exhaustion is a provider error, not a Manifest code
 
-When the primary and every fallback fail, the response **says what the provider said**: the message leads with the primary provider's own sentence followed by a one-line summary of every attempt, `source` is always `provider`, and `code` holds only the provider's own code. Exhaustion is a routing outcome, carried by `fallback_exhausted: true` in the body and the `X-Manifest-Fallback-Exhausted` header — it is **not** an error class and gets no `M###` code. Each `attempted_fallbacks[]` entry carries its sanitized `message`, `code`, and `auth_type`. The provider-error parsers also understand FastAPI-style `{detail}` bodies (how ChatGPT Codex rejects an unsupported model) and bare `{"error": "…"}` strings, so those no longer collapse to a generic "Bad request to upstream provider".
+When the primary and every fallback fail, the response **says what the provider said**: the message leads with the primary provider's own sentence followed by a one-line summary of every attempt, `source` is always `provider`, and `code` holds only the provider's own code. Exhaustion is a routing outcome, carried by `fallback_exhausted: true` in the body and the `X-Thinker-Fallback-Exhausted` header — it is **not** an error class and gets no `M###` code. Each `attempted_fallbacks[]` entry carries its sanitized `message`, `code`, and `auth_type`. The provider-error parsers also understand FastAPI-style `{detail}` bodies (how ChatGPT Codex rejects an unsupported model) and bare `{"error": "…"}` strings, so those no longer collapse to a generic "Bad request to upstream provider".
 
 ## Request Recording (Provider Attempt bodies)
 
@@ -573,7 +575,7 @@ Opt-in, **per-harness** recording of Provider Attempt request/response bodies, b
 
 - **Toggle**: `GET/PATCH /api/v1/routing/:agentName/recording` (in `tier.controller.ts`); UI in `pages/SettingsRecordingSection.tsx`. **Default ON for newly created harnesses only** — enabling the feature never changed existing harnesses' settings. Setting changes apply immediately across replicas.
 - **Storage selection** (`REQUEST_RECORDING_STORAGE=auto|s3|filesystem|disabled`, default `auto`): complete S3 credentials win; otherwise recordings go to the filesystem path (`REQUEST_RECORDING_FILESYSTEM_PATH`, default `/data/request-recordings` in production, `.data/request-recordings` under the working directory otherwise). S3 config: `REQUEST_RECORDING_S3_BUCKET/ENDPOINT/REGION/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`.
-- **Encryption at rest**: recordings are encrypted under the **current** `MANIFEST_ENCRYPTION_KEY` only. The `MANIFEST_ENCRYPTION_KEY_PREVIOUS` re-encryption pass does **not** rewrite recordings — after a key change, older recordings are unreadable until retention removes them. Pre-encryption gzip-only recordings stay readable.
+- **Encryption at rest**: recordings are encrypted under the **current** `THINKER_ENCRYPTION_KEY` only. The `THINKER_ENCRYPTION_KEY_PREVIOUS` re-encryption pass does **not** rewrite recordings — after a key change, older recordings are unreadable until retention removes them. Pre-encryption gzip-only recordings stay readable.
 - **Retention** (`REQUEST_RECORDING_RETENTION_DAYS`): one instance-wide value, default 365d (no per-plan retention). Cleanup cron in `database/request-recording-retention.service.ts`.
 - **Privacy**: inline base64 images are stripped from recordings.
 - **Code**: `common/services/request-recording-storage.service.ts` (storage backends), `common/utils/request-recording-codec.ts` (gzip + encryption codec), `routing/proxy/attempt-recording.service.ts` + `attempt-recording-capture.ts` (capture in the proxy path).

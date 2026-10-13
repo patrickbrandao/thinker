@@ -1450,21 +1450,21 @@ describe('CustomProviderService', () => {
           ...overrides,
         }) as CustomProvider;
 
-      const ORIGINAL_ENV = process.env['MANIFEST_ENCRYPTION_KEY'];
-      const ORIGINAL_PREVIOUS = process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+      const ORIGINAL_ENV = process.env['THINKER_ENCRYPTION_KEY'];
+      const ORIGINAL_PREVIOUS = process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
       beforeAll(() => {
-        process.env['MANIFEST_ENCRYPTION_KEY'] = 'test-encryption-secret-min-32-chars-long-padding';
+        process.env['THINKER_ENCRYPTION_KEY'] = 'test-encryption-secret-min-32-chars-long-padding';
       });
       afterAll(() => {
         if (ORIGINAL_ENV === undefined) {
-          delete process.env['MANIFEST_ENCRYPTION_KEY'];
+          delete process.env['THINKER_ENCRYPTION_KEY'];
         } else {
-          process.env['MANIFEST_ENCRYPTION_KEY'] = ORIGINAL_ENV;
+          process.env['THINKER_ENCRYPTION_KEY'] = ORIGINAL_ENV;
         }
         if (ORIGINAL_PREVIOUS === undefined) {
-          delete process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+          delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
         } else {
-          process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = ORIGINAL_PREVIOUS;
+          process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = ORIGINAL_PREVIOUS;
         }
       });
 
@@ -1520,9 +1520,9 @@ describe('CustomProviderService', () => {
         expect(getProviders).not.toHaveBeenCalled();
       });
 
-      it('decrypts a key still stored under MANIFEST_ENCRYPTION_KEY_PREVIOUS', async () => {
+      it('decrypts a key still stored under THINKER_ENCRYPTION_KEY_PREVIOUS', async () => {
         const previous = 'previous-encryption-secret-min-32-chars-long';
-        process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'] = previous;
+        process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = previous;
         try {
           const { svc, getProviders } = makeDeps({ findOneResults: [cpRow()] });
           getProviders.mockResolvedValueOnce([
@@ -1532,7 +1532,7 @@ describe('CustomProviderService', () => {
             'sk-old',
           );
         } finally {
-          delete process.env['MANIFEST_ENCRYPTION_KEY_PREVIOUS'];
+          delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
         }
       });
 

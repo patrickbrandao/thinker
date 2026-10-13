@@ -68,11 +68,11 @@ describe('proxy-response-handler', () => {
       const meta = makeMeta();
       const headers = buildMetaHeaders(meta);
 
-      expect(headers['X-Manifest-Tier']).toBe('standard');
-      expect(headers['X-Manifest-Model']).toBe('gpt-4o');
-      expect(headers['X-Manifest-Provider']).toBe('openai');
-      expect(headers['X-Manifest-Confidence']).toBe('0.9');
-      expect(headers['X-Manifest-Reason']).toBe('auto');
+      expect(headers['X-Thinker-Tier']).toBe('standard');
+      expect(headers['X-Thinker-Model']).toBe('gpt-4o');
+      expect(headers['X-Thinker-Provider']).toBe('openai');
+      expect(headers['X-Thinker-Confidence']).toBe('0.9');
+      expect(headers['X-Thinker-Reason']).toBe('auto');
     });
 
     it('should include fallback headers when fallbackFromModel is set', () => {
@@ -82,37 +82,37 @@ describe('proxy-response-handler', () => {
       });
       const headers = buildMetaHeaders(meta);
 
-      expect(headers['X-Manifest-Fallback-From']).toBe('gpt-4o');
-      expect(headers['X-Manifest-Fallback-Index']).toBe('2');
+      expect(headers['X-Thinker-Fallback-From']).toBe('gpt-4o');
+      expect(headers['X-Thinker-Fallback-Index']).toBe('2');
     });
 
     it('should default fallback index to 0 when not set', () => {
       const meta = makeMeta({ fallbackFromModel: 'gpt-4o' });
       const headers = buildMetaHeaders(meta);
 
-      expect(headers['X-Manifest-Fallback-Index']).toBe('0');
+      expect(headers['X-Thinker-Fallback-Index']).toBe('0');
     });
 
     it('should not include fallback headers when no fallback', () => {
       const meta = makeMeta();
       const headers = buildMetaHeaders(meta);
 
-      expect(headers).not.toHaveProperty('X-Manifest-Fallback-From');
-      expect(headers).not.toHaveProperty('X-Manifest-Fallback-Index');
+      expect(headers).not.toHaveProperty('X-Thinker-Fallback-From');
+      expect(headers).not.toHaveProperty('X-Thinker-Fallback-Index');
     });
 
     it('should include specificity header when specificity_category is set', () => {
       const meta = makeMeta({ specificity_category: 'coding' });
       const headers = buildMetaHeaders(meta);
 
-      expect(headers['X-Manifest-Specificity']).toBe('coding');
+      expect(headers['X-Thinker-Specificity']).toBe('coding');
     });
 
     it('should not include specificity header when specificity_category is not set', () => {
       const meta = makeMeta();
       const headers = buildMetaHeaders(meta);
 
-      expect(headers).not.toHaveProperty('X-Manifest-Specificity');
+      expect(headers).not.toHaveProperty('X-Thinker-Specificity');
     });
   });
 
@@ -321,7 +321,7 @@ describe('proxy-response-handler', () => {
         undefined,
         expect.objectContaining({ providerKeyLabel: 'Work', apiMode: 'messages' }),
       );
-      expect(res.setHeader).toHaveBeenCalledWith('X-Manifest-Fallback-Exhausted', 'true');
+      expect(res.setHeader).toHaveBeenCalledWith('X-Thinker-Fallback-Exhausted', 'true');
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.objectContaining({
@@ -376,7 +376,7 @@ describe('proxy-response-handler', () => {
         recorder as any,
       );
 
-      expect(res.setHeader).toHaveBeenCalledWith('X-Manifest-Fallback-Exhausted', 'true');
+      expect(res.setHeader).toHaveBeenCalledWith('X-Thinker-Fallback-Exhausted', 'true');
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.objectContaining({
@@ -837,7 +837,7 @@ describe('proxy-response-handler', () => {
     it('attributes an exhausted chain to the provider and keeps code free of the routing outcome', async () => {
       const { error, headers } = await exhausted({});
 
-      expect(headers['X-Manifest-Fallback-Exhausted']).toBe('true');
+      expect(headers['X-Thinker-Fallback-Exhausted']).toBe('true');
       expect(error).toEqual(
         expect.objectContaining({
           source: 'provider',

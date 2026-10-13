@@ -36,7 +36,7 @@ describe('custom provider alias', () => {
   describe('isReservedCustomProviderAlias', () => {
     it('reserves the synthetic routes and the custom prefix', () => {
       expect(isReservedCustomProviderAlias('auto')).toBe(true);
-      expect(isReservedCustomProviderAlias('manifest')).toBe(true);
+      expect(isReservedCustomProviderAlias('thinker')).toBe(true);
       expect(isReservedCustomProviderAlias('custom')).toBe(true);
     });
 

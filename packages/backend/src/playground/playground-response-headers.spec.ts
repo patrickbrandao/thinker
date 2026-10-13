@@ -48,25 +48,25 @@ describe('whitelistResponseHeaders', () => {
     expect(out['content-type']).toBe('application/json');
   });
 
-  it('allows x-ratelimit-, x-manifest-, and ratelimit- prefixes (case-insensitive)', () => {
+  it('allows x-ratelimit-, x-thinker-, and ratelimit- prefixes (case-insensitive)', () => {
     const h = new Headers();
     // Mix of casings — Headers normalizes to lowercase internally, but we
     // also rely on the function's defensive .toLowerCase() call.
     h.append('X-RateLimit-Remaining', '99');
-    h.append('X-MANIFEST-Tier', 'standard');
+    h.append('X-THINKER-Tier', 'standard');
     h.append('RateLimit-Reset', '60');
     h.append('x-ratelimit-limit', '100');
-    h.append('x-manifest-specificity', 'coding');
+    h.append('x-thinker-specificity', 'coding');
     h.append('ratelimit-policy', '100;w=60');
 
     const out = whitelistResponseHeaders(h);
 
     // Keys come out lowercased.
     expect(out['x-ratelimit-remaining']).toBe('99');
-    expect(out['x-manifest-tier']).toBe('standard');
+    expect(out['x-thinker-tier']).toBe('standard');
     expect(out['ratelimit-reset']).toBe('60');
     expect(out['x-ratelimit-limit']).toBe('100');
-    expect(out['x-manifest-specificity']).toBe('coding');
+    expect(out['x-thinker-specificity']).toBe('coding');
     expect(out['ratelimit-policy']).toBe('100;w=60');
   });
 
@@ -139,7 +139,7 @@ describe('whitelistResponseHeaders', () => {
     // would let custom-prefixed headers leak through.
     const h = new Headers();
     h.append('my-x-ratelimit-remaining', '50');
-    h.append('foo-x-manifest-tier', 'cheap');
+    h.append('foo-x-thinker-tier', 'cheap');
     h.append('not-ratelimit-policy', 'spoof');
 
     expect(whitelistResponseHeaders(h)).toEqual({});
@@ -163,7 +163,7 @@ describe('whitelistResponseHeaders', () => {
     h.append('openai-model', 'gpt-4o');
     // Allowed (prefix)
     h.append('x-ratelimit-remaining', '99');
-    h.append('x-manifest-tier', 'standard');
+    h.append('x-thinker-tier', 'standard');
     // Blocked
     h.append('authorization', 'Bearer sk-secret');
     h.append('cookie', 'session=abc');
@@ -175,7 +175,7 @@ describe('whitelistResponseHeaders', () => {
       'content-type': 'application/json',
       'openai-model': 'gpt-4o',
       'x-ratelimit-remaining': '99',
-      'x-manifest-tier': 'standard',
+      'x-thinker-tier': 'standard',
     });
   });
 });

@@ -163,9 +163,19 @@ jobs:
           path: .gateway-contract-baseline
           sparse-checkout: contracts/gateway
 
+      # A pull request that changes a contract on purpose, as an exception to
+      # the two-PR rule in contracts/gateway/README.md approved on its issue,
+      # carries the `contract-break` label: the baseline still runs and shows
+      # what broke, but its failure no longer fails the job. The label has to
+      # be on the PR before the run starts (push again after adding it).
       - name: Run baseline gateway contracts
+        id: baseline-contracts
         if: github.event_name == 'pull_request'
+        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'contract-break') }}
         env:
+          THINKER_BASE_URL: http://127.0.0.1:2099
+          # Base commits from before #21 read the URL under its old name.
+          # TODO(#31): drop this line once no open PR has a base before #21.
           MANIFEST_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
@@ -176,9 +186,16 @@ jobs:
           fi
           node --test "${tests[@]}"
 
+      - name: Flag baseline contract failures accepted by contract-break
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.baseline-contracts.outcome == 'failure'
+        run: |
+          echo "::warning title=Baseline contracts failed::The base commit's gateway contracts failed and the job continued only because this PR carries the contract-break label. Check that every failure is an approved contract change."
+
       - name: Run candidate gateway contracts
         env:
-          MANIFEST_BASE_URL: http://127.0.0.1:2099
+          THINKER_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
           tests=(contracts/gateway/tests/*.test.mjs)
@@ -232,7 +249,10 @@ jobs:
           agent=$(curl -sSf -b "$cookie_jar" -X POST "$base_url/api/v1/agents" \
             -H 'Content-Type: application/json' \
             --data '{"name":"Volume Smoke Agent"}')
-          agent_key=$(jq -er '.apiKey | select(startswith("mnfst_"))' <<<"$agent")
+          agent_key=$(jq -er '.apiKey | select(startswith("thk_"))' <<<"$agent")
+          echo "::add-mask::$agent_key"
+          # Kept for the routed-response gateway contract in a later step.
+          printf '%s' "$agent_key" > "$RUNNER_TEMP/smoke-agent-key"
 
           provider=$(curl -sSf -b "$cookie_jar" -X POST \
             "$base_url/api/v1/routing/volume-smoke-agent/custom-providers" \
@@ -326,6 +346,15 @@ jobs:
              ))' \
             <<<"$details" >/dev/null
 
+      # Runs after the recording check, which reads the latest recorded row:
+      # the routed request below would otherwise be that row.
+      - name: Run the routed-response gateway contract with the smoke agent key
+        run: |
+          THINKER_CONTRACT_AGENT_KEY="$(cat "$RUNNER_TEMP/smoke-agent-key")" \
+            node --test contracts/gateway/tests/identifiers.test.mjs
+        env:
+          THINKER_BASE_URL: http://127.0.0.1:2099
+
       - name: Dump backend logs on success (for diff inspection)
         if: success()
         working-directory: docker
@@ -377,19 +406,20 @@ jobs:
 
       - name: Serve a patched copy of the PR's docker/ files on a local HTTP port
         run: |
-          # docker/docker-compose.yml still names the upstream image until #26.
-          # Serve install.sh a temporary copy whose app image is the local
-          # thinker:ci, so nothing is pulled from a registry and docker/ is
-          # left untouched. Only the app service's image line matches
-          # `<registry>/manifest:<tag>`; the Postgres image does not.
+          # docker/docker-compose.yml names the published app image
+          # (tmsoftbrasil/thinker:${THINKER_VERSION:-latest}). Serve install.sh
+          # a temporary copy whose app image is the local thinker:ci, so
+          # nothing is pulled from a registry and docker/ is left untouched.
+          # Only the app service's image line matches `<registry>/thinker:<tag>`
+          # (or the legacy `<registry>/manifest:<tag>`); Postgres does not.
           src_dir="$RUNNER_TEMP/installer-source"
           mkdir -p "$src_dir"
           cp docker/docker-compose.yml docker/.env.example "$src_dir/"
           sed -E -i \
-            's#^([[:space:]]*image:[[:space:]]*)[^[:space:]]+/manifest:[^[:space:]]+$#\1thinker:ci#' \
+            's#^([[:space:]]*image:[[:space:]]*)[^[:space:]]+/(thinker|manifest):[^[:space:]]+$#\1thinker:ci#' \
             "$src_dir/docker-compose.yml"
           test "$(grep -Ec '^[[:space:]]*image:[[:space:]]*thinker:ci$' "$src_dir/docker-compose.yml")" = 1
-          if grep -Eq '^[[:space:]]*image:.*/manifest:' "$src_dir/docker-compose.yml"; then
+          if grep -Eq '^[[:space:]]*image:.*/(thinker|manifest):' "$src_dir/docker-compose.yml"; then
             echo "::error::The patched Compose file still names a published app image." >&2
             exit 1
           fi

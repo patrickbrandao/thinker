@@ -18,9 +18,9 @@ import {
   MESSAGE_ROW_SELECT_ALIASES,
   sqlCountMessages,
   ERROR_MESSAGE_STATUSES,
-  MANIFEST_ORIGIN_PREDICATE,
+  THINKER_ORIGIN_PREDICATE,
 } from './query-helpers';
-import { MANIFEST_ERROR_ORIGINS } from 'thinker-shared';
+import { THINKER_ERROR_ORIGINS } from 'thinker-shared';
 import { SelectQueryBuilder } from 'typeorm';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 
@@ -569,9 +569,9 @@ describe('sqlCountMessages', () => {
 });
 
 describe('origin predicates', () => {
-  it('MANIFEST_ORIGIN_PREDICATE matches every Manifest origin, request included', () => {
-    expect(MANIFEST_ERROR_ORIGINS).toEqual(['config', 'policy', 'internal', 'request']);
-    expect(MANIFEST_ORIGIN_PREDICATE).toBe(
+  it('THINKER_ORIGIN_PREDICATE matches every Manifest origin, request included', () => {
+    expect(THINKER_ERROR_ORIGINS).toEqual(['config', 'policy', 'internal', 'request']);
+    expect(THINKER_ORIGIN_PREDICATE).toBe(
       "at.error_origin IN ('config', 'policy', 'internal', 'request')",
     );
   });

@@ -22,7 +22,7 @@ import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
 import { isLoopbackPeer } from '../../common/utils/local-ip';
 import { scryptFingerprint } from '../../common/utils/crypto.util';
 const MIN_TOKEN_LENGTH = 12;
-// Generated keys are `mnfst_` + 43 base64url chars. The ceiling is generous on
+// Generated keys are `thk_` + 43 base64url chars. The ceiling is generous on
 // purpose; it bounds the input to the cache fingerprint below, so an oversized
 // header cannot buy extra scrypt work per request.
 const MAX_TOKEN_LENGTH = 512;
@@ -98,7 +98,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly MAX_CACHE_SIZE = 10_000;
   // Maps a rejected token's fingerprint to when its rejection stops being trusted.
-  // Without this, every request bearing a wrong/revoked mnfst_ key runs a
+  // Without this, every request bearing a wrong/revoked thk_ key runs a
   // fresh indexed DB lookup AND emits a warn log — so a single misconfigured
   // agent in a retry loop sustains DB load and floods the logs indefinitely.
   // The TTL is deliberately much shorter than CACHE_TTL_MS so a key that gets
@@ -211,7 +211,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       throw new UnauthorizedException('Invalid API key format');
     }
 
-    return this.validateMnfstToken(request, token);
+    return this.validatePrefixedAgentKey(request, token);
   }
 
   invalidateCache(key: string) {
@@ -245,7 +245,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     return true;
   }
 
-  private async validateMnfstToken(request: Request, token: string): Promise<boolean> {
+  private async validatePrefixedAgentKey(request: Request, token: string): Promise<boolean> {
     const fingerprint = AgentKeyAuthGuard.fingerprint(token);
     const now = Date.now();
 
@@ -351,7 +351,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       // An expired key still identifies its agent, so this rejection is the one
       // auth failure Manifest can attribute and record (M004). The others
       // (M001–M003, M005, M006) never resolve a tenant and stay unrecorded — see
-      // UNRECORDABLE_MANIFEST_CODES.
+      // UNRECORDABLE_THINKER_CODES.
       (request as Request & RequestWithManifestErrorContext).manifestErrorContext = {
         tenantId: keyRecord.tenant_id,
         agentId: keyRecord.agent_id,

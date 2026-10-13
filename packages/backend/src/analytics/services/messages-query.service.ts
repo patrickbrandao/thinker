@@ -11,7 +11,7 @@ import {
   selectMessageRowColumns,
   ERROR_MESSAGE_STATUSES,
   SUCCESS_STATUS_SQL_LIST,
-  MANIFEST_ORIGIN_PREDICATE,
+  THINKER_ORIGIN_PREDICATE,
   CUSTOM_PROVIDER_JOIN_CONDITION,
   excludePlaygroundAgents,
   filterByLiveAgentName,
@@ -928,7 +928,7 @@ export class MessagesQueryService {
     // to see to fix their setup. `manifest` is a shorthand for every
     // Manifest-authored origin at once.
     if (params.origin === 'manifest') {
-      qb.andWhere(MANIFEST_ORIGIN_PREDICATE);
+      qb.andWhere(THINKER_ORIGIN_PREDICATE);
     } else if (params.origin) {
       qb.andWhere('at.error_origin = :originFilter', { originFilter: params.origin });
     }

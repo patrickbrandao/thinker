@@ -27,7 +27,7 @@ describe("FrameworkSnippets", () => {
 
   it("renders connection details with API key placeholder", () => {
     const { container } = render(() => <FrameworkSnippets {...defaultProps} />);
-    expect(container.textContent).toContain("mnfst_YOUR_KEY");
+    expect(container.textContent).toContain("thk_YOUR_KEY");
     expect(container.textContent).toContain("API Key");
   });
 

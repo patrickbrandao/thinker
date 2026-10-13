@@ -85,7 +85,7 @@ describe('ProxyExceptionFilter', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       const content = res.json.mock.calls[0][0].choices[0].message.content;
-      expect(content).toContain('mnfst_');
+      expect(content).toContain('thk_');
     });
 
     it('converts "API key expired" with dashboard URL', () => {

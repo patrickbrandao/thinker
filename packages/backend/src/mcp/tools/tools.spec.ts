@@ -899,6 +899,80 @@ describe('MCP tools', () => {
         global.fetch = originalFetch;
       }
     });
+
+    it('sends the header rule the custom tier stores, not a fixed header name', async () => {
+      const originalFetch = global.fetch;
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ model: 'gpt-4o', choices: [{ message: { content: 'OK' } }] }),
+            { status: 200 },
+          ),
+        );
+      global.fetch = fetchMock;
+      try {
+        const deps = makeDeps();
+        (deps.headerTiers.list as jest.Mock).mockResolvedValue([
+          // e.g. created by the CLI or the dashboard with its own header key
+          {
+            id: 'h1',
+            name: 'Deep',
+            header_key: 'x-team-route',
+            header_value: 'deep-v2',
+            enabled: true,
+          },
+        ]);
+        const res = await call(registerAll(deps), 'manifest_routing_test', {
+          agent: 'demo',
+          as: 'openclaw',
+          tier: 'deep',
+        });
+        expect(res.error).toBeFalsy();
+        expect(res.data).toMatchObject({ tier: 'deep', tier_header: 'x-team-route: deep-v2' });
+        const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+        expect(headers['x-team-route']).toBe('deep-v2');
+        expect(Object.keys(headers).filter((h) => h.endsWith('-tier'))).toEqual([]);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('refuses to test an unknown or disabled custom tier without calling the gateway', async () => {
+      const originalFetch = global.fetch;
+      const fetchMock = jest.fn();
+      global.fetch = fetchMock;
+      try {
+        const deps = makeDeps();
+        (deps.headerTiers.list as jest.Mock).mockResolvedValue([
+          {
+            id: 'h1',
+            name: 'deep',
+            header_key: 'x-thinker-tier',
+            header_value: 'deep',
+            enabled: false,
+          },
+        ]);
+        const tools = registerAll(deps);
+        const unknown = await call(tools, 'manifest_routing_test', {
+          agent: 'demo',
+          as: 'openclaw',
+          tier: 'nope',
+        });
+        expect(unknown.error).toBe(true);
+        expect(JSON.stringify(unknown)).toContain('Custom tier \\"nope\\" not found');
+        const disabled = await call(tools, 'manifest_routing_test', {
+          agent: 'demo',
+          as: 'openclaw',
+          tier: 'deep',
+        });
+        expect(disabled.error).toBe(true);
+        expect(JSON.stringify(disabled)).toContain('is disabled');
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
   });
 
   describe('model tools', () => {
@@ -1026,7 +1100,7 @@ describe('MCP tools', () => {
     it('returns env lines and the guide', async () => {
       const tools = registerAll(makeDeps());
       const env = await call(tools, 'manifest_agent_env', { agent: 'demo', export: true });
-      expect((env.data as { lines: string[] }).lines[0]).toContain('export MANIFEST_AGENT_KEY=');
+      expect((env.data as { lines: string[] }).lines[0]).toContain('export THINKER_AGENT_KEY=');
       expect((await call(tools, 'manifest_guide')).data).toHaveProperty('workflow');
 
       const deps = makeDeps();
