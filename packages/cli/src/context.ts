@@ -23,12 +23,12 @@ export interface CliIo {
   /**
    * True when attached to an interactive terminal — gates browser login.
    * Wired from stderr, not stdout: stdout is JSON-only and is routinely piped
-   * (`mnfst login | jq`), which must not disable browser login.
+   * (`thinker login | jq`), which must not disable browser login.
    */
   isTTY: boolean;
   /** Injected browser opener; falls back to defaultOpenBrowser. Returns false when opening failed. */
   openBrowser?: (url: string) => boolean;
-  /** Injected child-process runner for `mnfst run`; defaults to stdio-inherit spawn. */
+  /** Injected child-process runner for `thinker run`; defaults to stdio-inherit spawn. */
   spawnImpl?: (
     cmd: string,
     args: string[],
@@ -55,8 +55,8 @@ export function getConfig(io: CliIo): CliConfig {
 export function resolveFromFlags(io: CliIo, args: ParsedArgs): ResolvedTarget {
   // An explicit env credential + target needs nothing from the stored config,
   // so a corrupt config file must not abort scripted commands.
-  const envCredential = io.env['MANIFEST_API_KEY'];
-  const explicitTarget = args.strings['url'] ?? io.env['MANIFEST_URL'];
+  const envCredential = io.env['THINKER_API_KEY'];
+  const explicitTarget = args.strings['url'] ?? io.env['THINKER_URL'];
   const config = envCredential && explicitTarget ? {} : getConfig(io);
   return resolveTarget(args.strings['url'], io.env, config);
 }
@@ -71,7 +71,7 @@ export function clientFromFlags(
     throw new CliError(
       'not_authenticated',
       `No credential for ${target.origin}`,
-      'Run mnfst login, or set MANIFEST_API_KEY',
+      'Run thinker login, or set THINKER_API_KEY',
       401,
     );
   }

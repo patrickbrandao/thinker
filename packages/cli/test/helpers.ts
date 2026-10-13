@@ -22,7 +22,7 @@ export interface TestIoOptions {
 
 /** Hermetic CliIo: temp XDG config dir, captured output, stubbed fetch/stdin. */
 export function makeIo(options: TestIoOptions = {}): TestIo {
-  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-cli-test-'));
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-cli-test-'));
   const lines: string[] = [];
   const errLines: string[] = [];
   return {
@@ -59,7 +59,12 @@ export function jsonResponse(status: number, body: unknown): Response {
 
 /** fetch stub recording calls and replying from a queue (last reply sticks). */
 export function fetchStub(replies: Array<{ status: number; body: unknown }>) {
-  const calls: Array<{ url: string; method: string; headers: Record<string, string>; body?: string }> = [];
+  const calls: Array<{
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body?: string;
+  }> = [];
   const impl = (async (input: string | URL | Request, init?: RequestInit) => {
     const reply = replies.length > 1 ? replies.shift()! : replies[0];
     calls.push({
@@ -74,7 +79,7 @@ export function fetchStub(replies: Array<{ status: number; body: unknown }>) {
 }
 
 export function writeConfig(io: TestIo, config: unknown): string {
-  const dir = path.join(io.configDir, 'manifest');
+  const dir = path.join(io.configDir, 'thinker');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'config.json');
   fs.writeFileSync(file, JSON.stringify(config));

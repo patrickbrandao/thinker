@@ -16,7 +16,7 @@ function authedIo(
 ) {
   const stub = fetchStub(replies);
   const io = makeIo({
-    env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+    env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
     fetchImpl: stub.impl,
   });
   if (spawnImpl) io.spawnImpl = spawnImpl;
@@ -31,7 +31,7 @@ describe('runCmd', () => {
       spawned.push({ cmd, args, env });
       return 0;
     });
-    saveAgentKey(io.env, HOST, 'my-bot', 'mnfst_run_secret');
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_run_secret');
 
     await expect(
       runCmd(io, ['--agent', 'my-bot', '--', 'some-tool', '--flag', 'value']),
@@ -42,19 +42,19 @@ describe('runCmd', () => {
         cmd: 'some-tool',
         args: ['--flag', 'value'],
         env: expect.objectContaining({
-          MANIFEST_AGENT_KEY: 'mnfst_run_secret',
-          MANIFEST_AGENT_URL: `${HOST}/v1`,
+          THINKER_AGENT_KEY: 'thk_run_secret',
+          THINKER_AGENT_URL: `${HOST}/v1`,
         }),
       },
     ]);
     // The raw key never reaches stdout.
-    expect(io.lines.join('\n')).not.toContain('mnfst_run_secret');
+    expect(io.lines.join('\n')).not.toContain('thk_run_secret');
   });
 
   it('recovers the key from the server when the cache is cold', async () => {
     let env: Record<string, string | undefined> = {};
     const { io, calls } = authedIo(
-      [{ status: 200, body: { keyPrefix: 'mnfst_serv', apiKey: 'mnfst_from_server' } }],
+      [{ status: 200, body: { keyPrefix: 'thk_serv', apiKey: 'thk_from_server' } }],
       async (_c, _a, e) => {
         env = e;
         return 0;
@@ -62,7 +62,7 @@ describe('runCmd', () => {
     );
     await expect(runCmd(io, ['--agent', 'my-bot', '--', 'tool'])).resolves.toBe(0);
     expect(calls[0].url).toBe(`${HOST}/api/v1/agents/my-bot/key`);
-    expect(env['MANIFEST_AGENT_KEY']).toBe('mnfst_from_server');
+    expect(env['THINKER_AGENT_KEY']).toBe('thk_from_server');
   });
 
   it('renames the injected variable with --env', async () => {
@@ -74,7 +74,7 @@ describe('runCmd', () => {
     saveAgentKey(io.env, HOST, 'my-bot', 'k');
     await runCmd(io, ['--agent', 'my-bot', '--env', 'OPENAI_API_KEY', '--', 'tool']);
     expect(env['OPENAI_API_KEY']).toBe('k');
-    expect(env['MANIFEST_AGENT_KEY']).toBeUndefined();
+    expect(env['THINKER_AGENT_KEY']).toBeUndefined();
   });
 
   it('propagates the child exit code', async () => {
@@ -83,19 +83,19 @@ describe('runCmd', () => {
     await expect(runCmd(io, ['--agent', 'my-bot', '--', 'failing-tool'])).resolves.toBe(42);
   });
 
-  it('strips inherited MANIFEST_AGENT_KEY and variant-case credentials', async () => {
+  it('strips inherited THINKER_AGENT_KEY and variant-case credentials', async () => {
     let env: Record<string, string | undefined> = {};
     const { io } = authedIo([], async (_c, _a, e) => {
       env = e;
       return 0;
     });
-    io.env['MANIFEST_AGENT_KEY'] = 'stale-parent-key';
-    io.env['manifest_api_key'] = 'lower-case-patched';
+    io.env['THINKER_AGENT_KEY'] = 'stale-parent-key';
+    io.env['thinker_api_key'] = 'lower-case-patched';
     saveAgentKey(io.env, HOST, 'my-bot', 'fresh');
     await runCmd(io, ['--agent', 'my-bot', '--env', 'ROLE_KEY', '--', 'tool']);
     expect(env['ROLE_KEY']).toBe('fresh');
-    expect(env['MANIFEST_AGENT_KEY']).toBeUndefined();
-    expect(env['manifest_api_key']).toBeUndefined();
+    expect(env['THINKER_AGENT_KEY']).toBeUndefined();
+    expect(env['thinker_api_key']).toBeUndefined();
   });
 
   it('requires the -- separator and a command', async () => {
@@ -109,10 +109,10 @@ describe('runCmd', () => {
   it('rejects a reserved --env name', async () => {
     const { io } = authedIo([]);
     saveAgentKey(io.env, HOST, 'my-bot', 'k');
-    for (const name of ['MANIFEST_API_KEY', 'manifest_agent_key', 'MANIFEST_AGENT_URL']) {
-      await expect(
-        runCmd(io, ['--agent', 'my-bot', '--env', name, '--', 'tool']),
-      ).rejects.toThrow(expect.objectContaining({ code: 'invalid_env_name' }));
+    for (const name of ['THINKER_API_KEY', 'thinker_agent_key', 'THINKER_AGENT_URL']) {
+      await expect(runCmd(io, ['--agent', 'my-bot', '--env', name, '--', 'tool'])).rejects.toThrow(
+        expect.objectContaining({ code: 'invalid_env_name' }),
+      );
     }
   });
 

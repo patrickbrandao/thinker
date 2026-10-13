@@ -51,7 +51,7 @@ describe('run', () => {
     expect(io.lastJson()).toEqual({
       error: 'unknown_command',
       message: 'Unknown command: frobnicate now',
-      hint: 'Run mnfst --help',
+      hint: 'Run thinker --help',
     });
   });
 
@@ -93,7 +93,7 @@ describe('run', () => {
   it('sends only the command request: no usage report, no spool on disk (#17)', async () => {
     const urls: string[] = [];
     const io = makeIo({
-      env: { MANIFEST_URL: 'http://localhost:2099', MANIFEST_API_KEY: 'k' },
+      env: { THINKER_URL: 'http://localhost:2099', THINKER_API_KEY: 'k' },
       fetchImpl: async (input) => {
         urls.push(String(input));
         return new Response(JSON.stringify({ agents: [] }), {
@@ -103,7 +103,7 @@ describe('run', () => {
       },
     });
     for (const ok of [true, false]) {
-      if (!ok) io.env['MANIFEST_API_KEY'] = '';
+      if (!ok) io.env['THINKER_API_KEY'] = '';
       await run(io, ['agent', 'list']);
     }
     expect(urls.length).toBeGreaterThan(0);
@@ -115,7 +115,7 @@ describe('run', () => {
   it('sends an env key only to the local default when no host is configured (#17)', async () => {
     const calls: Array<{ url: string; key: string | undefined }> = [];
     const io = makeIo({
-      env: { MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_API_KEY: 'env-key' },
       fetchImpl: async (input, init) => {
         const headers = (init?.headers ?? {}) as Record<string, string>;
         calls.push({ url: String(input), key: headers['X-API-Key'] });
@@ -143,9 +143,9 @@ describe('run', () => {
   it('usage advertises only flags the commands actually accept', () => {
     // `enable` has no --yes (nothing destructive to confirm); `disable` requires it.
     expect(USAGE).toContain(
-      'mnfst agent provider enable <name> <provider> [--auth-type <a>] [--label <l>]\n',
+      'thinker agent provider enable <name> <provider> [--auth-type <a>] [--label <l>]\n',
     );
-    expect(USAGE).toContain('mnfst agent provider disable <name> <provider>');
+    expect(USAGE).toContain('thinker agent provider disable <name> <provider>');
     expect(USAGE).toMatch(/agent provider disable[^\n]*--yes/);
     // Flags that existed but went undocumented.
     expect(USAGE).toMatch(/agent configure[^\n]*--key-label/);
@@ -155,9 +155,9 @@ describe('run', () => {
     expect(USAGE).toMatch(/agent key show <name> \[--raw\]/);
     // --enabled belongs to `set`, not `get`.
     expect(USAGE).toContain(
-      'mnfst routing recording get <agent> | mnfst routing recording set <agent> --enabled true|false',
+      'thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false',
     );
-    expect(USAGE).toContain('mnfst routing params get <agent> [--tier <t>] [--model <m>]\n');
+    expect(USAGE).toContain('thinker routing params get <agent> [--tier <t>] [--model <m>]\n');
     expect(USAGE).toMatch(
       /routing params set <agent>[^\n]*--set <path>=<value>[^\n]*--unset <path>/,
     );

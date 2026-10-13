@@ -109,7 +109,7 @@ export const providerCustom = {
       throw new CliError(
         'not_found',
         `No custom provider "${nameOrId}"`,
-        'See mnfst provider custom list',
+        'See thinker provider custom list',
         404,
       );
     }

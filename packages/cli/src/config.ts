@@ -4,9 +4,9 @@ import * as os from 'os';
 import { CliError } from './errors';
 
 /**
- * Origin used when no `--url`, `MANIFEST_URL` or stored login selects one: a
+ * Origin used when no `--url`, `THINKER_URL` or stored login selects one: a
  * Thinker instance on this machine, at its default port. Never a hosted
- * service, so a key from `MANIFEST_API_KEY` cannot leave the machine by
+ * service, so a key from `THINKER_API_KEY` cannot leave the machine by
  * default (#17).
  */
 export const DEFAULT_URL = 'http://localhost:2099';
@@ -26,7 +26,7 @@ export interface Env {
 
 export function configFilePath(env: Env): string {
   const base = env['XDG_CONFIG_HOME'] || path.join(os.homedir(), '.config');
-  return path.join(base, 'manifest', 'config.json');
+  return path.join(base, 'thinker', 'config.json');
 }
 
 /** Reduce any URL to a normalized origin — the only key credentials bind to. */
@@ -61,7 +61,7 @@ export function loadConfig(filePath: string): CliConfig {
     throw new CliError(
       'config_corrupt',
       `Could not parse ${filePath}`,
-      'Fix or delete the file, then run mnfst login again',
+      'Fix or delete the file, then run thinker login again',
     );
   }
   // An array parses as an object but cannot hold hosts/apiKey, so returning it
@@ -70,7 +70,7 @@ export function loadConfig(filePath: string): CliConfig {
     throw new CliError(
       'config_corrupt',
       `Invalid config shape (expected an object) in ${filePath}`,
-      'Fix or delete the file, then run mnfst login again',
+      'Fix or delete the file, then run thinker login again',
     );
   }
   return typeof parsed === 'object' && parsed !== null ? (parsed as CliConfig) : {};
@@ -91,8 +91,8 @@ export interface ResolvedTarget {
 }
 
 /**
- * Resolution order — url: --url flag, then MANIFEST_URL, then the active
- * config host, then Cloud. Credential: MANIFEST_API_KEY, then the stored
+ * Resolution order — url: --url flag, then THINKER_URL, then the active
+ * config host, then DEFAULT_URL (this machine). Credential: THINKER_API_KEY, then the stored
  * credential whose origin EXACTLY matches the target. A credential stored
  * for another host is never sent.
  */
@@ -101,10 +101,8 @@ export function resolveTarget(
   env: Env,
   config: CliConfig,
 ): ResolvedTarget {
-  const origin = normalizeOrigin(
-    flagUrl ?? env['MANIFEST_URL'] ?? config.activeHost ?? DEFAULT_URL,
-  );
-  const envKey = env['MANIFEST_API_KEY'];
+  const origin = normalizeOrigin(flagUrl ?? env['THINKER_URL'] ?? config.activeHost ?? DEFAULT_URL);
+  const envKey = env['THINKER_API_KEY'];
   if (envKey) {
     return { origin, apiKey: envKey, source: 'env' };
   }

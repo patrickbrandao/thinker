@@ -189,7 +189,7 @@ packages/
 │   │   └── styles/
 │   └── tests/
 ├── shared/                           # Shared TypeScript types + helpers (consumed by backend and frontend)
-├── cli/                              # `mnfst` management CLI (private; bin/mnfst.js, commands/, generated provider catalog + skill content)
+├── cli/                              # `thinker` management CLI (private; bin/thinker.js, commands/, generated provider catalog + skill content)
 └── manifest/                         # Code-free shell package holding the canonical Manifest version (see Releases)
 ```
 
@@ -282,7 +282,7 @@ npm test --workspace=packages/backend          # Jest unit tests
 npm run test:e2e:docker --workspace=packages/backend  # Jest e2e tests on a throwaway Postgres (needs Docker)
 npm test --workspace=packages/frontend         # Vitest tests
 npm test --workspace=packages/shared           # Jest unit tests
-npm test --workspace=packages/cli              # Jest unit tests (mnfst CLI)
+npm test --workspace=packages/cli              # Jest unit tests (thinker CLI)
 ```
 
 #### Backend e2e database safety (issue #67)
@@ -360,20 +360,20 @@ async handler(@CurrentUser() user: AuthUser) {
 }
 ```
 
-### CLI login (`mnfst login`)
+### CLI login (`thinker login`)
 
-`packages/cli/` is the `mnfst` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `thk_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package publishes to npm as `mnfst-gateway-cli` (`npm i -g mnfst-gateway-cli`, command still `mnfst`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/mnfst.js`. `packages/cli/README.md` is the user-facing reference. The CLI embeds an agent skill whose source is `packages/cli/skill/SKILL.md`. It used to live in `.claude/skills/mnfst-cli/` and was moved out so that it isn't auto-loaded in this repo; #23 recreates it as `.claude/skills/thinker-cli/`.
+`packages/cli/` is the `thinker` management CLI: a thin wrapper over the `/api/v1` REST API (JSON on stdout, exit `0`/`1`, never interactive mid-task). One global tenant credential unlocks every command; per-agent `thk_*` keys are outputs only (written to `--key-file` paths with mode `0600`), never inputs. The package is `thinker-cli` (`private: true`, not published to any registry; install with `npm install -g ./packages/cli` or a local `npm pack`); from the monorepo, build with `npm run build --workspace=packages/shared && npm run build --workspace=packages/cli` and run `node packages/cli/bin/thinker.js`. It reads `THINKER_URL` and `THINKER_API_KEY`, injects `THINKER_AGENT_KEY`/`THINKER_AGENT_URL`, defaults to `http://localhost:2099` and stores its state in `~/.config/thinker/`. No legacy env var or config directory is read. `packages/cli/README.md` is the user-facing reference. The CLI embeds an agent skill whose source is `packages/cli/skill/SKILL.md` (skill name `thinker-cli`). It stays out of `.claude/skills/` so that it isn't auto-loaded in this repo.
 
 The default login is a browser flow, PKCE-protected so an intercepted code is useless without the verifier:
 
 1. The CLI opens the dashboard at `/cli/auth` (`pages/CliAuth.tsx`) with a `state` and an S256 `code_challenge`.
 2. The signed-in user approves; the page calls `POST /api/v1/cli/authorize` (session-only — an API key caller gets 403) and receives a short-lived code stored in `cli_auth_codes`.
 3. The CLI exchanges it at `POST /api/v1/cli/token` (public — the code is the credential, with `state` + `code_verifier`) for a `cli` PAT in `api_keys`; `expiresAt` is ISO-8601 UTC.
-4. `DELETE /api/v1/cli/token` revokes the calling PAT on `mnfst logout` (best-effort).
+4. `DELETE /api/v1/cli/token` revokes the calling PAT on `thinker logout` (best-effort).
 
 Non-interactive alternatives: `--token-stdin` or `--token-env`. The secret is never a CLI argument. `GET /api/v1/me` is the identity probe (`{ tenantId, userId, authMethod, expiresAt }`); it fails closed with 401 for the env `API_KEY` operator fallback because that credential attaches no tenant. Token lifetime: `CLI_TOKEN_TTL_DAYS` (sliding, default 30) capped by `CLI_TOKEN_ABSOLUTE_TTL_DAYS` (hard ceiling from issuance, default 90).
 
-The CLI refuses HTTP redirects (so the key cannot leak cross-origin) and strips inherited `MANIFEST_AGENT_KEY` / `MANIFEST_API_KEY` from `mnfst run` children. `mnfst routing test` sends `User-Agent: mnfst-cli/<version>` so gateway caller attribution (`routing/proxy/caller-classifier.ts`, which also recognises the n8n node's `n8n-nodes-manifest/<version>` UA) can tell CLI test traffic apart from real agent traffic in request details.
+The CLI refuses HTTP redirects (so the key cannot leak cross-origin) and strips inherited `THINKER_AGENT_KEY` / `THINKER_API_KEY` from `thinker run` children. `thinker routing test` sends `User-Agent: thinker-cli/<version>` so gateway caller attribution (`routing/proxy/caller-classifier.ts`, which also recognises the n8n node's `n8n-nodes-manifest/<version>` UA) can tell CLI test traffic apart from real agent traffic in request details.
 
 ### Remote MCP server
 
