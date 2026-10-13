@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import type { IncomingMessage, Server, ServerResponse } from 'http';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import {
@@ -12,11 +13,86 @@ import { PricingSyncService } from '../src/database/pricing-sync.service';
 import { ModelPricingCacheService } from '../src/model-prices/model-pricing-cache.service';
 import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
 import { ModelDiscoveryService } from '../src/model-discovery/model-discovery.service';
+import { closeServer, redirectFetchToLoopback, serveOnLoopback } from './loopback';
 
 let app: INestApplication;
 let ds: DataSource;
 
+/**
+ * Stand-in for api.openai.com on 127.0.0.1 (issue #114): the suite must never
+ * reach the internet, so the built-in `openai` provider's requests are routed
+ * here. It answers a normal chat completion, or the provider's 401 when the
+ * prompt asks for it, and records what the proxy forwarded.
+ */
+const FORCE_PROVIDER_401 = 'force-provider-401';
+interface UpstreamCall {
+  method: string;
+  path: string;
+  authorization?: string;
+  body: Record<string, unknown> | null;
+}
+let upstream: Server;
+let upstreamCalls: UpstreamCall[] = [];
+let restoreFetch: () => void;
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+}
+
+function json(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+async function handleOpenAi(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJson(req);
+  upstreamCalls.push({
+    method: req.method ?? '',
+    path: req.url ?? '',
+    authorization: req.headers.authorization,
+    body,
+  });
+  if (req.method === 'GET' && req.url === '/v1/models') {
+    return json(res, 200, { object: 'list', data: [] });
+  }
+  if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
+    return json(res, 404, { error: { message: 'not found', type: 'invalid_request_error' } });
+  }
+  const messages = (body?.messages ?? []) as Array<{ content?: unknown }>;
+  if (messages.some((m) => m.content === FORCE_PROVIDER_401)) {
+    return json(res, 401, {
+      error: {
+        message: 'Incorrect API key provided: sk-fake-***-key.',
+        type: 'invalid_request_error',
+        code: 'invalid_api_key',
+      },
+    });
+  }
+  return json(res, 200, {
+    id: 'chatcmpl-loopback',
+    object: 'chat.completion',
+    created: 1_700_000_000,
+    model: 'gpt-4o-mini',
+    choices: [
+      {
+        index: 0,
+        message: { role: 'assistant', content: 'Hello from the loopback mock.' },
+        finish_reason: 'stop',
+      },
+    ],
+    usage: { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 },
+  });
+}
+
 beforeAll(async () => {
+  upstream = await serveOnLoopback((req, res) => {
+    handleOpenAi(req, res).catch((err: unknown) => json(res, 500, { error: String(err) }));
+  });
+  restoreFetch = redirectFetchToLoopback('https://api.openai.com', upstream);
+
   app = await createTestApp();
 
   ds = app.get(DataSource);
@@ -86,7 +162,13 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
-  await app.close();
+  await app?.close();
+  restoreFetch?.();
+  if (upstream) await closeServer(upstream);
+});
+
+beforeEach(() => {
+  upstreamCalls = [];
 });
 
 const api = () => request(app.getHttpServer());
@@ -222,88 +304,56 @@ describe('Proxy E2E — /v1/chat/completions', () => {
     expect(res.text).toContain('messages');
   });
 
-  it('resolves and attempts to forward to provider', async () => {
-    // This test verifies the full proxy pipeline: auth → resolve → forward.
-    // The forward will reach the real OpenAI API which rejects the fake key,
-    // proving the proxy successfully routed and forwarded the request.
-    const res = await bearer(api().post('/v1/chat/completions')).send({
+  it('resolves and forwards to the provider', async () => {
+    // The full proxy pipeline: auth -> resolve -> forward, against the
+    // loopback stand-in for api.openai.com.
+    const res = await bearer(api().post('/v1/chat/completions'))
+      .send({
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: false,
+      })
+      .expect(200);
+
+    expect(res.body.choices[0].message.content).toBe('Hello from the loopback mock.');
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBe('gpt-4o-mini');
+    expect(res.headers['x-thinker-provider']).toBe('openai');
+
+    const forwarded = upstreamCalls.filter((c) => c.path === '/v1/chat/completions');
+    expect(forwarded).toHaveLength(1);
+    expect(forwarded[0].method).toBe('POST');
+    expect(forwarded[0].authorization).toBe('Bearer sk-fake-test-key');
+    expect(forwarded[0].body).toMatchObject({
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'hi' }],
-      stream: false,
     });
-
-    // Whitelist of intentionally-handled status codes. If a status outside this
-    // set surfaces (e.g., a stray 404, 405, 501), the test should fail loudly
-    // instead of silently passing — that signals a real regression in the
-    // proxy pipeline. Forcing the assertion BEFORE the header check also
-    // prevents the original bug where a provider-returned 403 would skip the
-    // header verification entirely and be misread as success.
-    expect([200, 400, 401, 403, 429, 500, 502, 503, 504]).toContain(res.status);
-
-    // The AgentKeyAuthGuard rejects requests BEFORE the proxy resolves a model,
-    // so guard-emitted responses never carry X-Thinker-* headers. If the
-    // status is in the 4xx range that the guard could plausibly emit (401/403),
-    // we must prove that this response came from the provider — i.e., the
-    // proxy successfully passed auth and forwarded — by asserting that the
-    // routing meta headers are present. A guard rejection here would mean the
-    // setup in beforeAll is broken (TEST_OTLP_KEY no longer valid).
-    if (res.status === 401 || res.status === 403) {
-      expect(res.headers['x-thinker-tier']).toBeDefined();
-      expect(res.headers['x-thinker-model']).toBeDefined();
-      expect(res.headers['x-thinker-provider']).toBeDefined();
-      // Body shape from handleProviderError() with the forwarded status and
-      // source echoed in the error. Provider-defined error types are preserved,
-      // so `source` discriminates this path from the guard's Manifest error.
-      expect(res.body?.error?.status).toBe(res.status);
-      expect(res.body?.error?.source).toBe('provider');
-    } else if (res.status >= 500) {
-      // Two failure modes converge here:
-      //  - handleProviderError (provider returned 5xx)  → type: 'server_error', X-Thinker-* present
-      //  - handleProxyError    (network/throw in proxy) → type: 'server_error', no X-Thinker-* headers
-      // Whichever path fires, the envelope must be one of the two known shapes —
-      // a 5xx with no `error` object would indicate a regression.
-      expect(res.body?.error?.type).toBe('server_error');
-    } else if (res.status === 200) {
-      // Unlikely in CI (the fake key would be rejected), but if it succeeds
-      // we still expect the routing meta headers on the response.
-      expect(res.headers['x-thinker-tier']).toBeDefined();
-      expect(res.headers['x-thinker-model']).toBeDefined();
-    }
   });
 
   it('does not return guard 401 envelope when a valid agent key is supplied', async () => {
     // Regression guard: if the AgentKeyAuthGuard ever rejects TEST_OTLP_KEY,
-    // the entire suite above silently degrades into "always 401, no headers"
-    // territory. Pin the contract explicitly so that a broken seed/key setup
-    // fails this single test instead of corrupting the meaning of every other
-    // assertion in the file.
+    // every forwarding test above degrades into "always 401". Pin the
+    // contract explicitly so that a broken seed/key setup fails here.
     const res = await bearer(api().post('/v1/chat/completions')).send({
       messages: [{ role: 'user', content: 'hi' }],
       stream: false,
     });
 
-    if (res.status === 401) {
-      // Guard 401s pass through ProxyExceptionFilter and are wrapped with
-      // type: 'auth_error', code: 'manifest_auth'. Provider 401s come from
-      // handleProviderError() with type: 'authentication_error'. Asserting
-      // type discriminates the two, even before headers are checked.
-      expect(res.body?.error?.type).not.toBe('auth_error');
-      expect(res.body?.error?.code).not.toBe('manifest_auth');
-    }
+    expect(res.status).toBe(200);
+    expect(res.body?.error).toBeUndefined();
   });
 
   it('includes X-Thinker-* headers when forwarding', async () => {
-    const res = await bearer(api().post('/v1/chat/completions')).send({
-      messages: [{ role: 'user', content: 'hello' }],
-      stream: false,
-    });
+    const res = await bearer(api().post('/v1/chat/completions'))
+      .send({
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: false,
+      })
+      .expect(200);
 
-    // Skip assertion if proxy returned 400 (no model) or 500 (network error)
-    if (res.status !== 500 && res.status !== 400) {
-      expect(res.headers['x-thinker-tier']).toBeDefined();
-      expect(res.headers['x-thinker-model']).toBeDefined();
-      expect(res.headers['x-thinker-provider']).toBeDefined();
-      expect(res.headers['x-thinker-confidence']).toBeDefined();
-    }
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBeDefined();
+    expect(res.headers['x-thinker-provider']).toBeDefined();
+    expect(res.headers['x-thinker-confidence']).toBeDefined();
   });
 
   it('accepts X-Session-Key header without error', async () => {
@@ -314,8 +364,31 @@ describe('Proxy E2E — /v1/chat/completions', () => {
         stream: false,
       });
 
-    // X-Session-Key should not cause a validation error (400 from body parsing)
-    // Auth (401) or no-model (400) or provider error are all acceptable outcomes
-    expect([200, 400, 401, 429, 500, 502]).toContain(res.status);
+    // X-Session-Key must not trip body validation (400) or auth: the request
+    // is routed and forwarded like any other.
+    expect(res.status).toBe(200);
+    expect(res.body.choices[0].message.content).toBe('Hello from the loopback mock.');
+    expect(upstreamCalls.filter((c) => c.path === '/v1/chat/completions')).toHaveLength(1);
+  });
+
+  it('passes a provider 401 through with the provider error envelope', async () => {
+    // A provider rejection must be told apart from the AgentKeyAuthGuard's own
+    // 401: it carries the routing headers and `source: 'provider'`.
+    // Keep this test last: the 401 puts the key in the credential rejection
+    // cooldown, so later requests in this file would no longer be forwarded.
+    const res = await bearer(api().post('/v1/chat/completions'))
+      .send({
+        messages: [{ role: 'user', content: FORCE_PROVIDER_401 }],
+        stream: false,
+      })
+      .expect(401);
+
+    expect(res.headers['x-thinker-tier']).toBeDefined();
+    expect(res.headers['x-thinker-model']).toBe('gpt-4o-mini');
+    expect(res.headers['x-thinker-provider']).toBe('openai');
+    expect(res.body?.error?.status).toBe(401);
+    expect(res.body?.error?.source).toBe('provider');
+    expect(res.body?.error?.type).not.toBe('auth_error');
+    expect(res.body?.error?.code).not.toBe('manifest_auth');
   });
 });

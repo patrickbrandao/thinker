@@ -128,7 +128,7 @@ openssl rand -hex 32
 ```
 
 `THINKER_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
-request recordings Manifest stores; the rest of the database is not encrypted
+request recordings Thinker stores; the rest of the database is not encrypted
 by it. Left unset it falls back to `BETTER_AUTH_SECRET`, which means one leaked
 session-signing secret also decrypts every stored credential and recording.
 Set it before first boot.
@@ -310,7 +310,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific major version (e.g. `tmsoftbrasil/thinker:6`) in `docker-compose.yml` if you want control over when major upgrades happen.
+Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific minor version (e.g. `tmsoftbrasil/thinker:0.1`) in `docker-compose.yml` if you want control over when upgrades happen.
 
 ## Backup & persistence
 

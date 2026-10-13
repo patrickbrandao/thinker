@@ -889,3 +889,15 @@ Never hand supertest a server that isn't listening yet. In that case it calls `s
 `createTestApp()` already listens on an ephemeral loopback port. Apps built some other way use `listenOnLoopback(app)` (Nest) or `serveOnLoopback(handler)` (Express or plain handlers) from `packages/backend/test/loopback.ts`. Unit specs under `src/` can't import from `test/`, so they bind `127.0.0.1` themselves (see `mcp-discovery.spec.ts`).
 
 `test/jest-e2e.json` sets a 30 s `testTimeout`, which also covers hooks. Each suite boots a full Nest app and syncs the schema in `beforeAll`, and on a loaded machine that can take more than Jest's default 5 s.
+
+### E2E tests never touch the internet (issue #114)
+
+`test/jest-e2e.json` loads `test/support/offline-setup.ts` (`setupFilesAfterEnv`) for every spec. It installs the offline guard from `test/support/offline-guard.ts`, which patches `net.Socket.prototype.connect` (so `net`, `tls`, `http(s)`, Node's `fetch` and the `undici` package) plus `dns.lookup`, `dns.promises.lookup` and the `dns.resolve*` family in the Jest process. Only loopback (`127.0.0.0/8`, `::1`, `localhost`), Unix sockets and the host:port of `DATABASE_URL` get through. A connection to a hostname is allowed when every address it resolves to is loopback, so a spec may pin a fake name to `127.0.0.1`. Names under the reserved `.invalid` TLD get a local NXDOMAIN. Anything else fails as it would offline (`ENETUNREACH`/`ENOTFOUND`) and is recorded, and an `afterEach`/`afterAll` hook fails the test that tried it, even when the app swallowed the error.
+
+So a spec that reaches a provider or an ADR 0003 catalog must mock it:
+
+- `createTestApp()` answers the boot-time catalog fetches (OpenRouter pricing from a fixture, models.dev with an empty catalog).
+- Built-in providers: serve a stand-in with `serveOnLoopback()` and route the provider's origin to it with `redirectFetchToLoopback('https://api.openai.com', server)` (see `proxy.e2e-spec.ts`), or use a custom provider whose `base_url` is `http://127.0.0.1:<port>`.
+- Child processes the suite spawns are outside the guard. The ones that boot the server preload `test/support/egress-recorder.cjs`, which keeps them offline as well. The opt-in Codex CLI run in `codex-responses.e2e-spec.ts` (only with `CODEX_CLI_BINARY` set) is a third-party binary and is not covered.
+
+The unit suite covers the guard itself (`test/offline-guard.spec.ts`).

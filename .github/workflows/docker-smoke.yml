@@ -406,19 +406,20 @@ jobs:
 
       - name: Serve a patched copy of the PR's docker/ files on a local HTTP port
         run: |
-          # docker/docker-compose.yml still names the upstream image until #26.
-          # Serve install.sh a temporary copy whose app image is the local
-          # thinker:ci, so nothing is pulled from a registry and docker/ is
-          # left untouched. Only the app service's image line matches
-          # `<registry>/manifest:<tag>`; the Postgres image does not.
+          # docker/docker-compose.yml names the published app image
+          # (tmsoftbrasil/thinker:${THINKER_VERSION:-latest}). Serve install.sh
+          # a temporary copy whose app image is the local thinker:ci, so
+          # nothing is pulled from a registry and docker/ is left untouched.
+          # Only the app service's image line matches `<registry>/thinker:<tag>`
+          # (or the legacy `<registry>/manifest:<tag>`); Postgres does not.
           src_dir="$RUNNER_TEMP/installer-source"
           mkdir -p "$src_dir"
           cp docker/docker-compose.yml docker/.env.example "$src_dir/"
           sed -E -i \
-            's#^([[:space:]]*image:[[:space:]]*)[^[:space:]]+/manifest:[^[:space:]]+$#\1thinker:ci#' \
+            's#^([[:space:]]*image:[[:space:]]*)[^[:space:]]+/(thinker|manifest):[^[:space:]]+$#\1thinker:ci#' \
             "$src_dir/docker-compose.yml"
           test "$(grep -Ec '^[[:space:]]*image:[[:space:]]*thinker:ci$' "$src_dir/docker-compose.yml")" = 1
-          if grep -Eq '^[[:space:]]*image:.*/manifest:' "$src_dir/docker-compose.yml"; then
+          if grep -Eq '^[[:space:]]*image:.*/(thinker|manifest):' "$src_dir/docker-compose.yml"; then
             echo "::error::The patched Compose file still names a published app image." >&2
             exit 1
           fi
