@@ -16,6 +16,20 @@ if (!logFile) throw new Error('EGRESS_LOG is required');
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
+// The disposable test database may live on another host, e.g. a container on
+// a Docker `--internal` network (#114). Resolving it is not egress.
+function databaseHost() {
+  try {
+    return new URL(process.env.DATABASE_URL || '').hostname.replace(/^\[|\]$/g, '') || null;
+  } catch {
+    return null;
+  }
+}
+const DB_HOST = databaseHost();
+// Not recorded either: the specs read the DNS log as a list of egress attempts.
+const isDatabaseHost = (hostname) =>
+  DB_HOST !== null && hostname === DB_HOST && !LOCAL_HOSTS.has(hostname);
+
 function record(kind, target) {
   fs.appendFileSync(logFile, JSON.stringify({ kind, target }) + '\n');
 }
@@ -40,6 +54,7 @@ globalThis.fetch = async function recordedFetch(input, init) {
 
 const realLookup = dns.lookup;
 dns.lookup = function recordedLookup(hostname, options, callback) {
+  if (isDatabaseHost(hostname)) return realLookup.apply(this, arguments);
   record('dns', hostname);
   if (LOCAL_HOSTS.has(hostname)) return realLookup.apply(this, arguments);
   const cb = typeof options === 'function' ? options : callback;
@@ -49,6 +64,7 @@ dns.lookup = function recordedLookup(hostname, options, callback) {
 
 const realPromisesLookup = dns.promises.lookup;
 dns.promises.lookup = async function recordedPromisesLookup(hostname, options) {
+  if (isDatabaseHost(hostname)) return realPromisesLookup.call(this, hostname, options);
   record('dns', hostname);
   if (LOCAL_HOSTS.has(hostname)) return realPromisesLookup.call(this, hostname, options);
   throw notFound(hostname);

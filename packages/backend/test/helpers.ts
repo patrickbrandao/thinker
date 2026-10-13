@@ -83,6 +83,7 @@ const entities = [
   CliAuthCode,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+const MODELS_DEV_URL = 'https://models.dev/api.json';
 const OPENROUTER_MODELS_FIXTURE = {
   data: [
     {
@@ -220,7 +221,7 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
   process.env['NODE_ENV'] = 'test';
   process.env['BETTER_AUTH_SECRET'] =
     process.env['BETTER_AUTH_SECRET'] ?? 'test-secret-for-e2e-at-least-32chars!!';
-  const restoreFetch = stubOpenRouterPricingFetch();
+  const restoreFetch = stubCatalogFetch();
 
   try {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -351,7 +352,13 @@ export function stubProviderDiscoveryFetch(): () => void {
   };
 }
 
-function stubOpenRouterPricingFetch(): () => void {
+/**
+ * Answers the ADR 0003 catalog fetches the app makes at boot (OpenRouter
+ * pricing, models.dev) from fixtures, so no e2e touches the internet (#114).
+ * models.dev gets an empty catalog: that is the offline state every spec
+ * already works with; a spec that needs entries stubs its own.
+ */
+function stubCatalogFetch(): () => void {
   const originalFetch = global.fetch;
 
   global.fetch = (async (
@@ -361,6 +368,12 @@ function stubOpenRouterPricingFetch(): () => void {
     const url = getFetchUrl(input);
     if (url === OPENROUTER_MODELS_URL) {
       return new Response(JSON.stringify(OPENROUTER_MODELS_FIXTURE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url === MODELS_DEV_URL) {
+      return new Response('{}', {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
