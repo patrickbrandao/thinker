@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createServer, type RequestListener, type Server } from 'http';
+import type { AddressInfo } from 'net';
 
 /**
  * The address supertest always dials: `http://127.0.0.1:<port>`.
@@ -43,4 +44,35 @@ export async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) =>
     server.close((err) => (err ? reject(err) : resolve())),
   );
+}
+
+/**
+ * Routes every `global.fetch` call aimed at `origin` (e.g.
+ * `https://api.openai.com`) to the same path on a loopback server, so a spec
+ * can exercise a built-in provider's real endpoint config without the
+ * internet (issue #114). Returns the restore function; call it in afterAll.
+ */
+export function redirectFetchToLoopback(origin: string, server: Server): () => void {
+  const { port } = server.address() as AddressInfo;
+  const target = `http://${LOOPBACK_HOST}:${port}`;
+  const originalFetch = global.fetch;
+
+  global.fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url === origin || url.startsWith(`${origin}/`)) {
+      const rewritten = `${target}${url.slice(origin.length)}`;
+      return originalFetch(
+        typeof input === 'string' || input instanceof URL
+          ? rewritten
+          : new Request(rewritten, input),
+        init,
+      );
+    }
+    return originalFetch(input, init);
+  }) as typeof fetch;
+
+  return () => {
+    global.fetch = originalFetch;
+  };
 }
