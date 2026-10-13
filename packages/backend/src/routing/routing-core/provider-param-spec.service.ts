@@ -166,7 +166,11 @@ function loadModelparamsCatalogData(): unknown {
   const dataModule = readFileSync(dataPath, 'utf8');
   // modelparams is ESM-only while the backend is CommonJS, so read the generated
   // JSON-shaped catalog literal directly from the installed package.
-  const match = dataModule.match(/export const CATALOG = ([\s\S]*?);\nfunction authSuffix/);
+  // Older releases emit `export const CATALOG = [...]`; 0.0.71+ emit
+  // `const GENERATED_CATALOG = [...]` followed by `export const CATALOG = GENERATED_CATALOG`.
+  const match = dataModule.match(
+    /(?:export )?const (?:GENERATED_)?CATALOG = (\[[\s\S]*?\]);\n(?:export const CATALOG|function authSuffix)/,
+  );
   if (!match) throw new Error('modelparams package catalog file has an unknown shape');
   return JSON.parse(match[1]) as unknown;
 }
