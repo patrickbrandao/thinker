@@ -12,7 +12,6 @@ export class SetupController {
   async getStatus(): Promise<{
     needsSetup: boolean;
     socialProviders: string[];
-    ollamaAvailable: boolean;
     localLlmHost: string;
     emailConfigured: boolean;
     mcpEnabled: boolean;
@@ -20,7 +19,6 @@ export class SetupController {
     return {
       needsSetup: await this.setupService.needsSetup(),
       socialProviders: this.setupService.getEnabledSocialProviders(),
-      ollamaAvailable: await this.setupService.isOllamaAvailable(),
       localLlmHost: this.setupService.getLocalLlmHost(),
       emailConfigured: this.setupService.isEmailConfigured(),
       mcpEnabled: this.setupService.isMcpEnabled(),

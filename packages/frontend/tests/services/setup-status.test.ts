@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   checkNeedsSetup,
   checkSocialProviders,
-  checkIsOllamaAvailable,
   checkLocalLlmHost,
   checkEmailConfigured,
   checkMcpEnabled,
   resetSetupStatus,
   createFirstAdmin,
 } from '../../src/services/setup-status';
+import * as setupStatus from '../../src/services/setup-status';
 
 describe('setup-status service', () => {
   beforeEach(() => {
@@ -123,61 +123,27 @@ describe('setup-status service', () => {
         json: async () => ({
           needsSetup: true,
           socialProviders: ['google'],
-          ollamaAvailable: true,
+          localLlmHost: 'host.docker.internal',
         }),
       });
       vi.stubGlobal('fetch', fetchMock);
 
-      const [needs, social, ollama] = await Promise.all([
+      const [needs, social, host] = await Promise.all([
         checkNeedsSetup(),
         checkSocialProviders(),
-        checkIsOllamaAvailable(),
+        checkLocalLlmHost(),
       ]);
 
       expect(needs).toBe(true);
       expect(social).toEqual(['google']);
-      expect(ollama).toBe(true);
+      expect(host).toBe('host.docker.internal');
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('checkIsOllamaAvailable', () => {
-    it('returns true when backend reports ollamaAvailable=true', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false, ollamaAvailable: true }),
-        }),
-      );
-      expect(await checkIsOllamaAvailable()).toBe(true);
-    });
-
-    it('returns false when backend reports ollamaAvailable=false', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false, ollamaAvailable: false }),
-        }),
-      );
-      expect(await checkIsOllamaAvailable()).toBe(false);
-    });
-
-    it('returns false when backend omits ollamaAvailable', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({ needsSetup: false }),
-        }),
-      );
-      expect(await checkIsOllamaAvailable()).toBe(false);
-    });
-
-    it('returns false on fetch failure', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-      expect(await checkIsOllamaAvailable()).toBe(false);
+  describe('local runner probe (#109)', () => {
+    it('exposes no Ollama availability check', () => {
+      expect(setupStatus).not.toHaveProperty('checkIsOllamaAvailable');
     });
   });
 
