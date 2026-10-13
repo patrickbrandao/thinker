@@ -2,8 +2,6 @@
 
 Thanks for your interest in contributing to Manifest! This guide will help you get up and running.
 
-[![codecov](https://img.shields.io/codecov/c/github/mnfst/llm-gateway?color=brightgreen)](https://codecov.io/gh/mnfst/llm-gateway)
-
 ## Tech Stack
 
 | Layer    | Technology                                       |
