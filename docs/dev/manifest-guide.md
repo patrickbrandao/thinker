@@ -626,6 +626,8 @@ What the operator loses with the sync off, as ADR 0003 accepted:
 
 `test/no-phonehome-egress.e2e-spec.ts` fails if the backend, CLI or shared source names a removed destination again, or if a production-mode boot fetches anything outside that list. It boots the real server three times against the same database: with no OpenCode Go provider (openrouter.ai and models.dev are fetched, raw.githubusercontent.com is not), with an OpenCode Go provider and `THINKER_CATALOG_SYNC=false` (no remote fetch at all), and with that provider and the default (the OpenCode Go doc is warmed).
 
+**Local runners (#109).** Ollama, LM Studio and llama.cpp are reached only through operator actions or configured providers: connecting Ollama (`POST /api/v1/routing/:agentName/providers` runs `OllamaSyncService.sync()`), `POST /api/v1/routing/ollama/sync`, and model discovery or proxying for a registered local provider. The public `GET /api/v1/setup/status` route no longer pings `${OLLAMA_HOST}/api/tags`, and its response has no `ollamaAvailable` field. Upstream ran that probe, with a 3 s timeout, on every call the dashboard made at first load. The first boot of the egress e2e points `OLLAMA_HOST`, `THINKER_LMSTUDIO_BASE_URL` and `THINKER_LLAMACPP_BASE_URL` at loopback TCP traps. It then calls `/setup/status` with no provider configured and fails if any trap sees a connection.
+
 ## Architecture Notes
 
 - **Single-service**: In production, `@nestjs/serve-static` serves `frontend/dist/` with SPA fallback. API routes (`/api/*`, `/otlp/*`) are excluded.
