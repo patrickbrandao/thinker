@@ -3,7 +3,7 @@
  * index.spec.ts. Do not hand-edit for a release: `npm run set-version -- <v>`
  * rewrites this file and package.json together, and CI runs it before packing.
  */
-export const VERSION = '6.24.0';
+export const VERSION = '0.1.0';
 
 /**
  * The one User-Agent every CLI-originated HTTP request carries — management
