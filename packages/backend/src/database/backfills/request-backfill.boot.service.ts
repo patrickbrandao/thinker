@@ -10,6 +10,7 @@ import {
 } from './backfill-requests';
 import { DEFAULT_BACKFILL_OPTIONS } from './backfill-message-providers';
 import { TypeOrmRequestBackfillGateway } from './backfill-requests.gateway';
+import { BootBackfillConnection } from './boot-backfill-connection';
 import { MESSAGE_PROVIDER_BACKFILL_LOCK_KEY } from './message-provider-backfill.boot.service';
 
 /** Initial historical pass marker; legacy-writer delta is tracked by unlinked rows. */
@@ -60,10 +61,12 @@ const defaultTransitionFinalizer: RequestTransitionFinalizer = async (dataSource
 };
 
 /**
- * Runs historical regrouping without blocking application readiness, on the
- * application's DATABASE_URL-backed connection. The standalone worker in
- * `request-backfill.cli.ts` remains for operators who front Postgres with a
- * transaction-mode pooler and need a direct connection.
+ * Runs historical regrouping without blocking application readiness. The
+ * advisory lock and the backfill SQL run on a direct connection when one is
+ * configured (`MIGRATION_DATABASE_URL`, `DATABASE_UNPOOLED_URL` or
+ * `BACKFILL_DATABASE_URL`), and on the application's DATABASE_URL-backed
+ * connection otherwise (see `BootBackfillConnection`). The standalone worker
+ * in `request-backfill.cli.ts` remains available.
  */
 @Injectable()
 export class RequestBackfillBootService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -71,12 +74,16 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
   private tailTimer: ReturnType<typeof setInterval> | undefined;
   private stopping = false;
   private readonly transitionReadyAt = Date.now() + REQUEST_BACKFILL_GENERIC_GRACE_MS;
+  /** Where the lock and the backfill SQL run. Replaceable in tests. */
+  connection: BootBackfillConnection;
 
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(BackfillState)
     private readonly stateRepo: Repository<BackfillState>,
-  ) {}
+  ) {
+    this.connection = new BootBackfillConnection(dataSource);
+  }
 
   onApplicationBootstrap(): void {
     if (process.env['NODE_ENV'] !== 'production') return;
@@ -87,6 +94,7 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
   async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
     this.stopTailSweep();
+    await this.connection.close();
   }
 
   private async runManagedBackfill(): Promise<void> {
@@ -94,7 +102,7 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
       try {
         await this.runUntilComplete();
         if (this.stopping) return;
-        await this.startTailSweep();
+        if (!(await this.startTailSweep())) await this.connection.close();
         return;
       } catch (error) {
         if (this.stopping) return;
@@ -119,7 +127,8 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
 
   async runOnce(runner: RequestBackfillRunner = defaultRunner): Promise<boolean> {
     if (await this.isCompleted()) return true;
-    const lock = this.dataSource.createQueryRunner();
+    const db = await this.connection.get();
+    const lock = db.createQueryRunner();
     await lock.connect();
     let acquired = false;
     try {
@@ -133,7 +142,7 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
       }
       if (await this.isCompleted()) return true;
       this.logger.log('running post-deploy request/provider-attempt backfill…');
-      const result = await runner(this.dataSource, this.logger, this.runOptions(true));
+      const result = await runner(db, this.logger, this.runOptions(true));
       await this.stateRepo
         .createQueryBuilder()
         .insert()
@@ -164,7 +173,8 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
     const options = this.runOptions(false);
     if (!(await this.hasEligibleAttempts(options.fallbackBefore!))) return true;
 
-    const lock = this.dataSource.createQueryRunner();
+    const db = await this.connection.get();
+    const lock = db.createQueryRunner();
     await lock.connect();
     let acquired = false;
     try {
@@ -175,7 +185,7 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
       if (!acquired) return false;
       if (!(await this.hasEligibleAttempts(options.fallbackBefore!))) return true;
 
-      const result = await runner(this.dataSource, this.logger, options);
+      const result = await runner(db, this.logger, options);
       this.logger.log(
         `request backfill tail sweep: ${result.attempts} attempt(s), ${result.rejections} rejection(s), ${result.windows} window(s)`,
       );
@@ -201,9 +211,10 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
     return rows[0]?.pending === true;
   }
 
-  private async startTailSweep(): Promise<void> {
-    if (!(await this.hasAttemptTable())) return;
-    if (await this.isTransitionFinalized()) return;
+  /** Returns whether a sweep was scheduled. */
+  private async startTailSweep(): Promise<boolean> {
+    if (!(await this.hasAttemptTable())) return false;
+    if (await this.isTransitionFinalized()) return false;
     this.tailTimer = setInterval(() => {
       void this.runMaintenanceOnce().catch((error) => {
         this.logger.error(
@@ -212,12 +223,16 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
       });
     }, REQUEST_BACKFILL_TAIL_INTERVAL_MS);
     if (typeof this.tailTimer === 'object' && 'unref' in this.tailTimer) this.tailTimer.unref();
+    return true;
   }
 
   private async runMaintenanceOnce(): Promise<void> {
     if (!(await this.runTailOnce())) return;
     if (Date.now() < this.transitionReadyAt) return;
-    if (await this.runTransitionFinalizeOnce()) this.stopTailSweep();
+    if (await this.runTransitionFinalizeOnce()) {
+      this.stopTailSweep();
+      await this.connection.close();
+    }
   }
 
   async runTransitionFinalizeOnce(
@@ -226,7 +241,8 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
     if (await this.isTransitionFinalized()) return true;
     if (await this.hasUnlinkedAttempts()) return false;
 
-    const lock = this.dataSource.createQueryRunner();
+    const db = await this.connection.get();
+    const lock = db.createQueryRunner();
     await lock.connect();
     let acquired = false;
     try {
@@ -238,7 +254,7 @@ export class RequestBackfillBootService implements OnApplicationBootstrap, OnApp
       if (await this.isTransitionFinalized()) return true;
       if (await this.hasUnlinkedAttempts()) return false;
 
-      const result = await runner(this.dataSource, this.logger);
+      const result = await runner(db, this.logger);
       await this.stateRepo
         .createQueryBuilder()
         .insert()

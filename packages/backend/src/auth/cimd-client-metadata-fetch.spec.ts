@@ -278,14 +278,43 @@ describe('fetchClientMetadataResource', () => {
       expect(request).not.toHaveBeenCalled();
     });
 
-    it('lets a lookup failure fall through to the request resolver with the opt-in', async () => {
+    it('resolves again at connect time after a lookup failure with the opt-in, validated and pinned (#74)', async () => {
       process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
-      lookup.mockRejectedValue(new Error('ENOTFOUND'));
+      lookup.mockRejectedValueOnce(new Error('ENOTFOUND'));
+      lookup.mockResolvedValueOnce([{ address: '10.0.0.7', family: 4 }]);
+      let captured: { lookup: (...a: unknown[]) => void } | undefined;
       request.mockImplementation((_url, opts, cb) => {
-        expect((opts as { lookup?: unknown }).lookup).toBeUndefined();
+        captured = opts as { lookup: (...a: unknown[]) => void };
         return fakeRequest(cb);
       });
       expect((await fetchClientMetadataResource('https://lan.example/meta')).status).toBe(200);
+      expect(typeof captured!.lookup).toBe('function');
+
+      const single = jest.fn();
+      await new Promise<void>((resolve) => {
+        captured!.lookup('lan.example', {}, (...args: unknown[]) => {
+          single(...args);
+          resolve();
+        });
+      });
+      expect(single).toHaveBeenCalledWith(null, '10.0.0.7', 4);
+    });
+
+    it('refuses a cloud-metadata answer at connect time after a lookup failure (#74)', async () => {
+      process.env['THINKER_CIMD_ALLOW_PRIVATE'] = 'true';
+      lookup.mockRejectedValueOnce(new Error('ENOTFOUND'));
+      lookup.mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
+      let captured: { lookup: (...a: unknown[]) => void } | undefined;
+      request.mockImplementation((_url, opts, cb) => {
+        captured = opts as { lookup: (...a: unknown[]) => void };
+        return fakeRequest(cb);
+      });
+      await fetchClientMetadataResource('https://lan.example/meta');
+
+      const error = await new Promise<unknown>((resolve) => {
+        captured!.lookup('lan.example', { all: true }, (err: unknown) => resolve(err));
+      });
+      expect(String(error)).toMatch(/cloud metadata/);
     });
   });
 

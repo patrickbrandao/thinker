@@ -52,6 +52,26 @@ function selectPinnedAddress(addresses: LookupAddress[], allowPrivate: boolean):
   return addresses.find(({ family }) => family === 4) ?? addresses[0]!;
 }
 
+/**
+ * A lookup that resolves at connect time and validates the answer like the
+ * up-front lookup does, then connects to the address it validated. Used when
+ * the up-front lookup failed with the private-host opt-in (#74): the request
+ * still gets a second chance to resolve a LAN name, but never connects to an
+ * address that skipped validation.
+ */
+function createValidatingLookup(allowPrivate: boolean): LookupFunction {
+  return (hostname, options, callback) => {
+    lookup(hostname, { all: true, verbatim: true })
+      .then((addresses) => {
+        const address = selectPinnedAddress(addresses, allowPrivate);
+        createPinnedLookup(address)(hostname, options, callback);
+      })
+      .catch((error: unknown) => {
+        callback(error instanceof Error ? error : new Error(String(error)), '', 0);
+      });
+  };
+}
+
 function createPinnedLookup(pinnedAddress: LookupAddress): LookupFunction {
   return (_hostname, options, callback) => {
     if (options.all) {
@@ -94,14 +114,17 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
   try {
     addresses = await lookup(hostname, { all: true, verbatim: true });
   } catch (error) {
-    // With the opt-in, the operator may use a LAN name its own resolver
-    // handles; let the request try to resolve it rather than failing before the
+    // With the opt-in, the operator may use a LAN name whose resolution is
+    // flaky; let the request resolve it again at connect time (validated and
+    // pinned, see createValidatingLookup) rather than failing before the
     // fetch. By default a DNS failure is an error.
     if (!allowPrivate) throw error;
   }
-  // Address validation always runs when the lookup succeeded: a cloud-metadata
-  // answer must never be reached.
-  const pinnedAddress = addresses ? selectPinnedAddress(addresses, allowPrivate) : undefined;
+  // Address validation always runs: up front when the lookup succeeded, and
+  // at connect time otherwise. A cloud-metadata answer must never be reached.
+  const pinnedLookup = addresses
+    ? createPinnedLookup(selectPinnedAddress(addresses, allowPrivate))
+    : createValidatingLookup(allowPrivate);
   const headers = Object.fromEntries(webRequest.headers.entries());
   headers.host = url.host;
   const signal = init?.signal ?? (input instanceof Request ? input.signal : webRequest.signal);
@@ -114,7 +137,7 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
       method: webRequest.method,
       servername: hostname,
       signal,
-      ...(pinnedAddress ? { lookup: createPinnedLookup(pinnedAddress) } : {}),
+      lookup: pinnedLookup,
       // A metadata server that accepts the connection then stalls must not wedge
       // the whole authorization flow. Node does not destroy the request on its
       // own when the socket timeout fires.
