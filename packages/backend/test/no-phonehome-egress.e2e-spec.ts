@@ -34,15 +34,10 @@ const FORBIDDEN_DESTINATIONS = [
  */
 const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
 /**
- * Backend production files that still name a hosted gateway host, none of them
- * as a request destination: the dashboard link fallback with the OG-tag
- * placeholder it matches in the frontend's index.html (#22, #25). The list may
- * only shrink.
+ * Backend production files that still name a hosted gateway host. None are
+ * left (#22): the dashboard link fallback is now the local default port.
  */
-const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
-  'backend/src/common/utils/dashboard-url.ts',
-  'backend/src/common/utils/og-rewrite.ts',
-];
+const BACKEND_HOSTED_GATEWAY_LEFTOVERS: string[] = [];
 const OPENCODE_GO_DOC_HOST = 'raw.githubusercontent.com';
 const ADR_0003_CATALOG_HOSTS = new Set(['openrouter.ai', 'models.dev', OPENCODE_GO_DOC_HOST]);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
