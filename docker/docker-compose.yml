@@ -73,6 +73,9 @@ services:
       # Defaults to the host-installed Ollama. Override in .env if your
       # Ollama runs elsewhere (e.g. on another host on your LAN).
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Built-in LM Studio / llama.cpp servers. Empty uses the host default.
+      - THINKER_LMSTUDIO_BASE_URL=${THINKER_LMSTUDIO_BASE_URL:-}
+      - THINKER_LLAMACPP_BASE_URL=${THINKER_LLAMACPP_BASE_URL:-}
       - PROVIDER_TIMEOUT_MS=${PROVIDER_TIMEOUT_MS:-180000}
       - STREAM_WARMUP_MS=${STREAM_WARMUP_MS:-15000}
       - CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS=${CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS:-60000}

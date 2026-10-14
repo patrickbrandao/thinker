@@ -3,6 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import type { IncomingMessage, Server, ServerResponse } from 'http';
 import { AddressInfo } from 'net';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
+import { RenameReservedCustomProviderAliases1803610000000 } from '../src/database/migrations/1803610000000-RenameReservedCustomProviderAliases';
 import {
   API_BODY_LIMIT,
   PROXY_BODY_LIMIT,
@@ -212,6 +214,58 @@ describe('Reserved local runner aliases (e2e)', () => {
       expect(res.body.choices[0].message.content).toBe('Hello from second-box');
       expect(native.received.filter((r) => r.url === '/v1/chat/completions')).toHaveLength(0);
       expect(secondBox.received.at(-1)?.body).toMatchObject({ model: 'qwen/qwen3-8b' });
+    });
+
+    // An install that stored the alias before it was reserved (#101): the
+    // migration renames it, and both providers keep routing.
+    describe('after a legacy lmstudio alias is migrated', () => {
+      beforeAll(async () => {
+        const ds = app.get(DataSource);
+        await ds.query(`UPDATE "custom_providers" SET "alias" = 'lmstudio' WHERE "id" = $1`, [
+          customId,
+        ]);
+        const queryRunner = ds.createQueryRunner();
+        try {
+          await new RenameReservedCustomProviderAliases1803610000000().up(queryRunner);
+        } finally {
+          await queryRunner.release();
+        }
+        // Drop cached routing state the direct SQL bypassed, as a restart would.
+        await request(app.getHttpServer())
+          .put(`/api/v1/routing/${agentName}/custom-providers/${customId}`)
+          .set(headers)
+          .send({ name: 'LMStudio' })
+          .expect(200);
+      }, 30000);
+
+      it('renames the alias with a -custom suffix', async () => {
+        const [row] = await app
+          .get(DataSource)
+          .query(`SELECT "alias" FROM "custom_providers" WHERE "id" = $1`, [customId]);
+        expect(row.alias).toBe('lmstudio-custom');
+      });
+
+      it('lists every model id once', async () => {
+        const ids = await modelIds();
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(ids.filter((id) => id === 'lmstudio/qwen/qwen3-8b')).toHaveLength(1);
+        expect(ids).toEqual(
+          expect.arrayContaining(['lmstudio-custom/qwen/qwen3-8b', 'lmstudio-custom/mistral-7b']),
+        );
+        expect(ids).not.toContain('lmstudio/mistral-7b');
+      });
+
+      it('routes the new alias to the custom provider and lmstudio/ to the built-in one', async () => {
+        const custom = await chat('lmstudio-custom/mistral-7b').expect(200);
+        expect(custom.body.choices[0].message.content).toBe('Hello from second-box');
+        const builtIn = await chat('lmstudio/qwen/qwen3-8b').expect(200);
+        expect(builtIn.body.choices[0].message.content).toBe('Hello from native');
+      });
+
+      it('keeps routing the internal key', async () => {
+        const res = await chat(`custom:${customId}/mistral-7b`).expect(200);
+        expect(res.body.choices[0].message.content).toBe('Hello from second-box');
+      });
     });
   });
 });
