@@ -115,7 +115,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
       },
     ]),
   getPerModelReliability: () => Promise.resolve([]),
-  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {}, auto_fixed: 0 }),
+  getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {} }),
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
