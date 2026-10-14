@@ -290,12 +290,11 @@ else
     printf '    \033[2m$ openssl rand -hex 32   # THINKER_ENCRYPTION_KEY\033[0m\n'
   else
     SECRET="$(gen_secret)"
-    # A second, independent key. Left unset the backend falls back to
-    # BETTER_AUTH_SECRET for at-rest encryption and warns about it on every
-    # boot — which means one leaked session-signing secret also decrypts every
-    # stored provider key and OAuth token. It costs nothing to generate here,
-    # and after first boot it can never be introduced without re-encrypting
-    # what is already in the database.
+    # A second, independent key, required by the backend (no fallback to
+    # BETTER_AUTH_SECRET): one leaked session-signing secret must not also
+    # decrypt every stored provider key, OAuth token and recording. Changing
+    # it after first boot needs THINKER_ENCRYPTION_KEY_PREVIOUS (see
+    # DOCKER_README.md).
     ENCRYPTION_KEY="$(gen_secret)"
   fi
 

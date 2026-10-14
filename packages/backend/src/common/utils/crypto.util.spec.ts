@@ -79,6 +79,10 @@ describe('encryptionKeyConfigProblems / assertEncryptionKeyConfig', () => {
     expect(() => assertEncryptionKeyConfig(env)).toThrow(/openssl rand -hex 32/);
   });
 
+  it('points a missing key at the BETTER_AUTH_SECRET upgrade recipe', () => {
+    expect(() => assertEncryptionKeyConfig({})).toThrow(/THINKER_ENCRYPTION_KEY_PREVIOUS/);
+  });
+
   it('fails when the key is empty', () => {
     expect(() => assertEncryptionKeyConfig({ THINKER_ENCRYPTION_KEY: '' })).toThrow(
       /THINKER_ENCRYPTION_KEY is not set/,
