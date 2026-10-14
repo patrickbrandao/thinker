@@ -13,8 +13,8 @@ import { CliError } from './errors';
 
 function tmpFile(): string {
   return path.join(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-config-')),
-    'manifest',
+    fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-config-')),
+    'thinker',
     'config.json',
   );
 }
@@ -22,9 +22,9 @@ function tmpFile(): string {
 describe('configFilePath', () => {
   it('prefers XDG_CONFIG_HOME and falls back to ~/.config', () => {
     expect(configFilePath({ XDG_CONFIG_HOME: '/xdg' })).toBe(
-      path.join('/xdg', 'manifest', 'config.json'),
+      path.join('/xdg', 'thinker', 'config.json'),
     );
-    expect(configFilePath({})).toBe(path.join(os.homedir(), '.config', 'manifest', 'config.json'));
+    expect(configFilePath({})).toBe(path.join(os.homedir(), '.config', 'thinker', 'config.json'));
   });
 });
 
@@ -100,18 +100,18 @@ describe('resolveTarget', () => {
     expect(DEFAULT_URL).toBe('http://localhost:2099');
     expect(normalizeOrigin(DEFAULT_URL)).toBe('http://localhost:2099');
     // An env key with nothing else configured stays on this machine.
-    expect(resolveTarget(undefined, { MANIFEST_API_KEY: 'env-key' }, {})).toEqual({
+    expect(resolveTarget(undefined, { THINKER_API_KEY: 'env-key' }, {})).toEqual({
       origin: 'http://localhost:2099',
       apiKey: 'env-key',
       source: 'env',
     });
   });
 
-  it('resolves url as flag > MANIFEST_URL > activeHost > local default', () => {
-    expect(resolveTarget('http://flag:1', { MANIFEST_URL: 'http://env:2' }, config).origin).toBe(
+  it('resolves url as flag > THINKER_URL > activeHost > local default', () => {
+    expect(resolveTarget('http://flag:1', { THINKER_URL: 'http://env:2' }, config).origin).toBe(
       'http://flag:1',
     );
-    expect(resolveTarget(undefined, { MANIFEST_URL: 'http://env:2' }, config).origin).toBe(
+    expect(resolveTarget(undefined, { THINKER_URL: 'http://env:2' }, config).origin).toBe(
       'http://env:2',
     );
     expect(resolveTarget(undefined, {}, config).origin).toBe('http://active:1000');
@@ -122,8 +122,8 @@ describe('resolveTarget', () => {
     });
   });
 
-  it('prefers MANIFEST_API_KEY over the stored credential', () => {
-    expect(resolveTarget(undefined, { MANIFEST_API_KEY: 'env-key' }, config)).toEqual({
+  it('prefers THINKER_API_KEY over the stored credential', () => {
+    expect(resolveTarget(undefined, { THINKER_API_KEY: 'env-key' }, config)).toEqual({
       origin: 'http://active:1000',
       apiKey: 'env-key',
       source: 'env',

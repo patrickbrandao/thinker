@@ -16,7 +16,7 @@ export interface RequestOptions {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
- * Thin HTTP client for the Manifest management API. All paths are relative
+ * Thin HTTP client for the Thinker management API. All paths are relative
  * to `/api/v1`. Failures become CliError with the server's message when one
  * exists — the raw API key never appears in any error.
  */
@@ -52,7 +52,7 @@ export class ApiClient {
         throw new CliError(
           'redirect_not_allowed',
           `The server redirected ${method} ${url.pathname} (HTTP ${response.status})`,
-          'Manifest does not follow API redirects; point --url at the final origin',
+          'Thinker does not follow API redirects; point --url at the final origin',
           response.status,
         );
       }
@@ -77,7 +77,7 @@ export class ApiClient {
       throw new CliError(
         'network_error',
         `Could not reach ${this.opts.origin}: ${error instanceof Error ? error.message : String(error)}`,
-        'Check the URL and that the Manifest server is running',
+        'Check the URL and that the Thinker server is running',
       );
     } finally {
       clearTimeout(timeout);
@@ -104,9 +104,9 @@ export class ApiClient {
       typeof record['error'] === 'string' ? slugify(redact(record['error'])) : 'http_error';
     const hint =
       status === 401
-        ? 'Run mnfst login, or set MANIFEST_API_KEY'
+        ? 'Run thinker login, or set THINKER_API_KEY'
         : status === 404
-          ? 'Check the resource name — see mnfst agent list / mnfst provider list'
+          ? 'Check the resource name — see thinker agent list / thinker provider list'
           : undefined;
     return new CliError(code, message, hint, status);
   }

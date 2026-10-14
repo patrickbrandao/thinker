@@ -196,6 +196,6 @@ export async function subscriptionConnect(
   throw new CliError(
     'oauth_timeout',
     `No ${providerId} subscription connection appeared within ${Math.round(OAUTH_POLL.timeoutMs / 1000)}s`,
-    'Finish the browser sign-in and check mnfst provider list, or retry',
+    'Finish the browser sign-in and check thinker provider list, or retry',
   );
 }

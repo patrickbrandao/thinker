@@ -81,81 +81,81 @@ export const COMMANDS: Record<string, Handler> = {
   skill: skill.skillShow,
 };
 
-export const USAGE = `mnfst ${VERSION} — Manifest management CLI (JSON output, agent-first)
+export const USAGE = `thinker ${VERSION} — Thinker management CLI (JSON output, agent-first)
 ${skill.SKILL_NUDGE}
 
 Auth
-  mnfst login [--token-stdin | --token-env <name>] [--url <base>]   (no flags: browser login)
-  mnfst logout [--url <base>]
-  mnfst auth status | mnfst whoami | mnfst config path
+  thinker login [--token-stdin | --token-env <name>] [--url <base>] (no flags: browser login)
+  thinker logout [--url <base>]
+  thinker auth status | thinker whoami | thinker config path
 
 Diagnostics
-  mnfst doctor [--url <base>]                          (config, host, credential, connections, agents — run this first when something is wrong)
+  thinker doctor [--url <base>]                        (config, host, credential, connections, agents — run this first when something is wrong)
 
 Agents
-  mnfst agent list [--include-playground]
-  mnfst agent platforms
-  mnfst agent create --name <name> --platform <p> [--category <${CATEGORY_CATALOG.join('|')}>] [--key-file <path>] [--if-absent]
-  mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--recording true|false] [--force]
+  thinker agent list [--include-playground]
+  thinker agent platforms
+  thinker agent create --name <name> --platform <p> [--category <${CATEGORY_CATALOG.join('|')}>] [--key-file <path>] [--if-absent]
+  thinker agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--recording true|false] [--force]
     (--models is the full chain: first = route, rest = fallbacks, one entry clears fallbacks;
      default route unless --tier names a custom tier, upserted on "x-thinker-tier: <name>";
      models are checked against the agent's discovered set — --force writes them anyway)
-  mnfst agent env <name> [--export]                     (dotenv/shell lines: KEY + URL; append to .env or eval)
-  mnfst agent setup <name> [--reveal]                   (platform setup instructions, same content as the dashboard)
-  mnfst agent provider enable <name> <provider> [--auth-type <a>] [--label <l>]
-  mnfst agent provider disable <name> <provider> [--auth-type <a>] [--label <l>] --yes
-  mnfst agent key path <name> | mnfst agent key show <name> [--raw]
-  mnfst agent get <name> | mnfst agent update <name> [--name|--category|--platform]
-  mnfst agent delete <name> --yes
-  mnfst agent rotate-key <name> --yes [--key-file <path>]
+  thinker agent env <name> [--export]                   (dotenv/shell lines: KEY + URL; append to .env or eval)
+  thinker agent setup <name> [--reveal]                 (platform setup instructions, same content as the dashboard)
+  thinker agent provider enable <name> <provider> [--auth-type <a>] [--label <l>]
+  thinker agent provider disable <name> <provider> [--auth-type <a>] [--label <l>] --yes
+  thinker agent key path <name> | thinker agent key show <name> [--raw]
+  thinker agent get <name> | thinker agent update <name> [--name|--category|--platform]
+  thinker agent delete <name> --yes
+  thinker agent rotate-key <name> --yes [--key-file <path>]
 
 Providers
-  mnfst provider list [--agent <name>]                 (connections; --agent annotates enabled per agent)
-  mnfst provider catalog                               (everything connectable: ids + auth types)
-  mnfst provider connect <provider> [--credential-stdin | --credential-env <name>] [--agent <name>] [--label <l>] [--region <r>] [--auth-type <a>]
+  thinker provider list [--agent <name>]               (connections; --agent annotates enabled per agent)
+  thinker provider catalog                             (everything connectable: ids + auth types)
+  thinker provider connect <provider> [--credential-stdin | --credential-env <name>] [--agent <name>] [--label <l>] [--region <r>] [--auth-type <a>]
     (interactive terminals are prompted for the key, input hidden; agent auto-picked — the connection is tenant-wide)
-  mnfst provider refresh [<provider>] [--agent <name>] [--auth-type <a>]
+  thinker provider refresh [<provider>] [--agent <name>] [--auth-type <a>]
     (re-runs model discovery tenant-wide and reports each connection's model count;
      the fix for a connection that is active with 0 cached models)
-  mnfst provider disconnect <provider> --yes [--agent <name>] [--auth-type <a>] [--label <l>]
-  mnfst provider custom add --name <n> --endpoint <url> [--api openai|anthropic] [--credential-stdin|--credential-env <e>] [--agent <name>]
-  mnfst provider custom list [--agent <name>]
-  mnfst provider custom remove <name> --yes [--agent <name>]
+  thinker provider disconnect <provider> --yes [--agent <name>] [--auth-type <a>] [--label <l>]
+  thinker provider custom add --name <n> --endpoint <url> [--api openai|anthropic] [--credential-stdin|--credential-env <e>] [--agent <name>]
+  thinker provider custom list [--agent <name>]
+  thinker provider custom remove <name> --yes [--agent <name>]
     (custom providers are tenant-wide; --agent only picks which agent performs the discovery call)
 
 Models
-  mnfst models <agent> [--provider <p>] [--cost] [--capabilities]   (like /v1/models: bare ids; flags opt into metadata)
-  mnfst model prices [--provider <p>]                  (install-wide price list — no agent needed)
+  thinker models <agent> [--provider <p>] [--cost] [--capabilities] (like /v1/models: bare ids; flags opt into metadata)
+  thinker model prices [--provider <p>]                (install-wide price list — no agent needed)
 
-Routing readouts + custom-tier lifecycle (route writes go through mnfst agent configure; params set writes model params)
-  mnfst routing status <agent>
-  mnfst routing test <agent> [prompt...] [--tier <t>] [--model <m>] [--as <platform>]
+Routing readouts + custom-tier lifecycle (route writes go through thinker agent configure; params set writes model params)
+  thinker routing status <agent>
+  thinker routing test <agent> [prompt...] [--tier <t>] [--model <m>] [--as <platform>]
     (one real request through the surface the agent's platform uses — anthropic-family via /v1/messages)
-  mnfst routing fallbacks get|clear <agent> [--yes]
-  mnfst routing custom list <agent>
-  mnfst routing custom create <agent> --name <n> --model <m> --provider <p> [--auth-type <a>] [--fallbacks <m1,m2>] [--header-key <k>] [--header-value <v>] [--force]
-  mnfst routing custom delete <agent> <name> --yes
-  mnfst routing recording get <agent> | mnfst routing recording set <agent> --enabled true|false
-  mnfst routing params get <agent> [--tier <t>] [--model <m>]
-  mnfst routing params set <agent> [--tier <t>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]
+  thinker routing fallbacks get|clear <agent> [--yes]
+  thinker routing custom list <agent>
+  thinker routing custom create <agent> --name <n> --model <m> --provider <p> [--auth-type <a>] [--fallbacks <m1,m2>] [--header-key <k>] [--header-value <v>] [--force]
+  thinker routing custom delete <agent> <name> --yes
+  thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false
+  thinker routing params get <agent> [--tier <t>] [--model <m>]
+  thinker routing params set <agent> [--tier <t>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]
 
 Requests (paginated, mirrors the API: opaque cursor, one page per call)
-  mnfst requests get [--agent <name>] [--range <r>] [--status <s>] [--provider <p>] [--origin <o>] [--limit <1-200>] [--cursor <c>] [--full]
+  thinker requests get [--agent <name>] [--range <r>] [--status <s>] [--provider <p>] [--origin <o>] [--limit <1-200>] [--cursor <c>] [--full]
 
 Agent skill (this CLI ships the operating guide it wants an agent to read)
-  mnfst skill show                                     (raw markdown on stdout, NOT JSON — like agent env)
-  mnfst skill install [--agents-dir | --project]        (writes <dir>/mnfst-cli/SKILL.md; --agents-dir ~/.agents/skills,
+  thinker skill show                                   (raw markdown on stdout, NOT JSON — like agent env)
+  thinker skill install [--agents-dir | --project]      (writes <dir>/thinker-cli/SKILL.md; --agents-dir ~/.agents/skills,
                                                         --project ./.claude/skills; otherwise the detected agent
                                                         runtime's own skills dir, else ~/.claude/skills)
 
 Run (key injection, 1Password-style)
-  mnfst run --agent <name> [--env <VAR>] -- <command...>
-    Runs the command with the agent's key injected as MANIFEST_AGENT_KEY (or <VAR>) plus
-    MANIFEST_AGENT_URL (already ends in /v1 — append /chat/completions directly).
+  thinker run --agent <name> [--env <VAR>] -- <command...>
+    Runs the command with the agent's key injected as THINKER_AGENT_KEY (or <VAR>) plus
+    THINKER_AGENT_URL (already ends in /v1 — append /chat/completions directly).
     The key never crosses stdout or your transcript.
 
-Environment: MANIFEST_URL, MANIFEST_API_KEY (overrides stored login)
-Credentials are stored per-host in ~/.config/manifest/config.json (mode 0600).`;
+Environment: THINKER_URL, THINKER_API_KEY (overrides stored login)
+Credentials are stored per-host in ~/.config/thinker/config.json (mode 0600).`;
 
 export function resolveCommand(
   argv: readonly string[],
@@ -186,7 +186,7 @@ export async function run(io: CliIo, argv: string[]): Promise<number> {
         {
           error: 'unknown_command',
           message: `Unknown command: ${argv.join(' ')}`,
-          hint: 'Run mnfst --help',
+          hint: 'Run thinker --help',
         },
         null,
         2,
@@ -210,7 +210,7 @@ export async function run(io: CliIo, argv: string[]): Promise<number> {
         {
           error: 'internal_error',
           message: error instanceof Error ? error.message : String(error),
-          hint: 'This is a mnfst CLI bug — please report it',
+          hint: 'This is a thinker CLI bug — please report it',
         },
         null,
         2,
@@ -221,7 +221,7 @@ export async function run(io: CliIo, argv: string[]): Promise<number> {
 }
 
 /**
- * Entry point used by bin/mnfst.js — pure process wiring, excluded from
+ * Entry point used by bin/thinker.js — pure process wiring, excluded from
  * coverage like the backend's main.ts.
  */
 /* istanbul ignore next */

@@ -40,7 +40,7 @@ function messageOf(error: unknown): string {
 
 /**
  * The first command to run when something is wrong. Checks run in dependency
- * order — config, host, auth, providers, agents — because a bad MANIFEST_URL
+ * order — config, host, auth, providers, agents — because a bad THINKER_URL
  * and a bad key look identical from any single command's error. Output is one
  * JSON object; exit is non-zero when any check actually failed.
  */
@@ -52,8 +52,8 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
   const target = resolveFromFlags(io, args);
   const originFrom = args.strings['url']
     ? '--url'
-    : io.env['MANIFEST_URL']
-      ? 'MANIFEST_URL'
+    : io.env['THINKER_URL']
+      ? 'THINKER_URL'
       : getConfig(io).activeHost
         ? 'stored login'
         : 'default';
@@ -62,12 +62,12 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
     ok: target.source !== null,
     detail:
       target.source === 'env'
-        ? `credential from MANIFEST_API_KEY (env) · origin ${target.origin} (from ${originFrom})`
+        ? `credential from THINKER_API_KEY (env) · origin ${target.origin} (from ${originFrom})`
         : target.source === 'config'
           ? `credential from stored login · origin ${target.origin} (from ${originFrom})`
           : `no credential for ${target.origin} (origin from ${originFrom})`,
     ...(target.source === null
-      ? { hint: 'Run mnfst login, or set MANIFEST_URL + MANIFEST_API_KEY' }
+      ? { hint: 'Run thinker login, or set THINKER_URL + THINKER_API_KEY' }
       : {}),
   });
 
@@ -106,7 +106,7 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
       name: 'host',
       ok: false,
       detail: `${healthUrl} → ${messageOf(error)}`,
-      hint: 'host unreachable — is MANIFEST_URL correct?',
+      hint: 'host unreachable — is THINKER_URL correct?',
     });
   }
 
@@ -138,8 +138,8 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
         status === 401
           ? `${target.origin} is alive but this credential is not valid on it — wrong install or wrong key${
               target.source === 'env'
-                ? ' (check MANIFEST_API_KEY belongs to this host)'
-                : ' (the stored login may have expired — mnfst login re-authenticates)'
+                ? ' (check THINKER_API_KEY belongs to this host)'
+                : ' (the stored login may have expired — thinker login re-authenticates)'
             }`
           : error instanceof CliError
             ? error.hint
@@ -180,12 +180,12 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
         detail: `${connections.length} connection(s) across ${groups.length} provider(s)`,
         ...(hollow.length > 0
           ? {
-              hint: `hollow (no discovered models — reconnect with a working credential or run: mnfst provider refresh): ${hollow
+              hint: `hollow (no discovered models — reconnect with a working credential or run: thinker provider refresh): ${hollow
                 .map((c) => c.id)
                 .join(', ')}`,
             }
           : connections.length === 0
-            ? { hint: 'nothing to route through yet — mnfst provider connect <provider>' }
+            ? { hint: 'nothing to route through yet — thinker provider connect <provider>' }
             : {}),
       });
     } catch (error) {
@@ -202,7 +202,7 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
       ok: true,
       detail: `${agents.length} agent(s)`,
       ...(agents.length === 0
-        ? { hint: 'no agent yet — mnfst agent create --name <name> --platform <p>' }
+        ? { hint: 'no agent yet — thinker agent create --name <name> --platform <p>' }
         : {}),
     });
   }
@@ -218,7 +218,7 @@ export async function doctor(io: CliIo, argv: string[]): Promise<number> {
     detail: skillPath
       ? `installed at ${skillPath}${runtime ? ` · ${runtime.name} detected` : ''}`
       : `not_found${runtime ? ` · ${runtime.name} detected` : ''}`,
-    ...(skillPath ? {} : { hint: 'mnfst skill install' }),
+    ...(skillPath ? {} : { hint: 'thinker skill install' }),
   });
 
   const ok = checks.every((c) => c.ok !== false);

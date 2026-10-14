@@ -11,7 +11,7 @@
     "thinker-backend",
     "thinker-frontend",
     "thinker-shared",
-    "mnfst-gateway-cli"
+    "thinker-cli"
   ],
   "privatePackages": {
     "version": true,

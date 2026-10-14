@@ -31,8 +31,7 @@ describe('browserLogin', () => {
     const exchange = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () =>
-        JSON.stringify({ token: 'mnfst_pat_ok', expiresAt: '2026-09-01T00:00:00Z' }),
+      text: async () => JSON.stringify({ token: 'thk_pat_ok', expiresAt: '2026-09-01T00:00:00Z' }),
     });
     let openedUrl = '';
     const io = makeIo(exchange as unknown as typeof fetch, (url: string) => {
@@ -43,7 +42,7 @@ describe('browserLogin', () => {
       )(url);
     });
     const result = await browserLogin(io, 'http://localhost:3001');
-    expect(result).toEqual({ token: 'mnfst_pat_ok', expiresAt: '2026-09-01T00:00:00Z' });
+    expect(result).toEqual({ token: 'thk_pat_ok', expiresAt: '2026-09-01T00:00:00Z' });
     const [url, init] = exchange.mock.calls[0];
     expect(url).toBe('http://localhost:3001/api/v1/cli/token');
     const body = JSON.parse(init.body);
@@ -155,7 +154,7 @@ describe('browserLogin', () => {
     const exchange = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ token: 'mnfst_pat_ok' }),
+      text: async () => JSON.stringify({ token: 'thk_pat_ok' }),
     });
     const io = makeIo(
       exchange as unknown as typeof fetch,
@@ -165,7 +164,7 @@ describe('browserLogin', () => {
       ),
     );
     await expect(browserLogin(io, 'http://localhost:3001')).resolves.toEqual({
-      token: 'mnfst_pat_ok',
+      token: 'thk_pat_ok',
       expiresAt: null,
     });
   });
@@ -223,7 +222,7 @@ describe('browserLogin', () => {
     const exchange = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ token: 'mnfst_pat_ok', expiresAt: null }),
+      text: async () => JSON.stringify({ token: 'thk_pat_ok', expiresAt: null }),
     });
     const io = makeIo(exchange as unknown as typeof fetch, (url: string) => {
       const authUrl = new URL(url);
@@ -239,7 +238,7 @@ describe('browserLogin', () => {
       return true;
     });
     await expect(browserLogin(io, 'http://localhost:3001')).resolves.toMatchObject({
-      token: 'mnfst_pat_ok',
+      token: 'thk_pat_ok',
     });
   });
 
@@ -265,7 +264,7 @@ describe('browserLogin', () => {
         fetchImpl: jest.fn().mockResolvedValue({
           ok: true,
           status: 200,
-          text: async () => JSON.stringify({ token: 'mnfst_pat_fallback', expiresAt: null }),
+          text: async () => JSON.stringify({ token: 'thk_pat_fallback', expiresAt: null }),
         }) as unknown as typeof fetch,
         stdout: jest.fn(),
         stderr: jest.fn(),
@@ -273,7 +272,7 @@ describe('browserLogin', () => {
         isTTY: true,
       };
       await expect(mod.browserLogin(io, 'http://localhost:3001')).resolves.toEqual({
-        token: 'mnfst_pat_fallback',
+        token: 'thk_pat_fallback',
         expiresAt: null,
       });
       expect(spawn).toHaveBeenCalled();

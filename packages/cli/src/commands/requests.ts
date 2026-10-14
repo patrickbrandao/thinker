@@ -8,8 +8,8 @@ import { slugifyAgentName } from '../slug';
  * (GET /api/v1/messages): opaque `cursor` + `next_cursor`, server-capped
  * `limit`. One page per invocation — callers (and agents) page explicitly:
  *
- *   mnfst requests get --agent john --limit 50
- *   mnfst requests get --agent john --cursor <next_cursor from last page>
+ *   thinker requests get --agent john --limit 50
+ *   thinker requests get --agent john --cursor <next_cursor from last page>
  */
 /** Always present on a trimmed row. */
 const CORE_FIELDS = [

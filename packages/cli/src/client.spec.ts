@@ -22,7 +22,7 @@ describe('ApiClient', () => {
     expect(result).toEqual({ ok: true });
     expect(calls[0].url).toBe('http://localhost:2099/api/v1/agents?includePlayground=true');
     expect(calls[0].headers['X-API-Key']).toBe('secret-key');
-    expect(calls[0].headers['User-Agent']).toBe(`mnfst-cli/${VERSION}`);
+    expect(calls[0].headers['User-Agent']).toBe(`thinker-cli/${VERSION}`);
     expect(calls[0].headers['Content-Type']).toBeUndefined();
   });
 
@@ -83,7 +83,7 @@ describe('ApiClient', () => {
     const unauthorized = makeClient([{ status: 401, body: { message: 'Invalid API key' } }]);
     await expect(unauthorized.client.request('GET', '/me')).rejects.toMatchObject({
       status: 401,
-      hint: expect.stringContaining('mnfst login'),
+      hint: expect.stringContaining('thinker login'),
     });
     const missing = makeClient([{ status: 404, body: {} }]);
     await expect(missing.client.request('GET', '/agents/x')).rejects.toMatchObject({
