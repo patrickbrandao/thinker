@@ -124,5 +124,8 @@ export async function ssrfSafeFetch(url: string, init: RequestInit = {}): Promis
     ...(init as unknown as UndiciRequestInit),
     dispatcher: getSsrfSafeDispatcher(),
   });
+  // undici's Response is not the global `Response` class (`instanceof Response`
+  // is false), but it implements the same interface: status, headers, body
+  // stream, json()/text(). Callers only use that interface, never instanceof.
   return response as unknown as Response;
 }
