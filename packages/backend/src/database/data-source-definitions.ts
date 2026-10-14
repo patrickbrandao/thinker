@@ -57,6 +57,7 @@ import { DropBillingSchema1803200000000 } from './migrations/1803200000000-DropB
 import { DropSaasFeatureSchema1803300000000 } from './migrations/1803300000000-DropSaasFeatureSchema';
 import { DropAutofixSchema1803400000000 } from './migrations/1803400000000-DropAutofixSchema';
 import { DropInstallMetadata1803500000000 } from './migrations/1803500000000-DropInstallMetadata';
+import { RenameReservedCustomProviderAliases1803610000000 } from './migrations/1803610000000-RenameReservedCustomProviderAliases';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -352,4 +353,5 @@ export const migrations = [
   DropSaasFeatureSchema1803300000000,
   DropAutofixSchema1803400000000,
   DropInstallMetadata1803500000000,
+  RenameReservedCustomProviderAliases1803610000000,
 ];

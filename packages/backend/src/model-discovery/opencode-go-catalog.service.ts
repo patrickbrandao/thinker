@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/comm
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PROVIDER_BY_ID } from '../common/constants/providers';
-import { CATALOG_SYNC_ENV, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
+import { describeCatalogSyncSetting, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 
 export interface OpencodeGoCatalogEntry {
@@ -153,7 +153,7 @@ export class OpencodeGoCatalogService implements OnModuleInit {
    */
   async refresh(): Promise<OpencodeGoCatalogEntry[]> {
     if (!isCatalogSyncEnabled()) {
-      this.logger.log(`${CATALOG_SYNC_ENV}=false: OpenCode Go docs catalog not fetched`);
+      this.logger.log(`${describeCatalogSyncSetting()}: OpenCode Go docs catalog not fetched`);
       return [];
     }
     return this.startFetch(Date.now());

@@ -1,4 +1,4 @@
-process.env['BETTER_AUTH_SECRET'] ??= 'test-encryption-secret-at-least-32-characters-long';
+process.env['THINKER_ENCRYPTION_KEY'] ??= 'test-encryption-secret-at-least-32-characters-long';
 
 import { DataSource } from 'typeorm';
 import { Tenant } from '../src/entities/tenant.entity';

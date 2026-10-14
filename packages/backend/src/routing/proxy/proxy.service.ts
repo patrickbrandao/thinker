@@ -262,7 +262,7 @@ export class ProxyService {
       if (unavailableModel) {
         return this.buildModelUnavailableResult(stream, agentName, unavailableModel);
       }
-      return this.buildNoProviderResult(stream, agentName);
+      return this.buildNoProviderResult(stream, agentName, resolved.no_route_detail);
     }
 
     const route = resolved.route;
@@ -1170,9 +1170,12 @@ export class ProxyService {
     return false;
   }
 
-  private buildNoProviderResult(stream: boolean, agentName?: string): ProxyResult {
+  private buildNoProviderResult(stream: boolean, agentName?: string, detail?: string): ProxyResult {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-    const content = formatManifestError('M101', { dashboardUrl });
+    const content = formatManifestError('M101', {
+      dashboardUrl,
+      detail: detail ? ` ${detail}` : '',
+    });
     return buildFriendlyResponse(content, stream, 'no_provider', 'M101');
   }
 
