@@ -232,6 +232,7 @@ describe('appConfig', () => {
 
   it('reads EMAIL_PROVIDER from env', async () => {
     process.env['EMAIL_PROVIDER'] = 'resend';
+    process.env['EMAIL_FROM'] = 'noreply@example.com';
     const config = await loadConfig();
     expect(config.emailProvider).toBe('resend');
   });
@@ -254,5 +255,19 @@ describe('appConfig', () => {
     delete process.env['NOTIFICATION_FROM_EMAIL'];
     const config = await loadConfig();
     expect(config.emailFrom).toBe('noreply@thinker.example.com');
+  });
+
+  it('fails boot naming EMAIL_FROM when EMAIL_PROVIDER is set without a sender', async () => {
+    process.env['EMAIL_PROVIDER'] = 'resend';
+    delete process.env['EMAIL_FROM'];
+    delete process.env['NOTIFICATION_FROM_EMAIL'];
+    await expect(loadConfig()).rejects.toThrow('EMAIL_FROM is required when EMAIL_PROVIDER is set');
+  });
+
+  it('treats a blank EMAIL_FROM as missing when EMAIL_PROVIDER is set', async () => {
+    process.env['EMAIL_PROVIDER'] = 'mailgun';
+    process.env['EMAIL_FROM'] = '  ';
+    delete process.env['NOTIFICATION_FROM_EMAIL'];
+    await expect(loadConfig()).rejects.toThrow('EMAIL_FROM is required');
   });
 });

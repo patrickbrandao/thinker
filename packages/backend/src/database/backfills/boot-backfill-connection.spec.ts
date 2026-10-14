@@ -128,6 +128,34 @@ describe('BootBackfillConnection (#74)', () => {
     expect(direct.isInitialized).toBe(false);
   });
 
+  it('refuses to reopen the direct pool after close() (#158)', async () => {
+    const direct = fakeDataSource().ds;
+    const factory = jest.fn(() => direct);
+    const connection = new BootBackfillConnection(
+      fakeDataSource().ds,
+      { MIGRATION_DATABASE_URL: DIRECT },
+      factory,
+    );
+    await connection.get();
+    await connection.close();
+
+    await expect(connection.get()).rejects.toThrow('closed');
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(direct.initialize).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a first get() that arrives after close() (#158)', async () => {
+    const factory = jest.fn(() => fakeDataSource().ds);
+    const connection = new BootBackfillConnection(
+      fakeDataSource().ds,
+      { MIGRATION_DATABASE_URL: DIRECT },
+      factory,
+    );
+    await connection.close();
+    await expect(connection.get()).rejects.toThrow('closed');
+    expect(factory).not.toHaveBeenCalled();
+  });
+
   it('never logs the URL', async () => {
     const direct = fakeDataSource().ds;
     const connection = new BootBackfillConnection(

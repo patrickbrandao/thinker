@@ -90,7 +90,7 @@ Sem provedor de e-mail, a verificação de cadastro é dispensada e a redefiniç
 | `EMAIL_PROVIDER` | `resend`, `mailgun` ou `sendgrid`. |
 | `EMAIL_API_KEY` | Chave do provedor de e-mail. |
 | `EMAIL_DOMAIN` | Domínio de envio (obrigatório no Mailgun). |
-| `EMAIL_FROM` | Remetente. |
+| `EMAIL_FROM` | Remetente. Obrigatório quando `EMAIL_PROVIDER` está definido: sem ele o Thinker não sobe e a mensagem de erro cita a variável. `NOTIFICATION_FROM_EMAIL` ainda é aceita como nome antigo. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`, `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | Login social; cada um liga quando o par está completo. A URL de callback é `${BETTER_AUTH_URL}/api/auth/callback/<provedor>`. O login social só entra em contas que já existem. |
 | `OPENAI_OAUTH_CLIENT_ID`, `MINIMAX_OAUTH_CLIENT_ID` | Substituem o cliente OAuth embutido, se você registrou o seu. |
 

@@ -135,7 +135,7 @@ Regras:
 - Importe a nova migração em `database.module.ts` e inclua-a no array `migrations`.
 - O modo de transação é `each` (uma transação por migração), porque algumas migrações de índice usam `CONCURRENTLY`.
 - Migrações costumam ter um spec ao lado; mudanças de dados ganham também um e2e.
-- As tabelas do Better Auth têm migrações próprias, geridas por ele.
+- As tabelas do Better Auth têm migrações próprias, geridas por ele: `DatabaseSeederService` chama `ctx.runMigrations()` no boot. A checagem de schema do Better Auth na inicialização (`advanced.database.validateSchema`) fica desligada, porque roda antes dessa migração e registrava um falso "Database schema mismatch" em todo banco novo. `auth/better-auth-schema.ts` faz a mesma checagem logo depois da migração e só registra ERROR quando há divergência real.
 
 ## Autenticação
 

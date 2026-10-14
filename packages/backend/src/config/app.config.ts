@@ -11,6 +11,23 @@ function resolveDatabaseUrl(): string {
   throw new Error('DATABASE_URL is required. Set it in your .env file.');
 }
 
+/**
+ * Sender address for transactional email. There is no product-owned default
+ * sender, so a configured EMAIL_PROVIDER without EMAIL_FROM fails boot rather
+ * than sending mail from an address the operator never chose (issue #22).
+ * NOTIFICATION_FROM_EMAIL stays accepted as the legacy alias.
+ */
+export function resolveEmailFrom(env: NodeJS.ProcessEnv = process.env): string {
+  const from = env['EMAIL_FROM']?.trim() || env['NOTIFICATION_FROM_EMAIL']?.trim();
+  if (from) return from;
+  if (env['EMAIL_PROVIDER']?.trim()) {
+    throw new Error(
+      'EMAIL_FROM is required when EMAIL_PROVIDER is set. Set EMAIL_FROM to the sender address (e.g. noreply@your-domain.com).',
+    );
+  }
+  return 'noreply@thinker.example.com';
+}
+
 export const appConfig = registerAs('app', () => ({
   port: Number(process.env['PORT'] ?? DEFAULT_PORT),
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
@@ -28,10 +45,7 @@ export const appConfig = registerAs('app', () => ({
   emailProvider: process.env['EMAIL_PROVIDER'] ?? '',
   emailApiKey: process.env['EMAIL_API_KEY'] ?? '',
   emailDomain: process.env['EMAIL_DOMAIN'] ?? '',
-  emailFrom:
-    process.env['EMAIL_FROM'] ??
-    process.env['NOTIFICATION_FROM_EMAIL'] ??
-    'noreply@thinker.example.com',
+  emailFrom: resolveEmailFrom(),
   // Legacy Mailgun-only (backward compat with older deployments).
   mailgunApiKey: process.env['MAILGUN_API_KEY'] ?? '',
   mailgunDomain: process.env['MAILGUN_DOMAIN'] ?? '',

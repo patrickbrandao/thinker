@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 /**
  * Pure helper functions for classifying and formatting transport-level
  * errors that occur when forwarding requests to upstream LLM providers.
@@ -11,6 +13,63 @@ export const PROVIDER_TIMEOUT_STATUS = 504;
 /** Status for a provider URL the SSRF policy refused (#74). */
 export const PROVIDER_URL_BLOCKED_STATUS = 502;
 export const PROVIDER_URL_BLOCKED_CODE = 'provider_url_blocked';
+
+/**
+ * The 502 body for a blocked provider URL is built by the gateway itself, but
+ * downstream it is read back as text alongside real upstream bodies. An
+ * upstream could send `code: "provider_url_blocked"` in its own 502, so the
+ * code alone must not classify it (#158). Each gateway-built body carries a
+ * random marker that is registered here; only a body whose marker is known to
+ * this process counts as gateway-produced. The registry is bounded, so markers
+ * that leak into logs or recordings expire.
+ */
+const GATEWAY_MARKER_FIELD = 'thinker_gateway_error';
+const GATEWAY_MARKER_LIMIT = 1024;
+const gatewayMarkers = new Set<string>();
+
+function issueGatewayMarker(): string {
+  const marker = randomBytes(16).toString('hex');
+  gatewayMarkers.add(marker);
+  if (gatewayMarkers.size > GATEWAY_MARKER_LIMIT) {
+    const oldest = gatewayMarkers.values().next().value;
+    if (oldest !== undefined) gatewayMarkers.delete(oldest);
+  }
+  return marker;
+}
+
+/**
+ * Removes the internal marker from a body before it is logged, stored or
+ * recorded, so markers never leave the process. Other bodies pass unchanged.
+ */
+export function stripGatewayMarker(rawBody: string): string {
+  if (!rawBody.includes(GATEWAY_MARKER_FIELD)) return rawBody;
+  try {
+    const parsed = JSON.parse(rawBody) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return rawBody;
+    if (!(GATEWAY_MARKER_FIELD in parsed)) return rawBody;
+    const rest: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+    delete rest[GATEWAY_MARKER_FIELD];
+    return JSON.stringify(rest);
+  } catch {
+    return rawBody;
+  }
+}
+
+/** True only for a blocked-URL body this gateway process built itself. */
+export function isGatewayProviderUrlBlockedBody(rawBody: string): boolean {
+  try {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    const marker = parsed[GATEWAY_MARKER_FIELD];
+    const error = parsed.error as Record<string, unknown> | undefined;
+    return (
+      typeof marker === 'string' &&
+      gatewayMarkers.has(marker) &&
+      error?.code === PROVIDER_URL_BLOCKED_CODE
+    );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The configured provider URL was refused by the SSRF policy: a cloud metadata
@@ -134,6 +193,7 @@ export function buildTransportErrorResponse(error: unknown): Response {
           type: PROVIDER_URL_BLOCKED_CODE,
           code: PROVIDER_URL_BLOCKED_CODE,
         },
+        [GATEWAY_MARKER_FIELD]: issueGatewayMarker(),
       }),
       {
         status: PROVIDER_URL_BLOCKED_STATUS,

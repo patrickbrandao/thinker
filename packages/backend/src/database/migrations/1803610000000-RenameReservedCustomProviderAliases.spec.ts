@@ -84,6 +84,21 @@ describe('RenameReservedCustomProviderAliases1803610000000', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('clears the alias when every -custom candidate is taken in the tenant', async () => {
+    const taken = Array.from({ length: 100 }, (_, i) => ({
+      id: `taken-${i + 1}`,
+      tenant_id: 't1',
+      alias: i === 0 ? 'lmstudio-custom' : `lmstudio-custom-${i + 1}`,
+    }));
+    rows = [...taken, { id: 'cp-1', tenant_id: 't1', alias: 'lmstudio' }];
+    await migration.up(mockQueryRunner);
+    expect(updates()).toEqual([[[null, 'cp-1']]]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = String(warn.mock.calls[0][0]);
+    expect(message).toContain('alias cleared');
+    expect(message).toContain('custom:cp-1/<model>');
+  });
+
   it('never logs a provider name', async () => {
     rows = [{ id: 'cp-1', tenant_id: 't1', alias: 'llamacpp' }];
     await migration.up(mockQueryRunner);
