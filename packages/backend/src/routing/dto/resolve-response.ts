@@ -40,4 +40,9 @@ export interface ResolveResponse {
    * ("model not available") instead of M101 ("no model to route to").
    */
   override_model_unavailable?: string;
+  /**
+   * When `route` is null: one sentence saying which tier `auto` consulted and
+   * what it is missing, appended to M101 so the operator knows what to set.
+   */
+  no_route_detail?: string;
 }

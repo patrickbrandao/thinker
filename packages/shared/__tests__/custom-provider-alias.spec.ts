@@ -105,6 +105,14 @@ describe('custom provider alias', () => {
       expect(deriveCustomProviderAlias('Ollama')).toBeNull();
     });
 
+    it('returns null for a native local runner id in another case or padded', () => {
+      expect(deriveCustomProviderAlias(' LMStudio ')).toBeNull();
+      expect(deriveCustomProviderAlias('  LLAMACPP')).toBeNull();
+      // An explicit alias goes through normalizeCustomProviderAlias first.
+      expect(isReservedCustomProviderAlias(normalizeCustomProviderAlias(' LMStudio ')!)).toBe(true);
+      expect(isReservedCustomProviderAlias(normalizeCustomProviderAlias('LlamaCpp ')!)).toBe(true);
+    });
+
     it('still derives the tile names the dashboard uses', () => {
       expect(deriveCustomProviderAlias('LM Studio')).toBe('lm-studio');
       expect(deriveCustomProviderAlias('llama.cpp')).toBe('llama.cpp');

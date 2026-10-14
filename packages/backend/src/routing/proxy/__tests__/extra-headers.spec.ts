@@ -107,4 +107,19 @@ describe('mergeExtraHeaders', () => {
       expect(mergeExtraHeaders(ADAPTER, { 'anthropic-beta': 'Bad Flag' })).toEqual(ADAPTER);
     });
   });
+
+  it('emits a kept header under its trimmed name (#105)', () => {
+    const merged = mergeExtraHeaders(ADAPTER, { ' X-Custom-Trace ': 'trace-123' });
+    expect(merged).toEqual({ ...ADAPTER, 'X-Custom-Trace': 'trace-123' });
+    expect(Object.keys(merged)).not.toContain(' X-Custom-Trace ');
+  });
+
+  it('treats differently padded spellings as the same header, first wins (#105)', () => {
+    const merged = mergeExtraHeaders(ADAPTER, { ' x-trace': 'first', 'X-TRACE ': 'second' });
+    expect(merged).toEqual({ ...ADAPTER, 'x-trace': 'first' });
+  });
+
+  it('ignores a blank header name (#105)', () => {
+    expect(mergeExtraHeaders(ADAPTER, { '  ': 'x' })).toEqual(ADAPTER);
+  });
 });

@@ -514,20 +514,46 @@ describe('MCP tools', () => {
         (await call(registerAll(noProviders), 'manifest_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'no_provider' });
 
+      const inactiveOnly = makeDeps();
+      (inactiveOnly.providers.getProviders as jest.Mock).mockResolvedValue([
+        { ...CONNECTION, is_active: false },
+      ]);
+      expect(
+        (await call(registerAll(inactiveOnly), 'manifest_routing_status', { agent: 'demo' })).data,
+      ).toMatchObject({ reason: 'no_provider' });
+
+      // #75: an empty pricing cache (right after boot, or a failed fetch) does
+      // not block an agent that can route, same as the REST endpoint.
       const noPricing = makeDeps();
       (noPricing.pricingSync.getAll as jest.Mock).mockReturnValue(new Map());
       expect(
         (await call(registerAll(noPricing), 'manifest_routing_status', { agent: 'demo' })).data,
-      ).toMatchObject({ reason: 'pricing_cache_empty' });
+      ).toMatchObject({ enabled: true, reason: null });
 
-      // With THINKER_CATALOG_SYNC=false the cache is empty by design and does
-      // not stop routing.
+      // It only explains an agent that cannot route.
+      const noPricingNotRoutable = makeDeps();
+      (noPricingNotRoutable.pricingSync.getAll as jest.Mock).mockReturnValue(new Map());
+      (noPricingNotRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
+      expect(
+        (
+          await call(registerAll(noPricingNotRoutable), 'manifest_routing_status', {
+            agent: 'demo',
+          })
+        ).data,
+      ).toMatchObject({ enabled: false, reason: 'pricing_cache_empty' });
+
+      // With THINKER_CATALOG_SYNC=false the cache is empty by design, so it is
+      // not blamed.
       const previous = process.env['THINKER_CATALOG_SYNC'];
       process.env['THINKER_CATALOG_SYNC'] = 'false';
       try {
         expect(
-          (await call(registerAll(noPricing), 'manifest_routing_status', { agent: 'demo' })).data,
-        ).toMatchObject({ enabled: true, reason: null });
+          (
+            await call(registerAll(noPricingNotRoutable), 'manifest_routing_status', {
+              agent: 'demo',
+            })
+          ).data,
+        ).toMatchObject({ enabled: false, reason: 'no_routable_models' });
       } finally {
         if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
         else process.env['THINKER_CATALOG_SYNC'] = previous;

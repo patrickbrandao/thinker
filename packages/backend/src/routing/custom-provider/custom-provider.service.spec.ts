@@ -424,8 +424,8 @@ describe('CustomProviderService', () => {
         );
       });
 
-      it.each(['lmstudio', 'llamacpp', 'ollama'])(
-        'rejects the native local runner id %s as an explicit alias',
+      it.each(['lmstudio', 'llamacpp', 'ollama', ' LMStudio ', 'LlamaCpp '])(
+        'rejects the native local runner id %j as an explicit alias',
         async (alias) => {
           const { svc } = makeDeps({ findOneResults: [null] });
           await expect(svc.create('tenant-1', { ...dto, alias })).rejects.toBeInstanceOf(
@@ -437,6 +437,12 @@ describe('CustomProviderService', () => {
       it('leaves the default alias empty for a name that derives to lmstudio', async () => {
         const { svc } = makeDeps({ findOneResults: [null] });
         const cp = await svc.create('tenant-1', { ...dto, name: 'LMStudio' });
+        expect(cp.alias).toBeNull();
+      });
+
+      it('leaves the default alias empty for a padded, upper-case local runner name', async () => {
+        const { svc } = makeDeps({ findOneResults: [null] });
+        const cp = await svc.create('tenant-1', { ...dto, name: ' LMSTUDIO ' });
         expect(cp.alias).toBeNull();
       });
 

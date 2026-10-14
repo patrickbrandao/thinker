@@ -163,12 +163,21 @@ function loadModelparamsCatalog(): ProviderParamSpecCatalog {
 function loadModelparamsCatalogData(): unknown {
   const packageJsonPath = requireFromThisModule.resolve(MODELPARAMS_PACKAGE_JSON);
   const dataPath = join(dirname(packageJsonPath), MODELPARAMS_DATA_RELATIVE_PATH);
-  const dataModule = readFileSync(dataPath, 'utf8');
-  // modelparams is ESM-only while the backend is CommonJS, so read the generated
-  // JSON-shaped catalog literal directly from the installed package.
-  const match = dataModule.match(/export const CATALOG = ([\s\S]*?);\nfunction authSuffix/);
+  return JSON.parse(extractModelparamsCatalogLiteral(readFileSync(dataPath, 'utf8'))) as unknown;
+}
+
+/**
+ * modelparams is ESM-only while the backend is CommonJS, so the JSON-shaped
+ * catalog literal is read straight from the installed `dist/generated/data.js`.
+ * Older releases emit `export const CATALOG = [...]`; 0.0.71+ emit
+ * `const GENERATED_CATALOG = [...]` followed by `export const CATALOG = GENERATED_CATALOG`.
+ */
+export function extractModelparamsCatalogLiteral(source: string): string {
+  const match = source.match(
+    /(?:export )?const (?:GENERATED_)?CATALOG = (\[[\s\S]*?\]);\n(?:export const CATALOG|function authSuffix)/,
+  );
   if (!match) throw new Error('modelparams package catalog file has an unknown shape');
-  return JSON.parse(match[1]) as unknown;
+  return match[1];
 }
 
 function providerMetadataIdentity(

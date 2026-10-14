@@ -35,8 +35,9 @@ function toServerRoot(url: string): string {
  * the gateway can append `/v1/...` to. A bare `host:port` (the usual
  * mistake) is caught before parsing, since `new URL` would read the host as
  * a scheme.
- * Credentials and query strings are rejected because `fetch` refuses the
- * first and the endpoint path would land after the second.
+ * Credentials and query strings (even an empty trailing `?` or `#`) are
+ * rejected because `fetch` refuses the first and the endpoint path would land
+ * after the second.
  */
 function invalidBaseUrlReason(value: string): string | null {
   if (!value.includes('://')) return 'has no http:// or https:// scheme';
@@ -53,7 +54,11 @@ function invalidBaseUrlReason(value: string): string | null {
   if (url.username || url.password) {
     return 'must not embed credentials (store an API key on the connection instead)';
   }
-  if (url.search || url.hash) return 'must not carry a query string or fragment';
+  // `new URL` drops an empty `?` or `#`, but the raw value is what would be
+  // concatenated with the endpoint path (`.../v1?/v1/chat/completions`).
+  if (url.search || url.hash || value.includes('?') || value.includes('#')) {
+    return 'must not carry a query string or fragment';
+  }
   return null;
 }
 

@@ -129,9 +129,9 @@ openssl rand -hex 32
 
 `THINKER_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
 request recordings Thinker stores; the rest of the database is not encrypted
-by it. Left unset it falls back to `BETTER_AUTH_SECRET`, which means one leaked
-session-signing secret also decrypts every stored credential and recording.
-Set it before first boot.
+by it. It is required: the server refuses to start when it is missing, shorter
+than 32 characters, or equal to `BETTER_AUTH_SECRET`, so a leaked
+session-signing secret never decrypts a stored credential or recording.
 Recordings written under a previous secret are not migrated: after the secret
 changes they can no longer be decrypted and the dashboard shows them as
 unavailable, while retention removes them on schedule.
@@ -169,6 +169,7 @@ docker run -d \
   -p 2099:2099 \
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest \
   -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
+  -e THINKER_ENCRYPTION_KEY=$(openssl rand -hex 32) \
   -e BETTER_AUTH_URL=http://localhost:2099 \
   tmsoftbrasil/thinker
 ```
@@ -180,11 +181,13 @@ docker run -d \
 
 ```powershell
 $secret = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
+$encryptionKey = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
 
 docker run -d `
   -p 2099:2099 `
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest `
   -e BETTER_AUTH_SECRET=$secret `
+  -e THINKER_ENCRYPTION_KEY=$encryptionKey `
   -e BETTER_AUTH_URL=http://localhost:2099 `
   tmsoftbrasil/thinker
 ```
@@ -194,13 +197,14 @@ docker run -d `
 <details>
 <summary><strong>Windows (CMD)</strong></summary>
 
-Generate a 64-character hex secret with any tool you trust, then:
+Generate two different 64-character hex secrets with any tool you trust, then:
 
 ```cmd
 docker run -d ^
   -p 2099:2099 ^
   -e DATABASE_URL=postgresql://user:pass@host:5432/manifest ^
   -e BETTER_AUTH_SECRET=<your-64-char-secret> ^
+  -e THINKER_ENCRYPTION_KEY=<another-64-char-secret> ^
   -e BETTER_AUTH_URL=http://localhost:2099 ^
   tmsoftbrasil/thinker
 ```
@@ -408,10 +412,12 @@ refused, including when a hostname starts resolving to them after it was saved.
 | ---------------------------------- | ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                     | Yes         | --                                           | PostgreSQL connection string                                                                                                                                                                               |
 | `BETTER_AUTH_SECRET`               | Yes         | --                                           | Session signing secret (min 32 chars)                                                                                                                                                                      |
-| `THINKER_ENCRYPTION_KEY`          | Recommended | falls back to `BETTER_AUTH_SECRET`           | Separate 32+ char key encrypting stored provider keys and OAuth tokens. The install script generates one; set it before first boot, since introducing it later means re-encrypting what is already stored. |
+| `THINKER_ENCRYPTION_KEY`           | Yes         | --                                           | 32+ char key encrypting stored provider keys, OAuth tokens and request recordings. Must differ from `BETTER_AUTH_SECRET`; the server refuses to start otherwise. The install script generates one.          |
 | `BETTER_AUTH_URL`                  | No          | `http://localhost:${PORT}`                   | Public URL. Must match the URL in the browser                                                                                                                                                              |
 | `PORT`                             | No          | `2099`                                       | Dashboard port — sets both the published host port and the internal listener                                                                                                                               |
 | `OLLAMA_HOST`                      | No          | `http://host.docker.internal:11434`          | Ollama endpoint for the built-in tile. Override to point at a LAN-hosted Ollama.                                                                                                                           |
+| `THINKER_LMSTUDIO_BASE_URL`        | No          | `http://host.docker.internal:1234`           | LM Studio server for the built-in `lmstudio` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
+| `THINKER_LLAMACPP_BASE_URL`        | No          | `http://host.docker.internal:8080`           | llama.cpp server for the built-in `llamacpp` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
 | `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
 | `THINKER_DISABLE_HSTS`             | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |

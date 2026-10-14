@@ -91,7 +91,7 @@ export function resolveRecordingStorage(
   if (requested !== 'auto') {
     return {
       backend: null,
-      reason: `Unknown REQUEST_RECORDING_STORAGE value "${requested}"`,
+      reason: `Unknown THINKER_RECORDING_STORAGE value "${requested}"`,
     };
   }
   if (bucket || region || hasPartialCredentials || endpoint) return s3();

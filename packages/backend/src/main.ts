@@ -26,10 +26,14 @@ import { createRateLimitReachedHandler } from './common/middleware/rate-limit-lo
 import { shouldCompress } from './routing/proxy/compression-filter';
 import { checkLocalServerBaseUrls } from './common/constants/local-servers';
 import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
+import { assertEncryptionKeyConfig, StartupConfigError } from './common/utils/crypto.util';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
   assertLegacyEncryptionKeyMigrated(process.env);
+  // Before anything touches the database: migrations and the re-encryption
+  // pass both need the key, and it must never silently be the session secret.
+  assertEncryptionKeyConfig(process.env);
 
   // Before the app (and its migrations) start: name any upstream-era
   // variables that are set and ignored, so a stale .env doesn't fail silently.
@@ -261,6 +265,12 @@ export async function bootstrap() {
 // Only auto-start when run directly (not when embedded)
 if (!process.env['THINKER_EMBEDDED']) {
   bootstrap().catch((err) => {
+    if (err instanceof StartupConfigError) {
+      // An operator error with its own remediation; the migration hint below
+      // would only mislead.
+      new Logger('Bootstrap').fatal(`Configuration error:\n${err.message}`);
+      process.exit(1);
+    }
     // The server never came up. The most common cause is a failed database
     // migration — TypeORM logs the specific "Migration X failed, error: ..."
     // line just above this. Surface a clear, intentional fatal message and

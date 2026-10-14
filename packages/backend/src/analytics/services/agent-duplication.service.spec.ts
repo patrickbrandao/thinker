@@ -6,7 +6,7 @@ import { AgentDuplicationService } from './agent-duplication.service';
 import { Agent } from '../../entities/agent.entity';
 import { RoutingCacheService } from '../../routing/routing-core/routing-cache.service';
 
-process.env['BETTER_AUTH_SECRET'] = 'a'.repeat(64);
+process.env['THINKER_ENCRYPTION_KEY'] = 'a'.repeat(64);
 
 describe('AgentDuplicationService', () => {
   let service: AgentDuplicationService;
