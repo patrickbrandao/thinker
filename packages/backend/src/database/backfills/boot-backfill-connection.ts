@@ -39,6 +39,7 @@ export class BootBackfillConnection {
   private readonly logger = new Logger(BootBackfillConnection.name);
   private direct: DataSource | undefined;
   private opening: Promise<DataSource> | undefined;
+  private closed = false;
 
   constructor(
     private readonly appDataSource: DataSource,
@@ -54,6 +55,8 @@ export class BootBackfillConnection {
   async get(): Promise<DataSource> {
     const url = resolveDirectBackfillDatabaseUrl(this.env);
     if (!url) return this.appDataSource;
+    // After shutdown began, never open a fresh pool that nothing would close.
+    if (this.closed) throw new Error('Boot backfill connection is closed');
     if (this.direct?.isInitialized) return this.direct;
     const opening = (this.opening ??= this.open(url));
     try {
@@ -64,6 +67,7 @@ export class BootBackfillConnection {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     // A close() racing an open() still in flight must not leak the pool that
     // open() is about to hand back: wait for it, then destroy it.
     const opening = this.opening;

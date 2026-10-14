@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { auth } from '../auth/auth.instance';
+import { migrateAndVerifyBetterAuthSchema } from '../auth/better-auth-schema';
 import { runAsServerUserCreation } from '../auth/signup-policy';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
@@ -188,7 +189,7 @@ export class DatabaseSeederService implements OnModuleInit {
 
   private async runBetterAuthMigrations() {
     const ctx = await auth.$context;
-    await ctx.runMigrations();
+    await migrateAndVerifyBetterAuthSchema(ctx, this.logger);
   }
 
   private async seedAdminUser() {

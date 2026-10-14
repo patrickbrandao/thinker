@@ -223,6 +223,11 @@ const pluginAuth = betterAuth({
   secret: betterAuthSecret,
   logger: { level: 'debug' },
   telemetry: { enabled: false },
+  // The runtime check runs at init, before the boot migration creates the
+  // Better Auth tables, so a fresh database always logged a false "schema
+  // mismatch". The same check runs after the migration instead
+  // (auth/better-auth-schema.ts).
+  advanced: { database: { validateSchema: false } },
   plugins: buildPlugins(),
   session: {
     // Validate sessions from a signed cookie instead of the database. The two

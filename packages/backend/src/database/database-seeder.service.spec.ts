@@ -18,6 +18,14 @@ jest.mock('../auth/auth.instance', () => ({
   },
 }));
 
+// Better Auth's migrator is ESM-only; run just the migration step here.
+jest.mock('../auth/better-auth-schema', () => ({
+  migrateAndVerifyBetterAuthSchema: jest.fn(async (ctx: { runMigrations(): Promise<void> }) => {
+    await ctx.runMigrations();
+    return [];
+  }),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { auth } = require('../auth/auth.instance');
 

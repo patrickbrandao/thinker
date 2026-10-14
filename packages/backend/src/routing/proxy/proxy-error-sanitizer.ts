@@ -1,5 +1,5 @@
 import { scrubSecrets } from '../../common/utils/secret-scrub';
-import { PROVIDER_URL_BLOCKED_CODE } from './proxy-transport';
+import { PROVIDER_URL_BLOCKED_CODE, isGatewayProviderUrlBlockedBody } from './proxy-transport';
 
 const KNOWN_ERROR_MESSAGES: Record<number, string> = {
   400: 'Bad request to upstream provider',
@@ -218,7 +218,7 @@ export function classifyProviderError(
   status: number,
   rawBody: string,
 ): ClassifiedProviderError | null {
-  if (status === 502 && extractProviderErrorCode(rawBody) === PROVIDER_URL_BLOCKED_CODE) {
+  if (status === 502 && isGatewayProviderUrlBlockedBody(rawBody)) {
     return {
       message: PROVIDER_URL_BLOCKED_MESSAGE,
       type: PROVIDER_URL_BLOCKED_CODE,

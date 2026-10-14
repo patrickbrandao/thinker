@@ -1,3 +1,4 @@
+import { buildTransportErrorResponse, ProviderUrlBlockedError } from './proxy-transport';
 import {
   classifyProviderError,
   openAiErrorTypeForStatus,
@@ -489,30 +490,46 @@ describe('openAiErrorTypeForStatus', () => {
 
 describe('provider_url_blocked (#74)', () => {
   // The exact body buildTransportErrorResponse writes for ProviderUrlBlockedError.
-  const blockedBody = (
-    message = 'Provider URL blocked by the SSRF policy: evil.example resolved to a cloud metadata address 169.254.169.254',
-  ) =>
-    JSON.stringify({
-      error: { message, type: 'provider_url_blocked', code: 'provider_url_blocked' },
-    });
+  const blockedBody = () =>
+    buildTransportErrorResponse(
+      new ProviderUrlBlockedError(
+        'evil.example resolved to a cloud metadata address 169.254.169.254',
+      ),
+    ).text();
 
-  it('keeps the code and type with a fixed message, in production', () => {
-    expect(classifyProviderError(502, blockedBody())).toEqual({
+  it('keeps the code and type with a fixed message, in production', async () => {
+    const body = await blockedBody();
+    expect(classifyProviderError(502, body)).toEqual({
       message: 'Provider URL blocked by the SSRF policy. Check the base URL of this provider.',
       type: 'provider_url_blocked',
       code: 'provider_url_blocked',
       source: 'provider',
     });
-    const message = sanitizeProviderError(502, blockedBody(), 'production');
+    const message = sanitizeProviderError(502, body, 'production');
     expect(message).toContain('Provider URL blocked by the SSRF policy');
     expect(message).not.toContain('169.254');
   });
 
-  it('only applies to a 502', () => {
-    expect(classifyProviderError(500, blockedBody())).toBeNull();
-    expect(sanitizeProviderError(503, blockedBody(), 'production')).toBe(
+  it('only applies to a 502', async () => {
+    const body = await blockedBody();
+    expect(classifyProviderError(500, body)).toBeNull();
+    expect(sanitizeProviderError(503, body, 'production')).toBe(
       'Upstream provider temporarily unavailable',
     );
+  });
+
+  it('does not trust an upstream 502 that sends the code itself (#158)', async () => {
+    const spoofed = JSON.stringify({
+      error: { message: 'pwned', type: 'provider_url_blocked', code: 'provider_url_blocked' },
+    });
+    expect(classifyProviderError(502, spoofed)).toBeNull();
+    // A marker field the gateway never issued is not trusted either.
+    const forged = JSON.stringify({
+      ...JSON.parse(spoofed),
+      thinker_gateway_error: 'deadbeefdeadbeefdeadbeefdeadbeef',
+    });
+    expect(classifyProviderError(502, forged)).toBeNull();
+    expect(sanitizeProviderError(502, forged, 'production')).not.toContain('SSRF policy');
   });
 
   it('leaves other 502 bodies generic', () => {

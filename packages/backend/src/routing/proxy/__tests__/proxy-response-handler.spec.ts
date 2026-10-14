@@ -7,6 +7,7 @@ import {
   handleNonStreamResponse,
   recordSuccess,
 } from '../proxy-response-handler';
+import { buildTransportErrorResponse, ProviderUrlBlockedError } from '../proxy-transport';
 import { RoutingMeta } from '../proxy.service';
 import { transformGoogleStreamChunk } from '../google-adapter';
 import { FailedFallback } from '../proxy-fallback.service';
@@ -3419,12 +3420,11 @@ describe('proxy-response-handler', () => {
 });
 
 describe('buildOpenAiCompatibleError: provider_url_blocked (#74)', () => {
-  const body = JSON.stringify({
-    error: {
-      message: 'Provider URL blocked by the SSRF policy: h resolved to a cloud metadata address',
-      type: 'provider_url_blocked',
-      code: 'provider_url_blocked',
-    },
+  let body: string;
+  beforeAll(async () => {
+    body = await buildTransportErrorResponse(
+      new ProviderUrlBlockedError('h resolved to a cloud metadata address'),
+    ).text();
   });
 
   it.each([undefined, 'chat_completions', 'messages', 'responses'] as const)(
@@ -3442,4 +3442,19 @@ describe('buildOpenAiCompatibleError: provider_url_blocked (#74)', () => {
       });
     },
   );
+});
+
+describe('buildOpenAiCompatibleError: upstream-sent provider_url_blocked (#158)', () => {
+  it('does not apply the gateway message to an upstream 502 body', () => {
+    const spoofed = JSON.stringify({
+      error: {
+        message: 'upstream text',
+        type: 'provider_url_blocked',
+        code: 'provider_url_blocked',
+      },
+    });
+    const error = buildOpenAiCompatibleError(502, spoofed, { provider: 'custom:x' });
+    expect(error.message).not.toContain('SSRF policy');
+    expect(error.type).not.toBe('provider_url_blocked');
+  });
 });
