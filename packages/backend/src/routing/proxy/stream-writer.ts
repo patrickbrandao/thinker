@@ -262,6 +262,7 @@ export function initSseHeaders(
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   for (const [key, value] of Object.entries(extraHeaders)) {
     res.setHeader(key, value);
   }

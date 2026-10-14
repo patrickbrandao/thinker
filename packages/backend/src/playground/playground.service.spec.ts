@@ -1103,6 +1103,29 @@ describe('PlaygroundService.runStream', () => {
     expect(res.end).toHaveBeenCalled();
   });
 
+  it('escapes HTML metacharacters from error text in SSE frames', async () => {
+    const { service, mocks } = buildService();
+    const failingBody = new ReadableStream<Uint8Array>({
+      pull() {
+        throw new Error('<script>alert(1)</script> & boom');
+      },
+    });
+    mocks.providerClient.forward.mockResolvedValue({
+      response: { ok: true, status: 200, headers: new Headers(), body: failingBody },
+      isGoogle: false,
+      isAnthropic: false,
+      isChatGpt: false,
+    });
+    const res = mockRes();
+
+    await service.runStream(CTX, makeDto(), asRes(res));
+
+    const raw = (res.write as jest.Mock).mock.calls.map((c) => String(c[0])).join('');
+    expect(raw).not.toMatch(/[<>&]/);
+    const errEvent = parseSse(res).find((e) => e.type === 'error') as Record<string, unknown>;
+    expect(errEvent.message).toContain('<script>alert(1)</script> & boom');
+  });
+
   // The service registers `res.on('close', () => abort.abort())` *before* it
   // touches `forward.response.body`. A ReadableStream calls `pull` eagerly at
   // construction (highWaterMark 1), so building the stream inline would run

@@ -38,6 +38,7 @@ import { buildForwardBody, derivePromptForHistory } from './playground-payload';
 import { consumeProviderStream } from './playground-stream';
 import type { RunPlaygroundDto } from './dto/run-playground.dto';
 import { ThinkerRequest } from '../entities/request.entity';
+import { safeJsonStringify } from '../common/utils/safe-json';
 
 @Injectable()
 export class PlaygroundService {
@@ -296,7 +297,7 @@ export class PlaygroundService {
     initSseHeaders(res, {});
     const send = (event: PlaygroundStreamEvent): void => {
       if (res.writableEnded) return;
-      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      res.write(`event: ${event.type}\ndata: ${safeJsonStringify(event)}\n\n`);
     };
 
     if (!forward.response.body) {

@@ -170,9 +170,6 @@ jobs:
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'contract-break') }}
         env:
           THINKER_BASE_URL: http://127.0.0.1:2099
-          # Base commits from before #21 read the URL under its old name.
-          # TODO(#31): drop this line once no open PR has a base before #21.
-          THINKER_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
           tests=(.gateway-contract-baseline/contracts/gateway/tests/*.test.mjs)

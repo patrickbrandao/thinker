@@ -141,6 +141,23 @@ describe('proxy-friendly-response', () => {
       } as unknown as jest.Mocked<ExpressResponse>;
     });
 
+    it('escapes HTML metacharacters in the SSE body and sets nosniff', () => {
+      sendFriendlyResponse(res, '<script>alert(1)</script> & more', true);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+      expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+      const body = res.send.mock.calls[0][0] as string;
+      expect(body).not.toMatch(/[<>&]/);
+      const frame = body.split('\n\n')[0].replace(/^data: /, '');
+      expect(JSON.parse(frame).choices[0].delta.content).toBe('<script>alert(1)</script> & more');
+      expect(body.endsWith('data: [DONE]\n\n')).toBe(true);
+    });
+
+    it('sets nosniff on the JSON response', () => {
+      sendFriendlyResponse(res, 'x', false);
+      expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+    });
+
     it('sends non-streaming JSON response', () => {
       sendFriendlyResponse(res, 'Test message', false);
 

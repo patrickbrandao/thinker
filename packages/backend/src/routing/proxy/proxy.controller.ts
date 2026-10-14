@@ -64,6 +64,7 @@ import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-
 import { StreamFailure } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
+import { safeJsonStringify } from '../../common/utils/safe-json';
 import {
   createAttemptRecordingCapture,
   recordingResponseFromText,
@@ -747,16 +748,21 @@ export class ProxyController {
     });
     error.message = streamError.message;
 
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+
     if (apiMode === 'messages') {
       res.write(
-        `event: error\ndata: ${JSON.stringify({
+        `event: error\ndata: ${safeJsonStringify({
           type: 'error',
           error: { type: 'api_error', message: streamError.message },
         })}\n\n`,
       );
     } else if (apiMode === 'responses') {
       res.write(
-        `event: error\ndata: ${JSON.stringify({
+        `event: error\ndata: ${safeJsonStringify({
           type: 'error',
           code: error.code ?? 'server_error',
           message: streamError.message,
@@ -765,7 +771,7 @@ export class ProxyController {
         })}\n\n`,
       );
     } else {
-      res.write(`data: ${JSON.stringify({ error })}\n\ndata: [DONE]\n\n`);
+      res.write(`data: ${safeJsonStringify({ error })}\n\ndata: [DONE]\n\n`);
     }
     res.end();
   }

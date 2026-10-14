@@ -5,6 +5,7 @@ import type { TierSlot } from 'thinker-shared';
 import type { ResponseMode } from 'thinker-shared';
 import type { ThinkerErrorCode } from '../../common/errors/error-codes';
 import { DEFAULT_PORT } from '../../common/constants/server.constants';
+import { safeJsonStringify } from '../../common/utils/safe-json';
 
 export interface FriendlyForward {
   response: Response;
@@ -144,8 +145,9 @@ export function sendFriendlyResponse(res: ExpressResponse, content: string, stre
       model: 'thinker',
       choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }],
     };
-    const ssePayload = `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`;
+    const ssePayload = `data: ${safeJsonStringify(chunk)}\n\ndata: [DONE]\n\n`;
     res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.status(200).send(ssePayload);
@@ -165,6 +167,7 @@ export function sendFriendlyResponse(res: ExpressResponse, content: string, stre
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     };
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.status(200).json(responseBody);
   }
 }

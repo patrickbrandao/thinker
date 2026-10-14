@@ -2829,6 +2829,50 @@ describe('ProxyController', () => {
     });
   });
 
+  describe('writeStreamError', () => {
+    const makeRes = () => {
+      const writes: string[] = [];
+      const res = {
+        headersSent: false,
+        setHeader: jest.fn(),
+        write: jest.fn((chunk: string) => writes.push(chunk)),
+        end: jest.fn(),
+      };
+      return { res, writes };
+    };
+    const failure = { status: 502, message: '<img src=x onerror=alert(1)> & co', reason: 'x' };
+
+    it.each(['chat_completions', 'messages', 'responses'] as const)(
+      'escapes the error text and declares an SSE body (%s)',
+      (apiMode) => {
+        const { res, writes } = makeRes();
+        (
+          controller as unknown as {
+            writeStreamError: (r: unknown, m: string, f: unknown, meta: unknown) => void;
+          }
+        ).writeStreamError(res, apiMode, failure, undefined);
+
+        expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+        expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+        const body = writes.join('');
+        expect(body).not.toMatch(/[<>&]/);
+        expect(body).toContain('\\u003cimg');
+        expect(res.end).toHaveBeenCalled();
+      },
+    );
+
+    it('does not touch headers once the stream has started', () => {
+      const { res } = makeRes();
+      res.headersSent = true;
+      (
+        controller as unknown as {
+          writeStreamError: (r: unknown, m: string, f: unknown, meta: unknown) => void;
+        }
+      ).writeStreamError(res, 'chat_completions', failure, undefined);
+      expect(res.setHeader).not.toHaveBeenCalled();
+    });
+  });
+
   describe('client disconnect', () => {
     it('should register close listener on response', async () => {
       proxyService.proxyRequest.mockResolvedValue({

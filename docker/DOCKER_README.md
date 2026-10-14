@@ -272,6 +272,10 @@ docker compose up -d
 
 Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. To control when upgrades happen, pin a minor version with `THINKER_VERSION=0.1` in `.env`. The install script can also replace the managed compose file safely: `bash install.sh --upgrade`.
 
+### Coming from Manifest
+
+Thinker 0.1 supports fresh installs only. Do a new install rather than pointing Thinker at an old Manifest stack. The Compose project, the PostgreSQL user and the PostgreSQL database are all called `thinker` now, so Compose creates new volumes (`thinker_pgdata`, `thinker_request_recordings`) and does not see the old data. The recording variables `REQUEST_RECORDING_*` were renamed to `THINKER_RECORDING_*`, and the old names are not read.
+
 ## Backup & persistence
 
 PostgreSQL state lives in the `thinker_pgdata` named volume mounted at `/var/lib/postgresql/data` in the `postgres` service. The Compose install also stores local request recordings in the `thinker_request_recordings` volume mounted at `/data/request-recordings`; those recordings are not included in a PostgreSQL dump. For ephemeral hosts or multiple instances, configure durable S3-compatible storage instead.
