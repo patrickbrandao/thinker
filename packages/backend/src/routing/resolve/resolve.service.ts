@@ -186,10 +186,16 @@ export class ResolveService {
         `No route resolved for agent=${agentId} tier=${result.tier} ` +
           `(override=${assignment.override_route?.model ?? 'null'})`,
       );
-      // A scored tier without a model falls back to the default tier; M101
-      // only when the default tier is empty too.
-      const fallback = await this.resolveForTier(agentId, tenantId, DEFAULT_TIER_SLOT, 'default');
-      if (fallback.route) return fallback;
+      // A scored tier with no model set falls back to the default tier; M101
+      // only when the default tier has no usable route either. The fallback
+      // uses the default tier's own response_mode and output_modality.
+      // A tier whose configured override is unusable does NOT fall back: a
+      // broken config surfaces (M302 / M101) instead of silently routing to a
+      // possibly pricier default model.
+      if (!readOverrideRoute(assignment)) {
+        const fallback = await this.resolveForTier(agentId, tenantId, DEFAULT_TIER_SLOT, 'default');
+        if (fallback.route) return fallback;
+      }
       return {
         tier: result.tier,
         route: null,
@@ -620,17 +626,17 @@ function noRouteDetail(
   if (override) {
     return (
       `The ${tier} tier points at "${override.model}", but its provider is not ` +
-      `connected or not enabled for this agent.` +
-      (complexityRouting && tier !== DEFAULT_TIER_SLOT
-        ? ' The default tier it falls back to has no usable model either.'
-        : '')
+      `connected or not enabled for this agent.`
     );
   }
   if (complexityRouting) {
-    return (
-      `This request scored as the ${tier} tier, which has no model set, and the ` +
-      `default tier it falls back to has no model either.`
-    );
+    const defaultRow = tiers.find((t) => t.tier === DEFAULT_TIER_SLOT);
+    const defaultOverride = defaultRow ? readOverrideRoute(defaultRow) : null;
+    const defaultState = defaultOverride
+      ? `the default tier it falls back to points at "${defaultOverride.model}", but its ` +
+        `provider is not connected or not enabled for this agent.`
+      : `the default tier it falls back to has no model either.`;
+    return `This request scored as the ${tier} tier, which has no model set, and ${defaultState}`;
   }
   const ignored = TIERS.filter((name) =>
     tiers.some((t) => t.tier === name && readOverrideRoute(t)),

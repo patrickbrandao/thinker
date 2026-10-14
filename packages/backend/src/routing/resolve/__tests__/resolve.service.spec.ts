@@ -1345,6 +1345,39 @@ describe('ResolveService', () => {
       expect(result.tier).toBe('standard');
       expect(result.no_route_detail).toContain('standard tier');
       expect(result.no_route_detail).toContain('default tier');
+      expect(result.no_route_detail).toContain('has no model either');
+    });
+
+    it('says the default model provider is unavailable when default has an unusable model', async () => {
+      tierService.getTiers.mockResolvedValue([
+        tierRow('standard', null),
+        tierRow('default', route('openai', 'api_key', 'gpt-4o')),
+      ]);
+      providerKeyService.isRouteAvailable.mockResolvedValue(false);
+      providerKeyService.hasRouteCredentials.mockResolvedValue(false);
+
+      const result = await svc.resolve('agent-1', 'user-1', messages);
+
+      expect(result.route).toBeNull();
+      expect(result.no_route_detail).toContain('default tier it falls back to points at "gpt-4o"');
+      expect(result.no_route_detail).not.toContain('has no model either');
+    });
+
+    it('does not fall back when the scored tier override is unavailable (M302 kept)', async () => {
+      tierService.getTiers.mockResolvedValue([
+        tierRow('standard', route('openai', 'api_key', 'gpt-gone')),
+        tierRow('default', route('anthropic', 'api_key', 'claude-opus-4-6')),
+      ]);
+      providerKeyService.isRouteAvailable.mockImplementation(
+        async (_t, r: ModelRoute) => r.model !== 'gpt-gone',
+      );
+      providerKeyService.hasRouteCredentials.mockResolvedValue(true);
+
+      const result = await svc.resolve('agent-1', 'user-1', messages);
+
+      expect(result.route).toBeNull();
+      expect(result.tier).toBe('standard');
+      expect(result.override_model_unavailable).toBe('gpt-gone');
     });
   });
 });
