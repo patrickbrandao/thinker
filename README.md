@@ -14,30 +14,20 @@ AI Agents that don't break
 ---
 
 <p align="center">
-  <a href="https://render.com/deploy?repo=https://github.com/mnfst/llm-gateway" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-Render-46E3B7?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Deploy on Render" /></a>
-  <a href="https://railway.com/deploy/wild-wild" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-Railway-0B0D0E?style=for-the-badge&amp;logo=railway&amp;logoColor=white" alt="Deploy on Railway" /></a>
-  <a href="https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?stackName=manifest&amp;templateURL=https%3A%2F%2Fmnfst-manifest-deploy-templates.s3.us-east-1.amazonaws.com%2Fmanifest.yaml" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-AWS-232F3E?style=for-the-badge&amp;logo=amazonwebservices&amp;logoColor=white" alt="Deploy on AWS" /></a>
-  <a href="https://ssh.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fmnfst%2Fllm-gateway&amp;cloudshell_workspace=deploy%2Fgcp&amp;cloudshell_tutorial=TUTORIAL.md&amp;cloudshell_image=gcr.io/ds-artifacts-cloudshell/deploystack_custom_image&amp;shellonly=true" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-GCP-4285F4?style=for-the-badge&amp;logo=googlecloud&amp;logoColor=white" alt="Deploy on GCP" /></a>
+  <a href="https://render.com/deploy?repo=https://github.com/patrickbrandao/thinker" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-Render-46E3B7?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Deploy on Render" /></a>
+  <a href="https://ssh.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fpatrickbrandao%2Fthinker&amp;cloudshell_workspace=deploy%2Fgcp&amp;cloudshell_tutorial=TUTORIAL.md&amp;cloudshell_image=gcr.io/ds-artifacts-cloudshell/deploystack_custom_image&amp;shellonly=true" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-GCP-4285F4?style=for-the-badge&amp;logo=googlecloud&amp;logoColor=white" alt="Deploy on GCP" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/mnfst/llm-gateway/stargazers"><img src="https://img.shields.io/github/stars/mnfst/llm-gateway?style=flat" alt="GitHub stars" /></a>
+  <a href="https://github.com/patrickbrandao/thinker/stargazers"><img src="https://img.shields.io/github/stars/patrickbrandao/thinker?style=flat" alt="GitHub stars" /></a>
   &nbsp;
-  <a href="https://hub.docker.com/r/manifestdotbuild/manifest"><img src="https://img.shields.io/docker/pulls/manifestdotbuild/manifest?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
+  <a href="https://hub.docker.com/r/tmsoftbrasil/thinker"><img src="https://img.shields.io/docker/pulls/tmsoftbrasil/thinker?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
   &nbsp;
-  <a href="https://hub.docker.com/r/manifestdotbuild/manifest/tags"><img src="https://img.shields.io/docker/image-size/manifestdotbuild/manifest/latest?color=2496ED&label=image%20size" alt="Docker image size" /></a>
+  <a href="https://hub.docker.com/r/tmsoftbrasil/thinker/tags"><img src="https://img.shields.io/docker/image-size/tmsoftbrasil/thinker/latest?color=2496ED&label=image%20size" alt="Docker image size" /></a>
   &nbsp;
-  <a href="https://github.com/mnfst/llm-gateway/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mnfst/llm-gateway/ci.yml?branch=main&label=CI" alt="CI status" /></a>
+  <a href="https://github.com/patrickbrandao/thinker/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/patrickbrandao/thinker/ci.yml?branch=main&label=CI" alt="CI status" /></a>
   &nbsp;
-  <a href="https://app.codecov.io/gh/mnfst/llm-gateway"><img src="https://img.shields.io/codecov/c/github/mnfst/llm-gateway?label=coverage" alt="Codecov" /></a>
-  &nbsp;
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/mnfst/llm-gateway?color=blue" alt="license" /></a>
-  &nbsp;
-  <a href="https://discord.gg/FepAked3W7"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
-</p>
-
-<p align="center">
-<a href="https://trendshift.io/repositories/12890" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12890" alt="mnfst%2Fllm-gateway | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/patrickbrandao/thinker?color=blue" alt="license" /></a>
 </p>
 
 ## What is Manifest LLM Gateway?
