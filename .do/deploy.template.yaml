@@ -1,13 +1,15 @@
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker
 spec:
-  name: manifest
+  name: thinker
   region: nyc
   services:
-    - name: manifest
+    - name: thinker
       image:
         registry_type: DOCKER_HUB
-        registry: manifestdotbuild
-        repository: manifest
-        tag: "6"
+        registry: tmsoftbrasil
+        repository: thinker
+        tag: "0.1"
       instance_count: 1
       instance_size_slug: apps-s-1vcpu-1gb
       http_port: 2099
@@ -23,19 +25,16 @@ spec:
         - key: BIND_ADDRESS
           scope: RUN_TIME
           value: 0.0.0.0
-        - key: MANIFEST_MODE
-          scope: RUN_TIME
-          value: selfhosted
         - key: DATABASE_URL
           scope: RUN_TIME
-          value: "${manifest-db.DATABASE_URL}&uselibpqcompat=true"
+          value: "${thinker-db.DATABASE_URL}&uselibpqcompat=true"
         - key: BETTER_AUTH_URL
           scope: RUN_TIME
           value: "${APP_URL}"
         - key: BETTER_AUTH_SECRET
           scope: RUN_TIME
           type: SECRET
-        - key: MANIFEST_ENCRYPTION_KEY
+        - key: THINKER_ENCRYPTION_KEY
           scope: RUN_TIME
           type: SECRET
         - key: REQUEST_RECORDING_STORAGE
@@ -66,6 +65,6 @@ spec:
           scope: RUN_TIME
           value: "5"
   databases:
-    - name: manifest-db
+    - name: thinker-db
       engine: PG
       version: "16"

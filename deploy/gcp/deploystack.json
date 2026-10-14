@@ -1,9 +1,9 @@
 {
-  "title": "Manifest",
-  "description": "Deploy Manifest on Google Cloud Run with Cloud SQL and durable Cloud Storage request recordings.",
-  "logo": "https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/logo-dark.svg",
+  "title": "Thinker",
+  "description": "Deploy Thinker on Google Cloud Run with Cloud SQL and durable Cloud Storage request recordings.",
+  "logo": "https://raw.githubusercontent.com/patrickbrandao/thinker/main/.github/assets/thinker-logo.svg",
   "duration": 15,
-  "documentationLink": "https://manifest.build/llm-gateway/docs/introduction/",
+  "documentationLink": "https://github.com/patrickbrandao/thinker/tree/main/deploy/gcp",
   "variables": [
     {
       "name": "project_id",
@@ -20,13 +20,13 @@
       "name": "service_name",
       "prompt": "Cloud Run service name",
       "type": "string",
-      "default": "manifest"
+      "default": "thinker"
     },
     {
       "name": "image_url",
-      "prompt": "Manifest image",
+      "prompt": "Thinker image",
       "type": "string",
-      "default": "docker.io/manifestdotbuild/manifest:6"
+      "default": "docker.io/tmsoftbrasil/thinker:0.1"
     },
     {
       "name": "database_tier",
