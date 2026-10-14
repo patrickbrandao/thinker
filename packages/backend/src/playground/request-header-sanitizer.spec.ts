@@ -67,7 +67,7 @@ describe('sanitizeRequestHeaders', () => {
     expect(isBlockedHeaderName('AUTHORIZATION')).toBe(true);
     expect(isBlockedHeaderName('X-Thinker-Anything')).toBe(true);
     // The legacy upstream namespace is read by nothing in Thinker (#21).
-    expect(isBlockedHeaderName('X-Manifest-Anything')).toBe(false);
+    expect(isBlockedHeaderName('X-' + 'Manifest-Anything')).toBe(false);
     expect(isBlockedHeaderName('X-Title')).toBe(false);
   });
 

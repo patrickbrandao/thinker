@@ -60,7 +60,7 @@ export interface ForwardResult {
   response: Response;
   /** Provider-native protocol emitted at the transport boundary. */
   wireFormat?: ProviderWireFormat;
-  /** False only when Manifest produced a response without invoking provider transport. */
+  /** False only when Thinker produced a response without invoking provider transport. */
   providerCallStarted?: boolean;
   /** Persisted provider-call identity, when request tracking is available. */
   attempt?: ProviderAttemptRef;
@@ -106,7 +106,7 @@ interface BuiltProviderRequest {
 }
 
 /**
- * Anthropic-format headers with the caller's beta flags folded in. Manifest's
+ * Anthropic-format headers with the caller's beta flags folded in. Thinker's
  * own flags always win their slot; the caller's are appended, so a request that
  * sent none is byte-identical to before.
  */
@@ -240,7 +240,7 @@ function responsesTextFormat(
 
 function buildPromptCacheKey(sessionKey: string): string {
   const digest = createHash('sha256').update(sessionKey).digest('hex').slice(0, 32);
-  return `manifest-${digest}`;
+  return `thinker-${digest}`;
 }
 
 function applyHashedPromptCacheKey(
@@ -781,7 +781,7 @@ export class ProviderClient {
         ctx.apiMode === 'responses'
           ? // ChatGPT subscription tokens hit the Codex Responses backend, which
             // requires instruction text, list-shaped input, and upstream SSE even
-            // when Manifest returns a non-streaming JSON response to the caller.
+            // when Thinker returns a non-streaming JSON response to the caller.
             // It also rejects sampling/metadata/cache fields the OpenAI SDK
             // routinely sends, so we drop those before forwarding.
             toNativeResponsesRequest(body, bareModel, {
@@ -791,7 +791,7 @@ export class ProviderClient {
               stripCodexUnsupported: endpointKey === 'openai-subscription',
             })
           : toResponsesRequest(requestSource, bareModel, {
-              // The subscription backend only serves SSE. Manifest buffers it
+              // The subscription backend only serves SSE. Thinker buffers it
               // for non-streaming callers in handleNonStreamResponse.
               stream:
                 endpointKey === 'openai-subscription'

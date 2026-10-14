@@ -492,7 +492,7 @@ describe('analytics chart surface components', () => {
     expect(onViewChange).toHaveBeenCalledWith('cost');
   });
 
-  it('explains provider-attempt reliability and Manifest recovery', () => {
+  it('explains provider-attempt reliability and Thinker recovery', () => {
     const { unmount } = render(() => (
       <ProviderChartCard
         activeView="messages"

@@ -55,7 +55,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       const result = await controller.authorize(
@@ -68,7 +68,7 @@ describe('GeminiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
       expect(result).toEqual({ url: 'https://accounts.google.com/o/oauth2/v2/auth?...' });
@@ -77,7 +77,7 @@ describe('GeminiOauthController', () => {
     it('throws 400 when agentName is missing', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -92,7 +92,7 @@ describe('GeminiOauthController', () => {
     it('throws 400 when agentName is empty string', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -108,7 +108,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -122,7 +122,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -135,7 +135,7 @@ describe('GeminiOauthController', () => {
       oauthService.generateAuthorizationUrl.mockResolvedValue(
         'https://accounts.google.com/o/oauth2/v2/auth?...',
       );
-      configService.get.mockReturnValue('https://manifest.example.com');
+      configService.get.mockReturnValue('https://thinker.example.com');
 
       const req = {
         protocol: 'http',
@@ -151,7 +151,7 @@ describe('GeminiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'https://manifest.example.com',
+        'https://thinker.example.com',
         'user-1',
       );
     });
@@ -338,7 +338,7 @@ describe('GeminiOauthController', () => {
       const cspCall = res.setHeader.mock.calls.find((c) => c[0] === 'Content-Security-Policy');
       expect(cspCall).toBeDefined();
       expect(cspCall![1]).toMatch(/^default-src 'none'; script-src 'nonce-[A-Za-z0-9+/=]+'$/);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('manifest-oauth-success'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('thinker-oauth-success'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Login successful'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('BroadcastChannel'));
       const html = res.send.mock.calls[0][0] as string;
@@ -352,7 +352,7 @@ describe('GeminiOauthController', () => {
       const cspCall = res.setHeader.mock.calls.find((c) => c[0] === 'Content-Security-Policy');
       expect(cspCall).toBeDefined();
       expect(cspCall![1]).toMatch(/^default-src 'none'; script-src 'nonce-[A-Za-z0-9+/=]+'$/);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('manifest-oauth-error'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('thinker-oauth-error'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Login failed'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('BroadcastChannel'));
     });

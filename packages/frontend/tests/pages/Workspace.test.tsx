@@ -785,16 +785,16 @@ describe('Workspace — view toggle', () => {
     // The platform icon carries the class the dark-mode invert rules target.
     expect(row.querySelector('img.workspace-table__icon')).not.toBeNull();
     expect(container.querySelector('.agents-grid')).toBeNull();
-    expect(localStorage.getItem('manifest_harness_view')).toBe('table');
+    expect(localStorage.getItem('thinker_harness_view')).toBe('table');
   });
 
   it('restores the persisted table view on mount and can switch back', async () => {
-    localStorage.setItem('manifest_harness_view', 'table');
+    localStorage.setItem('thinker_harness_view', 'table');
     const { container } = render(() => <Workspace />);
     await waitFor(() => expect(container.querySelector('table.data-table')).not.toBeNull());
     fireEvent.click(screen.getByLabelText('Grid view'));
     expect(container.querySelector('.agents-grid')).not.toBeNull();
-    expect(localStorage.getItem('manifest_harness_view')).toBe('grid');
+    expect(localStorage.getItem('thinker_harness_view')).toBe('grid');
   });
 
   it('falls back to grid view when localStorage.getItem throws', async () => {
@@ -839,7 +839,7 @@ describe('Workspace — view toggle', () => {
   });
 
   it('shows the table skeleton with the real header while loading in table view', async () => {
-    localStorage.setItem('manifest_harness_view', 'table');
+    localStorage.setItem('thinker_harness_view', 'table');
     let resolveAgents!: (v: unknown) => void;
     mockGetAgents.mockReturnValue(
       new Promise((res) => {
@@ -860,7 +860,7 @@ describe('Workspace — view toggle', () => {
   });
 
   it('renders em dashes for missing cost and last_active in the table view', async () => {
-    localStorage.setItem('manifest_harness_view', 'table');
+    localStorage.setItem('thinker_harness_view', 'table');
     // total_cost omitted: Number(undefined) is NaN, which the real formatCost
     // maps to null, firing the em-dash fallback (null would render $0.00).
     mockGetAgents.mockResolvedValue({
@@ -888,7 +888,7 @@ describe('Workspace — view toggle', () => {
   });
 
   it('drives Duplicate and Delete from the table row action menu', async () => {
-    localStorage.setItem('manifest_harness_view', 'table');
+    localStorage.setItem('thinker_harness_view', 'table');
     const { container } = render(() => <Workspace />);
     await waitFor(() =>
       expect(

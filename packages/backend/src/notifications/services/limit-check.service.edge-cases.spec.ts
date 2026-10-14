@@ -14,7 +14,7 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
+import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
 
 const TENANT = 'tenant-1';
 const AGENT = 'my-agent';
@@ -58,8 +58,8 @@ describe('LimitCheckService — edge cases', () => {
     } as unknown as EmailProviderConfigService;
 
     const runtime = {
-      getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:3001'),
-    } as unknown as ManifestRuntimeService;
+      getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
+    } as unknown as ThinkerRuntimeService;
 
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);
     mockInsertLog = jest.fn().mockResolvedValue(undefined);

@@ -13,8 +13,8 @@ export function deriveCodeChallenge(codeVerifier: string): string {
   return createHash('sha256').update(codeVerifier).digest('base64url');
 }
 
-const SUCCESS_HTML = `<!doctype html><meta charset="utf-8"><title>Manifest CLI</title><body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><h1>&#10003; Connected</h1><p>You can close this page and return to the terminal.</p></div></body>`;
-const FAILURE_HTML = `<!doctype html><meta charset="utf-8"><title>Manifest CLI</title><body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><h1>Login failed</h1><p>State mismatch &mdash; return to the terminal and retry.</p></div></body>`;
+const SUCCESS_HTML = `<!doctype html><meta charset="utf-8"><title>Thinker CLI</title><body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><h1>&#10003; Connected</h1><p>You can close this page and return to the terminal.</p></div></body>`;
+const FAILURE_HTML = `<!doctype html><meta charset="utf-8"><title>Thinker CLI</title><body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><h1>Login failed</h1><p>State mismatch &mdash; return to the terminal and retry.</p></div></body>`;
 
 /**
  * Open a URL with the platform opener, detached so the CLI never blocks on it.
@@ -49,7 +49,7 @@ function escapeForCmd(url: string): string {
 }
 
 /**
- * Browser half of `mnfst login`: loopback listener + one-time code exchange.
+ * Browser half of `thinker login`: loopback listener + one-time code exchange.
  * The raw PAT travels only over the direct CLI→server exchange, never through
  * the browser. Human-readable progress goes to stderr; stdout stays JSON-only.
  */
@@ -81,7 +81,7 @@ export async function browserLogin(
           new CliError(
             'login_timeout',
             `No browser authorization received within ${Math.round(timeoutMs / 1000)}s`,
-            'Try again, or use mnfst login --token-stdin',
+            'Try again, or use thinker login --token-stdin',
           ),
         );
       }, timeoutMs);
@@ -149,7 +149,7 @@ export async function browserLogin(
     throw new CliError(
       'network_error',
       `Could not reach ${origin}: ${error instanceof Error ? error.message : String(error)}`,
-      'Check the URL and that the Manifest server is running',
+      'Check the URL and that the Thinker server is running',
     );
   } finally {
     clearTimeout(exchangeTimer);
@@ -167,7 +167,7 @@ export async function browserLogin(
       typeof parsed['message'] === 'string'
         ? (parsed['message'] as string)
         : `Token exchange failed with HTTP ${response.status}`;
-    throw new CliError('login_failed', message, 'Run mnfst login again');
+    throw new CliError('login_failed', message, 'Run thinker login again');
   }
   return {
     token: parsed['token'] as string,

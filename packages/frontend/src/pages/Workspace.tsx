@@ -64,7 +64,7 @@ const DeleteIcon: Component = () => (
 );
 
 type HarnessView = 'grid' | 'table';
-const VIEW_STORAGE_KEY = 'manifest_harness_view';
+const VIEW_STORAGE_KEY = 'thinker_harness_view';
 
 function readStoredView(): HarnessView {
   try {
@@ -147,7 +147,7 @@ const Workspace: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>My Harnesses - Manifest</Title>
+      <Title>My Harnesses - Thinker</Title>
       <Meta
         name="description"
         content="View and manage all your harnesses. Monitor usage, requests, and costs."

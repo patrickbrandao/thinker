@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ModelPricingImprovements1771600000000
-  implements MigrationInterface
-{
+export class ModelPricingImprovements1771600000000 implements MigrationInterface {
   name = 'ModelPricingImprovements1771600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -11,9 +9,7 @@ export class ModelPricingImprovements1771600000000
     await this.convertUpdatedAtToTimestamp(queryRunner);
   }
 
-  private async createModelPricingHistoryTable(
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  private async createModelPricingHistoryTable(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE "model_pricing_history" (
         "id" character varying NOT NULL,
@@ -35,9 +31,7 @@ export class ModelPricingImprovements1771600000000
     );
   }
 
-  private async createUnresolvedModelsTable(
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  private async createUnresolvedModelsTable(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE "unresolved_models" (
         "model_name" character varying NOT NULL,
@@ -55,9 +49,7 @@ export class ModelPricingImprovements1771600000000
     );
   }
 
-  private async convertUpdatedAtToTimestamp(
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  private async convertUpdatedAtToTimestamp(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "model_pricing"
       ALTER COLUMN "updated_at" TYPE TIMESTAMP

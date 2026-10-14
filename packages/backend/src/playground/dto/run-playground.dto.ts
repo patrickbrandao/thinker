@@ -35,7 +35,7 @@ export class PlaygroundMessageDto {
 /**
  * Constraint asserting exactly one of `messages` / `rawRequestBody` is set.
  *
- * `messages` is the chat-completions shape Manifest builds itself; replay
+ * `messages` is the chat-completions shape Thinker builds itself; replay
  * (future) ships `rawRequestBody`, the verbatim recorded payload. Allowing
  * both at once is ambiguous (which one wins?); allowing neither is a
  * silent no-op upstream. Exactly-one is the only safe contract.

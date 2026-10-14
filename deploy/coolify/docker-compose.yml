@@ -1,22 +1,23 @@
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker
 services:
-  manifest:
-    image: manifestdotbuild/manifest:6
+  thinker:
+    image: tmsoftbrasil/thinker:0.1
     environment:
-      - SERVICE_URL_MANIFEST_2099
+      - SERVICE_URL_THINKER_2099
       - PORT=2099
       - BIND_ADDRESS=0.0.0.0
-      - DATABASE_URL=postgresql://manifest:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/manifest
+      - DATABASE_URL=postgresql://thinker:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/thinker
       - BETTER_AUTH_SECRET=${SERVICE_HEX_64_AUTH}
-      - MANIFEST_ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTION}
-      - BETTER_AUTH_URL=${SERVICE_URL_MANIFEST_2099}
-      - MANIFEST_MODE=selfhosted
+      - THINKER_ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTION}
+      - BETTER_AUTH_URL=${SERVICE_URL_THINKER_2099}
       - NODE_ENV=production
       - DB_POOL_MAX=10
       - AUTH_DB_POOL_MAX=5
-      - REQUEST_RECORDING_STORAGE=filesystem
-      - REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings
+      - THINKER_RECORDING_STORAGE=filesystem
+      - THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings
     volumes:
-      - manifest-recordings-data:/data/request-recordings
+      - thinker-recordings-data:/data/request-recordings
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,19 +33,19 @@ services:
       retries: 3
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     environment:
-      - POSTGRES_USER=manifest
+      - POSTGRES_USER=thinker
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=manifest
+      - POSTGRES_DB=thinker
     volumes:
-      - manifest-postgres-data:/var/lib/postgresql/data
+      - thinker-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: pg_isready -U manifest
+      test: pg_isready -U thinker
       interval: 5s
       timeout: 3s
       retries: 5
 
 volumes:
-  manifest-postgres-data:
-  manifest-recordings-data:
+  thinker-postgres-data:
+  thinker-recordings-data:

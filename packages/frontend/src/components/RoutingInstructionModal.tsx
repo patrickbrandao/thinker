@@ -31,7 +31,7 @@ const RoutingInstructionModal: Component<Props> = (props) => {
   };
 
   const disableCmd = () =>
-    `openclaw config unset models.providers.manifest\nopenclaw config unset agents.defaults.models.manifest/auto\nopenclaw config set agents.defaults.model.primary ${modelOrPlaceholder()}\nopenclaw gateway restart`;
+    `openclaw config unset models.providers.thinker\nopenclaw config unset agents.defaults.models.thinker/auto\nopenclaw config set agents.defaults.model.primary ${modelOrPlaceholder()}\nopenclaw gateway restart`;
 
   const handleModelSelect = (cliValue: string) => {
     setSelectedModel(cliValue);
@@ -91,7 +91,7 @@ const RoutingInstructionModal: Component<Props> = (props) => {
           </div>
           <Show when={isEnable()}>
             <p class="modal-card__desc">
-              Connect your harness to Manifest to start routing requests.
+              Connect your harness to Thinker to start routing requests.
             </p>
           </Show>
 
@@ -100,8 +100,8 @@ const RoutingInstructionModal: Component<Props> = (props) => {
             fallback={
               <>
                 <p style="margin: 0 0 14px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); line-height: 1.5;">
-                  This will stop routing requests through Manifest and restore direct model access
-                  in your OpenClaw harness.
+                  This will stop routing requests through Thinker and restore direct model access in
+                  your OpenClaw harness.
                 </p>
 
                 <p style="margin: 0 0 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); line-height: 1.5;">
@@ -130,13 +130,13 @@ const RoutingInstructionModal: Component<Props> = (props) => {
                     <div>
                       <span class="modal-terminal__prompt">$</span>
                       <span class="modal-terminal__code">
-                        openclaw config unset models.providers.manifest
+                        openclaw config unset models.providers.thinker
                       </span>
                     </div>
                     <div style="margin-top: 8px;">
                       <span class="modal-terminal__prompt">$</span>
                       <span class="modal-terminal__code">
-                        openclaw config unset agents.defaults.models.manifest/auto
+                        openclaw config unset agents.defaults.models.thinker/auto
                       </span>
                     </div>
                     <div style="margin-top: 8px;">

@@ -11,7 +11,7 @@ const URL_ONLY = { strings: ['url'] } as const;
 /**
  * Platforms come from the generated catalog (thinker-shared is the source of
  * truth; `npm run gen` refreshes it at build, a drift spec pins it) — a new
- * platform in Manifest lands in the CLI on the next build, never by hand.
+ * platform in Thinker lands in the CLI on the next build, never by hand.
  */
 export const CLI_AGENT_PLATFORMS: readonly string[] = PLATFORM_CATALOG.map((p) => p.id);
 
@@ -22,14 +22,14 @@ function requirePlatform(args: ParsedArgs): string {
     throw new CliError(
       'missing_platform',
       `--platform is required (it determines the agent setup). Valid platforms: ${list}`,
-      'Run mnfst agent platforms to list them',
+      'Run thinker agent platforms to list them',
     );
   }
   if (!(CLI_AGENT_PLATFORMS as readonly string[]).includes(value)) {
     throw new CliError(
       'invalid_platform',
       `Unknown platform: ${value}. Valid platforms: ${list}`,
-      'Run mnfst agent platforms to list them',
+      'Run thinker agent platforms to list them',
     );
   }
   return value;
@@ -61,7 +61,7 @@ function validateCategory(args: ParsedArgs): string | undefined {
  * was generated with `--url` against a non-active login.
  */
 function maskedKeyRef(slug: string, origin: string): string {
-  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw --url ${origin}>`;
+  return `<THINKER_AGENT_KEY — run: thinker agent key show ${slug} --raw --url ${origin}>`;
 }
 
 /**
@@ -77,10 +77,10 @@ function renderSetup(platform: string | undefined, origin: string, keyRef: strin
     return template.replaceAll('{{ORIGIN}}', origin).replaceAll('{{API_KEY}}', keyRef);
   }
   return [
-    `Point your tool's OpenAI-compatible client at Manifest:`,
+    `Point your tool's OpenAI-compatible client at Thinker:`,
     `  base URL: ${origin}/v1`,
     `  API key:  ${keyRef}`,
-    `Or wire it via env: mnfst agent env <name> --url ${origin} >> .env`,
+    `Or wire it via env: thinker agent env <name> --url ${origin} >> .env`,
   ].join('\n');
 }
 
@@ -93,7 +93,7 @@ export async function agentSetup(io: CliIo, argv: string[]): Promise<void> {
     agent: { agent_platform?: string | null } | null;
   };
   if (!info.agent) {
-    throw new CliError('not_found', `Agent "${slug}" not found`, 'See mnfst agent list', 404);
+    throw new CliError('not_found', `Agent "${slug}" not found`, 'See thinker agent list', 404);
   }
   const keyRef = args.booleans['reveal']
     ? (await resolveAgentKey(io, args, slug)).key
@@ -228,7 +228,7 @@ export async function agentGet(io: CliIo, argv: string[]): Promise<void> {
   };
   // The API returns 200 { agent: null } for a missing agent — normalize.
   if (!result.agent) {
-    throw new CliError('not_found', `Agent "${name}" not found`, 'See mnfst agent list', 404);
+    throw new CliError('not_found', `Agent "${name}" not found`, 'See thinker agent list', 404);
   }
   printJson(io, result);
 }
@@ -328,7 +328,7 @@ export async function resolveAgentKey(
     throw new CliError(
       'key_unrecoverable',
       `The server cannot recover the key for "${name}"`,
-      `Run mnfst agent rotate-key ${name} --yes to mint a fresh one`,
+      `Run thinker agent rotate-key ${name} --yes to mint a fresh one`,
     );
   }
   const path = saveAgentKey(io.env, target.origin, name, result.apiKey);
@@ -344,7 +344,7 @@ export async function agentKeyPathCmd(io: CliIo, argv: string[]): Promise<void> 
 
 /**
  * Emit the agent's connection config as env lines — the mainstream wiring
- * path: `mnfst agent env my-bot >> .env`, or eval `--export` in a shell, or
+ * path: `thinker agent env my-bot >> .env`, or eval `--export` in a shell, or
  * pipe into a platform CLI (railway variables set, vercel env add, ...).
  * Deliberately prints the raw key, like `agent key show`.
  */
@@ -353,8 +353,8 @@ export async function agentEnv(io: CliIo, argv: string[]): Promise<void> {
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const resolved = await resolveAgentKey(io, args, name);
   const prefix = args.booleans['export'] ? 'export ' : '';
-  io.stdout(`${prefix}MANIFEST_AGENT_KEY=${resolved.key}`);
-  io.stdout(`${prefix}MANIFEST_AGENT_URL=${resolved.origin}/v1`);
+  io.stdout(`${prefix}THINKER_AGENT_KEY=${resolved.key}`);
+  io.stdout(`${prefix}THINKER_AGENT_URL=${resolved.origin}/v1`);
 }
 
 /**

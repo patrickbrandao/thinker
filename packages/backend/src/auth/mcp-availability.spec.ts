@@ -10,8 +10,8 @@ import {
 
 describe('authOriginFromEnv', () => {
   it('uses BETTER_AUTH_URL with trailing slashes stripped', () => {
-    expect(authOriginFromEnv({ BETTER_AUTH_URL: 'https://app.manifest.build//' })).toBe(
-      'https://app.manifest.build',
+    expect(authOriginFromEnv({ BETTER_AUTH_URL: 'https://app.thinker.example.com//' })).toBe(
+      'https://app.thinker.example.com',
     );
   });
 
@@ -20,14 +20,14 @@ describe('authOriginFromEnv', () => {
   });
 
   it('falls back to the default port when PORT is unset', () => {
-    expect(authOriginFromEnv({})).toBe('http://localhost:3001');
+    expect(authOriginFromEnv({})).toBe('http://localhost:2099');
   });
 });
 
 describe('mcpResourceFromEnv', () => {
   it('appends the MCP route to the auth origin', () => {
-    expect(mcpResourceFromEnv({ BETTER_AUTH_URL: 'https://mnfst.example.com' })).toBe(
-      'https://mnfst.example.com/api/v1/mcp',
+    expect(mcpResourceFromEnv({ BETTER_AUTH_URL: 'https://thinker.example.com' })).toBe(
+      'https://thinker.example.com/api/v1/mcp',
     );
   });
 });
@@ -82,25 +82,25 @@ describe('reading process.env by default', () => {
 
 describe('isMcpCapableResource', () => {
   it.each([
-    'https://app.manifest.build/api/v1/mcp',
-    'http://localhost:3001/api/v1/mcp',
-    'http://127.0.0.1:3001/api/v1/mcp',
+    'https://app.thinker.example.com/api/v1/mcp',
+    'http://localhost:2099/api/v1/mcp',
+    'http://127.0.0.1:2099/api/v1/mcp',
     'http://127.5.5.5/api/v1/mcp',
-    'http://[::1]:3001/api/v1/mcp',
+    'http://[::1]:2099/api/v1/mcp',
   ])('accepts %s', (resource) => {
     expect(isMcpCapableResource(resource)).toBe(true);
   });
 
   it.each([
-    'http://manifest.example.internal/api/v1/mcp',
-    'http://192.168.1.50:3001/api/v1/mcp',
-    'http://manifest.tail1234.ts.net/api/v1/mcp',
+    'http://thinker.example.internal/api/v1/mcp',
+    'http://192.168.1.50:2099/api/v1/mcp',
+    'http://thinker.tail1234.ts.net/api/v1/mcp',
     'http://128.0.0.1/api/v1/mcp',
     'ftp://example.com/api/v1/mcp',
-    'https://user:pw@mnfst.example.com/api/v1/mcp',
-    'https://user@mnfst.example.com/api/v1/mcp',
-    'https://mnfst.example.com/app?tenant=x/api/v1/mcp',
-    'https://mnfst.example.com/api/v1/mcp#frag',
+    'https://user:pw@thinker.example.com/api/v1/mcp',
+    'https://user@thinker.example.com/api/v1/mcp',
+    'https://thinker.example.com/app?tenant=x/api/v1/mcp',
+    'https://thinker.example.com/api/v1/mcp#frag',
     'not a url',
   ])('rejects %s', (resource) => {
     expect(isMcpCapableResource(resource)).toBe(false);
@@ -110,11 +110,11 @@ describe('isMcpCapableResource', () => {
 describe('mcpResourceProblem', () => {
   it.each([
     ['not a url', 'is not an absolute URL'],
-    ['https://user:pw@mnfst.example.com/api/v1/mcp', 'must not contain credentials'],
-    ['https://mnfst.example.com/api/v1/mcp#frag', 'must not contain a fragment'],
-    ['https://mnfst.example.com/app?tenant=x/api/v1/mcp', 'must not contain a query'],
+    ['https://user:pw@thinker.example.com/api/v1/mcp', 'must not contain credentials'],
+    ['https://thinker.example.com/api/v1/mcp#frag', 'must not contain a fragment'],
+    ['https://thinker.example.com/app?tenant=x/api/v1/mcp', 'must not contain a query'],
     [
-      'http://192.168.1.50:3001/api/v1/mcp',
+      'http://192.168.1.50:2099/api/v1/mcp',
       'must use HTTPS (loopback HTTP is allowed for development)',
     ],
     ['ftp://example.com/api/v1/mcp', 'must use HTTPS (loopback HTTP is allowed for development)'],
@@ -123,14 +123,14 @@ describe('mcpResourceProblem', () => {
   });
 
   it('is null for a usable resource', () => {
-    expect(mcpResourceProblem('https://mnfst.example.com/api/v1/mcp')).toBeNull();
-    expect(mcpResourceProblem('http://localhost:3001/api/v1/mcp')).toBeNull();
+    expect(mcpResourceProblem('https://thinker.example.com/api/v1/mcp')).toBeNull();
+    expect(mcpResourceProblem('http://localhost:2099/api/v1/mcp')).toBeNull();
   });
 });
 
 describe('resolveMcpAvailability', () => {
   it('enables MCP on an HTTPS origin', () => {
-    expect(resolveMcpAvailability({ BETTER_AUTH_URL: 'https://mnfst.example.com' })).toEqual({
+    expect(resolveMcpAvailability({ BETTER_AUTH_URL: 'https://thinker.example.com' })).toEqual({
       enabled: true,
       reason: null,
     });
@@ -142,7 +142,7 @@ describe('resolveMcpAvailability', () => {
 
   it.each(['false', 'FALSE', '0', 'no', 'off'])('disables MCP when MCP_ENABLED=%s', (value) => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'https://mnfst.example.com',
+      BETTER_AUTH_URL: 'https://thinker.example.com',
       MCP_ENABLED: value,
     });
     expect(result.enabled).toBe(false);
@@ -151,26 +151,29 @@ describe('resolveMcpAvailability', () => {
 
   it.each(['true', '1', 'yes', 'on', ''])('keeps MCP on when MCP_ENABLED=%s', (value) => {
     expect(
-      resolveMcpAvailability({ BETTER_AUTH_URL: 'https://mnfst.example.com', MCP_ENABLED: value }),
+      resolveMcpAvailability({
+        BETTER_AUTH_URL: 'https://thinker.example.com',
+        MCP_ENABLED: value,
+      }),
     ).toEqual({ enabled: true, reason: null });
   });
 
   it('disables MCP on a plain-HTTP non-loopback origin instead of letting boot fail', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'http://manifest.example.internal',
+      BETTER_AUTH_URL: 'http://thinker.example.internal',
     });
     expect(result.enabled).toBe(false);
-    expect(result.reason).toContain('http://manifest.example.internal/api/v1/mcp');
+    expect(result.reason).toContain('http://thinker.example.internal/api/v1/mcp');
     expect(result.reason).toContain('HTTPS');
   });
 
   it('names the real problem for an HTTPS origin with credentials and never logs the secret', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'https://admin:hunter2@mnfst.example.com',
+      BETTER_AUTH_URL: 'https://admin:hunter2@thinker.example.com',
     });
     expect(result.enabled).toBe(false);
     expect(result.reason).toContain('must not contain credentials');
-    expect(result.reason).toContain('https://mnfst.example.com/api/v1/mcp');
+    expect(result.reason).toContain('https://thinker.example.com/api/v1/mcp');
     expect(result.reason).not.toContain('hunter2');
     expect(result.reason).not.toContain('admin');
     expect(result.reason).not.toContain('HTTPS (loopback');
@@ -178,7 +181,7 @@ describe('resolveMcpAvailability', () => {
 
   it('names a query problem rather than blaming the scheme', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'https://mnfst.example.com/app?tenant=x',
+      BETTER_AUTH_URL: 'https://thinker.example.com/app?tenant=x',
     });
     expect(result.enabled).toBe(false);
     expect(result.reason).toContain('must not contain a query');
@@ -199,7 +202,7 @@ describe('resolveMcpAvailability', () => {
 
   it('reports the explicit opt-out even when the origin is also incapable', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'http://manifest.example.internal',
+      BETTER_AUTH_URL: 'http://thinker.example.internal',
       MCP_ENABLED: 'false',
     });
     expect(result.enabled).toBe(false);
@@ -208,7 +211,7 @@ describe('resolveMcpAvailability', () => {
 
   it('still refuses an incapable origin when MCP_ENABLED asks for it', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'http://192.168.1.50:3001',
+      BETTER_AUTH_URL: 'http://192.168.1.50:2099',
       MCP_ENABLED: 'true',
     });
     expect(result.enabled).toBe(false);

@@ -57,18 +57,6 @@ const ModelParamsAffordance: Component<Props> = (props) => {
 
   const configured = () => current() !== null;
 
-  const requestUrl = () => {
-    if (!props.provider || !props.authType) return undefined;
-    const authTypeLabel = props.authType === 'subscription' ? 'Subscription' : 'API key';
-    const modelLabel = `${props.provider}/${props.model}`;
-    const params = new URLSearchParams({
-      title: `Parameters: ${modelLabel}`,
-      labels: 'parameters',
-      body: `Model: \`${modelLabel}\`\nAuth type: ${authTypeLabel}\n\nPlease add the configurable request parameters for this model.`,
-    });
-    return `https://github.com/mnfst/modelparams.dev/issues/new?${params.toString()}`;
-  };
-
   return (
     <Show when={canOpen()}>
       <button
@@ -117,7 +105,6 @@ const ModelParamsAffordance: Component<Props> = (props) => {
             current={current()}
             specs={specs() ?? []}
             loading={specs.loading}
-            requestParamsUrl={requestUrl()}
             onSave={(next) =>
               props.setParams(props.scope, props.provider!, props.authType!, props.model, next)
             }

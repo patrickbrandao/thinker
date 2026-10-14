@@ -87,8 +87,7 @@ export function classifyProbeError(input: ClassifyInput): ProbeError {
   // `ECONNREFUSED` / `ENOTFOUND` / `AbortError` don't fall through to the
   // opaque "unknown" branch.
   const cause = (error as { cause?: unknown } | undefined)?.cause as
-    | { code?: string; name?: string; message?: string }
-    | undefined;
+    { code?: string; name?: string; message?: string } | undefined;
   const code = (error as { code?: string } | undefined)?.code ?? cause?.code;
   const name = (error as { name?: string } | undefined)?.name ?? cause?.name;
   const directMsg = (error as { message?: string } | undefined)?.message ?? '';

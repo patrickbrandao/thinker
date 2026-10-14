@@ -23,14 +23,15 @@ describe("AuthLayout", () => {
     expect(imgs.length).toBe(2);
   });
 
-  it("links logo to manifest website", () => {
+  it("shows the Thinker logo for both themes without linking off the instance", () => {
     const { container } = render(() => (
       <AuthLayout>
         <span>Content</span>
       </AuthLayout>
     ));
-    const link = container.querySelector(".auth-logo__link") as HTMLAnchorElement;
-    expect(link).toBeDefined();
-    expect(link.getAttribute("href")).toBe("https://manifest.build");
+    const srcs = [...container.querySelectorAll("img")].map((i) => i.getAttribute("src"));
+    expect(srcs).toEqual(["/brand/thinker-logo.svg?v=1", "/brand/thinker-logo-dark.svg?v=1"]);
+    expect(container.querySelector("img")?.getAttribute("alt")).toBe("Thinker");
+    expect(container.querySelector("a")).toBeNull();
   });
 });

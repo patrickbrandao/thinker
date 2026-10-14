@@ -351,7 +351,7 @@ const ERROR_DESCRIPTORS: Record<string, string> = {
   transport: 'Transport',
   config: 'Setup',
   policy: 'Custom limit',
-  internal: 'Manifest error',
+  internal: 'Thinker error',
   request: 'Bad request',
 };
 
@@ -394,14 +394,14 @@ function describeStatusPill(item: MessageRow): {
 export function StatusCell(item: MessageRow, _agentName: string | undefined): JSX.Element {
   const pill = describeStatusPill(item);
 
-  // A Manifest software limit is one red pill linking to its agent's limits page.
+  // A Thinker software limit is one red pill linking to its agent's limits page.
   if (pill.limitAgent) {
     return (
       <td>
         <A
           class={pill.cls}
           href={`/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`}
-          title="Manifest usage limit reached - open your limits"
+          title="Thinker usage limit reached - open your limits"
         >
           {pill.label}
         </A>

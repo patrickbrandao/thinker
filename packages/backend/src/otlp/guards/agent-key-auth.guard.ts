@@ -15,7 +15,7 @@ import { Request } from 'express';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import {
   IngestionContext,
-  RequestWithManifestErrorContext,
+  RequestWithThinkerErrorContext,
 } from '../interfaces/ingestion-context.interface';
 import { verifyKey, keyPrefix as computePrefix } from '../../common/utils/hash.util';
 import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
@@ -349,10 +349,10 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
 
     if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
       // An expired key still identifies its agent, so this rejection is the one
-      // auth failure Manifest can attribute and record (M004). The others
+      // auth failure Thinker can attribute and record (M004). The others
       // (M001–M003, M005, M006) never resolve a tenant and stay unrecorded — see
       // UNRECORDABLE_THINKER_CODES.
-      (request as Request & RequestWithManifestErrorContext).manifestErrorContext = {
+      (request as Request & RequestWithThinkerErrorContext).thinkerErrorContext = {
         tenantId: keyRecord.tenant_id,
         agentId: keyRecord.agent_id,
         agentName: keyRecord.agent.name,

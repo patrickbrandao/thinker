@@ -11,8 +11,8 @@ describe('VersionIndicator', () => {
     const { container } = render(() => <VersionIndicator />);
     const badge = container.querySelector('.version-indicator');
     expect(badge).not.toBeNull();
-    expect(badge?.textContent).toBe(`v${__MANIFEST_VERSION__}`);
-    expect(badge?.getAttribute('aria-label')).toBe(`Version ${__MANIFEST_VERSION__}`);
+    expect(badge?.textContent).toBe(`v${__THINKER_VERSION__}`);
+    expect(badge?.getAttribute('aria-label')).toBe(`Version ${__THINKER_VERSION__}`);
   });
 
   it('makes no network request and offers no update link', () => {

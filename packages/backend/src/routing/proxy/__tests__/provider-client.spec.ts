@@ -315,7 +315,7 @@ describe('ProviderClient', () => {
       });
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(sentBody.prompt_cache_key).not.toContain('tenant-agent-session');
     });
 
@@ -444,7 +444,7 @@ describe('ProviderClient', () => {
       const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
       const thirdBody = JSON.parse(mockFetch.mock.calls[2][1].body);
-      expect(firstBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(firstBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(secondBody.prompt_cache_key).toBe(firstBody.prompt_cache_key);
       expect(thirdBody.prompt_cache_key).not.toBe(firstBody.prompt_cache_key);
       expect(firstBody.prompt_cache_key).not.toContain('sk-mi');
@@ -512,7 +512,7 @@ describe('ProviderClient', () => {
 
       const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-      expect(firstBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(firstBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(secondBody.prompt_cache_key).toBe(firstBody.prompt_cache_key);
       expect(firstBody.prompt_cache_key).not.toContain('sk-kimi');
       expect(firstBody.prompt_cache_key).not.toContain('session-1');
@@ -579,7 +579,7 @@ describe('ProviderClient', () => {
 
       const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-      expect(firstBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(firstBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(secondBody.prompt_cache_key).toBe(firstBody.prompt_cache_key);
       expect(firstBody.prompt_cache_key).not.toContain('fw-key');
       expect(firstBody.prompt_cache_key).not.toContain('session-1');
@@ -797,7 +797,7 @@ describe('ProviderClient', () => {
       });
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(sentBody.prompt_cache_key).not.toContain('tenant-agent-session');
       expect(sentBody.stream_options).toEqual({ include_usage: true });
     });
@@ -822,7 +822,7 @@ describe('ProviderClient', () => {
       expect(sentBody.model).toBe('global.moonshotai.kimi-k3');
       expect(sentBody.input).toBe('Hello');
       expect(sentBody.max_output_tokens).toBe(64);
-      expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(result.isResponses).toBe(true);
       expect(result.isChatGpt).toBe(false);
     });
@@ -1247,8 +1247,8 @@ describe('ProviderClient', () => {
           headers: {
             Authorization: 'Bearer sk-or-test',
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://manifest.build',
-            'X-Title': 'Manifest',
+            'HTTP-Referer': 'https://github.com/patrickbrandao/thinker',
+            'X-Title': 'Thinker',
           },
         }),
       );
@@ -4158,7 +4158,7 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBeUndefined();
     });
 
-    it('adds prompt_cache_key to xAI Responses requests from the Manifest session', async () => {
+    it('adds prompt_cache_key to xAI Responses requests from the Thinker session', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
       await client.forward({
@@ -4171,7 +4171,7 @@ describe('ProviderClient', () => {
       });
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(sentBody.prompt_cache_key).not.toContain('session-xai');
     });
 
@@ -4230,7 +4230,7 @@ describe('ProviderClient', () => {
       });
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(sentBody.prompt_cache_key).not.toContain('native-session');
       expect(sentBody.input).toBe('Hello');
     });

@@ -4,7 +4,7 @@
 // the exact same migration set. Using an explicit array (not a dist glob) keeps
 // stale compiled .js from deleted migrations out of the run (deleteOutDir is off).
 import { AgentMessage } from '../entities/agent-message.entity';
-import { ManifestRequest } from '../entities/request.entity';
+import { ThinkerRequest } from '../entities/request.entity';
 import { ApiKey } from '../entities/api-key.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
@@ -57,6 +57,7 @@ import { DropBillingSchema1803200000000 } from './migrations/1803200000000-DropB
 import { DropSaasFeatureSchema1803300000000 } from './migrations/1803300000000-DropSaasFeatureSchema';
 import { DropAutofixSchema1803400000000 } from './migrations/1803400000000-DropAutofixSchema';
 import { DropInstallMetadata1803500000000 } from './migrations/1803500000000-DropInstallMetadata';
+import { RenameThinkerRoutingReasons1803600000000 } from './migrations/1803600000000-RenameThinkerRoutingReasons';
 import { RenameReservedCustomProviderAliases1803610000000 } from './migrations/1803610000000-RenameReservedCustomProviderAliases';
 import { RemapAutofixedStatus1803620000000 } from './migrations/1803620000000-RemapAutofixedStatus';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
@@ -180,7 +181,7 @@ import { AddProviderAttemptOrdering1801100000000 } from './migrations/1801100000
 
 export const entities = [
   AgentMessage,
-  ManifestRequest,
+  ThinkerRequest,
   ApiKey,
   Tenant,
   Agent,
@@ -354,6 +355,7 @@ export const migrations = [
   DropSaasFeatureSchema1803300000000,
   DropAutofixSchema1803400000000,
   DropInstallMetadata1803500000000,
+  RenameThinkerRoutingReasons1803600000000,
   RenameReservedCustomProviderAliases1803610000000,
   RemapAutofixedStatus1803620000000,
 ];

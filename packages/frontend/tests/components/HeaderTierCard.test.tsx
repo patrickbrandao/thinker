@@ -209,7 +209,7 @@ const baseTier: HeaderTier = {
   id: 'ht-1',
   agent_id: 'agent-1',
   name: 'Premium',
-  header_key: 'x-manifest-tier',
+  header_key: 'x-thinker-tier',
   header_value: 'premium',
   badge_color: 'indigo',
   sort_order: 0,
@@ -306,7 +306,7 @@ describe('HeaderTierCard', () => {
       />
     ));
     expect(container.textContent).toContain('Premium');
-    expect(container.textContent).toContain('x-manifest-tier');
+    expect(container.textContent).toContain('x-thinker-tier');
     expect(container.textContent).toContain('premium');
   });
 

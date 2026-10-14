@@ -106,7 +106,7 @@ interface OverviewResponse {
     successful: number;
     success_rate: number;
     attempt_success_rate: number;
-    manifest_lift_pct: number;
+    thinker_lift_pct: number;
     recovered: number;
   } | null;
   token_usage: Array<{ hour?: string; date?: string; input_tokens: number; output_tokens: number }>;
@@ -137,8 +137,8 @@ const RANGE_OPTIONS = [
   { label: 'Last 365 days', value: '365d' },
 ];
 
-const RANGE_STORAGE_KEY = 'manifest_global_range';
-const GROUP_STORAGE_KEY = 'manifest_global_group';
+const RANGE_STORAGE_KEY = 'thinker_global_range';
+const GROUP_STORAGE_KEY = 'thinker_global_group';
 
 function loadRange(): string {
   try {
@@ -542,7 +542,7 @@ const GlobalOverview: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>Overview | Manifest</Title>
+      <Title>Overview | Thinker</Title>
 
       {/* Add Harness Modal */}
       <AddAgentModal open={addAgentOpen()} onClose={dismissAddAgent} />

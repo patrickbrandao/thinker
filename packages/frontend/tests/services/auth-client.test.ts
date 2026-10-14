@@ -29,7 +29,7 @@ describe("authClient", () => {
       ...window,
       location: {
         ...window.location,
-        origin: "https://app.manifest.build",
+        origin: "https://thinker.example.com",
       },
     } as Window & typeof globalThis);
   });
@@ -46,7 +46,7 @@ describe("authClient", () => {
       baseURL: string;
       basePath: string;
     };
-    expect(config.baseURL).toBe("https://app.manifest.build");
+    expect(config.baseURL).toBe("https://thinker.example.com");
   });
 
   it("creates client with basePath /api/auth", async () => {
@@ -89,7 +89,7 @@ describe("authClient", () => {
     // First load uses the stubbed origin from beforeEach.
     await import("../../src/services/auth-client.js");
     expect(createAuthClientMock.mock.calls[0][0]).toMatchObject({
-      baseURL: "https://app.manifest.build",
+      baseURL: "https://thinker.example.com",
     });
 
     // Swap the origin and reload. We expect a fresh `createAuthClient`

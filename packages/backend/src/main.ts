@@ -25,6 +25,7 @@ import {
 import { createRateLimitReachedHandler } from './common/middleware/rate-limit-log';
 import { shouldCompress } from './routing/proxy/compression-filter';
 import { checkLocalServerBaseUrls } from './common/constants/local-servers';
+import { DEFAULT_PORT } from './common/constants/server.constants';
 import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
 import { assertEncryptionKeyConfig, StartupConfigError } from './common/utils/crypto.util';
 
@@ -41,7 +42,7 @@ export async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
-    logger: new ConsoleLogger({ prefix: 'Manifest' }),
+    logger: new ConsoleLogger({ prefix: 'Thinker' }),
   });
   app.enableShutdownHooks();
   app.useGlobalFilters(new SpaFallbackFilter(process.env['BETTER_AUTH_URL']));
@@ -206,7 +207,7 @@ export async function bootstrap() {
 
   // Re-add body parsing for NestJS routes. The OpenAI-compatible proxy has a
   // separate parser because clients may legitimately send large inline image
-  // payloads. Regular Manifest API/auth routes stay small.
+  // payloads. Regular Thinker API/auth routes stay small.
   expressApp.use('/v1', createProxyBodyBudgetMiddleware());
   expressApp.use('/v1', express.json({ limit: PROXY_BODY_LIMIT }));
   expressApp.use('/v1', express.urlencoded({ extended: true, limit: PROXY_BODY_LIMIT }));
@@ -225,7 +226,7 @@ export async function bootstrap() {
     logger.warn(`Remote MCP server disabled: ${mcpDisabledReason}`);
   }
 
-  const port = Number(process.env['PORT'] ?? 3001);
+  const port = Number(process.env['PORT'] ?? DEFAULT_PORT);
   const host = process.env['BIND_ADDRESS'] ?? '127.0.0.1';
   await app.listen(port, host);
   logger.log(`Server running on http://${host}:${port}`);
@@ -277,7 +278,7 @@ if (!process.env['THINKER_EMBEDDED']) {
     // exit non-zero, rather than leaving an unhandled rejection (or, before
     // the toRetry change, a misleading "Unable to connect to the database").
     new Logger('Bootstrap').fatal(
-      'Manifest failed to start — see the error above. A failed database migration is the most ' +
+      'Thinker failed to start — see the error above. A failed database migration is the most ' +
         'common cause; if it reports provider/config rows that "cannot be re-scoped", back up your ' +
         'database and re-run with THINKER_MIGRATION_FORCE=1.',
       err instanceof Error ? err.stack : String(err),

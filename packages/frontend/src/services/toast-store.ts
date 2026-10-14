@@ -1,6 +1,6 @@
-import { createSignal } from "solid-js";
+import { createSignal } from 'solid-js';
 
-export type ToastType = "error" | "success" | "warning";
+export type ToastType = 'error' | 'success' | 'warning';
 
 export interface Toast {
   id: number;
@@ -33,7 +33,7 @@ export function dismissToast(id: number) {
 }
 
 export const toast = {
-  error: (message: string, duration?: number) => addToast("error", message, duration),
-  success: (message: string, duration?: number) => addToast("success", message, duration),
-  warning: (message: string, duration?: number) => addToast("warning", message, duration),
+  error: (message: string, duration?: number) => addToast('error', message, duration),
+  success: (message: string, duration?: number) => addToast('success', message, duration),
+  warning: (message: string, duration?: number) => addToast('warning', message, duration),
 };

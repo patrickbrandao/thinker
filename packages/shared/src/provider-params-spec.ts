@@ -37,9 +37,7 @@ export interface ParamApplicabilityCondition {
  * Keep this in sync with docs/model-parameters-schema.md.
  */
 export type ParamApplicabilityValue =
-  | JsonPrimitive
-  | readonly JsonPrimitive[]
-  | ParamApplicabilityCondition;
+  JsonPrimitive | readonly JsonPrimitive[] | ParamApplicabilityCondition;
 
 export type ParamApplicabilityMatch = Record<string, ParamApplicabilityValue>;
 export type ParamApplicabilityRule = ParamApplicabilityMatch | readonly ParamApplicabilityMatch[];

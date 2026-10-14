@@ -429,7 +429,7 @@ describe('AggregationService', () => {
         successful: 0,
         success_rate: 0,
         attempt_success_rate: 0,
-        manifest_lift_pct: 0,
+        thinker_lift_pct: 0,
         recovered: 0,
         previous_total: 0,
       });
@@ -455,7 +455,7 @@ describe('AggregationService', () => {
         successful: 3,
         success_rate: 75,
         attempt_success_rate: (4 / 6) * 100,
-        manifest_lift_pct: 75 - (4 / 6) * 100,
+        thinker_lift_pct: 75 - (4 / 6) * 100,
         recovered: 2,
         previous_total: 5,
       });
@@ -502,7 +502,7 @@ describe('AggregationService', () => {
         successful: 0,
         success_rate: 0,
         attempt_success_rate: 0,
-        manifest_lift_pct: 0,
+        thinker_lift_pct: 0,
         recovered: 0,
         previous_total: 0,
       });

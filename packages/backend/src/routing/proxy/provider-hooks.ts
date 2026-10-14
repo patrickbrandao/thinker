@@ -35,7 +35,7 @@ export function resolveSubscriptionEndpointKey(endpointKey: string): string | un
 
 /**
  * Keys available to an extra-header builder, both already hashed into
- * opaque `manifest-*` identifiers.
+ * opaque `thinker-*` identifiers.
  */
 interface ExtraHeaderKeys {
   /** Per-conversation key; absent when the caller sent no x-session-key. */
@@ -87,5 +87,5 @@ export function buildProviderExtraHeaders(
 
 function buildProviderPromptCacheKey(providerCacheKey: string): string {
   const digest = createHash('sha256').update(providerCacheKey).digest('hex').slice(0, 32);
-  return `manifest-${digest}`;
+  return `thinker-${digest}`;
 }

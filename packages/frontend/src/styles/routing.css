@@ -969,15 +969,6 @@
   text-align: center;
 }
 
-.model-params__empty-link {
-  align-self: center;
-  text-decoration: none;
-}
-
-.model-params__empty-link:hover {
-  text-decoration: none;
-}
-
 .model-params__footer {
   align-items: center;
   justify-content: space-between;
@@ -989,31 +980,6 @@
   justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
-}
-
-.model-params__request-link {
-  align-self: flex-start;
-  color: hsl(var(--muted-foreground));
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  line-height: 2rem;
-  text-decoration: underline;
-  text-decoration-color: hsl(var(--border));
-  text-underline-offset: 3px;
-  transition:
-    color var(--transition-fast),
-    text-decoration-color var(--transition-fast);
-}
-
-.model-params__request-link:hover {
-  color: hsl(var(--foreground));
-  text-decoration-color: currentColor;
-}
-
-.model-params__request-link:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
 }
 
 /* Loading / "no configurable parameters" placeholder shown while the per-model

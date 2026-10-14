@@ -7,6 +7,7 @@ import {
   blankEntry,
   cleanUpStoredHeaders,
   headerEntryIssue,
+  headerEntryIssues,
   headerValueIssue,
   isBlockedHeaderKey,
   isValidHeaderName,
@@ -152,6 +153,36 @@ describe('toHeaderRecord / activeHeaderCount', () => {
     expect(record['X-H19']).toBe('v');
     expect(record['X-H20']).toBeUndefined();
     expect(activeHeaderCount(many)).toBe(20);
+  });
+
+  it('flags case-variant duplicates and rows past the cap, matching what is sent', () => {
+    const rows = [
+      { id: 'a', key: 'X-Title', value: 'first' },
+      { id: 'b', key: 'x-title', value: 'second' },
+      { id: 'c', key: 'Authorization', value: 'Bearer x' },
+      ...Array.from({ length: 21 }, (_, i) => ({ id: `n${i}`, key: `X-H${i}`, value: 'v' })),
+    ];
+    const issues = headerEntryIssues(rows);
+    expect(issues.get('a')).toBeUndefined();
+    expect(issues.get('b')).toBe('duplicate');
+    expect(issues.get('c')).toBe('blocked');
+    // X-Title + X-H0..X-H18 fill the 20 slots; X-H19 and X-H20 are dropped.
+    expect(issues.get('n18')).toBeUndefined();
+    expect(issues.get('n19')).toBe('over-limit');
+    expect(issues.get('n20')).toBe('over-limit');
+    expect(activeHeaderCount(rows)).toBe(20);
+    for (const id of issues.keys()) {
+      const row = rows.find((r) => r.id === id)!;
+      expect(Object.keys(toHeaderRecord(rows))).not.toContain(row.key);
+    }
+  });
+
+  it('does not flag rows that have a name but no value yet', () => {
+    const rows = [
+      { id: 'a', key: 'X-Title', value: 'v' },
+      { id: 'b', key: 'X-Title', value: '' },
+    ];
+    expect(headerEntryIssues(rows).size).toBe(0);
   });
 
   it('still sends a valid name too long to be saved', () => {

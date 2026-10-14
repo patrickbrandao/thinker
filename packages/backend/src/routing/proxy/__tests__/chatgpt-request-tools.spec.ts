@@ -198,18 +198,18 @@ describe('ChatGPT Adapter – toResponsesRequest (tool calls)', () => {
         { type: 'function_call_output', call_id: 'terminal:0', output: 'one' },
         {
           type: 'function_call',
-          call_id: 'terminal:0-mnfst-2',
+          call_id: 'terminal:0-thinker-2',
           name: 'terminal',
           arguments: '{"cmd":"pwd"}',
         },
-        { type: 'function_call_output', call_id: 'terminal:0-mnfst-2', output: 'two' },
+        { type: 'function_call_output', call_id: 'terminal:0-thinker-2', output: 'two' },
         {
           type: 'function_call',
-          call_id: 'terminal:0-mnfst-3',
+          call_id: 'terminal:0-thinker-3',
           name: 'terminal',
           arguments: '{"cmd":"whoami"}',
         },
-        { type: 'function_call_output', call_id: 'terminal:0-mnfst-3', output: 'three' },
+        { type: 'function_call_output', call_id: 'terminal:0-thinker-3', output: 'three' },
       ]);
     });
 
@@ -256,8 +256,8 @@ describe('ChatGPT Adapter – toResponsesRequest (tool calls)', () => {
           messages: [
             call('terminal:0', '{}'),
             output('terminal:0', 'one'),
-            call('terminal:0-mnfst-2', '{}'),
-            output('terminal:0-mnfst-2', 'other tool'),
+            call('terminal:0-thinker-2', '{}'),
+            output('terminal:0-thinker-2', 'other tool'),
             call('terminal:0', '{}'),
             output('terminal:0', 'two'),
           ],
@@ -268,10 +268,10 @@ describe('ChatGPT Adapter – toResponsesRequest (tool calls)', () => {
       expect((result.input as Record<string, unknown>[]).map((item) => item.call_id)).toEqual([
         'terminal:0',
         'terminal:0',
-        'terminal:0-mnfst-2',
-        'terminal:0-mnfst-2',
-        'terminal:0-mnfst-2-x',
-        'terminal:0-mnfst-2-x',
+        'terminal:0-thinker-2',
+        'terminal:0-thinker-2',
+        'terminal:0-thinker-2-x',
+        'terminal:0-thinker-2-x',
       ]);
     });
   });

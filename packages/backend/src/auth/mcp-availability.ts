@@ -18,7 +18,8 @@
  * `mcp-scopes.ts` exists.
  */
 
-const DEFAULT_PORT = '3001';
+import { DEFAULT_PORT } from '../common/constants/server.constants';
+
 const MCP_ROUTE = '/api/v1/mcp';
 const FALSEY = new Set(['false', '0', 'no', 'off']);
 

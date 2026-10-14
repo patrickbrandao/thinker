@@ -1,6 +1,6 @@
 import { getBedrockInferenceProfileBaseModelId } from './bedrock-region';
 
-/** A Manifest API that a model serves on Bedrock Runtime. */
+/** A Thinker API that a model serves on Bedrock Runtime. */
 export type BedrockRuntimeApi = 'chat_completions' | 'responses';
 
 /**
@@ -12,7 +12,7 @@ export interface BedrockRuntimeCapabilities {
   /** Exact base model ID. Lookups are case-sensitive. */
   modelId: string;
   /**
-   * Every entry must list both APIs: Manifest keeps the agent's API on Runtime
+   * Every entry must list both APIs: Thinker keeps the agent's API on Runtime
    * and does not convert between them there.
    */
   apis: readonly BedrockRuntimeApi[];
@@ -101,7 +101,7 @@ const THINKER_ENDPOINT_BY_API: Record<BedrockRuntimeApi, string> = {
   responses: '/v1/responses',
 };
 
-/** Manifest endpoints that serve a Claude profile through Runtime Messages. */
+/** Thinker endpoints that serve a Claude profile through Runtime Messages. */
 const CLAUDE_PROFILE_ENDPOINTS: readonly string[] = ['/v1/chat/completions', '/v1/messages'];
 
 /**
@@ -123,7 +123,7 @@ export function isBedrockRuntimeClaudeProfile(model: string): boolean {
 }
 
 /**
- * Manifest endpoints that serve a catalogued or Claude CRIS profile, for model
+ * Thinker endpoints that serve a catalogued or Claude CRIS profile, for model
  * discovery.
  */
 export function getBedrockRuntimeSupportedEndpoints(model: string): string[] {

@@ -15,7 +15,7 @@ export interface RoutingStatusInputs {
 
 /**
  * Whether a harness can route yet, and why not. Shared by
- * `GET /api/v1/routing/:agent/status` and the MCP `manifest_routing_status`
+ * `GET /api/v1/routing/:agent/status` and the MCP `thinker_routing_status`
  * tool so the two never disagree (#75).
  *
  * An empty pricing cache only explains an agent that cannot route: it never

@@ -6,7 +6,7 @@ import { CliError } from './errors';
 import { makeIo } from '../test/helpers';
 
 describe('key files', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-secrets-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-secrets-'));
 
   it('accepts a fresh path in an existing directory and resolves it absolute', () => {
     const target = path.join(dir, 'agent.key');
@@ -40,7 +40,7 @@ describe('key files', () => {
     fs.writeFileSync(target, 'someone-else');
     let error: unknown;
     try {
-      writeKeyFile(target, 'mnfst_super_secret');
+      writeKeyFile(target, 'thk_super_secret');
     } catch (e) {
       error = e;
     }
@@ -51,13 +51,13 @@ describe('key files', () => {
 
   it('writes the secret with mode 0600', () => {
     const target = path.join(dir, 'written.key');
-    writeKeyFile(target, 'mnfst_super_secret');
-    expect(fs.readFileSync(target, 'utf8')).toBe('mnfst_super_secret');
+    writeKeyFile(target, 'thk_super_secret');
+    expect(fs.readFileSync(target, 'utf8')).toBe('thk_super_secret');
     expect(fs.statSync(target).mode & 0o777).toBe(0o600);
   });
 
   it('keyPrefixOf keeps only the first 10 characters', () => {
-    expect(keyPrefixOf('mnfst_abcdefghij')).toBe('mnfst_abcd');
+    expect(keyPrefixOf('thk_abcdefghij')).toBe('thk_abcdef');
   });
 });
 

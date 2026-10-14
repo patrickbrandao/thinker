@@ -340,7 +340,11 @@ const Routing: Component = () => {
     }
     if (pricingWarningShown()) return;
     setPricingWarningShown(true);
-    toast.warning('Model pricing data is unavailable. Model cost details may be incomplete.');
+    toast.warning(
+      health.sync_enabled === false
+        ? 'Model pricing data is unavailable because catalog sync is turned off (THINKER_CATALOG_SYNC). Model cost details may be incomplete.'
+        : 'Model pricing data is unavailable. Model cost details may be incomplete.',
+    );
   });
 
   const refetchAll = async () => {
@@ -500,7 +504,7 @@ const Routing: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>{agentDisplayName() ?? agentName()} Routing - Manifest</Title>
+      <Title>{agentDisplayName() ?? agentName()} Routing - Thinker</Title>
       <Meta
         name="description"
         content={`Configure model routing for ${agentDisplayName() ?? agentName()}.`}

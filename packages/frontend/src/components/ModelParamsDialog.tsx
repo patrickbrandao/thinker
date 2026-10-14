@@ -18,7 +18,6 @@ interface Props {
   slotLabel: string;
   current: RequestParamDefaults | null;
   specs: readonly ProviderParamSpec[];
-  requestParamsUrl?: string;
   // True while the per-model specs are still being fetched (dialog opens
   // immediately, specs arrive async).
   loading?: boolean;
@@ -28,7 +27,7 @@ interface Props {
 
 type DraftState = Record<string, JsonValue>;
 
-const UNSET_OPTION_VALUE = '__manifest_param_unset__';
+const UNSET_OPTION_VALUE = '__thinker_param_unset__';
 
 const GROUP_LABELS: Record<ModelParamGroup, string> = {
   generation_length: 'Generation length',
@@ -575,7 +574,7 @@ const ModelParamsDialog: Component<Props> = (props) => {
                 ? `Loading parameters for ${props.slotLabel}…`
                 : hasSpecs()
                   ? `Values you set override the client's request for ${props.slotLabel}; unset ones keep the client's value. Requests that name a model instead of auto skip them.`
-                  : `No parameter controls are published for ${props.slotLabel} yet.`}
+                  : `No parameter controls are available for ${props.slotLabel}.`}
             </p>
 
             <div class="model-params__body">
@@ -592,24 +591,7 @@ const ModelParamsDialog: Component<Props> = (props) => {
                   when={hasSpecs()}
                   fallback={
                     <div class="model-params__empty">
-                      <Show
-                        when={props.requestParamsUrl}
-                        fallback={
-                          <p class="model-params__status">
-                            This model has no configurable parameters.
-                          </p>
-                        }
-                      >
-                        <a
-                          class="btn btn--outline btn--sm model-params__empty-link"
-                          href={props.requestParamsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Request model parameters for ${props.slotLabel}`}
-                        >
-                          Request parameters for this model
-                        </a>
-                      </Show>
+                      <p class="model-params__status">This model has no configurable parameters.</p>
                     </div>
                   }
                 >
@@ -639,17 +621,6 @@ const ModelParamsDialog: Component<Props> = (props) => {
             </div>
 
             <div class="modal-card__footer model-params__footer">
-              <Show when={!props.loading && hasSpecs() && props.requestParamsUrl}>
-                <a
-                  class="model-params__request-link"
-                  href={props.requestParamsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Request parameters for ${props.slotLabel}`}
-                >
-                  Request
-                </a>
-              </Show>
               <div class="model-params__footer-actions">
                 <button
                   class="btn btn--ghost btn--sm"

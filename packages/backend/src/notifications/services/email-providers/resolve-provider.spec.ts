@@ -25,7 +25,8 @@ describe('createProvider', () => {
   });
 
   it('throws for unknown provider', () => {
-    expect(() => createProvider({ ...baseConfig, provider: 'unknown' as never }))
-      .toThrow('Unknown email provider: unknown');
+    expect(() => createProvider({ ...baseConfig, provider: 'unknown' as never })).toThrow(
+      'Unknown email provider: unknown',
+    );
   });
 });

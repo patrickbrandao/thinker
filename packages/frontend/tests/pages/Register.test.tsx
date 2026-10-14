@@ -97,10 +97,11 @@ describe('Register', () => {
     expect(container.querySelector('a[href="/login?redirect=%2Fmessages"]')).not.toBeNull();
   });
 
-  it('shows terms and privacy links', () => {
-    render(() => <Register />);
-    expect(screen.getByText('Terms')).toBeDefined();
-    expect(screen.getByText('Privacy Policy')).toBeDefined();
+  it('links to no hosted terms or privacy policy', () => {
+    const { container } = render(() => <Register />);
+    expect(screen.queryByText('Terms')).toBeNull();
+    expect(screen.queryByText('Privacy Policy')).toBeNull();
+    expect(container.querySelector('a[href^="http"]')).toBeNull();
   });
 
   it('submits registration form', async () => {
@@ -232,7 +233,7 @@ describe('Register', () => {
       expect(hrefSetter).toHaveBeenCalledWith('/welcome');
     });
     // No questionnaire marker is left behind for the guards to act on.
-    expect(localStorage.getItem('manifest_discovery_pending_u1')).toBeNull();
+    expect(localStorage.getItem('thinker_discovery_pending_u1')).toBeNull();
 
     locationSpy.mockRestore();
   });

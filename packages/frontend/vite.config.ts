@@ -32,7 +32,7 @@ const configureDevProxy: NonNullable<ProxyOptions['configure']> = (proxy) => {
 
 const devProxyRoute: ProxyOptions = { target: backendTarget, configure: configureDevProxy };
 
-const manifestVersion = (() => {
+const thinkerVersion = (() => {
   try {
     const pkg = JSON.parse(
       readFileSync(resolve(import.meta.dirname, '../thinker/package.json'), 'utf-8'),
@@ -48,7 +48,7 @@ export default defineConfig({
     // The version shown by the dashboard badge. Read from the canonical
     // package.json at build time so the dashboard never asks the backend (or
     // anyone else) for it.
-    __MANIFEST_VERSION__: JSON.stringify(manifestVersion),
+    __THINKER_VERSION__: JSON.stringify(thinkerVersion),
   },
   plugins: [solidPlugin()],
   server: {

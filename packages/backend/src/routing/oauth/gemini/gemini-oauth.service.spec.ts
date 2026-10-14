@@ -109,7 +109,7 @@ describe('GeminiOauthService', () => {
 
   describe('generateAuthorizationUrl', () => {
     it('builds a Google OAuth URL with PKCE S256 challenge and tracks pending state', async () => {
-      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:2099');
       const parsed = new URL(url);
       expect(parsed.origin + parsed.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
       expect(parsed.searchParams.get('response_type')).toBe('code');
@@ -135,7 +135,7 @@ describe('GeminiOauthService', () => {
     });
 
     it('uses port 1455 for the callback redirect URI', async () => {
-      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:2099');
       const redirectUri = new URL(url).searchParams.get('redirect_uri');
       expect(redirectUri).toBe('http://localhost:1455/auth/callback');
     });

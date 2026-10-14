@@ -707,7 +707,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   ensureStorageLike('localStorage').clear();
   ensureStorageLike('sessionStorage').clear();
-  localStorage.setItem('manifest_global_group', 'provider');
+  localStorage.setItem('thinker_global_group', 'provider');
   routerState.navigate.mockReset();
   routerState.params = { connectionId: 'conn-openai' };
 
@@ -823,7 +823,7 @@ describe('GlobalOverview (analytics)', () => {
   });
 
   it('offers every dashboard range, long windows included, with no plan lock', async () => {
-    localStorage.setItem('manifest_global_range', '365d');
+    localStorage.setItem('thinker_global_range', '365d');
 
     render(() => <GlobalOverview />);
 
@@ -837,11 +837,11 @@ describe('GlobalOverview (analytics)', () => {
     expect(longOptions.map((option) => option.disabled)).toEqual([false, false, false]);
 
     fireEvent.change(rangeSelect, { target: { value: '90d' } });
-    expect(localStorage.getItem('manifest_global_range')).toBe('90d');
+    expect(localStorage.getItem('thinker_global_range')).toBe('90d');
   });
 
   it('shows custom provider names instead of custom:<uuid> in provider series', async () => {
-    localStorage.setItem('manifest_global_group', 'provider');
+    localStorage.setItem('thinker_global_group', 'provider');
     const customSeries = {
       agents: ['openai', 'custom:cp-1'],
       timeseries: [{ hour: '2026-06-04 10:00:00', openai: 1200, 'custom:cp-1': 300 }],

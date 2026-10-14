@@ -255,6 +255,8 @@ export function isEncrypted(value: string): boolean {
 // scrypt run on the request path. GCM's guarantee rests on the random 96-bit
 // IV per blob, not on the salt. Bump the salt string to rotate the derivation.
 export const BINARY_ENVELOPE_MAGIC = Buffer.from('MRE1', 'ascii');
+// Frozen storage-format constant inherited from upstream: changing it would
+// make every existing recording unreadable, so it keeps its original name.
 const BINARY_KDF_SALT = Buffer.from('manifest-recording-envelope-v1', 'utf8');
 const TAG_LENGTH = 16;
 const BINARY_HEADER_LENGTH = BINARY_ENVELOPE_MAGIC.length + IV_LENGTH + TAG_LENGTH;

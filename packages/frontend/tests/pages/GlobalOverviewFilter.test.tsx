@@ -267,7 +267,7 @@ const overviewResponse = {
     successful: 17,
     success_rate: 94.4,
     attempt_success_rate: 88.9,
-    manifest_lift_pct: 5.5,
+    thinker_lift_pct: 5.5,
     recovered: 1,
     previous_total: 16,
   },
@@ -319,7 +319,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   sessionStorage.clear();
-  localStorage.setItem('manifest_global_group', 'provider');
+  localStorage.setItem('thinker_global_group', 'provider');
   filterSelectProps = null;
   providerChartProps = null;
   sseMocks.reset?.();

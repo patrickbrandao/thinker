@@ -36,7 +36,7 @@ import { TenantCacheService } from '../../common/services/tenant-cache.service';
 
 const mockConfigService = {
   get: (key: string, fallback?: string) =>
-    ({ 'app.notificationFromEmail': 'noreply@manifest.build' })[key] ?? fallback,
+    ({ 'app.notificationFromEmail': 'noreply@thinker.example.com' })[key] ?? fallback,
 } as unknown as ConfigService;
 
 function createMockTenantCache(ensuredTenantId = 'tenant-1') {
@@ -577,7 +577,7 @@ describe('EmailProviderConfigService', () => {
       );
       expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: 'Manifest <noreply@mg.example.com>',
+          from: 'Thinker <noreply@mg.example.com>',
         }),
       );
     });

@@ -1,16 +1,16 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response as ExpressResponse } from 'express';
-import { formatManifestError, ManifestErrorCode } from '../../common/errors/error-codes';
-import { THINKER_CODE_TO_REASON } from '../../common/errors/manifest-error';
-import type { RequestWithManifestErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
+import { formatThinkerError, ThinkerErrorCode } from '../../common/errors/error-codes';
+import { THINKER_CODE_TO_REASON } from '../../common/errors/thinker-error';
+import type { RequestWithThinkerErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { CONFLICTING_API_KEY_HEADERS } from '../../otlp/guards/agent-key-auth.guard';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
 import { sanitizeRequestHeaders } from './request-headers';
 import { getDashboardUrl, sendFriendlyResponse } from './proxy-friendly-response';
 
 /** Guard-thrown messages that should become friendly chat responses. */
-const AUTH_ERROR_CODES: Record<string, ManifestErrorCode> = {
+const AUTH_ERROR_CODES: Record<string, ThinkerErrorCode> = {
   'Authorization header required': 'M001',
   'Empty token': 'M002',
   'Invalid API key format': 'M003',
@@ -56,19 +56,19 @@ export class ProxyExceptionFilter implements ExceptionFilter {
   /**
    * Record an expired-key rejection (M004) against the agent the key belongs to.
    * The guard resolved that agent before noticing the expiry and left it on
-   * `manifestErrorContext`; without a context there is nobody to attribute the
+   * `thinkerErrorContext`; without a context there is nobody to attribute the
    * row to, so nothing is written.
    *
    * `content` is the exact text the caller received, dashboard link included —
    * the row is only useful if it says where to generate a new key.
    */
   private recordExpiredKey(req: Request, content: string): void {
-    const ctx = (req as Request & RequestWithManifestErrorContext).manifestErrorContext;
+    const ctx = (req as Request & RequestWithThinkerErrorContext).thinkerErrorContext;
     if (!ctx) return;
     const body = req.body as Record<string, unknown> | undefined;
     const model = typeof body?.model === 'string' ? body.model : undefined;
     this.recorder
-      .recordManifestBlockedRequest(ctx, {
+      .recordThinkerBlockedRequest(ctx, {
         httpStatus: 401,
         errorMessage: content,
         errorCode: 'M004',
@@ -105,7 +105,7 @@ export class ProxyExceptionFilter implements ExceptionFilter {
 
     const errorCode = AUTH_ERROR_CODES[message];
     if (errorCode) {
-      const friendly = formatManifestError(errorCode);
+      const friendly = formatThinkerError(errorCode);
       const dashboardUrl = getDashboardUrl(this.config);
       const content =
         errorCode === 'M004'
@@ -118,21 +118,21 @@ export class ProxyExceptionFilter implements ExceptionFilter {
         // Real status — auth errors get 401, validation errors keep their status.
         const realStatus = status === 400 ? 400 : 401;
         res.status(realStatus).json({
-          error: { message: content, type: 'auth_error', code: 'manifest_auth' },
+          error: { message: content, type: 'auth_error', code: 'thinker_auth' },
         });
       }
       return;
     }
 
     if (isChatClient) {
-      const content = status >= 500 ? formatManifestError('M500') : message;
+      const content = status >= 500 ? formatThinkerError('M500') : message;
       sendFriendlyResponse(res, content, isStream);
       return;
     }
 
     // Tools and monitors: pass the real HTTP status with a structured envelope.
     const errorMessage =
-      status >= 500 ? 'Manifest encountered an internal error. Try again shortly.' : message;
+      status >= 500 ? 'Thinker encountered an internal error. Try again shortly.' : message;
     res.status(status).json({
       error: {
         message: errorMessage,

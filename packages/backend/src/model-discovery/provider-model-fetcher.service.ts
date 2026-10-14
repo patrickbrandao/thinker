@@ -204,7 +204,7 @@ interface BedrockInferenceProfileEntry {
 
 /**
  * CRIS profiles Bedrock Runtime serves (catalogued or verified Claude): exactly
- * those with at least one supported Manifest endpoint.
+ * those with at least one supported Thinker endpoint.
  */
 const isBedrockRuntimeProfile = (id: string): boolean =>
   getBedrockRuntimeSupportedEndpoints(id).length > 0;

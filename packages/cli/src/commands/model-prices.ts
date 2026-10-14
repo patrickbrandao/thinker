@@ -22,10 +22,10 @@ function cleanPrice(value: unknown): unknown {
 }
 
 /**
- * The install-wide price list — every model Manifest knows a price for, not
+ * The install-wide price list — every model Thinker knows a price for, not
  * one agent's routable set. Deliberately agent-free: pricing is a property of
  * the install, so answering "what does model X cost" must not require
- * creating a probe agent first (`mnfst models <agent>` is the per-agent
+ * creating a probe agent first (`thinker models <agent>` is the per-agent
  * question).
  *
  * The endpoint labels rows with the provider's DISPLAY name ("OpenAI"), so

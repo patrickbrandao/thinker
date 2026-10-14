@@ -11,7 +11,7 @@ import { registerRoutingTools } from './routing.tools';
 
 // The tool files read the server origin from the auth instance, which is
 // ESM-only and cannot be required by Jest on Node 22. The origin is all they use.
-jest.mock('../../auth/auth.instance', () => ({ authOrigin: 'http://localhost:3001' }));
+jest.mock('../../auth/auth.instance', () => ({ authOrigin: 'http://localhost:2099' }));
 
 type Handler = (args: Record<string, unknown>, ctx?: unknown) => Promise<unknown>;
 
@@ -206,24 +206,24 @@ describe('MCP tools', () => {
   describe('agent tools', () => {
     it('lists agents and strips the sparkline', async () => {
       const tools = registerAll(makeDeps());
-      const { data } = await call(tools, 'manifest_agent_list', { include_playground: true });
+      const { data } = await call(tools, 'thinker_agent_list', { include_playground: true });
       expect((data as { agents: Record<string, unknown>[] }).agents[0]).not.toHaveProperty(
         'sparkline',
       );
     });
 
     it('gets one agent', async () => {
-      const { data } = await call(registerAll(makeDeps()), 'manifest_agent_get', { agent: 'demo' });
+      const { data } = await call(registerAll(makeDeps()), 'thinker_agent_get', { agent: 'demo' });
       expect(data).toMatchObject({ agent: { agent_name: 'demo' } });
     });
 
     it('lists platforms', async () => {
-      const { data } = await call(registerAll(makeDeps()), 'manifest_agent_platforms');
+      const { data } = await call(registerAll(makeDeps()), 'thinker_agent_platforms');
       expect((data as { platforms: string[] }).platforms.length).toBeGreaterThan(0);
     });
 
     it('creates an agent and returns the key', async () => {
-      const { data } = await call(registerAll(makeDeps()), 'manifest_agent_create', {
+      const { data } = await call(registerAll(makeDeps()), 'thinker_agent_create', {
         name: 'My Agent',
         agent_platform: 'codex',
         agent_category: 'automation',
@@ -234,8 +234,8 @@ describe('MCP tools', () => {
 
     it('rejects a reserved name and an empty slug', async () => {
       const tools = registerAll(makeDeps());
-      expect((await call(tools, 'manifest_agent_create', { name: 'Playground' })).error).toBe(true);
-      expect((await call(tools, 'manifest_agent_create', { name: '!!!' })).error).toBe(true);
+      expect((await call(tools, 'thinker_agent_create', { name: 'Playground' })).error).toBe(true);
+      expect((await call(tools, 'thinker_agent_create', { name: '!!!' })).error).toBe(true);
     });
 
     it('rolls back the agent when provider enablement fails, and survives a failed rollback', async () => {
@@ -243,7 +243,7 @@ describe('MCP tools', () => {
       (deps.providers.enableAllProvidersForAgent as jest.Mock).mockRejectedValueOnce(
         new Error('boom'),
       );
-      const first = await call(registerAll(deps), 'manifest_agent_create', { name: 'A' });
+      const first = await call(registerAll(deps), 'thinker_agent_create', { name: 'A' });
       expect(first.error).toBe(true);
 
       const deps2 = makeDeps();
@@ -251,14 +251,14 @@ describe('MCP tools', () => {
         new Error('boom'),
       );
       (deps2.lifecycle.deleteAgent as jest.Mock).mockRejectedValueOnce(new Error('cleanup'));
-      expect((await call(registerAll(deps2), 'manifest_agent_create', { name: 'B' })).error).toBe(
+      expect((await call(registerAll(deps2), 'thinker_agent_create', { name: 'B' })).error).toBe(
         true,
       );
     });
 
     it('renames / retypes and rejects the reserved slug', async () => {
       const tools = registerAll(makeDeps());
-      const ok = await call(tools, 'manifest_agent_update', {
+      const ok = await call(tools, 'thinker_agent_update', {
         agent: 'demo',
         name: 'Renamed',
         agent_category: 'coding',
@@ -266,33 +266,33 @@ describe('MCP tools', () => {
       });
       expect(ok.error).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_agent_update', { agent: 'demo', name: 'Playground' })).error,
+        (await call(tools, 'thinker_agent_update', { agent: 'demo', name: 'Playground' })).error,
       ).toBe(true);
     });
 
     it('deletes, rotates, and shows a key', async () => {
       const deps = makeDeps();
       const tools = registerAll(deps);
-      expect((await call(tools, 'manifest_agent_delete', { agent: 'demo' })).error).toBeFalsy();
-      expect((await call(tools, 'manifest_agent_rotate_key', { agent: 'demo' })).error).toBeFalsy();
-      const show = await call(tools, 'manifest_agent_key_show', { agent: 'demo' });
+      expect((await call(tools, 'thinker_agent_delete', { agent: 'demo' })).error).toBeFalsy();
+      expect((await call(tools, 'thinker_agent_rotate_key', { agent: 'demo' })).error).toBeFalsy();
+      const show = await call(tools, 'thinker_agent_key_show', { agent: 'demo' });
       expect(show.data).toMatchObject({ apiKey: 'full' });
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValueOnce(null);
-      expect((await call(tools, 'manifest_agent_key_show', { agent: 'x' })).error).toBe(true);
+      expect((await call(tools, 'thinker_agent_key_show', { agent: 'x' })).error).toBe(true);
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValueOnce(null);
-      expect((await call(tools, 'manifest_agent_rotate_key', { agent: 'x' })).error).toBe(true);
+      expect((await call(tools, 'thinker_agent_rotate_key', { agent: 'x' })).error).toBe(true);
     });
 
     it('hides write tools from a read-only token', () => {
       const tools = registerAll(makeDeps(), { ...OPERATOR, scopes: new Set(['mcp:read']) });
-      expect(tools.has('manifest_agent_list')).toBe(true);
-      expect(tools.has('manifest_agent_create')).toBe(false);
+      expect(tools.has('thinker_agent_list')).toBe(true);
+      expect(tools.has('thinker_agent_create')).toBe(false);
     });
   });
 
   describe('provider tools', () => {
     it('lists connections and custom providers', async () => {
-      const { data } = await call(registerAll(makeDeps()), 'manifest_provider_list');
+      const { data } = await call(registerAll(makeDeps()), 'thinker_provider_list');
       expect(data).toMatchObject({ connections: [{ cached_model_count: 1 }] });
     });
 
@@ -314,13 +314,13 @@ describe('MCP tools', () => {
       ]);
       const tools = registerAll(deps);
 
-      const { data } = await call(tools, 'manifest_provider_list');
+      const { data } = await call(tools, 'thinker_provider_list');
       expect(data).toMatchObject({
         connections: [{ cached_model_count: 1 }, { cached_model_count: 2 }],
         custom_providers: [{ model_count: 2 }, { model_count: 0 }],
       });
 
-      const refreshed = await call(tools, 'manifest_provider_refresh', { agent: 'demo' });
+      const refreshed = await call(tools, 'thinker_provider_refresh', { agent: 'demo' });
       expect(refreshed.data).toMatchObject({
         connections: [{ cached_model_count: 1 }, { cached_model_count: 2 }],
       });
@@ -331,27 +331,27 @@ describe('MCP tools', () => {
       (deps.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, cached_models: null },
       ]);
-      const { data } = await call(registerAll(deps), 'manifest_provider_list');
+      const { data } = await call(registerAll(deps), 'thinker_provider_list');
       expect(data).toMatchObject({ connections: [{ cached_model_count: 0 }] });
     });
 
     it('returns the catalog', async () => {
-      const { data } = await call(registerAll(makeDeps()), 'manifest_provider_catalog');
+      const { data } = await call(registerAll(makeDeps()), 'thinker_provider_catalog');
       expect((data as { providers: unknown[] }).providers.length).toBeGreaterThan(0);
     });
 
     it('connects a known provider and rejects an unknown one', async () => {
       const tools = registerAll(makeDeps());
       expect(
-        (await call(tools, 'manifest_provider_connect', { provider: 'openai', agent: 'demo' }))
+        (await call(tools, 'thinker_provider_connect', { provider: 'openai', agent: 'demo' }))
           .error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_provider_connect', { provider: 'nope', agent: 'demo' })).error,
+        (await call(tools, 'thinker_provider_connect', { provider: 'nope', agent: 'demo' })).error,
       ).toBe(true);
       // Built-in local providers connect with no deployment mode configured.
       expect(
-        (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
+        (await call(tools, 'thinker_provider_connect', { provider: 'ollama', agent: 'demo' }))
           .error,
       ).toBeFalsy();
 
@@ -360,7 +360,7 @@ describe('MCP tools', () => {
       (discoveryFails.modelDiscovery.discoverModels as jest.Mock).mockRejectedValueOnce(
         new Error('upstream down'),
       );
-      const res = await call(registerAll(discoveryFails), 'manifest_provider_connect', {
+      const res = await call(registerAll(discoveryFails), 'thinker_provider_connect', {
         provider: 'openai',
         agent: 'demo',
       });
@@ -374,27 +374,27 @@ describe('MCP tools', () => {
     it('disconnects and refreshes', async () => {
       const tools = registerAll(makeDeps());
       expect(
-        (await call(tools, 'manifest_provider_disconnect', { provider: 'openai', agent: 'demo' }))
+        (await call(tools, 'thinker_provider_disconnect', { provider: 'openai', agent: 'demo' }))
           .error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_provider_refresh', { agent: 'demo', provider: 'openai' }))
+        (await call(tools, 'thinker_provider_refresh', { agent: 'demo', provider: 'openai' }))
           .error,
       ).toBeFalsy();
-      expect((await call(tools, 'manifest_provider_refresh', { agent: 'demo' })).error).toBeFalsy();
+      expect((await call(tools, 'thinker_provider_refresh', { agent: 'demo' })).error).toBeFalsy();
     });
 
     it('adds and removes a custom provider', async () => {
       const tools = registerAll(makeDeps());
-      const add = await call(tools, 'manifest_provider_custom_add', {
+      const add = await call(tools, 'thinker_provider_custom_add', {
         name: 'cp',
         base_url: 'http://127.0.0.1:1/v1',
         alias: 'cp',
       });
       expect(add.error).toBeFalsy();
-      expect((await call(tools, 'manifest_provider_custom_list')).error).toBeFalsy();
+      expect((await call(tools, 'thinker_provider_custom_list')).error).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_provider_custom_remove', { name: 'cp' })).error,
+        (await call(tools, 'thinker_provider_custom_remove', { name: 'cp' })).error,
       ).toBeFalsy();
 
       // An endpoint with no models and no explicit list is an error.
@@ -402,7 +402,7 @@ describe('MCP tools', () => {
       (deps.customProviders.probeModels as jest.Mock).mockResolvedValueOnce([]);
       expect(
         (
-          await call(registerAll(deps), 'manifest_provider_custom_add', {
+          await call(registerAll(deps), 'thinker_provider_custom_add', {
             name: 'empty',
             base_url: 'http://127.0.0.1:1/v1',
           })
@@ -414,11 +414,11 @@ describe('MCP tools', () => {
       const deps = makeDeps();
       const tools = registerAll(deps);
       expect(
-        (await call(tools, 'manifest_agent_provider_enable', { agent: 'demo', provider: 'openai' }))
+        (await call(tools, 'thinker_agent_provider_enable', { agent: 'demo', provider: 'openai' }))
           .error,
       ).toBeFalsy();
       // The default tier points at openai, so disable must be rejected.
-      const blocked = await call(tools, 'manifest_agent_provider_disable', {
+      const blocked = await call(tools, 'thinker_agent_provider_disable', {
         agent: 'demo',
         provider: 'openai',
       });
@@ -429,7 +429,7 @@ describe('MCP tools', () => {
       ]);
       expect(
         (
-          await call(tools, 'manifest_agent_provider_disable', {
+          await call(tools, 'thinker_agent_provider_disable', {
             agent: 'demo',
             provider: 'openai',
           })
@@ -439,7 +439,7 @@ describe('MCP tools', () => {
       // No matching connection.
       expect(
         (
-          await call(tools, 'manifest_agent_provider_enable', {
+          await call(tools, 'thinker_agent_provider_enable', {
             agent: 'demo',
             provider: 'anthropic',
           })
@@ -459,7 +459,7 @@ describe('MCP tools', () => {
           fallback_routes: [],
         },
       ]);
-      const blocked = await call(registerAll(deps), 'manifest_agent_provider_disable', {
+      const blocked = await call(registerAll(deps), 'thinker_agent_provider_disable', {
         agent: 'demo',
         provider: 'openai',
       });
@@ -493,7 +493,7 @@ describe('MCP tools', () => {
         // No provider field → matched by model id.
         { category: 'coding', override_route: null, fallback_routes: [{ model: 'gpt-4o' }] },
       ]);
-      const blocked = await call(registerAll(deps), 'manifest_agent_provider_disable', {
+      const blocked = await call(registerAll(deps), 'thinker_agent_provider_disable', {
         agent: 'demo',
         provider: 'openai',
       });
@@ -505,13 +505,13 @@ describe('MCP tools', () => {
     it('reports status in each branch', async () => {
       const deps = makeDeps();
       expect(
-        (await call(registerAll(deps), 'manifest_routing_status', { agent: 'demo' })).data,
+        (await call(registerAll(deps), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ enabled: true });
 
       const noProviders = makeDeps();
       (noProviders.providers.getProviders as jest.Mock).mockResolvedValue([]);
       expect(
-        (await call(registerAll(noProviders), 'manifest_routing_status', { agent: 'demo' })).data,
+        (await call(registerAll(noProviders), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'no_provider' });
 
       const inactiveOnly = makeDeps();
@@ -519,7 +519,7 @@ describe('MCP tools', () => {
         { ...CONNECTION, is_active: false },
       ]);
       expect(
-        (await call(registerAll(inactiveOnly), 'manifest_routing_status', { agent: 'demo' })).data,
+        (await call(registerAll(inactiveOnly), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'no_provider' });
 
       // #75: an empty pricing cache (right after boot, or a failed fetch) does
@@ -527,7 +527,7 @@ describe('MCP tools', () => {
       const noPricing = makeDeps();
       (noPricing.pricingSync.getAll as jest.Mock).mockReturnValue(new Map());
       expect(
-        (await call(registerAll(noPricing), 'manifest_routing_status', { agent: 'demo' })).data,
+        (await call(registerAll(noPricing), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ enabled: true, reason: null });
 
       // It only explains an agent that cannot route.
@@ -536,7 +536,7 @@ describe('MCP tools', () => {
       (noPricingNotRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
       expect(
         (
-          await call(registerAll(noPricingNotRoutable), 'manifest_routing_status', {
+          await call(registerAll(noPricingNotRoutable), 'thinker_routing_status', {
             agent: 'demo',
           })
         ).data,
@@ -549,7 +549,7 @@ describe('MCP tools', () => {
       try {
         expect(
           (
-            await call(registerAll(noPricingNotRoutable), 'manifest_routing_status', {
+            await call(registerAll(noPricingNotRoutable), 'thinker_routing_status', {
               agent: 'demo',
             })
           ).data,
@@ -562,28 +562,28 @@ describe('MCP tools', () => {
       const notRoutable = makeDeps();
       (notRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
       expect(
-        (await call(registerAll(notRoutable), 'manifest_routing_status', { agent: 'demo' })).data,
+        (await call(registerAll(notRoutable), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'no_routable_models' });
     });
 
     it('reads and writes fallbacks', async () => {
       const tools = registerAll(makeDeps());
       expect(
-        (await call(tools, 'manifest_routing_fallbacks_get', { agent: 'demo' })).error,
+        (await call(tools, 'thinker_routing_fallbacks_get', { agent: 'demo' })).error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_routing_fallbacks_set', { agent: 'demo', models: ['a', 'b'] }))
+        (await call(tools, 'thinker_routing_fallbacks_set', { agent: 'demo', models: ['a', 'b'] }))
           .error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_routing_fallbacks_clear', { agent: 'demo' })).error,
+        (await call(tools, 'thinker_routing_fallbacks_clear', { agent: 'demo' })).error,
       ).toBeFalsy();
     });
 
     it('reads and writes model params by tier and model', async () => {
       const deps = makeDeps();
       const tools = registerAll(deps);
-      const got = await call(tools, 'manifest_routing_params_get', {
+      const got = await call(tools, 'thinker_routing_params_get', {
         agent: 'demo',
         tier: 'deep',
         model: 'gpt-5',
@@ -591,7 +591,7 @@ describe('MCP tools', () => {
       expect(got.data).toEqual({ tier: 'default', params: [] });
       expect(deps.routeModelParams.get).toHaveBeenCalledWith('agent-1', 'deep', 'gpt-5');
 
-      const set = await call(tools, 'manifest_routing_params_set', {
+      const set = await call(tools, 'thinker_routing_params_set', {
         agent: 'demo',
         tier: 'deep',
         model: 'gpt-5',
@@ -607,18 +607,18 @@ describe('MCP tools', () => {
 
     it('hides the params write tool from a read-only token', () => {
       const tools = registerAll(makeDeps(), { ...OPERATOR, scopes: new Set(['mcp:read']) });
-      expect(tools.has('manifest_routing_params_get')).toBe(true);
-      expect(tools.has('manifest_routing_params_set')).toBe(false);
+      expect(tools.has('thinker_routing_params_get')).toBe(true);
+      expect(tools.has('thinker_routing_params_set')).toBe(false);
     });
 
     it('reads and writes recording, and exposes no repair toggle', async () => {
       const tools = registerAll(makeDeps());
       expect([...tools.keys()].filter((name) => name.includes('auto'))).toEqual([]);
       expect(
-        (await call(tools, 'manifest_routing_recording_get', { agent: 'demo' })).error,
+        (await call(tools, 'thinker_routing_recording_get', { agent: 'demo' })).error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_routing_recording_set', { agent: 'demo', enabled: true }))
+        (await call(tools, 'thinker_routing_recording_set', { agent: 'demo', enabled: true }))
           .error,
       ).toBeFalsy();
     });
@@ -627,11 +627,11 @@ describe('MCP tools', () => {
       const deps = makeDeps();
       const tools = registerAll(deps);
       expect(
-        (await call(tools, 'manifest_routing_custom_list', { agent: 'demo' })).error,
+        (await call(tools, 'thinker_routing_custom_list', { agent: 'demo' })).error,
       ).toBeFalsy();
       expect(
         (
-          await call(tools, 'manifest_routing_custom_create', {
+          await call(tools, 'thinker_routing_custom_create', {
             agent: 'demo',
             name: 'tier',
             header_key: 'x',
@@ -644,13 +644,13 @@ describe('MCP tools', () => {
         ).error,
       ).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_routing_custom_delete', { agent: 'demo', id: 'h1' })).error,
+        (await call(tools, 'thinker_routing_custom_delete', { agent: 'demo', id: 'h1' })).error,
       ).toBeFalsy();
 
       (deps.headerTiers.setOverride as jest.Mock).mockRejectedValueOnce(new Error('nope'));
       expect(
         (
-          await call(tools, 'manifest_routing_custom_create', {
+          await call(tools, 'thinker_routing_custom_create', {
             agent: 'demo',
             name: 'tier2',
             header_key: 'x',
@@ -665,7 +665,7 @@ describe('MCP tools', () => {
       // Fallbacks without a primary route are rejected.
       expect(
         (
-          await call(tools, 'manifest_routing_custom_create', {
+          await call(tools, 'thinker_routing_custom_create', {
             agent: 'demo',
             name: 'tier3',
             header_key: 'x',
@@ -682,7 +682,7 @@ describe('MCP tools', () => {
       const tools = registerAll(deps);
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['gpt-4o'],
             provider: 'openai',
@@ -691,7 +691,7 @@ describe('MCP tools', () => {
       ).toBeFalsy();
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['gpt-4o', 'gpt-4o'],
             provider: 'openai',
@@ -704,7 +704,7 @@ describe('MCP tools', () => {
       // Default tier with a fallback (set branch) and a custom tier with none.
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['gpt-4o', 'gpt-4o'],
             provider: 'openai',
@@ -713,7 +713,7 @@ describe('MCP tools', () => {
       ).toBeFalsy();
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['gpt-4o'],
             provider: 'openai',
@@ -723,7 +723,7 @@ describe('MCP tools', () => {
       ).toBeFalsy();
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             recording: true,
           })
@@ -731,15 +731,15 @@ describe('MCP tools', () => {
       ).toBeFalsy();
 
       // Nothing to configure.
-      expect((await call(tools, 'manifest_agent_configure', { agent: 'demo' })).error).toBe(true);
+      expect((await call(tools, 'thinker_agent_configure', { agent: 'demo' })).error).toBe(true);
       // tier without a route.
       expect(
-        (await call(tools, 'manifest_agent_configure', { agent: 'demo', tier: 'x' })).error,
+        (await call(tools, 'thinker_agent_configure', { agent: 'demo', tier: 'x' })).error,
       ).toBe(true);
       // Unknown model without force.
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['nope'],
             provider: 'openai',
@@ -749,7 +749,7 @@ describe('MCP tools', () => {
       // force skips the check.
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['nope'],
             provider: 'openai',
@@ -759,8 +759,7 @@ describe('MCP tools', () => {
       ).toBeFalsy();
       // Missing provider.
       expect(
-        (await call(tools, 'manifest_agent_configure', { agent: 'demo', models: ['gpt-4o'] }))
-          .error,
+        (await call(tools, 'thinker_agent_configure', { agent: 'demo', models: ['gpt-4o'] })).error,
       ).toBe(true);
     });
 
@@ -773,7 +772,7 @@ describe('MCP tools', () => {
       const tools = registerAll(deps);
 
       // A model another provider offers no longer passes the guard.
-      const wrong = await call(tools, 'manifest_agent_configure', {
+      const wrong = await call(tools, 'thinker_agent_configure', {
         agent: 'demo',
         models: ['gpt-4o'],
         provider: 'anthropic',
@@ -782,7 +781,7 @@ describe('MCP tools', () => {
       expect(wrong.text).toContain('not offered by provider "anthropic"');
 
       // An unknown fallback is still named.
-      const fallback = await call(tools, 'manifest_agent_configure', {
+      const fallback = await call(tools, 'thinker_agent_configure', {
         agent: 'demo',
         models: ['gpt-4o', 'nope'],
         provider: 'openai',
@@ -791,7 +790,7 @@ describe('MCP tools', () => {
       expect(fallback.text).toContain('Not in the models discovered for "demo": nope');
 
       // No auth_type: a subscription model stays a subscription route.
-      await call(tools, 'manifest_agent_configure', {
+      await call(tools, 'thinker_agent_configure', {
         agent: 'demo',
         models: ['openai/gpt-5.4-subscription'],
         provider: 'openai',
@@ -812,7 +811,7 @@ describe('MCP tools', () => {
       // tier with another toggle set reaches the "tier needs models" guard.
       expect(
         (
-          await call(tools, 'manifest_agent_configure', {
+          await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             tier: 'x',
             recording: true,
@@ -823,7 +822,7 @@ describe('MCP tools', () => {
       const deps = makeDeps();
       (deps.headerTiers.list as jest.Mock).mockResolvedValueOnce([]);
       (deps.headerTiers.setOverride as jest.Mock).mockRejectedValueOnce(new Error('boom'));
-      const res = await call(registerAll(deps), 'manifest_agent_configure', {
+      const res = await call(registerAll(deps), 'thinker_agent_configure', {
         agent: 'demo',
         models: ['gpt-4o'],
         provider: 'openai',
@@ -847,7 +846,7 @@ describe('MCP tools', () => {
       );
       try {
         const tools = registerAll(makeDeps());
-        const res = await call(tools, 'manifest_routing_test', {
+        const res = await call(tools, 'thinker_routing_test', {
           agent: 'demo',
           prompt: 'hi',
           as: 'openclaw',
@@ -861,12 +860,12 @@ describe('MCP tools', () => {
           }),
         );
         expect(
-          (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'claude-code' })).data,
+          (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'claude-code' })).data,
         ).toMatchObject({ surface: 'messages', reply: 'HI' });
 
         // unknown platform
         expect(
-          (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'constructor' })).error,
+          (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'constructor' })).error,
         ).toBe(true);
 
         // upstream failure
@@ -876,7 +875,7 @@ describe('MCP tools', () => {
             new Response(JSON.stringify({ error: { message: 'nope' } }), { status: 500 }),
           );
         expect(
-          (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'openclaw' })).error,
+          (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'openclaw' })).error,
         ).toBe(true);
 
         // 2xx with no payload
@@ -884,20 +883,20 @@ describe('MCP tools', () => {
           .fn()
           .mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
         expect(
-          (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'openclaw' })).error,
+          (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'openclaw' })).error,
         ).toBe(true);
 
-        // Manifest error reply
+        // Thinker error reply
         global.fetch = jest.fn().mockResolvedValue(
           new Response(
             JSON.stringify({
-              choices: [{ message: { content: '[🦚 Manifest M100] no provider' } }],
+              choices: [{ message: { content: '[🦚 Thinker M100] no provider' } }],
             }),
             { status: 200 },
           ),
         );
         expect(
-          (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'openclaw' })).error,
+          (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'openclaw' })).error,
         ).toBe(true);
       } finally {
         global.fetch = originalFetch;
@@ -916,7 +915,7 @@ describe('MCP tools', () => {
         ),
       );
       try {
-        const res = await call(registerAll(makeDeps()), 'manifest_routing_test', {
+        const res = await call(registerAll(makeDeps()), 'thinker_routing_test', {
           agent: 'demo',
           as: 'codex',
         });
@@ -949,7 +948,7 @@ describe('MCP tools', () => {
             enabled: true,
           },
         ]);
-        const res = await call(registerAll(deps), 'manifest_routing_test', {
+        const res = await call(registerAll(deps), 'thinker_routing_test', {
           agent: 'demo',
           as: 'openclaw',
           tier: 'deep',
@@ -980,14 +979,14 @@ describe('MCP tools', () => {
           },
         ]);
         const tools = registerAll(deps);
-        const unknown = await call(tools, 'manifest_routing_test', {
+        const unknown = await call(tools, 'thinker_routing_test', {
           agent: 'demo',
           as: 'openclaw',
           tier: 'nope',
         });
         expect(unknown.error).toBe(true);
         expect(JSON.stringify(unknown)).toContain('Custom tier \\"nope\\" not found');
-        const disabled = await call(tools, 'manifest_routing_test', {
+        const disabled = await call(tools, 'thinker_routing_test', {
           agent: 'demo',
           as: 'openclaw',
           tier: 'deep',
@@ -1004,13 +1003,13 @@ describe('MCP tools', () => {
   describe('model tools', () => {
     it('lists models and prices (provider id or display name)', async () => {
       const tools = registerAll(makeDeps());
-      expect((await call(tools, 'manifest_models_list', { agent: 'demo' })).error).toBeFalsy();
+      expect((await call(tools, 'thinker_models_list', { agent: 'demo' })).error).toBeFalsy();
       expect(
-        (await call(tools, 'manifest_model_prices', { provider: 'openai' })).data,
+        (await call(tools, 'thinker_model_prices', { provider: 'openai' })).data,
       ).toMatchObject({
         models: [{ model_name: 'gpt-4o' }],
       });
-      expect((await call(tools, 'manifest_model_prices', {})).error).toBeFalsy();
+      expect((await call(tools, 'thinker_model_prices', {})).error).toBeFalsy();
       // A provider alias resolves to the provider entry in the label lookup.
       const aliasDeps = makeDeps();
       (aliasDeps.modelPrices.getAll as jest.Mock).mockReturnValue({
@@ -1027,7 +1026,7 @@ describe('MCP tools', () => {
         lastSyncedAt: null,
       });
       expect(
-        (await call(registerAll(aliasDeps), 'manifest_model_prices', { provider: 'aws-bedrock' }))
+        (await call(registerAll(aliasDeps), 'thinker_model_prices', { provider: 'aws-bedrock' }))
           .data,
       ).toMatchObject({ models: [{ provider: 'bedrock' }] });
     });
@@ -1035,7 +1034,7 @@ describe('MCP tools', () => {
 
   describe('request tools', () => {
     it('returns a page', async () => {
-      const res = await call(registerAll(makeDeps()), 'manifest_requests_get', {
+      const res = await call(registerAll(makeDeps()), 'thinker_requests_get', {
         agent: 'demo',
         status: 'success',
         origin: 'provider',
@@ -1048,19 +1047,19 @@ describe('MCP tools', () => {
   describe('identity tools', () => {
     it('reports whoami and a doctor verdict', async () => {
       const tools = registerAll(makeDeps());
-      expect((await call(tools, 'manifest_whoami')).data).toMatchObject({ tenantId: TENANT });
-      expect((await call(tools, 'manifest_doctor')).data).toMatchObject({ ok: true });
+      expect((await call(tools, 'thinker_whoami')).data).toMatchObject({ tenantId: TENANT });
+      expect((await call(tools, 'thinker_doctor')).data).toMatchObject({ ok: true });
 
       const empty = makeDeps();
       (empty.providers.getProviders as jest.Mock).mockResolvedValue([]);
       (empty.timeseries.getAgentList as jest.Mock).mockResolvedValue([]);
-      expect((await call(registerAll(empty), 'manifest_doctor')).data).toMatchObject({ ok: false });
+      expect((await call(registerAll(empty), 'thinker_doctor')).data).toMatchObject({ ok: false });
 
       const hollow = makeDeps();
       (hollow.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, cached_models: [] },
       ]);
-      expect((await call(registerAll(hollow), 'manifest_doctor')).data).toMatchObject({
+      expect((await call(registerAll(hollow), 'thinker_doctor')).data).toMatchObject({
         ok: false,
       });
 
@@ -1069,7 +1068,7 @@ describe('MCP tools', () => {
       (hollowNoLabel.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, label: '', cached_models: [] },
       ]);
-      expect((await call(registerAll(hollowNoLabel), 'manifest_doctor')).data).toMatchObject({
+      expect((await call(registerAll(hollowNoLabel), 'thinker_doctor')).data).toMatchObject({
         ok: false,
       });
     });
@@ -1078,11 +1077,11 @@ describe('MCP tools', () => {
   describe('environment tools', () => {
     it('renders setup masked, revealed, and generic', async () => {
       const tools = registerAll(makeDeps());
-      const masked = await call(tools, 'manifest_agent_setup', { agent: 'demo' });
-      expect((masked.data as { setup: string }).setup).toContain('MNFST_AGENT_KEY');
+      const masked = await call(tools, 'thinker_agent_setup', { agent: 'demo' });
+      expect((masked.data as { setup: string }).setup).toContain('THINKER_AGENT_KEY');
 
-      const revealed = await call(tools, 'manifest_agent_setup', { agent: 'demo', reveal: true });
-      expect((revealed.data as { setup: string }).setup).not.toContain('MNFST_AGENT_KEY');
+      const revealed = await call(tools, 'thinker_agent_setup', { agent: 'demo', reveal: true });
+      expect((revealed.data as { setup: string }).setup).not.toContain('THINKER_AGENT_KEY');
 
       const deps = makeDeps();
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValue({
@@ -1091,22 +1090,22 @@ describe('MCP tools', () => {
         agent_category: 'coding',
         agent_platform: 'unknown-platform',
       });
-      const generic = await call(registerAll(deps), 'manifest_agent_setup', { agent: 'demo' });
+      const generic = await call(registerAll(deps), 'thinker_agent_setup', { agent: 'demo' });
       expect((generic.data as { setup: string }).setup).toContain('base URL');
     });
 
     it('rejects reveal without write scope and missing agents', async () => {
       const deps = makeDeps();
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValueOnce(null);
-      expect((await call(registerAll(deps), 'manifest_agent_setup', { agent: 'x' })).error).toBe(
+      expect((await call(registerAll(deps), 'thinker_agent_setup', { agent: 'x' })).error).toBe(
         true,
       );
 
       const ro = registerAll(makeDeps(), { ...OPERATOR, scopes: new Set(['mcp:read']) });
-      expect((await call(ro, 'manifest_agent_setup', { agent: 'demo', reveal: true })).error).toBe(
+      expect((await call(ro, 'thinker_agent_setup', { agent: 'demo', reveal: true })).error).toBe(
         true,
       );
-      expect(ro.has('manifest_agent_env')).toBe(false);
+      expect(ro.has('thinker_agent_env')).toBe(false);
       // Read-only generic setup omits the write-only env guidance.
       const roDeps = makeDeps();
       (roDeps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValue({
@@ -1117,26 +1116,24 @@ describe('MCP tools', () => {
       });
       const roSetup = await call(
         registerAll(roDeps, { ...OPERATOR, scopes: new Set(['mcp:read']) }),
-        'manifest_agent_setup',
+        'thinker_agent_setup',
         { agent: 'demo' },
       );
-      expect((roSetup.data as { setup: string }).setup).not.toContain('manifest_agent_env');
+      expect((roSetup.data as { setup: string }).setup).not.toContain('thinker_agent_env');
     });
 
     it('returns env lines and the guide', async () => {
       const tools = registerAll(makeDeps());
-      const env = await call(tools, 'manifest_agent_env', { agent: 'demo', export: true });
+      const env = await call(tools, 'thinker_agent_env', { agent: 'demo', export: true });
       expect((env.data as { lines: string[] }).lines[0]).toContain('export THINKER_AGENT_KEY=');
-      expect((await call(tools, 'manifest_guide')).data).toHaveProperty('workflow');
+      expect((await call(tools, 'thinker_guide')).data).toHaveProperty('workflow');
 
       const deps = makeDeps();
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValueOnce(null);
-      expect((await call(registerAll(deps), 'manifest_agent_env', { agent: 'x' })).error).toBe(
-        true,
-      );
+      expect((await call(registerAll(deps), 'thinker_agent_env', { agent: 'x' })).error).toBe(true);
       const deps2 = makeDeps();
       (deps2.apiKeys.getKeyForAgent as jest.Mock).mockResolvedValueOnce({ keyPrefix: 'p' });
-      expect((await call(registerAll(deps2), 'manifest_agent_env', { agent: 'demo' })).error).toBe(
+      expect((await call(registerAll(deps2), 'thinker_agent_env', { agent: 'demo' })).error).toBe(
         true,
       );
     });

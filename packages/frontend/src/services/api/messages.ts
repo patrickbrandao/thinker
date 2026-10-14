@@ -18,7 +18,7 @@ export interface MessageDetailResponse {
     model: string | null;
     status: string;
     error_message: string | null;
-    /** Documented Manifest error code ('M100', 'M300', …). Null for provider failures. */
+    /** Documented Thinker error code ('M100', 'M300', …). Null for provider failures. */
     error_code: string | null;
     /** WHO caused a failure: provider | transport | config | policy | internal | request. Null on success. */
     error_origin: string | null;

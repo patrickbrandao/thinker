@@ -12,9 +12,9 @@ function agentPath(agent: string, suffix: string): string {
 /**
  * The human front door for agent configuration — one verb, one line:
  *
- *   mnfst agent configure <name> --models <primary,fb1,fb2> --provider <p>
- *   mnfst agent configure <name> --tier test --models <primary> --provider <p>
- *   mnfst agent configure <name> --recording false
+ *   thinker agent configure <name> --models <primary,fb1,fb2> --provider <p>
+ *   thinker agent configure <name> --tier test --models <primary> --provider <p>
+ *   thinker agent configure <name> --recording false
  *
  * --models is the FULL desired chain: first entry is the route, the rest are
  * fallbacks, and stating a single model clears any existing fallbacks.

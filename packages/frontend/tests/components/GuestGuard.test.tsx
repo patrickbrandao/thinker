@@ -50,7 +50,7 @@ describe('GuestGuard', () => {
   });
 
   it('ignores a leftover discovery marker and sends the user home', async () => {
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+    localStorage.setItem('thinker_discovery_pending_u1', '/welcome');
     mockSessionData = {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,

@@ -3,31 +3,33 @@ import { Title, Meta } from '@solidjs/meta';
 import CodeBlock from '../../components/CodeBlock.jsx';
 import { installOrigin } from '../../services/install-endpoints.js';
 
-const DOCS_URL = 'https://manifest.build/llm-gateway/docs/cli/';
-const PACKAGE = 'mnfst-gateway-cli';
+import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
+
+/** Installed from a checkout of the Thinker repository; it is not published to a registry. */
+const INSTALL = `git clone https://github.com/patrickbrandao/thinker.git\ncd thinker && npm ci && npm run build --workspace=packages/shared --workspace=packages/cli\nnpm install -g ./packages/cli`;
 
 /**
  * The CLI has to be told which host to talk to, and this dashboard is the only
  * place that knows it.
  */
 export function loginCommand(origin: string): string {
-  return `mnfst login --url ${origin}`;
+  return `thinker login --url ${origin}`;
 }
 
-const EXAMPLE = `mnfst agent create --name coding-assistant --platform openclaw
-mnfst provider connect xai --auth-type api_key --credential-env XAI_API_KEY
-mnfst agent configure coding-assistant --models grok-4.5,grok-4 --provider xai
-mnfst routing test coding-assistant`;
+const EXAMPLE = `thinker agent create --name coding-assistant --platform openclaw
+thinker provider connect xai --auth-type api_key --credential-env XAI_API_KEY
+thinker agent configure coding-assistant --models grok-4.5,grok-4 --provider xai
+thinker routing test coding-assistant`;
 
 const Cli: Component = () => {
   const login = () => loginCommand(installOrigin());
 
   return (
     <div class="container--lg">
-      <Title>CLI - Manifest</Title>
+      <Title>CLI - Thinker</Title>
       <Meta
         name="description"
-        content="Install the mnfst CLI and manage harnesses, providers, routing and request logs from the terminal."
+        content="Install the thinker CLI and manage harnesses, providers, routing and request logs from the terminal."
       />
       <div class="page-header">
         <div>
@@ -42,10 +44,10 @@ const Cli: Component = () => {
         <div class="panel">
           <div class="panel__title">1. Install</div>
           <p class="integration-panel__desc">
-            The package is <code>mnfst-gateway-cli</code>, but the command you type is{' '}
-            <code>mnfst</code>. Its version tracks the Manifest release it ships with.
+            The CLI ships in the Thinker repository. Install it from a checkout of the release that
+            matches this instance; the command is <code>thinker</code>.
           </p>
-          <CodeBlock code={`npm install -g ${PACKAGE}`} language="bash" />
+          <CodeBlock code={INSTALL} language="bash" />
         </div>
 
         <div class="panel">
@@ -62,13 +64,13 @@ const Cli: Component = () => {
         <div class="integration-panel__header">
           <div class="panel__title">3. Drive it</div>
           <a
-            href={DOCS_URL}
+            href={THINKER_DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
             class="btn btn--outline btn--sm"
             style="text-decoration: none;"
           >
-            All commands
+            Documentation
           </a>
         </div>
         <p class="integration-panel__desc">

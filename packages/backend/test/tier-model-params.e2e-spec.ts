@@ -5,7 +5,7 @@ import { createTestApp, TEST_AGENT_ID, TEST_API_KEY, TEST_TENANT_ID } from './he
 import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
 
 /**
- * Tier-addressed model params (`mnfst routing params`): the CLI names a route
+ * Tier-addressed model params (`thinker routing params`): the CLI names a route
  * by tier + model, and the rows it writes must be the same ones the dashboard
  * reads through the scope-keyed `/model-params` endpoint.
  */

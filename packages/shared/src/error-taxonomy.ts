@@ -116,18 +116,18 @@ export const ERROR_ORIGINS = [
 export type ErrorOrigin = (typeof ERROR_ORIGINS)[number];
 
 /**
- * Origins that are NOT a provider round-trip: Manifest rejected or
+ * Origins that are NOT a provider round-trip: Thinker rejected or
  * short-circuited the request before (or without) reaching a provider. These
  * are returned to the caller as HTTP 200 friendly stubs, so they must never
  * count as a "message" nor as a provider-reliability event.
  *
- * `request` is the caller's own fault (a malformed body Manifest refused to
+ * `request` is the caller's own fault (a malformed body Thinker refused to
  * route), which is neither the operator's setup (`config`), a limit they set
- * (`policy`), nor a Manifest bug (`internal`) — but it is still not a provider
+ * (`policy`), nor a Thinker bug (`internal`) — but it is still not a provider
  * failure, so it belongs here to stay out of `provider_error_rate`.
  */
 export const THINKER_ERROR_ORIGINS = ['config', 'policy', 'internal', 'request'] as const;
-export type ManifestErrorOrigin = (typeof THINKER_ERROR_ORIGINS)[number];
+export type ThinkerErrorOrigin = (typeof THINKER_ERROR_ORIGINS)[number];
 
 export const ERROR_CLASSES = [
   // provider (HTTP-derived)
@@ -142,7 +142,7 @@ export const ERROR_CLASSES = [
   // transport
   'timeout',
   'network',
-  // manifest (config / policy / internal / request)
+  // thinker (config / policy / internal / request)
   'no_provider',
   'no_provider_key',
   'subscription_credentials_unusable',
@@ -153,18 +153,18 @@ export const ERROR_CLASSES = [
 export type ErrorClass = (typeof ERROR_CLASSES)[number];
 
 /**
- * Canned `routing_reason` values the proxy writes for Manifest-originated stubs
+ * Canned `routing_reason` values the proxy writes for Thinker-originated stubs
  * (see proxy-message-recorder.ts). Their presence is the definitive signal that
- * a row is Manifest's own error, not a provider's.
+ * a row is Thinker's own error, not a provider's.
  *
- * Every documented Manifest error code (`M###`, see
+ * Every documented Thinker error code (`M###`, see
  * backend/src/common/errors/error-codes.ts) that can be attributed to an agent
- * maps onto exactly one reason here — `manifest-error.spec.ts` fails if a new
+ * maps onto exactly one reason here — `thinker-error.spec.ts` fails if a new
  * code ships without one.
  */
 const THINKER_REASON_TO_CLASSIFICATION: Record<
   string,
-  { origin: ManifestErrorOrigin; errorClass: ErrorClass }
+  { origin: ThinkerErrorOrigin; errorClass: ErrorClass }
 > = {
   no_provider: { origin: 'config', errorClass: 'no_provider' },
   no_provider_key: { origin: 'config', errorClass: 'no_provider_key' },
@@ -179,16 +179,16 @@ const THINKER_REASON_TO_CLASSIFICATION: Record<
   key_expired: { origin: 'config', errorClass: 'auth' },
   limit_exceeded: { origin: 'policy', errorClass: 'limit_exceeded' },
   // Three distinct limits (per-user / per-IP / concurrency) that used to
-  // collapse into `manifest_rate_limited`. That legacy reason stays mapped so
+  // collapse into `thinker_rate_limited`. That legacy reason stays mapped so
   // rows written before the split keep classifying.
-  manifest_rate_limited: { origin: 'policy', errorClass: 'rate_limit' },
-  manifest_ip_rate_limited: { origin: 'policy', errorClass: 'rate_limit' },
-  manifest_concurrency_limited: { origin: 'policy', errorClass: 'rate_limit' },
+  thinker_rate_limited: { origin: 'policy', errorClass: 'rate_limit' },
+  thinker_ip_rate_limited: { origin: 'policy', errorClass: 'rate_limit' },
+  thinker_concurrency_limited: { origin: 'policy', errorClass: 'rate_limit' },
   provider_cooldown: { origin: 'policy', errorClass: 'rate_limit' },
-  manifest_invalid_request: { origin: 'request', errorClass: 'invalid_request' },
+  thinker_invalid_request: { origin: 'request', errorClass: 'invalid_request' },
   model_not_available: { origin: 'request', errorClass: 'not_found' },
-  manifest_internal_error: { origin: 'internal', errorClass: 'internal' },
-  // Legacy alias of `manifest_internal_error`, kept for rows already written.
+  thinker_internal_error: { origin: 'internal', errorClass: 'internal' },
+  // Legacy alias of `thinker_internal_error`, kept for rows already written.
   friendly_error: { origin: 'internal', errorClass: 'internal' },
 };
 
@@ -212,7 +212,7 @@ export interface MessageErrorSignals {
   status: string;
   /** `agent_messages.error_http_status` (numeric provider/synthetic code, or null). */
   errorHttpStatus?: number | null;
-  /** `agent_messages.routing_reason` — carries the canned Manifest reason for stubs. */
+  /** `agent_messages.routing_reason` — carries the canned Thinker reason for stubs. */
   routingReason?: string | null;
   /** Canonical provider id, used for narrow provider-specific semantic overrides. */
   provider?: string | null;
@@ -230,7 +230,7 @@ export interface MessageErrorClassification {
  * Derive the `{ error_origin, error_class, superseded }` triple for a message
  * row from the signals available both at ingestion time and in the backfill.
  *
- * Precedence: ok short-circuits → Manifest canned reason → 429 (provider rate
+ * Precedence: ok short-circuits → Thinker canned reason → 429 (provider rate
  * limit even when the numeric code was dropped) → synthetic transport codes →
  * any other numeric provider code → an errored row with no captured HTTP
  * response (the fetch failed before the provider replied ⇒ transport/network).
@@ -251,11 +251,11 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
   // as a live fault against the provider.
   const superseded = SUPERSEDED_STATUSES.includes(signals.status);
 
-  const manifest = signals.routingReason
+  const thinker = signals.routingReason
     ? THINKER_REASON_TO_CLASSIFICATION[signals.routingReason]
     : undefined;
-  if (manifest) {
-    return { error_origin: manifest.origin, error_class: manifest.errorClass, superseded };
+  if (thinker) {
+    return { error_origin: thinker.origin, error_class: thinker.errorClass, superseded };
   }
 
   if (signals.status === RATE_LIMITED_STATUS) {
@@ -286,12 +286,12 @@ export function classifyMessageError(signals: MessageErrorSignals): MessageError
 }
 
 /**
- * True when an origin is Manifest's own — config, policy, internal, or request —
+ * True when an origin is Thinker's own — config, policy, internal, or request —
  * rather than a provider round-trip. Reads THINKER_ERROR_ORIGINS, so a new
  * origin added there is covered without touching this guard.
  */
-export function isManifestErrorOrigin(
+export function isThinkerErrorOrigin(
   origin: string | null | undefined,
-): origin is ManifestErrorOrigin {
+): origin is ThinkerErrorOrigin {
   return origin != null && (THINKER_ERROR_ORIGINS as readonly string[]).includes(origin);
 }

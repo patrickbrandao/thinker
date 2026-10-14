@@ -27,7 +27,7 @@ import { createProvider } from './email-providers/resolve-provider';
 
 function createMockConfig(overrides: Record<string, string> = {}): ConfigService {
   const values: Record<string, string> = {
-    'app.notificationFromEmail': 'noreply@manifest.build',
+    'app.notificationFromEmail': 'noreply@thinker.example.com',
     ...overrides,
   };
   return {
@@ -53,7 +53,7 @@ describe('NotificationEmailService', () => {
       actualValue: 1500,
       period: 'hour',
       timestamp: '2024-01-01T00:00:00Z',
-      agentUrl: 'http://localhost:3001/agents/demo-agent',
+      agentUrl: 'http://localhost:2099/agents/demo-agent',
     });
 
     expect(result).toBe(true);
@@ -77,7 +77,7 @@ describe('NotificationEmailService', () => {
       actualValue: 75,
       period: 'day',
       timestamp: '2024-01-01T12:00:00Z',
-      agentUrl: 'http://localhost:3001/agents/demo-agent',
+      agentUrl: 'http://localhost:2099/agents/demo-agent',
     });
 
     expect(result).toBe(false);
@@ -96,7 +96,7 @@ describe('NotificationEmailService', () => {
         actualValue: 1500,
         period: 'hour',
         timestamp: '2024-01-01T00:00:00Z',
-        agentUrl: 'http://localhost:3001/agents/demo-agent',
+        agentUrl: 'http://localhost:2099/agents/demo-agent',
       },
       {
         provider: 'resend',
@@ -112,7 +112,7 @@ describe('NotificationEmailService', () => {
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'user@test.com',
-        from: 'Manifest <noreply@mg.example.com>',
+        from: 'Thinker <noreply@mg.example.com>',
       }),
     );
     expect(sendEmail).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe('NotificationEmailService', () => {
         actualValue: 75,
         period: 'day',
         timestamp: '2024-01-01T12:00:00Z',
-        agentUrl: 'http://localhost:3001/agents/demo-agent',
+        agentUrl: 'http://localhost:2099/agents/demo-agent',
       },
       {
         provider: 'sendgrid',
@@ -142,7 +142,7 @@ describe('NotificationEmailService', () => {
 
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: expect.stringContaining('Manifest <'),
+        from: expect.stringContaining('Thinker <'),
       }),
     );
   });
@@ -161,7 +161,7 @@ describe('NotificationEmailService', () => {
         actualValue: 1500,
         period: 'hour',
         timestamp: '2024-01-01T00:00:00Z',
-        agentUrl: 'http://localhost:3001/agents/demo-agent',
+        agentUrl: 'http://localhost:2099/agents/demo-agent',
       },
       {
         provider: 'resend',
@@ -183,7 +183,7 @@ describe('NotificationEmailService', () => {
       actualValue: 1500,
       period: 'hour',
       timestamp: '2024-01-01T00:00:00Z',
-      agentUrl: 'http://localhost:3001/agents/demo-agent',
+      agentUrl: 'http://localhost:2099/agents/demo-agent',
       alertType: 'soft',
     });
 
@@ -204,7 +204,7 @@ describe('NotificationEmailService', () => {
       actualValue: 75,
       period: 'day',
       timestamp: '2024-01-01T12:00:00Z',
-      agentUrl: 'http://localhost:3001/agents/demo-agent',
+      agentUrl: 'http://localhost:2099/agents/demo-agent',
       alertType: 'hard',
     });
 
@@ -225,7 +225,7 @@ describe('NotificationEmailService', () => {
       actualValue: 1500,
       period: 'hour',
       timestamp: '2024-01-01T00:00:00Z',
-      agentUrl: 'http://localhost:3001/agents/demo-agent',
+      agentUrl: 'http://localhost:2099/agents/demo-agent',
     });
 
     expect(sendEmail).toHaveBeenCalledWith(

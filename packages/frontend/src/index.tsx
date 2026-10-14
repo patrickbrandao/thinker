@@ -14,6 +14,7 @@ import ToastContainer from './components/ToastContainer.jsx';
 import { lazyReload, clearReloadFlag } from './services/lazy-reload.js';
 import { RightSidebarProvider } from './services/right-sidebar.jsx';
 import { cleanUpStoredHeaders } from './services/playground-request-headers.js';
+import { removeLegacyStorageKeys } from './services/legacy-storage.js';
 import type { ParentComponent } from 'solid-js';
 import './styles/theme.css';
 
@@ -21,6 +22,9 @@ clearReloadFlag();
 // Wipe Playground header values saved in plain text by older builds, even if
 // the Playground is never opened again (#105). Never throws.
 cleanUpStoredHeaders();
+// Drop Web Storage keys left by pre-rename builds. Runs after the header
+// cleanup above, which still reads header names from one of them.
+removeLegacyStorageKeys();
 
 const GlobalOverview = lazyReload(() => import('./pages/GlobalOverview.jsx'));
 const AgentDetail = lazyReload(() => import('./pages/AgentDetail.jsx'));
@@ -83,7 +87,7 @@ if (!root) {
 render(
   () => (
     <MetaProvider>
-      <Title>Manifest</Title>
+      <Title>Thinker</Title>
       <ToastContainer />
       <Router>
         <Route path="/" component={App}>

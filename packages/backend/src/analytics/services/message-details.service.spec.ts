@@ -238,7 +238,7 @@ describe('MessageDetailsService', () => {
     expect(result.message.superseded).toBe(false);
   });
 
-  it('surfaces the origin/class/superseded axes for a Manifest config error', async () => {
+  it('surfaces the origin/class/superseded axes for a Thinker config error', async () => {
     msgQb.getOne.mockResolvedValue({
       ...baseMessage,
       status: 'error',
@@ -451,7 +451,7 @@ describe('MessageDetailsService', () => {
           requested_model: 'gpt-4o',
           status: 'error',
           error_message: 'No provider',
-          error_code: 'MNFST001',
+          error_code: 'THK001',
           error_http_status: 400,
           error_origin: 'config',
           error_class: 'no_provider',
@@ -475,7 +475,7 @@ describe('MessageDetailsService', () => {
         id: 'request-zero',
         model: 'gpt-4o',
         status: 'error',
-        error_code: 'MNFST001',
+        error_code: 'THK001',
         input_tokens: 0,
         output_tokens: 0,
         cost_usd: 0,

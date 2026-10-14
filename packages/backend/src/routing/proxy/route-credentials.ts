@@ -3,8 +3,8 @@
  *
  * Primary proxy and mid-chain fallbacks must agree on:
  *  - how a route becomes a usable apiKey (or why it cannot)
- *  - which Manifest code/message that maps to (M100 vs M102)
- *  - how that failure appears as a recorded attempt on the Manifest request
+ *  - which Thinker code/message that maps to (M100 vs M102)
+ *  - how that failure appears as a recorded attempt on the Thinker request
  *
  * Keep new credential failure kinds here — callers should not re-implement
  * selectProviderKey → resolveApiKey or invent parallel error text.
@@ -14,8 +14,8 @@ import {
   ProviderKeyService,
   SYNTHETIC_OLLAMA_PROVIDER_ID,
 } from '../routing-core/provider-key.service';
-import { formatManifestError, type ManifestErrorCode } from '../../common/errors/error-codes';
-import type { ManifestBlockedRequestReason } from '../../common/errors/manifest-error';
+import { formatThinkerError, type ThinkerErrorCode } from '../../common/errors/error-codes';
+import type { ThinkerBlockedRequestReason } from '../../common/errors/thinker-error';
 import {
   isRefreshableOAuthCredential,
   resolveApiKey,
@@ -26,13 +26,13 @@ import type { ProviderAttemptRef, StartProviderAttempt } from './proxy-types';
 
 /** Why a route could not produce a usable provider apiKey. */
 export type CredentialFailureReason = Extract<
-  ManifestBlockedRequestReason,
+  ThinkerBlockedRequestReason,
   'no_provider_key' | 'subscription_credentials_unusable'
 >;
 
 const CREDENTIAL_FAILURE_CODE: Record<
   CredentialFailureReason,
-  Extract<ManifestErrorCode, 'M100' | 'M102'>
+  Extract<ThinkerErrorCode, 'M100' | 'M102'>
 > = {
   no_provider_key: 'M100',
   subscription_credentials_unusable: 'M102',
@@ -64,7 +64,7 @@ export type ResolvedRouteCredentials =
     };
 
 export interface CredentialFailurePresentation {
-  code: Extract<ManifestErrorCode, 'M100' | 'M102'>;
+  code: Extract<ThinkerErrorCode, 'M100' | 'M102'>;
   reason: CredentialFailureReason;
   message: string;
   status: typeof CREDENTIAL_FAILURE_HTTP_STATUS;
@@ -78,12 +78,12 @@ export interface RouteCredentialDeps {
 
 export function credentialFailureCode(
   reason: CredentialFailureReason,
-): Extract<ManifestErrorCode, 'M100' | 'M102'> {
+): Extract<ThinkerErrorCode, 'M100' | 'M102'> {
   return CREDENTIAL_FAILURE_CODE[reason];
 }
 
 /**
- * User-facing Manifest error for a credential miss.
+ * User-facing Thinker error for a credential miss.
  * `dashboardUrl` should be a real agent routing URL when available.
  */
 export function presentCredentialFailure(
@@ -92,7 +92,7 @@ export function presentCredentialFailure(
   dashboardUrl: string,
 ): CredentialFailurePresentation {
   const code = credentialFailureCode(reason);
-  const message = formatManifestError(code, { provider, dashboardUrl });
+  const message = formatThinkerError(code, { provider, dashboardUrl });
   return {
     code,
     reason,

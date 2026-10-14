@@ -11,7 +11,7 @@ import { CLI_USER_AGENT } from '../version';
 const URL_ONLY = { strings: ['url'] } as const;
 
 /**
- * The CLI exposes only the routing surfaces Manifest keeps long-term:
+ * The CLI exposes only the routing surfaces Thinker keeps long-term:
  * the DEFAULT route (one model + fallbacks) and CUSTOM header-triggered
  * tiers. The deprecated complexity tiers (simple/standard/complex/reasoning)
  * are deliberately absent.
@@ -126,7 +126,7 @@ async function findCustomTier(
     throw new CliError(
       'not_found',
       `No custom tier "${nameOrId}" on agent "${agent}"`,
-      'See mnfst routing custom list',
+      'See thinker routing custom list',
       404,
     );
   }
@@ -248,7 +248,7 @@ const TEST_TIMEOUT_MS = 120_000;
 /**
  * Which proxy surface a platform's real traffic uses — read from the
  * generated catalog (source of truth: thinker-shared PLATFORM_API_SURFACES),
- * so a platform added in Manifest gets the right test surface automatically.
+ * so a platform added in Thinker gets the right test surface automatically.
  */
 const SURFACE_BY_PLATFORM = new Map(PLATFORM_CATALOG.map((p) => [p.id, p.surface]));
 
@@ -320,7 +320,7 @@ function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): bo
 /**
  * Send ONE real request through the agent's route to prove the config works
  * end-to-end — the closing move after `agent configure`. Not an inference
- * client: fixed shape, canned default prompt, facts-first output. Manifest
+ * client: fixed shape, canned default prompt, facts-first output. Thinker
  * errors that the proxy wraps as HTTP-200 assistant text are unmasked into
  * real failures so a broken route can never look like an answer.
  */
@@ -338,7 +338,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     throw new CliError(
       'invalid_platform',
       `Unknown platform: ${platform}. Valid platforms: ${[...SURFACE_BY_PLATFORM.keys()].join(', ')}`,
-      'Run mnfst agent platforms to list them',
+      'Run thinker agent platforms to list them',
     );
   }
 
@@ -405,7 +405,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     throw new CliError(
       'network_error',
       `Could not reach ${resolved.origin}: ${error instanceof Error ? error.message : String(error)}`,
-      'Check the URL and that the Manifest server is running',
+      'Check the URL and that the Thinker server is running',
     );
   } finally {
     clearTimeout(timer);
@@ -428,7 +428,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     throw new CliError(
       'route_test_failed',
       err ?? `Route test failed with HTTP ${response.status}`,
-      'See mnfst routing status ' + agent,
+      'See thinker routing status ' + agent,
       response.status,
     );
   }
@@ -438,7 +438,7 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     throw new CliError(
       'route_test_failed',
       `Route test got HTTP ${response.status} but no ${surface} payload`,
-      'See mnfst routing status ' + agent,
+      'See thinker routing status ' + agent,
       response.status,
     );
   }
@@ -449,8 +449,10 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
       : surface === 'responses'
         ? parseResponsesSurface(parsed)
         : parseCompletionSurface(parsed);
-  if (/^\[🦚 Manifest M\d+\]/.test(result.reply)) {
-    throw new CliError('route_test_failed', result.reply, 'See mnfst routing status ' + agent);
+  // The gateway tags its own errors as `[🦚 <product> M###]`. Match any product
+  // word so the check survives the server-side rename of that tag.
+  if (/^\[🦚 [^\]\s]+ M\d+\]/.test(result.reply)) {
+    throw new CliError('route_test_failed', result.reply, 'See thinker routing status ' + agent);
   }
 
   printJson(io, {
@@ -518,7 +520,7 @@ function parseParamAssignment(raw: string): [string, unknown] {
  * Model params of one routed model, addressed as tier + model: `--tier` is
  * `default` (the default) or a custom tier's name, `--model` defaults to the
  * tier's primary and may name one of its fallbacks. Saved params override the
- * values the calling app sends, on requests Manifest routes (`model: "auto"`
+ * values the calling app sends, on requests Thinker routes (`model: "auto"`
  * or a matching custom-tier header); a request naming a model skips them.
  */
 export const routingParams = {
@@ -546,7 +548,7 @@ export const routingParams = {
       throw new CliError(
         'missing_flag',
         'Pass at least one --set <path>=<value> or --unset <path>',
-        `Run mnfst routing params get ${agent} to list the available params`,
+        `Run thinker routing params get ${agent} to list the available params`,
       );
     }
     const { client } = clientFromFlags(io, args);

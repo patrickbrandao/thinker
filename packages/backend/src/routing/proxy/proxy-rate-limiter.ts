@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, HttpStatus } from '@nestjs/common';
-import { ManifestError } from '../../common/errors/manifest-error';
+import { ThinkerError } from '../../common/errors/thinker-error';
 import { optionalPositiveInteger } from '../../config/env.util';
 
 const RATE_WINDOW_MS = 60_000;
@@ -54,7 +54,7 @@ export class ProxyRateLimiter implements OnModuleDestroy {
     }
 
     if (entry.count >= this.rateMaxRequests) {
-      throw new ManifestError('M201', HttpStatus.TOO_MANY_REQUESTS);
+      throw new ThinkerError('M201', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     entry.count++;
@@ -79,7 +79,7 @@ export class ProxyRateLimiter implements OnModuleDestroy {
     }
 
     if (entry.count >= this.ipRateMaxRequests) {
-      throw new ManifestError('M202', HttpStatus.TOO_MANY_REQUESTS);
+      throw new ThinkerError('M202', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     entry.count++;
@@ -92,7 +92,7 @@ export class ProxyRateLimiter implements OnModuleDestroy {
   acquireSlot(tenantId: string): void {
     const current = this.concurrency.get(tenantId) ?? 0;
     if (current >= this.concurrencyMax) {
-      throw new ManifestError('M203', HttpStatus.TOO_MANY_REQUESTS);
+      throw new ThinkerError('M203', HttpStatus.TOO_MANY_REQUESTS);
     }
     this.concurrency.set(tenantId, current + 1);
   }

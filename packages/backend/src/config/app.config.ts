@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { optionalPositiveInteger } from './env.util';
+import { DEFAULT_PORT } from '../common/constants/server.constants';
 import { parseRecordingRetentionDays } from './recording-retention';
 
 function resolveDatabaseUrl(): string {
@@ -11,7 +12,7 @@ function resolveDatabaseUrl(): string {
 }
 
 export const appConfig = registerAs('app', () => ({
-  port: Number(process.env['PORT'] ?? 3001),
+  port: Number(process.env['PORT'] ?? DEFAULT_PORT),
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
   databaseUrl: resolveDatabaseUrl(),
 
@@ -28,11 +29,13 @@ export const appConfig = registerAs('app', () => ({
   emailApiKey: process.env['EMAIL_API_KEY'] ?? '',
   emailDomain: process.env['EMAIL_DOMAIN'] ?? '',
   emailFrom:
-    process.env['EMAIL_FROM'] ?? process.env['NOTIFICATION_FROM_EMAIL'] ?? 'noreply@manifest.build',
+    process.env['EMAIL_FROM'] ??
+    process.env['NOTIFICATION_FROM_EMAIL'] ??
+    'noreply@thinker.example.com',
   // Legacy Mailgun-only (backward compat with older deployments).
   mailgunApiKey: process.env['MAILGUN_API_KEY'] ?? '',
   mailgunDomain: process.env['MAILGUN_DOMAIN'] ?? '',
-  notificationFromEmail: process.env['NOTIFICATION_FROM_EMAIL'] ?? 'noreply@manifest.build',
+  notificationFromEmail: process.env['NOTIFICATION_FROM_EMAIL'] ?? 'noreply@thinker.example.com',
   // Keep the per-process pool conservative by default. Multi-replica installs
   // multiply this value, and large analytics queries can otherwise saturate a
   // pooler and execute enough concurrent hash/sort work to exhaust DB memory.

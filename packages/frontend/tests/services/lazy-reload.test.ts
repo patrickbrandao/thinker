@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('solid-js', () => ({
   lazy: (factory: () => Promise<unknown>) => factory,
@@ -6,7 +6,7 @@ vi.mock('solid-js', () => ({
 
 import { lazyReload, clearReloadFlag } from '../../src/services/lazy-reload.js';
 
-const RELOAD_KEY = 'manifest:chunk-reload';
+const RELOAD_KEY = 'thinker:chunk-reload';
 
 describe('lazyReload', () => {
   const reloadMock = vi.fn();
@@ -68,5 +68,38 @@ describe('clearReloadFlag', () => {
   it('is a no-op when key is absent', () => {
     clearReloadFlag();
     expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+  });
+});
+
+describe('with sessionStorage blocked', () => {
+  const reloadMock = vi.fn();
+
+  beforeEach(() => {
+    reloadMock.mockReset();
+    Object.defineProperty(window, 'location', {
+      value: { reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    const blocked = () => {
+      throw new DOMException('blocked', 'SecurityError');
+    };
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(blocked);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('clearReloadFlag does not throw at startup', () => {
+    expect(() => clearReloadFlag()).not.toThrow();
+  });
+
+  it('surfaces the import error instead of reloading without a loop guard', async () => {
+    const factory = lazyReload(() => Promise.reject(new Error('chunk fail')));
+    await expect((factory as unknown as () => Promise<unknown>)()).rejects.toThrow('chunk fail');
+    expect(reloadMock).not.toHaveBeenCalled();
   });
 });

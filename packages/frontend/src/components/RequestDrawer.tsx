@@ -384,7 +384,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                         <div class="drawer__body">
                           <Show when={tab() === 'details'}>
                             <div style="color: hsl(var(--muted-foreground));">
-                              Manifest rejected this request before contacting a provider.
+                              Thinker rejected this request before contacting a provider.
                             </div>
                           </Show>
                         </div>

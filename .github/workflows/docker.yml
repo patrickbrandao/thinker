@@ -92,9 +92,11 @@ jobs:
           arch=$(docker run --rm thinker:ci -p 'process.arch')
           echo "node arch=$arch"
           test "$arch" = "$EXPECTED_ARCH"
-          # The backend bundle and the dashboard are where the app expects them.
+          # The backend bundle, the dashboard and the license notices are where
+          # they are expected, and the default port is 2099.
           docker run --rm thinker:ci -e \
-            "for (const f of ['packages/backend/dist/main.js', 'packages/frontend/dist/index.html']) require('fs').accessSync(f)"
+            "for (const f of ['packages/backend/dist/main.js', 'packages/frontend/dist/index.html', 'LICENSE', 'THIRD_PARTY_NOTICES']) require('fs').accessSync(f)"
+          test "$(docker run --rm thinker:ci -p 'process.env.PORT')" = 2099
 
       - name: Image size
         run: docker image ls thinker:ci --format '{{.Repository}}:{{.Tag}} {{.Size}}'

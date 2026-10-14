@@ -22,7 +22,7 @@ import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelPricesService } from '../model-prices/model-prices.service';
 
 /**
- * The Manifest services the MCP tools call. Injected once and closed over by the
+ * The Thinker services the MCP tools call. Injected once and closed over by the
  * per-request server, so a tool reaches the exact behaviour the dashboard and
  * CLI do — this is the mutualization seam, and it is why no tool speaks HTTP.
  */

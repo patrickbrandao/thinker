@@ -1,6 +1,8 @@
-# Deploy Manifest on DigitalOcean
+# Deploy Thinker on DigitalOcean
 
-This deploys Manifest on DigitalOcean App Platform with a web service, Dev PostgreSQL database, and a user-provided DigitalOcean Space for durable request recordings. The deploy link uses DigitalOcean's Deploy to DigitalOcean flow, which reads `.do/deploy.template.yaml` from the public repository.
+> **Template mantido pela comunidade, não testado no CI.** O único caminho oficial e testado é o Docker Compose ([`docker/`](https://github.com/patrickbrandao/thinker/tree/main/docker)). Repositório: [patrickbrandao/thinker](https://github.com/patrickbrandao/thinker) · [issues](https://github.com/patrickbrandao/thinker/issues).
+
+This deploys Thinker on DigitalOcean App Platform with a web service, Dev PostgreSQL database, and a user-provided DigitalOcean Space for durable request recordings. The deploy link uses DigitalOcean's Deploy to DigitalOcean flow, which reads `.do/deploy.template.yaml` from the public repository.
 
 ## Prerequisites
 
@@ -17,7 +19,7 @@ App Platform has no persistent volumes and its deploy template cannot create sco
 Open the DigitalOcean deploy link:
 
 ```text
-https://cloud.digitalocean.com/apps/new?repo=https://github.com/mnfst/llm-gateway/tree/main
+https://cloud.digitalocean.com/apps/new?repo=https://github.com/patrickbrandao/thinker/tree/main
 ```
 
 DigitalOcean prompts for the missing secret values before deployment. Generate and paste separate values for:
@@ -26,16 +28,16 @@ DigitalOcean prompts for the missing secret values before deployment. Generate a
 openssl rand -hex 32
 ```
 
-Use one generated value for `BETTER_AUTH_SECRET` and another for `MANIFEST_ENCRYPTION_KEY`. Also provide:
+Use one generated value for `BETTER_AUTH_SECRET` and another for `THINKER_ENCRYPTION_KEY`. Also provide:
 
-- `REQUEST_RECORDING_S3_BUCKET`: your Space name.
-- `REQUEST_RECORDING_S3_ENDPOINT`: `https://<space-region>.digitaloceanspaces.com`.
-- `REQUEST_RECORDING_S3_ACCESS_KEY_ID`: the limited Spaces access key.
-- `REQUEST_RECORDING_S3_SECRET_ACCESS_KEY`: its secret.
+- `THINKER_RECORDING_S3_BUCKET`: your Space name.
+- `THINKER_RECORDING_S3_ENDPOINT`: `https://<space-region>.digitaloceanspaces.com`.
+- `THINKER_RECORDING_S3_ACCESS_KEY_ID`: the limited Spaces access key.
+- `THINKER_RECORDING_S3_SECRET_ACCESS_KEY`: its secret.
 
-Keep `REQUEST_RECORDING_S3_REGION=us-east-1` and `REQUEST_RECORDING_S3_FORCE_PATH_STYLE=false`; DigitalOcean's AWS SDK guidance uses the endpoint to select the actual Space region.
+Keep `THINKER_RECORDING_S3_REGION=us-east-1` and `THINKER_RECORDING_S3_FORCE_PATH_STYLE=false`; DigitalOcean's AWS SDK guidance uses the endpoint to select the actual Space region.
 
-## Open Manifest
+## Open Thinker
 
 After App Platform finishes deploying, open the app URL and create the first account. The first account becomes the admin.
 

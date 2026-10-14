@@ -3,10 +3,10 @@ import * as path from 'path';
 import { Env, configFilePath } from './config';
 
 /**
- * CLI-managed agent-key store: `<config>/manifest/keys/<origin>/<agent>.key`,
+ * CLI-managed agent-key store: `<config>/thinker/keys/<origin>/<agent>.key`,
  * files 0600 under 0700 directories. This is a cache, not the only copy —
  * the server keeps agent keys recoverable (encrypted at rest), so a lost
- * file heals via `mnfst agent key path|show`. Host-scoped like config.json
+ * file heals via `thinker agent key path|show`. Host-scoped like config.json
  * so a key minted on one host is never resolved for another.
  */
 export function agentKeyPath(env: Env, origin: string, agentName: string): string {

@@ -1,47 +1,27 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/logo-light-new.png" />
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/logo-dark-new.png" />
-    <img src="https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/logo-dark-new.png" alt="Manifest Gateway" height="53" title="Manifest Gateway"/>
-  </picture>
-</p>
-<p align="center">
+# Thinker
+
+<p>
   <a href="https://hub.docker.com/r/tmsoftbrasil/thinker"><img src="https://img.shields.io/docker/pulls/tmsoftbrasil/thinker?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
   &nbsp;
-  <a href="https://github.com/mnfst/llm-gateway/stargazers"><img src="https://img.shields.io/github/stars/mnfst/llm-gateway?style=flat" alt="GitHub stars" /></a>
-  &nbsp;
-  <a href="https://github.com/mnfst/llm-gateway/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mnfst/llm-gateway?color=blue" alt="license" /></a>
-  &nbsp;
-  <a href="https://discord.gg/FepAked3W7"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/patrickbrandao/thinker/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="license" /></a>
 </p>
 
-## What is Manifest Gateway?
+## What is Thinker?
 
-Manifest Gateway is an open-source LLM gateway for agents and apps. It sits between your agents and your LLM providers (OpenAI, Anthropic, Gemini, local models, and 300+ more) and gives you complete control over routing decisions. Define custom routing rules, set fallbacks when models fail, and track everything from one dashboard.
+Thinker is an open-source LLM gateway for agents and apps. It sits between your agents (Claude Code, Codex, OpenCode, SDK apps and others) and your inference providers (API keys, subscriptions, local models, custom endpoints), routes each request to the right model, and tracks cost, tokens and full request logs from one dashboard.
 
-- **Custom routing rules**: route by model, header, complexity, or task type
-- **Automatic fallbacks**: if a model fails, the next one picks up instantly
-- **Cost control**: set limits and track spending across all providers
-- **Self-hosted**: your requests, your providers, your data — complete privacy
-
-![manifest-gh](https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/manifest-screenshot.png)
-
-<p align="center">
-  <a href="https://manifest.build/api-bot/"><img src="https://raw.githubusercontent.com/mnfst/llm-gateway/HEAD/.github/assets/api-bot-readme-banner.png" alt="Meet API Bot: API changes won't take your app down anymore. Discover" width="100%" /></a>
-</p>
+Thinker is derived from an MIT-licensed upstream project and evolves independently. The image ships `/app/LICENSE` and `/app/THIRD_PARTY_NOTICES`.
 
 ---
 
 ## Table of contents
 
 - [Supported providers](#supported-providers)
-- [Manifest vs OpenRouter](#manifest-vs-openrouter)
 - [Installation](#installation)
   - [Option 1: Quickstart install script (recommended)](#option-1-quickstart-install-script-recommended)
   - [Option 2: Docker Compose (manual)](#option-2-docker-compose-manual)
   - [Option 3: Docker Run (bring your own PostgreSQL)](#option-3-docker-run-bring-your-own-postgresql)
   - [First request](#first-request)
-  - [Verifying the image signature](#verifying-the-image-signature)
   - [Custom port](#custom-port)
   - [Exposing on the LAN](#exposing-on-the-lan)
 - [Image tags](#image-tags)
@@ -55,18 +35,6 @@ Manifest Gateway is an open-source LLM gateway for agents and apps. It sits betw
 
 Works with 300+ models across OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Mistral, Qwen, MiniMax, Kimi, Amazon Nova, Z.ai, OpenRouter, Ollama, and any provider with an OpenAI-compatible API. Connect with an API key, or reuse an existing paid subscription (ChatGPT Plus/Pro, Claude Max/Pro, Kimi Coding Plan, GLM Coding Plan, etc.) where supported.
 
-## Manifest vs OpenRouter
-
-|              | Manifest                                          | OpenRouter                                          |
-| ------------ | ------------------------------------------------- | --------------------------------------------------- |
-| Architecture | Your Manifest instance forwards to your providers | Cloud proxy. All traffic goes through their servers |
-| Cost         | Free                                              | 5% fee on every API call                            |
-| Source code  | MIT, fully open                                   | Proprietary                                         |
-| Data privacy | Self-hosted, no middleman                         | Prompts and responses pass through a third party    |
-| Transparency | Open scoring. You see why a model was chosen      | No visibility into routing decisions                |
-
----
-
 ## Installation
 
 Three paths, ordered from fastest to most hands-on. All three end in the same place: a running stack at [http://localhost:2099](http://localhost:2099) where you sign up. The first account you create becomes the admin. No demo credentials are pre-seeded.
@@ -78,7 +46,7 @@ Three paths, ordered from fastest to most hands-on. All three end in the same pl
 One command. The installer downloads the compose file, generates the secrets, and brings up the stack. First boot pulls the app image and Postgres, so give it up to a couple of minutes.
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh)
 ```
 
 <details>
@@ -87,7 +55,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker
 Download the script:
 
 ```bash
-curl -sSLO https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/install.sh
+curl -sSLO https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh
 ```
 
 Review it (optional):
@@ -115,8 +83,8 @@ Same underlying flow as the install script, but you drive it yourself so you can
 1. Download the compose file and the env template into the same directory:
 
 ```bash
-curl -O https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/docker-compose.yml
-curl -O https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/.env.example
+curl -O https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/docker-compose.yml
+curl -O https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/.env.example
 cp .env.example .env
 ```
 
@@ -144,7 +112,7 @@ unavailable, while retention removes them on schedule.
 docker compose up -d
 ```
 
-Give it up to a couple of minutes on a cold pull — you can watch startup with `docker compose logs -f manifest`.
+Give it up to a couple of minutes on a cold pull — you can watch startup with `docker compose logs -f thinker`.
 
 4. Open [http://localhost:2099](http://localhost:2099) and sign up. The first account you create becomes the admin.
 
@@ -167,7 +135,7 @@ If you already have PostgreSQL running, replace `user`, `pass`, and `host` with 
 ```bash
 docker run -d \
   -p 2099:2099 \
-  -e DATABASE_URL=postgresql://user:pass@host:5432/manifest \
+  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker \
   -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
   -e THINKER_ENCRYPTION_KEY=$(openssl rand -hex 32) \
   -e BETTER_AUTH_URL=http://localhost:2099 \
@@ -185,7 +153,7 @@ $encryptionKey = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Obje
 
 docker run -d `
   -p 2099:2099 `
-  -e DATABASE_URL=postgresql://user:pass@host:5432/manifest `
+  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker `
   -e BETTER_AUTH_SECRET=$secret `
   -e THINKER_ENCRYPTION_KEY=$encryptionKey `
   -e BETTER_AUTH_URL=http://localhost:2099 `
@@ -202,7 +170,7 @@ Generate two different 64-character hex secrets with any tool you trust, then:
 ```cmd
 docker run -d ^
   -p 2099:2099 ^
-  -e DATABASE_URL=postgresql://user:pass@host:5432/manifest ^
+  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker ^
   -e BETTER_AUTH_SECRET=<your-64-char-secret> ^
   -e THINKER_ENCRYPTION_KEY=<another-64-char-secret> ^
   -e BETTER_AUTH_URL=http://localhost:2099 ^
@@ -220,40 +188,28 @@ Signing up leaves you with an empty instance. Three steps to a routed request:
 1. **Connect a provider.** In the sidebar, **Providers → Usage-based** to paste
    an API key (OpenAI, Anthropic, Gemini, …), **Subscriptions** to reuse a plan
    you already pay for, or **Local** for Ollama / LM Studio / llama.cpp.
-   Manifest discovers the available models as soon as the connection is saved.
+   Thinker discovers the available models as soon as the connection is saved.
 
 2. **Copy your agent's key.** Each agent has its own key, shown when you create
-   it and under the agent's **Settings**. It starts with `mnfst_`.
+   it and under the agent's **Settings**. It starts with `thk_`.
 
 3. **Point something at it.** The endpoint is OpenAI-compatible, so any SDK or
    agent that takes a base URL works — use `http://localhost:2099/v1` and the
-   `mnfst_` key. To check it end to end:
+   `thk_` key. To check it end to end:
 
 ```bash
 curl -X POST http://localhost:2099/v1/chat/completions \
-  -H "Authorization: Bearer mnfst_YOUR_KEY_HERE" \
+  -H "Authorization: Bearer thk_YOUR_KEY_HERE" \
   -H "Content-Type: application/json" \
   -d '{"model": "auto", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-`"model": "auto"` asks Manifest to route. Any other model name is treated as an
+`"model": "auto"` asks Thinker to route. Any other model name is treated as an
 explicit choice and falls back to your routing config if it matches nothing.
 
-Errors from Manifest itself carry an `M###` code, a plain-English cause, and a
-link to the matching page under
-[manifest.build/llm-gateway/docs/errors](https://manifest.build/llm-gateway/docs/errors/) — including
-`M100` (no provider connected yet) and `M003`/`M005` (bad or unknown key), the
+Errors from Thinker itself carry an `M###` code and a plain-English cause —
+including `M100` (no provider connected yet) and `M003`/`M005` (bad or unknown key), the
 three you are most likely to hit on a fresh install.
-
-### Verifying the image signature
-
-Published images are signed with cosign keyless signing (Sigstore). Verify before pulling:
-
-```bash
-cosign verify tmsoftbrasil/thinker:<version> \
-  --certificate-identity-regexp="^https://github.com/mnfst/llm-gateway/" \
-  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
-```
 
 ### Custom port
 
@@ -286,7 +242,7 @@ both. A mismatch fails the login with "Invalid origin".
 By default the compose file binds port `2099` to `127.0.0.1` only. The dashboard is reachable from the host but not from other machines on the network. To expose it on the LAN:
 
 1. In `.env`, set `HOST_BIND_ADDRESS=0.0.0.0`. Editing `docker-compose.yml` by hand does not survive an upgrade; `.env` does.
-2. In `.env`, set `BETTER_AUTH_URL` to the host you'll reach the dashboard on, e.g. `http://192.168.1.20:2099` or `https://manifest.mydomain.com`. This MUST match the URL in the browser or Better Auth will reject the login with "Invalid origin".
+2. In `.env`, set `BETTER_AUTH_URL` to the host you'll reach the dashboard on, e.g. `http://192.168.1.20:2099` or `https://thinker.mydomain.com`. This MUST match the URL in the browser or Better Auth will reject the login with "Invalid origin".
 3. `docker compose up -d` to apply.
 
 If you see "Invalid origin" on the login page, `BETTER_AUTH_URL` doesn't match the URL you're accessing the dashboard on. The host matters as much as the port.
@@ -297,53 +253,57 @@ If the dashboard loads as a **blank page on a LAN IP on an older image**, pull t
 
 Every release is published with the following tags:
 
-- `{major}.{minor}.{patch}` - fully pinned (e.g. `6.18.0`)
-- `{major}.{minor}` - latest patch within a minor (e.g. `6.18`)
-- `{major}` - latest minor+patch within a major (e.g. `6`)
+- `{major}.{minor}.{patch}` - fully pinned (e.g. `0.1.0`)
+- `{major}.{minor}` - latest patch within a minor (e.g. `0.1`), stable releases only
 - `latest` - latest stable release
 - `sha-<short>` - exact commit for rollback
+- `{major}.{minor}.{patch}-rc.{n}` - release candidates; they never move `{major}.{minor}` or `latest`
 
 Images are built for both `linux/amd64` and `linux/arm64`.
 
 ## Upgrading
 
-Manifest ships a new image on every release. To upgrade an existing compose install:
+Thinker ships a new image on every release. To upgrade an existing compose install:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. Pin to a specific minor version (e.g. `tmsoftbrasil/thinker:0.1`) in `docker-compose.yml` if you want control over when upgrades happen.
+Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. To control when upgrades happen, pin a minor version with `THINKER_VERSION=0.1` in `.env`. The install script can also replace the managed compose file safely: `bash install.sh --upgrade`.
+
+### Coming from Manifest
+
+Thinker 0.1 supports fresh installs only. Do a new install rather than pointing Thinker at an old Manifest stack. The Compose project, the PostgreSQL user and the PostgreSQL database are all called `thinker` now, so Compose creates new volumes (`thinker_pgdata`, `thinker_request_recordings`) and does not see the old data. The recording variables `REQUEST_RECORDING_*` were renamed to `THINKER_RECORDING_*`, and the old names are not read.
 
 ## Backup & persistence
 
-PostgreSQL state lives in the `mnfst_pgdata` named volume mounted at `/var/lib/postgresql/data` in the `postgres` service. The Compose install also stores local request recordings in the `mnfst_recordings` volume mounted at `/data/request-recordings`; those recordings are not included in a PostgreSQL dump. For ephemeral hosts or multiple instances, configure durable S3-compatible storage instead.
+PostgreSQL state lives in the `thinker_pgdata` named volume mounted at `/var/lib/postgresql/data` in the `postgres` service. The Compose install also stores local request recordings in the `thinker_request_recordings` volume mounted at `/data/request-recordings`; those recordings are not included in a PostgreSQL dump. For ephemeral hosts or multiple instances, configure durable S3-compatible storage instead.
 
 **Back up** (from the host, with the stack running):
 
 ```bash
-docker compose exec -T postgres pg_dump -U manifest manifest > manifest-backup-$(date +%F).sql
+docker compose exec -T postgres pg_dump -U thinker thinker > thinker-backup-$(date +%F).sql
 ```
 
 **Restore** into a fresh stack:
 
 ```bash
 docker compose up -d postgres
-cat manifest-backup-2026-04-12.sql | docker compose exec -T postgres psql -U manifest manifest
+cat thinker-backup-2026-04-12.sql | docker compose exec -T postgres psql -U thinker thinker
 docker compose up -d
 ```
 
 To list / remove the volume manually:
 
 ```bash
-docker volume ls | grep -E 'mnfst_(pgdata|recordings)'
+docker volume ls | grep -E 'thinker_(pgdata|request_recordings)'
 docker compose down -v    # ⚠  destroys all data
 ```
 
 ## Connecting local LLM servers
 
-The self-hosted Manifest container can reach any OpenAI-compatible server running on your host via `host.docker.internal:<port>`. This works on Docker Desktop (macOS/Windows) out of the box, and on Linux with Docker Engine 20.10 or later.
+The self-hosted Thinker container can reach any OpenAI-compatible server running on your host via `host.docker.internal:<port>`. This works on Docker Desktop (macOS/Windows) out of the box, and on Linux with Docker Engine 20.10 or later.
 
 Because the container detects self-hosted mode automatically (via `/.dockerenv`), it lets you add custom providers with `http://` and private/loopback URLs — cloud-metadata endpoints (169.254.169.254, etc.) stay blocked.
 
@@ -356,19 +316,19 @@ ollama pull llama3.1:8b
 ```
 
 2. In the dashboard, go to Providers → API Keys → click the **Ollama** tile.
-3. Manifest reaches Ollama at `http://host.docker.internal:11434` and syncs the available models.
+3. Thinker reaches Ollama at `http://host.docker.internal:11434` and syncs the available models.
 
 ### LM Studio
 
-1. Install LM Studio from https://lmstudio.ai, load at least one chat model, and start the local server. **Bind to `0.0.0.0`** so the Manifest container can reach it:
+1. Install LM Studio from https://lmstudio.ai, load at least one chat model, and start the local server. **Bind to `0.0.0.0`** so the Thinker container can reach it:
    - GUI: Developer tab → enable "Serve on Local Network" (LM Studio persists this across restarts).
    - CLI: `lms server start --bind 0.0.0.0 --port 1234 --cors`
 2. Providers → API Keys → click the **LM Studio** tile.
-3. Manifest probes `http://host.docker.internal:1234/v1`, discovers your loaded models, and connects them in one click.
+3. Thinker probes `http://host.docker.internal:1234/v1`, discovers your loaded models, and connects them in one click.
 
 ### llama.cpp
 
-1. Build `llama-server` from the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) repo (or grab a release binary), then start it with a GGUF model bound to `0.0.0.0` so the Manifest container can reach it:
+1. Build `llama-server` from the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) repo (or grab a release binary), then start it with a GGUF model bound to `0.0.0.0` so the Thinker container can reach it:
 
    ```bash
    ./llama-server -m models/llama-3.1-8b-instruct.Q4_K_M.gguf --host 0.0.0.0 --port 8080
@@ -377,7 +337,7 @@ ollama pull llama3.1:8b
    `llama-server` only listens on `0.0.0.0` if you pass `--host 0.0.0.0`; the default bind isn't reachable from Docker.
 
 2. Providers → API Keys → click the **llama.cpp** tile.
-3. Manifest probes `http://host.docker.internal:8080/v1`, lists the model your server loaded, and connects it in one click. Pre-b3800 builds that don't expose `/v1/models` get a hint to upgrade or fall back to **Add custom provider**.
+3. Thinker probes `http://host.docker.internal:8080/v1`, lists the model your server loaded, and connects it in one click. Pre-b3800 builds that don't expose `/v1/models` get a hint to upgrade or fall back to **Add custom provider**.
 
 ### Any other OpenAI-compatible server
 
@@ -419,6 +379,7 @@ refused, including when a hostname starts resolving to them after it was saved.
 | `THINKER_LMSTUDIO_BASE_URL`        | No          | `http://host.docker.internal:1234`           | LM Studio server for the built-in `lmstudio` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
 | `THINKER_LLAMACPP_BASE_URL`        | No          | `http://host.docker.internal:8080`           | llama.cpp server for the built-in `llamacpp` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
 | `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
+| `TRUST_PROXY`                      | No          | `loopback` (compose)                         | Reverse proxy allowed to set `X-Forwarded-For`/`-Proto`: an address, CIDR or hop count                                                                                                                     |
 | `THINKER_DISABLE_HSTS`             | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
 | `THINKER_CATALOG_SYNC`             | No          | `true`                                       | Set `false` to stop fetching the public model catalogs (see [No telemetry](#no-telemetry)). Costs then come from the bundled data only, so most models show $0                                                |
@@ -429,8 +390,8 @@ not knobs here: the image is a production artifact, and the demo-data seeder
 refuses to run under `NODE_ENV=production` regardless of `SEED_DATA`. Use the
 first-run setup wizard to create your admin account.
 
-Full env var reference:
-[manifest.build/llm-gateway/docs/reference/environment-variables](https://manifest.build/llm-gateway/docs/reference/environment-variables/)
+Every variable the compose file passes through is listed, with comments, in
+[`.env.example`](https://github.com/patrickbrandao/thinker/blob/main/docker/.env.example).
 
 ## No telemetry
 
@@ -452,11 +413,10 @@ pricing refresh endpoint reports `sync_enabled: false`.
 
 ## Links
 
-- [GitHub](https://github.com/mnfst/llm-gateway)
-- [Website](https://manifest.build)
-- [Docs](https://manifest.build/llm-gateway/docs/introduction/)
-- [Discord](https://discord.gg/FepAked3W7)
+- [GitHub](https://github.com/patrickbrandao/thinker)
+- [Docs (PT-BR)](https://github.com/patrickbrandao/thinker/tree/main/docs)
+- [Issues](https://github.com/patrickbrandao/thinker/issues)
 
 ## License
 
-[MIT](https://github.com/mnfst/llm-gateway/blob/main/LICENSE)
+[MIT](https://github.com/patrickbrandao/thinker/blob/main/LICENSE)

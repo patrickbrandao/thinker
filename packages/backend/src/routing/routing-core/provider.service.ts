@@ -24,7 +24,7 @@ import {
   getDecryptionSecrets,
 } from '../../common/utils/crypto.util';
 import {
-  isManifestUsableProvider,
+  isThinkerUsableProvider,
   isSupportedSubscriptionProvider,
 } from '../../common/utils/subscription-support';
 import { MAX_KEYS_PER_PROVIDER, type AuthType, type ModelRoute } from 'thinker-shared';
@@ -146,7 +146,7 @@ export class ProviderService {
 
     await this.cleanupUnsupportedSubscriptionProviders(tenantId);
     const providers = (await this.providerRepo.find({ where: { tenant_id: tenantId } })).filter(
-      isManifestUsableProvider,
+      isThinkerUsableProvider,
     );
     this.routingCache.setProviders(tenantId, providers);
     return providers;
@@ -1126,7 +1126,7 @@ export class ProviderService {
     }
 
     const stillHasOtherKeys = matching.some(
-      (r) => r.id !== target.id && r.is_active && isManifestUsableProvider(r),
+      (r) => r.id !== target.id && r.is_active && isThinkerUsableProvider(r),
     );
 
     if (!stillHasOtherKeys) {
@@ -1169,7 +1169,7 @@ export class ProviderService {
       where: { tenant_id: tenantId, is_active: true },
     });
     const unsupported = activeProviders.filter(
-      (record) => record.auth_type === 'subscription' && !isManifestUsableProvider(record),
+      (record) => record.auth_type === 'subscription' && !isThinkerUsableProvider(record),
     );
     if (unsupported.length === 0) return;
 
@@ -1182,7 +1182,7 @@ export class ProviderService {
 
     const unsupportedIds = new Set(unsupported.map((record) => record.id));
     const remainingActive = activeProviders.filter((record) => !unsupportedIds.has(record.id));
-    const usableProviders = remainingActive.filter(isManifestUsableProvider);
+    const usableProviders = remainingActive.filter(isThinkerUsableProvider);
 
     const removedProviders = Array.from(
       new Set(

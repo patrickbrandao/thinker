@@ -19,7 +19,7 @@ import { registerRoutingTools } from './tools/routing.tools';
 export function buildMcpServer(deps: McpToolDeps, operator: McpOperator): McpServer {
   const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
   const server = new McpServer(
-    { name: 'manifest', version: '1.0.0' },
+    { name: 'thinker', version: '1.0.0' },
     {
       // A server built per POST and closed with it has no channel to push on,
       // and replicas share no event bus, so `notifications/tools/list_changed`
@@ -29,7 +29,7 @@ export function buildMcpServer(deps: McpToolDeps, operator: McpOperator): McpSer
       // bit on by default as soon as a tool is registered, so say no here.
       capabilities: { tools: { listChanged: false } },
       instructions:
-        'Manifest is an LLM gateway control plane. Use these tools to manage harnesses ' +
+        'Thinker is an LLM gateway control plane. Use these tools to manage harnesses ' +
         '(agents), provider connections, routing, model catalogs, and to read the request ' +
         'ledger. ' +
         (canWrite

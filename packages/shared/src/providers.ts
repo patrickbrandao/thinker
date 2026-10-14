@@ -542,7 +542,7 @@ export interface LocalServerHint {
   installUrl: string;
   /**
    * Short human-readable note shown at the top of the detail view when
-   * the user is running Manifest inside Docker and the server needs to
+   * the user is running Thinker inside Docker and the server needs to
    * bind `0.0.0.0` (otherwise host.docker.internal can't reach it).
    */
   dockerBindNote?: string;

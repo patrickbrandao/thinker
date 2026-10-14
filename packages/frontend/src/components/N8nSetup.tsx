@@ -60,17 +60,14 @@ const N8nSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-step__desc">
-        In n8n, install <code>n8n-nodes-manifest</code>, then add the Manifest Chat Model node to
-        your AI Agent or Basic LLM Chain, or the Manifest node for direct calls. Create or select
-        Manifest credentials, paste the values below, and set the node model to <code>auto</code>.
+        In n8n, install the <code>n8n-nodes-thinker</code> community node (built from the Thinker
+        repository), then add the Thinker Chat Model node to your AI Agent or Basic LLM Chain, or
+        the Thinker node for direct calls. Create or select Thinker credentials, paste the values
+        below, and set the node model to <code>auto</code>.
       </p>
 
       <p class="setup-method__hint">
         Reference:{' '}
-        <a href="https://www.npmjs.com/package/n8n-nodes-manifest" target="_blank" rel="noreferrer">
-          npm package
-        </a>{' '}
-        and{' '}
         <a
           href="https://docs.n8n.io/integrations/community-nodes/installation-and-management/"
           target="_blank"

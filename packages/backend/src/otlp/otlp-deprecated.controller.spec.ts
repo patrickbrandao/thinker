@@ -114,7 +114,7 @@ describe('OtlpDeprecatedController', () => {
     it('points the baseURL hint at this gateway, never a hosted one', () => {
       const result = controller.wrongChatPath();
       expect(result.error.message).toContain('this gateway URL followed by /v1');
-      expect(result.error.message).not.toMatch(/manifest\.build/);
+      expect(result.error.message).not.toMatch(/thinker\.build/);
     });
   });
 });

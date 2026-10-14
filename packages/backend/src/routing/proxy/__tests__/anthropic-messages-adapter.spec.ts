@@ -512,7 +512,7 @@ describe('Anthropic Messages adapter', () => {
       // tools (web_search, bash, computer, etc.) carry no `input_schema`;
       // some strict providers (e.g. MiniMax) reject any function tool with
       // no `parameters` field at all, so omitting it 400s the request even
-      // though Manifest itself never executes the tool.
+      // though Thinker itself never executes the tool.
       const result = messagesToChatCompletionsRequest({
         messages: [{ role: 'user', content: 'x' }],
         tools: [
@@ -1198,7 +1198,7 @@ describe('Anthropic Messages adapter', () => {
     });
 
     it('drops reasoning_content arriving during an open tool_use to keep the tool_use block contiguous', () => {
-      // Manifest's Anthropic-compat layer assumes thinking blocks precede
+      // Thinker's Anthropic-compat layer assumes thinking blocks precede
       // tool_use and replays them in that shape on the next turn. Emitting a
       // post-tool thinking block would give clients a transcript shape
       // (`thinking → tool_use → thinking`) we cannot safely replay, so late

@@ -1,6 +1,8 @@
-# Deploy Manifest on Heroku
+# Deploy Thinker on Heroku
 
-This guide deploys Manifest to a Heroku Cedar container-stack app with one web dyno and a Heroku Postgres Essential-0 database.
+> **Template mantido pela comunidade, não testado no CI.** O único caminho oficial e testado é o Docker Compose ([`docker/`](https://github.com/patrickbrandao/thinker/tree/main/docker)). Repositório: [patrickbrandao/thinker](https://github.com/patrickbrandao/thinker) · [issues](https://github.com/patrickbrandao/thinker/issues).
+
+This guide deploys Thinker to a Heroku Cedar container-stack app with one web dyno and a Heroku Postgres Essential-0 database.
 
 ## Prerequisites
 
@@ -15,7 +17,7 @@ This stack creates paid resources. Heroku no longer provides free dynos or free 
 Open the Heroku deploy link and choose an app name:
 
 ```text
-https://www.heroku.com/deploy?template=https://github.com/mnfst/llm-gateway
+https://www.heroku.com/deploy?template=https://github.com/patrickbrandao/thinker
 ```
 
 Heroku dyno filesystems are ephemeral, so request recordings must use external object storage. Before deploying, create a private S3-compatible bucket and an access key that can read, write, and delete its objects.
@@ -28,11 +30,11 @@ https://<your-app-name>.herokuapp.com
 
 Also provide the recording bucket values:
 
-- `REQUEST_RECORDING_S3_BUCKET`: private bucket name.
-- `REQUEST_RECORDING_S3_ENDPOINT`: custom endpoint, or blank for AWS S3.
-- `REQUEST_RECORDING_S3_REGION`: signing region, such as `us-east-1`.
-- `REQUEST_RECORDING_S3_ACCESS_KEY_ID`: limited access key.
-- `REQUEST_RECORDING_S3_SECRET_ACCESS_KEY`: matching secret key.
+- `THINKER_RECORDING_S3_BUCKET`: private bucket name.
+- `THINKER_RECORDING_S3_ENDPOINT`: custom endpoint, or blank for AWS S3.
+- `THINKER_RECORDING_S3_REGION`: signing region, such as `us-east-1`.
+- `THINKER_RECORDING_S3_ACCESS_KEY_ID`: limited access key.
+- `THINKER_RECORDING_S3_SECRET_ACCESS_KEY`: matching secret key.
 
 Heroku generates the session and encryption secrets, provisions Postgres as `DATABASE_URL`, builds `Dockerfile.heroku`, and starts the web dyno.
 
@@ -41,10 +43,10 @@ Heroku generates the session and encryption secrets, provisions Postgres as `DAT
 - Heroku app on the `container` stack.
 - One `basic` web dyno.
 - Heroku Postgres `essential-0`.
-- Runtime config for Manifest self-hosting, Postgres TLS, and conservative connection pools.
+- Runtime config for Thinker self-hosting, Postgres TLS, and conservative connection pools.
 - Durable S3-compatible storage configuration for request recordings.
 
-## Open Manifest
+## Open Thinker
 
 Open the deployed app and create the first admin account. Fresh installs redirect to `/setup`; the first account you create becomes the admin.
 

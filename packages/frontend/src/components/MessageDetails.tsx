@@ -6,7 +6,7 @@ import {
 } from '../services/api.js';
 import { inferProviderName } from '../services/routing-utils.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { manifestErrorDocsUrl, isSuccessStatus } from 'thinker-shared';
+import { thinkerErrorDocsUrl, isSuccessStatus } from 'thinker-shared';
 import { formatErrorClass, formatErrorOrigin } from '../services/formatters.js';
 import { ModelParamsSection, RequestHeadersSection } from './MessageDetailsSections.jsx';
 import { routingTierLabel } from './message-table-types.js';
@@ -194,7 +194,7 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                               <td class="error-recovery-row__meta-value">
                                 <a
                                   class="msg-detail__error-code"
-                                  href={manifestErrorDocsUrl(m.error_code!)}
+                                  href={thinkerErrorDocsUrl(m.error_code!)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
@@ -216,12 +216,12 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                                     'The LLM provider rejected the request.'}
                                   {m.error_origin === 'transport' &&
                                     'Network or connection failure.'}
-                                  {m.error_origin === 'config' && 'Manifest configuration issue.'}
+                                  {m.error_origin === 'config' && 'Thinker configuration issue.'}
                                   {m.error_origin === 'policy' &&
-                                    'A Manifest usage limit was reached.'}
-                                  {m.error_origin === 'internal' && 'An unexpected Manifest error.'}
+                                    'A Thinker usage limit was reached.'}
+                                  {m.error_origin === 'internal' && 'An unexpected Thinker error.'}
                                   {m.error_origin === 'request' &&
-                                    'Your agent sent a request Manifest could not route. No provider was called.'}
+                                    'Your agent sent a request Thinker could not route. No provider was called.'}
                                 </span>
                               </td>
                             </tr>

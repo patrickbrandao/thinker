@@ -123,25 +123,25 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
     });
   }
 
-  it('stages Manifest rejections without deleting their legacy rows', async () => {
+  it('stages Thinker rejections without deleting their legacy rows', async () => {
     const expected = [
-      { id: 'manifest-config', error_code: 'M100', error_origin: 'config' },
-      { id: 'manifest-internal', error_code: 'M500', error_origin: 'internal' },
-      { id: 'manifest-policy', error_code: 'M201', error_origin: 'policy' },
-      { id: 'manifest-request', error_code: 'M300', error_origin: 'request' },
+      { id: 'thinker-config', error_code: 'M100', error_origin: 'config' },
+      { id: 'thinker-internal', error_code: 'M500', error_origin: 'internal' },
+      { id: 'thinker-policy', error_code: 'M201', error_origin: 'policy' },
+      { id: 'thinker-request', error_code: 'M300', error_origin: 'request' },
     ];
     await dataSource.query(`
       INSERT INTO agent_messages (
         id, tenant_id, agent_id, agent_name, timestamp, duration_ms, status,
         error_code, error_origin, error_class, model
       ) VALUES
-        ('manifest-config', 'tenant-1', 'agent-1', 'Agent',
+        ('thinker-config', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:00.000', 0, 'error', 'M100', 'config', 'no_provider_key', 'auto'),
-        ('manifest-policy', 'tenant-1', 'agent-1', 'Agent',
+        ('thinker-policy', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:01.000', 0, 'rate_limited', 'M201', 'policy', 'rate_limit', 'auto'),
-        ('manifest-request', 'tenant-1', 'agent-1', 'Agent',
+        ('thinker-request', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:02.000', 0, 'error', 'M300', 'request', 'invalid_request', 'auto'),
-        ('manifest-internal', 'tenant-1', 'agent-1', 'Agent',
+        ('thinker-internal', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:03.000', 0, 'error', 'M500', 'internal', 'internal_error', 'auto')
     `);
 
@@ -163,13 +163,13 @@ describe('request backfill legacy fallback reconstruction (e2e)', () => {
     expect(requestRows).toEqual(expected.map((row) => ({ ...row, status: 'failed' })));
   });
 
-  it('removes staged Manifest rejections and validates constraints at transition completion', async () => {
+  it('removes staged Thinker rejections and validates constraints at transition completion', async () => {
     await dataSource.query(`
       INSERT INTO agent_messages (
         id, tenant_id, agent_id, agent_name, timestamp, duration_ms, status,
         error_code, error_origin, error_class, model
       ) VALUES
-        ('manifest-config', 'tenant-1', 'agent-1', 'Agent',
+        ('thinker-config', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:00.000', 0, 'error', 'M100', 'config', 'no_provider_key', 'auto'),
         ('provider-error', 'tenant-1', 'agent-1', 'Agent',
          '2026-01-01 00:00:01.000', 100, 'error', NULL, 'provider', 'server_error', 'gpt-4o')

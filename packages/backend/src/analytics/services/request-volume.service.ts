@@ -338,7 +338,7 @@ export class RequestVolumeService {
     const range = params.range ?? '7d';
     const keyExpr =
       dim === 'provider'
-        ? `CASE WHEN t.provider LIKE 'custom:%' THEN 'custom' ELSE COALESCE(t.provider, 'manifest') END`
+        ? `CASE WHEN t.provider LIKE 'custom:%' THEN 'custom' ELSE COALESCE(t.provider, 'thinker') END`
         : `t.${dim}`;
     const sql = `${this.terminalCte(params.agentName)}
       SELECT ${keyExpr} AS key,

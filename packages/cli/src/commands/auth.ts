@@ -18,14 +18,14 @@ const LOGIN_FLAGS = { strings: ['token-env', 'url'], booleans: ['token-stdin'] }
 
 export async function login(io: CliIo, argv: string[]): Promise<void> {
   const args = parseArgs(argv, { ...LOGIN_FLAGS, maxPositionals: 0 });
-  const origin = normalizeOrigin(args.strings['url'] ?? io.env['MANIFEST_URL'] ?? DEFAULT_URL);
+  const origin = normalizeOrigin(args.strings['url'] ?? io.env['THINKER_URL'] ?? DEFAULT_URL);
   const useStdin = Boolean(args.booleans['token-stdin']);
   const tokenEnv = args.strings['token-env'];
   if (tokenEnv === '') {
     throw new CliError(
       'missing_value',
       '--token-env requires an environment variable name',
-      'Pass a name, e.g. --token-env MANIFEST_TOKEN',
+      'Pass a name, e.g. --token-env THINKER_TOKEN',
     );
   }
 
@@ -38,7 +38,7 @@ export async function login(io: CliIo, argv: string[]): Promise<void> {
       throw new CliError(
         'no_tty',
         'Browser login needs an interactive terminal',
-        'Use mnfst login --token-stdin or --token-env <name> in scripts',
+        'Use thinker login --token-stdin or --token-env <name> in scripts',
       );
     }
     const result = await browserLogin(io, origin);
@@ -59,7 +59,7 @@ export async function login(io: CliIo, argv: string[]): Promise<void> {
   // Ordering differs by source, deliberately. A browser token was just minted
   // by this server, so it is valid by construction — store it BEFORE /me, or a
   // failing validation call strands a live 30-day PAT that the user can no
-  // longer revoke with `mnfst logout`. A user-supplied token may be garbage, so
+  // longer revoke with `thinker logout`. A user-supplied token may be garbage, so
   // that path keeps validate-then-store and writes nothing on failure.
   if (viaBrowser) store();
 
@@ -72,7 +72,7 @@ export async function login(io: CliIo, argv: string[]): Promise<void> {
     throw new CliError(
       'login_validation_failed',
       error instanceof Error ? error.message : String(error),
-      `Credential stored for ${origin} — run mnfst auth status to retry, or mnfst logout to revoke`,
+      `Credential stored for ${origin} — run thinker auth status to retry, or thinker logout to revoke`,
     );
   }
   if (!viaBrowser) store();
@@ -96,7 +96,7 @@ export async function logout(io: CliIo, argv: string[]): Promise<void> {
   const configPath = getConfigPath(io);
   const config = loadConfig(configPath);
   const origin = normalizeOrigin(
-    args.strings['url'] ?? io.env['MANIFEST_URL'] ?? config.activeHost ?? DEFAULT_URL,
+    args.strings['url'] ?? io.env['THINKER_URL'] ?? config.activeHost ?? DEFAULT_URL,
   );
 
   const stored = config.hosts?.[origin]?.apiKey;
@@ -129,7 +129,7 @@ export async function authStatus(io: CliIo, argv: string[]): Promise<number | vo
     printJson(io, {
       authenticated: false,
       url: target.origin,
-      hint: 'Run mnfst login, or set MANIFEST_API_KEY',
+      hint: 'Run thinker login, or set THINKER_API_KEY',
     });
     return 1;
   }

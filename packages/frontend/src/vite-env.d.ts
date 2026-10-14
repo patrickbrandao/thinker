@@ -1,3 +1,3 @@
 /// <reference types="vite/client" />
 
-declare const __MANIFEST_VERSION__: string;
+declare const __THINKER_VERSION__: string;

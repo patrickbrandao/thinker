@@ -53,7 +53,7 @@ export {
   TRANSPORT_TIMEOUT_HTTP_STATUS,
   classifyHttpErrorClass,
   classifyMessageError,
-  isManifestErrorOrigin,
+  isThinkerErrorOrigin,
   normalizeStatus,
   isSuccessStatus,
   isFailedStatus,
@@ -61,7 +61,7 @@ export {
 export type {
   ErrorOrigin,
   ErrorClass,
-  ManifestErrorOrigin,
+  ThinkerErrorOrigin,
   MessageErrorSignals,
   MessageErrorClassification,
   RequestStatus,
@@ -69,7 +69,7 @@ export type {
 } from './error-taxonomy';
 export { isAnthropicExtraUsageError } from './provider-error-semantics';
 export type { ProviderErrorSignals } from './provider-error-semantics';
-export { THINKER_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from './manifest-error-docs';
+export { THINKER_ERRORS_DOCS_BASE, thinkerErrorDocsUrl } from './thinker-error-docs';
 export { DEFAULT_RESPONSE_MODE, RESPONSE_MODES, isResponseMode } from './response-mode';
 export type { ResponseMode } from './response-mode';
 export { DEFAULT_OUTPUT_MODALITY, OUTPUT_MODALITIES, isOutputModality } from './output-modality';

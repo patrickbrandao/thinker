@@ -424,6 +424,8 @@ export function disableProviderForAgent(agentName: string, userProviderId: strin
 export interface PricingHealth {
   model_count: number;
   last_fetched_at: string | null;
+  /** False when THINKER_CATALOG_SYNC turns the public catalog sync off. */
+  sync_enabled?: boolean;
 }
 
 export function getPricingHealth() {

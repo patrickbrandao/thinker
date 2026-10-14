@@ -70,7 +70,7 @@ interface OverviewData {
     successful: number;
     success_rate: number;
     attempt_success_rate: number;
-    manifest_lift_pct: number;
+    thinker_lift_pct: number;
     recovered: number;
   } | null;
   token_usage: Array<{
@@ -388,9 +388,7 @@ const Overview: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>
-        {agentDisplayName() ?? decodeURIComponent(params.agentName)} Overview - Manifest
-      </Title>
+      <Title>{agentDisplayName() ?? decodeURIComponent(params.agentName)} Overview - Thinker</Title>
       <Meta
         name="description"
         content={`Monitor ${agentDisplayName() ?? decodeURIComponent(params.agentName)} performance, costs, tokens, and activity.`}

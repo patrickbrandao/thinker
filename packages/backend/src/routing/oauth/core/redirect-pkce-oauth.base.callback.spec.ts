@@ -136,7 +136,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
 
   it('redirects to the stored localhost backendUrl on error', async () => {
     const svc = buildSvc();
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
     const state = new URL(url).searchParams.get('state')!;
 
     const { req, res, done, writeHead } = buildCallbackPair(
@@ -146,13 +146,13 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
     await done;
 
     expect(writeHead).toHaveBeenCalledWith(302, {
-      Location: 'http://localhost:3001/api/v1/oauth/test-provider/done?ok=0',
+      Location: 'http://localhost:2099/api/v1/oauth/test-provider/done?ok=0',
     });
   });
 
   it('redirects to the stored [::1] IPv6 loopback backendUrl on error', async () => {
     const svc = buildSvc();
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://[::1]:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://[::1]:2099');
     const state = new URL(url).searchParams.get('state')!;
 
     const { req, res, done, writeHead } = buildCallbackPair(
@@ -162,7 +162,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
     await done;
 
     expect(writeHead).toHaveBeenCalledWith(302, {
-      Location: 'http://[::1]:3001/api/v1/oauth/test-provider/done?ok=0',
+      Location: 'http://[::1]:2099/api/v1/oauth/test-provider/done?ok=0',
     });
   });
 
@@ -177,7 +177,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
     } as unknown as Response) as unknown as typeof fetch;
 
     try {
-      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://127.0.0.1:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://127.0.0.1:2099');
       const state = new URL(url).searchParams.get('state')!;
 
       const { req, res, done, writeHead } = buildCallbackPair(
@@ -187,7 +187,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
       await done;
 
       expect(writeHead).toHaveBeenCalledWith(302, {
-        Location: 'http://127.0.0.1:3001/api/v1/oauth/test-provider/done?ok=0',
+        Location: 'http://127.0.0.1:2099/api/v1/oauth/test-provider/done?ok=0',
       });
     } finally {
       global.fetch = originalFetch;
@@ -219,7 +219,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
       createDiscovery(),
       { providerId: 'custom-provider' },
     );
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
     const state = new URL(url).searchParams.get('state')!;
 
     const { req, res, done, writeHead } = buildCallbackPair(
@@ -229,13 +229,13 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
     await done;
 
     expect(writeHead).toHaveBeenCalledWith(302, {
-      Location: 'http://localhost:3001/api/v1/oauth/custom-provider/done?ok=0',
+      Location: 'http://localhost:2099/api/v1/oauth/custom-provider/done?ok=0',
     });
   });
 
   it('redirects with ok=0 (not ok=1) on provider-side error', async () => {
     const svc = buildSvc();
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
     const state = new URL(url).searchParams.get('state')!;
 
     const { req, res, done, writeHead } = buildCallbackPair(
@@ -251,7 +251,7 @@ describe('RedirectPkceOauthBaseService — sendDoneResponse', () => {
 
   it('clears the pending state when the provider returns an error', async () => {
     const svc = buildSvc();
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
     const state = new URL(url).searchParams.get('state')!;
     expect(svc.getPendingCount()).toBe(1);
 

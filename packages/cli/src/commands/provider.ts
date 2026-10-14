@@ -33,7 +33,7 @@ export function resolveProviderId(input: string): string {
     throw new CliError(
       'unknown_provider',
       `Unknown provider: ${input}`,
-      'Run mnfst provider catalog to list connectable providers',
+      'Run thinker provider catalog to list connectable providers',
     );
   }
   return hit.id;
@@ -55,7 +55,7 @@ export async function providerList(io: CliIo, argv: string[]): Promise<void> {
     agent: unknown | null;
   };
   if (!agentRes.agent) {
-    throw new CliError('not_found', `Agent "${agent}" not found`, 'See mnfst agent list', 404);
+    throw new CliError('not_found', `Agent "${agent}" not found`, 'See thinker agent list', 404);
   }
   const enabledRes = (await client.request(
     'GET',
@@ -123,8 +123,8 @@ function providerFromArgs(args: ReturnType<typeof parseArgs>): string {
   if (!input) {
     throw new CliError(
       'missing_positional',
-      'Usage: mnfst provider connect <provider>',
-      'Run mnfst provider catalog to list connectable providers',
+      'Usage: thinker provider connect <provider>',
+      'Run thinker provider catalog to list connectable providers',
     );
   }
   return resolveProviderId(input);
@@ -151,7 +151,7 @@ export async function resolveDiscoveryAgent(
     throw new CliError(
       'no_agents',
       'No agent exists yet — connecting a provider needs one for model discovery',
-      'Run mnfst agent create --name <name> --platform <p> first',
+      'Run thinker agent create --name <name> --platform <p> first',
     );
   }
   return first.agent_name;
@@ -176,7 +176,7 @@ function resolveAuthType(
       throw new CliError(
         'invalid_auth_type',
         `${providerId} supports: ${supported.join(', ')}`,
-        'Run mnfst provider catalog to see auth types per provider',
+        'Run thinker provider catalog to see auth types per provider',
       );
     }
     return flagged;
@@ -190,7 +190,7 @@ function resolveAuthType(
   throw new CliError(
     'missing_auth_type',
     `--auth-type is required for ${providerId}. Supported: ${supported.join(', ')}`,
-    'Run mnfst provider catalog to see auth types per provider',
+    'Run thinker provider catalog to see auth types per provider',
   );
 }
 
@@ -256,7 +256,7 @@ async function resolveConnection(
     throw new CliError(
       'not_found',
       `No connection matches "${input}"${authType ? ` (auth-type ${authType})` : ''}${label ? ` (label ${label})` : ''}`,
-      'See mnfst provider list',
+      'See thinker provider list',
       404,
     );
   }

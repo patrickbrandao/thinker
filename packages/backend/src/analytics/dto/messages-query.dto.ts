@@ -27,7 +27,7 @@ export const MESSAGE_STATUS_FILTER_VALUES = [
   'success',
   'ok',
   'failed',
-  // The caller hung up: neither Manifest nor the provider failed, so it is its
+  // The caller hung up: neither Thinker nor the provider failed, so it is its
   // own outcome rather than a flavour of `failed`.
   'cancelled',
   'error',
@@ -41,11 +41,11 @@ export const MESSAGE_TRIGGER_FILTER_VALUES = ['none', 'fallback'] as const;
 export type MessageTriggerFilter = (typeof MESSAGE_TRIGGER_FILTER_VALUES)[number];
 
 /**
- * Error-origin filter for the Messages log. The real origins plus a `manifest`
- * shorthand for "all of config/policy/internal" (the HTTP-200 Manifest stubs
+ * Error-origin filter for the Messages log. The real origins plus a `thinker`
+ * shorthand for "all of config/policy/internal" (the HTTP-200 Thinker stubs
  * that are hidden from the log by default).
  */
-export const MESSAGE_ORIGIN_FILTER_VALUES = [...ERROR_ORIGINS, 'manifest'] as const;
+export const MESSAGE_ORIGIN_FILTER_VALUES = [...ERROR_ORIGINS, 'thinker'] as const;
 export type MessageOriginFilter = (typeof MESSAGE_ORIGIN_FILTER_VALUES)[number];
 
 export class MessagesQueryDto {

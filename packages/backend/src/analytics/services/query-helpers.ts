@@ -90,17 +90,17 @@ export function sqlCountMessages(alias = 'at'): string {
   return `COUNT(DISTINCT COALESCE(${alias}.request_id, ${alias}.id)) FILTER (WHERE ${alias}.status IS NULL OR (${alias}.status NOT IN ('pending', 'cancelled') AND ${alias}.status NOT IN (${list})))`;
 }
 
-/** Comma-quoted list of Manifest-originated error origins, e.g. `'config', 'policy', …`. */
+/** Comma-quoted list of Thinker-originated error origins, e.g. `'config', 'policy', …`. */
 const THINKER_ORIGIN_SQL_LIST = THINKER_ERROR_ORIGINS.map((o) => `'${o}'`).join(', ');
 
 /**
- * SQL predicate matching Manifest-originated errors (config / policy / internal
+ * SQL predicate matching Thinker-originated errors (config / policy / internal
  * / request) — the rows the caller gets back as HTTP 200 stubs or 4xx envelopes
- * without a provider ever being contacted. Backs the `origin=manifest` filter
+ * without a provider ever being contacted. Backs the `origin=thinker` filter
  * shorthand. Assumes the query builder aliases `agent_messages` as `at`.
  *
  * The Messages log used to hide `config` rows by default on the theory that "a
- * Manifest config error is not a message". It was the only surface that hid
+ * Thinker config error is not a message". It was the only surface that hid
  * them — the Overview's Recent Messages panel always showed them — so a user who
  * saw a "Failed: Setup" row there and clicked through found nothing, with no
  * filter anywhere to bring it back. Every origin is now listed by default;

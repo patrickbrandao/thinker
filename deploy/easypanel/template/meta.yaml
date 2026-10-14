@@ -1,6 +1,6 @@
-name: Manifest
+name: Thinker
 description:
-  Manifest is an open-source model router for AI agents and apps. Connect
+  Thinker is an open-source model router for AI agents and apps. Connect
   OpenAI-compatible clients to one endpoint, route requests across your own
   provider API keys, subscriptions, local models, and custom providers, and keep
   usage data in your own infrastructure.
@@ -12,16 +12,14 @@ changeLog:
   - date: 2026-08-06
     description: Persist compressed request recordings in a dedicated app volume
   - date: 2026-07-08
-    description: Initial Manifest template
+    description: Initial Thinker template
 links:
-  - label: Website
-    url: https://manifest.build
   - label: Documentation
-    url: https://manifest.build/llm-gateway/docs/introduction/
+    url: https://github.com/patrickbrandao/thinker/tree/main/docs
   - label: GitHub
-    url: https://github.com/mnfst/llm-gateway
+    url: https://github.com/patrickbrandao/thinker
   - label: Docker Hub
-    url: https://hub.docker.com/r/manifestdotbuild/manifest
+    url: https://hub.docker.com/r/tmsoftbrasil/thinker
 contributors:
   - name: Guillaume Gay
     url: https://github.com/guillaumegay13
@@ -35,23 +33,23 @@ schema:
     appServiceName:
       type: string
       title: App Service Name
-      default: manifest
+      default: thinker
     appServiceImage:
       type: string
       title: App Service Image
-      default: manifestdotbuild/manifest:6
+      default: tmsoftbrasil/thinker:0.1
     databaseServiceName:
       type: string
       title: Database Service Name
-      default: manifest-db
+      default: thinker-db
 benefits:
   - title: One endpoint for AI agents
     description:
-      Manifest exposes an OpenAI-compatible endpoint that AI agents and apps can
+      Thinker exposes an OpenAI-compatible endpoint that AI agents and apps can
       use while you keep control of provider credentials and routing.
   - title: Self-hosted data path
     description:
-      Run Manifest and PostgreSQL on your own server through Easypanel instead
+      Run Thinker and PostgreSQL on your own server through Easypanel instead
       of sending prompts, responses, and usage data through a hosted proxy.
   - title: Bring your own providers
     description:
@@ -60,19 +58,19 @@ benefits:
 features:
   - title: OpenAI-compatible API
     description:
-      Point compatible clients at Manifest and route requests through your
+      Point compatible clients at Thinker and route requests through your
       configured providers.
   - title: PostgreSQL persistence
     description:
-      The template provisions a PostgreSQL service for Manifest data and stores
+      The template provisions a PostgreSQL service for Thinker data and stores
       provider credentials with a generated encryption key.
   - title: Request recording persistence
     description:
       Compressed request recordings are stored in a dedicated persistent volume
-      mounted by the Manifest app service.
+      mounted by the Thinker app service.
   - title: Usage tracking
     description:
-      Track routed requests, spend, and provider behavior from the Manifest
+      Track routed requests, spend, and provider behavior from the Thinker
       dashboard.
 tags:
   - AI

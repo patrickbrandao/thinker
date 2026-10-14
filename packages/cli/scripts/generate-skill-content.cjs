@@ -2,7 +2,7 @@
 'use strict';
 /**
  * Embeds the CLI's agent skill (packages/cli/skill/SKILL.md) into
- * src/skill-content.gen.ts so `mnfst skill show|install` can hand it to an
+ * src/skill-content.gen.ts so `thinker skill show|install` can hand it to an
  * agent without shipping a data file or reading the repo at runtime.
  *
  * Runs as part of `npm run build`; the output is committed. The drift spec
@@ -14,8 +14,8 @@ const path = require('path');
 
 /**
  * Lives inside the package, not under the repo's .claude/skills/, so Claude
- * Code sessions working on this repo don't auto-load it. The rebranded
- * thinker-cli skill is tracked in issue #23.
+ * Code sessions working on this repo don't auto-load it unless that is decided
+ * explicitly (#23).
  */
 const SKILL_PATH = path.join(__dirname, '..', 'skill', 'SKILL.md');
 
@@ -36,7 +36,7 @@ async function main() {
 // Source: packages/cli/skill/SKILL.md.
 // Refresh with: npm run gen (runs automatically in npm run build).
 
-/** The mnfst agent skill, embedded so the CLI can install it anywhere. */
+/** The thinker-cli agent skill, embedded so the CLI can install it anywhere. */
 export const SKILL_MD: string = ${JSON.stringify(markdown)};
 
 /** The CLI version this copy of the skill shipped with. */

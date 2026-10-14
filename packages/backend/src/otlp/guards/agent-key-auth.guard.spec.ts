@@ -1273,7 +1273,7 @@ describe('AgentKeyAuthGuard', () => {
       ]);
       const { ctx, req } = makeContext({ 'x-api-key': VALID });
       await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired');
-      expect(req.manifestErrorContext).toEqual(EXPECTED_CONTEXT);
+      expect(req.thinkerErrorContext).toEqual(EXPECTED_CONTEXT);
     });
 
     describe('dev loopback', () => {

@@ -99,7 +99,7 @@ export class TierService {
     providerKeyLabel?: string,
   ): Promise<TierAssignment> {
     const available = await this.discoveryService.getModelsForAgent(tenantId, agentId);
-    // Accept any name Manifest publishes for the model (the public
+    // Accept any name Thinker publishes for the model (the public
     // `/v1/models` id, a custom model's bare name, …) and store the canonical
     // route, so callers never have to know the internal id.
     const resolution = resolveModelRoute(model, available, {

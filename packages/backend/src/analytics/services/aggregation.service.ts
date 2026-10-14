@@ -18,7 +18,7 @@ import {
   sqlIsSuccessStatus,
 } from './query-helpers';
 import { computeCutoff, sqlSanitizeCost } from '../../common/utils/postgres-sql';
-import { ManifestRequest } from '../../entities/request.entity';
+import { ThinkerRequest } from '../../entities/request.entity';
 import { AgentUsageDailyService } from './agent-usage-daily.service';
 
 export { MetricWithTrend };
@@ -34,8 +34,8 @@ export class AggregationService {
     @InjectRepository(AgentMessage)
     private readonly turnRepo: Repository<AgentMessage>,
     @Optional()
-    @InjectRepository(ManifestRequest)
-    private readonly requestRepo?: Repository<ManifestRequest>,
+    @InjectRepository(ThinkerRequest)
+    private readonly requestRepo?: Repository<ThinkerRequest>,
     @Optional()
     private readonly agentUsageDaily?: AgentUsageDailyService,
   ) {}
@@ -234,7 +234,7 @@ export class AggregationService {
     };
   }
 
-  /** Request-level reliability for the headline KPI and Manifest value gap. */
+  /** Request-level reliability for the headline KPI and Thinker value gap. */
   async getRequestReliability(
     range: string,
     tenantId: string | null,
@@ -246,7 +246,7 @@ export class AggregationService {
     successful: number;
     success_rate: number;
     attempt_success_rate: number;
-    manifest_lift_pct: number;
+    thinker_lift_pct: number;
     recovered: number;
     previous_total: number;
   }> {
@@ -256,7 +256,7 @@ export class AggregationService {
         successful: 0,
         success_rate: 0,
         attempt_success_rate: 0,
-        manifest_lift_pct: 0,
+        thinker_lift_pct: 0,
         recovered: 0,
         previous_total: 0,
       };
@@ -358,7 +358,7 @@ export class AggregationService {
       successful,
       success_rate: successRate,
       attempt_success_rate: attemptSuccessRate,
-      manifest_lift_pct: successRate - attemptSuccessRate,
+      thinker_lift_pct: successRate - attemptSuccessRate,
       recovered: Number(row?.recovered ?? 0),
       previous_total: Number(row?.previous_total ?? 0),
     };

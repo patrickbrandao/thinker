@@ -70,7 +70,7 @@ const OpenClawSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-step__desc">
-        Register Manifest in your OpenClaw config to route each request to the best provider using
+        Register Thinker in your OpenClaw config to route each request to the best provider using
         the model <code class="setup-model-hint__code">thinker/auto</code>
       </p>
 

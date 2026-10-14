@@ -47,7 +47,7 @@ describe('checkE2eDatabaseEnv', () => {
   it.each([
     'mydatabase',
     'thinker',
-    'manifest_duprepro',
+    'thinker_duprepro',
     'moneyflow',
     'tst',
     'latest',

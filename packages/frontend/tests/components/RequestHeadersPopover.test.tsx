@@ -400,4 +400,87 @@ describe('RequestHeadersPopover', () => {
     fireEvent.click(close);
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('clears the announcement on close, so reopening does not replay a stale warning', () => {
+    const [open, setOpen] = createSignal(true);
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'row-7', key: 'X', value: 'v' },
+    ]);
+    const { container } = render(() => (
+      <RequestHeadersPopover
+        open={open()}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => setOpen(false)}
+      />
+    ));
+    const key = container.querySelector('.playground-headers__input--key') as HTMLInputElement;
+    fireEvent.input(key, { target: { value: 'X:' } });
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      headerIssueMessage('X:', 'invalid-name'),
+    );
+
+    setOpen(false);
+    setOpen(true);
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('');
+    // The warning itself is still shown on the row.
+    expect(container.querySelector('.playground-headers__warning')?.textContent).toBe(
+      headerIssueMessage('X:', 'invalid-name'),
+    );
+  });
+
+  it('warns on a duplicate name and on rows past the 20-header cap', () => {
+    const rows: HeaderEntry[] = [
+      { id: 'd1', key: 'X-Title', value: 'a' },
+      { id: 'd2', key: 'x-title', value: 'b' },
+      ...Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, key: `X-H${i}`, value: 'v' })),
+    ];
+    const { container } = render(() => (
+      <RequestHeadersPopover open={true} entries={rows} onChange={() => {}} onClose={() => {}} />
+    ));
+    expect(document.getElementById(headerWarningId('d2'))?.textContent).toBe(
+      headerIssueMessage('x-title', 'duplicate'),
+    );
+    expect(document.getElementById(headerWarningId('c19'))?.textContent).toBe(
+      headerIssueMessage('X-H19', 'over-limit'),
+    );
+    expect(document.getElementById(headerWarningId('c18'))).toBeNull();
+    expect(container.querySelectorAll('.playground-headers__warning')).toHaveLength(2);
+    const dupKey = container.querySelectorAll('.playground-headers__input--key')[1]!;
+    expect(dupKey.getAttribute('aria-invalid')).toBe('true');
+    expect(dupKey.getAttribute('aria-describedby')).toBe(headerWarningId('d2'));
+  });
+
+  it('removes the middle row and keeps the others with their values', () => {
+    const [entries, setEntries] = createSignal<HeaderEntry[]>([
+      { id: 'm1', key: 'X-A', value: '1' },
+      { id: 'm2', key: 'X-B', value: '2' },
+      { id: 'm3', key: 'X-C', value: '3' },
+    ]);
+    const { container, getByLabelText } = render(() => (
+      <RequestHeadersPopover
+        open={true}
+        entries={entries()}
+        onChange={setEntries}
+        onClose={() => {}}
+      />
+    ));
+    fireEvent.click(getByLabelText('Remove X-B'));
+    expect(entries().map((e) => e.id)).toEqual(['m1', 'm3']);
+    const keys = [...container.querySelectorAll<HTMLInputElement>('.playground-headers__input--key')];
+    const values = [
+      ...container.querySelectorAll<HTMLInputElement>('.playground-headers__input--value'),
+    ];
+    expect(keys.map((k) => k.value)).toEqual(['X-A', 'X-C']);
+    expect(values.map((v) => v.value)).toEqual(['1', '3']);
+  });
+
+  it('says headers set by the route adapter are ignored', () => {
+    const { container } = render(() => (
+      <RequestHeadersPopover open={true} entries={[]} onChange={() => {}} onClose={() => {}} />
+    ));
+    expect(container.querySelector('.playground-headers__hint')?.textContent).toContain(
+      "any header the route's provider adapter sets itself",
+    );
+  });
 });

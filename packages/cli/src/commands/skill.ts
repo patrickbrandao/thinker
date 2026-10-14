@@ -8,14 +8,14 @@ import { detectAgentRuntime, resolveHomePath } from '../agent-runtime';
 import { SKILL_MD, SKILL_VERSION } from '../skill-content.gen';
 
 /** The one-liner that tells an agent this CLI carries its own operating guide. */
-export const SKILL_NUDGE = 'AI agent operating this install? mnfst skill install';
+export const SKILL_NUDGE = 'AI agent operating this install? thinker skill install';
 
 const DEFAULT_SKILLS_DIR = '~/.claude/skills';
 const AGENTS_SKILLS_DIR = '~/.agents/skills';
 
-/** `<dir>/mnfst-cli/SKILL.md` — the only file this command ever writes. */
+/** `<dir>/thinker-cli/SKILL.md` — the only file this command ever writes. */
 function skillFileIn(dir: string): string {
-  return path.join(dir, 'mnfst-cli', 'SKILL.md');
+  return path.join(dir, 'thinker-cli', 'SKILL.md');
 }
 
 /**
@@ -55,7 +55,7 @@ function resolveTarget(
 }
 
 /**
- * Install the skill as `<dir>/mnfst-cli/SKILL.md`. Idempotent: a byte-identical
+ * Install the skill as `<dir>/thinker-cli/SKILL.md`. Idempotent: a byte-identical
  * file is reported as `updated: false` and left untouched, so a wrapper can run
  * this on every invocation.
  */
@@ -147,7 +147,7 @@ export function maybeNudgeSkill(io: CliIo, commandKey: string): void {
     if (state.shown?.[runtime.id]) return;
 
     io.stderr(
-      `hint: ${runtime.name} detected — run 'mnfst skill install' to load the mnfst operating ` +
+      `hint: ${runtime.name} detected — run 'thinker skill install' to load the thinker operating ` +
         'guide (fake-200 detection, hollow connections, tier auditing). Shown once.',
     );
     const next: NudgeState = {

@@ -11,7 +11,7 @@ import {
   type RequestParamDefaults,
 } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
-import { ManifestRequest } from '../../entities/request.entity';
+import { ThinkerRequest } from '../../entities/request.entity';
 import {
   ModelPricingCacheService,
   type PricingEntry,
@@ -29,12 +29,12 @@ import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-cata
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
 import { ProviderService } from '../routing-core/provider.service';
-import { extractManifestErrorCode, type ManifestErrorCode } from '../../common/errors/error-codes';
+import { extractThinkerErrorCode, type ThinkerErrorCode } from '../../common/errors/error-codes';
 import {
   THINKER_CODE_TO_REASON,
-  isRecordableManifestCode,
-  type ManifestBlockedRequestReason,
-} from '../../common/errors/manifest-error';
+  isRecordableThinkerCode,
+  type ThinkerBlockedRequestReason,
+} from '../../common/errors/thinker-error';
 import { normalizeProviderErrorForStorage } from './proxy-error-sanitizer';
 
 export const FAILED_WITHOUT_MESSAGE = 'Request failed without an error message.';
@@ -84,9 +84,9 @@ export interface ProviderErrorOpts extends HeaderTierRef {
   apiMode?: ProxyApiMode;
 }
 
-export type { ManifestBlockedRequestReason };
+export type { ThinkerBlockedRequestReason };
 
-export interface ManifestBlockedRequestOpts {
+export interface ThinkerBlockedRequestOpts {
   requestId?: string;
   /**
    * The status the caller saw, when there was one. Omitted for the HTTP-200
@@ -96,31 +96,31 @@ export interface ManifestBlockedRequestOpts {
   httpStatus?: number | null;
   errorMessage: string;
   /** The documented `M###` code, persisted so the UI can link to its doc page. */
-  errorCode?: ManifestErrorCode;
-  reason: ManifestBlockedRequestReason;
+  errorCode?: ThinkerErrorCode;
+  reason: ThinkerBlockedRequestReason;
   model?: string;
   traceId?: string;
   sessionKey?: string;
   callerAttribution?: CallerAttribution | null;
   requestHeaders?: Record<string, string> | null;
-  /** End-to-end time until Manifest returned the rejection. */
+  /** End-to-end time until Thinker returned the rejection. */
   durationMs?: number;
   /**
-   * The Manifest API surface the caller used. Stamped so a rejection that never
+   * The Thinker API surface the caller used. Stamped so a rejection that never
    * got a pending row (the guard-level M004 path writes the terminal row first)
    * still names its surface.
    */
   apiMode?: ProxyApiMode;
   /**
-   * How the request was classified, when Manifest failed after routing ran (a
+   * How the request was classified, when Thinker failed after routing ran (a
    * post-routing M500). Keeps tier and header-tier filters matching the row.
    * Provider stays null (the row still claims no provider attempt); the
    * requested model is still recorded in the model field.
    */
-  routing?: ManifestBlockedRouting;
+  routing?: ThinkerBlockedRouting;
 }
 
-export interface ManifestBlockedRouting {
+export interface ThinkerBlockedRouting {
   tier?: string;
   specificityCategory?: string;
   headerTierId?: string;
@@ -136,7 +136,7 @@ export interface PendingRequestOpts {
   requestedModel?: string;
   callerAttribution?: CallerAttribution | null;
   requestHeaders?: Record<string, string> | null;
-  /** The Manifest API surface the caller used. Persisted to requests.api_mode. */
+  /** The Thinker API surface the caller used. Persisted to requests.api_mode. */
   apiMode?: ProxyApiMode;
 }
 
@@ -270,7 +270,7 @@ function buildRequestRow(
   attempt: Partial<AgentMessage>,
   terminal: boolean,
   apiMode?: ProxyApiMode,
-): ManifestRequest {
+): ThinkerRequest {
   const classified = classifyRow(attempt);
   // classifyRow above reads the rich attempt status; the request row stores the
   // collapsed canonical outcome. A non-terminal request is still `pending`.
@@ -323,16 +323,16 @@ function classifyRow(row: Partial<AgentMessage>): {
   if (normalizeStatus(row.status) === PENDING_STATUS) {
     return { error_origin: null, error_class: null, superseded: false };
   }
-  // A stamped Manifest error_code is the authoritative origin signal. A
+  // A stamped Thinker error_code is the authoritative origin signal. A
   // credential-hop failure (M100/M102) carries a synthetic 401 and rides the
   // fallback recorder, whose routing_reason is the *tier* reason ('scored',
-  // 'default', …) — classifying off that alone would bucket a Manifest config
+  // 'default', …) — classifying off that alone would bucket a Thinker config
   // error as a provider 401 and inflate provider_error_rate / billing. Derive
   // the reason from the code so it classifies as config even though
   // routing_reason keeps the tier reason for display.
-  const code = row.error_code as ManifestErrorCode | null | undefined;
+  const code = row.error_code as ThinkerErrorCode | null | undefined;
   const codeReason =
-    code && isRecordableManifestCode(code) ? THINKER_CODE_TO_REASON[code] : undefined;
+    code && isRecordableThinkerCode(code) ? THINKER_CODE_TO_REASON[code] : undefined;
   return classifyMessageError({
     status: row.status ?? 'ok',
     errorHttpStatus: row.error_http_status,
@@ -487,10 +487,10 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     // repositories always expose manager.getRepository().
     const getRepository = this.messageRepo.manager?.getRepository?.bind(this.messageRepo.manager);
     if (!getRepository) return false;
-    const repo = getRepository(ManifestRequest);
+    const repo = getRepository(ThinkerRequest);
     if (typeof repo.createQueryBuilder !== 'function') return false;
     const row = buildRequestRow(ctx, requestId, attempt, terminal, apiMode);
-    const insert = repo.createQueryBuilder().insert().into(ManifestRequest).values(row);
+    const insert = repo.createQueryBuilder().insert().into(ThinkerRequest).values(row);
     if (terminal) {
       // Most terminal writers do not need to repeat the ingress surface. When
       // they do have it, let them repair a missing/failed pending write without
@@ -608,7 +608,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     return true;
   }
 
-  /** Finish caller-disconnected work without attributing an error to Manifest or the provider. */
+  /** Finish caller-disconnected work without attributing an error to Thinker or the provider. */
   async recordCancelledRequest(ctx: IngestionContext, opts: CancelledRequestOpts): Promise<void> {
     const row = buildMessageRow(ctx, {
       request_id: opts.requestId,
@@ -677,7 +677,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       {
         status: normalizeStatus(richStatus),
         error_message: errorMessage,
-        error_code: extractManifestErrorCode(errorMessage),
+        error_code: extractThinkerErrorCode(errorMessage),
         error_http_status: status,
         duration_ms: Math.max(0, (attempt.completedAtMs ?? Date.now()) - attempt.startedAtMs),
         ...classified,
@@ -763,20 +763,20 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
   }
 
   /**
-   * The single writer for every Manifest-authored failure row: setup errors
+   * The single writer for every Thinker-authored failure row: setup errors
    * (M100/M101), limits (M200), rate limits (M201–M203), malformed requests
    * (M300), internal errors (M500), and expired keys (M004).
    *
    * `provider` and `routing_tier` are deliberately left NULL — no provider was
    * contacted and no tier was chosen. (The old canned-stub path wrote a
-   * placeholder `provider='manifest'` / `routing_tier='simple'`, which put a
-   * meaningless SIMPLE badge on setup errors and a phantom "manifest" entry in
+   * placeholder `provider='thinker'` / `routing_tier='simple'`, which put a
+   * meaningless SIMPLE badge on setup errors and a phantom "thinker" entry in
    * the Messages provider dropdown.) `model` keeps the model the caller asked
    * for, which is real information.
    */
-  async recordManifestBlockedRequest(
+  async recordThinkerBlockedRequest(
     ctx: IngestionContext,
-    opts: ManifestBlockedRequestOpts,
+    opts: ThinkerBlockedRequestOpts,
   ): Promise<void> {
     const {
       requestId = uuid(),
@@ -921,8 +921,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           error_message: errorMessage,
           // Credential hop failures embed M100/M102 in the body; stamp the
           // code so filters/analytics do not have to parse error_message.
-          error_code:
-            extractManifestErrorCode(errorMessage) ?? extractManifestErrorCode(f.errorBody),
+          error_code: extractThinkerErrorCode(errorMessage) ?? extractThinkerErrorCode(f.errorBody),
           error_http_status: f.status,
           model: canonical.model,
           provider: canonical.provider,
@@ -1010,7 +1009,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       error_message: errorMessage,
       // Credential failures (M100/M102) land here with a peacock body; stamp
       // error_code so Messages filters and analytics can group on it.
-      error_code: extractManifestErrorCode(errorMessage) ?? extractManifestErrorCode(errorBody),
+      error_code: extractThinkerErrorCode(errorMessage) ?? extractThinkerErrorCode(errorBody),
       error_http_status: opts?.httpStatus ?? null,
       model: canonical.model,
       provider: canonical.provider,
@@ -1196,8 +1195,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
 
     const normalizedSessionKey = normalizeSessionKey(sessionKey);
 
-    // Manifest's own canned stubs never reach here — the controller routes them
-    // to recordManifestBlockedRequest, which is the sole writer of Manifest rows.
+    // Thinker's own canned stubs never reach here — the controller routes them
+    // to recordThinkerBlockedRequest, which is the sole writer of Thinker rows.
     const status = 'ok';
     const errorMessage = null;
 

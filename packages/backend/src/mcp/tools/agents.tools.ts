@@ -23,7 +23,7 @@ export function registerAgentTools(
   };
 
   server.registerTool(
-    'manifest_agent_list',
+    'thinker_agent_list',
     {
       title: 'List agents',
       description: 'List the workspace harnesses (agents) with usage rollups.',
@@ -56,7 +56,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_get',
+    'thinker_agent_get',
     {
       title: 'Get an agent',
       description: 'Fetch one harness by name (slug).',
@@ -70,7 +70,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_platforms',
+    'thinker_agent_platforms',
     {
       title: 'List agent platforms',
       description: 'List valid agent platforms and categories for create/update.',
@@ -89,7 +89,7 @@ export function registerAgentTools(
   if (!operator.scopes.has(MCP_WRITE_SCOPE)) return;
 
   server.registerTool(
-    'manifest_agent_create',
+    'thinker_agent_create',
     {
       title: 'Create an agent',
       description:
@@ -148,7 +148,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_update',
+    'thinker_agent_update',
     {
       title: 'Update an agent',
       description: 'Rename a harness or change its category/platform.',
@@ -188,7 +188,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_delete',
+    'thinker_agent_delete',
     {
       title: 'Delete an agent',
       description: 'Soft-delete a harness and deactivate its key.',
@@ -206,7 +206,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_rotate_key',
+    'thinker_agent_rotate_key',
     {
       title: 'Rotate an agent key',
       description: 'Rotate the harness ingest key and return the new key once.',
@@ -223,7 +223,7 @@ export function registerAgentTools(
   );
 
   server.registerTool(
-    'manifest_agent_key_show',
+    'thinker_agent_key_show',
     {
       title: 'Show an agent key',
       description:

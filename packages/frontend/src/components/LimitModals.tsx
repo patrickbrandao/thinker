@@ -94,7 +94,9 @@ const DeleteRuleModal: Component<DeleteRuleModalProps> = (props) => (
           style="max-width: 440px;"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 class="modal-card__title" id="delete-rule-modal-title">Delete rule</h2>
+          <h2 class="modal-card__title" id="delete-rule-modal-title">
+            Delete rule
+          </h2>
           <p class="modal-card__desc">
             This will permanently delete the{' '}
             <span style="font-weight: 600;">
@@ -152,7 +154,9 @@ const RemoveProviderModal: Component<RemoveProviderModalProps> = (props) => (
           style="max-width: 440px;"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 class="modal-card__title" id="remove-provider-modal-title">Remove provider</h2>
+          <h2 class="modal-card__title" id="remove-provider-modal-title">
+            Remove provider
+          </h2>
           <p class="modal-card__desc">
             This will disconnect your email provider.
             <Show when={props.hasEmailRules}>

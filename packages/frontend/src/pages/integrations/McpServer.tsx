@@ -5,7 +5,7 @@ import CodeBlock from '../../components/CodeBlock.jsx';
 import { mcpEndpoint } from '../../services/install-endpoints.js';
 import { checkMcpEnabled } from '../../services/setup-status.js';
 
-const DOCS_URL = 'https://manifest.build/llm-gateway/docs/integrations/mcp/';
+import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
 
 interface ClientSetup {
   id: string;
@@ -26,14 +26,14 @@ export function clientSetups(endpoint: string): [ClientSetup, ...ClientSetup[]] 
       label: 'Claude Code',
       icon: PLATFORM_ICONS['claude-code'],
       language: 'bash',
-      code: `claude mcp add --transport http manifest ${endpoint}`,
+      code: `claude mcp add --transport http thinker ${endpoint}`,
     },
     {
       id: 'codex',
       label: 'Codex',
       icon: PLATFORM_ICONS.codex,
       language: 'bash',
-      code: `codex mcp add manifest --url ${endpoint}\ncodex mcp login manifest`,
+      code: `codex mcp add thinker --url ${endpoint}\ncodex mcp login thinker`,
     },
     {
       id: 'opencode',
@@ -43,7 +43,7 @@ export function clientSetups(endpoint: string): [ClientSetup, ...ClientSetup[]] 
       code: `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "manifest": {
+    "thinker": {
       "type": "remote",
       "url": "${endpoint}",
       "enabled": true
@@ -58,7 +58,7 @@ export function clientSetups(endpoint: string): [ClientSetup, ...ClientSetup[]] 
       language: 'json',
       code: `{
   "mcpServers": {
-    "manifest": {
+    "thinker": {
       "url": "${endpoint}"
     }
   }
@@ -80,10 +80,10 @@ const McpServer: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>MCP server - Manifest</Title>
+      <Title>MCP server - Thinker</Title>
       <Meta
         name="description"
-        content="Connect Claude, Cursor, Codex and other MCP clients to this Manifest install over OAuth."
+        content="Connect Claude, Cursor, Codex and other MCP clients to this Thinker install over OAuth."
       />
       <div class="page-header">
         <div>
@@ -153,7 +153,7 @@ const McpServer: Component = () => {
           <div class="integration-panel__header">
             <div class="panel__title">Read-only or read-and-write</div>
             <a
-              href={DOCS_URL}
+              href={THINKER_DOCS_URL}
               target="_blank"
               rel="noopener noreferrer"
               class="btn btn--outline btn--sm"

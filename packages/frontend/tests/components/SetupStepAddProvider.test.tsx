@@ -20,7 +20,7 @@ describe("SetupStepAddProvider", () => {
 
   it("renders heading", () => {
     render(() => <SetupStepAddProvider {...defaultProps} />);
-    expect(screen.getByText("Connect your harness to Manifest")).toBeDefined();
+    expect(screen.getByText("Connect your harness to Thinker")).toBeDefined();
   });
 
   it("shows description with auto model", () => {
@@ -79,7 +79,7 @@ describe("SetupStepAddProvider", () => {
     const { container } = render(() => <SetupStepAddProvider {...defaultProps} />);
     const agentTabs = container.querySelectorAll(".panel__tab");
     fireEvent.click(agentTabs[3]); // Craft Agent
-    expect(container.textContent).toContain("Manifest provider preset");
+    expect(container.textContent).toContain("custom OpenAI-compatible endpoint");
     expect(container.textContent).toContain("thk_YOUR_KEY");
   });
 
@@ -88,7 +88,7 @@ describe("SetupStepAddProvider", () => {
     const agentTabs = container.querySelectorAll(".panel__tab");
     fireEvent.click(agentTabs[5]); // OpenCode
     expect(container.textContent).toContain("~/.config/opencode/opencode.json");
-    expect(container.textContent).toContain('"model": "manifest/auto"');
+    expect(container.textContent).toContain('"model": "thinker/auto"');
   });
 
   it("shows Codex setup when Codex tab clicked", () => {
@@ -123,7 +123,7 @@ describe("SetupStepAddProvider", () => {
     const { container } = render(() => <SetupStepAddProvider {...defaultProps} />);
     const agentTabs = container.querySelectorAll(".panel__tab");
     fireEvent.click(agentTabs[1]); // Hermes Agent
-    expect(container.textContent).toContain("Point Hermes at the Manifest endpoint");
+    expect(container.textContent).toContain("Point Hermes at the Thinker endpoint");
   });
 
   it("switches back to OpenClaw from Hermes Agent", () => {
@@ -132,7 +132,7 @@ describe("SetupStepAddProvider", () => {
     fireEvent.click(agentTabs[1]); // Hermes
     fireEvent.click(agentTabs[0]); // OpenClaw
     expect(container.textContent).toContain("thinker/auto");
-    expect(container.textContent).not.toContain("Point Hermes at the Manifest endpoint");
+    expect(container.textContent).not.toContain("Point Hermes at the Thinker endpoint");
   });
 
   it("shows CLI and openclaw onboard sub-tabs", () => {
@@ -191,33 +191,33 @@ describe("SetupStepAddProvider", () => {
 
   it("shows eye toggle on CLI sub-tab when apiKey provided", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} apiKey="mnfst_secret" keyPrefix="mnfst_abc" />
+      <SetupStepAddProvider {...defaultProps} apiKey="thk_secret" keyPrefix="thk_abc" />
     ));
     expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
   });
 
   it("reveals key in CLI commands when eye toggle clicked", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} apiKey="mnfst_secret" keyPrefix="mnfst_abc" />
+      <SetupStepAddProvider {...defaultProps} apiKey="thk_secret" keyPrefix="thk_abc" />
     ));
-    expect(container.textContent).toContain("mnfst_abc...");
-    expect(container.textContent).not.toContain("mnfst_secret");
+    expect(container.textContent).toContain("thk_abc...");
+    expect(container.textContent).not.toContain("thk_secret");
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    expect(container.textContent).toContain("mnfst_secret");
+    expect(container.textContent).toContain("thk_secret");
   });
 
   it("hides key again on second CLI eye toggle click", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} apiKey="mnfst_secret" keyPrefix="mnfst_abc" />
+      <SetupStepAddProvider {...defaultProps} apiKey="thk_secret" keyPrefix="thk_abc" />
     ));
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
     fireEvent.click(container.querySelector('[aria-label="Hide API key"]')!);
-    expect(container.textContent).not.toContain("mnfst_secret");
+    expect(container.textContent).not.toContain("thk_secret");
   });
 
   it("does not show eye toggle on CLI when no apiKey", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} keyPrefix="mnfst_abc" />
+      <SetupStepAddProvider {...defaultProps} keyPrefix="thk_abc" />
     ));
     expect(container.querySelector('[aria-label="Reveal API key"]')).toBeNull();
   });
@@ -241,10 +241,10 @@ describe("SetupStepAddProvider", () => {
 
   it("shows full API key on Toolkits tab when provided", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} apiKey="mnfst_test_key" />
+      <SetupStepAddProvider {...defaultProps} apiKey="thk_test_key" />
     ));
     fireEvent.click(container.querySelectorAll(".setup-segment__btn")[1]);
-    expect(container.textContent).toContain("mnfst_test_key");
+    expect(container.textContent).toContain("thk_test_key");
   });
 
   it("shows placeholder when no apiKey or keyPrefix", () => {
@@ -277,10 +277,10 @@ describe("SetupStepAddProvider", () => {
 
   it("includes api key in CLI snippet", () => {
     const { container } = render(() => (
-      <SetupStepAddProvider {...defaultProps} apiKey="mnfst_test" keyPrefix="mnfst_tes" />
+      <SetupStepAddProvider {...defaultProps} apiKey="thk_test" keyPrefix="thk_tes" />
     ));
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    expect(container.textContent).toContain("mnfst_test");
+    expect(container.textContent).toContain("thk_test");
   });
 
   describe("platform-filtered mode", () => {
@@ -288,7 +288,7 @@ describe("SetupStepAddProvider", () => {
       const { container } = render(() => (
         <SetupStepAddProvider {...defaultProps} platform="openclaw" />
       ));
-      expect(container.textContent).toContain("Register Manifest in your OpenClaw config");
+      expect(container.textContent).toContain("Register Thinker in your OpenClaw config");
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });
 
@@ -296,14 +296,14 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="openclaw" />
       ));
-      expect(screen.getByText("Connect your OpenClaw harness to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect your OpenClaw harness to Thinker")).toBeDefined();
     });
 
     it("shows HermesSetup directly when platform is hermes", () => {
       const { container } = render(() => (
         <SetupStepAddProvider {...defaultProps} platform="hermes" />
       ));
-      expect(container.textContent).toContain("Point Hermes at the Manifest endpoint");
+      expect(container.textContent).toContain("Point Hermes at the Thinker endpoint");
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });
 
@@ -311,7 +311,7 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="hermes" />
       ));
-      expect(screen.getByText("Connect your Hermes harness to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect your Hermes harness to Thinker")).toBeDefined();
     });
 
     it("shows NanobotSetup directly when platform is nanobot", () => {
@@ -328,14 +328,14 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="nanobot" />
       ));
-      expect(screen.getByText("Connect your Nanobot harness to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect your Nanobot harness to Thinker")).toBeDefined();
     });
 
     it("shows CraftAgentSetup directly when platform is craft", () => {
       const { container } = render(() => (
         <SetupStepAddProvider {...defaultProps} platform="craft" />
       ));
-      expect(container.textContent).toContain("Manifest provider preset");
+      expect(container.textContent).toContain("custom OpenAI-compatible endpoint");
       expect(container.textContent).toContain("thk_YOUR_KEY");
       // No top-level Agents/Toolkits tabs in filtered mode.
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
@@ -345,21 +345,21 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="craft" />
       ));
-      expect(screen.getByText("Connect your Craft harness to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect your Craft harness to Thinker")).toBeDefined();
     });
 
     it("shows n8n setup guidance with docs and credential values", () => {
       const { container } = render(() => (
-        <SetupStepAddProvider {...defaultProps} platform="n8n" keyPrefix="mnfst_abc" />
+        <SetupStepAddProvider {...defaultProps} platform="n8n" keyPrefix="thk_abc" />
       ));
-      expect(screen.getByText("Connect n8n to Manifest")).toBeDefined();
-      expect(container.textContent).toContain("n8n-nodes-manifest");
-      expect(container.textContent).toContain("Manifest Chat Model node");
-      expect(container.textContent).toContain("Create or select Manifest credentials");
+      expect(screen.getByText("Connect n8n to Thinker")).toBeDefined();
+      expect(container.textContent).toContain("n8n-nodes-thinker");
+      expect(container.textContent).toContain("Thinker Chat Model node");
+      expect(container.textContent).toContain("Create or select Thinker credentials");
       expect(container.textContent).toContain("set the node model to auto");
       expect(container.textContent).toContain("http://localhost:3001");
       expect(container.textContent).not.toContain("http://localhost:3001/v1");
-      expect(container.textContent).toContain("mnfst_abc...");
+      expect(container.textContent).toContain("thk_abc...");
       expect(container.textContent).toContain("auto");
       expect(container.textContent).not.toContain("not bundled");
       const docsLink = container.querySelector(
@@ -367,9 +367,7 @@ describe("SetupStepAddProvider", () => {
       );
       expect(docsLink).not.toBeNull();
       expect(docsLink!.textContent).toContain("n8n community node installation docs");
-      expect(
-        container.querySelector('a[href="https://www.npmjs.com/package/n8n-nodes-manifest"]'),
-      ).not.toBeNull();
+      expect(container.querySelector('a[href*="npmjs.com"]')).toBeNull();
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });
 
@@ -378,16 +376,16 @@ describe("SetupStepAddProvider", () => {
         <SetupStepAddProvider
           {...defaultProps}
           platform="n8n"
-          apiKey="mnfst_secret"
-          keyPrefix="mnfst_sec"
+          apiKey="thk_secret"
+          keyPrefix="thk_sec"
         />
       ));
 
-      expect(screen.queryByText("mnfst_secret")).toBeNull();
+      expect(screen.queryByText("thk_secret")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Reveal API key" }));
-      expect(screen.getByText("mnfst_secret")).toBeDefined();
+      expect(screen.getByText("thk_secret")).toBeDefined();
       fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
-      expect(screen.queryByText("mnfst_secret")).toBeNull();
+      expect(screen.queryByText("thk_secret")).toBeNull();
     });
 
     it("shows ClaudeCodeSetup directly when platform is claude-code", () => {
@@ -404,7 +402,7 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="claude-code" />
       ));
-      expect(screen.getByText("Connect Claude Code to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect Claude Code to Thinker")).toBeDefined();
     });
 
     it("shows OpenCodeSetup directly when platform is opencode", () => {
@@ -412,7 +410,7 @@ describe("SetupStepAddProvider", () => {
         <SetupStepAddProvider {...defaultProps} platform="opencode" />
       ));
       expect(container.textContent).toContain("~/.config/opencode/opencode.json");
-      expect(container.textContent).toContain('"model": "manifest/auto"');
+      expect(container.textContent).toContain('"model": "thinker/auto"');
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });
 
@@ -420,7 +418,7 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="opencode" />
       ));
-      expect(screen.getByText("Connect OpenCode to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect OpenCode to Thinker")).toBeDefined();
     });
 
     it("shows CodexSetup directly when platform is codex", () => {
@@ -436,7 +434,7 @@ describe("SetupStepAddProvider", () => {
       render(() => (
         <SetupStepAddProvider {...defaultProps} platform="codex" />
       ));
-      expect(screen.getByText("Connect Codex to Manifest")).toBeDefined();
+      expect(screen.getByText("Connect Codex to Thinker")).toBeDefined();
     });
 
     it("shows OpenAI SDK snippet when platform is openai-sdk", () => {
@@ -507,14 +505,14 @@ describe("SetupStepAddProvider", () => {
       const { container } = render(() => (
         <SetupStepAddProvider {...defaultProps} platform="openclaw" />
       ));
-      expect(container.textContent).toContain("Connect your OpenClaw harness to Manifest");
+      expect(container.textContent).toContain("Connect your OpenClaw harness to Thinker");
     });
 
     it("does not show description text in filtered mode", () => {
       const { container } = render(() => (
         <SetupStepAddProvider {...defaultProps} platform="openclaw" />
       ));
-      expect(container.textContent).not.toContain("Point your harness at the Manifest endpoint");
+      expect(container.textContent).not.toContain("Point your harness at the Thinker endpoint");
     });
   });
 });

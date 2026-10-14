@@ -1,19 +1,20 @@
 {
-  "name": "mnfst-gateway-cli",
+  "name": "thinker-cli",
   "version": "0.1.0",
-  "description": "Manifest gateway management CLI (mnfst) — configure agents, providers, and routing from the terminal",
+  "private": true,
+  "description": "Thinker gateway management CLI (thinker): configure agents, providers, and routing from the terminal",
   "license": "MIT",
-  "homepage": "https://manifest.build/llm-gateway/docs/cli/",
+  "homepage": "https://github.com/patrickbrandao/thinker/tree/main/packages/cli#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mnfst/llm-gateway.git",
+    "url": "git+https://github.com/patrickbrandao/thinker.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/mnfst/llm-gateway/issues"
+    "url": "https://github.com/patrickbrandao/thinker/issues"
   },
   "keywords": [
-    "manifest",
+    "thinker",
     "llm",
     "gateway",
     "router",
@@ -22,7 +23,7 @@
     "openai-compatible"
   ],
   "bin": {
-    "mnfst": "bin/mnfst.js"
+    "thinker": "bin/thinker.js"
   },
   "main": "dist/index.js",
   "files": [
@@ -34,13 +35,8 @@
   "engines": {
     "node": ">=20"
   },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && npm run gen && tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
     "gen": "node scripts/generate-provider-catalog.cjs && node scripts/generate-skill-content.cjs",

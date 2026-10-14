@@ -382,7 +382,7 @@ describe('ApiKeyGuard', () => {
     ]);
     const ctx = makeContext({ 'x-api-key': rawKey });
 
-    await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired — run mnfst login');
+    await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired — run thinker login');
   });
 
   it('slides expires_at forward on successful auth for expiring keys', async () => {
@@ -439,7 +439,7 @@ describe('ApiKeyGuard', () => {
       getClass: () => ({}),
     } as unknown as ExecutionContext;
 
-    await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired — run mnfst login');
+    await expect(guard.canActivate(ctx)).rejects.toThrow('API key expired — run thinker login');
     // No credential attached, no renewal written.
     expect(request.tenantContext).toBeUndefined();
     expect(mockExecute).not.toHaveBeenCalled();

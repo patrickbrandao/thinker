@@ -1,5 +1,5 @@
 /**
- * #17: Thinker makes no outbound call of its own. Upstream Manifest phoned home
+ * #17: Thinker makes no outbound call of its own. Upstream Thinker phoned home
  * from the backend and the CLI: usage telemetry, a daily update check against
  * GitHub releases, the setup-questionnaire forwarding, Sentry, the hourly
  * modelparams.dev catalog refresh, and a hosted Wingman origin always allowed by
@@ -24,26 +24,21 @@ import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 const FORBIDDEN_DESTINATIONS = [
   'telemetry.manifest.build',
   'blue.manifest.build',
-  'api.github.com/repos/mnfst',
+  'api.github.com/repos/thinker',
   'modelparams.dev',
   'wingman.manifest.build',
   'sentry.io',
 ];
 /**
- * Manifest Cloud's API hosts. A CLI defaulting to one sent the user's key there
+ * Thinker Cloud's API hosts. A CLI defaulting to one sent the user's key there
  * whenever no host was configured; nothing may target them by default.
  */
 const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
 /**
- * Backend production files that still name a hosted gateway host, none of them
- * as a request destination: the dashboard link fallback with the OG-tag
- * placeholder it matches in the frontend's index.html (#22, #25). The list may
- * only shrink.
+ * Backend production files that still name a hosted gateway host. None are
+ * left (#22): the dashboard link fallback is now the local default port.
  */
-const BACKEND_HOSTED_GATEWAY_LEFTOVERS = [
-  'backend/src/common/utils/dashboard-url.ts',
-  'backend/src/common/utils/og-rewrite.ts',
-];
+const BACKEND_HOSTED_GATEWAY_LEFTOVERS: string[] = [];
 const OPENCODE_GO_DOC_HOST = 'raw.githubusercontent.com';
 const ADR_0003_CATALOG_HOSTS = new Set(['openrouter.ai', 'models.dev', OPENCODE_GO_DOC_HOST]);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);

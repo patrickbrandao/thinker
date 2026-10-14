@@ -1,5 +1,5 @@
 /**
- * #16: Thinker makes no call to Manifest's hosted healer. Upstream pinged
+ * #16: Thinker makes no call to Thinker's hosted healer. Upstream pinged
  * `autofix.manifest.build` on every production boot (AutofixHealthProbe) and on
  * every repairable 4xx (the heal-once flow). Both are gone; this guards against
  * either coming back.

@@ -53,7 +53,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       const result = await controller.authorize(
@@ -66,7 +66,7 @@ describe('OpenaiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
       expect(result).toEqual({ url: 'https://auth.openai.com/oauth/...' });
@@ -75,7 +75,7 @@ describe('OpenaiOauthController', () => {
     it('throws 400 when agentName is missing', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -90,7 +90,7 @@ describe('OpenaiOauthController', () => {
     it('throws 400 when agentName is empty string', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -106,7 +106,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -120,7 +120,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -131,7 +131,7 @@ describe('OpenaiOauthController', () => {
     it('uses BETTER_AUTH_URL from config when set, ignoring Host header', async () => {
       resolveAgent.resolve.mockResolvedValue({ id: 'agent-id-1', tenant_id: 'tenant-1' } as never);
       oauthService.generateAuthorizationUrl.mockResolvedValue('https://auth.openai.com/oauth/...');
-      configService.get.mockReturnValue('https://manifest.example.com');
+      configService.get.mockReturnValue('https://thinker.example.com');
 
       const req = {
         protocol: 'http',
@@ -147,7 +147,7 @@ describe('OpenaiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'https://manifest.example.com',
+        'https://thinker.example.com',
         'user-1',
       );
     });
@@ -375,7 +375,7 @@ describe('OpenaiOauthController', () => {
       const cspCall = res.setHeader.mock.calls.find((c) => c[0] === 'Content-Security-Policy');
       expect(cspCall).toBeDefined();
       expect(cspCall![1]).toMatch(/^default-src 'none'; script-src 'nonce-[A-Za-z0-9+/=]+'$/);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('manifest-oauth-success'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('thinker-oauth-success'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Login successful'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('BroadcastChannel'));
       // Script tag should include the nonce
@@ -390,7 +390,7 @@ describe('OpenaiOauthController', () => {
       const cspCall = res.setHeader.mock.calls.find((c) => c[0] === 'Content-Security-Policy');
       expect(cspCall).toBeDefined();
       expect(cspCall![1]).toMatch(/^default-src 'none'; script-src 'nonce-[A-Za-z0-9+/=]+'$/);
-      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('manifest-oauth-error'));
+      expect(res.send).toHaveBeenCalledWith(expect.stringContaining('thinker-oauth-error'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Login failed'));
       expect(res.send).toHaveBeenCalledWith(expect.stringContaining('BroadcastChannel'));
     });

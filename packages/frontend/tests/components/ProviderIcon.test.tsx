@@ -40,12 +40,12 @@ describe('providerIcon', () => {
     });
   }
 
-  it('returns the branded <img> for "manifest"', () => {
-    const { container } = render(() => <div>{providerIcon('manifest')}</div>);
+  it('returns the Thinker mark for the gateway marker "thinker"', () => {
+    const { container } = render(() => <div>{providerIcon('thinker')}</div>);
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    expect(img?.getAttribute('src')).toBe('/icons/manifest.svg');
-    expect(img?.getAttribute('alt')).toBe('Manifest');
+    expect(img?.getAttribute('src')).toBe('/brand/thinker-mark.svg?v=1');
+    expect(img?.getAttribute('alt')).toBe('Thinker');
   });
 
   it('returns the Meta logo image for "meta"', () => {

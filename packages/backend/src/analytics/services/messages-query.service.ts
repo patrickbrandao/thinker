@@ -29,7 +29,7 @@ import type {
 import { computeCutoff, sqlCastFloat, sqlSanitizeCost } from '../../common/utils/postgres-sql';
 import { inferProviderFromModel } from '../../common/utils/provider-inference';
 import { TtlCache } from '../../common/utils/ttl-cache';
-import { ManifestRequest } from '../../entities/request.entity';
+import { ThinkerRequest } from '../../entities/request.entity';
 import { HeaderTier } from '../../entities/header-tier.entity';
 
 // The Messages-log "failed"/"errors" filters and every "messages" KPI count
@@ -234,8 +234,8 @@ export class MessagesQueryService {
     @InjectRepository(CustomProvider)
     private readonly customProviderRepo: Repository<CustomProvider>,
     @Optional()
-    @InjectRepository(ManifestRequest)
-    private readonly requestRepo?: Repository<ManifestRequest>,
+    @InjectRepository(ThinkerRequest)
+    private readonly requestRepo?: Repository<ThinkerRequest>,
     @Optional()
     @InjectRepository(TenantProvider)
     private readonly tenantProviderRepo?: Repository<TenantProvider>,
@@ -349,7 +349,7 @@ export class MessagesQueryService {
     } else if (params.status) {
       qb.andWhere('r.status = :requestStatus', { requestStatus: params.status });
     }
-    if (params.origin === 'manifest') {
+    if (params.origin === 'thinker') {
       qb.andWhere(`r.error_origin IN ('config', 'policy', 'internal', 'request')`);
     } else if (params.origin) {
       qb.andWhere('r.error_origin = :requestOrigin', { requestOrigin: params.origin });
@@ -362,7 +362,7 @@ export class MessagesQueryService {
     if (params.models?.length) {
       // Kept outside `attemptPredicates` on purpose: those AND together on ONE
       // attempt row, while a model match is about the request as a whole. The
-      // requested_model arm catches Manifest-blocked requests, which carry no
+      // requested_model arm catches Thinker-blocked requests, which carry no
       // attempt but still render a model in the log.
       qb.andWhere(
         `(EXISTS (
@@ -799,7 +799,7 @@ export class MessagesQueryService {
     const providers = this.deriveProviders(distinctRows.models, distinctRows.providers);
     const providerLabels = await this.resolveCustomProviderLabels(providers, params.tenantId);
     // The distinct-model scan already ran to derive providers, so the Model
-    // filter reuses it. It only sees `agent_messages`, though: a request Manifest
+    // filter reuses it. It only sees `agent_messages`, though: a request Thinker
     // blocked before any provider call has no attempt, and the log renders its
     // `requested_model` in the Model column. Those models must be selectable too,
     // or the column shows a value the dropdown cannot offer.
@@ -924,10 +924,10 @@ export class MessagesQueryService {
     this.applyTriggerFilter(qb, params.triggers);
 
     // Error-origin scope. Nothing is hidden by default: the log is the complete
-    // event listing, and a Manifest setup error is exactly the row a user needs
-    // to see to fix their setup. `manifest` is a shorthand for every
-    // Manifest-authored origin at once.
-    if (params.origin === 'manifest') {
+    // event listing, and a Thinker setup error is exactly the row a user needs
+    // to see to fix their setup. `thinker` is a shorthand for every
+    // Thinker-authored origin at once.
+    if (params.origin === 'thinker') {
       qb.andWhere(THINKER_ORIGIN_PREDICATE);
     } else if (params.origin) {
       qb.andWhere('at.error_origin = :originFilter', { originFilter: params.origin });

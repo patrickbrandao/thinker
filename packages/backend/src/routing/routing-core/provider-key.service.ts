@@ -13,7 +13,7 @@ import {
   expandProviderNames,
   inferProviderFromModelName,
 } from '../../common/utils/provider-aliases';
-import { isManifestUsableProvider } from '../../common/utils/subscription-support';
+import { isThinkerUsableProvider } from '../../common/utils/subscription-support';
 
 /**
  * Sentinel id for the built-in Ollama tile. getProviderKeys() short-circuits
@@ -297,7 +297,7 @@ export class ProviderKeyService {
 
     const scopedRecords = await this.filterProvidersForAgent(records, agentId);
     const matches = scopedRecords.filter(
-      (r) => isManifestUsableProvider(r) && names.has(r.provider.toLowerCase()),
+      (r) => isThinkerUsableProvider(r) && names.has(r.provider.toLowerCase()),
     );
     if (matches.length === 0) return [];
 
@@ -386,7 +386,7 @@ export class ProviderKeyService {
         }),
         agentId,
       )
-    ).filter(isManifestUsableProvider);
+    ).filter(isThinkerUsableProvider);
     if (pricing) {
       const names = expandProviderNames([pricing.provider]);
       if (records.find((r) => names.has(r.provider.toLowerCase()))) return true;
@@ -442,7 +442,7 @@ export class ProviderKeyService {
         }),
         agentId,
       )
-    ).filter(isManifestUsableProvider);
+    ).filter(isThinkerUsableProvider);
     return records.some(
       (r) =>
         providerNames.has(r.provider.toLowerCase()) &&

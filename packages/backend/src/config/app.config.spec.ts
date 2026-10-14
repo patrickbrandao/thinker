@@ -19,10 +19,10 @@ describe('appConfig', () => {
     return appConfig();
   }
 
-  it('returns default port 3001', async () => {
+  it('returns default port 2099', async () => {
     delete process.env['PORT'];
     const config = await loadConfig();
-    expect(config.port).toBe(3001);
+    expect(config.port).toBe(2099);
   });
 
   it('reads PORT from env', async () => {
@@ -249,10 +249,10 @@ describe('appConfig', () => {
     expect(config.emailFrom).toBe('legacy@example.com');
   });
 
-  it('defaults emailFrom to noreply@manifest.build', async () => {
+  it('defaults emailFrom to noreply@thinker.example.com', async () => {
     delete process.env['EMAIL_FROM'];
     delete process.env['NOTIFICATION_FROM_EMAIL'];
     const config = await loadConfig();
-    expect(config.emailFrom).toBe('noreply@manifest.build');
+    expect(config.emailFrom).toBe('noreply@thinker.example.com');
   });
 });

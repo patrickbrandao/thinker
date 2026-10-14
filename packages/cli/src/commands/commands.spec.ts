@@ -20,7 +20,7 @@ function authedIo(
 ) {
   const stub = fetchStub(replies);
   const io = makeIo({
-    env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key', ...extra },
+    env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key', ...extra },
     fetchImpl: stub.impl,
   });
   return { io, calls: stub.calls };
@@ -33,10 +33,10 @@ describe('auth commands', () => {
   it('login --token-env validates via /me, stores host-bound, never echoes the token', async () => {
     const stub = fetchStub([{ status: 200, body: ME }]);
     const io = makeIo({
-      env: { MNFST_TOKEN: 'tok-123', MANIFEST_URL: HOST },
+      env: { THINKER_TOKEN: 'tok-123', THINKER_URL: HOST },
       fetchImpl: stub.impl,
     });
-    expect(await run(io, ['login', '--token-env', 'MNFST_TOKEN'])).toBe(0);
+    expect(await run(io, ['login', '--token-env', 'THINKER_TOKEN'])).toBe(0);
 
     expect(stub.calls[0].url).toBe(`${HOST}/api/v1/me`);
     expect(io.lastJson()).toEqual({
@@ -50,7 +50,7 @@ describe('auth commands', () => {
     });
     expect(io.lines.join('\n')).not.toContain('tok-123');
 
-    const configFile = path.join(io.configDir, 'manifest', 'config.json');
+    const configFile = path.join(io.configDir, 'thinker', 'config.json');
     expect(JSON.parse(fs.readFileSync(configFile, 'utf8'))).toEqual({
       activeHost: HOST,
       hosts: { [HOST]: { apiKey: 'tok-123' } },
@@ -60,31 +60,31 @@ describe('auth commands', () => {
 
   it('login --token-stdin reads the token from stdin', async () => {
     const stub = fetchStub([{ status: 200, body: ME }]);
-    const io = makeIo({ stdin: 'tok-stdin\n', env: { MANIFEST_URL: HOST }, fetchImpl: stub.impl });
+    const io = makeIo({ stdin: 'tok-stdin\n', env: { THINKER_URL: HOST }, fetchImpl: stub.impl });
     expect(await run(io, ['login', '--token-stdin'])).toBe(0);
     expect(stub.calls[0].headers['X-API-Key']).toBe('tok-stdin');
   });
 
   it('login with an invalid token surfaces the 401 and stores nothing', async () => {
     const stub = fetchStub([{ status: 401, body: { message: 'Invalid API key' } }]);
-    const io = makeIo({ env: { MNFST_TOKEN: 'bad', MANIFEST_URL: HOST }, fetchImpl: stub.impl });
-    expect(await run(io, ['login', '--token-env', 'MNFST_TOKEN'])).toBe(1);
+    const io = makeIo({ env: { THINKER_TOKEN: 'bad', THINKER_URL: HOST }, fetchImpl: stub.impl });
+    expect(await run(io, ['login', '--token-env', 'THINKER_TOKEN'])).toBe(1);
     expect(io.lastJson()).toMatchObject({
       error: expect.any(String),
       message: 'Invalid API key',
       status: 401,
     });
-    expect(fs.existsSync(path.join(io.configDir, 'manifest', 'config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(io.configDir, 'thinker', 'config.json'))).toBe(false);
   });
 
   it('login with both token sources fails with the no-argv rule', async () => {
-    const io = makeIo({ env: { MNFST_TOKEN: 't' } });
-    expect(await run(io, ['login', '--token-stdin', '--token-env', 'MNFST_TOKEN'])).toBe(1);
+    const io = makeIo({ env: { THINKER_TOKEN: 't' } });
+    expect(await run(io, ['login', '--token-stdin', '--token-env', 'THINKER_TOKEN'])).toBe(1);
     expect(io.lastJson()).toMatchObject({ error: 'credential_source_required' });
   });
 
   it('login with no flags refuses browser login outside a TTY', async () => {
-    const io = makeIo({ env: { MANIFEST_URL: HOST }, isTTY: false });
+    const io = makeIo({ env: { THINKER_URL: HOST }, isTTY: false });
     expect(await run(io, ['login'])).toBe(1);
     expect(io.lastJson()).toMatchObject({
       error: 'no_tty',
@@ -99,7 +99,7 @@ describe('auth commands', () => {
       calls.push({ url, ...(init?.body ? { body: String(init.body) } : {}) });
       if (url.endsWith('/api/v1/cli/token')) {
         return new Response(
-          JSON.stringify({ token: 'mnfst_pat_browser', expiresAt: '2026-09-01T00:00:00.000Z' }),
+          JSON.stringify({ token: 'thk_pat_browser', expiresAt: '2026-09-01T00:00:00.000Z' }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }
@@ -110,7 +110,7 @@ describe('auth commands', () => {
     }) as typeof fetch;
 
     const io = makeIo({
-      env: { MANIFEST_URL: HOST },
+      env: { THINKER_URL: HOST },
       fetchImpl,
       isTTY: true,
       openBrowser: (url: string) => {
@@ -140,14 +140,14 @@ describe('auth commands', () => {
       source: 'config',
     });
     // The raw PAT is never echoed on stdout, only stored.
-    expect(io.lines.join('\n')).not.toContain('mnfst_pat_browser');
+    expect(io.lines.join('\n')).not.toContain('thk_pat_browser');
     expect(io.errLines.join('\n')).toContain('/cli/auth');
     const config = JSON.parse(
-      fs.readFileSync(path.join(io.configDir, 'manifest', 'config.json'), 'utf8'),
+      fs.readFileSync(path.join(io.configDir, 'thinker', 'config.json'), 'utf8'),
     );
     expect(config).toEqual({
       activeHost: HOST,
-      hosts: { [HOST]: { apiKey: 'mnfst_pat_browser' } },
+      hosts: { [HOST]: { apiKey: 'thk_pat_browser' } },
     });
   });
 
@@ -155,7 +155,7 @@ describe('auth commands', () => {
     const fetchImpl = (async (input: string | URL | Request) => {
       const url = String(input);
       const body = url.endsWith('/api/v1/cli/token')
-        ? { token: 'mnfst_pat_browser', expiresAt: '2026-10-01T00:00:00.000Z' }
+        ? { token: 'thk_pat_browser', expiresAt: '2026-10-01T00:00:00.000Z' }
         : { ...ME, expiresAt: null };
       return new Response(JSON.stringify(body), {
         status: 200,
@@ -163,7 +163,7 @@ describe('auth commands', () => {
       });
     }) as typeof fetch;
     const io = makeIo({
-      env: { MANIFEST_URL: HOST },
+      env: { THINKER_URL: HOST },
       fetchImpl,
       isTTY: true,
       openBrowser: (url: string) => {
@@ -179,14 +179,14 @@ describe('auth commands', () => {
     expect(io.lastJson()).toMatchObject({ expiresAt: '2026-10-01T00:00:00.000Z' });
   });
 
-  it('login honors --url over MANIFEST_URL', async () => {
+  it('login honors --url over THINKER_URL', async () => {
     const stub = fetchStub([{ status: 200, body: ME }]);
     const io = makeIo({
-      env: { MNFST_TOKEN: 't', MANIFEST_URL: 'http://env-host:1' },
+      env: { THINKER_TOKEN: 't', THINKER_URL: 'http://env-host:1' },
       fetchImpl: stub.impl,
     });
     expect(
-      await run(io, ['login', '--token-env', 'MNFST_TOKEN', '--url', 'http://flag-host:2']),
+      await run(io, ['login', '--token-env', 'THINKER_TOKEN', '--url', 'http://flag-host:2']),
     ).toBe(0);
     expect(stub.calls[0].url).toBe('http://flag-host:2/api/v1/me');
   });
@@ -197,7 +197,7 @@ describe('auth commands', () => {
     const fetchImpl = (async (input: string | URL | Request) => {
       const url = String(input);
       if (url.endsWith('/api/v1/cli/token')) {
-        return new Response(JSON.stringify({ token: 'mnfst_pat_orphan', expiresAt: null }), {
+        return new Response(JSON.stringify({ token: 'thk_pat_orphan', expiresAt: null }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -208,7 +208,7 @@ describe('auth commands', () => {
       });
     }) as typeof fetch;
     const io = makeIo({
-      env: { MANIFEST_URL: HOST },
+      env: { THINKER_URL: HOST },
       fetchImpl,
       isTTY: true,
       openBrowser: (url: string) => {
@@ -225,19 +225,19 @@ describe('auth commands', () => {
     expect(io.lastJson()).toMatchObject({
       error: 'login_validation_failed',
       message: 'Service Unavailable',
-      hint: expect.stringContaining('mnfst logout'),
+      hint: expect.stringContaining('thinker logout'),
     });
-    // Stored anyway, so `mnfst logout` can still revoke it server-side.
+    // Stored anyway, so `thinker logout` can still revoke it server-side.
     const config = JSON.parse(
-      fs.readFileSync(path.join(io.configDir, 'manifest', 'config.json'), 'utf8'),
+      fs.readFileSync(path.join(io.configDir, 'thinker', 'config.json'), 'utf8'),
     );
-    expect(config).toEqual({ activeHost: HOST, hosts: { [HOST]: { apiKey: 'mnfst_pat_orphan' } } });
+    expect(config).toEqual({ activeHost: HOST, hosts: { [HOST]: { apiKey: 'thk_pat_orphan' } } });
   });
 
   it('browser login reports a non-Error validation failure without losing the token', async () => {
     const fetchImpl = (async (input: string | URL | Request) => {
       if (String(input).endsWith('/api/v1/cli/token')) {
-        return new Response(JSON.stringify({ token: 'mnfst_pat_weird', expiresAt: null }), {
+        return new Response(JSON.stringify({ token: 'thk_pat_weird', expiresAt: null }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -246,7 +246,7 @@ describe('auth commands', () => {
       return { ok: true, status: 200, text: () => Promise.reject('stream torn') } as Response;
     }) as typeof fetch;
     const io = makeIo({
-      env: { MANIFEST_URL: HOST },
+      env: { THINKER_URL: HOST },
       fetchImpl,
       isTTY: true,
       openBrowser: (url: string) => {
@@ -264,24 +264,24 @@ describe('auth commands', () => {
       message: expect.stringContaining('stream torn'),
     });
     const config = JSON.parse(
-      fs.readFileSync(path.join(io.configDir, 'manifest', 'config.json'), 'utf8'),
+      fs.readFileSync(path.join(io.configDir, 'thinker', 'config.json'), 'utf8'),
     );
-    expect(config.hosts[HOST].apiKey).toBe('mnfst_pat_weird');
+    expect(config.hosts[HOST].apiKey).toBe('thk_pat_weird');
   });
 
   it('token-flag login stores nothing when /me rejects the user-supplied token', async () => {
     // Mirror image of the browser path: a token the user typed may be garbage,
     // so it must prove itself before it is written to disk.
     const stub = fetchStub([{ status: 401, body: { message: 'Invalid API key' } }]);
-    const io = makeIo({ env: { MNFST_TOKEN: 'bad', MANIFEST_URL: HOST }, fetchImpl: stub.impl });
-    expect(await run(io, ['login', '--token-env', 'MNFST_TOKEN'])).toBe(1);
+    const io = makeIo({ env: { THINKER_TOKEN: 'bad', THINKER_URL: HOST }, fetchImpl: stub.impl });
+    expect(await run(io, ['login', '--token-env', 'THINKER_TOKEN'])).toBe(1);
     expect(io.lastJson()).toMatchObject({ message: 'Invalid API key', status: 401 });
-    expect(fs.existsSync(path.join(io.configDir, 'manifest', 'config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(io.configDir, 'thinker', 'config.json'))).toBe(false);
   });
 
   it('logout on a host with nothing stored reports loggedOut: false and never calls the server', async () => {
     const stub = fetchStub([{ status: 200, body: { revoked: true } }]);
-    const io = makeIo({ env: { MANIFEST_URL: HOST }, fetchImpl: stub.impl });
+    const io = makeIo({ env: { THINKER_URL: HOST }, fetchImpl: stub.impl });
     expect(await run(io, ['logout'])).toBe(0);
     expect(io.lastJson()).toEqual({ loggedOut: false, revoked: false, url: HOST });
     expect(stub.calls).toHaveLength(0);
@@ -307,7 +307,7 @@ describe('auth commands', () => {
     expect(await run(io, ['logout', '--url', HOST])).toBe(0);
     expect(io.lastJson()).toEqual({ loggedOut: true, revoked: false, url: HOST });
     const config = JSON.parse(
-      fs.readFileSync(path.join(io.configDir, 'manifest', 'config.json'), 'utf8'),
+      fs.readFileSync(path.join(io.configDir, 'thinker', 'config.json'), 'utf8'),
     );
     expect(config).toEqual({ hosts: {} });
   });
@@ -322,13 +322,13 @@ describe('auth commands', () => {
     expect(await run(io, ['logout', '--url', HOST])).toBe(0);
     expect(io.lastJson()).toEqual({ loggedOut: true, revoked: false, url: HOST });
     const config = JSON.parse(
-      fs.readFileSync(path.join(io.configDir, 'manifest', 'config.json'), 'utf8'),
+      fs.readFileSync(path.join(io.configDir, 'thinker', 'config.json'), 'utf8'),
     );
     expect(config).toEqual({ hosts: { 'http://other:1': { apiKey: 'b' } } });
   });
 
   it('auth status reports unauthenticated with exit 1 and no fetch', async () => {
-    const io = makeIo({ env: { MANIFEST_URL: HOST } });
+    const io = makeIo({ env: { THINKER_URL: HOST } });
     expect(await run(io, ['auth', 'status'])).toBe(1);
     expect(io.lastJson()).toMatchObject({
       authenticated: false,
@@ -361,7 +361,7 @@ describe('auth commands', () => {
   it('config path prints the resolved config location', async () => {
     const io = makeIo();
     expect(await run(io, ['config', 'path'])).toBe(0);
-    expect(io.lastJson()).toEqual({ path: path.join(io.configDir, 'manifest', 'config.json') });
+    expect(io.lastJson()).toEqual({ path: path.join(io.configDir, 'thinker', 'config.json') });
   });
 
   it('stored config credential is used when no env key is set', async () => {
@@ -373,7 +373,7 @@ describe('auth commands', () => {
   });
 
   it('commands fail closed when no credential resolves for the target host', async () => {
-    const io = makeIo({ env: { MANIFEST_URL: HOST } });
+    const io = makeIo({ env: { THINKER_URL: HOST } });
     expect(await run(io, ['agent', 'list'])).toBe(1);
     expect(io.lastJson()).toMatchObject({ error: 'not_authenticated', status: 401 });
   });
@@ -424,12 +424,12 @@ describe('agent commands', () => {
   });
 
   it('agent create writes the key file 0600 and prints only the prefix', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-agent-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-agent-'));
     const keyFile = path.join(dir, 'coding.key');
     const { io, calls } = authedIo([
       {
         status: 201,
-        body: { agent: { id: 'a1', name: 'coding' }, apiKey: 'mnfst_secret_full_key' },
+        body: { agent: { id: 'a1', name: 'coding' }, apiKey: 'thk_secret_full_key' },
       },
     ]);
     expect(
@@ -452,26 +452,26 @@ describe('agent commands', () => {
       agent_platform: 'claude-code',
       agent_category: 'coding',
     });
-    expect(fs.readFileSync(keyFile, 'utf8')).toBe('mnfst_secret_full_key');
+    expect(fs.readFileSync(keyFile, 'utf8')).toBe('thk_secret_full_key');
     expect(fs.statSync(keyFile).mode & 0o777).toBe(0o600);
     // --key-file is an ADDITIONAL copy; the keystore cache is always refreshed
     expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'coding'), 'utf8')).toBe(
-      'mnfst_secret_full_key',
+      'thk_secret_full_key',
     );
     expect(io.lastJson()).toMatchObject({
       agent: { id: 'a1', name: 'coding' },
-      keyPrefix: 'mnfst_secr',
+      keyPrefix: 'thk_secret',
       keyFile,
       keyPath: agentKeyPath(io.env, HOST, 'coding'),
     });
-    expect(io.lines.join('\n')).not.toContain('mnfst_secret_full_key');
+    expect(io.lines.join('\n')).not.toContain('thk_secret_full_key');
   });
 
   it('agent create omits absent optional category', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-agent-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-agent-'));
     const keyFile = path.join(dir, 'p.key');
     const { io, calls } = authedIo([
-      { status: 201, body: { agent: { name: 'p' }, apiKey: 'mnfst_k' } },
+      { status: 201, body: { agent: { name: 'p' }, apiKey: 'thk_k' } },
     ]);
     expect(
       await run(io, [
@@ -603,7 +603,7 @@ describe('agent commands', () => {
   });
 
   it('agent update requires at least one field and maps flags', async () => {
-    const none = makeIo({ env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' } });
+    const none = makeIo({ env: { THINKER_URL: HOST, THINKER_API_KEY: 'k' } });
     expect(await run(none, ['agent', 'update', 'a'])).toBe(1);
     expect(none.lastJson()).toMatchObject({ error: 'missing_flag' });
 
@@ -616,7 +616,7 @@ describe('agent commands', () => {
   });
 
   it('agent delete and rotate-key demand --yes', async () => {
-    const io = makeIo({ env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' } });
+    const io = makeIo({ env: { THINKER_URL: HOST, THINKER_API_KEY: 'k' } });
     expect(await run(io, ['agent', 'delete', 'a'])).toBe(1);
     expect(io.lastJson()).toMatchObject({ error: 'confirmation_required' });
 
@@ -626,21 +626,19 @@ describe('agent commands', () => {
   });
 
   it('agent rotate-key writes the fresh key to the key file', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-rotate-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-rotate-'));
     const keyFile = path.join(dir, 'rotated.key');
-    const { io, calls } = authedIo([{ status: 200, body: { apiKey: 'mnfst_rotated_key_value' } }]);
-    saveAgentKey(io.env, HOST, 'a', 'mnfst_STALE_REVOKED');
+    const { io, calls } = authedIo([{ status: 200, body: { apiKey: 'thk_rotated_key_value' } }]);
+    saveAgentKey(io.env, HOST, 'a', 'thk_STALE_REVOKED');
     expect(await run(io, ['agent', 'rotate-key', 'a', '--key-file', keyFile, '--yes'])).toBe(0);
     expect(calls[0].url).toBe(`${HOST}/api/v1/agents/a/rotate-key`);
-    expect(fs.readFileSync(keyFile, 'utf8')).toBe('mnfst_rotated_key_value');
+    expect(fs.readFileSync(keyFile, 'utf8')).toBe('thk_rotated_key_value');
     // regression (sim-B): --key-file must not leave the keystore serving the
-    // revoked key through mnfst run / agent key show
-    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'a'), 'utf8')).toBe(
-      'mnfst_rotated_key_value',
-    );
+    // revoked key through thinker run / agent key show
+    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'a'), 'utf8')).toBe('thk_rotated_key_value');
     expect(io.lastJson()).toEqual({
       rotated: true,
-      keyPrefix: 'mnfst_rota',
+      keyPrefix: 'thk_rotate',
       keyFile,
       keyPath: agentKeyPath(io.env, HOST, 'a'),
     });
@@ -648,7 +646,7 @@ describe('agent commands', () => {
 
   it('agent delete drops the local keystore entry', async () => {
     const { io } = authedIo([{ status: 200, body: { ok: true } }]);
-    const p = saveAgentKey(io.env, HOST, 'gone-bot', 'mnfst_dead');
+    const p = saveAgentKey(io.env, HOST, 'gone-bot', 'thk_dead');
     expect(await run(io, ['agent', 'delete', 'gone-bot', '--yes'])).toBe(0);
     expect(fs.existsSync(p)).toBe(false);
   });
@@ -657,7 +655,7 @@ describe('agent commands', () => {
     const { io, calls } = authedIo([
       { status: 409, body: { message: 'Agent "kept" already exists', error: 'Conflict' } },
       { status: 200, body: { agent: { agent_name: 'kept' } } },
-      { status: 200, body: { keyPrefix: 'mnfst_serv', apiKey: 'mnfst_recovered_key' } },
+      { status: 200, body: { keyPrefix: 'thk_serv', apiKey: 'thk_recovered_key' } },
     ]);
     expect(
       await run(io, ['agent', 'create', '--name', 'kept', '--platform', 'curl', '--if-absent']),
@@ -665,26 +663,26 @@ describe('agent commands', () => {
     expect(calls[1].url).toBe(`${HOST}/api/v1/agents/kept`);
     expect(io.lastJson()).toMatchObject({
       existed: true,
-      keyPrefix: 'mnfst_reco',
+      keyPrefix: 'thk_recove',
       agent: { agent_name: 'kept' },
     });
     // the recovered key lands in the keystore for run/key path
-    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'kept'), 'utf8')).toBe('mnfst_recovered_key');
+    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'kept'), 'utf8')).toBe('thk_recovered_key');
     // an --if-absent re-run is the idempotent setup path: it must carry the
     // same wiring instructions the create path prints
     const setup = (io.lastJson() as { setup: string }).setup;
     expect(setup).toContain('base URL');
     expect(setup).toContain(
-      `<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw --url ${HOST}>`,
+      `<THINKER_AGENT_KEY — run: thinker agent key show kept --raw --url ${HOST}>`,
     );
-    expect(setup).not.toContain('mnfst_recovered_key');
+    expect(setup).not.toContain('thk_recovered_key');
   });
 
   it('agent create --if-absent renders setup from the EXISTING agent platform', async () => {
     const { io } = authedIo([
       { status: 409, body: { message: 'exists', error: 'Conflict' } },
       { status: 200, body: { agent: { agent_name: 'kept', agent_platform: 'openclaw' } } },
-      { status: 200, body: { keyPrefix: 'mnfst_serv', apiKey: 'mnfst_recovered_key' } },
+      { status: 200, body: { keyPrefix: 'thk_serv', apiKey: 'thk_recovered_key' } },
     ]);
     // asked for curl, but the stored agent is an openclaw one — the record wins
     expect(
@@ -705,17 +703,17 @@ describe('agent commands', () => {
 
   it('agent create without --key-file stores the key in the managed keystore', async () => {
     const { io } = authedIo([
-      { status: 201, body: { agent: { name: 'kept' }, apiKey: 'mnfst_kept_secret' } },
+      { status: 201, body: { agent: { name: 'kept' }, apiKey: 'thk_kept_secret' } },
     ]);
     expect(await run(io, ['agent', 'create', '--name', 'kept', '--platform', 'claude-code'])).toBe(
       0,
     );
     const expected = agentKeyPath(io.env, HOST, 'kept');
-    expect(fs.readFileSync(expected, 'utf8')).toBe('mnfst_kept_secret');
+    expect(fs.readFileSync(expected, 'utf8')).toBe('thk_kept_secret');
     expect(fs.statSync(expected).mode & 0o777).toBe(0o600);
     expect(io.lastJson()).toMatchObject({
       agent: { name: 'kept' },
-      keyPrefix: 'mnfst_kept',
+      keyPrefix: 'thk_kept_s',
       keyPath: expected,
     });
     // setup instructions ride along, platform-templated, key masked
@@ -725,25 +723,25 @@ describe('agent commands', () => {
     // A literal placeholder, not a command substitution: the snippets embed it
     // in JSON / single-quoted contexts where no shell would expand it.
     expect(setup).toContain(
-      `<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw --url ${HOST}>`,
+      `<THINKER_AGENT_KEY — run: thinker agent key show kept --raw --url ${HOST}>`,
     );
     expect(setup).not.toContain('$(');
-    expect(setup).not.toContain('mnfst_kept_secret');
-    expect(io.lines.join('\n')).not.toContain('mnfst_kept_secret');
+    expect(setup).not.toContain('thk_kept_secret');
+    expect(io.lines.join('\n')).not.toContain('thk_kept_secret');
   });
 
   it('agent rotate-key without --key-file refreshes the keystore entry', async () => {
-    const { io } = authedIo([{ status: 200, body: { apiKey: 'mnfst_fresh_secret' } }]);
-    saveAgentKey(io.env, HOST, 'a', 'mnfst_stale');
+    const { io } = authedIo([{ status: 200, body: { apiKey: 'thk_fresh_secret' } }]);
+    saveAgentKey(io.env, HOST, 'a', 'thk_stale');
     expect(await run(io, ['agent', 'rotate-key', 'a', '--yes'])).toBe(0);
     const expected = agentKeyPath(io.env, HOST, 'a');
-    expect(fs.readFileSync(expected, 'utf8')).toBe('mnfst_fresh_secret');
-    expect(io.lastJson()).toEqual({ rotated: true, keyPrefix: 'mnfst_fres', keyPath: expected });
+    expect(fs.readFileSync(expected, 'utf8')).toBe('thk_fresh_secret');
+    expect(io.lastJson()).toEqual({ rotated: true, keyPrefix: 'thk_fresh_', keyPath: expected });
   });
 
   it('agent key path serves the cached keystore entry without the network', async () => {
     const { io, calls } = authedIo([]);
-    saveAgentKey(io.env, HOST, 'my-bot', 'mnfst_cached');
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_cached');
     expect(await run(io, ['agent', 'key', 'path', 'my-bot'])).toBe(0);
     expect(io.lastJson()).toEqual({
       agent: 'my-bot',
@@ -755,18 +753,18 @@ describe('agent commands', () => {
 
   it('agent key path self-heals from the server when the cache is missing', async () => {
     const { io, calls } = authedIo([
-      { status: 200, body: { keyPrefix: 'mnfst_serv', apiKey: 'mnfst_server_copy' } },
+      { status: 200, body: { keyPrefix: 'thk_serv', apiKey: 'thk_server_copy' } },
     ]);
     expect(await run(io, ['agent', 'key', 'path', 'my-bot'])).toBe(0);
     expect(calls[0].url).toBe(`${HOST}/api/v1/agents/my-bot/key`);
     const expected = agentKeyPath(io.env, HOST, 'my-bot');
-    expect(fs.readFileSync(expected, 'utf8')).toBe('mnfst_server_copy');
+    expect(fs.readFileSync(expected, 'utf8')).toBe('thk_server_copy');
     expect(io.lastJson()).toEqual({ agent: 'my-bot', path: expected, source: 'server' });
-    expect(io.lines.join('\n')).not.toContain('mnfst_server_copy');
+    expect(io.lines.join('\n')).not.toContain('thk_server_copy');
   });
 
   it('agent key path fails with a rotate hint when the server cannot recover the key', async () => {
-    const { io } = authedIo([{ status: 200, body: { keyPrefix: 'mnfst_lega' } }]);
+    const { io } = authedIo([{ status: 200, body: { keyPrefix: 'thk_lega' } }]);
     expect(await run(io, ['agent', 'key', 'path', 'legacy-bot'])).toBe(1);
     expect(io.lastJson()).toMatchObject({
       error: 'key_unrecoverable',
@@ -783,16 +781,16 @@ describe('agent commands', () => {
     expect(out.setup).toContain('openclaw config set models.providers.thinker');
     expect(out.setup).toContain(`${HOST}/v1`);
     expect(out.setup).toContain(
-      `<MNFST_AGENT_KEY — run: mnfst agent key show bot --raw --url ${HOST}>`,
+      `<THINKER_AGENT_KEY — run: thinker agent key show bot --raw --url ${HOST}>`,
     );
     expect(out.hint).toContain('--reveal');
 
     const { io: io2 } = authedIo([
       { status: 200, body: { agent: { agent_name: 'bot', agent_platform: 'openclaw' } } },
     ]);
-    saveAgentKey(io2.env, HOST, 'bot', 'mnfst_real_key');
+    saveAgentKey(io2.env, HOST, 'bot', 'thk_real_key');
     expect(await run(io2, ['agent', 'setup', 'bot', '--reveal'])).toBe(0);
-    expect((io2.lastJson() as { setup: string }).setup).toContain('mnfst_real_key');
+    expect((io2.lastJson() as { setup: string }).setup).toContain('thk_real_key');
   });
 
   it('agent setup 404s for a missing agent', async () => {
@@ -813,34 +811,34 @@ describe('agent commands', () => {
 
   it('agent env emits dotenv lines, and --export shell lines', async () => {
     const { io, calls } = authedIo([]);
-    saveAgentKey(io.env, HOST, 'my-bot', 'mnfst_env_secret');
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_env_secret');
     expect(await run(io, ['agent', 'env', 'My Bot'])).toBe(0);
     expect(io.lines.slice(-2)).toEqual([
-      'MANIFEST_AGENT_KEY=mnfst_env_secret',
-      `MANIFEST_AGENT_URL=${HOST}/v1`,
+      'THINKER_AGENT_KEY=thk_env_secret',
+      `THINKER_AGENT_URL=${HOST}/v1`,
     ]);
     expect(calls).toHaveLength(0);
 
     const { io: io2 } = authedIo([]);
     saveAgentKey(io2.env, HOST, 'my-bot', 'k2');
     expect(await run(io2, ['agent', 'env', 'my-bot', '--export'])).toBe(0);
-    expect(io2.lines.slice(-2)[0]).toBe('export MANIFEST_AGENT_KEY=k2');
+    expect(io2.lines.slice(-2)[0]).toBe('export THINKER_AGENT_KEY=k2');
   });
 
   it('agent key show prints the raw key as a deliberate act', async () => {
     const { io, calls } = authedIo([]);
-    saveAgentKey(io.env, HOST, 'my-bot', 'mnfst_cached_secret');
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_cached_secret');
     expect(await run(io, ['agent', 'key', 'show', 'my-bot'])).toBe(0);
-    expect(io.lastJson()).toEqual({ agent: 'my-bot', apiKey: 'mnfst_cached_secret' });
+    expect(io.lastJson()).toEqual({ agent: 'my-bot', apiKey: 'thk_cached_secret' });
     expect(calls).toHaveLength(0);
   });
 
   it('agent key show --raw prints the bare key with no JSON envelope', async () => {
     const { io } = authedIo([]);
-    saveAgentKey(io.env, HOST, 'my-bot', 'mnfst_cached_secret');
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_cached_secret');
     expect(await run(io, ['agent', 'key', 'show', 'my-bot', '--raw'])).toBe(0);
     // exactly the key — substitutable into a config file, pipeable
-    expect(io.lines).toEqual(['mnfst_cached_secret']);
+    expect(io.lines).toEqual(['thk_cached_secret']);
   });
 
   it('agent commands slugify display-name input like the backend does', async () => {
@@ -866,13 +864,13 @@ describe('agent commands', () => {
 
   it('create with a spaced name stores the keystore entry under the slug', async () => {
     const { io } = authedIo([
-      { status: 201, body: { agent: { display_name: 'My Cool Agent' }, apiKey: 'mnfst_spaced' } },
+      { status: 201, body: { agent: { display_name: 'My Cool Agent' }, apiKey: 'thk_spaced' } },
     ]);
     expect(
       await run(io, ['agent', 'create', '--name', 'My Cool Agent', '--platform', 'other']),
     ).toBe(0);
     const expected = agentKeyPath(io.env, HOST, 'my-cool-agent');
-    expect(fs.readFileSync(expected, 'utf8')).toBe('mnfst_spaced');
+    expect(fs.readFileSync(expected, 'utf8')).toBe('thk_spaced');
     expect((io.lastJson() as { keyPath: string }).keyPath).toBe(expected);
   });
 
@@ -885,13 +883,11 @@ describe('agent commands', () => {
 
   it('agent key show falls back to the server and caches the result', async () => {
     const { io } = authedIo([
-      { status: 200, body: { keyPrefix: 'mnfst_serv', apiKey: 'mnfst_server_secret' } },
+      { status: 200, body: { keyPrefix: 'thk_serv', apiKey: 'thk_server_secret' } },
     ]);
     expect(await run(io, ['agent', 'key', 'show', 'my-bot'])).toBe(0);
-    expect(io.lastJson()).toEqual({ agent: 'my-bot', apiKey: 'mnfst_server_secret' });
-    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'my-bot'), 'utf8')).toBe(
-      'mnfst_server_secret',
-    );
+    expect(io.lastJson()).toEqual({ agent: 'my-bot', apiKey: 'thk_server_secret' });
+    expect(fs.readFileSync(agentKeyPath(io.env, HOST, 'my-bot'), 'utf8')).toBe('thk_server_secret');
   });
 });
 
@@ -1150,7 +1146,7 @@ describe('provider commands', () => {
     const prompts: string[] = [];
     const stub = fetchStub([{ status: 201, body: { id: 'p1' } }]);
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: stub.impl,
       isTTY: true,
       readSecret: async (promptText: string) => {
@@ -1203,7 +1199,7 @@ describe('provider commands', () => {
       },
     ]);
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: stub.impl,
       isTTY: true,
       openBrowser: (url: string) => {
@@ -1230,7 +1226,7 @@ describe('provider commands', () => {
       ),
     );
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: stub.impl,
       isTTY: true,
       openBrowser: () => true,
@@ -1247,7 +1243,7 @@ describe('provider commands', () => {
       { status: 200, body: { ok: true } },
     ]);
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: stub.impl,
       isTTY: true,
       readLine: async () => 'the-pasted-code#st-1',
@@ -1278,7 +1274,7 @@ describe('provider commands', () => {
 
   it('subscription connect refuses device-flow providers and non-TTY sessions', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: fetchStub([]).impl,
       isTTY: true,
     });
@@ -1307,7 +1303,7 @@ describe('provider commands', () => {
     // keep the run fully non-blocking.
     const stub = fetchStub([{ status: 201, body: { id: 'p1' } }]);
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key', K: 'xai-secret' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key', K: 'xai-secret' },
       fetchImpl: stub.impl,
       isTTY: true,
       readLine: async () => {
@@ -1353,7 +1349,7 @@ describe('provider commands', () => {
 
   it('provider connect treats an empty prompted secret as an error', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: fetchStub([]).impl,
       isTTY: true,
       readSecret: async () => '   ',
@@ -1436,7 +1432,7 @@ describe('provider commands', () => {
   });
 
   it('provider disconnect requires --yes and forwards authType/label', async () => {
-    const io = makeIo({ env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' } });
+    const io = makeIo({ env: { THINKER_URL: HOST, THINKER_API_KEY: 'k' } });
     expect(await run(io, ['provider', 'disconnect', '--provider', 'openai', '--agent', 'a'])).toBe(
       1,
     );
@@ -1792,10 +1788,10 @@ describe('routing test', () => {
 
   it('sends one canned request through the route and reports facts', async () => {
     const { io, calls } = authedIo([completion('OK')]);
-    saveAgentKey(io.env, HOST, 'john', 'mnfst_test_key');
+    saveAgentKey(io.env, HOST, 'john', 'thk_test_key');
     expect(await run(io, ['routing', 'test', 'John', '--as', 'openclaw'])).toBe(0);
     expect(calls[0].url).toBe(`${HOST}/v1/chat/completions`);
-    expect(calls[0].headers['Authorization']).toBe('Bearer mnfst_test_key');
+    expect(calls[0].headers['Authorization']).toBe('Bearer thk_test_key');
     const body = JSON.parse(calls[0].body!);
     expect(body.model).toBe('auto');
     expect(body.messages[0].content).toContain('Reply with exactly: OK');
@@ -1854,7 +1850,7 @@ describe('routing test', () => {
     expect(calls[0].url).toBe(`${HOST}/api/v1/agents/john`);
     expect(calls[1].url).toBe(`${HOST}/v1/messages`);
     expect(calls[1].headers['anthropic-version']).toBe('2023-06-01');
-    expect(calls[1].headers['User-Agent']).toMatch(/^mnfst-cli\/\d+\.\d+\.\d+/);
+    expect(calls[1].headers['User-Agent']).toMatch(/^thinker-cli\/\d+\.\d+\.\d+/);
     const body = JSON.parse(calls[1].body!);
     expect(body.max_tokens).toBe(64);
     // "auto" routes on /v1/messages exactly like the completions surface —
@@ -1897,7 +1893,7 @@ describe('routing test', () => {
         },
       },
     ]);
-    saveAgentKey(io.env, HOST, 'john', 'mnfst_test_key');
+    saveAgentKey(io.env, HOST, 'john', 'thk_test_key');
     expect(await run(io, ['routing', 'test', 'john', '--as', 'codex'])).toBe(0);
     expect(calls[0].url).toBe(`${HOST}/v1/responses`);
     const body = JSON.parse(calls[0].body!);
@@ -1925,8 +1921,8 @@ describe('routing test', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('unmasks fake-200 Manifest errors as loud failures', async () => {
-    const { io } = authedIo([completion('[🦚 Manifest M101] No providers configured. docs')]);
+  it('unmasks fake-200 Thinker errors as loud failures', async () => {
+    const { io } = authedIo([completion('[🦚 Thinker M101] No providers configured. docs')]);
     saveAgentKey(io.env, HOST, 'john', 'k');
     expect(await run(io, ['routing', 'test', 'john', '--as', 'openclaw'])).toBe(1);
     expect(io.lastJson()).toMatchObject({
@@ -1979,7 +1975,7 @@ describe('routing test', () => {
     expect(io.lastJson()).toMatchObject({ error: 'route_test_failed', status: 429 });
 
     const io2 = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: (async () => {
         throw new Error('ECONNREFUSED');
       }) as typeof fetch,
@@ -2345,7 +2341,7 @@ describe('routing commands', () => {
     const failure = io.lastJson() as { error: string; message: string; hint: string };
     expect(failure.error).toBe('unknown_model');
     expect(failure.message).toContain('typo-model');
-    expect(failure.hint).toContain('mnfst provider refresh');
+    expect(failure.hint).toContain('thinker provider refresh');
     expect(failure.hint).toContain('--force');
 
     // A payload that is not a model array is treated as "nothing discovered".
@@ -2658,7 +2654,7 @@ describe('routing commands', () => {
     expect(io.lastJson()).toMatchObject({
       error: 'unknown_model',
       message: 'Not in the models discovered for "john": ghost-1, ghost-2',
-      hint: expect.stringContaining('mnfst provider refresh'),
+      hint: expect.stringContaining('thinker provider refresh'),
     });
     expect((io.lastJson() as { hint: string }).hint).toContain('--force');
 
@@ -3219,7 +3215,7 @@ describe('doctor', () => {
   };
 
   /** A HOME with no skill installed, so the informational check is stable. */
-  const BARE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-bare-home-'));
+  const BARE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-bare-home-'));
 
   function checksOf(io: { lastJson(): unknown }) {
     return (io.lastJson() as { checks: Array<Record<string, unknown>> }).checks;
@@ -3241,21 +3237,21 @@ describe('doctor', () => {
         {
           name: 'config',
           ok: true,
-          detail: `credential from MANIFEST_API_KEY (env) · origin ${HOST} (from MANIFEST_URL)`,
+          detail: `credential from THINKER_API_KEY (env) · origin ${HOST} (from THINKER_URL)`,
         },
         { name: 'host', ok: true, detail: `${HOST}/api/v1/health → healthy` },
         { name: 'auth', ok: true, detail: `credential accepted by ${HOST}` },
         { name: 'providers', ok: true, detail: '1 connection(s) across 1 provider(s)' },
         { name: 'agents', ok: true, detail: '1 agent(s)' },
-        { name: 'skill', ok: true, detail: 'not_found', hint: 'mnfst skill install' },
+        { name: 'skill', ok: true, detail: 'not_found', hint: 'thinker skill install' },
       ],
     });
   });
 
   it('reports the skill as informational: found, never failing the run', async () => {
     // Installed under the detected runtime's directory.
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-home-'));
-    const file = path.join(home, '.claude', 'skills', 'mnfst-cli', 'SKILL.md');
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-home-'));
+    const file = path.join(home, '.claude', 'skills', 'thinker-cli', 'SKILL.md');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, SKILL_MD);
     const { io } = authedIo([HEALTHY, ONE_AGENT, LIVE_PROVIDER], {
@@ -3271,7 +3267,7 @@ describe('doctor', () => {
 
     // Missing, with a runtime detected: still ok, still exit 0.
     const { io: io2 } = authedIo([HEALTHY, ONE_AGENT, LIVE_PROVIDER], {
-      HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-home-')),
+      HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-home-')),
       CURSOR_TRACE_ID: 'x',
     });
     expect(await run(io2, ['doctor'])).toBe(0);
@@ -3279,7 +3275,7 @@ describe('doctor', () => {
       name: 'skill',
       ok: true,
       detail: 'not_found · Cursor detected',
-      hint: 'mnfst skill install',
+      hint: 'thinker skill install',
     });
   });
 
@@ -3293,7 +3289,7 @@ describe('doctor', () => {
     );
 
     const stub2 = fetchStub([HEALTHY, ONE_AGENT, LIVE_PROVIDER]);
-    const io2 = makeIo({ env: { MANIFEST_API_KEY: 'k' }, fetchImpl: stub2.impl });
+    const io2 = makeIo({ env: { THINKER_API_KEY: 'k' }, fetchImpl: stub2.impl });
     expect(await run(io2, ['doctor', '--url', HOST])).toBe(0);
     expect(checksOf(io2)[0].detail).toContain('(from --url)');
   });
@@ -3307,7 +3303,7 @@ describe('doctor', () => {
       name: 'config',
       ok: false,
       detail: 'no credential for http://localhost:2099 (origin from default)',
-      hint: 'Run mnfst login, or set MANIFEST_URL + MANIFEST_API_KEY',
+      hint: 'Run thinker login, or set THINKER_URL + THINKER_API_KEY',
     });
     expect(checks[1].ok).toBe(true);
     expect(checks.slice(2, 5)).toEqual([
@@ -3321,7 +3317,7 @@ describe('doctor', () => {
 
   it('calls an unreachable host by its name, and skips auth rather than blaming the key', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'env-key' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'env-key' },
       fetchImpl: (async () => {
         throw new Error('ECONNREFUSED');
       }) as typeof fetch,
@@ -3332,14 +3328,14 @@ describe('doctor', () => {
       name: 'host',
       ok: false,
       detail: `${HOST}/api/v1/health → ECONNREFUSED`,
-      hint: 'host unreachable — is MANIFEST_URL correct?',
+      hint: 'host unreachable — is THINKER_URL correct?',
     });
     expect(checks[2]).toMatchObject({ detail: 'skipped — host check failed' });
   });
 
   it('stringifies a non-Error transport failure', async () => {
     const io = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'k' },
       fetchImpl: (() => Promise.reject('dns exploded')) as unknown as typeof fetch,
     });
     expect(await run(io, ['doctor'])).toBe(1);
@@ -3357,7 +3353,7 @@ describe('doctor', () => {
     });
 
     const io2 = makeIo({
-      env: { MANIFEST_URL: HOST, MANIFEST_API_KEY: 'k' },
+      env: { THINKER_URL: HOST, THINKER_API_KEY: 'k' },
       fetchImpl: (async () =>
         new Response('<html>gateway</html>', { status: 502 })) as typeof fetch,
     });
@@ -3372,9 +3368,9 @@ describe('doctor', () => {
     expect(auth).toMatchObject({ name: 'auth', ok: false, detail: 'Invalid API key' });
     expect(auth.hint).toBe(
       `${HOST} is alive but this credential is not valid on it — wrong install or wrong key` +
-        ' (check MANIFEST_API_KEY belongs to this host)',
+        ' (check THINKER_API_KEY belongs to this host)',
     );
-    expect(auth.hint).not.toContain('Run mnfst login');
+    expect(auth.hint).not.toContain('Run thinker login');
     // Downstream checks are skipped, not failed.
     expect(
       checksOf(io)
@@ -3388,7 +3384,7 @@ describe('doctor', () => {
     const io = makeIo({ fetchImpl: stub.impl });
     writeConfig(io, { activeHost: HOST, hosts: { [HOST]: { apiKey: 'stale' } } });
     expect(await run(io, ['doctor'])).toBe(1);
-    expect(checksOf(io)[2].hint).toContain('mnfst login re-authenticates');
+    expect(checksOf(io)[2].hint).toContain('thinker login re-authenticates');
   });
 
   it('passes a non-401 auth failure through with the client hint', async () => {
@@ -3430,7 +3426,7 @@ describe('doctor', () => {
     const providers = checksOf(io)[3];
     expect(providers).toMatchObject({ ok: false, detail: '3 connection(s) across 2 provider(s)' });
     expect(providers.hint).toBe(
-      'hollow (no discovered models — reconnect with a working credential or run: mnfst provider refresh): openai/api_key/Work',
+      'hollow (no discovered models — reconnect with a working credential or run: thinker provider refresh): openai/api_key/Work',
     );
   });
 
@@ -3445,13 +3441,13 @@ describe('doctor', () => {
       name: 'providers',
       ok: true,
       detail: '0 connection(s) across 0 provider(s)',
-      hint: 'nothing to route through yet — mnfst provider connect <provider>',
+      hint: 'nothing to route through yet — thinker provider connect <provider>',
     });
     expect(checksOf(io)[4]).toEqual({
       name: 'agents',
       ok: true,
       detail: '0 agent(s)',
-      hint: 'no agent yet — mnfst agent create --name <name> --platform <p>',
+      hint: 'no agent yet — thinker agent create --name <name> --platform <p>',
     });
   });
 
@@ -3473,10 +3469,10 @@ describe('doctor', () => {
 describe('skill', () => {
   /** A throwaway HOME so nothing reads or writes the developer's real one. */
   function tempHome() {
-    return fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-home-'));
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-home-'));
   }
   const skillFile = (base: string, ...segments: string[]) =>
-    path.join(base, ...segments, 'mnfst-cli', 'SKILL.md');
+    path.join(base, ...segments, 'thinker-cli', 'SKILL.md');
 
   it('skill show prints raw markdown on stdout, and bare `skill` is the same command', async () => {
     const io = makeIo();
@@ -3491,7 +3487,7 @@ describe('skill', () => {
     expect(io2.lines[0]).toBe(SKILL_MD);
   });
 
-  it('skill install writes ~/.claude/skills/mnfst-cli/SKILL.md and is idempotent', async () => {
+  it('skill install writes ~/.claude/skills/thinker-cli/SKILL.md and is idempotent', async () => {
     const home = tempHome();
     const io = makeIo({ env: { HOME: home } });
     expect(await run(io, ['skill', 'install'])).toBe(0);
@@ -3536,7 +3532,7 @@ describe('skill', () => {
       target: 'detected:cursor',
     });
 
-    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-project-'));
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-project-'));
     const cwd = jest.spyOn(process, 'cwd').mockReturnValue(project);
     try {
       const io3 = makeIo({ env: { HOME: tempHome() } });
@@ -3576,10 +3572,10 @@ describe('skill', () => {
   it('login nudges about the skill on stderr, never on stdout', async () => {
     const stub = fetchStub([{ status: 200, body: ME }]);
     const io = makeIo({
-      env: { MNFST_TOKEN: 'tok-123', MANIFEST_URL: HOST, HOME: tempHome() },
+      env: { THINKER_TOKEN: 'tok-123', THINKER_URL: HOST, HOME: tempHome() },
       fetchImpl: stub.impl,
     });
-    expect(await run(io, ['login', '--token-env', 'MNFST_TOKEN'])).toBe(0);
+    expect(await run(io, ['login', '--token-env', 'THINKER_TOKEN'])).toBe(0);
     expect(io.errLines).toContain(SKILL_NUDGE);
     expect(io.lines.join('\n')).not.toContain(SKILL_NUDGE);
   });
@@ -3618,10 +3614,10 @@ describe('agent runtime detection', () => {
 
 describe('skill nudge', () => {
   function nudgeIo(env: Record<string, string | undefined> = {}) {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-home-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-home-'));
     return { home, io: makeIo({ env: { HOME: home, CLAUDECODE: '1', ...env } }) };
   }
-  const HINT = /Claude Code detected — run 'mnfst skill install'/;
+  const HINT = /Claude Code detected — run 'thinker skill install'/;
 
   it('fires once per runtime after a successful command, then stays silent', async () => {
     const { home, io } = nudgeIo();
@@ -3633,7 +3629,7 @@ describe('skill nudge', () => {
 
     // State persisted next to the config — a later run says nothing.
     const state = JSON.parse(
-      fs.readFileSync(path.join(cfg, 'manifest', 'skill-nudge.json'), 'utf8'),
+      fs.readFileSync(path.join(cfg, 'thinker', 'skill-nudge.json'), 'utf8'),
     ) as { shown: Record<string, string> };
     expect(Date.parse(state.shown['claude-code'])).not.toBeNaN();
 
@@ -3667,7 +3663,7 @@ describe('skill nudge', () => {
 
   it('stays silent once the runtime already has the skill', async () => {
     const { home, io } = nudgeIo();
-    const file = path.join(home, '.claude', 'skills', 'mnfst-cli', 'SKILL.md');
+    const file = path.join(home, '.claude', 'skills', 'thinker-cli', 'SKILL.md');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, SKILL_MD);
     expect(await run(io, ['config', 'path'])).toBe(0);
@@ -3677,7 +3673,7 @@ describe('skill nudge', () => {
   it('tolerates corrupt state, and swallows an unwritable state file', async () => {
     // Corrupt JSON → treated as "never shown", so the hint still fires.
     const { io } = nudgeIo();
-    const configDir = path.join(io.configDir, 'manifest');
+    const configDir = path.join(io.configDir, 'thinker');
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(path.join(configDir, 'skill-nudge.json'), '{not json');
     expect(await run(io, ['config', 'path'])).toBe(0);
@@ -3685,9 +3681,9 @@ describe('skill nudge', () => {
 
     // Unwritable state (a FILE where the config dir must be): hint still
     // printed, command still succeeds, nothing thrown.
-    const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-home-'));
-    const brokenConfig = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-cfg-'));
-    fs.writeFileSync(path.join(brokenConfig, 'manifest'), 'not a directory');
+    const brokenHome = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-home-'));
+    const brokenConfig = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-cfg-'));
+    fs.writeFileSync(path.join(brokenConfig, 'thinker'), 'not a directory');
     const io2 = makeIo({
       env: { HOME: brokenHome, CLAUDECODE: '1', XDG_CONFIG_HOME: brokenConfig },
     });

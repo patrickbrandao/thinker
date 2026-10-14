@@ -37,7 +37,8 @@ import { PlaygroundHistoryService } from './playground-history.service';
 import { buildForwardBody, derivePromptForHistory } from './playground-payload';
 import { consumeProviderStream } from './playground-stream';
 import type { RunPlaygroundDto } from './dto/run-playground.dto';
-import { ManifestRequest } from '../entities/request.entity';
+import { ThinkerRequest } from '../entities/request.entity';
+import { safeJsonStringify } from '../common/utils/safe-json';
 
 @Injectable()
 export class PlaygroundService {
@@ -296,7 +297,7 @@ export class PlaygroundService {
     initSseHeaders(res, {});
     const send = (event: PlaygroundStreamEvent): void => {
       if (res.writableEnded) return;
-      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      res.write(`event: ${event.type}\ndata: ${safeJsonStringify(event)}\n\n`);
     };
 
     if (!forward.response.body) {
@@ -630,7 +631,7 @@ export class PlaygroundService {
       const getRepository = this.messageRepo.manager?.getRepository?.bind(this.messageRepo.manager);
       if (!getRepository) return;
       const errorMessage = scrubSecrets(errorBody).slice(0, 2000);
-      await getRepository(ManifestRequest).insert({
+      await getRepository(ThinkerRequest).insert({
         id: uuid(),
         tenant_id: agent.tenant_id,
         agent_id: agent.id,
@@ -665,14 +666,14 @@ export class PlaygroundService {
 
   private async insertPlaygroundRequest(
     attempt: Partial<AgentMessage>,
-    request: ManifestRequest,
+    request: ThinkerRequest,
   ): Promise<void> {
     const getRepository = this.messageRepo.manager?.getRepository?.bind(this.messageRepo.manager);
     if (!getRepository) {
       await this.messageRepo.insert(attempt);
       return;
     }
-    await getRepository(ManifestRequest).insert(request);
+    await getRepository(ThinkerRequest).insert(request);
     await this.messageRepo.insert(attempt);
   }
 

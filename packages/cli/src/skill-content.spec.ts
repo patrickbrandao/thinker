@@ -29,8 +29,8 @@ describe('embedded skill', () => {
   });
 
   it('embeds a usable skill: frontmatter name plus the commands it teaches', () => {
-    expect(SKILL_MD).toContain('name: mnfst-cli');
-    expect(SKILL_MD).toContain('mnfst doctor');
-    expect(SKILL_MD).toContain('mnfst provider refresh');
+    expect(SKILL_MD).toContain('name: thinker-cli');
+    expect(SKILL_MD).toContain('thinker doctor');
+    expect(SKILL_MD).toContain('thinker provider refresh');
   });
 });

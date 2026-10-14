@@ -474,7 +474,7 @@ describe('Playground page', () => {
 
       await waitFor(() => expect(mockStreamPlayground).toHaveBeenCalled());
       // Run id was set in the URL + sessionStorage.
-      await waitFor(() => expect(ssStore['manifest.playground.lastRun']).toBeDefined());
+      await waitFor(() => expect(ssStore['thinker.playground.lastRun']).toBeDefined());
       // The running→idle effect refreshes history and auto-selects the latest.
       await waitFor(() => expect(mockListPlaygroundRuns).toHaveBeenCalled());
       // After streaming completes the summary table receives the columns.
@@ -952,11 +952,11 @@ describe('Playground page', () => {
       render(() => <Playground />);
       renderSidebar();
       fireEvent.click(await find('sidebar-toggle'));
-      expect(lsStore['manifest.playground.recentOpen']).toBe('false');
+      expect(lsStore['thinker.playground.recentOpen']).toBe('false');
     });
 
     it('starts collapsed when the stored sidebar preference is "false"', async () => {
-      lsStore['manifest.playground.recentOpen'] = 'false';
+      lsStore['thinker.playground.recentOpen'] = 'false';
       render(() => <Playground />);
       renderSidebar();
       await waitFor(() =>
@@ -985,7 +985,7 @@ describe('Playground page', () => {
 
     it('restores from sessionStorage lastRun when no search param is set', async () => {
       mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
-      ssStore['manifest.playground.lastRun'] = 'r-ss';
+      ssStore['thinker.playground.lastRun'] = 'r-ss';
       mockGetPlaygroundRun.mockResolvedValue(makeRunDetail({ id: 'r-ss' }));
       render(() => <Playground />);
       await waitFor(() => expect(mockGetPlaygroundRun).toHaveBeenCalledWith('r-ss'));
@@ -994,11 +994,11 @@ describe('Playground page', () => {
     it('clears the stale run param + sessionStorage when restoring it fails', async () => {
       mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
       searchParamsState.run = 'r-bad';
-      ssStore['manifest.playground.lastRun'] = 'r-bad';
+      ssStore['thinker.playground.lastRun'] = 'r-bad';
       mockGetPlaygroundRun.mockRejectedValue(new Error('gone'));
       render(() => <Playground />);
       await waitFor(() => expect(setSearchParamsFn).toHaveBeenCalledWith({ run: undefined }));
-      await waitFor(() => expect(ssStore['manifest.playground.lastRun']).toBeUndefined());
+      await waitFor(() => expect(ssStore['thinker.playground.lastRun']).toBeUndefined());
     });
   });
 

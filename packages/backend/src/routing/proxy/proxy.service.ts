@@ -49,8 +49,8 @@ import { ThinkingBlockCache } from './thinking-block-cache';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
 import { buildFriendlyResponse, getDashboardUrl } from './proxy-friendly-response';
-import { formatManifestError, type ManifestErrorCode } from '../../common/errors/error-codes';
-import { ManifestError } from '../../common/errors/manifest-error';
+import { formatThinkerError, type ThinkerErrorCode } from '../../common/errors/error-codes';
+import { ThinkerError } from '../../common/errors/thinker-error';
 import {
   buildCredentialFailureForward,
   presentCredentialFailure,
@@ -93,11 +93,11 @@ export interface RoutingMeta {
   confidence: number;
   reason: string;
   /**
-   * Present when the "response" is really a Manifest error rendered as an
+   * Present when the "response" is really a Thinker error rendered as an
    * assistant message (no provider was contacted). See buildFriendlyResponse.
    */
-  manifest_error_code?: ManifestErrorCode;
-  manifest_error_message?: string;
+  thinker_error_code?: ThinkerErrorCode;
+  thinker_error_message?: string;
   auth_type?: AuthType;
   specificity_category?: string;
   header_tier_id?: string;
@@ -262,7 +262,7 @@ export class ProxyService {
       if (unavailableModel) {
         return this.buildModelUnavailableResult(stream, agentName, unavailableModel);
       }
-      return this.buildNoProviderResult(stream, agentName, resolved.no_route_detail);
+      return this.buildNoProviderResult(stream, agentName, resolved.no_route_detail, resolved.tier);
     }
 
     const route = resolved.route;
@@ -342,8 +342,8 @@ export class ProxyService {
       );
       // A synthetic provider attempt is only recorded by the fallback chain
       // (recordPrimaryFailure completes it). When no chain will run — explicit
-      // model override, no merge context, or zero fallback routes — the Manifest
-      // stub is the sole record (a Manifest rejection has zero provider
+      // model override, no merge context, or zero fallback routes — the Thinker
+      // stub is the sole record (a Thinker rejection has zero provider
       // attempts), so DON'T start one here: it would INSERT a pending
       // agent_messages row that nothing ever completes (orphan).
       const willRunChain =
@@ -593,15 +593,15 @@ export class ProxyService {
               (!!item && typeof item === 'object' && !Array.isArray(item)),
           ));
       if (hasInstructions || hasInput) return;
-      throw new ManifestError('M300', HttpStatus.BAD_REQUEST);
+      throw new ThinkerError('M300', HttpStatus.BAD_REQUEST);
     }
 
     const messages = body.messages;
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      // A ManifestError, not a bare BadRequestException: the proxy needs to tell
-      // "Manifest refused this body" from "the provider returned a 400", or the
+      // A ThinkerError, not a bare BadRequestException: the proxy needs to tell
+      // "Thinker refused this body" from "the provider returned a 400", or the
       // row lands in agent_messages blamed on the provider.
-      throw new ManifestError('M300', HttpStatus.BAD_REQUEST);
+      throw new ThinkerError('M300', HttpStatus.BAD_REQUEST);
     }
     if (apiMode === 'chat_completions') {
       sanitizeNullContent(messages as Record<string, unknown>[]);
@@ -1111,7 +1111,7 @@ export class ProxyService {
         ? `$${Number(exceeded.threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : Number(exceeded.threshold).toLocaleString(undefined, { maximumFractionDigits: 0 });
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'limits');
-    return formatManifestError('M200', {
+    return formatThinkerError('M200', {
       metric: exceeded.metricType,
       used: fmt,
       threshold: threshFmt,
@@ -1170,13 +1170,20 @@ export class ProxyService {
     return false;
   }
 
-  private buildNoProviderResult(stream: boolean, agentName?: string, detail?: string): ProxyResult {
+  private buildNoProviderResult(
+    stream: boolean,
+    agentName?: string,
+    detail?: string,
+    tier?: TierSlot,
+  ): ProxyResult {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-    const content = formatManifestError('M101', {
+    const content = formatThinkerError('M101', {
       dashboardUrl,
       detail: detail ? ` ${detail}` : '',
     });
-    return buildFriendlyResponse(content, stream, 'no_provider', 'M101');
+    // The header names the tier the request resolved to: `default` when the
+    // message is about the default tier, the scored tier otherwise.
+    return buildFriendlyResponse(content, stream, 'no_provider', 'M101', tier);
   }
 
   private buildModelUnavailableResult(
@@ -1185,7 +1192,7 @@ export class ProxyService {
     model: string,
   ): ProxyResult {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-    const content = formatManifestError('M302', { model, dashboardUrl });
+    const content = formatThinkerError('M302', { model, dashboardUrl });
     return buildFriendlyResponse(content, stream, 'model_not_available', 'M302');
   }
 

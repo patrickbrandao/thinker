@@ -12,21 +12,21 @@ function getOpenCodeConfig(baseUrl: string, apiKey: string): string {
   return `{
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "manifest": {
+    "thinker": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Manifest",
+      "name": "Thinker",
       "options": {
         "baseURL": "${baseUrl}",
         "apiKey": "${apiKey}"
       },
       "models": {
         "auto": {
-          "name": "Manifest Auto"
+          "name": "Thinker Auto"
         }
       }
     }
   },
-  "model": "manifest/auto"
+  "model": "thinker/auto"
 }`;
 }
 

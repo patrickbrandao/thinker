@@ -8,13 +8,13 @@ describe('keystore', () => {
   const env = () => ({ XDG_CONFIG_HOME: dir });
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mnfst-keystore-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thinker-keystore-'));
   });
 
   it('derives a host- and agent-scoped path under the config dir', () => {
     const p = agentKeyPath(env(), 'http://localhost:39412', 'my-bot');
     expect(p).toBe(
-      path.join(dir, 'manifest', 'keys', 'http%3A%2F%2Flocalhost%3A39412', 'my-bot.key'),
+      path.join(dir, 'thinker', 'keys', 'http%3A%2F%2Flocalhost%3A39412', 'my-bot.key'),
     );
   });
 
@@ -25,11 +25,11 @@ describe('keystore', () => {
 
   it('saves 0600 under a 0700 tree and reads back', () => {
     const origin = 'http://localhost:39412';
-    const p = saveAgentKey(env(), origin, 'my-bot', 'mnfst_secret');
-    expect(fs.readFileSync(p, 'utf8')).toBe('mnfst_secret');
+    const p = saveAgentKey(env(), origin, 'my-bot', 'thk_secret');
+    expect(fs.readFileSync(p, 'utf8')).toBe('thk_secret');
     expect(fs.statSync(p).mode & 0o777).toBe(0o600);
     expect(fs.statSync(path.dirname(p)).mode & 0o777).toBe(0o700);
-    expect(readAgentKey(env(), origin, 'my-bot')).toBe('mnfst_secret');
+    expect(readAgentKey(env(), origin, 'my-bot')).toBe('thk_secret');
   });
 
   it('overwrite keeps 0600 and returns the new value', () => {

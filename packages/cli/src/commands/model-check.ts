@@ -92,9 +92,7 @@ export async function assertModelsDiscovered(
         (r) =>
           r.provider === pid &&
           (r.model === m || r.model === qualified) &&
-          (authType === undefined ||
-            !rowsCarryAuthType ||
-            (r.authType ?? 'api_key') === authType),
+          (authType === undefined || !rowsCarryAuthType || (r.authType ?? 'api_key') === authType),
       );
       if (!hit) {
         // The model may exist under a different auth type; name that instead of
@@ -187,7 +185,7 @@ export async function assertModelsDiscovered(
       `Not in the models discovered for "${agent}"${
         enforceProvider ? ` under ${providerId}` : ''
       }: ${missing.join(', ')}`,
-      `The catalog may be stale or empty — rediscover with mnfst provider refresh (and check mnfst models ${agent}); or pass --force to write the route anyway (the backend supports provider-qualified passthrough for uncatalogued models)`,
+      `The catalog may be stale or empty — rediscover with thinker provider refresh (and check thinker models ${agent}); or pass --force to write the route anyway (the backend supports provider-qualified passthrough for uncatalogued models)`,
     );
   }
   return normalized;

@@ -14,7 +14,7 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
+import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
 
 const baseRule = {
   id: 'rule-1',
@@ -91,8 +91,8 @@ describe('NotificationCronService — edge cases', () => {
           },
         },
         {
-          provide: ManifestRuntimeService,
-          useValue: { getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:3001') },
+          provide: ThinkerRuntimeService,
+          useValue: { getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099') },
         },
       ],
     }).compile();

@@ -439,7 +439,7 @@ describe('MessagesQueryService request-first queries', () => {
       models: ['gpt-4o'],
       service_type: 'agent',
       status: 'failed',
-      origin: 'manifest',
+      origin: 'thinker',
       error_class: 'rate_limit',
       routing_tier: 'balanced',
       specificity_category: 'specific',

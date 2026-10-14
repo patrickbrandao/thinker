@@ -2,7 +2,7 @@ import { buildMcpServer } from './mcp-server.factory';
 import { McpToolDeps } from './tool-deps';
 import { McpOperator } from './mcp-auth';
 
-jest.mock('../auth/auth.instance', () => ({ authOrigin: 'http://localhost:3001' }));
+jest.mock('../auth/auth.instance', () => ({ authOrigin: 'http://localhost:2099' }));
 
 interface FakeServer {
   tools: string[];
@@ -36,10 +36,10 @@ describe('buildMcpServer', () => {
       tenantId: 't',
       scopes: new Set(['mcp:read', 'mcp:write']),
     }) as unknown as FakeServer;
-    expect(server.tools).toContain('manifest_agent_create');
-    expect(server.tools).toContain('manifest_provider_connect');
-    expect(server.tools).toContain('manifest_routing_test');
-    expect(server.tools).toContain('manifest_guide');
+    expect(server.tools).toContain('thinker_agent_create');
+    expect(server.tools).toContain('thinker_provider_connect');
+    expect(server.tools).toContain('thinker_routing_test');
+    expect(server.tools).toContain('thinker_guide');
     expect(JSON.stringify(server.opts)).toContain('create, update, and delete');
   });
 
@@ -61,8 +61,8 @@ describe('buildMcpServer', () => {
       tenantId: 't',
       scopes: new Set(['mcp:read']),
     } satisfies McpOperator) as unknown as FakeServer;
-    expect(server.tools).toContain('manifest_agent_list');
-    expect(server.tools).not.toContain('manifest_agent_create');
+    expect(server.tools).toContain('thinker_agent_list');
+    expect(server.tools).not.toContain('thinker_agent_create');
     expect(JSON.stringify(server.opts)).toContain('read-only');
   });
 });

@@ -15,8 +15,6 @@ export class AddRoutingTier1772100000000 implements MigrationInterface {
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "agent_messages" DROP COLUMN IF EXISTS "routing_tier"`,
-    );
+    await queryRunner.query(`ALTER TABLE "agent_messages" DROP COLUMN IF EXISTS "routing_tier"`);
   }
 }

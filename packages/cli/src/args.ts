@@ -69,7 +69,7 @@ export function parseArgs(argv: readonly string[], spec: FlagSpec): ParsedArgs {
     throw new CliError(
       'unexpected_argument',
       `Unexpected argument: ${out.positionals[spec.maxPositionals]}`,
-      'Run mnfst --help for the command usage',
+      'Run thinker --help for the command usage',
     );
   }
   return out;

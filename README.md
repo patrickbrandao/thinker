@@ -2,14 +2,14 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-white.svg" />
     <source media="(prefers-color-scheme: light)" srcset=".github/assets/logo-dark.svg" />
-    <img src=".github/assets/logo-dark.svg" alt="Manifest LLM Gateway" height="53" title="Manifest LLM Gateway"/>
+    <img src=".github/assets/logo-dark.svg" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
   </picture>
 </p>
 <p align="center">
 AI Agents that don't break
 </p>
 
-![manifest-gh](https://github.com/user-attachments/assets/7dd74fc2-f7d6-4558-a95a-014ed754a125)
+![thinker-gh](https://github.com/user-attachments/assets/7dd74fc2-f7d6-4558-a95a-014ed754a125)
 
 ---
 
@@ -30,31 +30,23 @@ AI Agents that don't break
   <a href="LICENSE"><img src="https://img.shields.io/github/license/patrickbrandao/thinker?color=blue" alt="license" /></a>
 </p>
 
-## What is Manifest LLM Gateway?
+## What is Thinker LLM Gateway?
 
-Manifest LLM Gateway is an open-source LLM gateway for AI agents and apps. Connect your API keys, subscriptions, and local models to one OpenAI-compatible endpoint, and each query goes to the right model. No single-provider lock-in.
+Thinker LLM Gateway is an open-source LLM gateway for AI agents and apps. Connect your API keys, subscriptions, and local models to one OpenAI-compatible endpoint, and each query goes to the right model. No single-provider lock-in.
 
 - 🔀 Custom Routing: API keys, Subscriptions, Local models, Custom providers
 - 💾 Full Body Logs for Success and Error Messages
 - 📊 Track every single dollar, setup notifications and limits
 - 🚑 Fallback on different models when queries fail, Self-heals your bad requests
 
-<p align="center">
-  <a href="https://manifest.build/api-bot/"><img src=".github/assets/api-bot-readme-banner.png" alt="Meet API Bot: API changes won't take your app down anymore. Discover" width="100%" /></a>
-</p>
-
 ## Quick start
-
-### Cloud version
-
-Go to [app.manifest.build](https://app.manifest.build) and follow the guide.
 
 ### Self-hosted
 
-Manifest ships as a [Docker image](https://hub.docker.com/r/manifestdotbuild/manifest). One command:
+Thinker ships as a [Docker image](https://hub.docker.com/r/tmsoftbrasil/thinker). One command:
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh)
 ```
 
 Open [http://localhost:2099](http://localhost:2099) and sign up — the first account you create becomes the admin. Full self-hosting guide: [docker/DOCKER_README.md](docker/DOCKER_README.md).
@@ -63,21 +55,20 @@ Open [http://localhost:2099](http://localhost:2099) and sign up — the first ac
 
 | Platform                                                                   | Notes                                                                                                |
 | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [Railway](https://railway.com/deploy/wild-wild)                            | Best path. Template includes Manifest, PostgreSQL, and S3-compatible storage for request recordings. |
-| [Render](https://render.com/deploy?repo=https://github.com/mnfst/llm-gateway) | Blueprint includes Manifest, PostgreSQL, and a persistent recording disk.                            |
+| [Render](https://render.com/deploy?repo=https://github.com/patrickbrandao/thinker) | Blueprint includes Thinker, PostgreSQL, and a persistent recording disk.                            |
 | [DigitalOcean](deploy/digitalocean/TUTORIAL.md)                            | App Platform and PostgreSQL; provide a private Space for recordings.                                 |
 | [AWS](deploy/aws/TUTORIAL.md)                                              | CloudFormation provisions ECS, RDS, and a private recording bucket.                                  |
 | [GCP](deploy/gcp/TUTORIAL.md)                                              | DeployStack provisions Cloud Run, Cloud SQL, and Cloud Storage.                                      |
 
-> Every deployment path now uses durable request-recording storage. Railway, AWS, GCP, and Fly.io provision it natively; Render, Coolify, Easypanel, Docker, and Apple Containers mount persistent storage. DigitalOcean, Heroku, and Koyeb collect external S3-compatible settings during setup. Volume-backed templates are single-instance; use S3-compatible storage before scaling horizontally.
+> Every deployment path now uses durable request-recording storage. AWS, GCP, and Fly.io provision it natively; Render, Coolify, Easypanel, Docker, and Apple Containers mount persistent storage. DigitalOcean, Heroku, and Koyeb collect external S3-compatible settings during setup. Volume-backed templates are single-instance; use S3-compatible storage before scaling horizontally.
 
-Full deployment guides: [Railway](https://manifest.build/llm-gateway/docs/deploy/railway/), [Render](https://manifest.build/llm-gateway/docs/deploy/render/), [DigitalOcean](https://manifest.build/llm-gateway/docs/deploy/digitalocean/), [AWS](https://manifest.build/llm-gateway/docs/deploy/aws/), [GCP](https://manifest.build/llm-gateway/docs/deploy/gcp/), [Fly.io](https://manifest.build/llm-gateway/docs/deploy/fly/), [Coolify](https://manifest.build/llm-gateway/docs/deploy/coolify/), [Easypanel](https://manifest.build/llm-gateway/docs/deploy/easypanel/), [Heroku](https://manifest.build/llm-gateway/docs/deploy/heroku/), [Koyeb](https://manifest.build/llm-gateway/docs/deploy/koyeb/), and [Apple Containers](deploy/apple-containers/TUTORIAL.md).
+Full deployment guides: [DigitalOcean](deploy/digitalocean/TUTORIAL.md), [AWS](deploy/aws/TUTORIAL.md), [GCP](deploy/gcp/TUTORIAL.md), [Fly.io](deploy/fly/TUTORIAL.md), [Coolify](deploy/coolify/TUTORIAL.md), [Easypanel](deploy/easypanel/TUTORIAL.md), [Heroku](deploy/heroku/TUTORIAL.md), [Koyeb](deploy/koyeb/TUTORIAL.md), and [Apple Containers](deploy/apple-containers/TUTORIAL.md).
 
 > The old npm-based self-hosting path is no longer supported. Use the Docker image or one of the deployment guides above.
 
 ## Providers
 
-Manifest connects to **300+ models through 35 built-in provider connections** plus any custom OpenAI/Anthropic-compatible endpoint. Bring your own API key, reuse one of **18 subscription flows**, or run models locally. Everything is routed through the same OpenAI-compatible endpoint — send `"model": "auto"` and Manifest picks the model.
+Thinker connects to **300+ models through 35 built-in provider connections** plus any custom OpenAI/Anthropic-compatible endpoint. Bring your own API key, reuse one of **18 subscription flows**, or run models locally. Everything is routed through the same OpenAI-compatible endpoint — send `"model": "auto"` and Thinker picks the model.
 
 Provider catalogs are discovered dynamically when credentials are connected. The examples below are representative, not exhaustive.
 
@@ -87,7 +78,7 @@ Provider catalogs are discovered dynamically when credentials are connected. The
 | [**Anthropic**](https://www.anthropic.com/)                                              |       ✅        | ✅ Claude Max / Pro          | Claude Opus 5, Sonnet 5, Fable 5, Haiku 4.5                     |
 | [**Google**](https://ai.google.dev/)                                                     |       ✅        | ✅ Sign in with Google       | Gemini 3.5 Flash, 3.1 Flash-Lite, Gemini 2.5                    |
 | [**Google Vertex AI**](https://cloud.google.com/vertex-ai)                               |       ✅        | —                            | Gemini models via Vertex AI                                     |
-| **Gemini Free**                                                                          | ✅ Managed key  | —                            | Free Gemini models through Manifest's managed gateway           |
+| **Gemini Free**                                                                          | ✅ Managed key  | —                            | Free Gemini models through Thinker's managed gateway           |
 | [**Meta**](https://www.meta.ai/)                                                         |       ✅        | —                            | Muse Spark 1.2 / 1.1 + Contributor route (Meta Model API)       |
 | [**xAI**](https://x.ai/)                                                                 |       ✅        | ✅ Grok subscription         | Grok 4.5, Grok 4.3, Grok Build, Grok 4.20                       |
 | [**AWS Bedrock**](https://aws.amazon.com/bedrock/)                                       |       ✅        | —                            | Claude, GPT, Kimi, MiniMax, Nemotron, Nova via Bedrock          |
@@ -121,13 +112,12 @@ Provider catalogs are discovered dynamically when credentials are connected. The
 
 ## Quick links
 
-- [Docs](https://manifest.build/llm-gateway/docs/introduction/)
-- [n8n community node](integrations/n8n-nodes-manifest) — `n8n-nodes-manifest` on npm
-- [Discord](https://discord.com/invite/FepAked3W7)
-- [Discussions](https://github.com/mnfst/llm-gateway/discussions)
+- [Docs](docs/)
+- [n8n community node](integrations/n8n-nodes-thinker) — `n8n-nodes-thinker`, installed from a local `npm pack`
+- [Discussions](https://github.com/patrickbrandao/thinker/discussions)
 - [Contributing](CONTRIBUTING.md)
-- [GitHub](https://github.com/mnfst/llm-gateway)
+- [GitHub](https://github.com/patrickbrandao/thinker)
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Thinker started from [mnfst/llm-gateway](https://github.com/mnfst/llm-gateway) (`manifest@6.28.6`, MIT).

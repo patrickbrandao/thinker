@@ -39,7 +39,7 @@ export function preloadModelDisplayNames(): void {
 }
 
 export function getModelDisplayName(slug: string): string {
-  if (slug === 'manifest') return 'Manifest';
+  if (slug === 'thinker') return 'Thinker';
   if (cache) {
     const cached = cache.get(slug);
     if (cached) return cached;

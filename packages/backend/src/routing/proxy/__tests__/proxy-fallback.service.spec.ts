@@ -993,7 +993,7 @@ describe('ProxyFallbackService', () => {
       expect(forwarded.body.thinking).toBeUndefined();
     });
 
-    it('lets saved Manifest params override inbound body fields at the same path', async () => {
+    it('lets saved Thinker params override inbound body fields at the same path', async () => {
       providerClient.forward.mockResolvedValue({
         response: new Response('{}', { status: 200 }),
         isGoogle: false,
@@ -1188,7 +1188,7 @@ describe('ProxyFallbackService', () => {
           body,
           stream: false,
           extraHeaders: {
-            'x-grok-conv-id': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+            'x-grok-conv-id': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
           },
           sessionKey: 'my-session',
           providerCacheKey: 'v1:scoped-session',
@@ -1242,7 +1242,7 @@ describe('ProxyFallbackService', () => {
       expect(providerClient.forward).toHaveBeenCalledWith(
         expect.objectContaining({
           extraHeaders: {
-            'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+            'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
           },
         }),
       );
@@ -1274,7 +1274,7 @@ describe('ProxyFallbackService', () => {
         ([opts]: [{ extraHeaders?: Record<string, string> }]) =>
           opts.extraHeaders?.['x-opencode-session'],
       );
-      expect(calls[0]).toMatch(/^manifest-[a-f0-9]{32}$/);
+      expect(calls[0]).toMatch(/^thinker-[a-f0-9]{32}$/);
       expect(calls[1]).toBe(calls[0]);
     });
 

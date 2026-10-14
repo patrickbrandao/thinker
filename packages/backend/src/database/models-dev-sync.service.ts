@@ -276,7 +276,7 @@ export class ModelsDevSyncService implements OnModuleInit {
   private cache = new Map<string, Map<string, ModelsDevModelEntry>>();
   /** Map: our provider ID → Map<model ID, entry>, for capability-only providers. */
   private capabilityCache = new Map<string, Map<string, ModelsDevModelEntry>>();
-  /** Map: models.dev provider ID → Map<model ID, entry>. Includes providers Manifest does not natively know. */
+  /** Map: models.dev provider ID → Map<model ID, entry>. Includes providers Thinker does not natively know. */
   private customProviderCache = new Map<string, Map<string, ModelsDevModelEntry>>();
   /** Map: provider id/display-name aliases → models.dev provider ID. */
   private customProviderIndex = new Map<string, string>();
@@ -705,7 +705,7 @@ export class ModelsDevSyncService implements OnModuleInit {
 
   /**
    * Extract time-of-day pricing tiers from a raw models.dev cost block.
-   * Context-size tiers (`tier.type = "context"`) are ignored — Manifest does
+   * Context-size tiers (`tier.type = "context"`) are ignored — Thinker does
    * not price by context band. Returns null when no valid time tier exists.
    */
   private parseTimeTiers(raw: RawModelsDevModel): ModelsDevTimeTier[] | null {

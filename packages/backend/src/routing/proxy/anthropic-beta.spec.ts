@@ -35,7 +35,7 @@ describe('parseClientBetas', () => {
 
   it('drops flags that are not lowercase header tokens', () => {
     // Anything outside [a-z0-9.-] could smuggle a second header or a control
-    // character into the upstream request, so it never leaves Manifest.
+    // character into the upstream request, so it never leaves Thinker.
     expect(parseClientBetas('Upper-2025-01-01')).toEqual([]);
     expect(parseClientBetas('has space')).toEqual([]);
     expect(parseClientBetas('bad\r\nx-injected: 1')).toEqual([]);
@@ -80,11 +80,11 @@ describe('mergeAnthropicBeta', () => {
     expect(mergeAnthropicBeta(undefined, undefined)).toBeUndefined();
   });
 
-  it("keeps Manifest's flags untouched when the caller sent none", () => {
+  it("keeps Thinker's flags untouched when the caller sent none", () => {
     expect(mergeAnthropicBeta('oauth-2025-04-20', undefined)).toBe('oauth-2025-04-20');
   });
 
-  it("forwards the caller's flags when Manifest requires none", () => {
+  it("forwards the caller's flags when Thinker requires none", () => {
     // The api_key path sends no beta header today, so a Claude Code request
     // carrying `output_config` currently 400s as an extra input.
     expect(mergeAnthropicBeta(undefined, 'structured-outputs-2025-11-13')).toBe(
@@ -92,7 +92,7 @@ describe('mergeAnthropicBeta', () => {
     );
   });
 
-  it("appends the caller's flags after Manifest's required ones", () => {
+  it("appends the caller's flags after Thinker's required ones", () => {
     expect(
       mergeAnthropicBeta('claude-code-20250219,oauth-2025-04-20', 'structured-outputs-2025-11-13'),
     ).toBe('claude-code-20250219,oauth-2025-04-20,structured-outputs-2025-11-13');
@@ -104,7 +104,7 @@ describe('mergeAnthropicBeta', () => {
     );
   });
 
-  it("keeps Manifest's flags when the caller's header is entirely junk", () => {
+  it("keeps Thinker's flags when the caller's header is entirely junk", () => {
     expect(mergeAnthropicBeta('oauth-2025-04-20', 'Bad Header')).toBe('oauth-2025-04-20');
   });
 });

@@ -12,7 +12,7 @@ export function registerModelTools(
   _operator: McpOperator,
 ): void {
   server.registerTool(
-    'manifest_models_list',
+    'thinker_models_list',
     {
       title: 'List available models',
       description: 'List the models the harness can route to, per connected provider.',
@@ -38,7 +38,7 @@ export function registerModelTools(
   );
 
   server.registerTool(
-    'manifest_model_prices',
+    'thinker_model_prices',
     {
       title: 'Model prices',
       description: 'Install-wide model pricing. No agent is required.',

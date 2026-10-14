@@ -8,13 +8,11 @@ name: Docker Smoke
 # Catches regressions from code that silently writes outside /tmp at boot,
 # which would crash users on the locked-down default deployment.
 #
-# The image is built locally as `thinker:ci` and never pulled from a registry.
-# Until #26 rebrands docker/docker-compose.yml (service, project, volume and
-# image names), the jobs point Compose at that image without editing docker/:
-# the `smoke` job layers a generated Compose override through COMPOSE_FILE,
-# and the `install-script` job serves install.sh a patched temporary copy of
-# the Compose file. Both go away in #26. The upgrade test returns in v0.2,
-# against the first published tmsoftbrasil/thinker.
+# The image is built locally as `tmsoftbrasil/thinker:ci` and never pulled
+# from a registry: each job exports THINKER_VERSION=ci, so the unmodified
+# docker/docker-compose.yml (`tmsoftbrasil/thinker:${THINKER_VERSION:-latest}`)
+# finds it in the local image store. The upgrade test against a previously
+# published image returns in v0.2, after the first tmsoftbrasil/thinker release.
 #
 # Path-filtered, so these checks must not be required on main.
 
@@ -62,26 +60,20 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build local image as thinker:ci
+      - name: Build local image as tmsoftbrasil/thinker:ci
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
           push: false
           load: true
-          tags: thinker:ci
+          tags: tmsoftbrasil/thinker:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=image-amd64
           cache-to: type=gha,mode=max,scope=image-amd64
 
-      - name: Point Compose at the local thinker:ci image
-        run: |
-          # docker/docker-compose.yml still names the upstream image until #26.
-          # Layer a generated override on top of it instead of editing docker/;
-          # COMPOSE_FILE makes every later `docker compose` call pick it up.
-          override="$RUNNER_TEMP/thinker-ci.compose.yml"
-          printf 'services:\n  manifest:\n    image: thinker:ci\n' > "$override"
-          echo "COMPOSE_FILE=$GITHUB_WORKSPACE/docker/docker-compose.yml:$override" >> "$GITHUB_ENV"
+      - name: Point Compose at the local image tag
+        run: echo "THINKER_VERSION=ci" >> "$GITHUB_ENV"
 
       - name: Prepare .env from .env.example with generated secrets
         working-directory: docker
@@ -101,26 +93,31 @@ jobs:
         env:
           HOST_BIND_ADDRESS: 0.0.0.0
           HOST_PORT: "28080"
-          REQUEST_RECORDING_RETENTION_DAYS: "42"
-          REQUEST_RECORDING_S3_BUCKET: recordings
-          REQUEST_RECORDING_S3_ENDPOINT: http://minio:9000
-          REQUEST_RECORDING_S3_REGION: auto
-          REQUEST_RECORDING_S3_ACCESS_KEY_ID: access
-          REQUEST_RECORDING_S3_SECRET_ACCESS_KEY: secret
-          REQUEST_RECORDING_S3_FORCE_PATH_STYLE: "true"
+          THINKER_RECORDING_RETENTION_DAYS: "42"
+          THINKER_RECORDING_S3_BUCKET: recordings
+          THINKER_RECORDING_S3_ENDPOINT: http://minio:9000
+          THINKER_RECORDING_S3_REGION: auto
+          THINKER_RECORDING_S3_ACCESS_KEY_ID: access
+          THINKER_RECORDING_S3_SECRET_ACCESS_KEY: secret
+          THINKER_RECORDING_S3_FORCE_PATH_STYLE: "true"
+          THINKER_ALLOW_SIGNUP: "true"
+          THINKER_ENCRYPTION_KEY_PREVIOUS: previous-key-for-wiring-check
         run: |
           docker compose config --format json > /tmp/compose.json
           jq -e '
-            .services.manifest.image == "thinker:ci" and
-            .services.manifest.ports[0].host_ip == "0.0.0.0" and
-            .services.manifest.ports[0].published == "28080" and
-            .services.manifest.environment.REQUEST_RECORDING_RETENTION_DAYS == "42" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_BUCKET == "recordings" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_ENDPOINT == "http://minio:9000" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_REGION == "auto" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_ACCESS_KEY_ID == "access" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_SECRET_ACCESS_KEY == "secret" and
-            .services.manifest.environment.REQUEST_RECORDING_S3_FORCE_PATH_STYLE == "true"
+            .services.thinker.image == "tmsoftbrasil/thinker:ci" and
+            .services.thinker.ports[0].host_ip == "0.0.0.0" and
+            .services.thinker.ports[0].published == "28080" and
+            .services.thinker.environment.TRUST_PROXY == "loopback" and
+            .services.thinker.environment.THINKER_RECORDING_RETENTION_DAYS == "42" and
+            .services.thinker.environment.THINKER_RECORDING_S3_BUCKET == "recordings" and
+            .services.thinker.environment.THINKER_RECORDING_S3_ENDPOINT == "http://minio:9000" and
+            .services.thinker.environment.THINKER_RECORDING_S3_REGION == "auto" and
+            .services.thinker.environment.THINKER_RECORDING_S3_ACCESS_KEY_ID == "access" and
+            .services.thinker.environment.THINKER_RECORDING_S3_SECRET_ACCESS_KEY == "secret" and
+            .services.thinker.environment.THINKER_RECORDING_S3_FORCE_PATH_STYLE == "true" and
+            .services.thinker.environment.THINKER_ALLOW_SIGNUP == "true" and
+            .services.thinker.environment.THINKER_ENCRYPTION_KEY_PREVIOUS == "previous-key-for-wiring-check"
           ' /tmp/compose.json
 
       - name: Start mock OpenAI provider
@@ -154,7 +151,7 @@ jobs:
             sleep 2
           done
           echo "health never returned 200" >&2
-          (cd docker && docker compose logs manifest)
+          (cd docker && docker compose logs thinker)
           exit 1
 
       - name: Checkout baseline gateway contracts
@@ -177,9 +174,6 @@ jobs:
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'contract-break') }}
         env:
           THINKER_BASE_URL: http://127.0.0.1:2099
-          # Base commits from before #21 read the URL under its old name.
-          # TODO(#31): drop this line once no open PR has a base before #21.
-          MANIFEST_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
           tests=(.gateway-contract-baseline/contracts/gateway/tests/*.test.mjs)
@@ -218,7 +212,7 @@ jobs:
         run: |
           curl -sSf http://127.0.0.1:2099/ -o /tmp/index.html
           test -s /tmp/index.html
-          grep -q '<title>Manifest</title>' /tmp/index.html
+          grep -q '<title>Thinker</title>' /tmp/index.html
 
       - name: Verify the removed public error pages endpoint returns 404
         run: |
@@ -228,17 +222,17 @@ jobs:
             exit 1
           fi
 
-      - name: Verify recording survives Manifest container recreation
+      - name: Verify recording survives Thinker container recreation
         working-directory: docker
         run: |
           base_url=http://127.0.0.1:2099
           auth_origin=http://localhost:2099
-          cookie_jar=/tmp/manifest-recording-smoke.cookies
+          cookie_jar=/tmp/thinker-recording-smoke.cookies
           prompt="persist this request through a container recreation"
           expected_answer="persisted through Docker volume"
 
           # One-time setup token printed at first boot (#29).
-          setup_token=$(docker compose logs manifest | grep -oE 'one-time setup token: [A-Za-z0-9_-]+' | tail -1 | awk '{print $NF}')
+          setup_token=$(docker compose logs thinker | grep -oE 'one-time setup token: [A-Za-z0-9_-]+' | tail -1 | awk '{print $NF}')
           test -n "$setup_token"
           echo "::add-mask::$setup_token"
           curl -sSf -X POST "$base_url/api/v1/setup/admin" \
@@ -302,7 +296,7 @@ jobs:
           recording_row=""
           for i in $(seq 1 100); do
             recording_row=$(docker compose exec -T postgres \
-              psql -U manifest -d manifest -AtF '|' -c \
+              psql -U thinker -d thinker -AtF '|' -c \
               "SELECT request_id, id, recording_key
                FROM agent_messages
                WHERE recording_key IS NOT NULL
@@ -319,18 +313,18 @@ jobs:
           docker run --rm --user 65532:65532 \
             -e RECORDING_KEY="$storage_key" \
             -e RECORDING_PROMPT="$prompt" \
-            -v manifest_request_recordings:/recordings:ro \
+            -v thinker_request_recordings:/recordings:ro \
             --entrypoint /nodejs/bin/node \
-            thinker:ci \
+            tmsoftbrasil/thinker:ci \
             -e "const fs=require('fs');const b=fs.readFileSync('/recordings/'+process.env.RECORDING_KEY);if(b.subarray(0,4).toString('ascii')!=='MRE1')process.exit(1);if(b.includes(process.env.RECORDING_PROMPT))process.exit(2)"
 
-          docker compose up -d --force-recreate --no-deps manifest
+          docker compose up -d --force-recreate --no-deps thinker
           for i in $(seq 1 60); do
             if curl -sSf "$base_url/api/v1/health" >/dev/null; then
               break
             fi
             if [[ "$i" -eq 60 ]]; then
-              docker compose logs manifest
+              docker compose logs thinker
               exit 1
             fi
             sleep 2
@@ -365,13 +359,13 @@ jobs:
       - name: Dump backend logs on success (for diff inspection)
         if: success()
         working-directory: docker
-        run: docker compose logs --tail=200 manifest
+        run: docker compose logs --tail=200 thinker
 
       - name: Dump backend logs on failure
         if: failure()
         working-directory: docker
         run: |
-          docker compose logs manifest || true
+          docker compose logs thinker || true
           docker compose logs postgres || true
 
       - name: Tear down
@@ -391,7 +385,7 @@ jobs:
     # from HTTP — against the branch-under-test. The default source
     # (raw.githubusercontent.com/.../main) would always test `main` even
     # on a PR, so we point the installer at a local HTTP server serving
-    # the PR's docker/ files via MANIFEST_INSTALLER_SOURCE.
+    # the PR's docker/ files via THINKER_INSTALLER_SOURCE.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -399,38 +393,24 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build local image as thinker:ci
+      - name: Build local image as tmsoftbrasil/thinker:ci
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
           push: false
           load: true
-          tags: thinker:ci
+          tags: tmsoftbrasil/thinker:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=image-amd64
           cache-to: type=gha,mode=max,scope=image-amd64
 
-      - name: Serve a patched copy of the PR's docker/ files on a local HTTP port
+      - name: Point Compose at the local image tag
+        run: echo "THINKER_VERSION=ci" >> "$GITHUB_ENV"
+
+      - name: Serve the PR's docker/ files on a local HTTP port
         run: |
-          # docker/docker-compose.yml names the published app image
-          # (tmsoftbrasil/thinker:${THINKER_VERSION:-latest}). Serve install.sh
-          # a temporary copy whose app image is the local thinker:ci, so
-          # nothing is pulled from a registry and docker/ is left untouched.
-          # Only the app service's image line matches `<registry>/thinker:<tag>`
-          # (or the legacy `<registry>/manifest:<tag>`); Postgres does not.
-          src_dir="$RUNNER_TEMP/installer-source"
-          mkdir -p "$src_dir"
-          cp docker/docker-compose.yml docker/.env.example "$src_dir/"
-          sed -E -i \
-            's#^([[:space:]]*image:[[:space:]]*)[^[:space:]]+/(thinker|manifest):[^[:space:]]+$#\1thinker:ci#' \
-            "$src_dir/docker-compose.yml"
-          test "$(grep -Ec '^[[:space:]]*image:[[:space:]]*thinker:ci$' "$src_dir/docker-compose.yml")" = 1
-          if grep -Eq '^[[:space:]]*image:.*/(thinker|manifest):' "$src_dir/docker-compose.yml"; then
-            echo "::error::The patched Compose file still names a published app image." >&2
-            exit 1
-          fi
-          cd "$src_dir"
+          cd docker
           # `python -m http.server` ships with every ubuntu-latest runner
           # and serves the cwd verbatim. Install.sh will fetch
           # docker-compose.yml and .env.example from this origin.
@@ -441,7 +421,7 @@ jobs:
 
       - name: Run install.sh against the local source
         env:
-          MANIFEST_INSTALLER_SOURCE: http://127.0.0.1:38000
+          THINKER_INSTALLER_SOURCE: http://127.0.0.1:38000
         run: |
           bash docker/install.sh --dir "$RUNNER_TEMP/install-smoke" --yes
 
@@ -455,23 +435,26 @@ jobs:
           install_dir="$RUNNER_TEMP/install-smoke"
           test -f "$install_dir/docker-compose.yml"
           test -f "$install_dir/.env"
-          # .env must have a real BETTER_AUTH_SECRET written — not the
-          # empty template value.
+          # .env must have a real BETTER_AUTH_SECRET and THINKER_ENCRYPTION_KEY
+          # written — not the empty template values — and they must differ.
           grep -Eq '^BETTER_AUTH_SECRET=[0-9a-f]{64}$' "$install_dir/.env"
           grep -Eq '^THINKER_ENCRYPTION_KEY=[0-9a-f]{64}$' "$install_dir/.env"
+          secret=$(grep -E '^BETTER_AUTH_SECRET=' "$install_dir/.env" | cut -d= -f2)
+          key=$(grep -E '^THINKER_ENCRYPTION_KEY=' "$install_dir/.env" | cut -d= -f2)
+          test "$secret" != "$key"
 
       - name: Verify Compose project name is pinned (no dir-basename leak)
         run: |
-          # `name: mnfst` in docker-compose.yml should win over the
-          # install-directory basename, so we always see `mnfst-*` here.
+          # `name: thinker` in docker-compose.yml should win over the
+          # install-directory basename, so we always see `thinker-*` here.
           docker ps --format '{{.Names}}' | tee /tmp/containers.txt
-          grep -Eq '^mnfst-manifest-1$' /tmp/containers.txt
-          grep -Eq '^mnfst-postgres-1$' /tmp/containers.txt
+          grep -Eq '^thinker-thinker-1$' /tmp/containers.txt
+          grep -Eq '^thinker-postgres-1$' /tmp/containers.txt
 
       - name: Upgrade the installation in place
         env:
-          MANIFEST_INSTALLER_SOURCE: http://127.0.0.1:38000
-          MANIFEST_INSTALLER_SKIP_PULL: "1"
+          THINKER_INSTALLER_SOURCE: http://127.0.0.1:38000
+          THINKER_INSTALLER_SKIP_PULL: "1"
         run: |
           install_dir="$RUNNER_TEMP/install-smoke"
           printf '\nUPGRADE_TEST_SENTINEL=preserve-me\n' >> "$install_dir/.env"
@@ -487,32 +470,33 @@ jobs:
           backup=$(find "$install_dir" -maxdepth 1 \
             -name 'docker-compose.yml.backup.*' -print -quit)
           test -n "$backup"
-          grep -q '^# manifest-compose-version: 1$' "$install_dir/docker-compose.yml"
+          grep -q '^# thinker-compose-version: 1$' "$install_dir/docker-compose.yml"
 
           (cd "$install_dir" && docker compose config --format json) > /tmp/upgraded-compose.json
           jq -e '
-            .services.manifest.volumes[] |
-            select(.source == "recordings" and .target == "/data/request-recordings")
+            .services.thinker.image == "tmsoftbrasil/thinker:ci" and
+            (.services.thinker.volumes[] |
+              select(.source == "request_recordings" and .target == "/data/request-recordings"))
           ' /tmp/upgraded-compose.json
-          jq -e '.volumes.recordings.name == "manifest_request_recordings"' \
+          jq -e '.volumes.request_recordings.name == "thinker_request_recordings"' \
             /tmp/upgraded-compose.json
-          docker volume inspect manifest_request_recordings >/dev/null
+          docker volume inspect thinker_request_recordings >/dev/null
 
           docker run --rm --user 65532:65532 \
-            -v manifest_request_recordings:/data/request-recordings \
+            -v thinker_request_recordings:/data/request-recordings \
             --entrypoint /nodejs/bin/node \
-            thinker:ci \
+            tmsoftbrasil/thinker:ci \
             -e "const fs=require('fs');const p='/data/request-recordings/.write-test';fs.writeFileSync(p,'ok');fs.unlinkSync(p)"
 
           curl -sSf http://127.0.0.1:2099/api/v1/health | grep -q '"status":"healthy"'
-          (cd "$install_dir" && docker compose logs manifest) |
+          (cd "$install_dir" && docker compose logs thinker) |
             grep -q 'Request recording storage: filesystem'
 
       - name: Dump backend logs on failure
         if: failure()
         run: |
           install_dir="$RUNNER_TEMP/install-smoke"
-          (cd "$install_dir" && docker compose logs manifest || true)
+          (cd "$install_dir" && docker compose logs thinker || true)
           (cd "$install_dir" && docker compose logs postgres || true)
           cat /tmp/http.log || true
 

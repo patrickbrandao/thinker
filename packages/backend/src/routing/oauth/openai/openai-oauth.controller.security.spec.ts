@@ -10,7 +10,7 @@ import { ProviderKeyService } from '../../routing-core/provider-key.service';
 const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as never;
 
 const buildRequest = (): Request =>
-  ({ protocol: 'http', get: jest.fn().mockReturnValue('localhost:3001') }) as unknown as Request;
+  ({ protocol: 'http', get: jest.fn().mockReturnValue('localhost:2099') }) as unknown as Request;
 
 function build() {
   const oauth = {
@@ -101,7 +101,7 @@ describe('OpenaiOauthController', () => {
       expect(oauth.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
     });
@@ -279,7 +279,7 @@ describe('OpenaiOauthController', () => {
       expect(getCsp(res)).toMatch(/^default-src 'none'; script-src 'nonce-[A-Za-z0-9+/=]+'$/);
       const html = res.send.mock.calls[0][0] as string;
       expect(html).toContain('Login successful!');
-      expect(html).toContain('manifest-oauth-success');
+      expect(html).toContain('thinker-oauth-success');
     });
 
     it('renders HTML failure page when ok is not "1"', () => {
@@ -288,7 +288,7 @@ describe('OpenaiOauthController', () => {
       ctrl.done('0', res);
       const html = res.send.mock.calls[0][0] as string;
       expect(html).toContain('Login failed');
-      expect(html).toContain('manifest-oauth-error');
+      expect(html).toContain('thinker-oauth-error');
     });
 
     it('generates a unique nonce on every render', () => {

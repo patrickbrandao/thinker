@@ -2,6 +2,7 @@ import { For, Show, type Accessor, type Component } from 'solid-js';
 import type { AuthType } from '../services/api.js';
 import type { ProviderDef } from '../services/providers.js';
 import { providerIcon } from './ProviderIcon.js';
+import { THINKER_PROVIDERS_DOCS_URL } from '../services/thinker-links.js';
 
 interface Props {
   subscriptionProviders: ProviderDef[];
@@ -97,7 +98,7 @@ const ProviderSubscriptionTab: Component<Props> = (props) => {
         <div class="provider-modal__add-custom">
           <a
             class="provider-modal__add-custom-chip"
-            href="https://github.com/mnfst/llm-gateway/discussions/973"
+            href={THINKER_PROVIDERS_DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -105,7 +106,7 @@ const ProviderSubscriptionTab: Component<Props> = (props) => {
               <path d="m9,13h2v2c0,.55.45,1,1,1s1-.45,1-1v-2h2c.55,0,1-.45,1-1s-.45-1-1-1h-2v-2c0-.55-.45-1-1-1s-1,.45-1,1v2h-2c-.55,0-1,.45-1,1s.45,1,1,1Z" />
               <path d="m2.72,19.65c-.32.46-.35,1.05-.1,1.55.26.5.77.8,1.33.8h8.05c4.35,0,8.26-2.81,9.51-6.82,1.06-3.41.4-6.9-1.81-9.56-2.18-2.62-5.51-3.95-8.9-3.54C6.07,2.63,2.3,6.63,2.02,11.39c-.14,2.34.55,4.66,1.91,6.51l-1.21,1.75Zm1.29-8.14c.23-3.81,3.24-7.01,7.01-7.45h0c2.73-.32,5.39.74,7.13,2.83,1.77,2.13,2.3,4.94,1.44,7.69-.99,3.19-4.12,5.42-7.6,5.42h-7.09l.67-.96c.49-.7.48-1.63-.01-2.3-1.12-1.52-1.66-3.33-1.55-5.23Z" />
             </svg>
-            Request new subscription model
+            Subscription provider guide
           </a>
         </div>
       </div>

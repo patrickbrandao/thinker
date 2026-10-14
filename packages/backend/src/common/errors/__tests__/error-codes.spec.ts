@@ -1,14 +1,16 @@
 import {
-  extractManifestErrorCode,
-  formatManifestError,
+  extractThinkerErrorCode,
+  formatThinkerError,
   THINKER_ERRORS,
   THINKER_ERRORS_DOCS_BASE,
-  ManifestErrorCode,
+  ThinkerErrorCode,
 } from '../error-codes';
 
 describe('THINKER_ERRORS registry', () => {
   it('exposes the public docs base URL', () => {
-    expect(THINKER_ERRORS_DOCS_BASE).toBe('https://manifest.build/llm-gateway/docs/errors');
+    expect(THINKER_ERRORS_DOCS_BASE).toBe(
+      'https://github.com/patrickbrandao/thinker/blob/main/docs/erros.md',
+    );
   });
 
   it('every code has a non-empty title and template', () => {
@@ -25,16 +27,16 @@ describe('THINKER_ERRORS registry', () => {
   });
 });
 
-describe('formatManifestError', () => {
+describe('formatThinkerError', () => {
   it('wraps a static template with the peacock prefix and docs URL', () => {
-    const out = formatManifestError('M001');
-    expect(out).toContain('[🦚 Manifest M001]');
+    const out = formatThinkerError('M001');
+    expect(out).toContain('[🦚 Thinker M001]');
     expect(out).toContain('Missing the Authorization header');
-    expect(out).toContain('https://manifest.build/llm-gateway/docs/errors/M001/');
+    expect(out).toContain('https://github.com/patrickbrandao/thinker/blob/main/docs/erros.md#m001');
   });
 
   it('interpolates {var} placeholders from the vars object', () => {
-    const out = formatManifestError('M100', {
+    const out = formatThinkerError('M100', {
       provider: 'anthropic',
       dashboardUrl: 'https://dash.example/x',
     });
@@ -45,20 +47,20 @@ describe('formatManifestError', () => {
   });
 
   it('leaves placeholders untouched when a var is missing', () => {
-    const out = formatManifestError('M100', { provider: 'openai' });
+    const out = formatThinkerError('M100', { provider: 'openai' });
     expect(out).toContain('No openai API key yet');
     expect(out).toContain('{dashboardUrl}');
   });
 
   it('renders M101 as a missing default model, not missing providers (#2942)', () => {
-    const out = formatManifestError('M101', { dashboardUrl: 'https://dash.example/routing' });
-    expect(out).toContain('[🦚 Manifest M101]');
+    const out = formatThinkerError('M101', { dashboardUrl: 'https://dash.example/routing' });
+    expect(out).toContain('[🦚 Thinker M101]');
     expect(out).toContain('This harness has no model to route to yet. Pick a default model here');
     expect(out).toContain('https://dash.example/routing');
   });
 
   it('inserts the optional M101 detail before the dashboard link', () => {
-    const out = formatManifestError('M101', {
+    const out = formatThinkerError('M101', {
       dashboardUrl: 'https://dash.example/routing',
       detail: ' The default tier has no model set.',
     });
@@ -68,68 +70,67 @@ describe('formatManifestError', () => {
   });
 
   it('renders M102 for unusable subscription credentials', () => {
-    const out = formatManifestError('M102', {
+    const out = formatThinkerError('M102', {
       provider: 'openai',
       dashboardUrl: 'https://dash.example/routing',
     });
-    expect(out).toContain('[🦚 Manifest M102]');
+    expect(out).toContain('[🦚 Thinker M102]');
     expect(out).toContain('openai subscription credentials could not be refreshed');
     expect(out).toContain('https://dash.example/routing');
   });
 
   it('appends the docs URL exactly once', () => {
-    const out = formatManifestError('M500');
-    const matches =
-      out.match(/https:\/\/manifest\.build\/llm-gateway\/docs\/errors\/M500\//g) ?? [];
+    const out = formatThinkerError('M500');
+    const matches = out.match(/docs\/erros\.md#m500/g) ?? [];
     expect(matches).toHaveLength(1);
   });
 
   it('produces a stable output for every registered code', () => {
-    for (const code of Object.keys(THINKER_ERRORS) as ManifestErrorCode[]) {
-      const out = formatManifestError(code);
-      expect(out.startsWith(`[🦚 Manifest ${code}]`)).toBe(true);
-      expect(out.endsWith(`See ${THINKER_ERRORS_DOCS_BASE}/${code}/`)).toBe(true);
+    for (const code of Object.keys(THINKER_ERRORS) as ThinkerErrorCode[]) {
+      const out = formatThinkerError(code);
+      expect(out.startsWith(`[🦚 Thinker ${code}]`)).toBe(true);
+      expect(out.endsWith(`See ${THINKER_ERRORS_DOCS_BASE}#${code.toLowerCase()}`)).toBe(true);
     }
   });
 });
 
-describe('extractManifestErrorCode', () => {
-  it('returns null for empty or non-Manifest text', () => {
-    expect(extractManifestErrorCode(null)).toBeNull();
-    expect(extractManifestErrorCode(undefined)).toBeNull();
-    expect(extractManifestErrorCode('')).toBeNull();
-    expect(extractManifestErrorCode('upstream 500')).toBeNull();
-    expect(extractManifestErrorCode('[Manifest M999] unknown')).toBeNull();
+describe('extractThinkerErrorCode', () => {
+  it('returns null for empty or non-Thinker text', () => {
+    expect(extractThinkerErrorCode(null)).toBeNull();
+    expect(extractThinkerErrorCode(undefined)).toBeNull();
+    expect(extractThinkerErrorCode('')).toBeNull();
+    expect(extractThinkerErrorCode('upstream 500')).toBeNull();
+    expect(extractThinkerErrorCode('[Thinker M999] unknown')).toBeNull();
     // A provider body that echoes the code text without the peacock must NOT
-    // be mistaken for a Manifest error (guards against provider-error mislabeling).
-    expect(extractManifestErrorCode('[Manifest M100] echoed by an upstream')).toBeNull();
-    expect(extractManifestErrorCode('provider said: Manifest M102 somewhere')).toBeNull();
+    // be mistaken for a Thinker error (guards against provider-error mislabeling).
+    expect(extractThinkerErrorCode('[Thinker M100] echoed by an upstream')).toBeNull();
+    expect(extractThinkerErrorCode('provider said: Thinker M102 somewhere')).toBeNull();
   });
 
   it('extracts the code from a formatted peacock message', () => {
-    expect(extractManifestErrorCode(formatManifestError('M102', { provider: 'openai' }))).toBe(
+    expect(extractThinkerErrorCode(formatThinkerError('M102', { provider: 'openai' }))).toBe(
       'M102',
     );
     expect(
-      extractManifestErrorCode('[🦚 Manifest M100] No openai API key yet. Add one here: https://x'),
+      extractThinkerErrorCode('[🦚 Thinker M100] No openai API key yet. Add one here: https://x'),
     ).toBe('M100');
   });
 
   it('finds the code when nested inside a JSON error body', () => {
     const body = JSON.stringify({
       error: {
-        message: formatManifestError('M102', {
+        message: formatThinkerError('M102', {
           provider: 'openai',
           dashboardUrl: 'https://dash/routing',
         }),
       },
     });
-    expect(extractManifestErrorCode(body)).toBe('M102');
+    expect(extractThinkerErrorCode(body)).toBe('M102');
   });
 
   it('round-trips every registered code', () => {
-    for (const code of Object.keys(THINKER_ERRORS) as ManifestErrorCode[]) {
-      expect(extractManifestErrorCode(formatManifestError(code))).toBe(code);
+    for (const code of Object.keys(THINKER_ERRORS) as ThinkerErrorCode[]) {
+      expect(extractThinkerErrorCode(formatThinkerError(code))).toBe(code);
     }
   });
 });

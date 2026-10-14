@@ -1,31 +1,32 @@
-# Template Fly.io config for Manifest.
+# Template Fly.io config for Thinker.
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker
 #
-# Replace `manifest-example` with your Fly app name, or run
+# Replace `thinker-example` with your Fly app name, or run
 # `deploy/fly/deploy.sh` from the repository root to generate a temporary
 # config automatically.
 
-app = "manifest-example"
+app = "thinker-example"
 primary_region = "cdg"
 kill_signal = "SIGINT"
 kill_timeout = "30s"
 
 [build]
-  image = "docker.io/manifestdotbuild/manifest:6"
+  image = "docker.io/tmsoftbrasil/thinker:0.1"
 
 [env]
   PORT = "2099"
   BIND_ADDRESS = "0.0.0.0"
-  BETTER_AUTH_URL = "https://manifest-example.fly.dev"
-  MANIFEST_MODE = "selfhosted"
+  BETTER_AUTH_URL = "https://thinker-example.fly.dev"
   NODE_ENV = "production"
   SEED_DATA = "false"
   DB_POOL_MAX = "8"
   AUTH_DB_POOL_MAX = "4"
-  REQUEST_RECORDING_STORAGE = "s3"
-  REQUEST_RECORDING_S3_BUCKET = "manifest-recordings-bucket"
-  REQUEST_RECORDING_S3_ENDPOINT = "https://fly.storage.tigris.dev"
-  REQUEST_RECORDING_S3_REGION = "auto"
-  REQUEST_RECORDING_S3_FORCE_PATH_STYLE = "false"
+  THINKER_RECORDING_STORAGE = "s3"
+  THINKER_RECORDING_S3_BUCKET = "thinker-recordings-bucket"
+  THINKER_RECORDING_S3_ENDPOINT = "https://fly.storage.tigris.dev"
+  THINKER_RECORDING_S3_REGION = "auto"
+  THINKER_RECORDING_S3_FORCE_PATH_STYLE = "false"
 
 [http_service]
   internal_port = 2099

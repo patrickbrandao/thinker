@@ -1,6 +1,7 @@
 import { useSearchParams } from '@solidjs/router';
 import { Title } from '@solidjs/meta';
 import { Show, createEffect, createSignal, type Component } from 'solid-js';
+import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 
 interface ClientSummary {
   client_id: string;
@@ -104,15 +105,11 @@ const Consent: Component = () => {
 
   return (
     <div class="auth-layout">
-      <Title>Authorize MCP client - Manifest</Title>
+      <Title>Authorize MCP client - Thinker</Title>
       <div class="auth-card" style="text-align: center;">
         <div class="auth-logo">
-          <img
-            src="/logotype-white.svg"
-            alt="Manifest LLM Gateway"
-            class="auth-logo__img auth-logo__img--light"
-          />
-          <img src="/logotype-dark.svg" alt="" class="auth-logo__img auth-logo__img--dark" />
+          <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
         </div>
         <Show
           when={!loadError()}
@@ -127,7 +124,7 @@ const Consent: Component = () => {
             <h1 class="auth-header__title">Authorize this MCP client?</h1>
             <p class="auth-header__subtitle">
               <strong>{client()?.client_name || clientId()}</strong> wants to connect to your
-              Manifest workspace.
+              Thinker workspace.
             </p>
             <Show when={client()?.client_uri}>
               <p class="auth-header__subtitle">{client()?.client_uri}</p>

@@ -875,7 +875,7 @@ describe('MessagesQueryService', () => {
   });
 
   function runWithOrigin(params: {
-    origin?: 'manifest' | 'provider' | 'transport' | 'config' | 'policy' | 'internal' | 'request';
+    origin?: 'thinker' | 'provider' | 'transport' | 'config' | 'policy' | 'internal' | 'request';
     error_class?: string;
   }): Promise<jest.Mock> {
     mockGetRawOne.mockResolvedValueOnce({ total: 0 });
@@ -906,8 +906,8 @@ describe('MessagesQueryService', () => {
     ).toBeUndefined();
   });
 
-  it('shows only Manifest-originated errors when origin=manifest', async () => {
-    const andWhereSpy = await runWithOrigin({ origin: 'manifest' });
+  it('shows only Thinker-originated errors when origin=thinker', async () => {
+    const andWhereSpy = await runWithOrigin({ origin: 'thinker' });
     expect(
       andWhereSpy.mock.calls.find(([clause]) => clause === THINKER_ORIGIN_PREDICATE),
     ).toBeDefined();

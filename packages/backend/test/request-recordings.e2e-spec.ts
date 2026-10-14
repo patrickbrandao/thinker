@@ -55,7 +55,7 @@ beforeAll(async () => {
   // Unset, so the app runs with the 30-day default retention.
   delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
   if (expectedBackend === 'filesystem') {
-    filesystemRoot = await mkdtemp(join(tmpdir(), 'manifest-recordings-e2e-'));
+    filesystemRoot = await mkdtemp(join(tmpdir(), 'thinker-recordings-e2e-'));
     process.env['THINKER_RECORDING_FILESYSTEM_PATH'] = filesystemRoot;
   }
 

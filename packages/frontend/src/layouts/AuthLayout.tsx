@@ -1,18 +1,13 @@
 import type { ParentComponent } from 'solid-js';
+import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 
 const AuthLayout: ParentComponent = (props) => {
   return (
     <div class="auth-layout">
       <div class="auth-card">
         <div class="auth-logo">
-          <a href="https://manifest.build" class="auth-logo__link">
-            <img
-              src="/logotype-white.svg"
-              alt="Manifest LLM Gateway"
-              class="auth-logo__img auth-logo__img--light"
-            />
-            <img src="/logotype-dark.svg" alt="" class="auth-logo__img auth-logo__img--dark" />
-          </a>
+          <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
         </div>
         {props.children}
       </div>

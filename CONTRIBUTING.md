@@ -1,6 +1,6 @@
-# Contributing to Manifest
+# Contributing to Thinker
 
-Thanks for your interest in contributing to Manifest! This guide will help you get up and running.
+Thanks for your interest in contributing to Thinker! This guide will help you get up and running.
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ Thanks for your interest in contributing to Manifest! This guide will help you g
 | Routing  | OpenAI-compatible proxy (`/v1/chat/completions`) |
 | Build    | Turborepo + npm workspaces                       |
 
-The full NestJS + SolidJS stack runs locally against PostgreSQL, and the same database backend is used in the [cloud version](https://app.manifest.build). For local development, the simplest option is to run PostgreSQL in Docker and point `DATABASE_URL` at it.
+The full NestJS + SolidJS stack runs locally against PostgreSQL. For local development, the simplest option is to run PostgreSQL in Docker and point `DATABASE_URL` at it.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ The full NestJS + SolidJS stack runs locally against PostgreSQL, and the same da
 
 ## Repository Structure
 
-Manifest is a monorepo managed with [Turborepo](https://turbo.build/) and npm workspaces.
+Thinker is a monorepo managed with [Turborepo](https://turbo.build/) and npm workspaces.
 
 ```
 packages/
@@ -30,7 +30,7 @@ packages/
 └── frontend/             # SolidJS single-page app (Vite, uPlot)
 ```
 
-Self-hosting is supported via the [Docker image](https://hub.docker.com/r/manifestdotbuild/manifest).
+Self-hosting is supported via the [Docker image](https://hub.docker.com/r/tmsoftbrasil/thinker) and Docker Compose (`docker/`), the only official and CI-tested deploy path. The templates under `deploy/` are community-maintained.
 
 ## Getting Started
 
@@ -65,7 +65,7 @@ SEED_DATA=true
 If you already have PostgreSQL running, you can skip this step and reuse it. Otherwise, the quickest option is Docker:
 
 ```bash
-docker run --name manifest-postgres \
+docker run --name thinker-postgres \
   -e POSTGRES_USER=myuser \
   -e POSTGRES_PASSWORD=mypassword \
   -e POSTGRES_DB=mydatabase \
@@ -82,9 +82,9 @@ DATABASE_URL=postgresql://myuser:mypassword@localhost:5432/mydatabase
 Useful commands:
 
 ```bash
-docker start manifest-postgres   # start again later
-docker stop manifest-postgres    # stop without deleting data
-docker rm -f manifest-postgres   # remove the container
+docker start thinker-postgres   # start again later
+docker stop thinker-postgres    # stop without deleting data
+docker rm -f thinker-postgres   # remove the container
 ```
 
 4. Start the development servers (in separate terminals):
@@ -102,15 +102,15 @@ The frontend runs on `http://localhost:3000` and proxies API requests to the bac
 
 `npm run dev` is filtered to exactly `thinker-frontend` — adding a new workspace with a `dev` script will not silently join the dev set.
 
-5. With `SEED_DATA=true`, you can log in with `admin@manifest.build` / `manifest`.
+5. With `SEED_DATA=true`, you can log in with `admin@thinker.example.com` / `thinker`.
 
 ## Testing Routing with AI agents
 
-Manifest is a smart router for any AI agent that speaks OpenAI-compatible HTTP. The list of supported agents lives in `packages/shared/src/agent-type.ts` — OpenClaw, Hermes, OpenAI SDK, Vercel AI SDK, LangChain, and cURL are all first-class. The dashboard's "Connect Agent" flow generates the right setup snippet for whichever platform you pick.
+Thinker is a smart router for any AI agent that speaks OpenAI-compatible HTTP. The list of supported agents lives in `packages/shared/src/agent-type.ts` — OpenClaw, Hermes, OpenAI SDK, Vercel AI SDK, LangChain, and cURL are all first-class. The dashboard's "Connect Agent" flow generates the right setup snippet for whichever platform you pick.
 
 This section walks through **OpenClaw** because it's the deepest integration and the easiest to wire up end-to-end. The same backend also handles all other agents — just follow the dashboard instructions after creating the agent, or grab the snippet shown by the setup modal.
 
-To test routing against your local backend, add Manifest as a model provider in your OpenClaw config:
+To test routing against your local backend, add Thinker as a model provider in your OpenClaw config:
 
 1. Build and start the backend:
 
@@ -122,11 +122,11 @@ PORT=38238 BIND_ADDRESS=127.0.0.1 \
 
 2. Create an agent in the dashboard at `http://localhost:38238` and get the API key.
 
-3. Add Manifest as a provider in OpenClaw:
+3. Add Thinker as a provider in OpenClaw:
 
 ```bash
-openclaw config set models.providers.manifest '{"baseUrl":"http://localhost:38238/v1","api":"openai-completions","apiKey":"mnfst_YOUR_KEY","models":[{"id":"auto","name":"Manifest Auto"}]}'
-openclaw config set agents.defaults.model.primary manifest/auto
+openclaw config set models.providers.thinker '{"baseUrl":"http://localhost:38238/v1","api":"openai-completions","apiKey":"thk_YOUR_KEY","models":[{"id":"auto","name":"Thinker Auto"}]}'
+openclaw config set agents.defaults.model.primary thinker/auto
 openclaw gateway restart
 ```
 
@@ -212,13 +212,10 @@ npm run build
 
 ### Cutting a Docker release
 
-Manifest ships as the Docker image at [`manifestdotbuild/manifest`](https://hub.docker.com/r/manifestdotbuild/manifest). Releases are manual:
+Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Releases are cut by the maintainer:
 
-1. After merging PRs with changesets, a `chore: version packages` PR will be open on `main` — merge it to land the version bump in `packages/thinker/package.json` and update `packages/thinker/CHANGELOG.md`.
-2. Go to **GitHub Actions → Docker → Run workflow**, leave the `version` input blank, click Run.
-3. The workflow reads the version from `packages/thinker/package.json` and pushes `manifestdotbuild/manifest:{version}` (plus `{major}.{minor}`, `{major}`, and a `sha-<short>` rollback tag).
-
-If you need to retag an older commit or publish a version that doesn't match the current `package.json`, pass a semver string in the `version` input and it overrides the auto-detected value.
+1. After merging PRs with changesets, a `chore: version packages` PR is open on `main`. Merging it lands the version bump in `packages/thinker/package.json` and `packages/thinker/CHANGELOG.md`.
+2. Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>` (a `vX.Y.Z-rc.N` tag pushes only `X.Y.Z-rc.N` and `sha-<short>`), and creates the GitHub release with the Portuguese notes from `docs/releases/X.Y.Z.md`.
 
 ### Commit Messages
 
@@ -240,7 +237,7 @@ Write clear, concise commit messages that explain **why** the change was made. U
 
 ## Reporting Issues
 
-Found a bug or have a feature request? [Open an issue](https://github.com/mnfst/llm-gateway/issues) with as much detail as possible.
+Found a bug or have a feature request? [Open an issue](https://github.com/patrickbrandao/thinker/issues) with as much detail as possible.
 
 ## Code of Conduct
 

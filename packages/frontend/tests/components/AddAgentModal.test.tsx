@@ -276,7 +276,7 @@ describe('AddAgentModal', () => {
     renderOpen();
     expect(screen.getByText('Enable logs')).toBeTruthy();
     expect(document.body.textContent).toContain('Logs stay in your own database.');
-    expect(document.body.textContent).not.toContain('Manifest workspace');
+    expect(document.body.textContent).not.toContain('Thinker workspace');
   });
 
   it('resets the category/platform to defaults when a category changes', () => {

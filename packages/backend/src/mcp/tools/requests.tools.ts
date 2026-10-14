@@ -19,10 +19,10 @@ export function registerRequestTools(
   operator: McpOperator,
 ): void {
   server.registerTool(
-    'manifest_requests_get',
+    'thinker_requests_get',
     {
       title: 'Get requests',
-      description: 'List recent Manifest requests (provider attempts) with cursor pagination.',
+      description: 'List recent Thinker requests (provider attempts) with cursor pagination.',
       inputSchema: z.object({
         agent: z.string().min(1).max(100).optional(),
         range: z.enum(RANGE_VALUES).optional(),

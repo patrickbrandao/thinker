@@ -20,7 +20,7 @@ describe('Bedrock Runtime capability catalog', () => {
   });
 
   it('only accepts models that serve both Chat Completions and Responses', () => {
-    // Manifest keeps the agent's API on Runtime and does not convert between the
+    // Thinker keeps the agent's API on Runtime and does not convert between the
     // two there, so a Chat-only or Responses-only model cannot be added as is.
     for (const entry of BEDROCK_RUNTIME_CAPABILITY_CATALOG) {
       expect([...entry.apis].sort()).toEqual(['chat_completions', 'responses']);
@@ -46,7 +46,7 @@ describe('Bedrock Runtime capability catalog', () => {
     expect(getBedrockRuntimeCapabilities('ca.openai.gpt-6-sol')).toBeNull();
   });
 
-  it('publishes the Manifest endpoints that serve a catalogued profile', () => {
+  it('publishes the Thinker endpoints that serve a catalogued profile', () => {
     expect(getBedrockRuntimeSupportedEndpoints('global.openai.gpt-6-luna')).toEqual([
       '/v1/chat/completions',
       '/v1/responses',
