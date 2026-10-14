@@ -24,7 +24,7 @@ Estes só são contatados porque você os configurou, e só quando o recurso é 
 | --- | --- |
 | APIs de inferência e de listagem de modelos dos **provedores conectados**, incluindo Ollama Cloud (`ollama.com`) e o `OLLAMA_HOST` local | Requisições roteadas e descoberta de modelos. |
 | URLs dos **provedores customizados**, inclusive em LAN | Idem. |
-| **Fluxos OAuth e de assinatura** dos provedores que você conecta, como `auth.openai.com`, `claude.ai` e `console.anthropic.com`, `accounts.google.com`, `oauth2.googleapis.com` e `cloudcode-pa.googleapis.com`, `api.github.com` (Copilot), `auth.x.ai`, MiniMax e o AWS SSO (Kiro) | Ao conectar ou renovar a assinatura. |
+| **Fluxos OAuth e de assinatura** dos provedores que você conecta, como `auth.openai.com`, `claude.ai` e `console.anthropic.com`, `accounts.google.com`, `oauth2.googleapis.com` e `cloudcode-pa.googleapis.com`, `github.com` e `api.github.com` (Copilot), `auth.x.ai`, MiniMax e o AWS SSO (Kiro) | Ao conectar ou renovar a assinatura. |
 | **E-mail** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |
 | **Login social** (Google, GitHub, Discord) | Só se o par `*_CLIENT_ID`/`*_CLIENT_SECRET` estiver definido. |
 | **Armazenamento S3** das gravações | Só se `THINKER_RECORDING_S3_ENDPOINT` estiver definido. |
