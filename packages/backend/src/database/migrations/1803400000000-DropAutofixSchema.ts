@@ -24,7 +24,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * `down()` restores the columns, constraint and indexes as the earlier
  * migrations created them on the self-hosted path, empty. The cloud-only
- * `IDX_requests_autofix_healed` was never part of that path.
+ * `IDX_requests_autofix_healed` was never part of that path. It sets the same
+ * lock timeout at session level (`migration:revert` runs with
+ * `--transaction none`, where `SET LOCAL` has no effect) and resets it after.
  */
 export class DropAutofixSchema1803400000000 implements MigrationInterface {
   name = 'DropAutofixSchema1803400000000';
@@ -53,6 +55,15 @@ export class DropAutofixSchema1803400000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET lock_timeout = '10s'`);
+    try {
+      await this.restore(queryRunner);
+    } finally {
+      await queryRunner.query(`RESET lock_timeout`);
+    }
+  }
+
+  private async restore(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TABLE "install_metadata" ADD COLUMN IF NOT EXISTS "autofix_consented_at" timestamp DEFAULT NULL`,
     );
