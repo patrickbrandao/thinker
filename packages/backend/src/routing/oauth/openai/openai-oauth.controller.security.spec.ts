@@ -10,7 +10,7 @@ import { ProviderKeyService } from '../../routing-core/provider-key.service';
 const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as never;
 
 const buildRequest = (): Request =>
-  ({ protocol: 'http', get: jest.fn().mockReturnValue('localhost:3001') }) as unknown as Request;
+  ({ protocol: 'http', get: jest.fn().mockReturnValue('localhost:2099') }) as unknown as Request;
 
 function build() {
   const oauth = {
@@ -101,7 +101,7 @@ describe('OpenaiOauthController', () => {
       expect(oauth.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
     });

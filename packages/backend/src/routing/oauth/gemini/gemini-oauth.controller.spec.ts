@@ -55,7 +55,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       const result = await controller.authorize(
@@ -68,7 +68,7 @@ describe('GeminiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
       expect(result).toEqual({ url: 'https://accounts.google.com/o/oauth2/v2/auth?...' });
@@ -77,7 +77,7 @@ describe('GeminiOauthController', () => {
     it('throws 400 when agentName is missing', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -92,7 +92,7 @@ describe('GeminiOauthController', () => {
     it('throws 400 when agentName is empty string', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -108,7 +108,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -122,7 +122,7 @@ describe('GeminiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(

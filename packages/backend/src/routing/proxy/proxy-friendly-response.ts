@@ -4,6 +4,7 @@ import { Response as ExpressResponse } from 'express';
 import { Tier } from '../../scoring/types';
 import type { ResponseMode } from 'thinker-shared';
 import type { ManifestErrorCode } from '../../common/errors/error-codes';
+import { DEFAULT_PORT } from '../../common/constants/server.constants';
 
 export interface FriendlyForward {
   response: Response;
@@ -41,7 +42,7 @@ export function getDashboardUrl(
 ): string {
   const baseUrl =
     config.get<string>('app.betterAuthUrl') ||
-    `http://localhost:${config.get<number>('app.port', 3001)}`;
+    `http://localhost:${config.get<number>('app.port', DEFAULT_PORT)}`;
   if (!agentName) return baseUrl;
   const suffix = section ? `/${section}` : '';
   return `${baseUrl}/agents/${encodeURIComponent(agentName)}${suffix}`;

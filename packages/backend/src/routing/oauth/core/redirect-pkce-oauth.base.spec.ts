@@ -103,7 +103,7 @@ describe('RedirectPkceOauthBaseService — client id resolution', () => {
   }
 
   async function clientIdInAuthorizeUrl(svc: TestPkceOauthService): Promise<string | null> {
-    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
     return new URL(url).searchParams.get('client_id');
   }
 
@@ -137,9 +137,9 @@ describe('RedirectPkceOauthBaseService — backendUrl validation', () => {
   describe('generateAuthorizationUrl — sanitises backendUrl on storage', () => {
     it('stores a valid http://localhost backendUrl verbatim', async () => {
       const svc = buildSvc();
-      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
       const state = new URL(url).searchParams.get('state')!;
-      expect(readPendingBackendUrl(svc, state)).toBe('http://localhost:3001');
+      expect(readPendingBackendUrl(svc, state)).toBe('http://localhost:2099');
     });
 
     it('stores a valid http://127.0.0.1 backendUrl verbatim', async () => {
@@ -154,9 +154,9 @@ describe('RedirectPkceOauthBaseService — backendUrl validation', () => {
       // isAllowedRedirectOrigin now strips the brackets before comparing, so
       // IPv6 loopback is accepted the same as localhost / 127.0.0.1.
       const svc = buildSvc();
-      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://[::1]:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://[::1]:2099');
       const state = new URL(url).searchParams.get('state')!;
-      expect(readPendingBackendUrl(svc, state)).toBe('http://[::1]:3001');
+      expect(readPendingBackendUrl(svc, state)).toBe('http://[::1]:2099');
     });
 
     it('accepts loopback hosts on non-standard ports', async () => {
@@ -168,9 +168,9 @@ describe('RedirectPkceOauthBaseService — backendUrl validation', () => {
 
     it('accepts https://localhost without rewriting the scheme', async () => {
       const svc = buildSvc();
-      const url = await svc.generateAuthorizationUrl('a', 'u', 'https://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'https://localhost:2099');
       const state = new URL(url).searchParams.get('state')!;
-      expect(readPendingBackendUrl(svc, state)).toBe('https://localhost:3001');
+      expect(readPendingBackendUrl(svc, state)).toBe('https://localhost:2099');
     });
 
     it('replaces a non-loopback http origin with empty string', async () => {
@@ -225,7 +225,7 @@ describe('RedirectPkceOauthBaseService — backendUrl validation', () => {
 
     it('stores empty string for a missing-scheme URL', async () => {
       const svc = buildSvc();
-      const url = await svc.generateAuthorizationUrl('a', 'u', '//localhost:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', '//localhost:2099');
       const state = new URL(url).searchParams.get('state')!;
       expect(readPendingBackendUrl(svc, state)).toBe('');
     });

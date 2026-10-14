@@ -87,7 +87,7 @@ describe('OpenaiOauthService', () => {
 
   describe('generateAuthorizationUrl', () => {
     it('builds an OAuth URL with PKCE S256 challenge and tracks pending state', async () => {
-      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:2099');
       const parsed = new URL(url);
       expect(parsed.origin + parsed.pathname).toBe('https://auth.openai.com/oauth/authorize');
       expect(parsed.searchParams.get('response_type')).toBe('code');
@@ -209,7 +209,7 @@ describe('OpenaiOauthService', () => {
   describe('callback handler', () => {
     it('shuts down the callback server after a callback exchange failure', async () => {
       fetchMock.mockResolvedValue(mockResponse(400, {}, 'invalid_grant'));
-      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:2099');
       const state = new URL(url).searchParams.get('state')!;
       const close = jest.fn();
       const serviceInternals = svc as unknown as {

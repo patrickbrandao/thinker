@@ -20,7 +20,7 @@ describe('authOriginFromEnv', () => {
   });
 
   it('falls back to the default port when PORT is unset', () => {
-    expect(authOriginFromEnv({})).toBe('http://localhost:3001');
+    expect(authOriginFromEnv({})).toBe('http://localhost:2099');
   });
 });
 
@@ -83,17 +83,17 @@ describe('reading process.env by default', () => {
 describe('isMcpCapableResource', () => {
   it.each([
     'https://app.manifest.build/api/v1/mcp',
-    'http://localhost:3001/api/v1/mcp',
-    'http://127.0.0.1:3001/api/v1/mcp',
+    'http://localhost:2099/api/v1/mcp',
+    'http://127.0.0.1:2099/api/v1/mcp',
     'http://127.5.5.5/api/v1/mcp',
-    'http://[::1]:3001/api/v1/mcp',
+    'http://[::1]:2099/api/v1/mcp',
   ])('accepts %s', (resource) => {
     expect(isMcpCapableResource(resource)).toBe(true);
   });
 
   it.each([
     'http://manifest.example.internal/api/v1/mcp',
-    'http://192.168.1.50:3001/api/v1/mcp',
+    'http://192.168.1.50:2099/api/v1/mcp',
     'http://manifest.tail1234.ts.net/api/v1/mcp',
     'http://128.0.0.1/api/v1/mcp',
     'ftp://example.com/api/v1/mcp',
@@ -114,7 +114,7 @@ describe('mcpResourceProblem', () => {
     ['https://mnfst.example.com/api/v1/mcp#frag', 'must not contain a fragment'],
     ['https://mnfst.example.com/app?tenant=x/api/v1/mcp', 'must not contain a query'],
     [
-      'http://192.168.1.50:3001/api/v1/mcp',
+      'http://192.168.1.50:2099/api/v1/mcp',
       'must use HTTPS (loopback HTTP is allowed for development)',
     ],
     ['ftp://example.com/api/v1/mcp', 'must use HTTPS (loopback HTTP is allowed for development)'],
@@ -124,7 +124,7 @@ describe('mcpResourceProblem', () => {
 
   it('is null for a usable resource', () => {
     expect(mcpResourceProblem('https://mnfst.example.com/api/v1/mcp')).toBeNull();
-    expect(mcpResourceProblem('http://localhost:3001/api/v1/mcp')).toBeNull();
+    expect(mcpResourceProblem('http://localhost:2099/api/v1/mcp')).toBeNull();
   });
 });
 
@@ -208,7 +208,7 @@ describe('resolveMcpAvailability', () => {
 
   it('still refuses an incapable origin when MCP_ENABLED asks for it', () => {
     const result = resolveMcpAvailability({
-      BETTER_AUTH_URL: 'http://192.168.1.50:3001',
+      BETTER_AUTH_URL: 'http://192.168.1.50:2099',
       MCP_ENABLED: 'true',
     });
     expect(result.enabled).toBe(false);

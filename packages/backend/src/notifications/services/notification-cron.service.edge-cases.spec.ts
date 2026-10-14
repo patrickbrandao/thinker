@@ -92,7 +92,7 @@ describe('NotificationCronService — edge cases', () => {
         },
         {
           provide: ManifestRuntimeService,
-          useValue: { getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:3001') },
+          useValue: { getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099') },
         },
       ],
     }).compile();

@@ -5,8 +5,8 @@ import { Logger } from '@nestjs/common';
 
 jest.mock('../auth/auth.instance', () => ({
   auth: { $context: Promise.resolve({ baseURL: '', internalAdapter: {} }) },
-  authIssuer: 'http://localhost:3001/api/auth',
-  mcpResource: 'http://localhost:3001/api/v1/mcp',
+  authIssuer: 'http://localhost:2099/api/auth',
+  mcpResource: 'http://localhost:2099/api/v1/mcp',
   MCP_READ_SCOPE: 'mcp:read',
 }));
 jest.mock('better-auth/node', () => ({ fromNodeHeaders: jest.fn(() => new Headers()) }));
@@ -112,9 +112,9 @@ describe('McpController', () => {
     expect(createDpopReplayStore).toHaveBeenCalledWith(internalAdapter);
     expect(createMcpProtectedRequestHandler).toHaveBeenCalledWith(
       {
-        issuer: 'http://localhost:3001/api/auth',
-        audience: 'http://localhost:3001/api/v1/mcp',
-        jwksUrl: 'http://localhost:3001/api/auth/jwks',
+        issuer: 'http://localhost:2099/api/auth',
+        audience: 'http://localhost:2099/api/v1/mcp',
+        jwksUrl: 'http://localhost:2099/api/auth/jwks',
         requiredScopes: ['mcp:read'],
         dpop: { replayStore: createDpopReplayStore.mock.results[0].value },
       },
@@ -314,9 +314,9 @@ describe('McpController', () => {
     );
     expect(createMcpProtectedRequestHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        issuer: 'http://localhost:3001/api/auth',
-        audience: 'http://localhost:3001/api/v1/mcp',
-        jwksUrl: 'http://localhost:3001/api/auth/jwks',
+        issuer: 'http://localhost:2099/api/auth',
+        audience: 'http://localhost:2099/api/v1/mcp',
+        jwksUrl: 'http://localhost:2099/api/auth/jwks',
       }),
       expect.any(Function),
     );

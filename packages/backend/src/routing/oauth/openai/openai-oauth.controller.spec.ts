@@ -53,7 +53,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       const result = await controller.authorize(
@@ -66,7 +66,7 @@ describe('OpenaiOauthController', () => {
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
-        'http://localhost:3001',
+        'http://localhost:2099',
         'user-1',
       );
       expect(result).toEqual({ url: 'https://auth.openai.com/oauth/...' });
@@ -75,7 +75,7 @@ describe('OpenaiOauthController', () => {
     it('throws 400 when agentName is missing', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -90,7 +90,7 @@ describe('OpenaiOauthController', () => {
     it('throws 400 when agentName is empty string', async () => {
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -106,7 +106,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
@@ -120,7 +120,7 @@ describe('OpenaiOauthController', () => {
 
       const req = {
         protocol: 'http',
-        get: jest.fn().mockReturnValue('localhost:3001'),
+        get: jest.fn().mockReturnValue('localhost:2099'),
       } as unknown as Request;
 
       await expect(
