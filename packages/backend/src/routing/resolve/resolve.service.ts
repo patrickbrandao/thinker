@@ -186,6 +186,10 @@ export class ResolveService {
         `No route resolved for agent=${agentId} tier=${result.tier} ` +
           `(override=${assignment.override_route?.model ?? 'null'})`,
       );
+      // A scored tier without a model falls back to the default tier; M101
+      // only when the default tier is empty too.
+      const fallback = await this.resolveForTier(agentId, tenantId, DEFAULT_TIER_SLOT, 'default');
+      if (fallback.route) return fallback;
       return {
         tier: result.tier,
         route: null,
@@ -616,11 +620,17 @@ function noRouteDetail(
   if (override) {
     return (
       `The ${tier} tier points at "${override.model}", but its provider is not ` +
-      `connected or not enabled for this agent.`
+      `connected or not enabled for this agent.` +
+      (complexityRouting && tier !== DEFAULT_TIER_SLOT
+        ? ' The default tier it falls back to has no usable model either.'
+        : '')
     );
   }
   if (complexityRouting) {
-    return `This request scored as the ${tier} tier, which has no model set.`;
+    return (
+      `This request scored as the ${tier} tier, which has no model set, and the ` +
+      `default tier it falls back to has no model either.`
+    );
   }
   const ignored = TIERS.filter((name) =>
     tiers.some((t) => t.tier === name && readOverrideRoute(t)),

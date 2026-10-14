@@ -143,4 +143,31 @@ describe('fresh install, custom provider only', () => {
 
     expect(upstreamModels).toEqual(['mock-model', 'mock-model', 'mock-model']);
   });
+
+  it('with complexity routing on, a scored tier without a model falls back to default', async () => {
+    await dashboard(api().post(`/api/v1/routing/${agentName}/complexity/toggle`))
+      .expect(201)
+      .expect(({ body }) => expect(body.enabled).toBe(true));
+    await dashboard(api().delete(`/api/v1/routing/${agentName}/tiers/simple`)).expect(200);
+    upstreamModels.length = 0;
+
+    const res = await harness(api().post('/v1/chat/completions'))
+      .send({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] })
+      .expect(200);
+    expect(res.body.choices[0].message.content).toBe('pong');
+    expect(res.headers['x-thinker-tier']).toBe('default');
+    expect(upstreamModels).toEqual(['mock-model']);
+  });
+
+  it('returns M101 naming both tiers when the default tier is empty too', async () => {
+    await dashboard(api().delete(`/api/v1/routing/${agentName}/tiers/default`)).expect(200);
+
+    const res = await harness(api().post('/v1/chat/completions'))
+      .send({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] })
+      .expect(200);
+    const text = res.body.choices[0].message.content as string;
+    expect(text).toContain('M101');
+    expect(text).toContain('scored as the simple tier');
+    expect(text).toContain('default tier it falls back to has no model either');
+  });
 });
