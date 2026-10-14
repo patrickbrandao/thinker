@@ -8,6 +8,29 @@
 
 export const PROVIDER_TRANSPORT_ERROR_STATUS = 503;
 export const PROVIDER_TIMEOUT_STATUS = 504;
+/** Status for a provider URL the SSRF policy refused (#74). */
+export const PROVIDER_URL_BLOCKED_STATUS = 502;
+export const PROVIDER_URL_BLOCKED_CODE = 'provider_url_blocked';
+
+/**
+ * The configured provider URL was refused by the SSRF policy: a cloud metadata
+ * address or name, before connecting or at connect time (DNS rebinding). It is
+ * a fault of the provider configuration, not of the gateway, so it surfaces
+ * like an unreachable provider (fallbacks run) with its own status and code
+ * instead of an internal error.
+ */
+export class ProviderUrlBlockedError extends Error {
+  readonly code = 'EPROVIDERURLBLOCKED';
+
+  constructor(detail: string) {
+    super(`Provider URL blocked by the SSRF policy: ${detail}`);
+    this.name = 'ProviderUrlBlockedError';
+  }
+}
+
+export function isProviderUrlBlockedError(error: unknown): boolean {
+  return getErrorCode(error) === 'EPROVIDERURLBLOCKED';
+}
 
 const GENERIC_FETCH_ERROR_MESSAGE = 'fetch failed';
 
@@ -46,6 +69,7 @@ export function getErrorCause(error: unknown): unknown {
 // ---------------------------------------------------------------------------
 
 export function isTransportError(error: unknown): boolean {
+  if (isProviderUrlBlockedError(error)) return true;
   const name = getErrorName(error);
   if (name === 'AbortError' || name === 'TimeoutError') return true;
 
@@ -101,6 +125,23 @@ export function describeTransportError(error: unknown): string {
 }
 
 export function buildTransportErrorResponse(error: unknown): Response {
+  if (isProviderUrlBlockedError(error)) {
+    const message = sanitizeTransportErrorDetail(getErrorMessage(error) ?? '');
+    return new Response(
+      JSON.stringify({
+        error: {
+          message,
+          type: PROVIDER_URL_BLOCKED_CODE,
+          code: PROVIDER_URL_BLOCKED_CODE,
+        },
+      }),
+      {
+        status: PROVIDER_URL_BLOCKED_STATUS,
+        statusText: 'Bad Gateway',
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }
   const status = isTimeoutError(error) ? PROVIDER_TIMEOUT_STATUS : PROVIDER_TRANSPORT_ERROR_STATUS;
   const message = describeTransportError(error);
 

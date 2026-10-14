@@ -18,6 +18,11 @@ jest.mock('../../../common/utils/url-validation', () => ({
 
 import { ProviderClient } from '../provider-client';
 import { buildCustomEndpoint, ProviderEndpoint } from '../provider-endpoints';
+import {
+  buildTransportErrorResponse,
+  isTransportError,
+  ProviderUrlBlockedError,
+} from '../proxy-transport';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validatePublicUrl } = require('../../../common/utils/url-validation');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -203,5 +208,64 @@ describe('ProviderClient — SSRF revalidation for custom endpoints', () => {
 
     expect(ssrfSafeFetch).not.toHaveBeenCalled();
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('blocked provider URLs surface as a 502 with their own code (#74)', () => {
+    const forwardCustom = () =>
+      client.forward({
+        provider: 'custom:x',
+        apiKey: 'k',
+        model: 'm',
+        body,
+        stream: false,
+        customEndpoint: buildCustomEndpoint('https://rebound.example.com'),
+      });
+
+    it('throws ProviderUrlBlockedError when revalidation refuses the URL', async () => {
+      (validatePublicUrl as jest.Mock).mockRejectedValue(new Error('cloud metadata'));
+      const error = await forwardCustom().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderUrlBlockedError);
+      expect(isTransportError(error)).toBe(true);
+    });
+
+    it('maps a connect-time SSRF refusal (the cause of fetch failed) the same way', async () => {
+      (validatePublicUrl as jest.Mock).mockResolvedValue(undefined);
+      mockFetch.mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(
+            new Error('rebound.example.com resolved to a cloud metadata address'),
+            {
+              code: 'ESSRFBLOCKED',
+            },
+          ),
+        }),
+      );
+      const error = await forwardCustom().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderUrlBlockedError);
+
+      const response = buildTransportErrorResponse(error);
+      expect(response.status).toBe(502);
+      const json = (await response.json()) as { error: Record<string, string> };
+      expect(json.error.code).toBe('provider_url_blocked');
+      expect(json.error.message).toContain('Provider URL blocked by the SSRF policy');
+      expect(json.error.message).toContain('cloud metadata address');
+    });
+
+    it('keeps the sanitized cause of any other fetch failure', async () => {
+      (validatePublicUrl as jest.Mock).mockResolvedValue(undefined);
+      mockFetch.mockRejectedValue(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('connect ECONNREFUSED https://h/?key=SECRET'), {
+            code: 'ECONNREFUSED',
+          }),
+        }),
+      );
+      const error = (await forwardCustom().catch((e: unknown) => e)) as Error;
+      expect(error.message).toBe('fetch failed');
+      const cause = error.cause as Error & { code?: string };
+      expect(cause.code).toBe('ECONNREFUSED');
+      expect(cause.message).toContain('key=***');
+      expect(cause.message).not.toContain('SECRET');
+    });
   });
 });

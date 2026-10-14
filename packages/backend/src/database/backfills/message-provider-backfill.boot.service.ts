@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
@@ -9,6 +9,7 @@ import {
   runMessageProviderBackfill,
 } from './backfill-message-providers';
 import { TypeOrmBackfillGateway } from './backfill-message-providers.gateway';
+import { BootBackfillConnection } from './boot-backfill-connection';
 
 /** Marker name in `backfill_state`; presence == this backfill has finished. */
 export const MESSAGE_PROVIDER_BACKFILL_NAME = 'agent_message_provider_attribution';
@@ -37,7 +38,8 @@ const defaultRunner: BackfillRunner = (dataSource, options) =>
  * - Production only (`NODE_ENV=production`).
  * - Fire-and-forget from onApplicationBootstrap: never blocks readiness/health
  *   and never crashes boot.
- * - Single-runner across replicas via a Postgres advisory lock.
+ * - Single-runner across replicas via a Postgres advisory lock, taken on a
+ *   direct connection when one is configured (see `BootBackfillConnection`).
  * - Exactly once per install via the `backfill_state` marker. The backfill is
  *   idempotent + resumable, so a crash mid-run simply re-runs on the next boot
  *   (the marker is only written on success).
@@ -46,23 +48,35 @@ const defaultRunner: BackfillRunner = (dataSource, options) =>
  * backfill:message-providers`, so the data it writes is identical either way.
  */
 @Injectable()
-export class MessageProviderBackfillBootService implements OnApplicationBootstrap {
+export class MessageProviderBackfillBootService
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly logger = new Logger(MessageProviderBackfillBootService.name);
+  /** Where the lock and the backfill SQL run. Replaceable in tests. */
+  connection: BootBackfillConnection;
 
   constructor(
-    private readonly dataSource: DataSource,
+    dataSource: DataSource,
     @InjectRepository(BackfillState)
     private readonly stateRepo: Repository<BackfillState>,
-  ) {}
+  ) {
+    this.connection = new BootBackfillConnection(dataSource);
+  }
+
+  async onApplicationShutdown(): Promise<void> {
+    await this.connection.close();
+  }
 
   onApplicationBootstrap(): void {
     // Only on real deploys, and never await — boot must not wait on the backfill.
     if (process.env['NODE_ENV'] !== 'production') return;
-    void this.runUntilComplete().catch((error) => {
-      this.logger.error(
-        `post-deploy backfill failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    });
+    void this.runUntilComplete()
+      .catch((error) => {
+        this.logger.error(
+          `post-deploy backfill failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      })
+      .finally(() => this.connection.close());
   }
 
   async runUntilComplete(): Promise<void> {
@@ -76,7 +90,8 @@ export class MessageProviderBackfillBootService implements OnApplicationBootstra
     if (await this.isCompleted()) {
       return true;
     }
-    const lock = this.dataSource.createQueryRunner();
+    const db = await this.connection.get();
+    const lock = db.createQueryRunner();
     await lock.connect();
     let acquired = false;
     try {
@@ -94,7 +109,7 @@ export class MessageProviderBackfillBootService implements OnApplicationBootstra
         return true;
       }
       this.logger.log('running post-deploy agent-message attribution backfill…');
-      const result = await runner(this.dataSource, { logger: this.logger });
+      const result = await runner(db, { logger: this.logger });
       await this.markCompleted();
       this.logger.log(
         `post-deploy backfill complete: stamped ${result.stamped} message(s) across ${result.windows} window(s)`,

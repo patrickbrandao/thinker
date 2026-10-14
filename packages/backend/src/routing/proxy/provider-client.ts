@@ -10,6 +10,12 @@ import {
 } from './provider-endpoints';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
+import {
+  getErrorCause,
+  getErrorCode,
+  getErrorMessage,
+  ProviderUrlBlockedError,
+} from './proxy-transport';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
 import { mergeExtraHeaders } from './extra-headers';
@@ -473,7 +479,7 @@ export class ProviderClient {
         await validatePublicUrl(url, { allowPrivate: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`Refusing to forward to disallowed URL: ${message}`);
+        throw new ProviderUrlBlockedError(`Refusing to forward to disallowed URL: ${message}`);
       }
     }
 
@@ -964,7 +970,23 @@ export class ProviderClient {
           ? (err as { message?: unknown; name?: unknown })
           : undefined;
       const message = typeof errorLike?.message === 'string' ? errorLike.message : String(err);
-      const sanitizedError = new Error(message.replace(/key=[^&\s]+/gi, 'key=***'));
+      const redact = (text: string) => text.replace(/key=[^&\s]+/gi, 'key=***');
+      // A connect-time SSRF refusal arrives as undici's generic `fetch failed`
+      // with the SsrfBlockedError as its cause (#74).
+      const blocked = [err, getErrorCause(err)].find((e) => getErrorCode(e) === 'ESSRFBLOCKED');
+      if (blocked) throw new ProviderUrlBlockedError(redact(getErrorMessage(blocked) ?? ''));
+      // Keep the cause (sanitized): otherwise every connect failure logs only
+      // as `fetch failed`. Its message and code only, never the request.
+      const cause = getErrorCause(err);
+      const sanitizedError = new Error(redact(message), {
+        ...(cause !== undefined
+          ? {
+              cause: Object.assign(new Error(redact(getErrorMessage(cause) ?? String(cause))), {
+                ...(getErrorCode(cause) ? { code: getErrorCode(cause) } : {}),
+              }),
+            }
+          : {}),
+      });
       if (typeof errorLike?.name === 'string') sanitizedError.name = errorLike.name;
       throw sanitizedError;
     } finally {
