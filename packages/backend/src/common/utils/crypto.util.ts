@@ -1,5 +1,4 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { Logger as NestLogger } from '@nestjs/common';
 
 /**
  * Constant-time string comparison for shared secrets sent in headers.
@@ -25,9 +24,6 @@ const KEY_LENGTH = 32;
 // remaining the same approved KDF family as the actual derivation below.
 const FINGERPRINT_LENGTH = 16;
 const FINGERPRINT_SCRYPT_OPTS = { N: 2, r: 1, p: 1 } as const;
-
-const logger = new NestLogger('crypto.util');
-let warnedAboutSecretReuse = false;
 
 // scrypt is deliberately CPU-expensive (~50ms+ per derivation with default
 // params). Calling it on every encrypt/decrypt — which happens on the proxy
@@ -66,31 +62,27 @@ function deriveKey(secret: string, salt: Buffer): Buffer {
   return derived;
 }
 
+export const ENCRYPTION_KEY_ENV = 'THINKER_ENCRYPTION_KEY';
+export const ENCRYPTION_KEY_PREVIOUS_ENV = 'THINKER_ENCRYPTION_KEY_PREVIOUS';
+export const MIN_ENCRYPTION_KEY_LENGTH = 32;
+
+/**
+ * The key that encrypts provider credentials, OAuth tokens and request
+ * recordings at rest: `THINKER_ENCRYPTION_KEY`, and nothing else. It is kept
+ * separate from the session-signing `BETTER_AUTH_SECRET` so a leak of one
+ * never decrypts what the other protects; there is deliberately no fallback.
+ *
+ * Boot refuses to start without a valid key ({@link assertEncryptionKeyConfig}),
+ * so this throwing at request time means the environment changed under a
+ * running process (or a test forgot to set the key).
+ */
 export function getEncryptionSecret(): string {
-  const dedicated = process.env['THINKER_ENCRYPTION_KEY'];
-  if (dedicated && dedicated.length >= 32) {
-    return dedicated;
+  const key = process.env[ENCRYPTION_KEY_ENV];
+  if (key && key.length >= MIN_ENCRYPTION_KEY_LENGTH) {
+    return key;
   }
-
-  // Falling back to BETTER_AUTH_SECRET means a single secret leak compromises
-  // both session signing and stored provider/OAuth keys. Warn once at boot so
-  // operators have a clear remediation path: set THINKER_ENCRYPTION_KEY to a
-  // separate 32+ char secret.
-  const sessionSecret = process.env['BETTER_AUTH_SECRET'];
-  if (sessionSecret && sessionSecret.length >= 32) {
-    if (!warnedAboutSecretReuse && process.env['NODE_ENV'] === 'production') {
-      warnedAboutSecretReuse = true;
-      logger.warn(
-        'THINKER_ENCRYPTION_KEY not set — falling back to BETTER_AUTH_SECRET for at-rest ' +
-          'encryption. Set THINKER_ENCRYPTION_KEY to a separate 32+ char secret so a session-' +
-          'signing leak does not also decrypt stored provider/OAuth keys.',
-      );
-    }
-    return sessionSecret;
-  }
-
   throw new Error(
-    'Encryption secret required. Set THINKER_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
+    `Encryption key required. Set ${ENCRYPTION_KEY_ENV} (>=${MIN_ENCRYPTION_KEY_LENGTH} chars).`,
   );
 }
 
@@ -102,24 +94,82 @@ export function getEncryptionSecret(): string {
  * current key" and anything greater means "written under an older key and due
  * for a rewrite".
  *
- * Order: the dedicated key, then THINKER_ENCRYPTION_KEY_PREVIOUS (set during
- * a rotation), then BETTER_AUTH_SECRET. Keeping the session secret last is
- * what lets an operator introduce THINKER_ENCRYPTION_KEY on an install that
- * had been encrypting with the session secret: old ciphertext still decrypts
- * without any PREVIOUS value.
+ * Order: `THINKER_ENCRYPTION_KEY`, then `THINKER_ENCRYPTION_KEY_PREVIOUS` (set
+ * only during a rotation). The session secret is never a candidate.
  */
 export function getDecryptionSecrets(): string[] {
   // getEncryptionSecret() throws when nothing usable is configured — let that
   // propagate, it is the same failure the encrypt path already reports.
   const secrets: string[] = [getEncryptionSecret()];
-  const add = (candidate: string | undefined): void => {
-    if (candidate && candidate.length >= 32 && !secrets.includes(candidate)) {
-      secrets.push(candidate);
-    }
-  };
-  add(process.env['THINKER_ENCRYPTION_KEY_PREVIOUS']);
-  add(process.env['BETTER_AUTH_SECRET']);
+  const previous = process.env[ENCRYPTION_KEY_PREVIOUS_ENV];
+  if (previous && previous.length >= MIN_ENCRYPTION_KEY_LENGTH && !secrets.includes(previous)) {
+    secrets.push(previous);
+  }
   return secrets;
+}
+
+/**
+ * A configuration problem that makes starting the server unsafe. The message
+ * is meant for the operator as-is: it names variables, never their values.
+ */
+export class StartupConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StartupConfigError';
+  }
+}
+
+const KEY_HINT = 'Generate one with: openssl rand -hex 32';
+
+/**
+ * Problems with the at-rest encryption configuration, one line each; empty
+ * when the configuration is valid. Exported for tests.
+ */
+export function encryptionKeyConfigProblems(env: NodeJS.ProcessEnv = process.env): string[] {
+  const problems: string[] = [];
+  const key = env[ENCRYPTION_KEY_ENV] ?? '';
+  const previous = env[ENCRYPTION_KEY_PREVIOUS_ENV] ?? '';
+  const sessionSecret = env['BETTER_AUTH_SECRET'] ?? '';
+
+  if (key === '') {
+    problems.push(
+      `${ENCRYPTION_KEY_ENV} is not set. It encrypts stored provider keys, OAuth tokens and ` +
+        `request recordings, and is required. ${KEY_HINT}`,
+    );
+  } else if (key.length < MIN_ENCRYPTION_KEY_LENGTH) {
+    problems.push(
+      `${ENCRYPTION_KEY_ENV} is too short (${key.length} chars); it must be at least ` +
+        `${MIN_ENCRYPTION_KEY_LENGTH} characters. ${KEY_HINT}`,
+    );
+  } else if (sessionSecret !== '' && key === sessionSecret) {
+    problems.push(
+      `${ENCRYPTION_KEY_ENV} must differ from BETTER_AUTH_SECRET, so a leak of the session ` +
+        `secret cannot decrypt stored credentials. ${KEY_HINT}`,
+    );
+  }
+
+  if (previous !== '' && previous.length < MIN_ENCRYPTION_KEY_LENGTH) {
+    problems.push(
+      `${ENCRYPTION_KEY_PREVIOUS_ENV} is too short (${previous.length} chars); when set it must ` +
+        `be the previous ${ENCRYPTION_KEY_ENV} value (at least ${MIN_ENCRYPTION_KEY_LENGTH} ` +
+        `characters). Remove it if no rotation is in progress.`,
+    );
+  }
+  return problems;
+}
+
+/**
+ * Boot-time gate for the at-rest encryption key: throws a
+ * {@link StartupConfigError} listing every problem when the key is missing,
+ * shorter than 32 characters or equal to `BETTER_AUTH_SECRET`, or when
+ * `THINKER_ENCRYPTION_KEY_PREVIOUS` is set but too short. Runs once before the
+ * app is created, never on the request path.
+ */
+export function assertEncryptionKeyConfig(env: NodeJS.ProcessEnv = process.env): void {
+  const problems = encryptionKeyConfigProblems(env);
+  if (problems.length > 0) {
+    throw new StartupConfigError(problems.join('\n'));
+  }
 }
 
 export function encrypt(plaintext: string, secret: string): string {

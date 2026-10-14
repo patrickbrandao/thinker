@@ -20,7 +20,12 @@ import { scoreRequest, ScorerInput, MomentumInput, scanMessages } from '../../sc
 import { ResolveResponse } from '../dto/resolve-response';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { Agent } from '../../entities/agent.entity';
-import { DEFAULT_RESPONSE_MODE, DEFAULT_OUTPUT_MODALITY, DEFAULT_TIER_SLOT } from 'thinker-shared';
+import {
+  DEFAULT_RESPONSE_MODE,
+  DEFAULT_OUTPUT_MODALITY,
+  DEFAULT_TIER_SLOT,
+  TIERS,
+} from 'thinker-shared';
 import type {
   AuthType,
   ModelRoute,
@@ -181,6 +186,16 @@ export class ResolveService {
         `No route resolved for agent=${agentId} tier=${result.tier} ` +
           `(override=${assignment.override_route?.model ?? 'null'})`,
       );
+      // A scored tier with no model set falls back to the default tier; M101
+      // only when the default tier has no usable route either. The fallback
+      // uses the default tier's own response_mode and output_modality.
+      // A tier whose configured override is unusable does NOT fall back: a
+      // broken config surfaces (M302 / M101) instead of silently routing to a
+      // possibly pricier default model.
+      if (!readOverrideRoute(assignment)) {
+        const fallback = await this.resolveForTier(agentId, tenantId, DEFAULT_TIER_SLOT, 'default');
+        if (fallback.route) return fallback;
+      }
       return {
         tier: result.tier,
         route: null,
@@ -191,6 +206,7 @@ export class ResolveService {
         score: result.score,
         reason: result.reason,
         override_model_unavailable: routeChain.unavailableOverrideModel ?? undefined,
+        no_route_detail: noRouteDetail(result.tier, assignment, tiers, true),
       };
     }
 
@@ -225,6 +241,8 @@ export class ResolveService {
         confidence: 1,
         score: 0,
         reason,
+        no_route_detail:
+          reason === 'default' ? noRouteDetail(tier, undefined, tiers, false) : undefined,
       };
     }
 
@@ -258,6 +276,10 @@ export class ResolveService {
         effectiveRoutes.primaryRoute || reason === 'heartbeat'
           ? undefined
           : (routeChain.unavailableOverrideModel ?? undefined),
+      no_route_detail:
+        effectiveRoutes.primaryRoute || reason !== 'default'
+          ? undefined
+          : noRouteDetail(tier, assignment, tiers, false),
     };
   }
 
@@ -587,6 +609,46 @@ export class ResolveService {
     if (pricing && pricing.provider !== 'OpenRouter') return pricing.provider;
     return null;
   }
+}
+
+/**
+ * Explain an empty route for M101. `auto` reads the default tier while
+ * complexity routing is off, so overrides set on the complexity tiers are
+ * ignored; that is the most common setup mistake on a fresh install.
+ */
+function noRouteDetail(
+  tier: TierSlot,
+  assignment: TierAssignment | undefined,
+  tiers: TierAssignment[],
+  complexityRouting: boolean,
+): string {
+  const override = assignment ? readOverrideRoute(assignment) : null;
+  if (override) {
+    return (
+      `The ${tier} tier points at "${override.model}", but its provider is not ` +
+      `connected or not enabled for this agent.`
+    );
+  }
+  if (complexityRouting) {
+    const defaultRow = tiers.find((t) => t.tier === DEFAULT_TIER_SLOT);
+    const defaultOverride = defaultRow ? readOverrideRoute(defaultRow) : null;
+    const defaultState = defaultOverride
+      ? `the default tier it falls back to points at "${defaultOverride.model}", but its ` +
+        `provider is not connected or not enabled for this agent.`
+      : `the default tier it falls back to has no model either.`;
+    return `This request scored as the ${tier} tier, which has no model set, and ${defaultState}`;
+  }
+  const ignored = TIERS.filter((name) =>
+    tiers.some((t) => t.tier === name && readOverrideRoute(t)),
+  );
+  if (ignored.length > 0) {
+    return (
+      `Complexity routing is off for this agent, so "auto" uses the default tier, ` +
+      `which has no model set. The models set on the ${ignored.join('/')} tier(s) ` +
+      `only apply with complexity routing on.`
+    );
+  }
+  return `"auto" uses the default tier, which has no model set.`;
 }
 
 function matchesHeaderRule(headers: IncomingHttpHeaders, tier: HeaderTier): boolean {

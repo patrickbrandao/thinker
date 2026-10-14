@@ -259,6 +259,8 @@ async function main() {
     THINKER_E2E_ALLOW_DROP: '1',
     BETTER_AUTH_SECRET:
       process.env.BETTER_AUTH_SECRET || 'e2e-docker-secret-at-least-32-characters!!',
+    THINKER_ENCRYPTION_KEY:
+      process.env.THINKER_ENCRYPTION_KEY || 'e2e-docker-encryption-key-at-least-32-characters',
   };
 
   log('Running migrations');

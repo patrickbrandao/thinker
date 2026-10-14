@@ -8,8 +8,8 @@
 #
 # Configuration comes from a `.env` file next to this compose file.
 # Copy `.env.example` to `.env` and set BETTER_AUTH_SECRET and
-# THINKER_ENCRYPTION_KEY (two different values) before booting. The install
-# script does this automatically.
+# THINKER_ENCRYPTION_KEY (two different values) before
+# booting. The install script does this automatically.
 #
 # Connecting local LLM servers (Ollama, LM Studio, or any OpenAI-compatible server):
 # Install your server on the host, bind it to 0.0.0.0, and point Thinker
@@ -57,8 +57,8 @@ services:
       - PORT=${PORT:-2099}
       - DATABASE_URL=${DATABASE_URL:-postgresql://thinker:thinker@postgres:5432/thinker}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
-      # Required at-rest encryption key for stored provider/OAuth credentials
-      # and recordings. Must differ from BETTER_AUTH_SECRET.
+      # Required at-rest encryption key for stored provider keys, OAuth tokens
+      # and request recordings. Must differ from BETTER_AUTH_SECRET.
       - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:?THINKER_ENCRYPTION_KEY must be set in .env}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The

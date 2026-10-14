@@ -125,7 +125,7 @@ describe('request recording storage selection', () => {
       resolveRecordingStorage(config({ 'app.requestRecordingStorage': 'somewhere-else' })),
     ).toEqual({
       backend: null,
-      reason: 'Unknown REQUEST_RECORDING_STORAGE value "somewhere-else"',
+      reason: 'Unknown THINKER_RECORDING_STORAGE value "somewhere-else"',
     });
   });
 });

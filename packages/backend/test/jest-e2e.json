@@ -6,6 +6,7 @@
   "testTimeout": 30000,
   "testRegex": ".e2e-spec.ts$",
   "globalSetup": "<rootDir>/test/e2e-global-setup.ts",
+  "setupFiles": ["<rootDir>/test/support/e2e-env.ts"],
   "setupFilesAfterEnv": ["<rootDir>/test/support/offline-setup.ts"],
   "transform": {
     "^.+\\.tsx?$": "ts-jest",

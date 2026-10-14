@@ -40,7 +40,7 @@ export const THINKER_ERRORS = {
   M101: {
     title: 'No model to route to',
     template:
-      'This harness has no model to route to yet. Pick a default model here: {dashboardUrl}',
+      'This harness has no model to route to yet.{detail} Pick a default model here: {dashboardUrl}',
   },
   M102: {
     title: 'Provider subscription credentials unusable',
@@ -94,7 +94,9 @@ export function formatThinkerError(
   const entry = THINKER_ERRORS[code];
   const interpolated = entry.template.replace(/\{(\w+)\}/g, (match, key: string) => {
     const value = vars[key];
-    return value === undefined ? match : String(value);
+    // `{detail}` is an optional sentence; leaving it out renders nothing.
+    if (value === undefined) return key === 'detail' ? '' : match;
+    return String(value);
   });
   return `[${PEACOCK} Thinker ${code}] ${interpolated} See ${thinkerErrorDocsUrl(code)}`;
 }

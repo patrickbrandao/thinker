@@ -26,9 +26,9 @@ const storageFailureTest = canBreakStorage ? it : it.skip;
 const execFileAsync = promisify(execFile);
 const previousEnv = new Map<string, string | undefined>();
 const recordingEnvKeys = [
-  'REQUEST_RECORDING_STORAGE',
-  'REQUEST_RECORDING_FILESYSTEM_PATH',
-  'REQUEST_RECORDING_RETENTION_DAYS',
+  'THINKER_RECORDING_STORAGE',
+  'THINKER_RECORDING_FILESYSTEM_PATH',
+  'THINKER_RECORDING_RETENTION_DAYS',
 ];
 
 let app: INestApplication;
@@ -51,11 +51,12 @@ const modelKey = () => `custom:${customProviderId}/recording-model`;
 beforeAll(async () => {
   for (const key of recordingEnvKeys) previousEnv.set(key, process.env[key]);
 
-  process.env['REQUEST_RECORDING_STORAGE'] = 'auto';
-  process.env['REQUEST_RECORDING_RETENTION_DAYS'] = '1';
+  process.env['THINKER_RECORDING_STORAGE'] = 'auto';
+  // Unset, so the app runs with the 30-day default retention.
+  delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
   if (expectedBackend === 'filesystem') {
     filesystemRoot = await mkdtemp(join(tmpdir(), 'thinker-recordings-e2e-'));
-    process.env['REQUEST_RECORDING_FILESYSTEM_PATH'] = filesystemRoot;
+    process.env['THINKER_RECORDING_FILESYSTEM_PATH'] = filesystemRoot;
   }
 
   await startMockProvider();
@@ -298,23 +299,16 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
     await expect(storage.get(jsonRecording.recording_key)).resolves.toBeInstanceOf(Buffer);
   });
 
-  it('retention removes the object before clearing its attempt pointer and preserves the parent Request', async () => {
-    await dataSource.query(
-      `UPDATE agent_messages
-       SET timestamp = CURRENT_TIMESTAMP - INTERVAL '10 days'
-       WHERE id = $1`,
-      [jsonRecording.attempt_id],
-    );
-    const retention = new RequestRecordingRetentionService(
-      dataSource,
-      {
-        get: (key: string) => (key === 'app.requestRecordingRetentionDays' ? 1 : undefined),
-      } as ConfigService,
-      storage,
-    );
+  it('retention keeps recordings for 30 days by default: a 31-day-old one is deleted, a 29-day-old one is kept', async () => {
+    await ageAttempt(jsonRecording.attempt_id, 31);
+    await ageAttempt(streamRecording.attempt_id, 29);
+    const retention = retentionService();
+    expect(retention.retentionDays).toBe(30);
 
     await expect(retention.deleteExpiredRecordings()).resolves.toBe(1);
 
+    // The expired object is removed before its attempt pointer is cleared, and
+    // the parent Request survives.
     const metadata = await dataSource.query(
       `SELECT recording_key FROM agent_messages WHERE id = $1`,
       [jsonRecording.attempt_id],
@@ -325,8 +319,53 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       jsonRecording.request_id,
     ]);
     expect(parent).toHaveLength(1);
+
+    // The 29-day-old recording is still there and still served.
+    const kept = await dataSource.query(`SELECT recording_key FROM agent_messages WHERE id = $1`, [
+      streamRecording.attempt_id,
+    ]);
+    expect(kept).toEqual([{ recording_key: streamRecording.recording_key }]);
+    await expect(storage.get(streamRecording.recording_key)).resolves.toBeInstanceOf(Buffer);
   });
+
+  it('honours THINKER_RECORDING_RETENTION_DAYS after a restart', async () => {
+    process.env['THINKER_RECORDING_RETENTION_DAYS'] = '7';
+    try {
+      await app.close();
+      app = await createTestApp({ dropSchema: false, seed: false });
+      refreshAppReferences();
+    } finally {
+      delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
+    }
+    const retention = retentionService();
+    expect(retention.retentionDays).toBe(7);
+
+    await expect(retention.deleteExpiredRecordings()).resolves.toBe(1);
+
+    const metadata = await dataSource.query(
+      `SELECT recording_key FROM agent_messages WHERE id = $1`,
+      [streamRecording.attempt_id],
+    );
+    expect(metadata).toEqual([{ recording_key: null }]);
+    await expect(storage.get(streamRecording.recording_key)).rejects.toBeDefined();
+  }, 30_000);
 });
+
+async function ageAttempt(attemptId: string, days: number): Promise<void> {
+  await dataSource.query(
+    `UPDATE agent_messages
+     SET timestamp = CURRENT_TIMESTAMP - ($2 * INTERVAL '1 day')
+     WHERE id = $1`,
+    [attemptId, days],
+  );
+}
+
+// The test app does not load DatabaseModule (no cron), so build the service
+// from the app's own ConfigService: the retention value is the one the app
+// parsed from the environment at boot.
+function retentionService(): RequestRecordingRetentionService {
+  return new RequestRecordingRetentionService(dataSource, app.get(ConfigService), storage);
+}
 
 function refreshAppReferences(): void {
   dataSource = app.get(DataSource);

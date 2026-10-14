@@ -103,6 +103,12 @@ export interface ForwardOptions {
   providerCacheKey?: string;
   stream: boolean;
   signal?: AbortSignal;
+  /**
+   * Caller-supplied headers (Playground request headers, provider session
+   * hints). The adapter's own headers always win: a name the adapter sets, in
+   * any casing, is dropped here, except `anthropic-beta`, whose flags are
+   * appended to the adapter's. See `mergeExtraHeaders`.
+   */
   extraHeaders?: Record<string, string>;
   customEndpoint?: ProviderEndpoint;
   authType?: string;

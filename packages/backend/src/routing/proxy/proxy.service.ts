@@ -262,7 +262,7 @@ export class ProxyService {
       if (unavailableModel) {
         return this.buildModelUnavailableResult(stream, agentName, unavailableModel);
       }
-      return this.buildNoProviderResult(stream, agentName);
+      return this.buildNoProviderResult(stream, agentName, resolved.no_route_detail, resolved.tier);
     }
 
     const route = resolved.route;
@@ -1170,10 +1170,20 @@ export class ProxyService {
     return false;
   }
 
-  private buildNoProviderResult(stream: boolean, agentName?: string): ProxyResult {
+  private buildNoProviderResult(
+    stream: boolean,
+    agentName?: string,
+    detail?: string,
+    tier?: TierSlot,
+  ): ProxyResult {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-    const content = formatThinkerError('M101', { dashboardUrl });
-    return buildFriendlyResponse(content, stream, 'no_provider', 'M101');
+    const content = formatThinkerError('M101', {
+      dashboardUrl,
+      detail: detail ? ` ${detail}` : '',
+    });
+    // The header names the tier the request resolved to: `default` when the
+    // message is about the default tier, the scored tier otherwise.
+    return buildFriendlyResponse(content, stream, 'no_provider', 'M101', tier);
   }
 
   private buildModelUnavailableResult(

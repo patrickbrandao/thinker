@@ -75,18 +75,17 @@ jobs:
       - name: Point Compose at the local image tag
         run: echo "THINKER_VERSION=ci" >> "$GITHUB_ENV"
 
-      - name: Prepare .env from .env.example with a generated secret
+      - name: Prepare .env from .env.example with generated secrets
         working-directory: docker
         run: |
           cp .env.example .env
-          # A fresh secret per run, so BETTER_AUTH_SECRET=${VAR:?…} succeeds.
-          # It never leaves the runner and is not printed.
+          # Fresh, distinct secrets per run, so both ${VAR:?…} checks succeed.
+          # They never leave the runner and are not printed.
           secret=$(openssl rand -hex 32)
+          encryption_key=$(openssl rand -hex 32)
           sed -i "s/^BETTER_AUTH_SECRET=\$/BETTER_AUTH_SECRET=${secret}/" .env
+          sed -i "s/^# THINKER_ENCRYPTION_KEY=\$/THINKER_ENCRYPTION_KEY=${encryption_key}/" .env
           grep -Eq '^BETTER_AUTH_SECRET=[0-9a-f]{64}$' .env
-          # THINKER_ENCRYPTION_KEY is required too, and must differ.
-          enc=$(openssl rand -hex 32)
-          sed -i "s/^# THINKER_ENCRYPTION_KEY=\$/THINKER_ENCRYPTION_KEY=${enc}/" .env
           grep -Eq '^THINKER_ENCRYPTION_KEY=[0-9a-f]{64}$' .env
 
       - name: Verify self-host configuration wiring

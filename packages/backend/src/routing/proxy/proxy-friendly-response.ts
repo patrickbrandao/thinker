@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { Response as ExpressResponse } from 'express';
-import { Tier } from '../../scoring/types';
+import type { TierSlot } from 'thinker-shared';
 import type { ResponseMode } from 'thinker-shared';
 import type { ThinkerErrorCode } from '../../common/errors/error-codes';
 import { DEFAULT_PORT } from '../../common/constants/server.constants';
@@ -16,7 +16,7 @@ export interface FriendlyForward {
 export interface FriendlyResult {
   forward: FriendlyForward;
   meta: {
-    tier: Tier;
+    tier: TierSlot;
     model: string;
     provider: string;
     confidence: number;
@@ -53,12 +53,13 @@ export function buildFriendlyResponse(
   stream: boolean,
   reason = 'thinker_internal_error',
   errorCode?: ThinkerErrorCode,
+  tier: TierSlot = 'simple',
 ): FriendlyResult {
   const id = `chatcmpl-thinker-${randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
 
   const meta: FriendlyResult['meta'] = {
-    tier: 'simple' as Tier,
+    tier,
     model: 'thinker',
     provider: 'thinker',
     confidence: 1,

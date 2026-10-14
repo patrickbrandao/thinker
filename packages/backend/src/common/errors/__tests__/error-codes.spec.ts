@@ -59,6 +59,16 @@ describe('formatThinkerError', () => {
     expect(out).toContain('https://dash.example/routing');
   });
 
+  it('inserts the optional M101 detail before the dashboard link', () => {
+    const out = formatThinkerError('M101', {
+      dashboardUrl: 'https://dash.example/routing',
+      detail: ' The default tier has no model set.',
+    });
+    expect(out).toContain(
+      'no model to route to yet. The default tier has no model set. Pick a default model here',
+    );
+  });
+
   it('renders M102 for unusable subscription credentials', () => {
     const out = formatThinkerError('M102', {
       provider: 'openai',

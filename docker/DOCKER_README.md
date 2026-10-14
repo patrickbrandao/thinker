@@ -97,9 +97,9 @@ openssl rand -hex 32
 
 `THINKER_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
 request recordings Thinker stores; the rest of the database is not encrypted
-by it. Keep it separate from `BETTER_AUTH_SECRET`, so one leaked
-session-signing secret does not also decrypt every stored credential and
-recording. Set it before first boot.
+by it. It is required: the server refuses to start when it is missing, shorter
+than 32 characters, or equal to `BETTER_AUTH_SECRET`, so a leaked
+session-signing secret never decrypts a stored credential or recording.
 Recordings written under a previous secret are not migrated: after the secret
 changes they can no longer be decrypted and the dashboard shows them as
 unavailable, while retention removes them on schedule.
@@ -148,14 +148,14 @@ docker run -d \
 <summary><strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
-$secret = -join ((48..57 + 97..102) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
-$key = -join ((48..57 + 97..102) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
+$secret = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
+$encryptionKey = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
 
 docker run -d `
   -p 2099:2099 `
   -e DATABASE_URL=postgresql://user:pass@host:5432/thinker `
   -e BETTER_AUTH_SECRET=$secret `
-  -e THINKER_ENCRYPTION_KEY=$key `
+  -e THINKER_ENCRYPTION_KEY=$encryptionKey `
   -e BETTER_AUTH_URL=http://localhost:2099 `
   tmsoftbrasil/thinker
 ```
@@ -368,7 +368,7 @@ refused, including when a hostname starts resolving to them after it was saved.
 | ---------------------------------- | ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                     | Yes         | --                                           | PostgreSQL connection string                                                                                                                                                                               |
 | `BETTER_AUTH_SECRET`               | Yes         | --                                           | Session signing secret (min 32 chars)                                                                                                                                                                      |
-| `THINKER_ENCRYPTION_KEY`           | Yes         | --                                           | Separate 32+ char key (different from `BETTER_AUTH_SECRET`) encrypting stored provider keys, OAuth tokens and recordings. The install script generates one.                                                |
+| `THINKER_ENCRYPTION_KEY`           | Yes         | --                                           | 32+ char key encrypting stored provider keys, OAuth tokens and request recordings. Must differ from `BETTER_AUTH_SECRET`; the server refuses to start otherwise. The install script generates one.          |
 | `BETTER_AUTH_URL`                  | No          | `http://localhost:${PORT}`                   | Public URL. Must match the URL in the browser                                                                                                                                                              |
 | `PORT`                             | No          | `2099`                                       | Dashboard port — sets both the published host port and the internal listener                                                                                                                               |
 | `OLLAMA_HOST`                      | No          | `http://host.docker.internal:11434`          | Ollama endpoint for the built-in tile. Override to point at a LAN-hosted Ollama.                                                                                                                           |

@@ -25,7 +25,7 @@
     "nestjs",
     "solidjs"
   ],
-  "packageManager": "npm@10.9.2",
+  "packageManager": "npm@11.19.0",
   "workspaces": [
     "packages/shared",
     "packages/frontend",
@@ -38,7 +38,6 @@
     "build": "turbo build",
     "test": "turbo test",
     "start": "node packages/backend/dist/main.js",
-    "check:api-prefix": "node scripts/check-api-prefix.js",
     "check:changesets": "node scripts/check-changesets.js",
     "design:registry": "node design-system/generate-registry.mjs",
     "design:registry:check": "node design-system/generate-registry.mjs --check",

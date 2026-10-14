@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { StartupConfigError } from './crypto.util';
 
 /**
  * Boot-time notice for configuration still written with the upstream project's
@@ -84,7 +85,7 @@ export function assertLegacyEncryptionKeyMigrated(env: NodeJS.ProcessEnv = proce
   const legacyKey = `${LEGACY_PREFIX}ENCRYPTION_KEY`;
   const currentKey = `${CURRENT_PREFIX}ENCRYPTION_KEY`;
   if ((env[legacyKey] ?? '') !== '' && (env[currentKey] ?? '') === '') {
-    throw new Error(
+    throw new StartupConfigError(
       `${legacyKey} is set but ${currentKey} is not. Thinker reads only ${currentKey}; ` +
         `starting without it would leave stored provider credentials undecryptable. ` +
         `Rename ${legacyKey} to ${currentKey} (same value) and restart.`,

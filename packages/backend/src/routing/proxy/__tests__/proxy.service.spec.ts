@@ -431,6 +431,34 @@ describe('ProxyService — orchestration', () => {
       expect(body).toContain('M101');
     });
 
+    it('labels the no-route response with the tier it resolved to', async () => {
+      resolveService.resolve.mockResolvedValue({
+        tier: 'default',
+        route: null,
+        fallback_routes: null,
+        confidence: 1,
+        score: 0,
+        reason: 'default',
+        no_route_detail: '"auto" uses the default tier, which has no model set.',
+      });
+      const result = await svc.proxyRequest(baseOpts());
+      expect(result.meta.tier).toBe('default');
+      expect(await result.forward.response.text()).toContain('default tier');
+    });
+
+    it('keeps the scored tier on a complexity-routed no-route response', async () => {
+      resolveService.resolve.mockResolvedValue({
+        tier: 'standard',
+        route: null,
+        fallback_routes: null,
+        confidence: 0.9,
+        score: 5,
+        reason: 'scored',
+      });
+      const result = await svc.proxyRequest(baseOpts());
+      expect(result.meta.tier).toBe('standard');
+    });
+
     it('returns M302 when a pinned override names an unavailable model', async () => {
       resolveService.resolve.mockResolvedValue({
         tier: 'standard',
