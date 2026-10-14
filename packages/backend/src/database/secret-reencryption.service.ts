@@ -62,8 +62,8 @@ interface TableResult {
 /**
  * Rewrites at-rest ciphertext onto the current encryption secret at boot.
  *
- * Manifest derives its AES-256-GCM key from `THINKER_ENCRYPTION_KEY`, falling
- * back to `BETTER_AUTH_SECRET`. Changing that secret used to brick every stored
+ * Thinker derives its AES-256-GCM key from `THINKER_ENCRYPTION_KEY` (and only
+ * from it). Changing that key used to brick every stored
  * provider key and OAuth token: the ciphertext carries no key id, and the read
  * paths swallow a decrypt failure as "provider not connected", so the damage
  * was silent. `THINKER_ENCRYPTION_KEY_PREVIOUS` makes the old secret readable
@@ -71,9 +71,9 @@ interface TableResult {
  * operator can drop it again.
  *
  * The pass only runs while `THINKER_ENCRYPTION_KEY_PREVIOUS` is set, so a
- * normal boot never touches the tables: the session secret is always a decrypt
- * candidate, and a dedicated key alone would otherwise trigger a full scan
- * (one scrypt per row) on every restart. It runs after bootstrap rather than
+ * normal boot never touches the tables: with only the current key configured
+ * there is nothing to move, and a scan would cost one scrypt per row on every
+ * restart. It runs after bootstrap rather than
  * during it, yields between rows, and never throws: a failure here must not
  * stop the app from serving, and the old secret keeps working while listed.
  */

@@ -19,7 +19,8 @@ const ANTHROPIC_BETA = 'anthropic-beta';
  * the flags a route depends on (the OAuth pair on a Claude subscription) stay
  * first and the caller's flags are sanitized.
  *
- * Among the caller's own headers the first spelling of a name wins. Returns
+ * Among the caller's own headers the first spelling of a name wins, and it is
+ * emitted under its trimmed name (the name it was compared by). Returns
  * `adapterHeaders` itself when there is nothing to add, so the common proxy
  * forward (no extra headers) allocates nothing.
  */
@@ -40,7 +41,7 @@ export function mergeExtraHeaders(
   const seen = new Set<string>();
   for (const key of extraKeys) {
     const name = key.trim().toLowerCase();
-    if (seen.has(name)) continue;
+    if (!name || seen.has(name)) continue;
     seen.add(name);
 
     const adapterKey = adapterKeyByName.get(name);
@@ -53,7 +54,7 @@ export function mergeExtraHeaders(
       continue;
     }
     if (adapterKey !== undefined) continue;
-    merged[key] = extraHeaders[key];
+    merged[key.trim()] = extraHeaders[key];
   }
   return merged;
 }

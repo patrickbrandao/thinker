@@ -86,8 +86,8 @@ describe('withSubscriptionCredentialLock — real Postgres (e2e)', () => {
   };
 
   beforeAll(async () => {
-    originalSecret = process.env['BETTER_AUTH_SECRET'];
-    process.env['BETTER_AUTH_SECRET'] = 'a'.repeat(48);
+    originalSecret = process.env['THINKER_ENCRYPTION_KEY'];
+    process.env['THINKER_ENCRYPTION_KEY'] = 'a'.repeat(48);
 
     ds = new DataSource({
       type: 'postgres',
@@ -114,8 +114,8 @@ describe('withSubscriptionCredentialLock — real Postgres (e2e)', () => {
 
   afterAll(async () => {
     if (ds?.isInitialized) await ds.destroy();
-    if (originalSecret === undefined) delete process.env['BETTER_AUTH_SECRET'];
-    else process.env['BETTER_AUTH_SECRET'] = originalSecret;
+    if (originalSecret === undefined) delete process.env['THINKER_ENCRYPTION_KEY'];
+    else process.env['THINKER_ENCRYPTION_KEY'] = originalSecret;
   });
 
   it('persists the rotated blob through COMMIT and busts the cache after', async () => {

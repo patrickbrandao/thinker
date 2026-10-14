@@ -9,6 +9,9 @@ import {
   getDecryptionSecrets,
   decryptWithAny,
   timingSafeCompare,
+  assertEncryptionKeyConfig,
+  encryptionKeyConfigProblems,
+  StartupConfigError,
 } from './crypto.util';
 
 describe('getEncryptionSecret', () => {
@@ -30,46 +33,161 @@ describe('getEncryptionSecret', () => {
     expect(getEncryptionSecret()).toBe(key);
   });
 
-  it('warns once when falling back to BETTER_AUTH_SECRET in production', () => {
-    jest.resetModules();
-    process.env['NODE_ENV'] = 'production';
-    process.env['BETTER_AUTH_SECRET'] = 'b'.repeat(48);
-    delete process.env['THINKER_ENCRYPTION_KEY'];
-    let warnSpy: jest.SpyInstance | undefined;
-    jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Logger } = require('@nestjs/common');
-      warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mod = require('./crypto.util') as typeof import('./crypto.util');
-      expect(mod.getEncryptionSecret()).toBe('b'.repeat(48));
-    });
-    expect(warnSpy).toHaveBeenCalled();
-  });
-
-  it('returns BETTER_AUTH_SECRET when THINKER_ENCRYPTION_KEY is not set and secret is >= 32 chars', () => {
-    const secret = 'b'.repeat(64);
-    process.env['BETTER_AUTH_SECRET'] = secret;
-    expect(getEncryptionSecret()).toBe(secret);
-  });
-
   it('prefers THINKER_ENCRYPTION_KEY over BETTER_AUTH_SECRET', () => {
     const encKey = 'e'.repeat(32);
-    const authSecret = 'a'.repeat(64);
     process.env['THINKER_ENCRYPTION_KEY'] = encKey;
-    process.env['BETTER_AUTH_SECRET'] = authSecret;
+    process.env['BETTER_AUTH_SECRET'] = 'a'.repeat(64);
     expect(getEncryptionSecret()).toBe(encKey);
   });
 
-  it('throws when no key is set', () => {
+  it('never falls back to BETTER_AUTH_SECRET when the key is missing', () => {
+    process.env['BETTER_AUTH_SECRET'] = 'b'.repeat(64);
     expect(() => getEncryptionSecret()).toThrow(
-      'Encryption secret required. Set THINKER_ENCRYPTION_KEY or BETTER_AUTH_SECRET (>=32 chars).',
+      'Encryption key required. Set THINKER_ENCRYPTION_KEY (>=32 chars).',
     );
   });
 
-  it('throws when key exists but is shorter than 32 chars', () => {
-    process.env['BETTER_AUTH_SECRET'] = 'only-31-chars-long-xxxxxxxxxx!';
-    expect(() => getEncryptionSecret()).toThrow('Encryption secret required.');
+  it('never falls back to BETTER_AUTH_SECRET when the key is too short', () => {
+    process.env['THINKER_ENCRYPTION_KEY'] = 'only-31-chars-long-xxxxxxxxxx!';
+    process.env['BETTER_AUTH_SECRET'] = 'b'.repeat(64);
+    expect(() => getEncryptionSecret()).toThrow('Encryption key required.');
+  });
+
+  it('throws when no key is set', () => {
+    expect(() => getEncryptionSecret()).toThrow('Encryption key required.');
+  });
+});
+
+describe('encryptionKeyConfigProblems / assertEncryptionKeyConfig', () => {
+  const KEY = 'k'.repeat(64);
+  const SESSION = 's'.repeat(64);
+
+  it('accepts a 32+ char key distinct from BETTER_AUTH_SECRET', () => {
+    const env = { THINKER_ENCRYPTION_KEY: KEY, BETTER_AUTH_SECRET: SESSION };
+    expect(encryptionKeyConfigProblems(env)).toEqual([]);
+    expect(() => assertEncryptionKeyConfig(env)).not.toThrow();
+  });
+
+  it('accepts exactly 32 characters', () => {
+    expect(encryptionKeyConfigProblems({ THINKER_ENCRYPTION_KEY: 'x'.repeat(32) })).toEqual([]);
+  });
+
+  it('fails when the key is missing, even with BETTER_AUTH_SECRET set', () => {
+    const env = { BETTER_AUTH_SECRET: SESSION };
+    expect(() => assertEncryptionKeyConfig(env)).toThrow(StartupConfigError);
+    expect(() => assertEncryptionKeyConfig(env)).toThrow(/THINKER_ENCRYPTION_KEY is not set/);
+    expect(() => assertEncryptionKeyConfig(env)).toThrow(/openssl rand -hex 32/);
+  });
+
+  it('fails when the key is empty', () => {
+    expect(() => assertEncryptionKeyConfig({ THINKER_ENCRYPTION_KEY: '' })).toThrow(
+      /THINKER_ENCRYPTION_KEY is not set/,
+    );
+  });
+
+  it('fails when the key is shorter than 32 characters', () => {
+    expect(() => assertEncryptionKeyConfig({ THINKER_ENCRYPTION_KEY: 'x'.repeat(31) })).toThrow(
+      /THINKER_ENCRYPTION_KEY is too short \(31 chars\)/,
+    );
+  });
+
+  it('fails when the key equals BETTER_AUTH_SECRET', () => {
+    const env = { THINKER_ENCRYPTION_KEY: SESSION, BETTER_AUTH_SECRET: SESSION };
+    expect(() => assertEncryptionKeyConfig(env)).toThrow(
+      /THINKER_ENCRYPTION_KEY must differ from BETTER_AUTH_SECRET/,
+    );
+  });
+
+  it('fails when PREVIOUS is set but shorter than 32 characters', () => {
+    const env = { THINKER_ENCRYPTION_KEY: KEY, THINKER_ENCRYPTION_KEY_PREVIOUS: 'short' };
+    expect(() => assertEncryptionKeyConfig(env)).toThrow(
+      /THINKER_ENCRYPTION_KEY_PREVIOUS is too short \(5 chars\)/,
+    );
+  });
+
+  it('accepts a valid PREVIOUS and ignores an empty one', () => {
+    expect(
+      encryptionKeyConfigProblems({
+        THINKER_ENCRYPTION_KEY: KEY,
+        THINKER_ENCRYPTION_KEY_PREVIOUS: 'p'.repeat(32),
+      }),
+    ).toEqual([]);
+    expect(
+      encryptionKeyConfigProblems({
+        THINKER_ENCRYPTION_KEY: KEY,
+        THINKER_ENCRYPTION_KEY_PREVIOUS: '',
+      }),
+    ).toEqual([]);
+  });
+
+  it('reports every problem at once', () => {
+    const problems = encryptionKeyConfigProblems({ THINKER_ENCRYPTION_KEY_PREVIOUS: 'short' });
+    expect(problems).toHaveLength(2);
+  });
+
+  it('never echoes a secret value in the message', () => {
+    const shortKey = 'secret-value-31-chars-xxxxxxxxx';
+    const env = {
+      THINKER_ENCRYPTION_KEY: shortKey,
+      THINKER_ENCRYPTION_KEY_PREVIOUS: 'prev-secret',
+    };
+    const message = encryptionKeyConfigProblems(env).join('\n');
+    expect(message).not.toContain(shortKey);
+    expect(message).not.toContain('prev-secret');
+    const same = { THINKER_ENCRYPTION_KEY: SESSION, BETTER_AUTH_SECRET: SESSION };
+    expect(encryptionKeyConfigProblems(same).join('\n')).not.toContain(SESSION);
+  });
+});
+
+/**
+ * Ciphertext produced by an earlier build (string envelope: salt:iv:tag:data,
+ * scrypt-derived AES-256-GCM key). Guards the stored format: a change to the
+ * derivation or the layout would make every stored provider key unreadable.
+ */
+describe('known ciphertext fixture', () => {
+  const FIXTURE_KEY = 'fixture-encryption-key-at-least-32-characters';
+  const FIXTURE_PLAINTEXT = 'sk-fixture-provider-key-0123456789';
+  const FIXTURE_CIPHERTEXT =
+    'jocd7mxvpGreBaYtgKB+Ww==:mkIOayz+PLdjguq4:/58tFAJkp5FG0ul+mpsgaQ==:' +
+    'HOHmgAB2AJEshqn5LiBRGqeZBz3FEg6aoVGRfc9/FpqtSQ==';
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('still decrypts with the key it was written under', () => {
+    expect(decrypt(FIXTURE_CIPHERTEXT, FIXTURE_KEY)).toBe(FIXTURE_PLAINTEXT);
+  });
+
+  it('does not decrypt with BETTER_AUTH_SECRET, which is never a candidate', () => {
+    process.env['THINKER_ENCRYPTION_KEY'] = 'n'.repeat(64);
+    process.env['BETTER_AUTH_SECRET'] = FIXTURE_KEY;
+    expect(getDecryptionSecrets()).not.toContain(FIXTURE_KEY);
+    expect(() => decryptWithAny(FIXTURE_CIPHERTEXT, getDecryptionSecrets())).toThrow();
+  });
+
+  it('rotates onto a new key through THINKER_ENCRYPTION_KEY_PREVIOUS', () => {
+    const newKey = 'n'.repeat(64);
+    process.env['THINKER_ENCRYPTION_KEY'] = newKey;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = FIXTURE_KEY;
+
+    const found = decryptWithAny(FIXTURE_CIPHERTEXT, getDecryptionSecrets());
+    expect(found).toEqual({ plaintext: FIXTURE_PLAINTEXT, secretIndex: 1 });
+
+    // What the re-encryption pass writes back reads under the new key alone.
+    const rewritten = encrypt(found.plaintext, getEncryptionSecret());
+    delete process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'];
+    expect(decryptWithAny(rewritten, getDecryptionSecrets())).toEqual({
+      plaintext: FIXTURE_PLAINTEXT,
+      secretIndex: 0,
+    });
+    expect(() => decrypt(rewritten, FIXTURE_KEY)).toThrow();
   });
 });
 
@@ -196,27 +314,30 @@ describe('getDecryptionSecrets', () => {
     process.env = originalEnv;
   });
 
-  it('lists the dedicated key first, then PREVIOUS, then the session secret', () => {
+  it('lists the key first, then PREVIOUS, and never the session secret', () => {
     process.env['THINKER_ENCRYPTION_KEY'] = KEY;
     process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     process.env['BETTER_AUTH_SECRET'] = SESSION;
-    expect(getDecryptionSecrets()).toEqual([KEY, PREVIOUS, SESSION]);
+    expect(getDecryptionSecrets()).toEqual([KEY, PREVIOUS]);
   });
 
-  it('returns only the session secret when it is the encryption fallback', () => {
-    process.env['BETTER_AUTH_SECRET'] = SESSION;
-    expect(getDecryptionSecrets()).toEqual([SESSION]);
-  });
-
-  it('drops short and duplicate candidates', () => {
+  it('returns only the key when no rotation is in progress', () => {
     process.env['THINKER_ENCRYPTION_KEY'] = KEY;
-    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = 'too-short';
-    process.env['BETTER_AUTH_SECRET'] = KEY;
+    process.env['BETTER_AUTH_SECRET'] = SESSION;
     expect(getDecryptionSecrets()).toEqual([KEY]);
   });
 
-  it('throws when nothing usable is configured', () => {
-    expect(() => getDecryptionSecrets()).toThrow('Encryption secret required');
+  it('drops a short or duplicate PREVIOUS', () => {
+    process.env['THINKER_ENCRYPTION_KEY'] = KEY;
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = 'too-short';
+    expect(getDecryptionSecrets()).toEqual([KEY]);
+    process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = KEY;
+    expect(getDecryptionSecrets()).toEqual([KEY]);
+  });
+
+  it('throws when only the session secret is configured', () => {
+    process.env['BETTER_AUTH_SECRET'] = SESSION;
+    expect(() => getDecryptionSecrets()).toThrow('Encryption key required');
   });
 });
 

@@ -95,7 +95,7 @@ describe('SecretReencryptionService', () => {
     ]);
   });
 
-  it('skips with a warning when PREVIOUS is set but no current secret is configured', async () => {
+  it('skips with a warning when PREVIOUS is set but no current key is configured', async () => {
     process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({});
     await new SecretReencryptionService(ds.dataSource).onApplicationBootstrap();
@@ -103,7 +103,7 @@ describe('SecretReencryptionService', () => {
     expect(ds.createQueryRunner).not.toHaveBeenCalled();
   });
 
-  it('is a no-op on a normal boot, even though the session secret is a decrypt candidate', async () => {
+  it('is a no-op on a normal boot, whatever BETTER_AUTH_SECRET holds', async () => {
     process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
     process.env['BETTER_AUTH_SECRET'] = PREVIOUS;
     const ds = buildDataSource({});
@@ -187,11 +187,11 @@ describe('SecretReencryptionService', () => {
     expect(log).not.toHaveBeenCalledWith(expect.stringContaining('can be removed'));
     expect(ds.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_unlock'));
     expect(ds.release).toHaveBeenCalled();
-  });
+    // Six scrypt derivations: give it room when the whole suite runs in parallel.
+  }, 30_000);
 
-  it('moves rows off the session secret when PREVIOUS names it', async () => {
+  it('moves email provider rows written under PREVIOUS onto the current key', async () => {
     process.env['THINKER_ENCRYPTION_KEY'] = CURRENT;
-    process.env['BETTER_AUTH_SECRET'] = PREVIOUS;
     process.env['THINKER_ENCRYPTION_KEY_PREVIOUS'] = PREVIOUS;
     const ds = buildDataSource({
       pages: { email_provider_configs: [[{ id: 'e', value: encrypt('re_123', PREVIOUS) }]] },

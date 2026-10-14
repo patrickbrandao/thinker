@@ -19,6 +19,14 @@
 # today (automated-security-fixes disabled); turning them on is a maintainer
 # decision proposed in #20, now that CI validates every Dependabot PR.
 
+# npm version: Dependabot (dependabot-core npm_and_yarn PackageManagerHelper)
+# reads the root `packageManager` field and installs that exact npm through
+# Corepack before regenerating package-lock.json; `engines` and the
+# lockfileVersion are only fallbacks. With `npm@10.9.2` it produced npm 10
+# lockfiles that mark optional native deps `"peer": true` and break `npm ci`
+# (#147). Keep `packageManager` equal to the npm bundled with the Node 24 used
+# in CI (npm 11.19.0 today) and bump both together.
+
 version: 2
 updates:
   # npm workspaces: Dependabot reads the root package.json and every
