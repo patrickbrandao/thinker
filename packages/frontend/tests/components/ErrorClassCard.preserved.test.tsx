@@ -63,7 +63,6 @@ describe('ErrorClassCard (unmounted, preserved for reintroduction)', () => {
     breakdown.mockResolvedValue({
       by_class: { rate_limit: 12, invalid_request: 5, server_error: 0 },
       by_origin: {},
-      auto_fixed: 3,
     });
 
     render(() => <ErrorClassCard range="7d" />);
@@ -78,7 +77,7 @@ describe('ErrorClassCard (unmounted, preserved for reintroduction)', () => {
   });
 
   it('still renders its empty state when there are no errors', async () => {
-    breakdown.mockResolvedValue({ by_class: {}, by_origin: {}, auto_fixed: 0 });
+    breakdown.mockResolvedValue({ by_class: {}, by_origin: {} });
 
     render(() => <ErrorClassCard range="7d" />);
 

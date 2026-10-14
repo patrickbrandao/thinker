@@ -425,7 +425,6 @@ describe('analytics chart surface components', () => {
     mockGetErrorBreakdown.mockResolvedValueOnce({
       by_class: { rate_limited: 2, timeout: 5, ignored: 0 },
       by_origin: {},
-      auto_fixed: 1,
     });
     const { container, unmount } = render(() => <ErrorClassCard range="7d" agentName="demo" />);
     await waitFor(() => expect(screen.getByText('Timeout')).toBeDefined());
@@ -433,7 +432,7 @@ describe('analytics chart surface components', () => {
     expect(container.querySelector('.error-class-card__label')?.textContent).toBe('Timeout');
     unmount();
 
-    mockGetErrorBreakdown.mockResolvedValueOnce({ by_class: {}, by_origin: {}, auto_fixed: 0 });
+    mockGetErrorBreakdown.mockResolvedValueOnce({ by_class: {}, by_origin: {} });
     render(() => <ErrorClassCard range="24h" />);
     await waitFor(() => expect(screen.getByText('No errors in this period')).toBeDefined());
   });

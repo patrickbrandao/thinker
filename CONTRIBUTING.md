@@ -214,8 +214,10 @@ npm run build
 
 Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Releases are cut by the maintainer:
 
-1. After merging PRs with changesets, a `chore: version packages` PR is open on `main`. Merging it lands the version bump in `packages/thinker/package.json` and `packages/thinker/CHANGELOG.md`.
-2. Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>` (a `vX.Y.Z-rc.N` tag pushes only `X.Y.Z-rc.N` and `sha-<short>`), and creates the GitHub release with the Portuguese notes from `docs/releases/X.Y.Z.md`.
+1. Contributions with user-facing changes add a changeset (`npx changeset`, package `thinker`, `patch` or `minor`). The maintainer then runs the Changesets version step (`npm run version-packages`), which bumps `packages/thinker/package.json` and `packages/thinker/CHANGELOG.md`, and merges that PR. Releases, tags and anything that publishes are never merged by an agent (see [ADR 0002](docs/adr/0002-politica-de-merge.md)).
+2. Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`, which checks that the tag matches `packages/thinker/package.json` and that `docs/releases/X.Y.Z.md` exists, builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>` (a `vX.Y.Z-rc.N` tag pushes only `X.Y.Z-rc.N` and `sha-<short>`), and creates the GitHub release with the Portuguese notes from `docs/releases/X.Y.Z.md`.
+
+The full flow is in the [developer guide](docs/dev/guia.md).
 
 ### Commit Messages
 

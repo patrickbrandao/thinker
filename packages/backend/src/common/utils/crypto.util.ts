@@ -95,7 +95,11 @@ export function getEncryptionSecret(): string {
  * for a rewrite".
  *
  * Order: `THINKER_ENCRYPTION_KEY`, then `THINKER_ENCRYPTION_KEY_PREVIOUS` (set
- * only during a rotation). The session secret is never a candidate.
+ * only during a rotation). The session secret is never a candidate, except by
+ * the operator's choice: an install that used to fall back to
+ * `BETTER_AUTH_SECRET` migrates by putting that old value in
+ * `THINKER_ENCRYPTION_KEY_PREVIOUS`, so the boot re-encryption pass rewrites
+ * its data under the new key.
  */
 export function getDecryptionSecrets(): string[] {
   // getEncryptionSecret() throws when nothing usable is configured — let that
@@ -134,7 +138,9 @@ export function encryptionKeyConfigProblems(env: NodeJS.ProcessEnv = process.env
   if (key === '') {
     problems.push(
       `${ENCRYPTION_KEY_ENV} is not set. It encrypts stored provider keys, OAuth tokens and ` +
-        `request recordings, and is required. ${KEY_HINT}`,
+        `request recordings, and is required. ${KEY_HINT}. Upgrading from an install that relied ` +
+        `on BETTER_AUTH_SECRET? Set the new key, set ${ENCRYPTION_KEY_PREVIOUS_ENV} to the old ` +
+        `BETTER_AUTH_SECRET, boot once, then remove it (docs/usuario/instalacao-docker.md).`,
     );
   } else if (key.length < MIN_ENCRYPTION_KEY_LENGTH) {
     problems.push(
