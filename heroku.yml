@@ -1,3 +1,5 @@
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker
 build:
   docker:
     web: Dockerfile.heroku

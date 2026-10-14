@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Deploy Manifest on AWS with ECS Fargate, RDS PostgreSQL, S3 request
+  Deploy Thinker on AWS with ECS Fargate, RDS PostgreSQL, S3 request
   recording storage, an Application Load Balancer, and Secrets Manager. The load balancer is
   HTTP-only by default; configure TLS with your own domain and ACM
   certificate before sending production auth traffic through it.
@@ -8,20 +8,20 @@ Description: >-
 Parameters:
   ServiceName:
     Type: String
-    Default: manifest
+    Default: thinker
     Description: Lowercase service name used in resource labels.
     AllowedPattern: "^[a-z][a-z0-9-]{0,39}$"
     ConstraintDescription: Use up to 40 lowercase letters, numbers, and hyphens, starting with a letter.
   ImageUrl:
     Type: String
-    Default: docker.io/manifestdotbuild/manifest:6
-    Description: Manifest container image to deploy.
+    Default: docker.io/tmsoftbrasil/thinker:0.1
+    Description: Thinker container image to deploy.
   ContainerPort:
     Type: Number
     Default: 2099
     MinValue: 1
     MaxValue: 65535
-    Description: Port exposed by the Manifest container.
+    Description: Port exposed by the Thinker container.
   DesiredCount:
     Type: Number
     Default: 1
@@ -40,12 +40,12 @@ Parameters:
     Description: Fargate task memory in MiB.
   DatabaseName:
     Type: String
-    Default: manifest
+    Default: thinker
     AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{0,62}$"
     Description: PostgreSQL database name.
   DatabaseUsername:
     Type: String
-    Default: manifest
+    Default: thinker
     AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{0,62}$"
     Description: PostgreSQL master username.
   DatabaseInstanceClass:
@@ -190,7 +190,7 @@ Resources:
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP traffic to Manifest.
+      GroupDescription: Allow HTTP traffic to Thinker.
       SecurityGroupIngress:
         - CidrIp: !Ref AllowedIngressCidr
           FromPort: 80
@@ -204,7 +204,7 @@ Resources:
   ServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow load balancer traffic to the Manifest ECS task.
+      GroupDescription: Allow load balancer traffic to the Thinker ECS task.
       SecurityGroupIngress:
         - FromPort: !Ref ContainerPort
           IpProtocol: tcp
@@ -218,7 +218,7 @@ Resources:
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow Manifest ECS tasks to reach PostgreSQL.
+      GroupDescription: Allow Thinker ECS tasks to reach PostgreSQL.
       SecurityGroupIngress:
         - FromPort: 5432
           IpProtocol: tcp
@@ -232,7 +232,7 @@ Resources:
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Private subnets for Manifest PostgreSQL.
+      DBSubnetGroupDescription: Private subnets for Thinker PostgreSQL.
       SubnetIds:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
@@ -240,7 +240,7 @@ Resources:
   DatabasePassword:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Description: Generated PostgreSQL password for Manifest.
+      Description: Generated PostgreSQL password for Thinker.
       GenerateSecretString:
         ExcludePunctuation: true
         IncludeSpace: false
@@ -249,16 +249,16 @@ Resources:
   BetterAuthSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Description: Generated Better Auth session secret for Manifest.
+      Description: Generated Better Auth session secret for Thinker.
       GenerateSecretString:
         ExcludePunctuation: true
         IncludeSpace: false
         PasswordLength: 64
 
-  ManifestEncryptionKey:
+  ThinkerEncryptionKey:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Description: Generated at-rest encryption key for Manifest provider credentials.
+      Description: Generated at-rest encryption key for Thinker provider credentials.
       GenerateSecretString:
         ExcludePunctuation: true
         IncludeSpace: false
@@ -302,7 +302,7 @@ Resources:
   DatabaseUrlSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Description: DATABASE_URL for Manifest.
+      Description: DATABASE_URL for Thinker.
       SecretString: !Sub "postgresql://${DatabaseUsername}:{{resolve:secretsmanager:${DatabasePassword}:SecretString}}@${Database.Endpoint.Address}:${Database.Endpoint.Port}/${DatabaseName}?uselibpqcompat=true&sslmode=require"
 
   Cluster:
@@ -329,7 +329,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
-        - PolicyName: ReadManifestRuntimeSecrets
+        - PolicyName: ReadThinkerRuntimeSecrets
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -339,7 +339,7 @@ Resources:
                 Resource:
                   - !Ref DatabaseUrlSecret
                   - !Ref BetterAuthSecret
-                  - !Ref ManifestEncryptionKey
+                  - !Ref ThinkerEncryptionKey
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -352,7 +352,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: ManageManifestRequestRecordings
+        - PolicyName: ManageThinkerRequestRecordings
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -410,8 +410,6 @@ Resources:
               Value: !Sub "${ContainerPort}"
             - Name: BIND_ADDRESS
               Value: 0.0.0.0
-            - Name: MANIFEST_MODE
-              Value: selfhosted
             - Name: DB_POOL_MAX
               Value: "10"
             - Name: AUTH_DB_POOL_MAX
@@ -431,8 +429,8 @@ Resources:
             Options:
               awslogs-group: !Ref LogGroup
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: manifest
-          Name: manifest
+              awslogs-stream-prefix: thinker
+          Name: thinker
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -441,8 +439,8 @@ Resources:
               ValueFrom: !Ref DatabaseUrlSecret
             - Name: BETTER_AUTH_SECRET
               ValueFrom: !Ref BetterAuthSecret
-            - Name: MANIFEST_ENCRYPTION_KEY
-              ValueFrom: !Ref ManifestEncryptionKey
+            - Name: THINKER_ENCRYPTION_KEY
+              ValueFrom: !Ref ThinkerEncryptionKey
       Cpu: !Ref Cpu
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       Family: !Sub "${AWS::StackName}-${ServiceName}"
@@ -463,7 +461,7 @@ Resources:
       HealthCheckGracePeriodSeconds: 180
       LaunchType: FARGATE
       LoadBalancers:
-        - ContainerName: manifest
+        - ContainerName: thinker
           ContainerPort: !Ref ContainerPort
           TargetGroupArn: !Ref TargetGroup
       NetworkConfiguration:
@@ -478,10 +476,10 @@ Resources:
 
 Outputs:
   ServiceUrl:
-    Description: Public Manifest URL.
+    Description: Public Thinker URL.
     Value: !Sub "http://${LoadBalancer.DNSName}"
   HealthCheckUrl:
-    Description: Manifest health check URL.
+    Description: Thinker health check URL.
     Value: !Sub "http://${LoadBalancer.DNSName}/api/v1/health"
   DatabaseEndpoint:
     Description: RDS PostgreSQL endpoint.

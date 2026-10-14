@@ -1,1 +1,3 @@
-FROM docker.io/manifestdotbuild/manifest:6
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker
+FROM docker.io/tmsoftbrasil/thinker:0.1

@@ -1,15 +1,17 @@
+# Community-maintained template, not tested in CI.
+# Thinker: https://github.com/patrickbrandao/thinker (deploy/ for the other templates)
 services:
   - type: web
-    name: manifest
+    name: thinker
     runtime: image
     image:
-      url: docker.io/manifestdotbuild/manifest:6
+      url: docker.io/tmsoftbrasil/thinker:0.1
     plan: starter
     numInstances: 1
     healthCheckPath: /api/v1/health
     autoDeployTrigger: off
     disk:
-      name: manifest-recordings
+      name: thinker-recordings
       mountPath: /data/request-recordings
       sizeGB: 1
     envVars:
@@ -17,27 +19,25 @@ services:
         value: 2099
       - key: DATABASE_URL
         fromDatabase:
-          name: manifest-postgres
+          name: thinker-postgres
           property: connectionString
       - key: BETTER_AUTH_SECRET
         generateValue: true
-      - key: MANIFEST_ENCRYPTION_KEY
+      - key: THINKER_ENCRYPTION_KEY
         generateValue: true
       - key: BETTER_AUTH_URL
         fromService:
           type: web
-          name: manifest
+          name: thinker
           envVarKey: RENDER_EXTERNAL_URL
-      - key: MANIFEST_MODE
-        value: selfhosted
       - key: REQUEST_RECORDING_STORAGE
         value: filesystem
       - key: REQUEST_RECORDING_FILESYSTEM_PATH
         value: /data/request-recordings
 
 databases:
-  - name: manifest-postgres
+  - name: thinker-postgres
     plan: free
-    databaseName: manifest
-    user: manifest
+    databaseName: thinker
+    user: thinker
     ipAllowList: []

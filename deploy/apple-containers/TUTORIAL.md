@@ -1,12 +1,14 @@
-# Run Manifest with Apple Containers
+# Run Thinker with Apple Containers
 
-This guide runs Manifest and PostgreSQL on Apple silicon using Apple's [`container`](https://github.com/apple/container) CLI. The deployment mirrors the bundled Docker Compose stack while accounting for differences in Apple Containers networking and storage.
+> **Template mantido pela comunidade, não testado no CI.** O único caminho oficial e testado é o Docker Compose ([`docker/`](https://github.com/patrickbrandao/thinker/tree/main/docker)). Repositório: [patrickbrandao/thinker](https://github.com/patrickbrandao/thinker) · [issues](https://github.com/patrickbrandao/thinker/issues).
+
+This guide runs Thinker and PostgreSQL on Apple silicon using Apple's [`container`](https://github.com/apple/container) CLI. The deployment mirrors the bundled Docker Compose stack while accounting for differences in Apple Containers networking and storage.
 
 ## Prerequisites
 
 - An Apple silicon Mac running a supported macOS version.
 - The Apple Containers `container` CLI installed from the [Apple Containers releases](https://github.com/apple/container/releases).
-- This Manifest repository checked out locally.
+- This Thinker repository checked out locally.
 - `curl` and OpenSSL, which are included with macOS.
 
 Confirm the CLI is available:
@@ -29,7 +31,7 @@ container system version
 
 The `container` and `container-apiserver` rows should report the same version. Startup also checks this and prints these recovery commands instead of continuing with mismatched components.
 
-## Configure Manifest
+## Configure Thinker
 
 The script reads `docker/.env`, the same configuration file used by Docker Compose.
 
@@ -52,7 +54,7 @@ BETTER_AUTH_SECRET=<paste-the-generated-value>
 For stronger separation between session signing and encrypted provider credentials, generate another value and set:
 
 ```env
-MANIFEST_ENCRYPTION_KEY=<a-different-generated-value>
+THINKER_ENCRYPTION_KEY=<a-different-generated-value>
 ```
 
 The default dashboard URL is `http://localhost:2099`. To use another port, set `PORT` and keep `BETTER_AUTH_URL` aligned:
@@ -62,28 +64,28 @@ PORT=3001
 BETTER_AUTH_URL=http://localhost:3001
 ```
 
-You can use a different configuration file by exporting `MANIFEST_ENV_FILE`:
+You can use a different configuration file by exporting `THINKER_ENV_FILE`:
 
 ```bash
-MANIFEST_ENV_FILE=/path/to/manifest.env ./deploy/apple-containers/start.sh up
+THINKER_ENV_FILE=/path/to/thinker.env ./deploy/apple-containers/start.sh up
 ```
 
 Explicitly exported environment variables take precedence over values in the file.
 
 ### Custom PostgreSQL password
 
-The default bundled database password is `manifest`. To change it, set both variables as described in `docker/.env.example`:
+The default bundled database password is `thinker`. To change it, set both variables as described in `docker/.env.example`:
 
 ```env
 POSTGRES_PASSWORD=change-me
-DATABASE_URL=postgresql://manifest:change-me@postgres:5432/manifest
+DATABASE_URL=postgresql://thinker:change-me@postgres:5432/thinker
 ```
 
 The script replaces the Compose hostname `postgres` with the PostgreSQL container's current IP. Percent-encode URL-special characters in the `DATABASE_URL` password.
 
-`POSTGRES_PASSWORD` initializes a new database volume; changing it later does not rotate the password stored by PostgreSQL. If the persistent volume already exists, either keep its original password or rotate the `manifest` PostgreSQL role explicitly.
+`POSTGRES_PASSWORD` initializes a new database volume; changing it later does not rotate the password stored by PostgreSQL. If the persistent volume already exists, either keep its original password or rotate the `thinker` PostgreSQL role explicitly.
 
-## Start Manifest
+## Start Thinker
 
 From the repository root, run:
 
@@ -100,10 +102,10 @@ From the repository root, run:
 The script:
 
 1. Starts the Apple Containers service.
-2. Creates or reuses the `mnfst-postgres-data` database volume and `mnfst-request-recordings` recording volume.
+2. Creates or reuses the `thinker-postgres-data` database volume and `thinker-request-recordings` recording volume.
 3. Starts PostgreSQL and verifies an authenticated connection.
 4. Discovers the PostgreSQL container address.
-5. Recreates the Manifest container so it always receives the current database address.
+5. Recreates the Thinker container so it always receives the current database address.
 6. Publishes the dashboard on host loopback and waits for `/api/v1/health`.
 
 When startup succeeds, open:
@@ -130,24 +132,24 @@ Stop and remove both containers:
 
 Both named volumes are retained, so a later `up` restores the same database and request recordings.
 
-Running `up` repeatedly is safe. A running PostgreSQL container is reused, while Manifest is recreated to pick up the current PostgreSQL IP and configuration.
+Running `up` repeatedly is safe. A running PostgreSQL container is reused, while Thinker is recreated to pick up the current PostgreSQL IP and configuration.
 
-## Upgrade Manifest
+## Upgrade Thinker
 
 First, back up the database:
 
 ```bash
-container exec mnfst-postgres pg_dump -U manifest manifest > manifest-backup-$(date +%F).sql
+container exec thinker-postgres pg_dump -U thinker thinker > thinker-backup-$(date +%F).sql
 ```
 
-The script always launches `manifestdotbuild/manifest:latest`, but `container run` uses the locally cached copy of that tag. To upgrade to a new release, pull the image explicitly and re-run `up`:
+The script always launches `tmsoftbrasil/thinker:latest`, but `container run` uses the locally cached copy of that tag. To upgrade to a new release, pull the image explicitly and re-run `up`:
 
 ```bash
-container image pull manifestdotbuild/manifest:latest
+container image pull tmsoftbrasil/thinker:latest
 ./deploy/apple-containers/start.sh up
 ```
 
-`up` recreates the Manifest container, so it starts from the freshly pulled image. Database migrations run automatically on boot — no manual steps. The PostgreSQL container, database volume, and request-recording volume are not touched, so all data is preserved across upgrades.
+`up` recreates the Thinker container, so it starts from the freshly pulled image. Database migrations run automatically on boot — no manual steps. The PostgreSQL container, database volume, and request-recording volume are not touched, so all data is preserved across upgrades.
 
 ## Local LLM Servers
 
@@ -159,7 +161,7 @@ http://<gateway-ip>:11434
 
 A host LLM server must listen on an interface reachable through that gateway. A service bound only to `127.0.0.1` cannot be reached from the container.
 
-For Ollama, configure `OLLAMA_HOST` on the macOS host according to Ollama's documentation. Avoid exposing the service broadly unless your firewall and network are trusted. You can also point Manifest at another reachable endpoint through `docker/.env`:
+For Ollama, configure `OLLAMA_HOST` on the macOS host according to Ollama's documentation. Avoid exposing the service broadly unless your firewall and network are trusted. You can also point Thinker at another reachable endpoint through `docker/.env`:
 
 ```env
 OLLAMA_HOST=http://192.168.1.50:11434
@@ -169,7 +171,7 @@ OLLAMA_HOST=http://192.168.1.50:11434
 
 The dashboard is published to `127.0.0.1`, providing a stable URL that does not depend on Apple Containers' private subnet and is less likely to conflict with VPN routes.
 
-PostgreSQL-to-Manifest traffic still uses the private address assigned by Apple Containers. The script discovers that address on every `up` and recreates Manifest accordingly. If Apple Containers cannot create or inspect its network while a VPN is active:
+PostgreSQL-to-Thinker traffic still uses the private address assigned by Apple Containers. The script discovers that address on every `up` and recreates Thinker accordingly. If Apple Containers cannot create or inspect its network while a VPN is active:
 
 1. Run `./deploy/apple-containers/start.sh down`.
 2. Temporarily disconnect the VPN.
@@ -180,11 +182,11 @@ The script prints the complete `container inspect` output if it cannot identify 
 
 ## Persistence and Backups
 
-PostgreSQL data is stored in `mnfst-postgres-data`, and compressed request recordings are stored in `mnfst-request-recordings`. Override either volume name before startup with:
+PostgreSQL data is stored in `thinker-postgres-data`, and compressed request recordings are stored in `thinker-request-recordings`. Override either volume name before startup with:
 
 ```bash
-MANIFEST_PG_VOLUME=my-manifest-data ./deploy/apple-containers/start.sh up
-MANIFEST_RECORDINGS_VOLUME=my-manifest-recordings ./deploy/apple-containers/start.sh up
+THINKER_PG_VOLUME=my-thinker-data ./deploy/apple-containers/start.sh up
+THINKER_RECORDINGS_VOLUME=my-thinker-recordings ./deploy/apple-containers/start.sh up
 ```
 
 The script mounts the named volume at `/var/lib/postgresql/data` and uses `/var/lib/postgresql/data/pgdata` as `PGDATA`. The nested directory is required because a newly formatted Apple Containers volume may contain a root-level `lost+found` directory.
@@ -192,10 +194,10 @@ The script mounts the named volume at `/var/lib/postgresql/data` and uses `/var/
 `down` never deletes either named volume. Use Apple Containers volume commands to inspect or deliberately remove them:
 
 ```bash
-container volume inspect mnfst-postgres-data
-container volume inspect mnfst-request-recordings
-container volume delete mnfst-postgres-data
-container volume delete mnfst-request-recordings
+container volume inspect thinker-postgres-data
+container volume inspect thinker-request-recordings
+container volume delete thinker-postgres-data
+container volume delete thinker-request-recordings
 ```
 
 Deleting either volume permanently deletes its database or recording data. PostgreSQL dumps do not include recordings, so back up the recording volume separately before removing it.
@@ -218,8 +220,8 @@ If `container system stop` prints protocol or decoding errors, continue with `co
 ### View logs
 
 ```bash
-container logs mnfst-postgres
-container logs mnfst-manifest
+container logs thinker-postgres
+container logs thinker-app
 ```
 
 ### PostgreSQL stops during initialization
@@ -236,12 +238,12 @@ If logs mention `chmod` or `chown` being denied, do not replace the named volume
 
 The named volume was probably initialized with a different password. Restore the original `POSTGRES_PASSWORD`, or rotate the database role password inside PostgreSQL and update `DATABASE_URL` to match.
 
-### Manifest stops before becoming healthy
+### Thinker stops before becoming healthy
 
 The script prints the container logs automatically. You can inspect them again with:
 
 ```bash
-container logs mnfst-manifest
+container logs thinker-app
 ```
 
 Common causes include a mismatched database URL, a port already in use, or invalid environment values.
@@ -268,8 +270,8 @@ Stop the containers first:
 To also discard all database and request-recording state, deliberately delete both named volumes:
 
 ```bash
-container volume delete mnfst-postgres-data
-container volume delete mnfst-request-recordings
+container volume delete thinker-postgres-data
+container volume delete thinker-request-recordings
 ```
 
-Then run `up` again. This is destructive and returns Manifest to a fresh-install state.
+Then run `up` again. This is destructive and returns Thinker to a fresh-install state.

@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "Google Cloud project ID to deploy Manifest into."
+  description = "Google Cloud project ID to deploy Thinker into."
   type        = string
 }
 
@@ -12,7 +12,7 @@ variable "region" {
 variable "service_name" {
   description = "Cloud Run service name. Use lowercase letters, numbers, and hyphens."
   type        = string
-  default     = "manifest"
+  default     = "thinker"
 
   validation {
     condition     = can(regex("^[a-z]([a-z0-9-]{0,38}[a-z0-9])?$", var.service_name))
@@ -21,9 +21,9 @@ variable "service_name" {
 }
 
 variable "image_url" {
-  description = "Manifest container image to deploy."
+  description = "Thinker container image to deploy."
   type        = string
-  default     = "docker.io/manifestdotbuild/manifest:6"
+  default     = "docker.io/tmsoftbrasil/thinker:0.1"
 }
 
 variable "database_tier" {
