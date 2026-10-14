@@ -25,6 +25,12 @@ describe("model-display", () => {
     vi.resetModules();
   });
 
+  it("names the gateway's own marker model Thinker", async () => {
+    mockGetModelPrices.mockResolvedValue({ models: [] });
+    const { getModelDisplayName } = await import("../../src/services/model-display.js");
+    expect(getModelDisplayName("thinker")).toBe("Thinker");
+  });
+
   it("returns display name from cache after preload", async () => {
     mockGetModelPrices.mockResolvedValue({
       models: [

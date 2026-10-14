@@ -18,7 +18,7 @@ describe("OpenCodeSetup", () => {
     const { container } = render(() => (
       <OpenCodeSetup
         apiKey={null}
-        keyPrefix="mnfst_live"
+        keyPrefix="thk_live"
         baseUrl="http://localhost:38240/v1"
       />
     ));
@@ -27,8 +27,8 @@ describe("OpenCodeSetup", () => {
     expect(container.textContent).not.toContain("project root");
     expect(container.textContent).toContain('"baseURL": "http://localhost:38240/v1"');
     expect(container.textContent).toContain('"apiKey": "thk_YOUR_KEY"');
-    expect(container.textContent).not.toContain('"apiKey": "mnfst_live..."');
-    expect(container.textContent).toContain('"model": "manifest/auto"');
+    expect(container.textContent).not.toContain('"apiKey": "thk_live..."');
+    expect(container.textContent).toContain('"model": "thinker/auto"');
     expect(screen.queryByLabelText("Reveal API key")).toBeNull();
 
     const copyConfig = container.querySelector(
@@ -39,26 +39,26 @@ describe("OpenCodeSetup", () => {
     await vi.waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "thk_YOUR_KEY"'));
     });
-    expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining("mnfst_live..."));
+    expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining("thk_live..."));
   });
 
   it("reveals and hides the full API key without changing the copy payload", async () => {
     const { container } = render(() => (
       <OpenCodeSetup
-        apiKey="mnfst_secret"
-        keyPrefix="mnfst_live"
+        apiKey="thk_secret"
+        keyPrefix="thk_live"
         baseUrl="http://localhost:38240/v1"
       />
     ));
 
-    expect(container.textContent).toContain('"apiKey": "mnfst_live..."');
-    expect(container.textContent).not.toContain("mnfst_secret");
+    expect(container.textContent).toContain('"apiKey": "thk_live..."');
+    expect(container.textContent).not.toContain("thk_secret");
 
     fireEvent.click(screen.getByLabelText("Reveal API key"));
-    expect(container.textContent).toContain('"apiKey": "mnfst_secret"');
+    expect(container.textContent).toContain('"apiKey": "thk_secret"');
 
     fireEvent.click(screen.getByLabelText("Hide API key"));
-    expect(container.textContent).toContain('"apiKey": "mnfst_live..."');
+    expect(container.textContent).toContain('"apiKey": "thk_live..."');
 
     const copyFullConfig = container.querySelector(
       '.setup-cli-block__actions [aria-label="Copy to clipboard"]',
@@ -66,7 +66,7 @@ describe("OpenCodeSetup", () => {
     expect(copyFullConfig).not.toBeNull();
     fireEvent.click(copyFullConfig!);
     await vi.waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "mnfst_secret"'));
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "thk_secret"'));
     });
   });
 });

@@ -146,13 +146,12 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   const [announcement, setAnnouncement] = createSignal('');
   const [promptHeight, setPromptHeight] = createSignal(0);
   const [historyOpen, setHistoryOpen] = createSignal(
-    !props.embedded &&
-      readStorage(() => localStorage, 'manifest.playground.recentOpen') !== 'false',
+    !props.embedded && readStorage(() => localStorage, 'thinker.playground.recentOpen') !== 'false',
   );
   const toggleRecent = () => {
     const next = !historyOpen();
     setHistoryOpen(next);
-    writeStorage(() => localStorage, 'manifest.playground.recentOpen', String(next));
+    writeStorage(() => localStorage, 'thinker.playground.recentOpen', String(next));
   };
   const [historyRuns, setHistoryRuns] = createSignal<PlaygroundHistoryRunSummary[]>([]);
   const [historyLoading, setHistoryLoading] = createSignal(false);
@@ -203,7 +202,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(null);
     setOverlayBestId(null);
     setSearchParams({ run: undefined });
-    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
+    writeStorage(() => sessionStorage, 'thinker.playground.lastRun', null);
     // pickDefaults will fire via the existing createEffect since columns are now empty
     requestAnimationFrame(() => promptRef?.focus());
   };
@@ -237,7 +236,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     }
     if (store().columns.length > 0) return;
     const runId =
-      searchParams.run || readStorage(() => sessionStorage, 'manifest.playground.lastRun');
+      searchParams.run || readStorage(() => sessionStorage, 'thinker.playground.lastRun');
     if (runId && !activeRunId()) {
       getPlaygroundRun(runId)
         .then((detail) => {
@@ -248,7 +247,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
         })
         .catch(() => {
           setSearchParams({ run: undefined });
-          writeStorage(() => sessionStorage, 'manifest.playground.lastRun', null);
+          writeStorage(() => sessionStorage, 'thinker.playground.lastRun', null);
         });
     }
   });
@@ -287,7 +286,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     setLiveRunId(runId);
     setViewingHistory(null);
     setSearchParams({ run: runId });
-    writeStorage(() => sessionStorage, 'manifest.playground.lastRun', runId);
+    writeStorage(() => sessionStorage, 'thinker.playground.lastRun', runId);
   };
 
   const handleRetry = (id: string) => {
@@ -454,7 +453,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       style={props.embedded ? undefined : { 'padding-bottom': `${promptHeight() + 48}px` }}
     >
       <Show when={!props.embedded}>
-        <Title>Playground · Manifest</Title>
+        <Title>Playground · Thinker</Title>
         <Meta
           name="description"
           content="Compare models side by side for cost, speed, and quality."

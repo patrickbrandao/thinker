@@ -218,7 +218,7 @@ describe('StatusCell merged pill', () => {
     const { container } = renderCell(
       baseRow({
         status: 'error',
-        error_message: '[🦚 Manifest M300] `messages` array is required.',
+        error_message: '[🦚 Thinker M300] `messages` array is required.',
         error_origin: 'request',
         error_class: 'invalid_request',
       }),
@@ -268,7 +268,7 @@ describe('StatusCell merged pill', () => {
     expect(badge.className).not.toContain('status-badge--error');
   });
 
-  it("merges a Manifest limit into one red 'Failed' pill linking to its agent's limits", () => {
+  it("merges a Thinker limit into one red 'Failed' pill linking to its agent's limits", () => {
     const { container } = renderCell(
       baseRow({
         agent_name: 'billing-bot',
@@ -286,7 +286,7 @@ describe('StatusCell merged pill', () => {
     expect(container.querySelectorAll('a').length).toBe(1);
   });
 
-  it('renders a Manifest limit with no agent as the pill without a link', () => {
+  it('renders a Thinker limit with no agent as the pill without a link', () => {
     const { container } = renderCell(
       baseRow({
         agent_name: null,

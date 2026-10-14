@@ -135,7 +135,7 @@ describe("Settings", () => {
     vi.clearAllMocks();
     mockAgentName = "test-agent";
     mockSetupThrows = false;
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_abc" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_abc" });
     mockGetAgentInfo.mockResolvedValue({ agent_name: "test-agent", agent_category: "personal", agent_platform: "openclaw" });
     mockDeleteAgent.mockResolvedValue(undefined);
     mockRenameAgent.mockResolvedValue({ renamed: true, name: "new-name" });
@@ -207,12 +207,12 @@ describe("Settings", () => {
   it("shows key prefix after loading", async () => {
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("mnfst_abc");
+      expect(container.textContent).toContain("thk_abc");
     });
   });
 
   it("shows reveal button when API returns full key", async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_abc", apiKey: "mnfst_full_key_123" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_abc", apiKey: "thk_full_key_123" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
@@ -220,19 +220,19 @@ describe("Settings", () => {
   });
 
   it("reveals full key when reveal button is clicked", async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_abc", apiKey: "mnfst_full_key_123" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_abc", apiKey: "thk_full_key_123" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
     });
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("mnfst_full_key_123");
+      expect(container.textContent).toContain("thk_full_key_123");
     });
   });
 
   it("hides full key when hide button is clicked", async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_abc", apiKey: "mnfst_full_key_123" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_abc", apiKey: "thk_full_key_123" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
@@ -243,7 +243,7 @@ describe("Settings", () => {
     });
     fireEvent.click(container.querySelector('[aria-label="Hide API key"]')!);
     await vi.waitFor(() => {
-      expect(container.textContent).not.toContain("mnfst_full_key_123");
+      expect(container.textContent).not.toContain("thk_full_key_123");
     });
   });
 
@@ -300,7 +300,7 @@ describe("Settings", () => {
   });
 
   it("clicking Rotate key calls rotateAgentKey", async () => {
-    mockRotateAgentKey.mockResolvedValue({ apiKey: "mnfst_new_rotated_key" });
+    mockRotateAgentKey.mockResolvedValue({ apiKey: "thk_new_rotated_key" });
     const { container } = render(() => <Settings />);
     const rotateBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("Rotate key"))!;
     fireEvent.click(rotateBtn);
@@ -308,13 +308,13 @@ describe("Settings", () => {
   });
 
   it("auto-reveals key after successful rotation", async () => {
-    mockRotateAgentKey.mockResolvedValue({ apiKey: "mnfst_new_rotated_key" });
+    mockRotateAgentKey.mockResolvedValue({ apiKey: "thk_new_rotated_key" });
     const { container } = render(() => <Settings />);
     const rotateBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("Rotate key"))!;
     fireEvent.click(rotateBtn);
     await vi.waitFor(() => {
       expect(container.querySelector('[aria-label="Hide API key"]')).not.toBeNull();
-      expect(container.textContent).toContain("mnfst_new_rotated_key");
+      expect(container.textContent).toContain("thk_new_rotated_key");
     });
   });
 
@@ -484,12 +484,12 @@ describe("Settings", () => {
   });
 
   it("passes keyPrefix to setup component", async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_xyz_prefix" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_xyz_prefix" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       const el = container.querySelector('[data-testid="setup-add-provider"]');
       expect(el).not.toBeNull();
-      expect(el!.getAttribute("data-key-prefix")).toBe("mnfst_xyz_prefix");
+      expect(el!.getAttribute("data-key-prefix")).toBe("thk_xyz_prefix");
     });
   });
 
@@ -541,10 +541,10 @@ describe("Settings", () => {
   });
 
   it("shows fallback key display when no full key available", async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_xyz" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_xyz" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("mnfst_xyz...");
+      expect(container.textContent).toContain("thk_xyz...");
     });
   });
 
@@ -634,19 +634,19 @@ describe("Settings", () => {
     });
   });
 
-  it("uses app.manifest.build in setup on the gateway host", async () => {
+  it("uses thinker.example.com in setup on the gateway host", async () => {
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
-      value: { ...originalLocation, hostname: "app.manifest.build", origin: "https://app.manifest.build" },
+      value: { ...originalLocation, hostname: "thinker.example.com", origin: "https://thinker.example.com" },
       writable: true,
       configurable: true,
     });
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: "mnfst_abc" });
+    mockGetAgentKey.mockResolvedValue({ keyPrefix: "thk_abc" });
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       const el = container.querySelector('[data-testid="setup-add-provider"]');
       expect(el).not.toBeNull();
-      expect(el!.getAttribute("data-base-url")).toBe("https://app.manifest.build/v1");
+      expect(el!.getAttribute("data-base-url")).toBe("https://thinker.example.com/v1");
     });
     Object.defineProperty(window, "location", { value: originalLocation, writable: true, configurable: true });
   });

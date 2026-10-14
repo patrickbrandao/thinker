@@ -6,7 +6,7 @@ import { Show } from 'solid-js';
  * request at all: Thinker never checks for updates on its own.
  */
 const VersionIndicator = () => {
-  const version = __MANIFEST_VERSION__;
+  const version = __THINKER_VERSION__;
 
   return (
     <Show when={version}>

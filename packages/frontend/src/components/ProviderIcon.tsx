@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { SHARED_PROVIDER_BY_ID_OR_ALIAS, normalizeProviderName } from 'thinker-shared';
+import { THINKER_MARK_URL } from '../services/thinker-links.js';
 
 /**
  * Returns a branded icon for a given provider ID, or null if no icon exists.
@@ -9,11 +10,9 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
   const s = { width: `${size}px`, height: `${size}px` };
 
   switch (id) {
-    /* ── Manifest ────────────────────────────────── */
-    case 'manifest':
-      return (
-        <img src="/icons/manifest.svg" alt="Manifest" style={{ ...s, 'border-radius': '3px' }} />
-      );
+    /* ── Thinker (the gateway's own marker) ──────── */
+    case 'thinker':
+      return <img src={THINKER_MARK_URL} alt="Thinker" style={s} />;
 
     /* ── Meta ────────────────────────────────────── */
     case 'meta':

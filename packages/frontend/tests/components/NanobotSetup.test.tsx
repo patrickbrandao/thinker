@@ -43,7 +43,7 @@ describe("NanobotSetup", () => {
 
   it("emits the baseUrl verbatim into the JSON (no /v1 stripping)", () => {
     // Nanobot's apiBase points at the OpenAI-compatible endpoint, which is
-    // /v1 on Manifest — preserve the suffix unlike the Anthropic-compatible
+    // /v1 on Thinker — preserve the suffix unlike the Anthropic-compatible
     // Claude Code setup.
     const { container } = render(() => (
       <NanobotSetup {...baseProps} baseUrl="http://localhost:3001/v1" />
@@ -53,9 +53,9 @@ describe("NanobotSetup", () => {
 
   it("masks the API key when only a prefix is available", () => {
     const { container } = render(() => (
-      <NanobotSetup {...baseProps} keyPrefix="mnfst_abc" />
+      <NanobotSetup {...baseProps} keyPrefix="thk_abc" />
     ));
-    expect(container.textContent).toContain("mnfst_abc...");
+    expect(container.textContent).toContain("thk_abc...");
     expect(container.querySelector('[aria-label="Reveal API key"]')).toBeNull();
     expect(container.querySelector('[aria-label="Hide API key"]')).toBeNull();
   });
@@ -67,33 +67,33 @@ describe("NanobotSetup", () => {
 
   it("toggles the API key reveal when the eye button is clicked", () => {
     const { container } = render(() => (
-      <NanobotSetup {...baseProps} apiKey="mnfst_full_secret_value" keyPrefix="mnfst_full" />
+      <NanobotSetup {...baseProps} apiKey="thk_full_secret_value" keyPrefix="thk_full" />
     ));
-    expect(container.textContent).toContain("mnfst_full...");
-    expect(container.textContent).not.toContain("mnfst_full_secret_value");
+    expect(container.textContent).toContain("thk_full...");
+    expect(container.textContent).not.toContain("thk_full_secret_value");
 
     const reveal = container.querySelector('[aria-label="Reveal API key"]') as HTMLButtonElement;
     expect(reveal).not.toBeNull();
     fireEvent.click(reveal);
-    expect(container.textContent).toContain("mnfst_full_secret_value");
+    expect(container.textContent).toContain("thk_full_secret_value");
 
     const hide = container.querySelector('[aria-label="Hide API key"]') as HTMLButtonElement;
     expect(hide).not.toBeNull();
     fireEvent.click(hide);
-    expect(container.textContent).not.toContain("mnfst_full_secret_value");
+    expect(container.textContent).not.toContain("thk_full_secret_value");
   });
 
   it("copy button always uses the real key (not the masked one)", () => {
     const writeText = vi.mocked(navigator.clipboard.writeText);
     const { container } = render(() => (
-      <NanobotSetup {...baseProps} apiKey="mnfst_full_secret_value" keyPrefix="mnfst_full" />
+      <NanobotSetup {...baseProps} apiKey="thk_full_secret_value" keyPrefix="thk_full" />
     ));
     const copyButton = container.querySelector('button[aria-label*="Copy" i]') as HTMLButtonElement
       | null;
     expect(copyButton).not.toBeNull();
     fireEvent.click(copyButton!);
     expect(writeText).toHaveBeenCalledTimes(1);
-    expect(writeText.mock.calls[0][0]).toContain("mnfst_full_secret_value");
+    expect(writeText.mock.calls[0][0]).toContain("thk_full_secret_value");
   });
 
   it("renders inside a setup-agents-card so card styling applies", () => {

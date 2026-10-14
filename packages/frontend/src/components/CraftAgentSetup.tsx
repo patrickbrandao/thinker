@@ -48,8 +48,9 @@ const CraftAgentSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-method__hint">
-        In Craft, add an API-key connection and choose the{' '}
-        <code class="setup-model-hint__code">Manifest</code> provider preset. Use model{' '}
+        In Craft, add an API-key connection with a custom OpenAI-compatible endpoint. Set the base
+        URL to <code class="setup-model-hint__code">{props.baseUrl}</code>{' '}
+        <CopyButton text={props.baseUrl} />, use model{' '}
         <code class="setup-model-hint__code">auto</code> and paste this API key:
       </p>
 

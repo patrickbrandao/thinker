@@ -388,9 +388,7 @@ const Overview: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>
-        {agentDisplayName() ?? decodeURIComponent(params.agentName)} Overview - Manifest
-      </Title>
+      <Title>{agentDisplayName() ?? decodeURIComponent(params.agentName)} Overview - Thinker</Title>
       <Meta
         name="description"
         content={`Monitor ${agentDisplayName() ?? decodeURIComponent(params.agentName)} performance, costs, tokens, and activity.`}

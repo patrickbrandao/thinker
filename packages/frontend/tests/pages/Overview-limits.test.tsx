@@ -161,7 +161,7 @@ describe('Overview - trend badges and status display', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem('manifest_global_group', 'provider');
+    localStorage.setItem('thinker_global_group', 'provider');
     mockAgentName = 'test-agent';
     mockGetOverviewDetails.mockResolvedValue({});
   });
@@ -215,7 +215,7 @@ describe('Overview - trend badges and status display', () => {
       expect(badge!.textContent).toContain('Failed');
     });
     expect(container.textContent).not.toContain('rate_limited');
-    // A provider rate limit is a plain error — it must not link to the Manifest
+    // A provider rate limit is a plain error — it must not link to the Thinker
     // spend-limits page (that page is for the user's own software limits).
     expect(container.querySelector('.status-badge--error a')).toBeNull();
   });

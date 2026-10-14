@@ -47,7 +47,7 @@ describe('Setup page', () => {
   async function renderSetup() {
     const result = render(() => <Setup />);
     await waitFor(() => {
-      expect(screen.queryByText('Welcome to Manifest')).toBeDefined();
+      expect(screen.queryByText('Welcome to Thinker')).toBeDefined();
     });
     return result;
   }
@@ -75,7 +75,7 @@ describe('Setup page', () => {
 
   it('renders the welcome headline and form after status check', async () => {
     await renderSetup();
-    expect(screen.getByText('Welcome to Manifest')).toBeDefined();
+    expect(screen.getByText('Welcome to Thinker')).toBeDefined();
     expect(screen.getByPlaceholderText('Your name')).toBeDefined();
     expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     expect(screen.getByPlaceholderText('At least 8 characters')).toBeDefined();
@@ -130,7 +130,7 @@ describe('Setup page', () => {
       expect(window.location.href).toBe('/');
     });
     // No questionnaire marker is left behind for the guards to act on.
-    expect(localStorage.getItem('manifest_discovery_pending_admin1')).toBeNull();
+    expect(localStorage.getItem('thinker_discovery_pending_admin1')).toBeNull();
   });
 
   it('surfaces server errors from createFirstAdmin', async () => {

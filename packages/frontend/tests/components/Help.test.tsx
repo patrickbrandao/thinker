@@ -21,57 +21,34 @@ describe("Help", () => {
     expect(screen.getByText("Help & Support")).toBeDefined();
   });
 
-  it("shows Email Support section", () => {
-    render(() => <Help />);
-    expect(screen.getByText("Email Support")).toBeDefined();
-  });
-
-  it("has Contact link", () => {
-    render(() => <Help />);
-    const links = screen.getAllByRole("link");
-    const contactLink = links.find((l) => l.textContent?.includes("Contact"));
-    expect(contactLink).toBeDefined();
-  });
-
-  it("Email link is mailto", () => {
-    render(() => <Help />);
-    const links = screen.getAllByRole("link");
-    const contactLink = links.find((l) => l.textContent?.includes("Contact"));
-    expect(contactLink?.getAttribute("href")).toBe(
-      "mailto:sebastien@manifest.build",
-    );
-  });
-
   it("renders Title metadata", () => {
     const { container } = render(() => <Help />);
     const title = container.querySelector("title");
-    expect(title?.textContent).toContain("Help & Support - Manifest");
+    expect(title?.textContent).toContain("Help & Support - Thinker");
   });
 
-  it("renders breadcrumb prompt text", () => {
-    render(() => <Help />);
-    expect(
-      screen.getByText(
-        /Questions or issues\? Reach out and we'll get back to you quickly/,
-      ),
-    ).toBeDefined();
-  });
-
-  it("shows the support email address with the response window", () => {
-    render(() => <Help />);
-    expect(
-      screen.getByText(/sebastien@manifest.build/),
-    ).toBeDefined();
-    expect(
-      screen.getByText(/we typically respond within 24 hours/),
-    ).toBeDefined();
-  });
-
-  it("renders a single action link (Contact) and no call booking", () => {
+  it("links the repository docs and issues, in a new tab", () => {
     render(() => <Help />);
     const links = screen.getAllByRole("link");
-    expect(links.length).toBe(1);
-    expect(screen.queryByText("Schedule a Call")).toBeNull();
-    expect(links.some((l) => l.getAttribute("href")?.includes("calendly"))).toBe(false);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "https://github.com/patrickbrandao/thinker/tree/main/docs",
+      "https://github.com/patrickbrandao/thinker/issues",
+    ]);
+    for (const link of links) {
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    }
+  });
+
+  it("has no email support, call booking or Discussions link", () => {
+    const { container } = render(() => <Help />);
+    expect(container.querySelector('a[href^="mailto:"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/manifest|calendly/i);
+    expect(container.querySelector('a[href*="discussions"]')).toBeNull();
+  });
+
+  it("warns not to paste secrets into a public issue", () => {
+    render(() => <Help />);
+    expect(screen.getByText(/Leave out keys, tokens and request logs/)).toBeDefined();
   });
 });

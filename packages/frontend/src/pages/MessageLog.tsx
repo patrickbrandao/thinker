@@ -564,7 +564,7 @@ const MessageLog: Component = () => {
 
   /** Resolve provider ID to display name */
   const providerDisplayName = (id: string): string => {
-    if (id === 'manifest') return 'Manifest';
+    if (id === 'thinker') return 'Thinker';
     const prov = PROVIDERS.find((p) => p.id === id);
     if (prov) return prov.name;
     // Custom providers arrive as `custom:<uuid>` — the backend ships a label
@@ -612,7 +612,7 @@ const MessageLog: Component = () => {
     { label: 'All statuses', value: '' },
     { label: 'Success', value: 'ok' },
     { label: 'Failed', value: 'failed' },
-    // The caller hung up — not a Manifest or provider failure, so it is no
+    // The caller hung up — not a Thinker or provider failure, so it is no
     // longer folded into Failed and needs its own way in.
     { label: 'Cancelled', value: 'cancelled' },
   ];
@@ -648,12 +648,13 @@ const MessageLog: Component = () => {
     { label: 'No recovery attempt', value: 'none', icon: noRecoveryIcon() },
   ];
 
-  // Who failed. `manifest` collapses every Manifest-authored origin (setup,
+  // Who failed. The gateway origin collapses every Thinker-authored origin (setup,
   // limits, bad requests, internal errors) into one choice, since from a user's
   // point of view they share a fix path that has nothing to do with a provider.
   const originOptions = [
     { label: 'All origins', value: '' },
-    { label: 'Manifest', value: 'manifest' },
+    // The query value is still the backend's legacy origin name; only the label changed.
+    { label: 'Thinker', value: 'manifest' },
     { label: 'Provider', value: 'provider' },
     { label: 'Transport', value: 'transport' },
   ];
@@ -683,8 +684,8 @@ const MessageLog: Component = () => {
     <div class="container--full" onClick={handlePageClick}>
       <Title>
         {params.agentName
-          ? `${agentDisplayName() ?? decodeURIComponent(params.agentName)} Requests - Manifest`
-          : 'Requests - Manifest'}
+          ? `${agentDisplayName() ?? decodeURIComponent(params.agentName)} Requests - Thinker`
+          : 'Requests - Thinker'}
       </Title>
       <Meta
         name="description"

@@ -774,7 +774,7 @@ describe('ProviderSelectModal', () => {
       });
       expect(window.open).toHaveBeenCalledWith(
         'https://auth.openai.com/oauth/authorize?test=1',
-        'manifest-oauth',
+        'thinker-oauth',
         'width=500,height=700',
       );
 

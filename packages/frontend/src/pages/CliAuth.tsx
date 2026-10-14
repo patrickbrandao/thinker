@@ -2,6 +2,7 @@ import { useSearchParams } from '@solidjs/router';
 import { Title } from '@solidjs/meta';
 import { Show, createSignal, type Component } from 'solid-js';
 import { fetchMutate } from '../services/api/core.js';
+import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 
 /** Mirrors the backend's `state` contract on POST /api/v1/cli/authorize. */
 const STATE_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -14,7 +15,7 @@ const MIN_PORT = 1024;
 const MAX_PORT = 65535;
 
 /**
- * Browser half of `mnfst login`: confirms the user wants to grant the CLI on
+ * Browser half of `thinker login`: confirms the user wants to grant the CLI on
  * this machine a workspace token, then hands a one-time code to the CLI's
  * loopback listener. The explicit click is a security boundary — a drive-by
  * link must never silently mint a token.
@@ -85,15 +86,11 @@ const CliAuth: Component = () => {
 
   return (
     <div class="auth-layout">
-      <Title>Authorize CLI - Manifest</Title>
+      <Title>Authorize CLI - Thinker</Title>
       <div class="auth-card" style="text-align: center;">
         <div class="auth-logo">
-          <img
-            src="/logotype-white.svg"
-            alt="Manifest LLM Gateway"
-            class="auth-logo__img auth-logo__img--light"
-          />
-          <img src="/logotype-dark.svg" alt="" class="auth-logo__img auth-logo__img--dark" />
+          <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
         </div>
         <Show
           when={request()}
@@ -102,7 +99,7 @@ const CliAuth: Component = () => {
               <h1 class="auth-header__title">Invalid login request</h1>
               <p class="auth-header__subtitle">
                 This link is missing or malformed. Return to your terminal and run{' '}
-                <code>mnfst login</code> again.
+                <code>thinker login</code> again.
               </p>
             </div>
           }
@@ -112,10 +109,10 @@ const CliAuth: Component = () => {
             fallback={
               <>
                 <div class="auth-header">
-                  <h1 class="auth-header__title">Authorize the Manifest CLI?</h1>
+                  <h1 class="auth-header__title">Authorize the Thinker CLI?</h1>
                   <p class="auth-header__subtitle">
                     This grants the CLI on this machine full access to your workspace. Revoke it any
-                    time by running <code>mnfst logout</code>.
+                    time by running <code>thinker logout</code>.
                   </p>
                 </div>
                 {/* .auth-form is the column that stretches the submit button edge

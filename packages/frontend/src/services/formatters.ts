@@ -86,21 +86,21 @@ export function formatStatus(status: string): string {
 }
 
 /**
- * Map an error_origin to a user-facing label. Manifest-originated errors
- * (config/policy/internal) are labelled as Manifest's own so they read
+ * Map an error_origin to a user-facing label. Thinker-originated errors
+ * (config/policy/internal) are labelled as Thinker's own so they read
  * distinctly from a provider's failure.
  */
 const ERROR_ORIGIN_LABELS: Record<string, string> = {
   provider: 'Provider',
   transport: 'Transport',
-  config: 'Manifest · Setup',
-  // policy = a Manifest software limit (spend/token guardrail) was hit — labelled
+  config: 'Thinker · Setup',
+  // policy = a Thinker software limit (spend/token guardrail) was hit — labelled
   // "Limit" so it reads distinctly from a provider rate limit.
-  policy: 'Manifest · Limit',
-  internal: 'Manifest · Internal',
+  policy: 'Thinker · Limit',
+  internal: 'Thinker · Internal',
   // request = the caller's own payload was refused before routing. Not the
-  // operator's setup, not a Manifest bug, and never a provider failure.
-  request: 'Manifest · Bad request',
+  // operator's setup, not a Thinker bug, and never a provider failure.
+  request: 'Thinker · Bad request',
 };
 
 export function formatErrorOrigin(origin: string | null | undefined): string | null {

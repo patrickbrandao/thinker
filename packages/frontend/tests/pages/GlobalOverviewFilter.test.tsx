@@ -319,7 +319,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   sessionStorage.clear();
-  localStorage.setItem('manifest_global_group', 'provider');
+  localStorage.setItem('thinker_global_group', 'provider');
   filterSelectProps = null;
   providerChartProps = null;
   sseMocks.reset?.();

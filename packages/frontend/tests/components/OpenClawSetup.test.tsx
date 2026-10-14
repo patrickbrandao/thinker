@@ -59,47 +59,47 @@ describe("OpenClawSetup", () => {
 
   it("shows key prefix when keyPrefix provided", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} keyPrefix="mnfst_abc" />
+      <OpenClawSetup {...defaultProps} keyPrefix="thk_abc" />
     ));
-    expect(container.textContent).toContain("mnfst_abc...");
+    expect(container.textContent).toContain("thk_abc...");
   });
 
   it("does not show eye toggle when no apiKey", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} keyPrefix="mnfst_abc" />
+      <OpenClawSetup {...defaultProps} keyPrefix="thk_abc" />
     ));
     expect(container.querySelector('[aria-label="Reveal API key"]')).toBeNull();
   });
 
   it("shows eye toggle on CLI tab when apiKey provided", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_secret_key" keyPrefix="mnfst_sec" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_secret_key" keyPrefix="thk_sec" />
     ));
     expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
   });
 
   it("reveals key in CLI when eye toggle clicked", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_secret_key" keyPrefix="mnfst_sec" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_secret_key" keyPrefix="thk_sec" />
     ));
-    expect(container.textContent).not.toContain("mnfst_secret_key");
+    expect(container.textContent).not.toContain("thk_secret_key");
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    expect(container.textContent).toContain("mnfst_secret_key");
+    expect(container.textContent).toContain("thk_secret_key");
   });
 
   it("hides key again on second CLI eye toggle click", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_secret_key" keyPrefix="mnfst_sec" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_secret_key" keyPrefix="thk_sec" />
     ));
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    expect(container.textContent).toContain("mnfst_secret_key");
+    expect(container.textContent).toContain("thk_secret_key");
     fireEvent.click(container.querySelector('[aria-label="Hide API key"]')!);
-    expect(container.textContent).not.toContain("mnfst_secret_key");
+    expect(container.textContent).not.toContain("thk_secret_key");
   });
 
   it("shows CLI copy button when key is hidden", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_secret_key" keyPrefix="mnfst_sec" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_secret_key" keyPrefix="thk_sec" />
     ));
     const cliBlock = container.querySelector(".setup-cli-block");
     const copyBtn = cliBlock!.querySelector('[aria-label="Copy to clipboard"]');
@@ -135,7 +135,7 @@ describe("OpenClawSetup", () => {
 
   it("shows eye toggle on wizard API Key field when apiKey provided", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_wiz" keyPrefix="mnfst_wi" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_wiz" keyPrefix="thk_wi" />
     ));
     const segment = container.querySelector(".setup-segment--full");
     fireEvent.click(segment!.querySelectorAll(".setup-segment__btn")[1]);
@@ -145,18 +145,18 @@ describe("OpenClawSetup", () => {
 
   it("reveals API key in wizard field when eye toggle clicked", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_wiz_full" keyPrefix="mnfst_wi" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_wiz_full" keyPrefix="thk_wi" />
     ));
     const segment = container.querySelector(".setup-segment--full");
     fireEvent.click(segment!.querySelectorAll(".setup-segment__btn")[1]);
-    expect(container.textContent).not.toContain("mnfst_wiz_full");
+    expect(container.textContent).not.toContain("thk_wiz_full");
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    expect(container.textContent).toContain("mnfst_wiz_full");
+    expect(container.textContent).toContain("thk_wiz_full");
   });
 
   it("shows wizard copy button when key is hidden", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_wiz" keyPrefix="mnfst_wi" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_wiz" keyPrefix="thk_wi" />
     ));
     const segment = container.querySelector(".setup-segment--full");
     fireEvent.click(segment!.querySelectorAll(".setup-segment__btn")[1]);
@@ -202,7 +202,7 @@ describe("OpenClawSetup", () => {
 
   it("renders CLI copy button with snippet text containing masked key", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} keyPrefix="mnfst_pre" />
+      <OpenClawSetup {...defaultProps} keyPrefix="thk_pre" />
     ));
     // The CLI copy button text should include the masked key in the snippet
     const cliActions = container.querySelector(".setup-cli-block__actions");
@@ -213,7 +213,7 @@ describe("OpenClawSetup", () => {
 
   it("renders CLI copy button with full API key in snippet after reveal", () => {
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_full_snippet" keyPrefix="mnfst_ful" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_full_snippet" keyPrefix="thk_ful" />
     ));
     // Reveal key
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
@@ -227,7 +227,7 @@ describe("OpenClawSetup", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     const { container } = render(() => (
-      <OpenClawSetup {...defaultProps} apiKey="mnfst_clip_key" keyPrefix="mnfst_cli" />
+      <OpenClawSetup {...defaultProps} apiKey="thk_clip_key" keyPrefix="thk_cli" />
     ));
     // Reveal key first
     fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
@@ -238,7 +238,7 @@ describe("OpenClawSetup", () => {
     await vi.waitFor(() => {
       expect(writeText).toHaveBeenCalled();
       const copiedText = writeText.mock.calls[0][0] as string;
-      expect(copiedText).toContain("mnfst_clip_key");
+      expect(copiedText).toContain("thk_clip_key");
       expect(copiedText).toContain("openclaw config set");
     });
   });

@@ -158,7 +158,11 @@ describe('Header - no hosted extras', () => {
     const { container } = render(() => <Header />);
     await new Promise((r) => setTimeout(r, 0));
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(container.querySelector('a[href*="github.com"]')).toBeNull();
+    // The only external link is the Docs one; no stars badge or repo widget.
+    const external = [...container.querySelectorAll('a[href^="http"]')].map((a) =>
+      a.getAttribute('href'),
+    );
+    expect(external).toEqual(['https://github.com/patrickbrandao/thinker/tree/main/docs']);
   });
 
   it('shows no plan badge in the user menu', async () => {
@@ -195,46 +199,24 @@ describe('Header - docs link', () => {
   const docsHref = (container: HTMLElement) =>
     container.querySelector('.header__docs-link')?.getAttribute('href');
 
-  it('links agent routing pages to routing docs', () => {
-    mockPathname = '/harnesses/my-agent/routing';
-    const { container } = render(() => <Header />);
-    expect(docsHref(container)).toBe('https://manifest.build/llm-gateway/docs/llm-gateway/');
+  it('links provider pages to the provider guides in the repository', () => {
+    for (const path of ['/providers/subscriptions', '/providers/byok', '/providers/local']) {
+      mockPathname = path;
+      const { container, unmount } = render(() => <Header />);
+      expect(docsHref(container)).toBe(
+        'https://github.com/patrickbrandao/thinker/tree/main/docs/providers',
+      );
+      unmount();
+    }
   });
 
-  it('links the current Limits route to limits docs', () => {
-    mockPathname = '/harnesses/my-agent/guardrails';
-    const { container } = render(() => <Header />);
-    expect(docsHref(container)).toBe('https://manifest.build/llm-gateway/docs/observability/');
-  });
-
-  it('keeps the legacy Limits route mapped to limits docs', () => {
-    mockPathname = '/harnesses/my-agent/limits';
-    const { container } = render(() => <Header />);
-    expect(docsHref(container)).toBe('https://manifest.build/llm-gateway/docs/observability/');
-  });
-
-  it('links provider pages to matching provider docs', () => {
-    mockPathname = '/providers/subscriptions';
-    const subscriptions = render(() => <Header />);
-    expect(docsHref(subscriptions.container)).toBe(
-      'https://manifest.build/llm-gateway/docs/providers/subscription-based-providers/',
-    );
-
-    mockPathname = '/providers/byok';
-    const byok = render(() => <Header />);
-    expect(docsHref(byok.container)).toBe(
-      'https://manifest.build/llm-gateway/docs/providers/api-key-providers/',
-    );
-
-    mockPathname = '/providers/local';
-    const local = render(() => <Header />);
-    expect(docsHref(local.container)).toBe('https://manifest.build/llm-gateway/docs/providers/local-models/');
-  });
-
-  it('falls back to introduction docs for unmapped pages', () => {
-    mockPathname = '/messages';
-    const { container } = render(() => <Header />);
-    expect(docsHref(container)).toBe('https://manifest.build/llm-gateway/docs/introduction/');
+  it('links every other page to the repository docs', () => {
+    for (const path of ['/harnesses/my-agent/routing', '/harnesses/my-agent/limits', '/messages']) {
+      mockPathname = path;
+      const { container, unmount } = render(() => <Header />);
+      expect(docsHref(container)).toBe('https://github.com/patrickbrandao/thinker/tree/main/docs');
+      unmount();
+    }
   });
 });
 

@@ -1,4 +1,8 @@
-import { isPlaygroundHeaderBlocked } from 'thinker-shared';
+import {
+  isPlaygroundHeaderBlocked,
+  isPlaygroundHeaderNameValid,
+  isPlaygroundHeaderValueValid,
+} from 'thinker-shared';
 
 /** One row of the Playground "Request headers" editor. */
 export interface HeaderEntry {
@@ -24,13 +28,13 @@ export const MAX_PERSISTED_NAME_LENGTH = 64;
  * - `control-chars`: the value has a control character (fetch rejects it).
  * - `unsupported-chars`: the value has a character above U+00FF, which an
  *   HTTP header can't carry.
+ * - `duplicate`: an earlier row already sends the same name (names are
+ *   case-insensitive and the first one wins).
+ * - `over-limit`: MAX_HEADER_ENTRIES headers are already being sent.
  */
-export type HeaderIssue = 'blocked' | 'invalid-name' | 'control-chars' | 'unsupported-chars';
+export type HeaderIssue =
+  'blocked' | 'invalid-name' | 'control-chars' | 'unsupported-chars' | 'duplicate' | 'over-limit';
 
-/** RFC 9110 `token`, the same pattern the server sanitizer enforces. */
-const HEADER_NAME_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
-/** C0 controls except horizontal tab, plus DEL. */
-const CONTROL_CHARS_RE = /[\u0000-\u0008\u000A-\u001F\u007F]/;
 /** Any UTF-16 code unit above U+00FF (includes emoji surrogate halves). */
 const UNSUPPORTED_CHARS_RE = /[\u0100-\uFFFF]/;
 
@@ -42,21 +46,22 @@ export function isBlockedHeaderKey(key: string): boolean {
   return isPlaygroundHeaderBlocked(key);
 }
 
-/** True when the trimmed name is a valid HTTP token. Empty names are not valid. */
+/** True when the trimmed name is a valid HTTP token (shared rule). Empty names are not valid. */
 export function isValidHeaderName(key: string): boolean {
-  return HEADER_NAME_RE.test(key.trim());
+  return isPlaygroundHeaderNameValid(key);
 }
 
 /** Problem with a header value that makes the server drop the header, if any. */
 export function headerValueIssue(value: string): 'control-chars' | 'unsupported-chars' | null {
-  if (CONTROL_CHARS_RE.test(value)) return 'control-chars';
-  if (UNSUPPORTED_CHARS_RE.test(value)) return 'unsupported-chars';
-  return null;
+  if (isPlaygroundHeaderValueValid(value)) return null;
+  return UNSUPPORTED_CHARS_RE.test(value) ? 'unsupported-chars' : 'control-chars';
 }
 
 /**
- * Why this row will be dropped by the server. Rows with an empty name report
- * no issue, so a freshly added row doesn't flash a warning.
+ * Why this row, on its own, will be dropped by the server. Rows with an empty
+ * name report no issue, so a freshly added row doesn't flash a warning.
+ * Problems that depend on the other rows (`duplicate`, `over-limit`) come from
+ * `headerEntryIssues`.
  */
 export function headerEntryIssue(entry: Pick<HeaderEntry, 'key' | 'value'>): HeaderIssue | null {
   const key = entry.key.trim();
@@ -67,25 +72,53 @@ export function headerEntryIssue(entry: Pick<HeaderEntry, 'key' | 'value'>): Hea
 }
 
 /**
+ * Walks the rows the way the server sanitizer does and returns what is sent
+ * plus, per row id, why a row is dropped. Rows with an empty name or value are
+ * neither sent nor flagged.
+ */
+function evaluateEntries(entries: HeaderEntry[]): {
+  record: Record<string, string>;
+  issues: Map<string, HeaderIssue>;
+} {
+  const record: Record<string, string> = {};
+  const issues = new Map<string, HeaderIssue>();
+  const seenLower = new Set<string>();
+  for (const e of entries) {
+    const key = e.key.trim();
+    const own = headerEntryIssue(e);
+    if (own) {
+      issues.set(e.id, own);
+      continue;
+    }
+    if (!key || !e.value) continue;
+    const lower = key.toLowerCase();
+    if (seenLower.has(lower)) {
+      issues.set(e.id, 'duplicate');
+      continue;
+    }
+    if (seenLower.size >= MAX_HEADER_ENTRIES) {
+      issues.set(e.id, 'over-limit');
+      continue;
+    }
+    seenLower.add(lower);
+    record[key] = e.value;
+  }
+  return { record, issues };
+}
+
+/** Per-row reasons the server will drop a row, including duplicates and rows past the cap. */
+export function headerEntryIssues(entries: HeaderEntry[]): Map<string, HeaderIssue> {
+  return evaluateEntries(entries).issues;
+}
+
+/**
  * Headers that will actually be forwarded: named, valued and free of issues.
  * Mirrors the server sanitizer: names are case-insensitive and the FIRST
  * occurrence wins, and at most MAX_HEADER_ENTRIES are kept. So the badge
  * count equals what reaches the provider.
  */
 export function toHeaderRecord(entries: HeaderEntry[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  const seenLower = new Set<string>();
-  for (const e of entries) {
-    if (seenLower.size >= MAX_HEADER_ENTRIES) break;
-    const key = e.key.trim();
-    if (!key || !e.value) continue;
-    if (headerEntryIssue(e)) continue;
-    const lower = key.toLowerCase();
-    if (seenLower.has(lower)) continue;
-    seenLower.add(lower);
-    out[key] = e.value;
-  }
-  return out;
+  return evaluateEntries(entries).record;
 }
 
 export function activeHeaderCount(entries: HeaderEntry[]): number {

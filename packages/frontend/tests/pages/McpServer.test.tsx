@@ -69,7 +69,7 @@ describe('MCP server page', () => {
   it('shows this install own endpoint, not a hardcoded host', async () => {
     const { container } = await renderReady();
     expect(container.textContent).toContain(`${window.location.origin}/api/v1/mcp`);
-    expect(container.textContent).not.toContain('app.manifest.build');
+    expect(container.textContent).not.toContain('thinker.example.com');
   });
 
   it('offers a tab per supported client, with Claude Code selected first', async () => {
@@ -80,7 +80,7 @@ describe('MCP server page', () => {
     expect(tabs).toEqual(['Claude Code', 'Codex', 'OpenCode', 'Other']);
     const active = container.querySelector('.panel__tab--active');
     expect(active?.textContent?.trim()).toBe('Claude Code');
-    expect(container.textContent).toContain('claude mcp add --transport http manifest');
+    expect(container.textContent).toContain('claude mcp add --transport http thinker');
   });
 
   it('swaps the snippet when another client tab is selected', async () => {
@@ -91,7 +91,7 @@ describe('MCP server page', () => {
       ) as HTMLElement;
 
     fireEvent.click(byLabel('Codex'));
-    expect(container.textContent).toContain('codex mcp add manifest --url');
+    expect(container.textContent).toContain('codex mcp add thinker --url');
     expect(container.textContent).not.toContain('claude mcp add --transport http');
     expect(byLabel('Codex').getAttribute('aria-selected')).toBe('true');
 
@@ -138,7 +138,9 @@ describe('MCP server page', () => {
   it('explains the read-only scope and links to the tool list', async () => {
     const { container } = await renderReady();
     expect(container.textContent).toContain('never sees the write');
-    const link = container.querySelector('a[href="https://manifest.build/llm-gateway/docs/integrations/mcp/"]');
+    const link = container.querySelector(
+      'a[href="https://github.com/patrickbrandao/thinker/tree/main/docs"]',
+    );
     expect(link).not.toBeNull();
     expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
   });

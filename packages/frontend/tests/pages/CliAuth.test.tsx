@@ -70,7 +70,7 @@ describe('CliAuth', () => {
     expect(
       screen.getByText(/full access to your workspace\. Revoke it any time/i),
     ).toBeTruthy();
-    expect(screen.getByText('mnfst logout')).toBeTruthy();
+    expect(screen.getByText('thinker logout')).toBeTruthy();
   });
 
   it('rejects a port below the unprivileged range', () => {

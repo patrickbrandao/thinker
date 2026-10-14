@@ -256,7 +256,7 @@ describe('Overview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem('manifest_global_group', 'provider');
+    localStorage.setItem('thinker_global_group', 'provider');
     sessionStorage.clear();
     const [ping, setPing] = createSignal(0);
     pingBox.read = ping;
@@ -1049,11 +1049,11 @@ describe('Overview', () => {
       });
       const select = container.querySelector('[data-testid="select"]') as HTMLSelectElement;
       await fireEvent.change(select, { target: { value: '24h' } });
-      expect(localStorage.getItem('manifest_chart_range')).toBe('24h');
+      expect(localStorage.getItem('thinker_chart_range')).toBe('24h');
     });
 
     it('reads persisted range from localStorage on mount', async () => {
-      localStorage.setItem('manifest_chart_range', '24h');
+      localStorage.setItem('thinker_chart_range', '24h');
       mockGetOverview.mockResolvedValue(overviewData);
       const { container } = render(() => <Overview />);
       await vi.waitFor(() => {
@@ -1072,7 +1072,7 @@ describe('Overview', () => {
     });
 
     it('ignores stale localStorage value and defaults to 30d', async () => {
-      localStorage.setItem('manifest_chart_range', '1h');
+      localStorage.setItem('thinker_chart_range', '1h');
       mockGetOverview.mockResolvedValue(overviewData);
       const { container } = render(() => <Overview />);
       await vi.waitFor(() => {
@@ -1082,7 +1082,7 @@ describe('Overview', () => {
     });
 
     it('offers every range, long windows included, with no plan lock', async () => {
-      localStorage.setItem('manifest_chart_range', '365d');
+      localStorage.setItem('thinker_chart_range', '365d');
       mockGetOverview.mockResolvedValue(overviewData);
 
       const { container } = render(() => <Overview />);
@@ -1099,7 +1099,7 @@ describe('Overview', () => {
       expect(longOptions.map((option) => option.disabled)).toEqual([false, false, false]);
 
       fireEvent.change(select, { target: { value: '90d' } });
-      expect(localStorage.getItem('manifest_chart_range')).toBe('90d');
+      expect(localStorage.getItem('thinker_chart_range')).toBe('90d');
     });
   });
 
@@ -1122,7 +1122,7 @@ describe('Overview', () => {
     });
 
     it('does not cascade when user has manually selected a range', async () => {
-      localStorage.setItem('manifest_chart_range', '30d');
+      localStorage.setItem('thinker_chart_range', '30d');
       const emptyUsageData = {
         ...overviewData,
         has_data: true,
@@ -1150,7 +1150,7 @@ describe('Overview', () => {
     it('cascades when localStorage contains an invalid range (not treated as user selection)', async () => {
       // An invalid stored range must NOT lock userSelectedRange=true;
       // the smart-range cascade must still kick in.
-      localStorage.setItem('manifest_chart_range', 'invalid');
+      localStorage.setItem('thinker_chart_range', 'invalid');
       const emptyUsageData = {
         ...overviewData,
         has_data: true,

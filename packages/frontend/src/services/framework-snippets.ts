@@ -68,9 +68,9 @@ export interface Snippet {
   code: string;
 }
 
-const STORAGE_KEY = 'manifest_setup_framework';
-const TOOLKIT_STORAGE_KEY = 'manifest_setup_toolkit';
-const OPENAI_LANG_STORAGE_KEY = 'manifest_setup_openai_lang';
+const STORAGE_KEY = 'thinker_setup_framework';
+const TOOLKIT_STORAGE_KEY = 'thinker_setup_toolkit';
+const OPENAI_LANG_STORAGE_KEY = 'thinker_setup_openai_lang';
 
 export function getStoredFramework(): FrameworkId {
   try {
@@ -298,13 +298,13 @@ export function getTypeScriptSnippets(
       code: `import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
-const manifest = createOpenAI({
+const thinker = createOpenAI({
   baseURL: "${baseUrl}",
   apiKey: "${apiKey}",${vercelHeaders}
 });
 
 const { text } = await generateText({
-  model: manifest("auto"),
+  model: thinker("auto"),
   prompt: "Hello",
 });`,
     },

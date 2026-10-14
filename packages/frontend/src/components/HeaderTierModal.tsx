@@ -280,7 +280,7 @@ const HeaderTierModal: Component<Props> = (props) => {
           value={headerKey()}
           onInput={setHeaderKey}
           suggestions={keySuggestions()}
-          placeholder="x-manifest-tier"
+          placeholder="x-thinker-tier"
           invalid={keyError() !== undefined}
           errorMessage={keyError()}
           freeFormHint={`Use "${headerKey().trim()}" as a custom header`}

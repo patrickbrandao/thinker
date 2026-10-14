@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
+import { THINKER_ERRORS_DOCS_BASE } from 'thinker-shared';
 
 const mockGetMessageDetails = vi.fn();
 const mockFlagMiscategorized = vi.fn();
@@ -137,7 +138,7 @@ describe('MessageDetails', () => {
     expect(container.querySelector('a[href^="/upgrade"]')).toBeNull();
   });
 
-  it('surfaces a Manifest config error as origin/type, not a provider fault', async () => {
+  it('surfaces a Thinker config error as origin/type, not a provider fault', async () => {
     mockGetMessageDetails.mockResolvedValue({
       message: {
         ...detailsResponse.message,
@@ -152,7 +153,7 @@ describe('MessageDetails', () => {
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Origin');
-      expect(container.textContent).toContain('Manifest · Setup');
+      expect(container.textContent).toContain('Thinker · Setup');
       expect(container.textContent).toContain('Missing API key');
     });
   });
@@ -165,7 +166,7 @@ describe('MessageDetails', () => {
         // The rendered text the caller actually saw — provider name and fix link
         // included — rather than a generic "Provider API key missing".
         error_message:
-          '[🦚 Manifest M100] No anthropic API key yet. Add one here: https://x/routing',
+          '[🦚 Thinker M100] No anthropic API key yet. Add one here: https://x/routing',
         error_code: 'M100',
         error_origin: 'config',
         error_class: 'no_provider_key',
@@ -177,7 +178,8 @@ describe('MessageDetails', () => {
     });
 
     const codeLink = container.querySelector('.msg-detail__error-code');
-    expect(codeLink?.getAttribute('href')).toBe('https://manifest.build/llm-gateway/docs/errors/M100/');
+    // The base URL is owned by thinker-shared.
+    expect(codeLink?.getAttribute('href')).toBe(`${THINKER_ERRORS_DOCS_BASE}/M100/`);
     expect(codeLink?.getAttribute('target')).toBe('_blank');
     expect(container.textContent).toContain('No anthropic API key yet');
   });
@@ -203,7 +205,7 @@ describe('MessageDetails', () => {
       message: {
         ...detailsResponse.message,
         status: 'error',
-        error_message: '[🦚 Manifest M300] `messages` array is required.',
+        error_message: '[🦚 Thinker M300] `messages` array is required.',
         error_code: 'M300',
         error_origin: 'request',
         error_class: 'invalid_request',
@@ -211,7 +213,7 @@ describe('MessageDetails', () => {
     });
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Manifest · Bad request');
+      expect(container.textContent).toContain('Thinker · Bad request');
     });
     expect(container.textContent).toContain('No provider was called.');
   });

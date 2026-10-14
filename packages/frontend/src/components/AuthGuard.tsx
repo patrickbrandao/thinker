@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from '@solidjs/router';
 import { Show, createEffect, type ParentComponent } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
 import { buildLoginRedirect } from '../services/auth-redirects.js';
+import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 
 const AuthGuard: ParentComponent = (props) => {
   const session = authClient.useSession();
@@ -24,11 +25,11 @@ const AuthGuard: ParentComponent = (props) => {
           <div class="auth-card" style="text-align: center;">
             <div class="auth-logo">
               <img
-                src="/logotype-white.svg"
-                alt="Manifest LLM Gateway"
+                src={THINKER_LOGO_URL}
+                alt="Thinker"
                 class="auth-logo__img auth-logo__img--light"
               />
-              <img src="/logotype-dark.svg" alt="" class="auth-logo__img auth-logo__img--dark" />
+              <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
             </div>
             <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm);">
               Loading...

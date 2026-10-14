@@ -37,5 +37,4 @@ npm run design:registry:check    # exit 1 if registry/* is stale (pre-commit run
   `theme.css`; it loads after the global styles.
 
 Related pieces of the machine: `scripts/check-design-tokens.mjs` (the diff
-check), the `.claude/settings.json` PostToolUse hook that runs it, and the
-`manifest-design-system` team skill.
+check) and the `.claude/settings.json` PostToolUse hook that runs it.

@@ -1,8 +1,17 @@
-import { Index, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
+import {
+  Index,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  type Component,
+} from 'solid-js';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
 import {
+  MAX_HEADER_ENTRIES,
   blankEntry,
-  headerEntryIssue,
+  headerEntryIssues,
   type HeaderEntry,
   type HeaderIssue,
 } from '../../services/playground-request-headers.js';
@@ -31,6 +40,10 @@ export function headerIssueMessage(name: string, issue: HeaderIssue): string {
       return `The value of ${name} contains control characters (such as line breaks), so the header will be dropped.`;
     case 'unsupported-chars':
       return `The value of ${name} contains characters a header can't carry (above U+00FF, such as emoji), so the header will be dropped.`;
+    case 'duplicate':
+      return `${name} is already set in an earlier row (names are case-insensitive), so this row will be dropped.`;
+    case 'over-limit':
+      return `Only ${MAX_HEADER_ENTRIES} headers are sent, so ${name} will be dropped.`;
   }
 }
 
@@ -60,13 +73,21 @@ const RequestHeadersPopover: Component<Props> = (props) => {
   // first pass (opening with existing rows) is silent: the warning is still
   // reachable through each input's aria-describedby.
   const [announcement, setAnnouncement] = createSignal('');
+  const issues = createMemo(() => headerEntryIssues(props.entries));
   let previousIssues: Map<string, HeaderIssue | null> | undefined;
   createEffect(() => {
+    // Closed: forget the last message so reopening doesn't replay a stale one.
+    if (!props.open) {
+      setAnnouncement('');
+      previousIssues = undefined;
+      return;
+    }
     const next = new Map<string, HeaderIssue | null>();
+    const current = issues();
     let message = '';
     let anyIssue = false;
     for (const e of props.entries) {
-      const issue = headerEntryIssue(e);
+      const issue = current.get(e.id) ?? null;
       next.set(e.id, issue);
       if (!issue) continue;
       anyIssue = true;
@@ -114,8 +135,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
 
         <p class="playground-headers__hint">
           Added to every provider call for this playground. Thinker-managed headers (Authorization,
-          Content-Type, x-thinker-*) are ignored. Only header names are saved in this browser;
-          values are kept until you leave the page.
+          Content-Type, x-thinker-*) are ignored, and so is any header the route's provider adapter
+          sets itself. Only header names are saved in this browser; values are kept until you leave
+          the page.
         </p>
 
         <Show when={props.entries.length === 0}>
@@ -127,8 +149,11 @@ const RequestHeadersPopover: Component<Props> = (props) => {
               recreate the row on every keystroke, dropping input focus. */}
           <Index each={props.entries}>
             {(entry) => {
-              const issue = () => headerEntryIssue(entry());
-              const nameIssue = () => issue() === 'blocked' || issue() === 'invalid-name';
+              const issue = () => issues().get(entry().id) ?? null;
+              const nameIssue = () => {
+                const i = issue();
+                return i !== null && i !== 'control-chars' && i !== 'unsupported-chars';
+              };
               const valueIssue = () =>
                 issue() === 'control-chars' || issue() === 'unsupported-chars';
               const warningId = () => headerWarningId(entry().id);
@@ -137,7 +162,10 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   class="playground-headers__row"
                   classList={{
                     'playground-headers__row--blocked': issue() === 'blocked',
-                    'playground-headers__row--invalid-name': issue() === 'invalid-name',
+                    'playground-headers__row--invalid-name':
+                      issue() === 'invalid-name' ||
+                      issue() === 'duplicate' ||
+                      issue() === 'over-limit',
                     'playground-headers__row--invalid-value': valueIssue(),
                   }}
                 >

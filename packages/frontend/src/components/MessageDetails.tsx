@@ -216,12 +216,12 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                                     'The LLM provider rejected the request.'}
                                   {m.error_origin === 'transport' &&
                                     'Network or connection failure.'}
-                                  {m.error_origin === 'config' && 'Manifest configuration issue.'}
+                                  {m.error_origin === 'config' && 'Thinker configuration issue.'}
                                   {m.error_origin === 'policy' &&
-                                    'A Manifest usage limit was reached.'}
-                                  {m.error_origin === 'internal' && 'An unexpected Manifest error.'}
+                                    'A Thinker usage limit was reached.'}
+                                  {m.error_origin === 'internal' && 'An unexpected Thinker error.'}
                                   {m.error_origin === 'request' &&
-                                    'Your agent sent a request Manifest could not route. No provider was called.'}
+                                    'Your agent sent a request Thinker could not route. No provider was called.'}
                                 </span>
                               </td>
                             </tr>

@@ -165,7 +165,7 @@ const ModelPickerModal: Component<Props> = (props) => {
     );
     if (!needsRefresh) return;
 
-    const refreshKey = `manifest:routing-model-refresh:${agentName}`;
+    const refreshKey = `thinker:routing-model-refresh:${agentName}`;
     const today = now.toDateString();
     if (sessionStorage.getItem(refreshKey) === today) return;
     sessionStorage.setItem(refreshKey, today);

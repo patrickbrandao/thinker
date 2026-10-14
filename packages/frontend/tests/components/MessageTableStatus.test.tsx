@@ -47,7 +47,7 @@ describe('MessageTable status labels', () => {
     expect(screen.queryByText('Upgrade plan')).toBeNull();
   });
 
-  it('keeps other Manifest policy failures labelled as custom limits', () => {
+  it('keeps other Thinker policy failures labelled as custom limits', () => {
     renderStatus({
       error_origin: 'policy',
       error_class: 'limit_exceeded',
@@ -56,6 +56,6 @@ describe('MessageTable status labels', () => {
 
     const link = screen.getByText('Failed') as HTMLAnchorElement;
     expect(link.getAttribute('href')).toBe('/harnesses/demo-agent/limits');
-    expect(link.getAttribute('title')).toBe('Manifest usage limit reached - open your limits');
+    expect(link.getAttribute('title')).toBe('Thinker usage limit reached - open your limits');
   });
 });

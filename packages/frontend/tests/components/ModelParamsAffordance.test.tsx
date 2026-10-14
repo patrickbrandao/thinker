@@ -61,65 +61,22 @@ describe('ModelParamsAffordance', () => {
     expect(findButton(container)).not.toBeNull();
   });
 
-  it('opens a model with no parameters and links to a prefilled request', async () => {
+  it('opens a model with no parameters without any outbound report link', async () => {
     mockGetSpecs.mockResolvedValue([]);
     const { container } = render(() => (
       <ModelParamsAffordance {...baseProps} provider="openai" model="gpt-4o" slotLabel="gpt-4o" />
     ));
-    const btn = container.querySelector(
-      'button[aria-label="Configure model parameters for gpt-4o"]',
-    ) as HTMLButtonElement;
-    expect(btn).not.toBeNull();
-
-    fireEvent.click(btn);
-
-    // Wait for specs to finish loading — the link only appears after loading is
-    // done. The desc text shows immediately but the empty-state link is gated
-    // behind Show when={!loading}.
-    const link = (await waitFor(() =>
-      screen.getByRole('link', { name: 'Request model parameters for gpt-4o' }),
-    )) as HTMLAnchorElement;
-    expect(screen.getByText('No parameter controls are published for gpt-4o yet.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
-    expect(link.textContent).toBe('Request parameters for this model');
-    const url = new URL(link.href);
-    expect(`${url.origin}${url.pathname}`).toBe(
-      'https://github.com/mnfst/modelparams.dev/issues/new',
-    );
-    expect(url.searchParams.get('template')).toBeNull();
-    expect(url.searchParams.get('title')).toBe('Parameters: openai/gpt-4o');
-    expect(url.searchParams.get('labels')).toBe('parameters');
-    expect(url.searchParams.get('body')).toBe(
-      'Model: `openai/gpt-4o`\nAuth type: API key\n\nPlease add the configurable request parameters for this model.',
-    );
-  });
-
-  it('prefills subscription auth type in the request body', async () => {
-    mockGetSpecs.mockResolvedValue([]);
-    const { container } = render(() => (
-      <ModelParamsAffordance
-        {...baseProps}
-        authType="subscription"
-        provider="anthropic"
-        model="claude-sonnet-4-6"
-        slotLabel="Claude Sonnet 4.6"
-      />
-    ));
-
     fireEvent.click(
       container.querySelector(
-        'button[aria-label="Configure model parameters for Claude Sonnet 4.6"]',
+        'button[aria-label="Configure model parameters for gpt-4o"]',
       ) as HTMLButtonElement,
     );
 
-    const link = (await waitFor(() =>
-      screen.getByRole('link', {
-        name: 'Request model parameters for Claude Sonnet 4.6',
-      }),
-    )) as HTMLAnchorElement;
-    const url = new URL(link.href);
-    expect(url.searchParams.get('title')).toBe('Parameters: anthropic/claude-sonnet-4-6');
-    expect(url.searchParams.get('body')).toContain('Auth type: Subscription');
+    await waitFor(() =>
+      expect(screen.getByText('This model has no configurable parameters.')).toBeTruthy(),
+    );
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('does not render the button when authType is missing', () => {
@@ -180,7 +137,6 @@ describe('ModelParamsAffordance', () => {
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     fireEvent.click(await waitFor(() => getByRole('button', { name: /Thinking mode/ })));
-    expect(getByRole('link', { name: 'Request parameters for deepseek-v4' })).toBeTruthy();
     fireEvent.click(getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
@@ -224,7 +180,7 @@ describe('ModelParamsAffordance', () => {
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     expect(
-      await findByText('No parameter controls are published for deepseek-v4 yet.'),
+      await findByText('No parameter controls are available for deepseek-v4.'),
     ).toBeTruthy();
     expect(queryByRole('button', { name: 'Save' })).toBeNull();
   });
@@ -235,7 +191,7 @@ describe('ModelParamsAffordance', () => {
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     expect(
-      await findByText('No parameter controls are published for deepseek-v4 yet.'),
+      await findByText('No parameter controls are available for deepseek-v4.'),
     ).toBeTruthy();
   });
 

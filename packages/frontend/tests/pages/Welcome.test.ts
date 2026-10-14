@@ -109,7 +109,7 @@ describe('onboarding activation helpers', () => {
 
     markOnboardingDone('user-1');
 
-    expect(calls).toEqual([['manifest_onboarding_done_user-1', '1']]);
+    expect(calls).toEqual([['thinker_onboarding_done_user-1', '1']]);
     vi.unstubAllGlobals();
   });
 

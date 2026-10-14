@@ -193,7 +193,7 @@ describe('RequestDrawer', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText('Manifest rejected this request before contacting a provider.'),
+        screen.getByText('Thinker rejected this request before contacting a provider.'),
       ).toBeDefined(),
     );
     expect(container.querySelector('.attempt-item')).toBeNull();

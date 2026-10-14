@@ -881,6 +881,34 @@ describe('Routing page', () => {
     expect(screen.queryByText(/openrouter/i)).toBeNull();
   });
 
+  it('explains the empty pricing data when catalog sync is turned off', async () => {
+    mockGetPricingHealth.mockResolvedValue({
+      model_count: 0,
+      last_fetched_at: null,
+      sync_enabled: false,
+    });
+    render(() => <Routing />);
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith(
+        'Model pricing data is unavailable because catalog sync is turned off (THINKER_CATALOG_SYNC). Model cost details may be incomplete.',
+      );
+    });
+  });
+
+  it('keeps the generic pricing warning when catalog sync is on', async () => {
+    mockGetPricingHealth.mockResolvedValue({
+      model_count: 0,
+      last_fetched_at: null,
+      sync_enabled: true,
+    });
+    render(() => <Routing />);
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith(
+        'Model pricing data is unavailable. Model cost details may be incomplete.',
+      );
+    });
+  });
+
   it('does not show a pricing warning when pricing data is loaded', async () => {
     render(() => <Routing />);
     await waitFor(() => {

@@ -104,10 +104,10 @@ const Register: Component = () => {
 
   return (
     <>
-      <Title>Sign Up - Manifest</Title>
+      <Title>Sign Up - Thinker</Title>
       <Meta
         name="description"
-        content="Create a Manifest account to start monitoring your AI harnesses."
+        content="Create a Thinker account to start monitoring your AI harnesses."
       />
       <Show
         when={!emailSent()}
@@ -232,26 +232,6 @@ const Register: Component = () => {
             {loading() ? <span class="spinner" /> : 'Create account'}
           </button>
         </form>
-        <p class="auth-terms">
-          By signing up, you agree to our{' '}
-          <a
-            href="https://manifest.build/terms"
-            class="auth-terms__link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Terms
-          </a>{' '}
-          and{' '}
-          <a
-            href="https://manifest.build/privacy"
-            class="auth-terms__link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Privacy Policy
-          </a>
-        </p>
         <div class="auth-footer">
           <span>Already have an account? </span>
           <A href={appendSearch('/login', location.search)} class="auth-footer__link">

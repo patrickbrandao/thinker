@@ -1,4 +1,4 @@
-const PREFIX = 'manifest_onboarding_done_';
+const PREFIX = 'thinker_onboarding_done_';
 
 export function markOnboardingDone(userId: string): void {
   try {

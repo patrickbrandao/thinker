@@ -1349,7 +1349,7 @@ describe('FallbackList', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText('No parameter controls are published for gpt-4o yet.'),
+          screen.getByText('No parameter controls are available for gpt-4o.'),
         ).toBeTruthy();
       });
     });

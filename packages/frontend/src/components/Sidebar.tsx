@@ -118,7 +118,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
         Subscriptions
       </A>
 
-      {/* Integrations: surfaces that drive Manifest from outside the dashboard.
+      {/* Integrations: surfaces that drive Thinker from outside the dashboard.
           The "New" pills are a showcase device, not structure — delete the two
           spans once these stop being new. n8n joins here when it gets a page. */}
       <div class="sidebar__section-label">INTEGRATIONS</div>

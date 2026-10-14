@@ -80,9 +80,7 @@ const SetupModal: Component<{
               </svg>
             </button>
           </div>
-          <p class="modal-card__desc">
-            Connect your harness to Manifest to start routing requests.
-          </p>
+          <p class="modal-card__desc">Connect your harness to Thinker to start routing requests.</p>
 
           <Show
             when={!apiKeyData.error || !!props.apiKey}

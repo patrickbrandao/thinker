@@ -136,8 +136,8 @@ const Login: Component = () => {
 
   return (
     <>
-      <Title>Sign In - Manifest</Title>
-      <Meta name="description" content="Sign in to Manifest to monitor your AI harnesses." />
+      <Title>Sign In - Thinker</Title>
+      <Meta name="description" content="Sign in to Thinker to monitor your AI harnesses." />
       <div class="auth-header">
         <h1 class="auth-header__title">Welcome back</h1>
         <p class="auth-header__subtitle">Take control of your AI harness costs</p>

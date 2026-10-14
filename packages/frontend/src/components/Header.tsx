@@ -13,8 +13,12 @@ import {
 } from '../services/connection-breadcrumb-store.js';
 import { providerIcon } from './ProviderIcon.jsx';
 import DuplicateAgentModal from './DuplicateAgentModal.jsx';
-
-const DOCS_BASE_URL = 'https://manifest.build/llm-gateway/docs';
+import {
+  THINKER_LOGO_URL,
+  THINKER_LOGO_DARK_URL,
+  THINKER_DOCS_URL,
+  THINKER_PROVIDERS_DOCS_URL,
+} from '../services/thinker-links.js';
 
 interface HeaderProps {
   showMobileNavToggle?: boolean;
@@ -33,20 +37,8 @@ const Header: Component<HeaderProps> = (props) => {
 
   const user = () => session()?.data?.user;
   const effectiveName = () => user()?.name ?? 'User';
-  const docsUrl = () => {
-    const p = location.pathname;
-    if (p.includes('/guardrails') || p.includes('/limits'))
-      return `${DOCS_BASE_URL}/observability/`;
-    if (p.includes('/routing')) return `${DOCS_BASE_URL}/llm-gateway/`;
-    if (p.startsWith('/providers/subscriptions')) {
-      return `${DOCS_BASE_URL}/providers/subscription-based-providers/`;
-    }
-    if (p.startsWith('/providers/usage-based'))
-      return `${DOCS_BASE_URL}/providers/api-key-providers/`;
-    if (p.startsWith('/providers/local')) return `${DOCS_BASE_URL}/providers/local-models/`;
-    if (p.includes('/providers')) return `${DOCS_BASE_URL}/providers/api-key-providers/`;
-    return `${DOCS_BASE_URL}/introduction/`;
-  };
+  const docsUrl = () =>
+    location.pathname.startsWith('/providers') ? THINKER_PROVIDERS_DOCS_URL : THINKER_DOCS_URL;
 
   const initials = () => {
     const name = effectiveName();
@@ -80,11 +72,11 @@ const Header: Component<HeaderProps> = (props) => {
       <div class="header__left">
         <A href="/" class="header__logo">
           <img
-            src="/logotype-white.svg"
-            alt="Manifest LLM Gateway"
+            src={THINKER_LOGO_URL}
+            alt="Thinker"
             class="header__logo-img header__logo-img--light"
           />
-          <img src="/logotype-dark.svg" alt="" class="header__logo-img header__logo-img--dark" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" class="header__logo-img header__logo-img--dark" />
         </A>
         <Show when={getAgentName()}>
           <span class="header__separator">/</span>

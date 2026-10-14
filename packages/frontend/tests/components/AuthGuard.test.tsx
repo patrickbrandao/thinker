@@ -35,7 +35,7 @@ describe('AuthGuard', () => {
   it('ignores a leftover discovery marker and renders the app (no post-signup detour)', async () => {
     // Builds before #13 stored this marker after signup/setup to force a
     // questionnaire. It must no longer route anyone anywhere.
-    localStorage.setItem('manifest_discovery_pending_u1', '/welcome');
+    localStorage.setItem('thinker_discovery_pending_u1', '/welcome');
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
@@ -77,7 +77,7 @@ describe('AuthGuard', () => {
   });
 
   it('renders children after onboarding without any plan redirect', async () => {
-    localStorage.setItem('manifest_onboarding_done_u1', '1');
+    localStorage.setItem('thinker_onboarding_done_u1', '1');
     render(() => (
       <AuthGuard>
         <span>Protected content</span>
