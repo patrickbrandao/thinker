@@ -34,8 +34,10 @@ vi.mock('../../src/services/toast-store.js', () => ({
 }));
 
 const mockCheckSocialProviders = vi.fn().mockResolvedValue([]);
+const mockCheckSignupEnabled = vi.fn().mockResolvedValue(true);
 vi.mock('../../src/services/setup-status.js', () => ({
   checkSocialProviders: (...args: unknown[]) => mockCheckSocialProviders(...args),
+  checkSignupEnabled: (...args: unknown[]) => mockCheckSignupEnabled(...args),
 }));
 
 import Login from '../../src/pages/Login';
@@ -48,6 +50,7 @@ describe('Login', () => {
     mockLocationSearch = '';
     mockSignInEmail.mockResolvedValue({});
     mockCheckSocialProviders.mockResolvedValue([]);
+    mockCheckSignupEnabled.mockResolvedValue(true);
     localStorage.clear();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
   });
@@ -90,16 +93,38 @@ describe('Login', () => {
     });
   });
 
-  it('has link to register', () => {
+  it('has link to register when sign-up is enabled', async () => {
     render(() => <Login />);
-    expect(screen.getByText('Sign up')).toBeDefined();
+    await vi.waitFor(() => expect(screen.getByText('Sign up')).toBeDefined());
   });
 
-  it('preserves the query string on the register link', () => {
+  it('preserves the query string on the register link', async () => {
     mockLocationSearch = '?redirect=%2Fmessages';
     const { container } = render(() => <Login />);
-    expect(container.querySelector('a[href="/register?redirect=%2Fmessages"]')).not.toBeNull();
+    await vi.waitFor(() =>
+      expect(container.querySelector('a[href="/register?redirect=%2Fmessages"]')).not.toBeNull(),
+    );
   });
+
+  it('hides the sign-up link when sign-up is disabled', async () => {
+    mockCheckSignupEnabled.mockResolvedValue(false);
+    const { container } = render(() => <Login />);
+    await vi.waitFor(() => expect(mockCheckSignupEnabled).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(container.querySelector('a[href^="/register"]')).toBeNull();
+    expect(screen.queryByText('Sign up')).toBeNull();
+  });
+
+  it.each(['signup_disabled', 'unable_to_create_user'])(
+    'explains a closed sign-up for the social callback error %s',
+    async (code) => {
+      mockSearchParams = { error: code };
+      render(() => <Login />);
+      await vi.waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toContain('does not allow sign-up');
+      });
+    },
+  );
 
   it('has forgot password link', () => {
     render(() => <Login />);

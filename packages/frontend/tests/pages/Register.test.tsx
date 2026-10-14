@@ -6,6 +6,8 @@ const mockSignInSocial = vi.fn().mockResolvedValue({});
 const mockSendVerificationEmail = vi.fn().mockResolvedValue({});
 const mockCheckSocialProviders = vi.fn().mockResolvedValue([]);
 let mockLocationSearch = '';
+const mockNavigate = vi.fn();
+const mockCheckSignupEnabled = vi.fn().mockResolvedValue(true);
 
 vi.mock('@solidjs/router', () => ({
   A: (props: any) => (
@@ -14,6 +16,7 @@ vi.mock('@solidjs/router', () => ({
     </a>
   ),
   useLocation: () => ({ search: mockLocationSearch }),
+  useNavigate: () => mockNavigate,
   // SocialButtons reads the query to build its callbacks.
   useSearchParams: () => [{}],
 }));
@@ -33,6 +36,7 @@ vi.mock('../../src/services/auth-client.js', () => ({
 
 vi.mock('../../src/services/setup-status.js', () => ({
   checkSocialProviders: (...args: unknown[]) => mockCheckSocialProviders(...args),
+  checkSignupEnabled: (...args: unknown[]) => mockCheckSignupEnabled(...args),
 }));
 
 import Register from '../../src/pages/Register';
@@ -44,8 +48,25 @@ describe('Register', () => {
     mockSignUpEmail.mockResolvedValue({});
     mockSignInSocial.mockResolvedValue({});
     mockCheckSocialProviders.mockResolvedValue([]);
+    mockCheckSignupEnabled.mockResolvedValue(true);
     mockLocationSearch = '';
     localStorage.clear();
+  });
+
+  it('redirects to /login, keeping the query, when sign-up is disabled', async () => {
+    mockCheckSignupEnabled.mockResolvedValue(false);
+    mockLocationSearch = '?redirect=%2Fmessages';
+    render(() => <Register />);
+    await vi.waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/login?redirect=%2Fmessages', { replace: true });
+    });
+    expect(mockCheckSocialProviders).not.toHaveBeenCalled();
+  });
+
+  it('stays on the page when sign-up is enabled', async () => {
+    render(() => <Register />);
+    await vi.waitFor(() => expect(mockCheckSocialProviders).toHaveBeenCalled());
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('renders create account heading', () => {

@@ -87,6 +87,12 @@
   color: hsl(var(--foreground));
 }
 
+.auth-form__hint {
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+}
+
 .auth-form__input {
   height: 2.75rem;
   padding: 0 var(--gap-md);
