@@ -70,7 +70,7 @@ export interface ProviderEndpoint {
   forwardResponsesStream?: boolean;
   /** Map Chat Completions token caps to `max_output_tokens`. */
   acceptsMaxOutputTokens?: boolean;
-  /** Send Manifest's stable `prompt_cache_key` when the caller did not set one. */
+  /** Send Thinker's stable `prompt_cache_key` when the caller did not set one. */
   acceptsPromptCacheKey?: boolean;
 }
 
@@ -566,8 +566,8 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildHeaders: (apiKey: string) => ({
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://manifest.build',
-      'X-Title': 'Manifest',
+      'HTTP-Referer': 'https://github.com/patrickbrandao/thinker',
+      'X-Title': 'Thinker',
     }),
     buildPath: () => '/api/v1/chat/completions',
     format: 'openai',

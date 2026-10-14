@@ -196,12 +196,12 @@ resource "google_cloud_run_v2_service" "thinker" {
       }
 
       env {
-        name  = "REQUEST_RECORDING_STORAGE"
+        name  = "THINKER_RECORDING_STORAGE"
         value = "filesystem"
       }
 
       env {
-        name  = "REQUEST_RECORDING_FILESYSTEM_PATH"
+        name  = "THINKER_RECORDING_FILESYSTEM_PATH"
         value = "/data/request-recordings"
       }
 
@@ -300,7 +300,7 @@ resource "terraform_data" "set_runtime_urls" {
   ]
 
   provisioner "local-exec" {
-    command = "gcloud run services update ${google_cloud_run_v2_service.thinker.name} --project ${var.project_id} --region ${var.region} --update-env-vars 'BETTER_AUTH_URL=${google_cloud_run_v2_service.thinker.uri},REQUEST_RECORDING_STORAGE=filesystem,REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings' --quiet"
+    command = "gcloud run services update ${google_cloud_run_v2_service.thinker.name} --project ${var.project_id} --region ${var.region} --update-env-vars 'BETTER_AUTH_URL=${google_cloud_run_v2_service.thinker.uri},THINKER_RECORDING_STORAGE=filesystem,THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings' --quiet"
   }
 
   depends_on = [

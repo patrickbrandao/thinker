@@ -12,7 +12,7 @@ export class AgentRecordingConfigService {
 
   async isRecording(agentId: string | null | undefined): Promise<boolean> {
     if (!agentId) return false;
-    // This setting controls whether Manifest stores request and response bodies.
+    // This setting controls whether Thinker stores request and response bodies.
     // Read it fresh so a choice changed on one replica applies to all replicas.
     const agent = await this.agentRepo.findOne({
       where: { id: agentId },

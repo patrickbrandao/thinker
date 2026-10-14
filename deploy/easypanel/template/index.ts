@@ -37,8 +37,8 @@ export function generate(input: Input): Output {
         "SEED_DATA=false",
         "DB_POOL_MAX=10",
         "AUTH_DB_POOL_MAX=5",
-        "REQUEST_RECORDING_STORAGE=filesystem",
-        "REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings",
+        "THINKER_RECORDING_STORAGE=filesystem",
+        "THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings",
       ].join("\n"),
       mounts: [
         {

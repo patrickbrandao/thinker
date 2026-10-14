@@ -3,7 +3,7 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService, formatNotificationTimestamp } from './notification-log.service';
-import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
+import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
 import {
   computePeriodBoundaries,
   computePeriodResetDate,
@@ -35,7 +35,7 @@ export class LimitCheckService {
     private readonly rulesService: NotificationRulesService,
     private readonly emailService: NotificationEmailService,
     private readonly emailProviderConfig: EmailProviderConfigService,
-    private readonly runtime: ManifestRuntimeService,
+    private readonly runtime: ThinkerRuntimeService,
     private readonly notificationLog: NotificationLogService,
   ) {}
 

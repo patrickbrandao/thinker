@@ -3,7 +3,7 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
+import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
 
 describe('LimitCheckService', () => {
   let service: LimitCheckService;
@@ -51,7 +51,7 @@ describe('LimitCheckService', () => {
       rulesService,
       emailService,
       emailProviderConfig,
-      mockRuntime as unknown as ManifestRuntimeService,
+      mockRuntime as unknown as ThinkerRuntimeService,
       notificationLog,
     );
   });

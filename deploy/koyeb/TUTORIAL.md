@@ -33,7 +33,7 @@ openssl rand -hex 32
 Open the Koyeb deploy link:
 
 ```text
-https://app.koyeb.com/deploy?type=docker&image=docker.io%2Ftmsoftbrasil%2Fthinker%3A0.1&name=thinker&service_type=web&ports=2099%3Bhttp%3B%2F&env%5BPORT%5D=2099&env%5BDATABASE_URL%5D=postgres%3A%2F%2FUSER%3APASSWORD%40HOST%2FDB%3Fsslmode%3Drequire&env%5BBETTER_AUTH_SECRET%5D=replace-with-openssl-rand-hex-32&env%5BTHINKER_ENCRYPTION_KEY%5D=replace-with-different-openssl-rand-hex-32&env%5BBETTER_AUTH_URL%5D=https%3A%2F%2F%7B%7B+KOYEB_PUBLIC_DOMAIN+%7D%7D&env%5BBIND_ADDRESS%5D=0.0.0.0&env%5BDB_POOL_MAX%5D=8&env%5BAUTH_DB_POOL_MAX%5D=4&env%5BREQUEST_RECORDING_STORAGE%5D=s3&env%5BREQUEST_RECORDING_S3_BUCKET%5D=replace-with-private-bucket&env%5BREQUEST_RECORDING_S3_ENDPOINT%5D=https%3A%2F%2Fs3.example.com&env%5BREQUEST_RECORDING_S3_REGION%5D=us-east-1&env%5BREQUEST_RECORDING_S3_ACCESS_KEY_ID%5D=replace-with-limited-access-key&env%5BREQUEST_RECORDING_S3_SECRET_ACCESS_KEY%5D=replace-with-secret-key&env%5BREQUEST_RECORDING_S3_FORCE_PATH_STYLE%5D=false
+https://app.koyeb.com/deploy?type=docker&image=docker.io%2Ftmsoftbrasil%2Fthinker%3A0.1&name=thinker&service_type=web&ports=2099%3Bhttp%3B%2F&env%5BPORT%5D=2099&env%5BDATABASE_URL%5D=postgres%3A%2F%2FUSER%3APASSWORD%40HOST%2FDB%3Fsslmode%3Drequire&env%5BBETTER_AUTH_SECRET%5D=replace-with-openssl-rand-hex-32&env%5BTHINKER_ENCRYPTION_KEY%5D=replace-with-different-openssl-rand-hex-32&env%5BBETTER_AUTH_URL%5D=https%3A%2F%2F%7B%7B+KOYEB_PUBLIC_DOMAIN+%7D%7D&env%5BBIND_ADDRESS%5D=0.0.0.0&env%5BDB_POOL_MAX%5D=8&env%5BAUTH_DB_POOL_MAX%5D=4&env%5BTHINKER_RECORDING_STORAGE%5D=s3&env%5BTHINKER_RECORDING_S3_BUCKET%5D=replace-with-private-bucket&env%5BTHINKER_RECORDING_S3_ENDPOINT%5D=https%3A%2F%2Fs3.example.com&env%5BTHINKER_RECORDING_S3_REGION%5D=us-east-1&env%5BTHINKER_RECORDING_S3_ACCESS_KEY_ID%5D=replace-with-limited-access-key&env%5BTHINKER_RECORDING_S3_SECRET_ACCESS_KEY%5D=replace-with-secret-key&env%5BTHINKER_RECORDING_S3_FORCE_PATH_STYLE%5D=false
 ```
 
 In the deploy form:
@@ -41,9 +41,9 @@ In the deploy form:
 - Replace `DATABASE_URL` with your Koyeb Postgres connection string.
 - Replace `BETTER_AUTH_SECRET` with the first generated secret.
 - Replace `THINKER_ENCRYPTION_KEY` with the second generated secret.
-- Replace `REQUEST_RECORDING_S3_BUCKET`, `REQUEST_RECORDING_S3_ENDPOINT`, `REQUEST_RECORDING_S3_REGION`, `REQUEST_RECORDING_S3_ACCESS_KEY_ID`, and `REQUEST_RECORDING_S3_SECRET_ACCESS_KEY` with your private bucket settings. Leave the endpoint blank only for AWS S3.
+- Replace `THINKER_RECORDING_S3_BUCKET`, `THINKER_RECORDING_S3_ENDPOINT`, `THINKER_RECORDING_S3_REGION`, `THINKER_RECORDING_S3_ACCESS_KEY_ID`, and `THINKER_RECORDING_S3_SECRET_ACCESS_KEY` with your private bucket settings. Leave the endpoint blank only for AWS S3.
 - Leave `BETTER_AUTH_URL` as `https://{{ KOYEB_PUBLIC_DOMAIN }}`.
-- Leave `PORT`, `BIND_ADDRESS`, `DB_POOL_MAX`, `AUTH_DB_POOL_MAX`, and `REQUEST_RECORDING_STORAGE=s3` unchanged for a single-instance deploy. Set `REQUEST_RECORDING_S3_FORCE_PATH_STYLE=true` only if your object-storage provider requires path-style URLs.
+- Leave `PORT`, `BIND_ADDRESS`, `DB_POOL_MAX`, `AUTH_DB_POOL_MAX`, and `THINKER_RECORDING_STORAGE=s3` unchanged for a single-instance deploy. Set `THINKER_RECORDING_S3_FORCE_PATH_STYLE=true` only if your object-storage provider requires path-style URLs.
 
 The button deploys `docker.io/tmsoftbrasil/thinker:0.1` and exposes port `2099` over HTTP.
 

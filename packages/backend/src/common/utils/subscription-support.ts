@@ -10,6 +10,6 @@ export function isSupportedSubscriptionProvider(provider: string): boolean {
   return supportsSubscriptionProvider(provider);
 }
 
-export function isManifestUsableProvider(record: ProviderAuthRecord): boolean {
+export function isThinkerUsableProvider(record: ProviderAuthRecord): boolean {
   return record.auth_type !== 'subscription' || isSupportedSubscriptionProvider(record.provider);
 }

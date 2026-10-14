@@ -1051,13 +1051,13 @@ describe('gemini-subscription endpoint', () => {
 describe('buildProviderExtraHeaders', () => {
   it('returns x-grok-conv-id for xai', () => {
     expect(buildProviderExtraHeaders('xai', 'sess-abc')).toEqual({
-      'x-grok-conv-id': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-grok-conv-id': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
 
   it('returns x-session-id for openrouter', () => {
     expect(buildProviderExtraHeaders('openrouter', 'ba44c58a-a1f5-4cc7-bc2a-9394d266cc2b')).toEqual(
-      { 'x-session-id': expect.stringMatching(/^manifest-[a-f0-9]{32}$/) },
+      { 'x-session-id': expect.stringMatching(/^thinker-[a-f0-9]{32}$/) },
     );
   });
 
@@ -1068,7 +1068,7 @@ describe('buildProviderExtraHeaders', () => {
 
   it('is case-insensitive for provider name', () => {
     expect(buildProviderExtraHeaders('OpenRouter', 'sess-xyz')).toEqual({
-      'x-session-id': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-session-id': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
 
@@ -1080,25 +1080,25 @@ describe('buildProviderExtraHeaders', () => {
 
   it('returns x-opencode-session for opencode-go and opencode-zen', () => {
     expect(buildProviderExtraHeaders('opencode-go', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
     expect(buildProviderExtraHeaders('opencode-zen', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
 
   it('resolves registry aliases (opencodego / opencodezen) to the canonical builder', () => {
     expect(buildProviderExtraHeaders('opencodego', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
     expect(buildProviderExtraHeaders('opencodezen', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
 
   it('falls back to the agent scope key for opencode when no session key exists', () => {
     expect(buildProviderExtraHeaders('opencode-go', undefined, 'tenant-1\u0000agent-1')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^manifest-[a-f0-9]{32}$/),
+      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
 

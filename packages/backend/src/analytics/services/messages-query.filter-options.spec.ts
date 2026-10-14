@@ -5,7 +5,7 @@ import { computeCutoff } from '../../common/utils/postgres-sql';
  * Filter options for the Requests log.
  *
  * The Model dropdown is built from the distinct-model scan over
- * `agent_messages`, which by construction cannot see a request Manifest blocked
+ * `agent_messages`, which by construction cannot see a request Thinker blocked
  * before any provider call — that request has no attempt, and the log renders
  * its `requests.requested_model` in the Model column. Those models are folded
  * in separately so the dropdown can offer every value the column shows.

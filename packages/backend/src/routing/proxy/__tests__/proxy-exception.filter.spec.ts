@@ -35,7 +35,7 @@ function chatHost(body: Record<string, unknown> = {}) {
 describe('ProxyExceptionFilter', () => {
   let filter: ProxyExceptionFilter;
   let config: jest.Mocked<ConfigService>;
-  let recordManifestBlockedRequest: jest.Mock;
+  let recordThinkerBlockedRequest: jest.Mock;
 
   beforeEach(() => {
     config = {
@@ -45,9 +45,9 @@ describe('ProxyExceptionFilter', () => {
       }),
     } as unknown as jest.Mocked<ConfigService>;
 
-    recordManifestBlockedRequest = jest.fn().mockResolvedValue(undefined);
+    recordThinkerBlockedRequest = jest.fn().mockResolvedValue(undefined);
     filter = new ProxyExceptionFilter(config, {
-      recordManifestBlockedRequest,
+      recordThinkerBlockedRequest,
     } as unknown as ProxyMessageRecorder);
   });
 
@@ -113,7 +113,7 @@ describe('ProxyExceptionFilter', () => {
       filter.catch(new UnauthorizedException('Authorization header required'), host);
 
       const content = res.json.mock.calls[0][0].choices[0].message.content;
-      expect(content).toContain('[🦚 Manifest M001]');
+      expect(content).toContain('[🦚 Thinker M001]');
       expect(content).toContain('Authorization: Bearer');
       expect(content).toContain('x-api-key');
     });
@@ -124,7 +124,7 @@ describe('ProxyExceptionFilter', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       const content = res.json.mock.calls[0][0].choices[0].message.content;
-      expect(content).toContain('[🦚 Manifest M006]');
+      expect(content).toContain('[🦚 Thinker M006]');
       expect(content).toContain('Authorization and x-api-key headers carry different credentials');
     });
   });
@@ -132,7 +132,7 @@ describe('ProxyExceptionFilter', () => {
   describe('recording an expired key (M004)', () => {
     it('records the rejection against the agent the guard resolved', () => {
       const { host, req } = chatHost({ model: 'gpt-4o' });
-      req.manifestErrorContext = {
+      req.thinkerErrorContext = {
         tenantId: 't-1',
         agentId: 'a-1',
         agentName: 'Fireplace',
@@ -141,8 +141,8 @@ describe('ProxyExceptionFilter', () => {
 
       filter.catch(new UnauthorizedException('API key expired'), host);
 
-      expect(recordManifestBlockedRequest).toHaveBeenCalledWith(
-        req.manifestErrorContext,
+      expect(recordThinkerBlockedRequest).toHaveBeenCalledWith(
+        req.thinkerErrorContext,
         expect.objectContaining({
           httpStatus: 401,
           errorCode: 'M004',
@@ -155,7 +155,7 @@ describe('ProxyExceptionFilter', () => {
 
     it('stores the same text the caller saw, dashboard link included', () => {
       const { host, req, res } = chatHost();
-      req.manifestErrorContext = {
+      req.thinkerErrorContext = {
         tenantId: 't-1',
         agentId: 'a-1',
         agentName: 'Fireplace',
@@ -164,7 +164,7 @@ describe('ProxyExceptionFilter', () => {
 
       filter.catch(new UnauthorizedException('API key expired'), host);
 
-      const recorded = recordManifestBlockedRequest.mock.calls[0][1].errorMessage as string;
+      const recorded = recordThinkerBlockedRequest.mock.calls[0][1].errorMessage as string;
       const shown = res.json.mock.calls[0][0].choices[0].message.content as string;
       expect(recorded).toBe(shown);
       // A row that doesn't say where to generate a new key isn't actionable.
@@ -174,25 +174,25 @@ describe('ProxyExceptionFilter', () => {
     it('records nothing when the key never resolved to an agent', () => {
       const { host } = chatHost();
       filter.catch(new UnauthorizedException('API key expired'), host);
-      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
+      expect(recordThinkerBlockedRequest).not.toHaveBeenCalled();
     });
 
     it('records nothing for auth failures that cannot be attributed', () => {
       const { host, req } = chatHost();
-      req.manifestErrorContext = {
+      req.thinkerErrorContext = {
         tenantId: 't-1',
         agentId: 'a-1',
         agentName: 'Fireplace',
         userId: null,
       };
       filter.catch(new UnauthorizedException('Invalid API key'), host);
-      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
+      expect(recordThinkerBlockedRequest).not.toHaveBeenCalled();
     });
 
     it('swallows a recorder failure rather than turning a 401 into a 500', () => {
-      recordManifestBlockedRequest.mockRejectedValueOnce(new Error('db down'));
+      recordThinkerBlockedRequest.mockRejectedValueOnce(new Error('db down'));
       const { host, req, res } = chatHost();
-      req.manifestErrorContext = {
+      req.thinkerErrorContext = {
         tenantId: 't-1',
         agentId: 'a-1',
         agentName: 'Fireplace',
@@ -205,7 +205,7 @@ describe('ProxyExceptionFilter', () => {
 
     it('omits a non-string model rather than persisting garbage', () => {
       const { host, req } = chatHost({ model: 42 });
-      req.manifestErrorContext = {
+      req.thinkerErrorContext = {
         tenantId: 't-1',
         agentId: 'a-1',
         agentName: 'Fireplace',
@@ -214,7 +214,7 @@ describe('ProxyExceptionFilter', () => {
 
       filter.catch(new UnauthorizedException('API key expired'), host);
 
-      expect(recordManifestBlockedRequest).toHaveBeenCalledWith(
+      expect(recordThinkerBlockedRequest).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ model: undefined }),
       );
@@ -297,9 +297,11 @@ describe('ProxyExceptionFilter', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       const content = res.json.mock.calls[0][0].choices[0].message.content;
-      expect(content).toContain('[🦚 Manifest M500]');
+      expect(content).toContain('[🦚 Thinker M500]');
       expect(content).toContain('Something broke on our end');
-      expect(content).toContain('https://manifest.build/llm-gateway/docs/errors/M500/');
+      expect(content).toContain(
+        'https://github.com/patrickbrandao/thinker/blob/main/docs/erros.md#m500',
+      );
     });
 
     it('converts unknown auth message to friendly message', () => {
@@ -322,7 +324,7 @@ describe('ProxyExceptionFilter', () => {
         expect.objectContaining({
           error: expect.objectContaining({
             type: 'auth_error',
-            code: 'manifest_auth',
+            code: 'thinker_auth',
             message: expect.stringContaining("don't recognize this key"),
           }),
         }),
@@ -336,14 +338,14 @@ describe('ProxyExceptionFilter', () => {
       expect(res.status).toHaveBeenCalledWith(401);
       const payload = res.json.mock.calls[0][0];
       expect(payload.error.type).toBe('auth_error');
-      expect(payload.error.code).toBe('manifest_auth');
-      expect(payload.error.message).toContain('[🦚 Manifest M006]');
+      expect(payload.error.code).toBe('thinker_auth');
+      expect(payload.error.message).toContain('[🦚 Thinker M006]');
     });
 
     it('records nothing for conflicting key headers (no agent resolved)', () => {
       const { host } = createMockHost();
       filter.catch(new UnauthorizedException(CONFLICTING_API_KEY_HEADERS), host);
-      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
+      expect(recordThinkerBlockedRequest).not.toHaveBeenCalled();
     });
 
     it('returns HTTP 400 when a known auth error originated as a 400', () => {
@@ -443,7 +445,7 @@ describe('ProxyExceptionFilter', () => {
       const { host } = createMockHost({}, { accept: 'application/json' });
       filter.catch(legacyPlanBlock(), host);
 
-      expect(recordManifestBlockedRequest).not.toHaveBeenCalled();
+      expect(recordThinkerBlockedRequest).not.toHaveBeenCalled();
     });
   });
 });

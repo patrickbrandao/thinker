@@ -106,7 +106,7 @@ interface OverviewResponse {
     successful: number;
     success_rate: number;
     attempt_success_rate: number;
-    manifest_lift_pct: number;
+    thinker_lift_pct: number;
     recovered: number;
   } | null;
   token_usage: Array<{ hour?: string; date?: string; input_tokens: number; output_tokens: number }>;

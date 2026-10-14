@@ -416,11 +416,11 @@ Resources:
               Value: "5"
             - Name: BETTER_AUTH_URL
               Value: !Sub "http://${LoadBalancer.DNSName}"
-            - Name: REQUEST_RECORDING_STORAGE
+            - Name: THINKER_RECORDING_STORAGE
               Value: s3
-            - Name: REQUEST_RECORDING_S3_BUCKET
+            - Name: THINKER_RECORDING_S3_BUCKET
               Value: !Ref RecordingBucket
-            - Name: REQUEST_RECORDING_S3_REGION
+            - Name: THINKER_RECORDING_S3_REGION
               Value: !Ref AWS::Region
           Essential: true
           Image: !Ref ImageUrl

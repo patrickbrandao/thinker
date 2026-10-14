@@ -569,7 +569,7 @@ describe('sqlCountMessages', () => {
 });
 
 describe('origin predicates', () => {
-  it('THINKER_ORIGIN_PREDICATE matches every Manifest origin, request included', () => {
+  it('THINKER_ORIGIN_PREDICATE matches every Thinker origin, request included', () => {
     expect(THINKER_ERROR_ORIGINS).toEqual(['config', 'policy', 'internal', 'request']);
     expect(THINKER_ORIGIN_PREDICATE).toBe(
       "at.error_origin IN ('config', 'policy', 'internal', 'request')",

@@ -1,7 +1,7 @@
 import {
   classifyHttpErrorClass,
   classifyMessageError,
-  isManifestErrorOrigin,
+  isThinkerErrorOrigin,
   ERROR_CLASSES,
   ERROR_ORIGINS,
   THINKER_ERROR_ORIGINS,
@@ -25,15 +25,15 @@ describe('error-taxonomy constants', () => {
     expect(TRANSPORT_TIMEOUT_HTTP_STATUS).toBe(504);
   });
 
-  it('keeps every manifest origin inside the origin set', () => {
+  it('keeps every thinker origin inside the origin set', () => {
     for (const origin of THINKER_ERROR_ORIGINS) {
       expect(ERROR_ORIGINS).toContain(origin);
     }
   });
 
-  it('counts a caller-malformed request as Manifest-originated, not a provider fault', () => {
+  it('counts a caller-malformed request as Thinker-originated, not a provider fault', () => {
     // `request` must live in THINKER_ERROR_ORIGINS: that membership is what keeps
-    // it out of provider_error_rate and inside the `origin=manifest` shorthand.
+    // it out of provider_error_rate and inside the `origin=thinker` shorthand.
     expect(THINKER_ERROR_ORIGINS).toContain('request');
     expect(ERROR_ORIGINS).toContain('request');
   });
@@ -89,16 +89,16 @@ describe('classifyMessageError', () => {
     ['local_provider_unavailable', 'config', 'local_provider_unavailable'],
     ['key_expired', 'config', 'auth'],
     ['limit_exceeded', 'policy', 'limit_exceeded'],
-    ['manifest_rate_limited', 'policy', 'rate_limit'],
-    ['manifest_ip_rate_limited', 'policy', 'rate_limit'],
-    ['manifest_concurrency_limited', 'policy', 'rate_limit'],
+    ['thinker_rate_limited', 'policy', 'rate_limit'],
+    ['thinker_ip_rate_limited', 'policy', 'rate_limit'],
+    ['thinker_concurrency_limited', 'policy', 'rate_limit'],
     ['provider_cooldown', 'policy', 'rate_limit'],
-    ['manifest_invalid_request', 'request', 'invalid_request'],
+    ['thinker_invalid_request', 'request', 'invalid_request'],
     ['model_not_available', 'request', 'not_found'],
-    ['manifest_internal_error', 'internal', 'internal'],
+    ['thinker_internal_error', 'internal', 'internal'],
     // Legacy alias, kept so rows written before the rename keep classifying.
     ['friendly_error', 'internal', 'internal'],
-  ])('maps the Manifest reason %s to %s/%s', (reason, origin, klass) => {
+  ])('maps the Thinker reason %s to %s/%s', (reason, origin, klass) => {
     expect(classifyMessageError({ status: 'error', routingReason: reason })).toEqual({
       error_origin: origin,
       error_class: klass,
@@ -199,7 +199,7 @@ describe('classifyMessageError', () => {
     });
   });
 
-  it('lets a Manifest reason win over an incidental HTTP status on a superseded row', () => {
+  it('lets a Thinker reason win over an incidental HTTP status on a superseded row', () => {
     expect(
       classifyMessageError({
         status: 'fallback_error',
@@ -288,19 +288,19 @@ describe('isAnthropicExtraUsageError', () => {
   });
 });
 
-describe('isManifestErrorOrigin', () => {
-  it.each(['config', 'policy', 'internal'])('returns true for the manifest origin %s', (origin) => {
-    expect(isManifestErrorOrigin(origin)).toBe(true);
+describe('isThinkerErrorOrigin', () => {
+  it.each(['config', 'policy', 'internal'])('returns true for the thinker origin %s', (origin) => {
+    expect(isThinkerErrorOrigin(origin)).toBe(true);
   });
 
   it.each(['provider', 'transport'])('returns false for the provider-side origin %s', (origin) => {
-    expect(isManifestErrorOrigin(origin)).toBe(false);
+    expect(isThinkerErrorOrigin(origin)).toBe(false);
   });
 
   it('returns false for null / undefined / unknown', () => {
-    expect(isManifestErrorOrigin(null)).toBe(false);
-    expect(isManifestErrorOrigin(undefined)).toBe(false);
-    expect(isManifestErrorOrigin('nonsense')).toBe(false);
+    expect(isThinkerErrorOrigin(null)).toBe(false);
+    expect(isThinkerErrorOrigin(undefined)).toBe(false);
+    expect(isThinkerErrorOrigin('nonsense')).toBe(false);
   });
 });
 

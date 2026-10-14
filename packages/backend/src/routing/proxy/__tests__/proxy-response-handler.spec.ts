@@ -56,7 +56,7 @@ function mockRecorder() {
     recordPrimaryFailure: jest.fn().mockResolvedValue(undefined),
     recordFallbackSuccess: jest.fn().mockResolvedValue(undefined),
     recordSuccessMessage: jest.fn().mockResolvedValue(undefined),
-    recordManifestBlockedRequest: jest.fn().mockResolvedValue(undefined),
+    recordThinkerBlockedRequest: jest.fn().mockResolvedValue(undefined),
   };
 }
 

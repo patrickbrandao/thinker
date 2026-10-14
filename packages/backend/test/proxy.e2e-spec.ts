@@ -389,6 +389,6 @@ describe('Proxy E2E — /v1/chat/completions', () => {
     expect(res.body?.error?.status).toBe(401);
     expect(res.body?.error?.source).toBe('provider');
     expect(res.body?.error?.type).not.toBe('auth_error');
-    expect(res.body?.error?.code).not.toBe('manifest_auth');
+    expect(res.body?.error?.code).not.toBe('thinker_auth');
   });
 });

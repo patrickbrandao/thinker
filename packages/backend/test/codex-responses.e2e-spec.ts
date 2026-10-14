@@ -267,7 +267,7 @@ describe('Codex Responses tool loop (e2e)', () => {
   // CI always runs the HTTP loops above without needing a Codex installation.
   const codexCli = process.env.CODEX_CLI_BINARY;
   if (codexCli) {
-    it('real Codex CLI executes a file write and returns its result through Manifest', async () => {
+    it('real Codex CLI executes a file write and returns its result through Thinker', async () => {
       const cwd = mkdtempSync(join(tmpdir(), 'codex-pr2837-'));
       // createTestApp already listens on an ephemeral loopback port.
       const url = await app.getUrl();

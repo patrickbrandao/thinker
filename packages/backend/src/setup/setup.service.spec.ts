@@ -203,17 +203,17 @@ describe('SetupService', () => {
     });
 
     it('returns true on an HTTPS origin', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://mnfst.example.com';
+      process.env['BETTER_AUTH_URL'] = 'https://thinker.example.com';
       expect(service.isMcpEnabled()).toBe(true);
     });
 
     it('returns false on a plain-HTTP non-loopback origin', () => {
-      process.env['BETTER_AUTH_URL'] = 'http://manifest.example.internal';
+      process.env['BETTER_AUTH_URL'] = 'http://thinker.example.internal';
       expect(service.isMcpEnabled()).toBe(false);
     });
 
     it('returns false when MCP_ENABLED opts out', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://mnfst.example.com';
+      process.env['BETTER_AUTH_URL'] = 'https://thinker.example.com';
       process.env['MCP_ENABLED'] = 'false';
       expect(service.isMcpEnabled()).toBe(false);
     });

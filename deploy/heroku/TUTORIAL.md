@@ -30,11 +30,11 @@ https://<your-app-name>.herokuapp.com
 
 Also provide the recording bucket values:
 
-- `REQUEST_RECORDING_S3_BUCKET`: private bucket name.
-- `REQUEST_RECORDING_S3_ENDPOINT`: custom endpoint, or blank for AWS S3.
-- `REQUEST_RECORDING_S3_REGION`: signing region, such as `us-east-1`.
-- `REQUEST_RECORDING_S3_ACCESS_KEY_ID`: limited access key.
-- `REQUEST_RECORDING_S3_SECRET_ACCESS_KEY`: matching secret key.
+- `THINKER_RECORDING_S3_BUCKET`: private bucket name.
+- `THINKER_RECORDING_S3_ENDPOINT`: custom endpoint, or blank for AWS S3.
+- `THINKER_RECORDING_S3_REGION`: signing region, such as `us-east-1`.
+- `THINKER_RECORDING_S3_ACCESS_KEY_ID`: limited access key.
+- `THINKER_RECORDING_S3_SECRET_ACCESS_KEY`: matching secret key.
 
 Heroku generates the session and encryption secrets, provisions Postgres as `DATABASE_URL`, builds `Dockerfile.heroku`, and starts the web dyno.
 

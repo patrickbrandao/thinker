@@ -15,8 +15,6 @@ export class AddRoutingReason1772300000000 implements MigrationInterface {
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "agent_messages" DROP COLUMN IF EXISTS "routing_reason"`,
-    );
+    await queryRunner.query(`ALTER TABLE "agent_messages" DROP COLUMN IF EXISTS "routing_reason"`);
   }
 }

@@ -20,7 +20,7 @@ import { IngestionContext } from '../../otlp/interfaces/ingestion-context.interf
 import { ProxyService, type RoutingMeta } from './proxy.service';
 import { ProxyRateLimiter } from './proxy-rate-limiter';
 import { ProviderClient } from './provider-client';
-import { ProxyMessageRecorder, type ManifestBlockedRequestReason } from './proxy-message-recorder';
+import { ProxyMessageRecorder, type ThinkerBlockedRequestReason } from './proxy-message-recorder';
 import { ThoughtSignatureCache } from './thought-signature-cache';
 import { ThinkingBlockCache } from './thinking-block-cache';
 import { ReasoningContentCache } from './reasoning-content-cache';
@@ -44,12 +44,12 @@ import {
 } from './proxy-response-handler';
 import { ProxyExceptionFilter, isChatRenderingClient } from './proxy-exception.filter';
 import { sendFriendlyResponse } from './proxy-friendly-response';
-import { formatManifestError, type ManifestErrorCode } from '../../common/errors/error-codes';
+import { formatThinkerError, type ThinkerErrorCode } from '../../common/errors/error-codes';
 import {
   THINKER_CODE_TO_REASON,
-  ManifestError,
-  isRecordableManifestCode,
-} from '../../common/errors/manifest-error';
+  ThinkerError,
+  isRecordableThinkerCode,
+} from '../../common/errors/thinker-error';
 import type {
   ProviderAttemptRef,
   ProviderAttemptStart,
@@ -257,7 +257,7 @@ export class ProxyController {
     res.once('close', () => clientAbort.abort());
     const startTime = Date.now();
 
-    // The Request exists as pending from ingress, before Manifest routes it or
+    // The Request exists as pending from ingress, before Thinker routes it or
     // starts any provider call. A recording failure must not reject user traffic.
     await this.recorder
       .recordPendingRequest(req.ingestionContext, {
@@ -340,7 +340,7 @@ export class ProxyController {
     };
 
     try {
-      // Each of these throws its own ManifestError (M201 per-user, M202 per-IP,
+      // Each of these throws its own ThinkerError (M201 per-user, M202 per-IP,
       // M203 concurrency), so handleProxyError records which limit actually
       // fired instead of collapsing all three into one reason.
       this.rateLimiter.checkLimit(tenantId);
@@ -446,9 +446,9 @@ export class ProxyController {
 
       // A friendly stub (no provider key, no providers, usage limit) leaves the
       // proxy as an HTTP 200 assistant message, so it lands here — but it is a
-      // Manifest failure, not a completion. Record it as one.
-      if (meta.manifest_error_code) {
-        this.recordManifestStub(
+      // Thinker failure, not a completion. Record it as one.
+      if (meta.thinker_error_code) {
+        this.recordThinkerStub(
           req,
           meta,
           requestId,
@@ -509,12 +509,12 @@ export class ProxyController {
   }
 
   /**
-   * Record the HTTP-200 friendly stub Manifest returned in place of a completion.
-   * `meta.manifest_error_message` is the rendered `[🦚 Manifest M100] …` text the
+   * Record the HTTP-200 friendly stub Thinker returned in place of a completion.
+   * `meta.thinker_error_message` is the rendered `[🦚 Thinker M100] …` text the
    * caller actually saw — persisting it verbatim (rather than a generic
    * "Provider API key missing") is what makes the row debuggable.
    */
-  private recordManifestStub(
+  private recordThinkerStub(
     req: Request & { ingestionContext: IngestionContext },
     meta: RoutingMeta,
     requestId: string,
@@ -525,12 +525,12 @@ export class ProxyController {
     durationMs: number,
     apiMode: ProxyApiMode,
   ): void {
-    const code = meta.manifest_error_code;
-    if (!code || !isRecordableManifestCode(code)) return;
+    const code = meta.thinker_error_code;
+    if (!code || !isRecordableThinkerCode(code)) return;
     this.recorder
-      .recordManifestBlockedRequest(req.ingestionContext, {
+      .recordThinkerBlockedRequest(req.ingestionContext, {
         requestId,
-        errorMessage: meta.manifest_error_message ?? formatManifestError(code),
+        errorMessage: meta.thinker_error_message ?? formatThinkerError(code),
         errorCode: code,
         reason: THINKER_CODE_TO_REASON[code],
         model: this.extractRequestedModel(req.body as Record<string, unknown> | undefined),
@@ -541,7 +541,7 @@ export class ProxyController {
         durationMs,
         apiMode,
       })
-      .catch((e) => this.logger.warn(`Failed to record Manifest stub: ${e}`));
+      .catch((e) => this.logger.warn(`Failed to record Thinker stub: ${e}`));
   }
 
   private async handleProxyError(
@@ -590,17 +590,17 @@ export class ProxyController {
     // before it reaches stdout (the recorded/returned copies already are).
     this.logger.error(`Proxy error: ${scrubSecrets(message)}`);
 
-    // Who failed? A ManifestError says so explicitly. Pre-response dead sockets
+    // Who failed? A ThinkerError says so explicitly. Pre-response dead sockets
     // and timeouts become synthetic 503/504 responses in proxy-transport. A
     // socket that dies after streaming starts is thrown as StreamFailure.
-    // Other non-HTTP throws are Manifest's own bugs (M500).
+    // Other non-HTTP throws are Thinker's own bugs (M500).
     //
-    // An unrecordable ManifestError (M001–M003, M005, M006) writes NOTHING: it has no
+    // An unrecordable ThinkerError (M001–M003, M005, M006) writes NOTHING: it has no
     // tenant to attribute, and falling through to recordProviderError would blame
     // the provider for someone presenting a bad key.
-    if (err instanceof ManifestError) {
-      if (isRecordableManifestCode(err.code)) {
-        this.recordManifestBlockedRequest(
+    if (err instanceof ThinkerError) {
+      if (isRecordableThinkerCode(err.code)) {
+        this.recordThinkerBlockedRequest(
           err,
           req,
           requestId,
@@ -620,8 +620,8 @@ export class ProxyController {
       !(err instanceof ResponsesSseError) &&
       !(err instanceof HttpException)
     ) {
-      // A non-HTTP throw is Manifest's own bug, never a provider fault.
-      this.recordManifestBlockedRequest(
+      // A non-HTTP throw is Thinker's own bug, never a provider fault.
+      this.recordThinkerBlockedRequest(
         err,
         req,
         requestId,
@@ -696,12 +696,12 @@ export class ProxyController {
     // Rate limit errors stay as HTTP 429 so clients can backoff
     if (status === 429) {
       // Never return the exception response object itself: framework and
-      // provider exceptions can carry stack traces or markup. Manifest's
+      // provider exceptions can carry stack traces or markup. Thinker's
       // rate-limit messages come from our static catalogue; provider failures
       // use a stable public message.
       const rateLimitMessage =
-        err instanceof ManifestError
-          ? formatManifestError(err.code)
+        err instanceof ThinkerError
+          ? formatThinkerError(err.code)
           : 'Rate limited by upstream provider';
       const responseBody = {
         error: { message: rateLimitMessage, type: 'rate_limit_error' },
@@ -713,7 +713,7 @@ export class ProxyController {
 
     const isStream = (req.body as Record<string, unknown>)?.stream === true;
     if (isChatRenderingClient(req)) {
-      const clientMessage = status >= 500 ? formatManifestError('M500') : message;
+      const clientMessage = status >= 500 ? formatThinkerError('M500') : message;
       sendFriendlyResponse(res, clientMessage, isStream);
       return;
     }
@@ -722,7 +722,7 @@ export class ProxyController {
     // envelope so CI pipelines can detect failures instead of treating the
     // friendly stub as success.
     const errorMessage =
-      status >= 500 ? 'Manifest encountered an internal error. Try again shortly.' : message;
+      status >= 500 ? 'Thinker encountered an internal error. Try again shortly.' : message;
     const responseBody = {
       error: {
         message: errorMessage,
@@ -813,23 +813,23 @@ export class ProxyController {
     return err instanceof Error ? err.message : String(err);
   }
 
-  private recordManifestBlockedRequest(
+  private recordThinkerBlockedRequest(
     err: unknown,
     req: Request & { ingestionContext: IngestionContext },
     requestId: string,
     traceId: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
     requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
-    reason: ManifestBlockedRequestReason,
+    reason: ThinkerBlockedRequestReason,
     apiMode: ProxyApiMode,
     httpStatus?: number,
-    errorCode?: ManifestErrorCode,
+    errorCode?: ThinkerErrorCode,
     durationMs?: number,
     meta?: RoutingMeta,
   ): void {
     const body = req.body as Record<string, unknown> | undefined;
     this.recorder
-      .recordManifestBlockedRequest(req.ingestionContext, {
+      .recordThinkerBlockedRequest(req.ingestionContext, {
         requestId,
         httpStatus: httpStatus ?? (err instanceof HttpException ? err.getStatus() : 500),
         // The raw internal message, not the friendly M500 text the caller saw —
@@ -858,7 +858,7 @@ export class ProxyController {
             }
           : {}),
       })
-      .catch((e) => this.logger.warn(`Failed to record Manifest-blocked request: ${e}`));
+      .catch((e) => this.logger.warn(`Failed to record Thinker-blocked request: ${e}`));
   }
 
   private trackFirstProxyRequest(tenantId: string): void {

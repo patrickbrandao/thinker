@@ -1,12 +1,12 @@
 /**
  * End-to-end cover for the `anthropic-beta` passthrough.
  *
- * Manifest builds the upstream header set from scratch, so a beta flag the
+ * Thinker builds the upstream header set from scratch, so a beta flag the
  * caller sent never reached Anthropic, and a body field gated behind that flag
  * was rejected as an extra input.
  *
  * This asserts transport only. The stubbed upstream always answers 200, so it
- * shows which headers Manifest emits, never what Anthropic makes of them.
+ * shows which headers Thinker emits, never what Anthropic makes of them.
  *
  * The unit tests call `ProviderClient.forward` directly. This one drives a real
  * `POST /v1/messages` through the whole stack — Express header handling, key

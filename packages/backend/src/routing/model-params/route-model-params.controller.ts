@@ -9,7 +9,7 @@ import {
 import { RouteModelParamsService, type RouteModelParamsView } from './route-model-params.service';
 
 /**
- * Model params addressed by tier + model, for the CLI (`mnfst routing params`).
+ * Model params addressed by tier + model, for the CLI (`thinker routing params`).
  * `:tier` is `default` or a custom tier's name; `?model=` picks one of the
  * models the tier routes to and defaults to its primary. The query string
  * carries the model because model ids contain slashes.

@@ -10,7 +10,7 @@ import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './he
  * The filter matches the model of ANY provider attempt on the request — the
  * same semantics the provider filter already uses — so filtering by the
  * primary of a fallback chain still surfaces the request it was recovered on.
- * A request that never reached a provider (a Manifest-blocked M###) has no
+ * A request that never reached a provider (a Thinker-blocked M###) has no
  * attempt to match, so it falls back to `requests.requested_model`, which is
  * what the Model column renders for those rows.
  */

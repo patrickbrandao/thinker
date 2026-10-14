@@ -70,7 +70,7 @@ interface OverviewData {
     successful: number;
     success_rate: number;
     attempt_success_rate: number;
-    manifest_lift_pct: number;
+    thinker_lift_pct: number;
     recovered: number;
   } | null;
   token_usage: Array<{

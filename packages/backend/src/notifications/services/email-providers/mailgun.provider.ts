@@ -18,7 +18,7 @@ export class MailgunProvider implements EmailProvider {
   constructor(config: EmailProviderConfig) {
     this.apiKey = config.apiKey;
     this.domain = config.domain ?? '';
-    this.defaultFrom = config.fromEmail ?? 'noreply@manifest.build';
+    this.defaultFrom = config.fromEmail ?? 'noreply@thinker.example.com';
   }
 
   async send(opts: SendEmailOptions): Promise<boolean> {
@@ -34,13 +34,13 @@ export class MailgunProvider implements EmailProvider {
 
     try {
       const form = new URLSearchParams();
-      form.append('from', opts.from ?? `Manifest <${this.defaultFrom}>`);
+      form.append('from', opts.from ?? `Thinker <${this.defaultFrom}>`);
       form.append('to', opts.to);
       form.append('subject', opts.subject);
       form.append('html', opts.html);
       if (opts.text) form.append('text', opts.text);
       form.append('h:Reply-To', this.defaultFrom);
-      form.append('o:tag', 'manifest');
+      form.append('o:tag', 'thinker');
 
       const url = new URL(`/v3/${encodeURIComponent(this.domain)}/messages`, MAILGUN_BASE);
       const res = await fetch(url.href, {

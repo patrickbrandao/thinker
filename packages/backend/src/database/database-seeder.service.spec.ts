@@ -272,8 +272,8 @@ describe('DatabaseSeederService', () => {
       const insertCall = mockApiKeyRepo.insert.mock.calls[0][0];
       expect(insertCall.id).toBe('seed-api-key-001');
       expect(insertCall.key).toBeNull();
-      expect(verifyKey('dev-api-key-manifest-001', insertCall.key_hash)).toBe(true);
-      expect(insertCall.key_prefix).toBe(keyPrefix('dev-api-key-manifest-001'));
+      expect(verifyKey('dev-api-key-thinker-001', insertCall.key_hash)).toBe(true);
+      expect(insertCall.key_prefix).toBe(keyPrefix('dev-api-key-thinker-001'));
       expect(insertCall.created_by_user_id).toBe('admin-user-id');
       expect(insertCall.tenant_id).toBe('seed-tenant-001');
       expect(insertCall.name).toBe('Development API Key');
@@ -286,7 +286,7 @@ describe('DatabaseSeederService', () => {
 
       const insertCall = mockApiKeyRepo.insert.mock.calls[0][0];
       expect(insertCall.key_hash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
-      expect(verifyKey('dev-api-key-manifest-001', insertCall.key_hash)).toBe(true);
+      expect(verifyKey('dev-api-key-thinker-001', insertCall.key_hash)).toBe(true);
     });
 
     it('should store the correct key prefix (first 12 chars)', async () => {
@@ -336,7 +336,7 @@ describe('DatabaseSeederService', () => {
         expect.objectContaining({
           id: 'seed-tenant-001',
           name: 'admin-user-id',
-          email: 'admin@manifest.build',
+          email: 'admin@thinker.example.com',
           is_active: true,
         }),
       );
@@ -450,8 +450,8 @@ describe('DatabaseSeederService', () => {
 
       expect(auth.api.signUpEmail).toHaveBeenCalledWith({
         body: {
-          email: 'admin@manifest.build',
-          password: 'manifest',
+          email: 'admin@thinker.example.com',
+          password: 'thinker',
           name: 'Admin',
         },
       });
@@ -467,7 +467,7 @@ describe('DatabaseSeederService', () => {
 
       expect(mockDataSource.query).toHaveBeenCalledWith(
         `UPDATE "user" SET "emailVerified" = true WHERE email = $1`,
-        ['admin@manifest.build'],
+        ['admin@thinker.example.com'],
       );
     });
   });
@@ -581,7 +581,7 @@ describe('DatabaseSeederService', () => {
       // A brand-new legacy "old" user is signed up.
       expect(auth.api.signUpEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({ email: 'olduser@manifest.build' }),
+          body: expect.objectContaining({ email: 'olduser@thinker.example.com' }),
         }),
       );
       // The legacy cohort tenant is created.

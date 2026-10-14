@@ -1,5 +1,5 @@
 /**
- * MCP tool results are content blocks. Manifest's tools return JSON payloads, so
+ * MCP tool results are content blocks. Thinker's tools return JSON payloads, so
  * every handler funnels through these two wrappers — one shape for the model to
  * parse, and errors flagged with `isError` so the client renders them as
  * failures rather than data.

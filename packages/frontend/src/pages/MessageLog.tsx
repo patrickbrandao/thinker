@@ -654,7 +654,7 @@ const MessageLog: Component = () => {
   const originOptions = [
     { label: 'All origins', value: '' },
     // The query value is still the backend's legacy origin name; only the label changed.
-    { label: 'Thinker', value: 'manifest' },
+    { label: 'Thinker', value: 'thinker' },
     { label: 'Provider', value: 'provider' },
     { label: 'Transport', value: 'transport' },
   ];

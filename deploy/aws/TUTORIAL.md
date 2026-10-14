@@ -53,9 +53,9 @@ Thinker runs with:
 - `PORT=2099`
 - `BIND_ADDRESS=0.0.0.0`
 - `BETTER_AUTH_URL=http://<load-balancer-dns-name>`
-- `REQUEST_RECORDING_STORAGE=s3`
-- `REQUEST_RECORDING_S3_BUCKET=<generated-private-bucket>`
-- `REQUEST_RECORDING_S3_REGION=<stack-region>`
+- `THINKER_RECORDING_STORAGE=s3`
+- `THINKER_RECORDING_S3_BUCKET=<generated-private-bucket>`
+- `THINKER_RECORDING_S3_REGION=<stack-region>`
 
 The ECS task uses its IAM task role to access only the request-recording object prefix, so no static S3 access keys are stored in the container. The recording bucket is retained when the CloudFormation stack is deleted to avoid accidental recording loss; remove it manually after exporting or deleting its contents.
 

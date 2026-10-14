@@ -1,6 +1,6 @@
 import { mcpOAuthResponse } from './mcp-oauth-response';
 
-const request = (path: string) => new Request(`https://app.manifest.build${path}`);
+const request = (path: string) => new Request(`https://app.thinker.example.com${path}`);
 const json = (body: object, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -33,11 +33,11 @@ describe('mcpOAuthResponse', () => {
     const response = await mcpOAuthResponse(
       request(path),
       json({
-        issuer: 'https://app.manifest.build/api/auth',
+        issuer: 'https://app.thinker.example.com/api/auth',
         registration_endpoint: '/oauth2/register',
       }),
     );
-    expect(await response.json()).toEqual({ issuer: 'https://app.manifest.build/api/auth' });
+    expect(await response.json()).toEqual({ issuer: 'https://app.thinker.example.com/api/auth' });
   });
 
   it('sends invalid callback requests to a visible error page', async () => {

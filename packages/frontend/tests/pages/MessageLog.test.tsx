@@ -999,11 +999,11 @@ describe('MessageLog', () => {
     await vi.waitFor(() => expect(mockGetMessages).toHaveBeenCalled());
 
     const originSelect = selectWithOption(container, 'All origins');
-    await fireEvent.change(originSelect, { target: { value: 'manifest' } });
+    await fireEvent.change(originSelect, { target: { value: 'thinker' } });
 
     await vi.waitFor(() => {
       const last = mockGetMessages.mock.calls.at(-1)![0] as Record<string, string>;
-      expect(last.origin).toBe('manifest');
+      expect(last.origin).toBe('thinker');
     });
   });
 

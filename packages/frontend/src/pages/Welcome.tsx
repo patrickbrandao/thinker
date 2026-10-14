@@ -61,7 +61,7 @@ import {
   PLATFORM_ICONS,
   PLATFORM_LABELS,
   PLATFORMS_BY_CATEGORY,
-  manifestErrorDocsUrl,
+  thinkerErrorDocsUrl,
 } from 'thinker-shared';
 import '../styles/routing.css';
 import '../styles/routing-providers.css';
@@ -1306,7 +1306,7 @@ const Welcome: Component = () => {
                           <Show when={errorDocCode()}>
                             <a
                               class="welcome__text-link"
-                              href={manifestErrorDocsUrl(errorDocCode()!)}
+                              href={thinkerErrorDocsUrl(errorDocCode()!)}
                               target="_blank"
                               rel="noreferrer"
                             >

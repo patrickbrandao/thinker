@@ -1,6 +1,7 @@
 import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
 
 /** @deprecated Static salt used by legacy hashes — only for backward-compat verification. */
+// Frozen: matches the salt the HashApiKeys migration used for pre-existing keys.
 const LEGACY_SALT = 'manifest-api-key-salt';
 const KEY_LENGTH = 32;
 const SALT_LENGTH = 16;

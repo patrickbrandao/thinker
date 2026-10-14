@@ -65,7 +65,7 @@ export class ApiKeyGuard implements CanActivate {
         (absoluteExpiryAt !== null && absoluteExpiryAt <= now);
       if (expired) {
         this.logger.warn(`Rejected expired API key from ${request.ip}`);
-        throw new UnauthorizedException('API key expired — run mnfst login');
+        throw new UnauthorizedException('API key expired — run thinker login');
       }
       // Keys are tenant credentials: the tenant comes straight off the key
       // row — no key → user → tenant indirection. The creating user is kept

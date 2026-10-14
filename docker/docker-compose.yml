@@ -57,9 +57,9 @@ services:
       - PORT=${PORT:-2099}
       - DATABASE_URL=${DATABASE_URL:-postgresql://thinker:thinker@postgres:5432/thinker}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
-      # Optional dedicated at-rest encryption key for stored provider/OAuth
-      # credentials. When unset, the backend falls back to BETTER_AUTH_SECRET.
-      - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:-}
+      # Required at-rest encryption key for stored provider/OAuth credentials
+      # and recordings. Must differ from BETTER_AUTH_SECRET.
+      - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:?THINKER_ENCRYPTION_KEY must be set in .env}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The
       # OAuth callback and session cookie follow the request host, so set this
@@ -96,15 +96,15 @@ services:
       - THINKER_CIMD_ALLOW_PRIVATE=${THINKER_CIMD_ALLOW_PRIVATE:-false}
       # Message recordings use this mounted Docker volume automatically when
       # S3-compatible bucket credentials are not present.
-      - REQUEST_RECORDING_STORAGE=${REQUEST_RECORDING_STORAGE:-auto}
-      - REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings
-      - REQUEST_RECORDING_RETENTION_DAYS=${REQUEST_RECORDING_RETENTION_DAYS:-}
-      - REQUEST_RECORDING_S3_BUCKET=${REQUEST_RECORDING_S3_BUCKET:-}
-      - REQUEST_RECORDING_S3_ENDPOINT=${REQUEST_RECORDING_S3_ENDPOINT:-}
-      - REQUEST_RECORDING_S3_REGION=${REQUEST_RECORDING_S3_REGION:-}
-      - REQUEST_RECORDING_S3_ACCESS_KEY_ID=${REQUEST_RECORDING_S3_ACCESS_KEY_ID:-}
-      - REQUEST_RECORDING_S3_SECRET_ACCESS_KEY=${REQUEST_RECORDING_S3_SECRET_ACCESS_KEY:-}
-      - REQUEST_RECORDING_S3_FORCE_PATH_STYLE=${REQUEST_RECORDING_S3_FORCE_PATH_STYLE:-false}
+      - THINKER_RECORDING_STORAGE=${THINKER_RECORDING_STORAGE:-auto}
+      - THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings
+      - THINKER_RECORDING_RETENTION_DAYS=${THINKER_RECORDING_RETENTION_DAYS:-}
+      - THINKER_RECORDING_S3_BUCKET=${THINKER_RECORDING_S3_BUCKET:-}
+      - THINKER_RECORDING_S3_ENDPOINT=${THINKER_RECORDING_S3_ENDPOINT:-}
+      - THINKER_RECORDING_S3_REGION=${THINKER_RECORDING_S3_REGION:-}
+      - THINKER_RECORDING_S3_ACCESS_KEY_ID=${THINKER_RECORDING_S3_ACCESS_KEY_ID:-}
+      - THINKER_RECORDING_S3_SECRET_ACCESS_KEY=${THINKER_RECORDING_S3_SECRET_ACCESS_KEY:-}
+      - THINKER_RECORDING_S3_FORCE_PATH_STYLE=${THINKER_RECORDING_S3_FORCE_PATH_STYLE:-false}
       # Email provider (optional). Covers both login/verification emails
       # and threshold alert notifications. Set one provider block — see
       # DOCKER_README.md "Email setup". Supports resend, mailgun, sendgrid.

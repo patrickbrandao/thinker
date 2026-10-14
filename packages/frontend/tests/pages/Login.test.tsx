@@ -74,8 +74,8 @@ describe('Login', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign in as dev/i }));
     await vi.waitFor(() => {
       expect(mockSignInEmail).toHaveBeenCalledWith({
-        email: 'admin@manifest.build',
-        password: 'manifest',
+        email: 'admin@thinker.example.com',
+        password: 'thinker',
       });
     });
     expect(getLastAuthMethod()).toBe('email');

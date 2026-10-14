@@ -17,8 +17,8 @@ export interface ErrorBreakdownResponse {
   provider_errors: number;
   /** Network/timeout failures reaching a provider. */
   transport_errors: number;
-  /** Manifest's OWN config/policy/internal rejections — NOT a provider failure. */
-  manifest_errors: number;
+  /** Thinker's OWN config/policy/internal rejections — NOT a provider failure. */
+  thinker_errors: number;
   by_origin: Record<string, number>;
   by_class: Record<string, number>;
   /** provider_errors / (provider_errors + successful), 0..1. */
@@ -111,7 +111,7 @@ export class ErrorBreakdownService {
       total += g.count;
     }
     const provider = by_origin['provider'] ?? 0;
-    const manifest = THINKER_ERROR_ORIGINS.reduce((sum, o) => sum + (by_origin[o] ?? 0), 0);
+    const thinker = THINKER_ERROR_ORIGINS.reduce((sum, o) => sum + (by_origin[o] ?? 0), 0);
     const denom = provider + successful;
     return {
       range,
@@ -119,7 +119,7 @@ export class ErrorBreakdownService {
       total_errors: total,
       provider_errors: provider,
       transport_errors: by_origin['transport'] ?? 0,
-      manifest_errors: manifest,
+      thinker_errors: thinker,
       by_origin,
       by_class,
       provider_error_rate: denom > 0 ? provider / denom : 0,

@@ -167,7 +167,7 @@ function buildMcpPlugins() {
       scopes: [...MCP_SCOPES, 'offline_access'],
       resources: [mcpResource].map((identifier) => ({
         identifier,
-        name: 'Manifest MCP',
+        name: 'Thinker MCP',
         // Short-lived bearer tokens; the refresh token (offline_access) is
         // how an editor stays connected across a session.
         accessTokenTtl: 15 * 60,

@@ -187,8 +187,8 @@ describe('ProviderClient — strict header contract on auth-critical paths', () 
     expect(sentHeaders).toEqual({
       Authorization: 'Bearer sk-or-key',
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://manifest.build',
-      'X-Title': 'Manifest',
+      'HTTP-Referer': 'https://github.com/patrickbrandao/thinker',
+      'X-Title': 'Thinker',
     });
     expect(sentHeaders).not.toHaveProperty('x-api-key');
   });
@@ -311,7 +311,7 @@ describe('ProviderClient — Codex prompt-cache affinity (openai-subscription)',
     });
 
     const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(sentBody.prompt_cache_key).toMatch(/^manifest-[a-f0-9]{32}$/);
+    expect(sentBody.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
     expect(sentBody.prompt_cache_key).not.toContain('tenant-agent-session');
   });
 
@@ -391,7 +391,7 @@ describe('ProviderClient — anthropic-beta merge', () => {
   const sentBeta = () =>
     (mockFetch.mock.calls[0][1].headers as Record<string, string>)['anthropic-beta'];
 
-  it("appends the caller's beta flags after Manifest's on the subscription path", async () => {
+  it("appends the caller's beta flags after Thinker's on the subscription path", async () => {
     await client.forward({
       provider: 'anthropic',
       apiKey: 'sk-ant-oat-token',
@@ -403,7 +403,7 @@ describe('ProviderClient — anthropic-beta merge', () => {
       clientAnthropicBeta: 'structured-outputs-2025-11-13',
     });
 
-    // Manifest's OAuth flags are load-bearing for this route, so they survive…
+    // Thinker's OAuth flags are load-bearing for this route, so they survive…
     expect(sentBeta()).toContain('oauth-2025-04-20');
     // …and the flag that makes the caller's `output_config` legal rides along.
     expect(sentBeta()).toContain('structured-outputs-2025-11-13');
@@ -423,7 +423,7 @@ describe('ProviderClient — anthropic-beta merge', () => {
     expect(sentBeta()).toBe('context-management-2025-06-27');
   });
 
-  it('never repeats a flag Manifest already sends', async () => {
+  it('never repeats a flag Thinker already sends', async () => {
     await client.forward({
       provider: 'anthropic',
       apiKey: 'sk-ant-oat-token',
@@ -609,10 +609,10 @@ describe('ProviderClient — extra headers never override adapter headers (#105)
       model: 'grok-4',
       body,
       stream: false,
-      extraHeaders: { 'x-grok-conv-id': 'manifest-abc' },
+      extraHeaders: { 'x-grok-conv-id': 'thinker-abc' },
     });
 
-    expect(sentHeaders()['x-grok-conv-id']).toBe('manifest-abc');
+    expect(sentHeaders()['x-grok-conv-id']).toBe('thinker-abc');
     expect(sentHeaders().Authorization).toBe('Bearer xai-key');
   });
 });

@@ -10,7 +10,7 @@ import { ok, result } from '../tool-result';
 function maskedKeyRef(slug: string): string {
   // Pin the origin so the command targets the server that produced the setup,
   // not whatever host the CLI is configured for.
-  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw --url ${authOrigin}>`;
+  return `<THINKER_AGENT_KEY — run: thinker agent key show ${slug} --raw --url ${authOrigin}>`;
 }
 
 /**
@@ -25,12 +25,12 @@ function renderSetup(platform: string | null, keyRef: string, canWrite: boolean)
     return template(`${authOrigin}/v1`, keyRef);
   }
   const lines = [
-    "Point your tool's OpenAI-compatible client at Manifest:",
+    "Point your tool's OpenAI-compatible client at Thinker:",
     `  base URL: ${authOrigin}/v1`,
     `  API key:  ${keyRef}`,
   ];
-  // `manifest_agent_env` is a write tool, so only name it when it is available.
-  if (canWrite) lines.push('Or wire it via env: use manifest_agent_env to get the export lines.');
+  // `thinker_agent_env` is a write tool, so only name it when it is available.
+  if (canWrite) lines.push('Or wire it via env: use thinker_agent_env to get the export lines.');
   return lines.join('\n');
 }
 
@@ -47,7 +47,7 @@ export function registerEnvironmentTools(
   const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
 
   server.registerTool(
-    'manifest_agent_setup',
+    'thinker_agent_setup',
     {
       title: 'Agent setup instructions',
       description:
@@ -80,11 +80,11 @@ export function registerEnvironmentTools(
   if (!canWrite) return;
 
   server.registerTool(
-    'manifest_agent_env',
+    'thinker_agent_env',
     {
       title: 'Agent environment variables',
       description:
-        'Return the dotenv/shell lines that point a harness at Manifest (THINKER_AGENT_KEY + THINKER_AGENT_URL).',
+        'Return the dotenv/shell lines that point a harness at Thinker (THINKER_AGENT_KEY + THINKER_AGENT_URL).',
       inputSchema: z.object({ agent: z.string().min(1), export: z.boolean().optional() }),
     },
     async ({ agent: agentName, export: useExport }) =>
@@ -115,23 +115,23 @@ export function registerEnvironmentTools(
  */
 export function registerGuideTool(server: McpServer): void {
   server.registerTool(
-    'manifest_guide',
+    'thinker_guide',
     {
-      title: 'Manifest operating guide',
-      description: 'Return the recommended workflow for managing a Manifest workspace.',
+      title: 'Thinker operating guide',
+      description: 'Return the recommended workflow for managing a Thinker workspace.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     },
     async () =>
       ok({
         workflow: [
-          'Call manifest_doctor first when anything looks wrong — it separates a bad URL from a bad credential.',
-          'Harnesses: manifest_agent_list, then manifest_agent_get. Create with manifest_agent_create; the returned key is shown once.',
-          'Providers: manifest_provider_catalog lists what is connectable; manifest_provider_connect stores a tenant-wide connection and discovers its models.',
-          'Routing: manifest_routing_status tells you whether a harness can route. Configure the default chain with the newer agent configure surface, or per-agent fallbacks with manifest_routing_fallbacks_set.',
-          'Model params (reasoning effort, temperature, …): manifest_routing_params_get lists what a tier route accepts and what is saved; manifest_routing_params_set saves values that override what the harness sends on routed requests (model "auto" or a matching custom-tier header). Address the route by tier ("default" or a custom tier name) and model.',
-          'Verify end-to-end with manifest_routing_test — it sends one real request through the selected platform surface.',
-          'A connection that is active with zero cached models is unusable; run manifest_provider_refresh.',
+          'Call thinker_doctor first when anything looks wrong — it separates a bad URL from a bad credential.',
+          'Harnesses: thinker_agent_list, then thinker_agent_get. Create with thinker_agent_create; the returned key is shown once.',
+          'Providers: thinker_provider_catalog lists what is connectable; thinker_provider_connect stores a tenant-wide connection and discovers its models.',
+          'Routing: thinker_routing_status tells you whether a harness can route. Configure the default chain with the newer agent configure surface, or per-agent fallbacks with thinker_routing_fallbacks_set.',
+          'Model params (reasoning effort, temperature, …): thinker_routing_params_get lists what a tier route accepts and what is saved; thinker_routing_params_set saves values that override what the harness sends on routed requests (model "auto" or a matching custom-tier header). Address the route by tier ("default" or a custom tier name) and model.',
+          'Verify end-to-end with thinker_routing_test — it sends one real request through the selected platform surface.',
+          'A connection that is active with zero cached models is unusable; run thinker_provider_refresh.',
         ],
       }),
   );

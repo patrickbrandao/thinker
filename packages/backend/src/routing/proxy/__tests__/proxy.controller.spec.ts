@@ -1,5 +1,5 @@
 import { HttpException, Logger } from '@nestjs/common';
-import { ManifestError } from '../../../common/errors/manifest-error';
+import { ThinkerError } from '../../../common/errors/thinker-error';
 import { ProxyController } from '../proxy.controller';
 import { ProxyMessageRecorder } from '../proxy-message-recorder';
 import { IngestEventBusService } from '../../../common/services/ingest-event-bus.service';
@@ -234,7 +234,7 @@ describe('ProxyController', () => {
     recorder.onModuleDestroy();
   });
 
-  it('should expose /v1/models as an OpenAI-compatible list with the Manifest auto route', async () => {
+  it('should expose /v1/models as an OpenAI-compatible list with the Thinker auto route', async () => {
     await expect(controller.models(mockRequest({}) as never)).resolves.toEqual({
       object: 'list',
       data: [
@@ -1065,7 +1065,7 @@ describe('ProxyController', () => {
       },
       meta: { tier: 'simple', model: 'gpt-4o', provider: 'OpenAI', confidence: 0.9 },
     });
-    const blockedSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+    const blockedSpy = jest.spyOn(recorder, 'recordThinkerBlockedRequest');
 
     const req = mockRequest({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] });
     const { res } = mockResponse();
@@ -1083,7 +1083,7 @@ describe('ProxyController', () => {
 
   it('handles a 402 raised while routing like any other 4xx, never as a plan block', async () => {
     proxyService.proxyRequest.mockRejectedValue(new HttpException('Payment required', 402));
-    const blockedSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+    const blockedSpy = jest.spyOn(recorder, 'recordThinkerBlockedRequest');
 
     const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
     const { res } = mockResponse();
@@ -1514,14 +1514,14 @@ describe('ProxyController', () => {
         header_tier_name: 'Program Weeks',
         header_tier_color: 'indigo',
       });
-      const manifestSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+      const thinkerSpy = jest.spyOn(recorder, 'recordThinkerBlockedRequest');
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'test' }] });
       const { res } = mockResponse();
       await controller.chatCompletions(req as never, res as never);
       await flushRecorderMicrotasks();
 
-      expect(manifestSpy).toHaveBeenCalledWith(
+      expect(thinkerSpy).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           errorCode: 'M500',
@@ -1553,16 +1553,16 @@ describe('ProxyController', () => {
         model: 'thinker',
         provider: 'thinker',
         confidence: 1,
-        reason: 'manifest_internal_error',
+        reason: 'thinker_internal_error',
       });
-      const manifestSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+      const thinkerSpy = jest.spyOn(recorder, 'recordThinkerBlockedRequest');
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'test' }] });
       const { res } = mockResponse();
       await controller.chatCompletions(req as never, res as never);
       await flushRecorderMicrotasks();
 
-      expect(manifestSpy).toHaveBeenCalledWith(
+      expect(thinkerSpy).toHaveBeenCalledWith(
         expect.anything(),
         expect.not.objectContaining({ routing: expect.anything() }),
       );
@@ -1887,7 +1887,7 @@ describe('ProxyController', () => {
         choices: expect.arrayContaining([
           expect.objectContaining({
             message: expect.objectContaining({
-              content: expect.stringContaining('[🦚 Manifest M500]'),
+              content: expect.stringContaining('[🦚 Thinker M500]'),
             }),
           }),
         ]),
@@ -2288,11 +2288,11 @@ describe('ProxyController', () => {
       expect(rateLimiter.releaseSlot).not.toHaveBeenCalled();
     });
 
-    it('should record local rate-limit blocks as Manifest policy rows', async () => {
-      // The real limiter throws a ManifestError — that type is what tells the
-      // controller this 429 is Manifest's, not a provider's.
+    it('should record local rate-limit blocks as Thinker policy rows', async () => {
+      // The real limiter throws a ThinkerError — that type is what tells the
+      // controller this 429 is Thinker's, not a provider's.
       rateLimiter.checkLimit.mockImplementation(() => {
-        throw new ManifestError('M201', 429);
+        throw new ThinkerError('M201', 429);
       });
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
@@ -2306,7 +2306,7 @@ describe('ProxyController', () => {
           status: 'failed',
           tenant_id: 'tenant-1',
           error_http_status: 429,
-          routing_reason: 'manifest_rate_limited',
+          routing_reason: 'thinker_rate_limited',
           error_origin: 'policy',
           error_class: 'rate_limit',
           error_code: 'M201',
@@ -2316,7 +2316,7 @@ describe('ProxyController', () => {
 
     it('names which limit fired: per-IP is M202, not the per-user reason', async () => {
       rateLimiter.checkIpLimit.mockImplementation(() => {
-        throw new ManifestError('M202', 429);
+        throw new ThinkerError('M202', 429);
       });
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
@@ -2328,7 +2328,7 @@ describe('ProxyController', () => {
       expect(mockMessageRepo.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           error_code: 'M202',
-          routing_reason: 'manifest_ip_rate_limited',
+          routing_reason: 'thinker_ip_rate_limited',
           error_origin: 'policy',
         }),
       );
@@ -2336,7 +2336,7 @@ describe('ProxyController', () => {
 
     it('names which limit fired: concurrency is M203', async () => {
       rateLimiter.acquireSlot.mockImplementation(() => {
-        throw new ManifestError('M203', 429);
+        throw new ThinkerError('M203', 429);
       });
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
@@ -2348,15 +2348,15 @@ describe('ProxyController', () => {
       expect(mockMessageRepo.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           error_code: 'M203',
-          routing_reason: 'manifest_concurrency_limited',
+          routing_reason: 'thinker_concurrency_limited',
         }),
       );
     });
   });
 
-  describe('Manifest-authored failures', () => {
+  describe('Thinker-authored failures', () => {
     it('records a malformed body (M300) on the request origin, not the provider', async () => {
-      proxyService.proxyRequest.mockRejectedValueOnce(new ManifestError('M300', 400));
+      proxyService.proxyRequest.mockRejectedValueOnce(new ThinkerError('M300', 400));
       const providerSpy = jest.spyOn(recorder, 'recordProviderError');
 
       const req = mockRequest({ messages: [] });
@@ -2382,7 +2382,7 @@ describe('ProxyController', () => {
     it('never records an unauthenticated auth failure — there is no agent to attribute it to', async () => {
       // M005 reaches the proxy only via the guard, which throws before any tenant
       // resolves. If it ever surfaced here it must still write nothing.
-      proxyService.proxyRequest.mockRejectedValueOnce(new ManifestError('M005', 401));
+      proxyService.proxyRequest.mockRejectedValueOnce(new ThinkerError('M005', 401));
 
       const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }] });
       const { res } = mockResponse();
@@ -2395,7 +2395,7 @@ describe('ProxyController', () => {
 
     it('swallows a recorder failure on the stub path rather than failing the response', async () => {
       jest
-        .spyOn(recorder, 'recordManifestBlockedRequest')
+        .spyOn(recorder, 'recordThinkerBlockedRequest')
         .mockRejectedValueOnce(new Error('db down'));
       proxyService.proxyRequest.mockResolvedValue({
         forward: {
@@ -2416,8 +2416,8 @@ describe('ProxyController', () => {
           provider: 'thinker',
           confidence: 1,
           reason: 'no_provider',
-          manifest_error_code: 'M101',
-          manifest_error_message: '[🦚 Manifest M101] No providers set up yet.',
+          thinker_error_code: 'M101',
+          thinker_error_message: '[🦚 Thinker M101] No providers set up yet.',
         },
         failedFallbacks: [],
       });
@@ -2453,8 +2453,8 @@ describe('ProxyController', () => {
           provider: 'thinker',
           confidence: 1,
           reason: 'no_provider_key',
-          manifest_error_code: 'M100',
-          manifest_error_message: '[🦚 Manifest M100] No anthropic API key yet.',
+          thinker_error_code: 'M100',
+          thinker_error_message: '[🦚 Thinker M100] No anthropic API key yet.',
         },
         failedFallbacks: [],
       });
@@ -2471,7 +2471,7 @@ describe('ProxyController', () => {
         expect.objectContaining({
           status: 'failed',
           error_code: 'M100',
-          error_message: '[🦚 Manifest M100] No anthropic API key yet.',
+          error_message: '[🦚 Thinker M100] No anthropic API key yet.',
           error_origin: 'config',
           error_class: 'no_provider_key',
           model: 'auto',
@@ -2956,7 +2956,7 @@ describe('ProxyController', () => {
           choices: expect.arrayContaining([
             expect.objectContaining({
               message: expect.objectContaining({
-                content: expect.stringContaining('[🦚 Manifest M500]'),
+                content: expect.stringContaining('[🦚 Thinker M500]'),
               }),
             }),
           ]),
@@ -3007,7 +3007,7 @@ describe('ProxyController', () => {
           choices: expect.arrayContaining([
             expect.objectContaining({
               message: expect.objectContaining({
-                content: expect.stringContaining('[🦚 Manifest M500]'),
+                content: expect.stringContaining('[🦚 Thinker M500]'),
               }),
             }),
           ]),

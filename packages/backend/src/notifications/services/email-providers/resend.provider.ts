@@ -13,7 +13,7 @@ export class ResendProvider implements EmailProvider {
 
   constructor(config: EmailProviderConfig) {
     this.apiKey = config.apiKey;
-    this.defaultFrom = config.fromEmail ?? 'noreply@manifest.build';
+    this.defaultFrom = config.fromEmail ?? 'noreply@thinker.example.com';
   }
 
   async send(opts: SendEmailOptions): Promise<boolean> {
@@ -30,7 +30,7 @@ export class ResendProvider implements EmailProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: opts.from ?? `Manifest <${this.defaultFrom}>`,
+          from: opts.from ?? `Thinker <${this.defaultFrom}>`,
           to: [opts.to],
           subject: opts.subject,
           html: opts.html,

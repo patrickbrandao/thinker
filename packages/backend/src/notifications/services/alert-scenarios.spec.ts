@@ -16,7 +16,7 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationEmailService } from './notification-email.service';
 import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ManifestRuntimeService } from '../../common/services/manifest-runtime.service';
+import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
 
 /* ── Shared helpers ──────────────────────────────── */
 
@@ -85,7 +85,7 @@ describe('Alert scenarios — email only (notify)', () => {
           },
         },
         {
-          provide: ManifestRuntimeService,
+          provide: ThinkerRuntimeService,
           useValue: {
             getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
           },
@@ -206,7 +206,7 @@ describe('Alert scenarios — email + block (both)', () => {
       } as unknown as EmailProviderConfigService,
       {
         getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-      } as unknown as ManifestRuntimeService,
+      } as unknown as ThinkerRuntimeService,
       {
         hasAlreadySent: mockHasAlreadySent,
         insertLog: mockInsertLog,
@@ -398,7 +398,7 @@ describe('Alert scenarios — no rules defined', () => {
           },
         },
         {
-          provide: ManifestRuntimeService,
+          provide: ThinkerRuntimeService,
           useValue: {
             getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
           },
@@ -421,7 +421,7 @@ describe('Alert scenarios — no rules defined', () => {
       } as unknown as EmailProviderConfigService,
       {
         getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-      } as unknown as ManifestRuntimeService,
+      } as unknown as ThinkerRuntimeService,
       {
         hasAlreadySent: jest.fn().mockResolvedValue(false),
         insertLog: jest.fn().mockResolvedValue(undefined),

@@ -489,25 +489,25 @@ describe('auth.instance', () => {
     });
 
     it('stays a static origin for a single-host install', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://manifest.example.com';
+      process.env['BETTER_AUTH_URL'] = 'https://thinker.example.com';
       delete process.env['CORS_ORIGIN'];
       loadModule();
 
       const config = mockBetterAuth.mock.calls[0][0];
-      expect(config.baseURL).toBe('https://manifest.example.com');
+      expect(config.baseURL).toBe('https://thinker.example.com');
     });
 
     it('never trusts or binds MCP to the former hosted-service domains', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://app.manifest.build';
-      process.env['CORS_ORIGIN'] = 'https://app.manifest.build';
+      process.env['BETTER_AUTH_URL'] = 'https://app.thinker.example.com';
+      process.env['CORS_ORIGIN'] = 'https://app.thinker.example.com';
       const mod = loadModule();
 
       // Even an operator whose canonical URL happens to be one of those hosts
       // gets only what they configured: no implicit sibling host.
       const config = mockBetterAuth.mock.calls[0][0];
-      expect(config.baseURL).toBe('https://app.manifest.build');
-      expect(config.trustedOrigins).not.toContain('https://gateway.manifest.build');
-      expect(mod.mcpResource).toBe('https://app.manifest.build/api/v1/mcp');
+      expect(config.baseURL).toBe('https://app.thinker.example.com');
+      expect(config.trustedOrigins).not.toContain('https://gateway.thinker.example.com');
+      expect(mod.mcpResource).toBe('https://app.thinker.example.com/api/v1/mcp');
       expect(mod).not.toHaveProperty('mcpResources');
       expect(mod).not.toHaveProperty('mcpResourceForHost');
     });
@@ -554,7 +554,7 @@ describe('auth.instance', () => {
     });
 
     it('uses http when the canonical origin is http', () => {
-      process.env['BETTER_AUTH_URL'] = 'http://manifest.internal';
+      process.env['BETTER_AUTH_URL'] = 'http://thinker.internal';
       process.env['CORS_ORIGIN'] = 'http://dashboard.internal';
       loadModule();
 
@@ -596,7 +596,7 @@ describe('auth.instance', () => {
     // process down at import time, so a self-hosted install on a plain-HTTP
     // LAN or tailnet hostname must never reach it (issue #2939).
     it('omits the MCP and CIMD plugins on a plain-HTTP non-loopback origin', () => {
-      process.env['BETTER_AUTH_URL'] = 'http://manifest.example.internal';
+      process.env['BETTER_AUTH_URL'] = 'http://thinker.example.internal';
       const mod = loadModule();
 
       const { mcp } = jest.requireMock('@better-auth/mcp') as { mcp: jest.Mock };
@@ -609,7 +609,7 @@ describe('auth.instance', () => {
     });
 
     it('omits the MCP and CIMD plugins when MCP_ENABLED opts out', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://manifest.example.com';
+      process.env['BETTER_AUTH_URL'] = 'https://thinker.example.com';
       process.env['MCP_ENABLED'] = 'false';
       const mod = loadModule();
 
@@ -637,20 +637,20 @@ describe('auth.instance', () => {
     });
 
     it('configures the MCP plugin for the /api/v1/mcp resource with login and consent pages', () => {
-      process.env['BETTER_AUTH_URL'] = 'https://manifest.example.com';
+      process.env['BETTER_AUTH_URL'] = 'https://thinker.example.com';
       loadModule();
 
       const { mcp } = jest.requireMock('@better-auth/mcp') as { mcp: jest.Mock };
       const config = mcp.mock.calls[0][0];
-      expect(config.resource).toBe('https://manifest.example.com/api/v1/mcp');
+      expect(config.resource).toBe('https://thinker.example.com/api/v1/mcp');
       expect(config.loginPage).toBe('/login');
       expect(config.consentPage).toBe('/consent');
       expect(config.scopes).toEqual(
         expect.arrayContaining(['mcp:read', 'mcp:write', 'offline_access']),
       );
-      expect(config.resources[0].identifier).toBe('https://manifest.example.com/api/v1/mcp');
+      expect(config.resources[0].identifier).toBe('https://thinker.example.com/api/v1/mcp');
       expect(config.clientRegistrationDefaultResources).toEqual([
-        'https://manifest.example.com/api/v1/mcp',
+        'https://thinker.example.com/api/v1/mcp',
       ]);
       expect(config.allowUnauthenticatedClientRegistration).toBe(false);
       expect(config.allowDynamicClientRegistration).toBe(true);

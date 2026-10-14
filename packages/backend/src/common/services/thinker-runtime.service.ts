@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DEFAULT_PORT } from '../constants/server.constants';
 
 @Injectable()
-export class ManifestRuntimeService {
+export class ThinkerRuntimeService {
   constructor(private readonly config: ConfigService) {}
 
   getAuthBaseUrl(): string {

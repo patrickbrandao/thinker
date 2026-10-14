@@ -475,7 +475,7 @@ describe('seedAgentMessages', () => {
       expect(origins.has('provider')).toBe(true);
       expect(origins.has('config')).toBe(true);
       expect(origins.has('transport')).toBe(true);
-      // A Manifest software-limit hit (policy) is seeded too, distinct from provider errors.
+      // A Thinker software-limit hit (policy) is seeded too, distinct from provider errors.
       expect(origins.has('policy')).toBe(true);
     });
 
@@ -495,7 +495,7 @@ describe('seedAgentMessages', () => {
       expect(superseded.length).toBeGreaterThan(0);
     });
 
-    it('surfaces internal (Manifest) errors alongside the other origins', async () => {
+    it('surfaces internal (Thinker) errors alongside the other origins', async () => {
       await seedAgentMessages(mockRepo as never, 'user-1', logger);
       const messages = collectInsertedMessages(mockRepo);
       const origins = new Set(messages.map((m) => m.error_origin as string | null));

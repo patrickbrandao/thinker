@@ -6,7 +6,7 @@ import {
 } from '../services/api.js';
 import { inferProviderName } from '../services/routing-utils.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { manifestErrorDocsUrl, isSuccessStatus } from 'thinker-shared';
+import { thinkerErrorDocsUrl, isSuccessStatus } from 'thinker-shared';
 import { formatErrorClass, formatErrorOrigin } from '../services/formatters.js';
 import { ModelParamsSection, RequestHeadersSection } from './MessageDetailsSections.jsx';
 import { routingTierLabel } from './message-table-types.js';
@@ -194,7 +194,7 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                               <td class="error-recovery-row__meta-value">
                                 <a
                                   class="msg-detail__error-code"
-                                  href={manifestErrorDocsUrl(m.error_code!)}
+                                  href={thinkerErrorDocsUrl(m.error_code!)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >

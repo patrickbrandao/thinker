@@ -131,7 +131,7 @@ beforeAll(async () => {
     origin: 'provider',
     attempts: [{ provider: 'anthropic', model: 'probe-b', status: 'error' }],
   });
-  // Rejected by Manifest before any provider call: no attempt at all.
+  // Rejected by Thinker before any provider call: no attempt at all.
   await seedRequest(ds, 'blocked', {
     msAgo: 5 * HOUR,
     status: 'failed',
@@ -212,7 +212,7 @@ describe('GET /api/v1/messages request filters', () => {
     ['status=ok&trigger=none', ['plain', 'retried']],
     ['status=failed&trigger=none', ['failed', 'blocked']],
     ['origin=provider', ['failed']],
-    ['origin=manifest', ['blocked']],
+    ['origin=thinker', ['blocked']],
     ['provider=anthropic', ['fallback', 'failed', 'edge']],
     ['provider=anthropic&trigger=none', ['failed']],
     ['model=probe-b', ['fallback', 'failed', 'edge']],

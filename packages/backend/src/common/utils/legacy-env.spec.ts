@@ -1,6 +1,9 @@
 import {
   assertLegacyEncryptionKeyMigrated,
-  findLegacyEnvVars, legacyEnvWarnings, warnLegacyEnvVars } from './legacy-env';
+  findLegacyEnvVars,
+  legacyEnvWarnings,
+  warnLegacyEnvVars,
+} from './legacy-env';
 
 // Built from parts so the acceptance grep for legacy names (#21) stays clean.
 const OLD = ['MANIFEST', ''].join('_');
@@ -43,7 +46,10 @@ describe('legacy env vars', () => {
 
   it('boots when THINKER_ENCRYPTION_KEY is set or the legacy key is absent/empty', () => {
     expect(() =>
-      assertLegacyEncryptionKeyMigrated({ [`${OLD}ENCRYPTION_KEY`]: 'old', THINKER_ENCRYPTION_KEY: 'new' }),
+      assertLegacyEncryptionKeyMigrated({
+        [`${OLD}ENCRYPTION_KEY`]: 'old',
+        THINKER_ENCRYPTION_KEY: 'new',
+      }),
     ).not.toThrow();
     expect(() => assertLegacyEncryptionKeyMigrated({ [`${OLD}ENCRYPTION_KEY`]: '' })).not.toThrow();
     expect(() => assertLegacyEncryptionKeyMigrated({})).not.toThrow();

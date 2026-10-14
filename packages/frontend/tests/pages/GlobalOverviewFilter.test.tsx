@@ -267,7 +267,7 @@ const overviewResponse = {
     successful: 17,
     success_rate: 94.4,
     attempt_success_rate: 88.9,
-    manifest_lift_pct: 5.5,
+    thinker_lift_pct: 5.5,
     recovered: 1,
     previous_total: 16,
   },

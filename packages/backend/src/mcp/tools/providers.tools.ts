@@ -47,7 +47,7 @@ export function registerProviderTools(
   operator: McpOperator,
 ): void {
   server.registerTool(
-    'manifest_provider_list',
+    'thinker_provider_list',
     {
       title: 'List provider connections',
       description: 'List the workspace provider connections and their cached model counts.',
@@ -84,7 +84,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_catalog',
+    'thinker_provider_catalog',
     {
       title: 'Provider catalog',
       description: 'List every connectable provider with its supported auth types.',
@@ -107,7 +107,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_custom_list',
+    'thinker_provider_custom_list',
     {
       title: 'List custom providers',
       description:
@@ -133,7 +133,7 @@ export function registerProviderTools(
   if (!operator.scopes.has(MCP_WRITE_SCOPE)) return;
 
   server.registerTool(
-    'manifest_provider_connect',
+    'thinker_provider_connect',
     {
       title: 'Connect a provider',
       description:
@@ -193,7 +193,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_disconnect',
+    'thinker_provider_disconnect',
     {
       title: 'Disconnect a provider',
       description: 'Remove a provider connection from the workspace.',
@@ -221,7 +221,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_refresh',
+    'thinker_provider_refresh',
     {
       title: 'Refresh provider models',
       description:
@@ -262,7 +262,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_custom_add',
+    'thinker_provider_custom_add',
     {
       title: 'Register a custom provider',
       description:
@@ -306,7 +306,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_provider_custom_remove',
+    'thinker_provider_custom_remove',
     {
       title: 'Remove a custom provider',
       description: 'Delete a custom provider registration by name.',
@@ -326,7 +326,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_agent_provider_enable',
+    'thinker_agent_provider_enable',
     {
       title: 'Enable a provider for an agent',
       description: 'Grant one provider connection to a harness.',
@@ -342,7 +342,7 @@ export function registerProviderTools(
   );
 
   server.registerTool(
-    'manifest_agent_provider_disable',
+    'thinker_agent_provider_disable',
     {
       title: 'Disable a provider for an agent',
       description: 'Revoke one provider connection from a harness.',

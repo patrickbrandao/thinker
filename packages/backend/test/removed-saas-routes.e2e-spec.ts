@@ -1,5 +1,5 @@
 /**
- * The Manifest Cloud and marketing surfaces removed in #15 are gone: the
+ * The Thinker Cloud and marketing surfaces removed in #15 are gone: the
  * waitlist, the CRM metrics feed, GitHub stars, free models, the public and
  * internal error pages, and the managed Gemini Free provider. Their routes
  * answer 404 and Gemini Free can no longer be connected.

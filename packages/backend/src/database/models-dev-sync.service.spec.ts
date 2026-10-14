@@ -1785,7 +1785,7 @@ describe('ModelsDevSyncService', () => {
     });
 
     it('should resolve capability-only providers', () => {
-      // `kilo` is a first-class Manifest provider that models.dev may not
+      // `kilo` is a first-class Thinker provider that models.dev may not
       // price, so only the capability catalog resolves it.
       expect(service.lookupModel('kilo', 'openai/gpt-4o-mini')).toBeNull();
       const model = service.lookupModelCapabilities('kilo', 'openai/gpt-4o-mini');

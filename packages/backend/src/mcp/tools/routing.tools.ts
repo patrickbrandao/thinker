@@ -99,7 +99,7 @@ export function registerRoutingTools(
 ): void {
   const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
   server.registerTool(
-    'manifest_routing_status',
+    'thinker_routing_status',
     {
       title: 'Routing status',
       description: 'Report whether a harness can route yet, and why not.',
@@ -123,7 +123,7 @@ export function registerRoutingTools(
   );
 
   server.registerTool(
-    'manifest_routing_fallbacks_get',
+    'thinker_routing_fallbacks_get',
     {
       title: 'Get fallbacks',
       description: 'Read the fallback chain of a tier (default tier by default).',
@@ -141,7 +141,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_fallbacks_set',
+      'thinker_routing_fallbacks_set',
       {
         title: 'Set fallbacks',
         description: 'Replace the fallback chain of a tier. One entry clears the rest.',
@@ -168,7 +168,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_fallbacks_clear',
+      'thinker_routing_fallbacks_clear',
       {
         title: 'Clear fallbacks',
         description: 'Remove the fallback chain from a tier.',
@@ -185,7 +185,7 @@ export function registerRoutingTools(
     );
 
   server.registerTool(
-    'manifest_routing_params_get',
+    'thinker_routing_params_get',
     {
       title: 'Get model params',
       description:
@@ -211,7 +211,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_params_set',
+      'thinker_routing_params_set',
       {
         title: 'Set model params',
         description:
@@ -219,7 +219,7 @@ export function registerRoutingTools(
           'on routed requests (model "auto" or a matching custom-tier header); a request naming a ' +
           'concrete model skips them. ' +
           'set maps a param path to its value ({"reasoning.effort": "high"}); unset lists paths to ' +
-          'remove. Other saved params are kept. Read manifest_routing_params_get first for valid paths.',
+          'remove. Other saved params are kept. Read thinker_routing_params_get first for valid paths.',
         inputSchema: z.object({
           agent: z.string().min(1),
           tier: z.string().min(1).optional(),
@@ -241,7 +241,7 @@ export function registerRoutingTools(
     );
 
   server.registerTool(
-    'manifest_routing_recording_get',
+    'thinker_routing_recording_get',
     {
       title: 'Get recording state',
       description: 'Report whether request recording is on for a harness.',
@@ -259,7 +259,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_recording_set',
+      'thinker_routing_recording_set',
       {
         title: 'Set recording state',
         description: 'Turn request recording on or off for a harness.',
@@ -277,7 +277,7 @@ export function registerRoutingTools(
     );
 
   server.registerTool(
-    'manifest_routing_custom_list',
+    'thinker_routing_custom_list',
     {
       title: 'List custom tiers',
       description: 'List a harness’s header-triggered custom tiers.',
@@ -295,7 +295,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_test',
+      'thinker_routing_test',
       {
         title: 'Test a route end-to-end',
         description:
@@ -416,7 +416,7 @@ export function registerRoutingTools(
                 : surface === 'responses'
                   ? parseResponsesSurface(parsed)
                   : parseCompletionSurface(parsed);
-            if (/^\[🦚 Manifest M\d+\]/.test(surfaceResult.reply)) {
+            if (/^\[🦚 Thinker M\d+\]/.test(surfaceResult.reply)) {
               throw new Error(surfaceResult.reply);
             }
             return {
@@ -438,7 +438,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_agent_configure',
+      'thinker_agent_configure',
       {
         title: 'Configure an agent',
         description:
@@ -591,7 +591,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_custom_create',
+      'thinker_routing_custom_create',
       {
         title: 'Create a custom tier',
         description:
@@ -665,7 +665,7 @@ export function registerRoutingTools(
 
   if (canWrite)
     server.registerTool(
-      'manifest_routing_custom_delete',
+      'thinker_routing_custom_delete',
       {
         title: 'Delete a custom tier',
         description: 'Delete a header-triggered custom tier by id.',

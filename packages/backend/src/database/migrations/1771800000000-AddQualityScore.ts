@@ -55,10 +55,10 @@ export class AddQualityScore1771800000000 implements MigrationInterface {
     ];
 
     for (const [model, score] of scores) {
-      await queryRunner.query(
-        `UPDATE model_pricing SET quality_score = $1 WHERE model_name = $2`,
-        [score, model],
-      );
+      await queryRunner.query(`UPDATE model_pricing SET quality_score = $1 WHERE model_name = $2`, [
+        score,
+        model,
+      ]);
     }
   }
 

@@ -12,7 +12,7 @@ import { ProviderParamSpecService } from '../routing-core/provider-param-spec.se
  * that belongs to this attempt's (provider, auth_type, model) tuple — not
  * the primary route's. Storage is model-scoped on the new
  * `agent_model_params` table, so cross-provider leak is structurally
- * impossible; we no longer need a provider-keyed filter, and Manifest's
+ * impossible; we no longer need a provider-keyed filter, and Thinker's
  * old tier-aware opinion layer is gone too (only the user's explicit
  * config and the provider's natural default participate).
  */

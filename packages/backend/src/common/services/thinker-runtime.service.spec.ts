@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { ManifestRuntimeService } from './manifest-runtime.service';
+import { ThinkerRuntimeService } from './thinker-runtime.service';
 
-describe('ManifestRuntimeService', () => {
+describe('ThinkerRuntimeService', () => {
   it('returns configured auth base URL when present', () => {
     const config = {
       get: jest
@@ -11,7 +11,7 @@ describe('ManifestRuntimeService', () => {
         ),
     } as unknown as ConfigService;
 
-    const service = new ManifestRuntimeService(config);
+    const service = new ThinkerRuntimeService(config);
 
     expect(service.getAuthBaseUrl()).toBe('https://auth.example.com');
   });
@@ -25,7 +25,7 @@ describe('ManifestRuntimeService', () => {
       }),
     } as unknown as ConfigService;
 
-    const service = new ManifestRuntimeService(config);
+    const service = new ThinkerRuntimeService(config);
 
     expect(service.getAuthBaseUrl()).toBe('http://localhost:4010');
   });

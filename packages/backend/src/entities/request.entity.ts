@@ -4,17 +4,17 @@ import type { CallerAttribution } from '../routing/proxy/caller-classifier';
 import type { ProxyApiMode } from '../routing/proxy/proxy-types';
 
 /**
- * One request made by a caller to Manifest.
+ * One request made by a caller to Thinker.
  *
  * Provider work belongs in agent_messages. A row with no attempts is valid:
- * Manifest may reject a request before choosing or contacting a provider.
+ * Thinker may reject a request before choosing or contacting a provider.
  */
 @Entity('requests')
 @Index(['tenant_id', 'agent_id', 'timestamp'])
 @Index(['tenant_id', 'timestamp'])
 @Index(['tenant_id', 'trace_id'])
 @Index(['tenant_id', 'status', 'timestamp'])
-export class ManifestRequest {
+export class ThinkerRequest {
   @PrimaryColumn('varchar')
   id!: string;
 
@@ -75,7 +75,7 @@ export class ManifestRequest {
   requested_model!: string | null;
 
   /**
-   * Which Manifest API surface the caller used: 'chat_completions'
+   * Which Thinker API surface the caller used: 'chat_completions'
    * (/v1/chat/completions), 'responses' (/v1/responses), or 'messages'
    * (/v1/messages). NULL when the surface was not known at write time.
    */

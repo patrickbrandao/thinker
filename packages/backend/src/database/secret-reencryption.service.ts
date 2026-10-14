@@ -62,7 +62,7 @@ interface TableResult {
 /**
  * Rewrites at-rest ciphertext onto the current encryption secret at boot.
  *
- * Manifest derives its AES-256-GCM key from `THINKER_ENCRYPTION_KEY`, falling
+ * Thinker derives its AES-256-GCM key from `THINKER_ENCRYPTION_KEY`, falling
  * back to `BETTER_AUTH_SECRET`. Changing that secret used to brick every stored
  * provider key and OAuth token: the ciphertext carries no key id, and the read
  * paths swallow a decrypt failure as "provider not connected", so the damage

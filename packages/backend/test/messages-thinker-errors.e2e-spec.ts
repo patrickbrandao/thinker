@@ -1,5 +1,5 @@
 /**
- * The Messages log must show every Manifest-authored failure.
+ * The Messages log must show every Thinker-authored failure.
  *
  * Regression e2e for the bug that motivated the error-code work: a "Failed:
  * Setup" row rendered in the Overview's Recent Messages panel but was filtered
@@ -14,8 +14,8 @@ import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './he
 
 let app: INestApplication;
 
-const SETUP_ERROR = '[🦚 Manifest M100] No anthropic API key yet.';
-const BAD_REQUEST_ERROR = '[🦚 Manifest M300] `messages` array is required.';
+const SETUP_ERROR = '[🦚 Thinker M100] No anthropic API key yet.';
+const BAD_REQUEST_ERROR = '[🦚 Thinker M300] `messages` array is required.';
 
 async function seed(
   ds: DataSource,
@@ -90,7 +90,7 @@ const list = (query = ''): request.Test =>
     .set('x-api-key', TEST_API_KEY)
     .expect(200);
 
-describe('Manifest-authored errors in the Messages log', () => {
+describe('Thinker-authored errors in the Messages log', () => {
   it('lists a setup error by default — it is a message, not hidden noise', async () => {
     const res = await list();
     const ids = res.body.items.map((i: { id: string }) => i.id);
@@ -115,8 +115,8 @@ describe('Manifest-authored errors in the Messages log', () => {
     expect(row.error_code).toBe('M300');
   });
 
-  it('narrows to every Manifest origin at once with origin=manifest', async () => {
-    const res = await list('&origin=manifest');
+  it('narrows to every Thinker origin at once with origin=thinker', async () => {
+    const res = await list('&origin=thinker');
     const ids = res.body.items.map((i: { id: string }) => i.id);
 
     expect(ids).toContain(setupErrorId);

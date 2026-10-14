@@ -230,7 +230,7 @@ function reasoningContentFromOutput(output: Record<string, unknown>[]): string {
 /**
  * Prefix-matched so new model generations that rename the summary delta event
  * (issue #2531) keep streaming without a per-model allowlist. Raw
- * chain-of-thought events (`response.reasoning_text*`) never match — Manifest
+ * chain-of-thought events (`response.reasoning_text*`) never match — Thinker
  * only exposes summaries.
  */
 function isReasoningDeltaEvent(eventType: string): boolean {

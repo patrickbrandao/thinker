@@ -10,23 +10,21 @@ describe('dashboard URLs', () => {
   });
 
   it('uses the app dashboard when no deployment URL is configured', () => {
-    expect(getDashboardBaseUrl()).toBe('https://app.manifest.build');
-    expect(getEmailAssetUrl('manifest-logo.png')).toBe(
-      'https://app.manifest.build/manifest-logo.png',
-    );
+    expect(getDashboardBaseUrl()).toBe('http://localhost:2099');
+    expect(getEmailAssetUrl('thinker-logo.png')).toBe('http://localhost:2099/thinker-logo.png');
   });
 
   it('uses the configured deployment for absolute email images', () => {
-    process.env['BETTER_AUTH_URL'] = ' https://selfhosted.example/manifest/// ';
-    expect(getEmailAssetUrl('/manifest-logo.png')).toBe(
-      'https://selfhosted.example/manifest/manifest-logo.png',
+    process.env['BETTER_AUTH_URL'] = ' https://selfhosted.example/thinker/// ';
+    expect(getEmailAssetUrl('/thinker-logo.png')).toBe(
+      'https://selfhosted.example/thinker/thinker-logo.png',
     );
   });
 
   it('keeps an explicitly supplied dashboard ahead of the deployment default', () => {
     process.env['BETTER_AUTH_URL'] = 'https://selfhosted.example';
-    expect(getEmailAssetUrl('manifest-logo.png', 'https://dashboard.example/')).toBe(
-      'https://dashboard.example/manifest-logo.png',
+    expect(getEmailAssetUrl('thinker-logo.png', 'https://dashboard.example/')).toBe(
+      'https://dashboard.example/thinker-logo.png',
     );
   });
 

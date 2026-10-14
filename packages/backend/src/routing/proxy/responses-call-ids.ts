@@ -65,7 +65,7 @@ function isAlternatingPairs(items: CallIdItem[]): boolean {
 
 /** Deterministic replacement id, extended until it collides with nothing. */
 function uniqueCallId(callId: string, pair: number, taken: Set<string>): string {
-  let candidate = `${callId}-mnfst-${pair + 1}`;
+  let candidate = `${callId}-thinker-${pair + 1}`;
   while (taken.has(candidate)) candidate += '-x';
   taken.add(candidate);
   return candidate;

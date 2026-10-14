@@ -179,7 +179,7 @@ describe('MessageDetails', () => {
 
     const codeLink = container.querySelector('.msg-detail__error-code');
     // The base URL is owned by thinker-shared.
-    expect(codeLink?.getAttribute('href')).toBe(`${THINKER_ERRORS_DOCS_BASE}/M100/`);
+    expect(codeLink?.getAttribute('href')).toBe(`${THINKER_ERRORS_DOCS_BASE}#m100`);
     expect(codeLink?.getAttribute('target')).toBe('_blank');
     expect(container.textContent).toContain('No anthropic API key yet');
   });

@@ -254,10 +254,10 @@ describe('ProxyMessageRecorder request parents', () => {
     recorder.onModuleDestroy();
   });
 
-  it('stamps the API surface on a Manifest-blocked Request', async () => {
+  it('stamps the API surface on a Thinker-blocked Request', async () => {
     const { recorder, requestValues } = setup();
 
-    await recorder.recordManifestBlockedRequest(ctx, {
+    await recorder.recordThinkerBlockedRequest(ctx, {
       requestId: 'request-blocked-surface',
       reason: 'no_provider_key',
       errorMessage: 'No provider key',
@@ -284,9 +284,9 @@ describe('ProxyMessageRecorder request parents', () => {
     recorder.onModuleDestroy();
   });
 
-  it('records a Manifest rejection as a failed attempt', async () => {
+  it('records a Thinker rejection as a failed attempt', async () => {
     const { recorder, insert, requestValues } = setup();
-    await recorder.recordManifestBlockedRequest(ctx, {
+    await recorder.recordThinkerBlockedRequest(ctx, {
       requestId: 'request-2',
       reason: 'no_provider_key',
       errorMessage: 'No provider key',

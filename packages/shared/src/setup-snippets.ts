@@ -11,7 +11,7 @@ function stripV1Suffix(baseUrl: string): string {
 }
 
 export function getOpenClawSnippet(baseUrl: string, apiKey: string): string {
-  // Manifest's cloud proxy speaks OpenAI Chat Completions
+  // Thinker's cloud proxy speaks OpenAI Chat Completions
   // (`/v1/chat/completions`). OpenClaw's `openai-responses` parser reads
   // assistant text from the Responses API shape (`output[].content[].text`),
   // which doesn't match — chat bubbles render empty even though tokens are

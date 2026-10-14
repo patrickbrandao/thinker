@@ -1,4 +1,4 @@
-> **WARNING FOR AGENTS: this is the inherited Manifest guide, under rewrite in v0.1.**
+> **WARNING FOR AGENTS: this is the inherited Thinker guide, under rewrite in v0.1.**
 > Thinker is a self-hosted-only fork. While this file is being rewritten, apply these overrides to everything below:
 >
 > - **There is no deployment mode** (#18). `MANIFEST_MODE` and the container detection are gone: the backend always behaves as self-hosted (local providers and LAN/`http://` custom-provider URLs accepted, filesystem recordings without S3), on any runtime.
@@ -6,23 +6,23 @@
 > - **Never call `app.manifest.build` or any other Manifest-hosted endpoint.**
 > - **Do not use the `mnfst` CLI against Manifest's cloud.** The CLI becomes `thinker` and only talks to a Thinker instance.
 
-# Manifest Development Guidelines
+# Thinker Development Guidelines
 
 Last updated: 2026-10-11
 
-## What Manifest Is
+## What Thinker Is
 
-Manifest is a smart model router for **AI agents**. It sits between an agent and its LLM providers, scores each request, and routes it to the cheapest model that can handle it. The dashboard tracks logical requests and their provider attempts, costs, and tokens across any agent that speaks OpenAI-compatible HTTP.
+Thinker is a smart model router for **AI agents**. It sits between an agent and its LLM providers, scores each request, and routes it to the cheapest model that can handle it. The dashboard tracks logical requests and their provider attempts, costs, and tokens across any agent that speaks OpenAI-compatible HTTP.
 
 **"Harness" is the dashboard word for an agent.** The UI now labels agents **Harnesses** (nav item "Harnesses", routes under `/harnesses`, categories `AI agent` / `Automation` / `App AI SDK` / `Coding Assistant` from `CATEGORY_LABELS` in `packages/shared/src/agent-type.ts`). This is a **copy-level rename only**: backend code, database tables (`agents`, `agent_messages`, …), API routes (`/api/v1/agents/*`), and entity/service names all still say *agent*. Legacy `/agents/*` dashboard URLs redirect to `/harnesses/*`. When writing UI copy say "harness"; when writing code or API docs keep "agent".
 
 **Product note:** this repo is **Manifest LLM Gateway**, the open-source LLM gateway of Manifest, available and maintained. The dashboard and the READMEs carry no promotion of the other Manifest product (the self-healing layer at `dashboard.manifest.build`), which is on hold. Thinker removed the dashboard's SaaS layer (#12): no API Bot banner or sidebar card, no plans/upgrade/Stripe UI, no GitHub stars, no Free Models page, no managed Gemini Free, and no cloud-mode branches (the dashboard always behaves as self-hosted). The matching backend endpoints are gone too: billing in #14, and the waitlist, CRM metrics feed, GitHub stars, free models, public and internal error pages and managed Gemini Free in #15.
 
-**Supported agents**: see `AGENT_PLATFORMS` in `packages/shared/src/agent-type.ts` for the current list (OpenClaw, Hermes, Claude Code, OpenCode, generic OpenAI/Anthropic SDK slots, and others — don't duplicate the list here, it grows independently of this doc). OpenClaw remains the deepest integration, but no new code or copy should frame Manifest as OpenClaw-only. When adding examples, prefer "AI agent" as the noun and pick OpenClaw as the worked example rather than the sole target. Manifest is consumed as a generic OpenAI-compatible HTTP endpoint — there are no first-party OpenClaw plugins in this repo anymore.
+**Supported agents**: see `AGENT_PLATFORMS` in `packages/shared/src/agent-type.ts` for the current list (OpenClaw, Hermes, Claude Code, OpenCode, generic OpenAI/Anthropic SDK slots, and others — don't duplicate the list here, it grows independently of this doc). OpenClaw remains the deepest integration, but no new code or copy should frame Thinker as OpenClaw-only. When adding examples, prefer "AI agent" as the noun and pick OpenClaw as the worked example rather than the sole target. Thinker is consumed as a generic OpenAI-compatible HTTP endpoint — there are no first-party OpenClaw plugins in this repo anymore.
 
-The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "new version" check (the version badge reads the build-time `__MANIFEST_VERSION__` constant from `vite.config.ts`), no post-signup Discovery questionnaire, and no Autofix UI. Setup and signup go straight to the dashboard (`/` and `/welcome`). The backend side went in #17 (see [No phone-home](#no-phone-home)). Autofix is gone from the backend too (#16, see [Autofix removed](#autofix-removed)); the generic reliability analytics the dashboard reads live under `/api/v1/overview/reliability/*` (see `RELIABILITY_PATHS` in `packages/frontend/src/services/api/analytics.ts`).
+The dashboard makes no outbound call of its own (#13): no Wingman drawer, no "new version" check (the version badge reads the build-time `__THINKER_VERSION__` constant from `vite.config.ts`), no post-signup Discovery questionnaire, and no Autofix UI. Setup and signup go straight to the dashboard (`/` and `/welcome`). The backend side went in #17 (see [No phone-home](#no-phone-home)). Autofix is gone from the backend too (#16, see [Autofix removed](#autofix-removed)); the generic reliability analytics the dashboard reads live under `/api/v1/overview/reliability/*` (see `RELIABILITY_PATHS` in `packages/frontend/src/services/api/analytics.ts`).
 
-**Three management surfaces share one REST API.** The dashboard, the `mnfst` CLI (`packages/cli/`), and the remote MCP server (`packages/backend/src/mcp/`) all drive the same `/api/v1/*` services with the same tenant scoping. Add a capability to the service layer once, then expose it on whichever surfaces need it; never fork logic per surface. See [CLI login](#cli-login-mnfst-login) and [Remote MCP server](#remote-mcp-server) below.
+**Three management surfaces share one REST API.** The dashboard, the `thinker` CLI (`packages/cli/`), and the remote MCP server (`packages/backend/src/mcp/`) all drive the same `/api/v1/*` services with the same tenant scoping. Add a capability to the service layer once, then expose it on whichever surfaces need it; never fork logic per surface. See [CLI login](#cli-login-thinker-login) and [Remote MCP server](#remote-mcp-server) below.
 
 ## IMPORTANT: Fresh Database per Session
 
@@ -34,7 +34,7 @@ docker start postgres_db 2>/dev/null || \
   docker run -d --name postgres_db -e POSTGRES_USER=myuser -e POSTGRES_PASSWORD=mypassword -e POSTGRES_DB=mydatabase -p 5432:5432 postgres:16
 
 # 2. Create a pristine database with a unique name
-DB_NAME="manifest_$(openssl rand -hex 4)"
+DB_NAME="thinker_$(openssl rand -hex 4)"
 docker exec postgres_db psql -U myuser -d postgres -c "CREATE DATABASE $DB_NAME;"
 
 # 3. Update DATABASE_URL in packages/backend/.env to use the new database
@@ -47,7 +47,7 @@ This guarantees each session starts with a clean, isolated database and avoids a
 
 ## Testing OpenClaw Integration
 
-To test routing from an OpenClaw agent against a local Manifest dev server, point OpenClaw at the dev server's OpenAI-compatible proxy directly — there is no plugin anymore:
+To test routing from an OpenClaw agent against a local Thinker dev server, point OpenClaw at the dev server's OpenAI-compatible proxy directly — there is no plugin anymore:
 
 ```bash
 # 1. Build and start the backend
@@ -57,7 +57,7 @@ PORT=38238 BIND_ADDRESS=127.0.0.1 \
 
 # 2. Configure OpenClaw to use the dev server as a generic OpenAI-compatible provider
 openclaw config set models.providers.thinker '{"baseUrl":"http://localhost:38238/v1","api":"openai-completions","apiKey":"thk_YOUR_KEY","models":[{"id":"auto","name":"Thinker Auto"}]}'
-openclaw config set agents.defaults.model.primary manifest/auto
+openclaw config set agents.defaults.model.primary thinker/auto
 
 # 3. Restart the gateway
 openclaw gateway restart
@@ -87,7 +87,7 @@ packages/
 │   │   │   ├── auth.module.ts               # Registers SessionGuard as APP_GUARD
 │   │   │   ├── session.guard.ts             # Cookie session auth via Better Auth
 │   │   │   ├── current-user.decorator.ts    # @CurrentUser() param decorator
-│   │   │   ├── cli-auth.controller.ts, cli-auth.service.ts # Browser login for the mnfst CLI (PKCE code → `cli` PAT)
+│   │   │   ├── cli-auth.controller.ts, cli-auth.service.ts # Browser login for the thinker CLI (PKCE code → `cli` PAT)
 │   │   │   ├── me.controller.ts             # GET /api/v1/me identity probe (tenant, user, auth method, expiry)
 │   │   │   └── mcp-scopes.ts                # mcp:read / mcp:write scope constants (leaf module, no Better Auth import)
 │   │   ├── database/
@@ -102,7 +102,7 @@ packages/
 │   │   │   ├── tenant.entity.ts             # Multi-tenant root
 │   │   │   ├── agent.entity.ts              # Agent (belongs to tenant)
 │   │   │   ├── agent-api-key.entity.ts      # OTLP ingest keys (thk_*)
-│   │   │   ├── cli-auth-code.entity.ts      # Short-lived PKCE codes for `mnfst login`
+│   │   │   ├── cli-auth-code.entity.ts      # Short-lived PKCE codes for `thinker login`
 │   │   │   └── ...                          # request, agent-message (provider attempt), tenant-provider, tier-assignment, header-tier, etc.
 │   │   ├── common/
 │   │   │   ├── guards/api-key.guard.ts      # X-API-Key header auth (timing-safe)
@@ -111,7 +111,7 @@ packages/
 │   │   │   ├── filters/spa-fallback.filter.ts
 │   │   │   ├── interceptors/               # agent-cache, user-cache
 │   │   │   ├── constants/                   # api-key, cache, ollama, providers, openai-models, xai-models, subscription-clients
-│   │   │   ├── services/                    # ingest-event-bus, manifest-runtime, tenant-cache, request-recording-storage
+│   │   │   ├── services/                    # ingest-event-bus, thinker-runtime, tenant-cache, request-recording-storage
 │   │   │   └── utils/                       # crypto, hash, range, period, slugify, url-validation, provider-inference, postgres-sql, cost-calculator, container-host, frontend-path, og-rewrite, secret-scrub, ttl-cache, local-ip, etc.
 │   │   ├── health/                          # @Public() health check
 │   │   ├── analytics/                       # Dashboard analytics
@@ -171,7 +171,7 @@ packages/
 │   │   │   ├── Setup.tsx                    # First-run setup wizard
 │   │   │   ├── Help.tsx                     # Help page
 │   │   │   ├── AgentLimitsRedirect.tsx, AgentMessagesRedirect.tsx # Legacy per-harness URL redirects
-│   │   │   ├── CliAuth.tsx                  # /cli/auth — approve a `mnfst login` browser request
+│   │   │   ├── CliAuth.tsx                  # /cli/auth — approve a `thinker login` browser request
 │   │   │   ├── Consent.tsx                  # /consent — OAuth consent screen for MCP clients
 │   │   │   └── NotFound.tsx                 # 404 page
 │   │   ├── services/
@@ -190,7 +190,7 @@ packages/
 │   └── tests/
 ├── shared/                           # Shared TypeScript types + helpers (consumed by backend and frontend)
 ├── cli/                              # `thinker` management CLI (private; bin/thinker.js, commands/, generated provider catalog + skill content)
-└── manifest/                         # Code-free shell package holding the canonical Manifest version (see Releases)
+└── thinker/                         # Code-free shell package holding the canonical Thinker version (see Releases)
 ```
 
 Beyond `packages/`, the repo root also carries:
@@ -235,10 +235,10 @@ cd packages/frontend && npx vite
 
 Set `SEED_DATA=true` in `packages/backend/.env` to seed on startup (dev/test only). This creates:
 
-- **Admin user**: `admin@manifest.build` / `manifest` (email verification email is skipped if Mailgun is not configured — user is created but unverified)
+- **Admin user**: `admin@thinker.example.com` / `thinker` (email verification email is skipped if Mailgun is not configured — user is created but unverified)
 - **Tenant**: `seed-tenant-001` linked to the admin user
 - **Agent**: `demo-agent` with OTLP key `dev-otlp-key-001`
-- **API key**: `dev-api-key-manifest-001`
+- **API key**: `dev-api-key-thinker-001`
 - **Security events**: 12 sample events for the security dashboard
 - **Requests and provider attempts**: Sample telemetry for the demo agent
 
@@ -246,7 +246,7 @@ Seeding is idempotent — it checks for existing records before inserting.
 
 **Dev-login shortcut:** when running under the Vite dev server the login page shows a
 prominent one-click **⚡ Sign in as dev** button that submits the seeded
-`admin@manifest.build` / `manifest` credentials — no copy-paste. It's gated by
+`admin@thinker.example.com` / `thinker` credentials — no copy-paste. It's gated by
 `import.meta.env.DEV`, so Vite strips the button and the credential literals from
 production builds, and no password ever rides in a URL. See
 `packages/frontend/src/pages/Login.tsx`.
@@ -265,13 +265,13 @@ SEED_DATA=true
 
 Generate a secret with: `openssl rand -hex 32`
 
-**Database naming convention:** Always create uniquely-named databases to avoid overlapping other dev/test instances. Use the pattern `manifest_<context>_<random>` (e.g., `manifest_sse_49821`, `manifest_dev_83712`). Create databases via Docker:
+**Database naming convention:** Always create uniquely-named databases to avoid overlapping other dev/test instances. Use the pattern `thinker_<context>_<random>` (e.g., `thinker_sse_49821`, `thinker_dev_83712`). Create databases via Docker:
 
 ```bash
-docker exec postgres_db psql -U myuser -d postgres -c "CREATE DATABASE manifest_<name>;"
+docker exec postgres_db psql -U myuser -d postgres -c "CREATE DATABASE thinker_<name>;"
 ```
 
-Then set `DATABASE_URL=postgresql://myuser:mypassword@localhost:5432/manifest_<name>` in `.env`.
+Then set `DATABASE_URL=postgresql://myuser:mypassword@localhost:5432/thinker_<name>` in `.env`.
 
 ```bash
 # Production build + start (single server)
@@ -337,7 +337,7 @@ Three global guards run on every request (order matters):
 2. **ApiKeyGuard** (`common/guards/api-key.guard.ts`) — Falls through if session already set. Otherwise reads the `X-API-Key` header and first looks it up against the tenant-scoped `ApiKey` entity (`api_keys` table, hashed with scrypt) — this is the primary multi-tenant credential path. Only if no DB match is found does it fall back to a timing-safe compare against the single `API_KEY` env var. Use `@Public()` to skip both guards.
 3. **ThrottlerGuard** — Rate limiting.
 
-`mnfst` CLI tokens are ordinary `api_keys` rows named `cli` (`CLI_KEY_NAME` in `auth/cli-auth.service.ts`), so they ride the `ApiKeyGuard` path with no special casing; the guard also enforces their sliding and absolute TTLs. The remote MCP route is `@Public()` because it carries its own credential (an OAuth 2.1 bearer) — see [Remote MCP server](#remote-mcp-server).
+`thinker` CLI tokens are ordinary `api_keys` rows named `cli` (`CLI_KEY_NAME` in `auth/cli-auth.service.ts`), so they ride the `ApiKeyGuard` path with no special casing; the guard also enforces their sliding and absolute TTLs. The remote MCP route is `@Public()` because it carries its own credential (an OAuth 2.1 bearer) — see [Remote MCP server](#remote-mcp-server).
 
 ### Better Auth Setup
 
@@ -373,7 +373,7 @@ The default login is a browser flow, PKCE-protected so an intercepted code is us
 
 Non-interactive alternatives: `--token-stdin` or `--token-env`. The secret is never a CLI argument. `GET /api/v1/me` is the identity probe (`{ tenantId, userId, authMethod, expiresAt }`); it fails closed with 401 for the env `API_KEY` operator fallback because that credential attaches no tenant. Token lifetime: `CLI_TOKEN_TTL_DAYS` (sliding, default 30) capped by `CLI_TOKEN_ABSOLUTE_TTL_DAYS` (hard ceiling from issuance, default 90).
 
-The CLI refuses HTTP redirects (so the key cannot leak cross-origin) and strips inherited `THINKER_AGENT_KEY` / `THINKER_API_KEY` from `thinker run` children. `thinker routing test` sends `User-Agent: thinker-cli/<version>` so gateway caller attribution (`routing/proxy/caller-classifier.ts`, which also recognises the n8n node's `n8n-nodes-manifest/<version>` UA) can tell CLI test traffic apart from real agent traffic in request details.
+The CLI refuses HTTP redirects (so the key cannot leak cross-origin) and strips inherited `THINKER_AGENT_KEY` / `THINKER_API_KEY` from `thinker run` children. `thinker routing test` sends `User-Agent: thinker-cli/<version>` so gateway caller attribution (`routing/proxy/caller-classifier.ts`, which also recognises the n8n node's `n8n-nodes-thinker/<version>` UA) can tell CLI test traffic apart from real agent traffic in request details.
 
 ### Remote MCP server
 
@@ -398,7 +398,7 @@ User (Better Auth) ──→ Tenant ──→ Agent ──→ AgentApiKey (thk_*
 - **Tenant** (`tenants` table): Created automatically on first agent creation. `tenant.owner_user_id` = `user.id` is the ONLY user→tenant link (resolved through `TenantCacheService`); `tenant.name` mirrors it for display until repurposed as a slug.
 - **Agent** (`agents` table): Belongs to a tenant. Unique constraint on `[tenant_id, name]`.
 - **AgentApiKey** (`agent_api_keys` table): One-to-one with agent. `thk_*` format key for OTLP ingestion.
-- **ApiKey** (`api_keys` table): A separate, tenant-scoped credential (not per-agent) used for dashboard/API access — the primary key `ApiKeyGuard` checks. Distinct from `AgentApiKey`. `mnfst login` PATs are rows of this table named `cli`.
+- **ApiKey** (`api_keys` table): A separate, tenant-scoped credential (not per-agent) used for dashboard/API access — the primary key `ApiKeyGuard` checks. Distinct from `AgentApiKey`. `thinker login` PATs are rows of this table named `cli`.
 - **Onboarding flow**: `ApiKeyGeneratorService.onboardAgent()` creates tenant (if new) + agent + API key via three sequential inserts.
 
 ### Data Isolation
@@ -426,8 +426,8 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET/PATCH/DELETE          | `/api/v1/messages/:id/*`                        | Session/API Key                     | Request details, feedback, miscategorized flag (legacy route name)                                          |
 | GET                       | `/api/v1/security`                              | Session/API Key                     | Security score + events                                                                                     |
 | GET                       | `/api/v1/model-prices`                          | Session/API Key                     | Model pricing list                                                                                          |
-| GET                       | `/api/v1/agent/usage`                           | Bearer / x-api-key (mnfst\_\*)      | Token usage for the calling agent                                                                           |
-| GET                       | `/api/v1/agent/costs`                           | Bearer / x-api-key (mnfst\_\*)      | Cost data for the calling agent                                                                             |
+| GET                       | `/api/v1/agent/usage`                           | Bearer / x-api-key (thk\_\*)          | Token usage for the calling agent                                                                           |
+| GET                       | `/api/v1/agent/costs`                           | Bearer / x-api-key (thk\_\*)          | Cost data for the calling agent                                                                             |
 | GET                       | `/api/v1/overview/*`                            | Session/API Key                     | Overview timeseries/breakdown sub-endpoints                                                                 |
 | GET                       | `/api/v1/providers` / `/api/v1/providers/usage` | Session/API Key                     | Connected provider list + usage                                                                             |
 | GET                       | `/api/v1/provider-analytics/*`                  | Session/API Key                     | Per-provider analytics                                                                                      |
@@ -436,25 +436,25 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 | GET/PUT/DELETE            | `/api/v1/agents/:agentName/enabled-providers*`  | Session/API Key                     | Per-agent provider enable/disable + impact preview                                                          |
 | GET/POST/PATCH/DELETE     | `/api/v1/notifications/*`                       | Session/API Key                     | Notification rules CRUD + email provider config                                                             |
 | GET/POST/PUT/PATCH/DELETE | `/api/v1/routing/:agentName/*`                  | Session/API Key                     | Routing config (tiers, providers, model-params, header-tiers, custom-providers, specificity, recording, etc.) |
-| GET/PATCH                 | `/api/v1/routing/:agentName/tiers/:tier/model-params` | Session/API Key                     | Model params addressed by tier (`default` or a custom tier name) + `?model=` (defaults to the tier primary); backs `mnfst routing params` and the MCP `manifest_routing_params_*` tools. Writes the same rows as the scope-keyed `…/model-params` |
+| GET/PATCH                 | `/api/v1/routing/:agentName/tiers/:tier/model-params` | Session/API Key                     | Model params addressed by tier (`default` or a custom tier name) + `?model=` (defaults to the tier primary); backs `thinker routing params` and the MCP `thinker_routing_params_*` tools. Writes the same rows as the scope-keyed `…/model-params` |
 | POST                      | `/api/v1/routing/ollama/sync`                   | Session/API Key                     | Sync Ollama models                                                                                          |
 | GET                       | `/api/v1/routing/pricing-health`                | Session/API Key                     | OpenRouter pricing sync health                                                                              |
 | POST                      | `/api/v1/routing/pricing/refresh`               | Session/API Key                     | Force pricing cache refresh                                                                                 |
 | GET/POST/DELETE           | `/api/v1/oauth/:provider/*`                     | Session/API Key                     | OAuth flows (Gemini, OpenAI, Anthropic, xAI, Kiro, MiniMax)                                                 |
-| POST                      | `/api/v1/routing/resolve`                       | Bearer / x-api-key (mnfst\_\*)      | Model resolution                                                                                            |
-| POST                      | `/api/v1/routing/subscription-providers`        | Bearer / x-api-key (mnfst\_\*)      | Subscription provider config                                                                                |
+| POST                      | `/api/v1/routing/resolve`                       | Bearer / x-api-key (thk\_\*)          | Model resolution                                                                                            |
+| POST                      | `/api/v1/routing/subscription-providers`        | Bearer / x-api-key (thk\_\*)          | Subscription provider config                                                                                |
 | GET                       | `/api/v1/setup/status`                          | Public                              | First-run setup status                                                                                      |
 | POST                      | `/api/v1/setup/admin`                           | Public                              | Create initial admin user                                                                                   |
-| GET                       | `/v1/models`                                    | Bearer / x-api-key (mnfst\_\*)      | Available model list (proxy)                                                                                |
-| POST                      | `/v1/chat/completions`                          | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (OpenAI-compatible)                                                                               |
-| POST                      | `/v1/responses`                                 | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (OpenAI Responses API)                                                                            |
-| POST                      | `/v1/messages`                                  | Bearer / x-api-key (mnfst\_\*)      | LLM proxy (Anthropic Messages API)                                                                          |
+| GET                       | `/v1/models`                                    | Bearer / x-api-key (thk\_\*)          | Available model list (proxy)                                                                                |
+| POST                      | `/v1/chat/completions`                          | Bearer / x-api-key (thk\_\*)          | LLM proxy (OpenAI-compatible)                                                                               |
+| POST                      | `/v1/responses`                                 | Bearer / x-api-key (thk\_\*)          | LLM proxy (OpenAI Responses API)                                                                            |
+| POST                      | `/v1/messages`                                  | Bearer / x-api-key (thk\_\*)          | LLM proxy (Anthropic Messages API)                                                                          |
 | POST                      | `/chat/completions`                             | Public                              | Structured 404 pointing callers at `/v1/chat/completions` (missing `/v1` basePath — not a proxy alias)      |
 | ALL                       | `/otlp/v1/*`, `/v1/{traces,metrics,logs}`       | Public                              | Structured **410 Gone** — OTLP ingest is removed (`otlp-deprecated.controller.ts`)                          |
 | GET/POST/PATCH            | `/api/v1/playground/*`                          | Session/API Key                     | Playground runs (run, list, star, mark best)                                                                |
 | GET                       | `/api/v1/events`                                | Session                             | SSE real-time events                                                                                        |
 | GET                       | `/api/v1/me`                                    | Session/API Key (tenant required)   | Identity probe for CLI/API clients: `{ tenantId, userId, authMethod, expiresAt }`; env `API_KEY` gets 401    |
-| POST                      | `/api/v1/cli/authorize`                         | Session only                        | Browser side of `mnfst login`: mints a PKCE-bound short-lived code                                          |
+| POST                      | `/api/v1/cli/authorize`                         | Session only                        | Browser side of `thinker login`: mints a PKCE-bound short-lived code                                          |
 | POST/DELETE               | `/api/v1/cli/token`                             | Public (code + verifier) / API Key  | Exchange the code for a `cli` PAT; DELETE revokes the calling PAT on logout                                 |
 | POST                      | `/api/v1/mcp`                                   | OAuth 2.1 bearer (`mcp:read`/`mcp:write`) | Remote MCP server (stateless Streamable HTTP); GET/DELETE answer 405 + `Allow: POST`                  |
 | GET                       | `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource[/api/v1/mcp]` | Public | OAuth discovery for MCP clients (root aliases of Better Auth's `/api/auth/.well-known/…`)   |
@@ -479,7 +479,7 @@ Thinker reads only `THINKER_*` names (#21); the upstream-era names are not alias
 - `FRONTEND_PORT` — Extra trusted origin port for Better Auth.
 - `MCP_ENABLED` — Set `false` to run without the remote MCP server. MCP needs an HTTPS `BETTER_AUTH_URL` (loopback HTTP is fine in dev) because `@better-auth/mcp` validates its protected-resource URL as the plugin is built; a plain-HTTP LAN or tailnet origin turns MCP off **automatically**, so this variable is only for switching it off on an install that could otherwise serve it. See [Remote MCP server](#remote-mcp-server).
 - `API_KEY` — Secret for programmatic API access (X-API-Key header).
-- `CLI_TOKEN_TTL_DAYS` — Sliding TTL in days for CLI-minted tokens (`mnfst login`); every authenticated request pushes the expiry out again. Default: `30`
+- `CLI_TOKEN_TTL_DAYS` — Sliding TTL in days for CLI-minted tokens (`thinker login`); every authenticated request pushes the expiry out again. Default: `30`
 - `CLI_TOKEN_ABSOLUTE_TTL_DAYS` — Hard ceiling in days from issuance for CLI-minted tokens; the sliding TTL never outlives it. Default: `90`
 - `THROTTLE_TTL` — Rate limit window in ms. Default: `60000`
 - `THROTTLE_LIMIT` — Max requests per window. Default: `100`
@@ -499,7 +499,7 @@ Thinker reads only `THINKER_*` names (#21); the upstream-era names are not alias
 - `EMAIL_PROVIDER` — Unified email provider: `resend` (recommended), `mailgun`, or `sendgrid`. Used for Better Auth transactional emails and threshold alerts.
 - `EMAIL_API_KEY` — API key for the configured `EMAIL_PROVIDER`.
 - `EMAIL_DOMAIN` — Sending domain (required for Mailgun).
-- `EMAIL_FROM` — Sender address. Default: `noreply@manifest.build`
+- `EMAIL_FROM` — Sender address. Default: `noreply@thinker.example.com`
 - `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` / `NOTIFICATION_FROM_EMAIL` — Legacy Mailgun-only variables. Deprecated; use `EMAIL_*` instead. Still honored for backward compatibility.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (optional)
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub OAuth (optional)
@@ -525,10 +525,10 @@ Thinker reads only `THINKER_*` names (#21); the upstream-era names are not alias
 
 ## Domain Terminology
 
-Manifest terminology is directional:
+Thinker terminology is directional:
 
-- A **Manifest Request** is one logical request from an agent to Manifest and lives in `requests`.
-- A **Provider Attempt** is one request from Manifest to an AI provider and lives in `agent_messages`.
+- A **Thinker Request** is one logical request from an agent to Thinker and lives in `requests`.
+- A **Provider Attempt** is one request from Thinker to an AI provider and lives in `agent_messages`.
 - A **Tenant** is a user's data boundary. It is created from `user.id` on first agent creation.
 - An **Agent** is an AI agent owned by a tenant. It has a unique OTLP ingest key. The dashboard labels agents **Harnesses** (UI copy only — code, DB, and API keep "agent").
 
@@ -545,27 +545,27 @@ Any backend endpoint that returns provider-attempt fields rendered by the fronte
 
 This rule exists because the Overview and Messages pages previously drifted and the Recent Messages badge read `STANDARD` instead of the specificity category (`CODING` etc.) — the frontend already shares the rendering code, so the divergence was purely backend projection drift.
 
-## Manifest's own errors (`M###`)
+## Thinker's own errors (`M###`)
 
-Every failure Manifest itself produces — as opposed to one a provider returned — carries a documented code from `THINKER_ERRORS` in `packages/backend/src/common/errors/error-codes.ts`, published at `https://manifest.build/llm-gateway/docs/errors/<code>`.
+Every failure Thinker itself produces — as opposed to one a provider returned — carries a documented code from `THINKER_ERRORS` in `packages/backend/src/common/errors/error-codes.ts`, documented in `docs/erros.md` (`thinkerErrorDocsUrl(code)` links to `docs/erros.md#<code>` in the repository).
 
-**Raise them with `ManifestError`** (`common/errors/manifest-error.ts`), never a bare `HttpException`. The type is what lets `proxy.controller.ts` tell "Manifest refused this request" from "the provider returned a 4xx". Before it existed, a malformed body (M300) and a Manifest bug (M500) were both recorded as _provider_ errors and counted against `provider_error_rate`.
+**Raise them with `ThinkerError`** (`common/errors/thinker-error.ts`), never a bare `HttpException`. The type is what lets `proxy.controller.ts` tell "Thinker refused this request" from "the provider returned a 4xx". Before it existed, a malformed body (M300) and a Thinker bug (M500) were both recorded as _provider_ errors and counted against `provider_error_rate`.
 
-**Every code is recorded on a Manifest Request**, with five exceptions. `M001`, `M002`, `M003`, `M005`, and `M006` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_THINKER_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.manifestErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/manifest-error.spec.ts` fails if a new code is neither mapped in `THINKER_CODE_TO_REASON` nor declared unrecordable.
+**Every code is recorded on a Thinker Request**, with five exceptions. `M001`, `M002`, `M003`, `M005`, and `M006` are raised by `AgentKeyAuthGuard` before a key resolves to a tenant, so there is no agent to attribute a row to — they're listed in `UNRECORDABLE_THINKER_CODES` and write nothing. (`M004`, an expired key, _does_ resolve an agent, so the guard stashes it on `request.thinkerErrorContext` and `ProxyExceptionFilter` records it.) `__tests__/thinker-error.spec.ts` fails if a new code is neither mapped in `THINKER_CODE_TO_REASON` nor declared unrecordable.
 
-**`ProxyMessageRecorder.recordManifestBlockedRequest()` is the only writer of Manifest-authored rejected requests.** It creates one `requests` row, stamps `requests.error_code` plus the _rendered_ message (the `[🦚 Manifest M100] No anthropic API key yet. Add one here: …` text the caller saw — not a generic stand-in), and creates zero `agent_messages` rows because no provider was contacted. Do not route these through `recordSuccessMessage` or manufacture a `provider='thinker'` attempt.
+**`ProxyMessageRecorder.recordThinkerBlockedRequest()` is the only writer of Thinker-authored rejected requests.** It creates one `requests` row, stamps `requests.error_code` plus the _rendered_ message (the `[🦚 Thinker M100] No anthropic API key yet. Add one here: …` text the caller saw — not a generic stand-in), and creates zero `agent_messages` rows because no provider was contacted. Do not route these through `recordSuccessMessage` or manufacture a `provider='thinker'` attempt.
 
 `M500` is the deliberate exception to "store what the caller saw": the caller gets the friendly "Something broke on our end", while the row stores the raw internal error message. The dashboard is where you go to find out what actually broke, so don't "fix" it to match.
 
-**The Requests log hides no origin.** The legacy `getMessages()` API method applies an origin filter only when the caller passes `?origin=`. It previously hid `config` requests by default while the Overview showed them — so a user who saw a "Failed: Setup" request and clicked through found nothing, with no filter anywhere to bring it back. `messages-manifest-errors.e2e-spec.ts` pins the fix.
+**The Requests log hides no origin.** The legacy `getMessages()` API method applies an origin filter only when the caller passes `?origin=`. It previously hid `config` requests by default while the Overview showed them — so a user who saw a "Failed: Setup" request and clicked through found nothing, with no filter anywhere to bring it back. `messages-thinker-errors.e2e-spec.ts` pins the fix.
 
 ### The `request` error origin
 
-`ERROR_ORIGINS` (in `packages/shared/src/error-taxonomy.ts`) has six values. `request` means the caller sent a body Manifest could not route — not the operator's setup (`config`), not a limit they set (`policy`), and not a Manifest bug (`internal`).
+`ERROR_ORIGINS` (in `packages/shared/src/error-taxonomy.ts`) has six values. `request` means the caller sent a body Thinker could not route — not the operator's setup (`config`), not a limit they set (`policy`), and not a Thinker bug (`internal`).
 
-`request` is a member of `THINKER_ERROR_ORIGINS`. Do not confuse the error-origin value with the `requests` table: it classifies who caused an error. That membership is load-bearing because it keeps caller-caused failures out of provider reliability metrics and inside the `origin=manifest` filter shorthand. Any new origin that is not a provider round-trip belongs there too.
+`request` is a member of `THINKER_ERROR_ORIGINS`. Do not confuse the error-origin value with the `requests` table: it classifies who caused an error. That membership is load-bearing because it keeps caller-caused failures out of provider reliability metrics and inside the `origin=thinker` filter shorthand. Any new origin that is not a provider round-trip belongs there too.
 
-### Fallback exhaustion is a provider error, not a Manifest code
+### Fallback exhaustion is a provider error, not a Thinker code
 
 When the primary and every fallback fail, the response **says what the provider said**: the message leads with the primary provider's own sentence followed by a one-line summary of every attempt, `source` is always `provider`, and `code` holds only the provider's own code. Exhaustion is a routing outcome, carried by `fallback_exhausted: true` in the body and the `X-Thinker-Fallback-Exhausted` header — it is **not** an error class and gets no `M###` code. Each `attempted_fallbacks[]` entry carries its sanitized `message`, `code`, and `auth_type`. The provider-error parsers also understand FastAPI-style `{detail}` bodies (how ChatGPT Codex rejects an unsupported model) and bare `{"error": "…"}` strings, so those no longer collapse to a generic "Bad request to upstream provider".
 
@@ -618,7 +618,7 @@ The only outbound destinations left are the providers the operator configures an
 | `models.dev/api.json` | `ModelsDevSyncService` | boot (fire-and-forget) and daily at 04:00, plus manual model refreshes |
 | `raw.githubusercontent.com/.../go.mdx` | `OpencodeGoCatalogService` | only when an OpenCode Go provider is registered: the boot warmup checks `tenant_providers` first, and every other caller (that provider's discovery, its proxied requests and playground runs, its models in the picker) is already scoped to OpenCode Go; cached 1 h |
 
-**`THINKER_CATALOG_SYNC=false`** (also `0`, `no`, `off`; read at call time by `isCatalogSyncEnabled()` in `common/utils/catalog-sync.ts`) turns all three off: no boot fetch, the crons and `POST /api/v1/routing/pricing/refresh` become no-ops, and the OpenCode Go catalog returns `[]` without fetching. `GET /api/v1/routing/pricing-health` and the refresh endpoint report `sync_enabled`, and the routing status (REST and the MCP `manifest_routing_status` tool) no longer blames the empty OpenRouter cache for an unroutable agent, since that cache is empty by design.
+**`THINKER_CATALOG_SYNC=false`** (also `0`, `no`, `off`; read at call time by `isCatalogSyncEnabled()` in `common/utils/catalog-sync.ts`) turns all three off: no boot fetch, the crons and `POST /api/v1/routing/pricing/refresh` become no-ops, and the OpenCode Go catalog returns `[]` without fetching. `GET /api/v1/routing/pricing-health` and the refresh endpoint report `sync_enabled`, and the routing status (REST and the MCP `thinker_routing_status` tool) no longer blames the empty OpenRouter cache for an unroutable agent, since that cache is empty by design.
 
 What the operator loses with the sync off, as ADR 0003 accepted:
 
@@ -679,7 +679,7 @@ Otherwise the agent is **clean** and gets the simplified view. The signals live 
 - **Old user, existing agent that used complexity/task-specific** → stays legacy → full surfaces + banners, behavior untouched.
 - **Old user creating a _new_ agent** → the new agent is **clean** (it has no complexity/specificity config of its own), so it gets the **simplified view** — even though the user is "old". An old user whose agent long ago stopped using these (no active config left) is likewise treated as clean.
 
-Dev seeding (`packages/backend/src/database/seed-cohorts.ts`, `seedRoutingCohorts`) creates two demo logins so both states are visible side by side: `admin@manifest.build` (clean — Default + Custom only) and `olduser@manifest.build` (legacy — complexity + task-specific visible). Both passwords are `manifest`. Seeding is idempotent.
+Dev seeding (`packages/backend/src/database/seed-cohorts.ts`, `seedRoutingCohorts`) creates two demo logins so both states are visible side by side: `admin@thinker.example.com` (clean — Default + Custom only) and `olduser@thinker.example.com` (legacy — complexity + task-specific visible). Both passwords are `thinker`. Seeding is idempotent.
 
 Still to come (not in this phase): a migration assistant (task-specific → header rules, complexity → collapse to default) and a committed end date.
 
@@ -687,8 +687,8 @@ Still to come (not in this phase): a migration assistant (task-specific → head
 
 Thinker has no Autofix (#16; the dashboard side went in #13). Upstream's Autofix handed a failed request to Manifest's hosted healer (Phoenix, `autofix.manifest.build`) and resent the patched body once before the fallback chain ran; it also pinged the healer at every production boot. All of that is gone:
 
-- **Proxy:** a failed primary goes straight to `shouldTriggerFallback` and the fallback chain, exactly as for an agent that never opted in. `ForwardResult` no longer exposes the wire body or a retry hook (only `wireFormat` remains, for the response handler), there is no heal-once branch, no observation reporter, and the `x-manifest-provider` / `x-manifest-auth-type` headers no longer rewrite the routing model. The primary is always attempt 1.
-- **API:** `GET/PATCH /api/v1/routing/:agentName/autofix`, `GET /api/v1/autofix/status`, `POST /api/v1/autofix/enable-all` and the `/api/v1/overview/autofix-*` analytics answer 404. The generic reliability metrics moved to `/api/v1/overview/reliability/{stats,timeseries,per-agent,per-provider,per-model}` without the Autofix fields (`autofix_saves`, `coverage`, `dispositions`, `needs_attention`, per-agent `autofixed`, the `autofix` timeseries dimension, the `healed` disposition). The Requests log `trigger` filter accepts `none` and `fallback` only. `autofix_enabled` is rejected on agent create. The MCP `manifest_routing_autofix_*` tools and the CLI `routing autofix` command and `--autofix` flag are gone.
+- **Proxy:** a failed primary goes straight to `shouldTriggerFallback` and the fallback chain, exactly as for an agent that never opted in. `ForwardResult` no longer exposes the wire body or a retry hook (only `wireFormat` remains, for the response handler), there is no heal-once branch, no observation reporter, and the `x-thinker-provider` / `x-thinker-auth-type` headers no longer rewrite the routing model. The primary is always attempt 1.
+- **API:** `GET/PATCH /api/v1/routing/:agentName/autofix`, `GET /api/v1/autofix/status`, `POST /api/v1/autofix/enable-all` and the `/api/v1/overview/autofix-*` analytics answer 404. The generic reliability metrics moved to `/api/v1/overview/reliability/{stats,timeseries,per-agent,per-provider,per-model}` without the Autofix fields (`autofix_saves`, `coverage`, `dispositions`, `needs_attention`, per-agent `autofixed`, the `autofix` timeseries dimension, the `healed` disposition). The Requests log `trigger` filter accepts `none` and `fallback` only. `autofix_enabled` is rejected on agent create. The MCP `thinker_routing_autofix_*` tools and the CLI `routing autofix` command and `--autofix` flag are gone.
 - **Schema:** `DropAutofixSchema1803400000000` drops `agents.autofix_enabled`, the `agent_messages.autofix_*` columns (`autofix_phoenix` included), `requests.autofix_status` with its check constraint, `install_metadata.autofix_consented_at`, and the `IDX_agent_messages_autofix_group`, `IDX_agent_messages_autofix_request` and `IDX_requests_autofix_healed` indexes, with `lock_timeout` set and `IF EXISTS` throughout. `down()` restores them, empty. `AddRequestsAutofixHealedIndex1802200000000` now runs its self-hosted path (no-op) everywhere.
 - **Shared:** `deriveAutofixStatus`, `AUTOFIX_STATUSES` and the `auto_fixed` status are gone.
 
@@ -797,28 +797,28 @@ Only the `ci.yml` checks can be required on `main`. The others are path-filtered
 
 > **Thinker:** the inherited `release.yml`, `docker.yml`, `publish-cli.yml`, `publish-n8n-node.yml`, `dockerhub-description.yml`, `phoenix-contract-drift.yml` and `db-diagram*.yml` workflows were removed in #38. The current CI is described in "Continuous integration" above; the new `docker.yml` only validates the build. The release flow for `tmsoftbrasil/thinker` lands in #31. The rest of this section describes the upstream flow and no longer applies.
 
-Most workspace packages are **not published to npm**: `packages/backend`, `packages/frontend`, `packages/shared`, and `packages/manifest` are all `private: true`. Manifest itself ships as the Docker image at `manifestdotbuild/manifest` (built from `docker/Dockerfile`).
+Most workspace packages are **not published to npm**: `packages/backend`, `packages/frontend`, `packages/shared`, and `packages/thinker` are all `private: true`. Thinker itself ships as the Docker image at `tmsoftbrasil/thinker` (built from `docker/Dockerfile`).
 
 `packages/cli` (`thinker-cli`, binary `thinker`) is `private: true` too and is not published to any registry; users install it from a checkout (`npm install -g ./packages/cli` or a local `npm pack`). Its version **tracks the Thinker release**: it has no changeset target of its own and stays in the `.changeset/config.json` ignore list. `npm run set-version --workspace=packages/cli` stamps the version from `packages/thinker/package.json` onto the three files that carry it (`packages/cli/package.json`, `src/version.ts`, and the generated `SKILL_VERSION` in `src/skill-content.gen.ts`, which `skill-content.spec.ts` pins to package.json).
 
 The **n8n community node** `n8n-nodes-thinker` (`integrations/n8n-nodes-thinker/`, v0.1.0) is standalone — outside the npm workspaces, Turborepo, and Changesets — with its own `package-lock.json`, build (`npm run build`) and tests (`npm test`). It is not published to any registry; `dist/` is git-ignored and users install the tarball from `npm pack` as a community node. Its nodes are `Thinker` and `LmChatThinker`, its credential `ThinkerApi` (`thinkerApi`), and requests carry `User-Agent: n8n-nodes-thinker`, which `routing/proxy/caller-classifier.ts` recognises.
 
-### `packages/manifest/` is the canonical version
+### `packages/thinker/` is the canonical version
 
-`packages/manifest/` is a **code-free shell package** that exists only to hold the canonical "Manifest version". It has no `src/`, no tests, no dependencies — just `package.json`, `README.md`, and (after the first release) a `CHANGELOG.md`. The real backend and frontend live under `packages/backend/` and `packages/frontend/` as before.
+`packages/thinker/` is a **code-free shell package** that exists only to hold the canonical "Thinker version". It has no `src/`, no tests, no dependencies — just `package.json`, `README.md`, and (after the first release) a `CHANGELOG.md`. The real backend and frontend live under `packages/backend/` and `packages/frontend/` as before.
 
-`.changeset/config.json` has `"ignore": ["manifest-backend", "manifest-frontend", "manifest-shared", "mnfst-cli"]`, so when a contributor runs `npx changeset`, **only `manifest` is a selectable target**. Bumps to `manifest-backend` / `manifest-frontend` / `manifest-shared` / `mnfst-cli` are silently discarded. Always target `manifest` regardless of which files you actually changed. A CI check (`scripts/check-changesets.js`, wired into the `changeset-check` job) enforces this: a changeset that targets an ignored package fails the PR, because it makes `changeset version` a no-op and breaks the Release workflow with "No commits between main and changeset-release/main".
+`.changeset/config.json` has `"ignore": ["thinker-backend", "thinker-frontend", "thinker-shared", "thinker-cli"]`, so when a contributor runs `npx changeset`, **only `thinker` is a selectable target**. Bumps to `thinker-backend` / `thinker-frontend` / `thinker-shared` / `thinker-cli` are silently discarded. Always target `thinker` regardless of which files you actually changed. A CI check (`scripts/check-changesets.js`, wired into the `changeset-check` job) enforces this: a changeset that targets an ignored package fails the PR, because it makes `changeset version` a no-op and breaks the Release workflow with "No commits between main and changeset-release/main".
 
 ### Adding a changeset
 
 ```bash
 npx changeset
-# → select "manifest"
+# → select "thinker"
 # → choose patch / minor / major
 # → write a one-line summary (this becomes the CHANGELOG entry)
 ```
 
-Commit the generated `.changeset/*.md` file alongside your code. On merge to `main`, `release.yml` runs `changesets/action`, which opens (or updates) a `chore: version packages` PR bumping `packages/manifest/package.json` and appending to `packages/manifest/CHANGELOG.md`.
+Commit the generated `.changeset/*.md` file alongside your code. On merge to `main`, `release.yml` runs `changesets/action`, which opens (or updates) a `chore: version packages` PR bumping `packages/thinker/package.json` and appending to `packages/thinker/CHANGELOG.md`.
 
 Changesets are **not** required on every PR — they're optional and only meaningful for changes you want in the changelog. Use `npx changeset add --empty` for purely internal work if you want an explicit "no release" marker.
 
@@ -826,11 +826,11 @@ Changesets are **not** required on every PR — they're optional and only meanin
 
 Merging the `chore: version packages` PR to `main` automatically publishes a new Docker image — no manual step required.
 
-1. Merge the pending `chore: version packages` PR. `release.yml` detects the version bump in `packages/manifest/package.json` (by diffing `HEAD~1` against `HEAD`) and calls `docker.yml` as a reusable workflow.
-2. The `publish` job reads `packages/manifest/package.json`, resolves the version automatically, and pushes `manifestdotbuild/manifest:{version}` + `{major}.{minor}` + `{major}` + `sha-<short>` to Docker Hub. The image is multi-arch (amd64 + arm64) and cosign-signed.
+1. Merge the pending `chore: version packages` PR. `release.yml` detects the version bump in `packages/thinker/package.json` (by diffing `HEAD~1` against `HEAD`) and calls `docker.yml` as a reusable workflow.
+2. The `publish` job reads `packages/thinker/package.json`, resolves the version automatically, and pushes `tmsoftbrasil/thinker:{version}` + `{major}.{minor}` + `{major}` + `sha-<short>` to Docker Hub. The image is multi-arch (amd64 + arm64) and cosign-signed.
 3. **Manually update the Docker Hub description** on hub.docker.com by copy-pasting the current contents of `docker/DOCKER_README.md`. (Automating this sync hit a wall because `docker-pushrm` and the Docker Hub web API need a personal-user PAT and the existing secrets are scoped to the org — tracked as a follow-up, not blocking releases.)
 
-**Manual override:** `workflow_dispatch` on `Docker → Run workflow` still works for hotfixes and retags. Leave the `version` input blank to use `packages/manifest/package.json`, or pass a semver string to retag an older commit / publish a hotfix version.
+**Manual override:** `workflow_dispatch` on `Docker → Run workflow` still works for hotfixes and retags. Leave the `version` input blank to use `packages/thinker/package.json`, or pass a semver string to retag an older commit / publish a hotfix version.
 
 ### Summary of what CI does on each trigger
 
@@ -838,8 +838,8 @@ Merging the `chore: version packages` PR to `main` automatically publishes a new
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PR opened/updated (runtime files)               | `ci.yml` runs tests, lint, typecheck, coverage. `docker.yml` validates the Docker build (no push). `changeset-check` warns softly if no changeset is present.                                   |
 | Merge to `main`                                 | `release.yml` runs `changesets/action` to open or update the `chore: version packages` PR. No publish — the version on `main` hasn't changed yet.                                               |
-| Merge of `chore: version packages` PR           | `release.yml` runs again, detects the version bump in `packages/manifest/package.json`, and calls `docker.yml` as a reusable workflow. This pushes a new image tag to Docker Hub automatically. |
-| Manual `workflow_dispatch` on `Docker` workflow | Reads `packages/manifest/package.json` (or the `version` input override) and pushes a new image tag to Docker Hub. Used for hotfixes and retags.                                                |
+| Merge of `chore: version packages` PR           | `release.yml` runs again, detects the version bump in `packages/thinker/package.json`, and calls `docker.yml` as a reusable workflow. This pushes a new image tag to Docker Hub automatically. |
+| Manual `workflow_dispatch` on `Docker` workflow | Reads `packages/thinker/package.json` (or the `version` input override) and pushes a new image tag to Docker Hub. Used for hotfixes and retags.                                                |
 
 ## Code Coverage (Codecov)
 

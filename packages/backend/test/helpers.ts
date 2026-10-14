@@ -18,7 +18,7 @@ import { appConfig } from '../src/config/app.config';
 import { IS_PUBLIC_KEY } from '../src/common/decorators/public.decorator';
 import { hashKey, keyPrefix } from '../src/common/utils/hash.util';
 import { AgentMessage } from '../src/entities/agent-message.entity';
-import { ManifestRequest } from '../src/entities/request.entity';
+import { ThinkerRequest } from '../src/entities/request.entity';
 import { ApiKey } from '../src/entities/api-key.entity';
 import { Tenant } from '../src/entities/tenant.entity';
 import { Agent } from '../src/entities/agent.entity';
@@ -61,7 +61,7 @@ export const TEST_OTLP_KEY = 'thk_test-otlp-key-001';
 
 const entities = [
   AgentMessage,
-  ManifestRequest,
+  ThinkerRequest,
   ApiKey,
   Tenant,
   Agent,

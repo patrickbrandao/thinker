@@ -30,12 +30,12 @@ openssl rand -hex 32
 
 Use one generated value for `BETTER_AUTH_SECRET` and another for `THINKER_ENCRYPTION_KEY`. Also provide:
 
-- `REQUEST_RECORDING_S3_BUCKET`: your Space name.
-- `REQUEST_RECORDING_S3_ENDPOINT`: `https://<space-region>.digitaloceanspaces.com`.
-- `REQUEST_RECORDING_S3_ACCESS_KEY_ID`: the limited Spaces access key.
-- `REQUEST_RECORDING_S3_SECRET_ACCESS_KEY`: its secret.
+- `THINKER_RECORDING_S3_BUCKET`: your Space name.
+- `THINKER_RECORDING_S3_ENDPOINT`: `https://<space-region>.digitaloceanspaces.com`.
+- `THINKER_RECORDING_S3_ACCESS_KEY_ID`: the limited Spaces access key.
+- `THINKER_RECORDING_S3_SECRET_ACCESS_KEY`: its secret.
 
-Keep `REQUEST_RECORDING_S3_REGION=us-east-1` and `REQUEST_RECORDING_S3_FORCE_PATH_STYLE=false`; DigitalOcean's AWS SDK guidance uses the endpoint to select the actual Space region.
+Keep `THINKER_RECORDING_S3_REGION=us-east-1` and `THINKER_RECORDING_S3_FORCE_PATH_STYLE=false`; DigitalOcean's AWS SDK guidance uses the endpoint to select the actual Space region.
 
 ## Open Thinker
 

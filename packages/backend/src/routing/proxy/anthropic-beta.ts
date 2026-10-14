@@ -6,11 +6,11 @@
  * permitted`. Which fields are gated is Anthropic's business and changes over
  * time — that is the point of forwarding rather than curating.
  *
- * Manifest builds every upstream header set from scratch, so the caller's own
+ * Thinker builds every upstream header set from scratch, so the caller's own
  * `anthropic-beta` never reached Anthropic: the api_key path sent no flags at
  * all and the subscription path sent a hardcoded list that goes stale the
  * moment Anthropic ships a new beta. Both turned perfectly valid client
- * requests into 400s. We merge instead of replace — Manifest keeps the flags
+ * requests into 400s. We merge instead of replace — Thinker keeps the flags
  * its own routes depend on (the OAuth pair on the subscription path) and the
  * caller's flags are appended.
  *
@@ -63,19 +63,19 @@ export function parseClientBetas(header: unknown): string[] {
 }
 
 /**
- * Manifest's required flags followed by whatever else the caller asked for.
- * Returns `manifestHeader` untouched when the caller contributed nothing, so a
+ * Thinker's required flags followed by whatever else the caller asked for.
+ * Returns `thinkerHeader` untouched when the caller contributed nothing, so a
  * request that sent no beta header is byte-identical to before this existed.
  */
 export function mergeAnthropicBeta(
-  manifestHeader: string | undefined,
+  thinkerHeader: string | undefined,
   clientHeader: unknown,
 ): string | undefined {
   const clientFlags = parseClientBetas(clientHeader);
-  if (clientFlags.length === 0) return manifestHeader;
+  if (clientFlags.length === 0) return thinkerHeader;
 
-  const merged = manifestHeader
-    ? manifestHeader
+  const merged = thinkerHeader
+    ? thinkerHeader
         .split(',')
         .map((flag) => flag.trim())
         .filter(Boolean)

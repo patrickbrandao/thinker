@@ -1,4 +1,4 @@
-import { ManifestError } from '../../../common/errors/manifest-error';
+import { ThinkerError } from '../../../common/errors/thinker-error';
 import { ConfigService } from '@nestjs/config';
 import {
   getProviderParamSpecs,
@@ -234,20 +234,18 @@ describe('ProxyService — orchestration', () => {
   });
 
   describe('payload validation', () => {
-    // A ManifestError, not a BadRequestException: the controller uses the type to
+    // A ThinkerError, not a BadRequestException: the controller uses the type to
     // record the row as `request` origin instead of blaming the provider.
-    it('throws a ManifestError M300 when messages is missing', async () => {
-      await expect(svc.proxyRequest(baseOpts({ body: {} as never }))).rejects.toThrow(
-        ManifestError,
-      );
+    it('throws a ThinkerError M300 when messages is missing', async () => {
+      await expect(svc.proxyRequest(baseOpts({ body: {} as never }))).rejects.toThrow(ThinkerError);
       await expect(svc.proxyRequest(baseOpts({ body: {} as never }))).rejects.toMatchObject({
         code: 'M300',
       });
     });
 
-    it('throws a ManifestError M300 when messages is empty', async () => {
+    it('throws a ThinkerError M300 when messages is empty', async () => {
       await expect(svc.proxyRequest(baseOpts({ body: { messages: [] } as never }))).rejects.toThrow(
-        ManifestError,
+        ThinkerError,
       );
     });
 
@@ -309,7 +307,7 @@ describe('ProxyService — orchestration', () => {
     });
 
     it("hands the caller's anthropic-beta header to the forward", async () => {
-      // Manifest builds upstream headers from scratch, so without this the
+      // Thinker builds upstream headers from scratch, so without this the
       // caller's beta flags never reach Anthropic and every beta-gated body
       // field comes back as `Extra inputs are not permitted`.
       resolveService.resolve.mockResolvedValue({
@@ -450,7 +448,7 @@ describe('ProxyService — orchestration', () => {
       expect(body).not.toContain('M101');
       expect(result.meta).toMatchObject({
         reason: 'model_not_available',
-        manifest_error_code: 'M302',
+        thinker_error_code: 'M302',
       });
     });
   });
@@ -474,7 +472,7 @@ describe('ProxyService — orchestration', () => {
 
     it('does NOT start a provider attempt when credentials fail with no fallback routes (no orphan row)', async () => {
       // With no chain to record it, a synthetic attempt would INSERT a pending
-      // agent_messages row that nothing ever completes. The Manifest stub is the
+      // agent_messages row that nothing ever completes. The Thinker stub is the
       // sole record, so no provider attempt must be started.
       resolveService.resolve.mockResolvedValue({
         tier: 'standard',
@@ -865,7 +863,7 @@ describe('ProxyService — orchestration', () => {
       expect(body).not.toContain('M101');
       expect(result.meta).toMatchObject({
         reason: 'model_not_available',
-        manifest_error_code: 'M302',
+        thinker_error_code: 'M302',
       });
     });
 
@@ -883,7 +881,7 @@ describe('ProxyService — orchestration', () => {
       expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'openai', authType: 'subscription', model: 'gpt-4o' }),
       );
-      expect(result.meta.manifest_error_code).toBeUndefined();
+      expect(result.meta.thinker_error_code).toBeUndefined();
     });
 
     it('surfaces a subscription failure to the caller without falling back to the api_key', async () => {
@@ -892,7 +890,7 @@ describe('ProxyService — orchestration', () => {
         discoveredModel({ id: 'gpt-4o', provider: 'openai', authType: 'subscription' }),
       ]);
       // Break the subscription credentials: the caller pinned the model, so
-      // the error is theirs to see — Manifest must not meter the key instead.
+      // the error is theirs to see — Thinker must not meter the key instead.
       providerKeyService.selectProviderKey.mockResolvedValue({
         apiKey: JSON.stringify({ t: 'access', r: 'refresh', e: 0 }),
         id: 'up-oai',
@@ -958,7 +956,7 @@ describe('ProxyService — orchestration', () => {
         auth_type: 'api_key',
         model: 'gpt-new',
       });
-      expect(result.meta.manifest_error_code).toBeUndefined();
+      expect(result.meta.thinker_error_code).toBeUndefined();
     });
 
     it('preserves the provider-native path when passing an uncatalogued gateway model through', async () => {
@@ -1051,7 +1049,7 @@ describe('ProxyService — orchestration', () => {
 
       expect(fallbackService.tryForwardToProvider).not.toHaveBeenCalled();
       expect(body).toContain('M302');
-      expect(result.meta.manifest_error_code).toBe('M302');
+      expect(result.meta.thinker_error_code).toBe('M302');
     });
 
     it('returns the real provider model-not-found response unchanged', async () => {
@@ -1091,7 +1089,7 @@ describe('ProxyService — orchestration', () => {
       // 404 is the response.
       expect(fallbackService.tryFallbacks).not.toHaveBeenCalled();
       expect(result.forward).toBe(providerFailure);
-      expect(result.meta.manifest_error_code).toBeUndefined();
+      expect(result.meta.thinker_error_code).toBeUndefined();
     });
 
     // A header rule is an override the operator configured on purpose; the
@@ -1193,7 +1191,7 @@ describe('ProxyService — orchestration', () => {
       expect(body).toContain('bogus/does-not-exist');
       expect(result.meta).toMatchObject({
         reason: 'model_not_available',
-        manifest_error_code: 'M302',
+        thinker_error_code: 'M302',
       });
     });
 
@@ -1220,7 +1218,7 @@ describe('ProxyService — orchestration', () => {
       );
     });
 
-    it('does not trigger Manifest fallbacks for explicit model failures', async () => {
+    it('does not trigger Thinker fallbacks for explicit model failures', async () => {
       modelDiscovery.getModelsForAgent.mockResolvedValue([
         discoveredModel({ id: 'gpt-4o-mini', provider: 'openai', authType: 'api_key' }),
       ]);
@@ -1740,7 +1738,7 @@ describe('ProxyService — orchestration', () => {
         }),
       );
       // The body still carries the client-supplied thinking field; the
-      // fallback service applies the resolved Manifest params last.
+      // fallback service applies the resolved Thinker params last.
       expect(fallbackService.tryForwardToProvider.mock.calls[0][0].body.thinking).toEqual({
         type: 'enabled',
       });

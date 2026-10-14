@@ -163,7 +163,7 @@ test('anonymous layer identities are unique across parser scopes', async () => {
 
 test('cascade loading propagates import layers and unique anonymous identities', async (t) => {
   const { loadCascade, resolveConflicts } = await cascade;
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-registry-layers-'));
+  const dir = mkdtempSync(join(tmpdir(), 'thinker-registry-layers-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(
     join(dir, 'entry.css'),

@@ -1,5 +1,5 @@
 /**
- * #17: Thinker makes no outbound call of its own. Upstream Manifest phoned home
+ * #17: Thinker makes no outbound call of its own. Upstream Thinker phoned home
  * from the backend and the CLI: usage telemetry, a daily update check against
  * GitHub releases, the setup-questionnaire forwarding, Sentry, the hourly
  * modelparams.dev catalog refresh, and a hosted Wingman origin always allowed by
@@ -23,13 +23,13 @@ import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 const FORBIDDEN_DESTINATIONS = [
   'telemetry.manifest.build',
   'blue.manifest.build',
-  'api.github.com/repos/mnfst',
+  'api.github.com/repos/thinker',
   'modelparams.dev',
   'wingman.manifest.build',
   'sentry.io',
 ];
 /**
- * Manifest Cloud's API hosts. A CLI defaulting to one sent the user's key there
+ * Thinker Cloud's API hosts. A CLI defaulting to one sent the user's key there
  * whenever no host was configured; nothing may target them by default.
  */
 const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];

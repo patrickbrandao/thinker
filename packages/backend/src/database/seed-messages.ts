@@ -7,7 +7,7 @@ import {
   normalizeStatus,
 } from 'thinker-shared';
 import { AgentMessage } from '../entities/agent-message.entity';
-import { ManifestRequest } from '../entities/request.entity';
+import { ThinkerRequest } from '../entities/request.entity';
 
 interface SeedOutcome {
   status: string;
@@ -54,13 +54,13 @@ const SEED_OUTCOME_SCENARIOS: SeedOutcome[][] = [
   // ── Transport: couldn't reach the provider (origin=transport) ──
   [wire('error', 504, 'Upstream provider request timed out', 'scored')],
   [wire('error', 503, 'Failed to reach upstream provider: ECONNRESET', 'scored')],
-  // ── Manifest setup (origin=config) — hidden from the log by default ──
+  // ── Thinker setup (origin=config) — hidden from the log by default ──
   [wire('error', null, 'Provider API key missing', 'no_provider_key')],
   [wire('error', null, 'No providers configured for this agent', 'no_provider')],
-  // ── Manifest software limit (origin=policy) — shown, links to the limits page ──
+  // ── Thinker software limit (origin=policy) — shown, links to the limits page ──
   [wire('error', null, 'Usage limit exceeded', 'limit_exceeded')],
-  // ── Manifest internal (origin=internal) ──
-  [wire('error', null, 'Manifest internal error', 'friendly_error')],
+  // ── Thinker internal (origin=internal) ──
+  [wire('error', null, 'Thinker internal error', 'friendly_error')],
   // ── Fallback RECOVERED: a failed Attempt followed by a successful fallback ──
   [
     wire(
@@ -215,7 +215,7 @@ export async function seedAgentMessages(
     agentId: 'seed-agent-001',
     agentName: 'demo-agent',
   },
-  requestRepo?: Repository<ManifestRequest>,
+  requestRepo?: Repository<ThinkerRequest>,
 ): Promise<void> {
   const count = await messageRepo.count();
   if (count > 0) return;
@@ -307,7 +307,7 @@ export async function seedAgentMessages(
   }
 
   if (requestRepo) {
-    const requests: Array<Partial<ManifestRequest>> = [];
+    const requests: Array<Partial<ThinkerRequest>> = [];
     let requestIndex = 0;
 
     for (const attempts of messageGroups) {

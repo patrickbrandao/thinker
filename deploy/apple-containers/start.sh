@@ -22,7 +22,8 @@
 #   ./deploy/apple-containers/start.sh status  # show container state and URLs
 #
 # Configuration comes from docker/.env (the same file as Docker Compose).
-# Override its path with THINKER_ENV_FILE. BETTER_AUTH_SECRET is required:
+# Override its path with THINKER_ENV_FILE. BETTER_AUTH_SECRET and
+# THINKER_ENCRYPTION_KEY are required (two different values), each from:
 #   openssl rand -hex 32
 
 set -euo pipefail
@@ -198,6 +199,12 @@ cmd_up() {
     exit 1
   fi
 
+  if [[ -z "${THINKER_ENCRYPTION_KEY:-}" ]]; then
+    echo "error: THINKER_ENCRYPTION_KEY must be set (in $ENV_FILE or the environment)." >&2
+    echo "Generate one with: openssl rand -hex 32 (a different value from BETTER_AUTH_SECRET)" >&2
+    exit 1
+  fi
+
   # A host bind mount cannot be chown/chmod'ed by PostgreSQL under Apple
   # Containers, so the image exits before starting. A named volume is managed
   # inside the container VM and supports the ownership changes the image needs.
@@ -293,7 +300,7 @@ cmd_up() {
     --env BIND_ADDRESS=0.0.0.0 \
     --env DATABASE_URL="$database_url" \
     --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
-    --env THINKER_ENCRYPTION_KEY="${THINKER_ENCRYPTION_KEY:-}" \
+    --env THINKER_ENCRYPTION_KEY="$THINKER_ENCRYPTION_KEY" \
     --env BETTER_AUTH_URL="${BETTER_AUTH_URL:-http://localhost:${PORT}}" \
     --env OLLAMA_HOST="$ollama_host" \
     --env PROVIDER_TIMEOUT_MS="$PROVIDER_TIMEOUT_MS" \
@@ -311,15 +318,15 @@ cmd_up() {
     --env GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-}" \
     --env DISCORD_CLIENT_ID="${DISCORD_CLIENT_ID:-}" \
     --env DISCORD_CLIENT_SECRET="${DISCORD_CLIENT_SECRET:-}" \
-    --env REQUEST_RECORDING_STORAGE="${REQUEST_RECORDING_STORAGE:-auto}" \
-    --env REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings \
-    --env REQUEST_RECORDING_RETENTION_DAYS="${REQUEST_RECORDING_RETENTION_DAYS:-}" \
-    --env REQUEST_RECORDING_S3_BUCKET="${REQUEST_RECORDING_S3_BUCKET:-}" \
-    --env REQUEST_RECORDING_S3_ENDPOINT="${REQUEST_RECORDING_S3_ENDPOINT:-}" \
-    --env REQUEST_RECORDING_S3_REGION="${REQUEST_RECORDING_S3_REGION:-}" \
-    --env REQUEST_RECORDING_S3_ACCESS_KEY_ID="${REQUEST_RECORDING_S3_ACCESS_KEY_ID:-}" \
-    --env REQUEST_RECORDING_S3_SECRET_ACCESS_KEY="${REQUEST_RECORDING_S3_SECRET_ACCESS_KEY:-}" \
-    --env REQUEST_RECORDING_S3_FORCE_PATH_STYLE="${REQUEST_RECORDING_S3_FORCE_PATH_STYLE:-false}" \
+    --env THINKER_RECORDING_STORAGE="${THINKER_RECORDING_STORAGE:-auto}" \
+    --env THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings \
+    --env THINKER_RECORDING_RETENTION_DAYS="${THINKER_RECORDING_RETENTION_DAYS:-}" \
+    --env THINKER_RECORDING_S3_BUCKET="${THINKER_RECORDING_S3_BUCKET:-}" \
+    --env THINKER_RECORDING_S3_ENDPOINT="${THINKER_RECORDING_S3_ENDPOINT:-}" \
+    --env THINKER_RECORDING_S3_REGION="${THINKER_RECORDING_S3_REGION:-}" \
+    --env THINKER_RECORDING_S3_ACCESS_KEY_ID="${THINKER_RECORDING_S3_ACCESS_KEY_ID:-}" \
+    --env THINKER_RECORDING_S3_SECRET_ACCESS_KEY="${THINKER_RECORDING_S3_SECRET_ACCESS_KEY:-}" \
+    --env THINKER_RECORDING_S3_FORCE_PATH_STYLE="${THINKER_RECORDING_S3_FORCE_PATH_STYLE:-false}" \
     "tmsoftbrasil/thinker:${THINKER_VERSION:-latest}"
 
   echo "waiting for thinker to become healthy..."

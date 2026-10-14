@@ -518,12 +518,12 @@ describe('Responses adapter', () => {
         output('terminal:0', 'one'),
         call('vision_analyze:0', 'vision_analyze', '{"id":1}'),
         output('vision_analyze:0', 'first look'),
-        call('terminal:0-mnfst-2', 'terminal', '{"cmd":"pwd"}'),
-        output('terminal:0-mnfst-2', 'two'),
-        call('vision_analyze:0-mnfst-2', 'vision_analyze', '{"id":2}'),
-        output('vision_analyze:0-mnfst-2', 'second look'),
-        call('terminal:0-mnfst-3', 'terminal', '{"cmd":"whoami"}'),
-        output('terminal:0-mnfst-3', 'three'),
+        call('terminal:0-thinker-2', 'terminal', '{"cmd":"pwd"}'),
+        output('terminal:0-thinker-2', 'two'),
+        call('vision_analyze:0-thinker-2', 'vision_analyze', '{"id":2}'),
+        output('vision_analyze:0-thinker-2', 'second look'),
+        call('terminal:0-thinker-3', 'terminal', '{"cmd":"whoami"}'),
+        output('terminal:0-thinker-3', 'three'),
       ]);
     });
 
@@ -533,8 +533,8 @@ describe('Responses adapter', () => {
           input: [
             call('terminal:0', 'terminal', '{}'),
             output('terminal:0', 'one'),
-            call('terminal:0-mnfst-2', 'terminal', '{}'),
-            output('terminal:0-mnfst-2', 'other tool'),
+            call('terminal:0-thinker-2', 'terminal', '{}'),
+            output('terminal:0-thinker-2', 'other tool'),
             call('terminal:0', 'terminal', '{}'),
             output('terminal:0', 'two'),
           ],
@@ -545,10 +545,10 @@ describe('Responses adapter', () => {
       expect(result.input).toEqual([
         call('terminal:0', 'terminal', '{}'),
         output('terminal:0', 'one'),
-        call('terminal:0-mnfst-2', 'terminal', '{}'),
-        output('terminal:0-mnfst-2', 'other tool'),
-        call('terminal:0-mnfst-2-x', 'terminal', '{}'),
-        output('terminal:0-mnfst-2-x', 'two'),
+        call('terminal:0-thinker-2', 'terminal', '{}'),
+        output('terminal:0-thinker-2', 'other tool'),
+        call('terminal:0-thinker-2-x', 'terminal', '{}'),
+        output('terminal:0-thinker-2-x', 'two'),
       ]);
     });
 
@@ -598,8 +598,8 @@ describe('Responses adapter', () => {
       ).toEqual([
         call('terminal:0', 'terminal', '{}'),
         output('terminal:0', 'one'),
-        call('terminal:0-mnfst-2', 'terminal', '{}'),
-        output('terminal:0-mnfst-2', 'two'),
+        call('terminal:0-thinker-2', 'terminal', '{}'),
+        output('terminal:0-thinker-2', 'two'),
       ]);
     });
 
@@ -620,8 +620,8 @@ describe('Responses adapter', () => {
       expect((result.input as Record<string, unknown>[]).map((item) => item.call_id)).toEqual([
         'terminal:0',
         'terminal:0',
-        'terminal:0-mnfst-2',
-        'terminal:0-mnfst-2',
+        'terminal:0-thinker-2',
+        'terminal:0-thinker-2',
       ]);
     });
 

@@ -22,7 +22,7 @@ export function registerIdentityTools(
   operator: McpOperator,
 ): void {
   server.registerTool(
-    'manifest_whoami',
+    'thinker_whoami',
     {
       title: 'Who am I',
       description: 'Return the acting user, tenant, and granted MCP scopes.',
@@ -34,7 +34,7 @@ export function registerIdentityTools(
   );
 
   server.registerTool(
-    'manifest_doctor',
+    'thinker_doctor',
     {
       title: 'Diagnose the workspace',
       description:

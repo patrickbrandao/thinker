@@ -35,14 +35,14 @@ describe('email image deployment URLs', () => {
     '%s renders images from the configured dashboard',
     (_, render) => {
       const html = renderToStaticMarkup(render());
-      expect(html).toContain(`src="${dashboard}/manifest-logo.png"`);
-      expect(html).not.toContain('app.manifest.build');
+      expect(html).toContain(`src="${dashboard}/thinker-logo.png"`);
+      expect(html).not.toContain('app.thinker.example.com');
     },
   );
 
   it('honors an explicit logo hosting override', () => {
     const html = renderToStaticMarkup(TestEmail({ logoUrl: 'https://cdn.example/logo.png' }));
     expect(html).toContain('src="https://cdn.example/logo.png"');
-    expect(html).not.toContain(`${dashboard}/manifest-logo.png`);
+    expect(html).not.toContain(`${dashboard}/thinker-logo.png`);
   });
 });

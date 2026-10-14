@@ -21,17 +21,17 @@ export interface VerifyEmailProps {
 }
 
 export function VerifyEmailEmail(props: VerifyEmailProps) {
-  const { userName, verificationUrl, logoUrl = getEmailAssetUrl('manifest-logo.png') } = props;
+  const { userName, verificationUrl, logoUrl = getEmailAssetUrl('thinker-logo.png') } = props;
 
   return (
     <Html>
       <Head />
-      <Preview>Verify your email address to get started with Manifest</Preview>
+      <Preview>Verify your email address to get started with Thinker</Preview>
       <Body style={body}>
         <Container style={container}>
           {/* Logo */}
           <Section style={logoSection}>
-            <Img src={logoUrl} alt="Manifest LLM Gateway" width="174" height="32" style={logoImg} />
+            <Img src={logoUrl} alt="Thinker LLM Gateway" width="174" height="32" style={logoImg} />
           </Section>
 
           {/* Main content */}
@@ -65,9 +65,9 @@ export function VerifyEmailEmail(props: VerifyEmailProps) {
           <Hr style={divider} />
           <Section style={footer}>
             <Text style={footerMuted}>
-              © 2026 MNFST Inc. All rights reserved.{' '}
-              <Link href="https://manifest.build" style={footerLink}>
-                manifest.build
+              Sent by Thinker.{' '}
+              <Link href="https://github.com/patrickbrandao/thinker" style={footerLink}>
+                github.com/patrickbrandao/thinker
               </Link>
             </Text>
           </Section>

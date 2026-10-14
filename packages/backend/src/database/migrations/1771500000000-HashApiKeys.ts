@@ -9,10 +9,7 @@ export class HashApiKeys1771500000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Helper: check if a column exists
-    const columnExists = async (
-      table: string,
-      column: string,
-    ): Promise<boolean> => {
+    const columnExists = async (table: string, column: string): Promise<boolean> => {
       const result = await queryRunner.query(
         `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`,
         [table, column],
@@ -22,10 +19,9 @@ export class HashApiKeys1771500000000 implements MigrationInterface {
 
     // Helper: check if an index exists
     const indexExists = async (name: string): Promise<boolean> => {
-      const result = await queryRunner.query(
-        `SELECT 1 FROM pg_indexes WHERE indexname = $1`,
-        [name],
-      );
+      const result = await queryRunner.query(`SELECT 1 FROM pg_indexes WHERE indexname = $1`, [
+        name,
+      ]);
       return result.length > 0;
     };
 
@@ -41,9 +37,7 @@ export class HashApiKeys1771500000000 implements MigrationInterface {
       );
     }
     if (!(await columnExists('api_keys', 'key_hash'))) {
-      await queryRunner.query(
-        `ALTER TABLE "api_keys" ADD COLUMN "key_hash" character varying(64)`,
-      );
+      await queryRunner.query(`ALTER TABLE "api_keys" ADD COLUMN "key_hash" character varying(64)`);
     }
     if (!(await columnExists('api_keys', 'key_prefix'))) {
       await queryRunner.query(
@@ -85,18 +79,10 @@ export class HashApiKeys1771500000000 implements MigrationInterface {
     );
 
     // 4. Set columns NOT NULL
-    await queryRunner.query(
-      `ALTER TABLE "agent_api_keys" ALTER COLUMN "key_hash" SET NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "agent_api_keys" ALTER COLUMN "key_prefix" SET NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" ALTER COLUMN "key_hash" SET NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" ALTER COLUMN "key_prefix" SET NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "agent_api_keys" ALTER COLUMN "key_hash" SET NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "agent_api_keys" ALTER COLUMN "key_prefix" SET NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "api_keys" ALTER COLUMN "key_hash" SET NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "api_keys" ALTER COLUMN "key_prefix" SET NOT NULL`);
 
     // 5. Create unique index on key_hash (if not already present)
     if (!(await indexExists('IDX_agent_api_keys_key_hash'))) {
@@ -112,18 +98,12 @@ export class HashApiKeys1771500000000 implements MigrationInterface {
 
     // 6. Drop old unique index on agent_api_keys.key (if still present)
     if (await indexExists('IDX_9357d38f073722e36f2f281276')) {
-      await queryRunner.query(
-        `DROP INDEX "public"."IDX_9357d38f073722e36f2f281276"`,
-      );
+      await queryRunner.query(`DROP INDEX "public"."IDX_9357d38f073722e36f2f281276"`);
     }
 
     // 7. Make key column nullable (MUST happen before nulling values)
-    await queryRunner.query(
-      `ALTER TABLE "agent_api_keys" ALTER COLUMN "key" DROP NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "api_keys" ALTER COLUMN "key" DROP NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "agent_api_keys" ALTER COLUMN "key" DROP NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "api_keys" ALTER COLUMN "key" DROP NOT NULL`);
 
     // 8. NULL out plaintext keys (safe now that column is nullable)
     await queryRunner.query(`UPDATE "agent_api_keys" SET key = NULL`);

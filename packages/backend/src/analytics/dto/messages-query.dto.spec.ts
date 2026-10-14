@@ -168,8 +168,8 @@ describe('MessagesQueryDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('accepts each known origin filter including the manifest shorthand', async () => {
-    for (const origin of ['provider', 'transport', 'config', 'policy', 'internal', 'manifest']) {
+  it('accepts each known origin filter including the thinker shorthand', async () => {
+    for (const origin of ['provider', 'transport', 'config', 'policy', 'internal', 'thinker']) {
       const dto = plainToInstance(MessagesQueryDto, { origin });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);

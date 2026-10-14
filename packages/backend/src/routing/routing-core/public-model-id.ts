@@ -1,13 +1,13 @@
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 
 /**
- * Public model ids: the names Manifest publishes in `/v1/models` and accepts
+ * Public model ids: the names Thinker publishes in `/v1/models` and accepts
  * back from clients, as opposed to the internal ids discovery stores.
  */
 export const OPENAI_MODEL_ID_AUTO = 'auto';
 export const SUBSCRIPTION_MODEL_SUFFIX = '-subscription';
 
-/** Encode a provider-native model for Manifest's public subscription route. */
+/** Encode a provider-native model for Thinker's public subscription route. */
 export function subscriptionOpenAiModelId(provider: string, modelId: string): string {
   const normalizedProvider = provider.toLowerCase();
   if (modelId === OPENAI_MODEL_ID_AUTO || normalizedProvider.startsWith('custom:')) return modelId;

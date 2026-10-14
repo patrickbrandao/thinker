@@ -441,7 +441,7 @@ export interface ErrorBreakdownResponse {
   total_errors: number;
   provider_errors: number;
   transport_errors: number;
-  manifest_errors: number;
+  thinker_errors: number;
   by_origin: Record<string, number>;
   by_class: Record<string, number>;
   provider_error_rate: number;

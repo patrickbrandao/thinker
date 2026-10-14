@@ -10,7 +10,7 @@ import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './he
  * filter was "anything that is not a success", which swept cancelled and
  * in-flight requests in with real failures.
  *
- * A cancelled request is the caller hanging up — neither Manifest nor the
+ * A cancelled request is the caller hanging up — neither Thinker nor the
  * provider failed — so it gets its own filter value and leaves `failed`,
  * matching `sqlIsFailedStatus`, the taxonomy's own definition of a failure.
  */

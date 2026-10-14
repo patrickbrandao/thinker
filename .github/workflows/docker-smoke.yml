@@ -84,19 +84,23 @@ jobs:
           secret=$(openssl rand -hex 32)
           sed -i "s/^BETTER_AUTH_SECRET=\$/BETTER_AUTH_SECRET=${secret}/" .env
           grep -Eq '^BETTER_AUTH_SECRET=[0-9a-f]{64}$' .env
+          # THINKER_ENCRYPTION_KEY is required too, and must differ.
+          enc=$(openssl rand -hex 32)
+          sed -i "s/^# THINKER_ENCRYPTION_KEY=\$/THINKER_ENCRYPTION_KEY=${enc}/" .env
+          grep -Eq '^THINKER_ENCRYPTION_KEY=[0-9a-f]{64}$' .env
 
       - name: Verify self-host configuration wiring
         working-directory: docker
         env:
           HOST_BIND_ADDRESS: 0.0.0.0
           HOST_PORT: "28080"
-          REQUEST_RECORDING_RETENTION_DAYS: "42"
-          REQUEST_RECORDING_S3_BUCKET: recordings
-          REQUEST_RECORDING_S3_ENDPOINT: http://minio:9000
-          REQUEST_RECORDING_S3_REGION: auto
-          REQUEST_RECORDING_S3_ACCESS_KEY_ID: access
-          REQUEST_RECORDING_S3_SECRET_ACCESS_KEY: secret
-          REQUEST_RECORDING_S3_FORCE_PATH_STYLE: "true"
+          THINKER_RECORDING_RETENTION_DAYS: "42"
+          THINKER_RECORDING_S3_BUCKET: recordings
+          THINKER_RECORDING_S3_ENDPOINT: http://minio:9000
+          THINKER_RECORDING_S3_REGION: auto
+          THINKER_RECORDING_S3_ACCESS_KEY_ID: access
+          THINKER_RECORDING_S3_SECRET_ACCESS_KEY: secret
+          THINKER_RECORDING_S3_FORCE_PATH_STYLE: "true"
         run: |
           docker compose config --format json > /tmp/compose.json
           jq -e '
@@ -104,13 +108,13 @@ jobs:
             .services.thinker.ports[0].host_ip == "0.0.0.0" and
             .services.thinker.ports[0].published == "28080" and
             .services.thinker.environment.TRUST_PROXY == "loopback" and
-            .services.thinker.environment.REQUEST_RECORDING_RETENTION_DAYS == "42" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_BUCKET == "recordings" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_ENDPOINT == "http://minio:9000" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_REGION == "auto" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_ACCESS_KEY_ID == "access" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_SECRET_ACCESS_KEY == "secret" and
-            .services.thinker.environment.REQUEST_RECORDING_S3_FORCE_PATH_STYLE == "true"
+            .services.thinker.environment.THINKER_RECORDING_RETENTION_DAYS == "42" and
+            .services.thinker.environment.THINKER_RECORDING_S3_BUCKET == "recordings" and
+            .services.thinker.environment.THINKER_RECORDING_S3_ENDPOINT == "http://minio:9000" and
+            .services.thinker.environment.THINKER_RECORDING_S3_REGION == "auto" and
+            .services.thinker.environment.THINKER_RECORDING_S3_ACCESS_KEY_ID == "access" and
+            .services.thinker.environment.THINKER_RECORDING_S3_SECRET_ACCESS_KEY == "secret" and
+            .services.thinker.environment.THINKER_RECORDING_S3_FORCE_PATH_STYLE == "true"
           ' /tmp/compose.json
 
       - name: Start mock OpenAI provider
@@ -169,7 +173,7 @@ jobs:
           THINKER_BASE_URL: http://127.0.0.1:2099
           # Base commits from before #21 read the URL under its old name.
           # TODO(#31): drop this line once no open PR has a base before #21.
-          MANIFEST_BASE_URL: http://127.0.0.1:2099
+          THINKER_BASE_URL: http://127.0.0.1:2099
         run: |
           shopt -s nullglob
           tests=(.gateway-contract-baseline/contracts/gateway/tests/*.test.mjs)

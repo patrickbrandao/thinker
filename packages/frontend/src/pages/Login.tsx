@@ -13,8 +13,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 // seeded only when SEED_DATA=true / non-production). Referenced solely inside the
 // `import.meta.env.DEV` branch below, so Vite strips both the button and these literals
 // from production builds — they never ship. The account exists only in a dev database.
-const DEV_EMAIL = 'admin@manifest.build';
-const DEV_PASSWORD = 'manifest';
+const DEV_EMAIL = 'admin@thinker.example.com';
+const DEV_PASSWORD = 'thinker';
 
 const Login: Component = () => {
   const [email, setEmail] = createSignal('');
@@ -160,7 +160,7 @@ const Login: Component = () => {
             disabled={loading()}
             style="background:#f59e0b;color:#1f1400;font-weight:700;margin-bottom:0.75rem;"
           >
-            ⚡ Sign in as dev, admin@manifest.build
+            ⚡ Sign in as dev, admin@thinker.example.com
           </button>
         )}
         {error() && (

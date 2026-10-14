@@ -2571,7 +2571,7 @@ describe('Anthropic Adapter', () => {
       const result = applyAnthropicMessagesMutations(
         {
           messages: [{ role: 'user', content: 'hi' }],
-          system: 'You are Manifest.',
+          system: 'You are Thinker.',
         },
         { injectSubscriptionIdentity: true },
       );
@@ -2579,7 +2579,7 @@ describe('Anthropic Adapter', () => {
       expect(system).toHaveLength(2);
       expect(system[0].text).toMatch(/Claude agent/);
       expect(system[0].cache_control).toBeUndefined();
-      expect(system[1].text).toBe('You are Manifest.');
+      expect(system[1].text).toBe('You are Thinker.');
       expect(system[1].cache_control).toEqual({ type: 'ephemeral' });
     });
 
@@ -2624,7 +2624,7 @@ describe('Anthropic Adapter', () => {
       expect(tools[0].cache_control).toEqual({ type: 'ephemeral' });
     });
 
-    it('caps Manifest cache_control injection when Claude Code already supplies three breakpoints', () => {
+    it('caps Thinker cache_control injection when Claude Code already supplies three breakpoints', () => {
       const cache = { type: 'ephemeral' };
       const inbound = {
         messages: [
@@ -3042,7 +3042,7 @@ describe('Anthropic Adapter', () => {
       });
     });
 
-    it('preserves xhigh effort when Manifest resolves the request to Sonnet', () => {
+    it('preserves xhigh effort when Thinker resolves the request to Sonnet', () => {
       const result = applyAnthropicMessagesMutations({
         messages: [{ role: 'user', content: 'hi' }],
         output_config: { effort: 'xhigh', style: 'unchanged' },

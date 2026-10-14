@@ -46,7 +46,7 @@ export interface ProviderAttemptStart {
   model: string;
   authType?: string;
   tenantProviderId?: string | null;
-  /** Reserve ordering for a Manifest-local route failure without a pending provider-call row. */
+  /** Reserve ordering for a Thinker-local route failure without a pending provider-call row. */
   providerCallStarted?: boolean;
   /**
    * Label of the connection serving this attempt. Carried from the start so a
@@ -114,7 +114,7 @@ export interface ForwardOptions {
   thinkingRouteContext?: ThinkingBlockRouteContext;
   /**
    * The caller's raw `anthropic-beta` header, merged into (never replacing)
-   * Manifest's own flags when the resolved endpoint is Anthropic itself (the
+   * Thinker's own flags when the resolved endpoint is Anthropic itself (the
    * `anthropic` route or a custom row pointed at it, never the
    * Anthropic-compatible third parties). Without it, beta-gated
    * body fields the caller legitimately sent come back as
@@ -143,7 +143,7 @@ export interface ProxyRequestOptions {
    */
   userId: string | null;
   body: Record<string, unknown>;
-  /** Body used for Manifest-owned routing/scoring/recording; large inline media may be redacted. */
+  /** Body used for Thinker-owned routing/scoring/recording; large inline media may be redacted. */
   routingBody?: Record<string, unknown>;
   apiMode?: ProxyApiMode;
   sessionKey: string;

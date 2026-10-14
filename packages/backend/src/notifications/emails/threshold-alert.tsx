@@ -56,7 +56,7 @@ export function ThresholdAlertEmail(props: ThresholdAlertProps) {
     period,
     timestamp,
     agentUrl,
-    logoUrl = getEmailAssetUrl('manifest-logo.png'),
+    logoUrl = getEmailAssetUrl('thinker-logo.png'),
     alertType = 'hard',
     periodResetDate,
   } = props;
@@ -78,7 +78,7 @@ export function ThresholdAlertEmail(props: ThresholdAlertProps) {
         <Container style={container}>
           {/* Logo */}
           <Section style={logoSection}>
-            <Img src={logoUrl} alt="Manifest LLM Gateway" width="174" height="32" style={logoImg} />
+            <Img src={logoUrl} alt="Thinker LLM Gateway" width="174" height="32" style={logoImg} />
           </Section>
 
           {/* Main content */}
@@ -160,12 +160,12 @@ export function ThresholdAlertEmail(props: ThresholdAlertProps) {
           <Hr style={divider} />
           <Section style={footer}>
             <Text style={footerNote}>
-              You are receiving this because you set up a notification rule in Manifest.
+              You are receiving this because you set up a notification rule in Thinker.
             </Text>
             <Text style={footerMuted}>
-              © 2026 MNFST Inc. All rights reserved.{' '}
-              <Link href="https://manifest.build" style={footerLink}>
-                manifest.build
+              Sent by Thinker.{' '}
+              <Link href="https://github.com/patrickbrandao/thinker" style={footerLink}>
+                github.com/patrickbrandao/thinker
               </Link>
             </Text>
           </Section>

@@ -1,4 +1,4 @@
-import { THINKER_ERRORS_DOCS_BASE, manifestErrorDocsUrl } from 'thinker-shared';
+import { THINKER_ERRORS_DOCS_BASE, thinkerErrorDocsUrl } from 'thinker-shared';
 
 export { THINKER_ERRORS_DOCS_BASE };
 
@@ -12,7 +12,7 @@ export const THINKER_ERRORS = {
   },
   M002: {
     title: 'Empty Bearer token',
-    template: 'The Bearer token is empty. Paste your Manifest key into it.',
+    template: 'The Bearer token is empty. Paste your Thinker key into it.',
   },
   M003: {
     title: 'Invalid key format',
@@ -79,16 +79,16 @@ export const THINKER_ERRORS = {
   },
 } as const;
 
-export type ManifestErrorCode = keyof typeof THINKER_ERRORS;
+export type ThinkerErrorCode = keyof typeof THINKER_ERRORS;
 
-// Matches the peacock prefix written by formatManifestError, e.g. `[🦚 Manifest M102]`.
-// The 🦚 is REQUIRED: only Manifest emits it, so a provider error body that merely
-// echoes the text "Manifest M100" can never be mis-extracted into a Manifest code
-// (which would then misclassify a provider round-trip as a Manifest config error).
-const THINKER_ERROR_CODE_RE = /\[\s*🦚\s*Manifest\s+(M\d{3})\s*\]/;
+// Matches the peacock prefix written by formatThinkerError, e.g. `[🦚 Thinker M102]`.
+// The 🦚 is REQUIRED: only Thinker emits it, so a provider error body that merely
+// echoes the text "Thinker M100" can never be mis-extracted into a Thinker code
+// (which would then misclassify a provider round-trip as a Thinker config error).
+const THINKER_ERROR_CODE_RE = /\[\s*🦚\s*Thinker\s+(M\d{3})\s*\]/;
 
-export function formatManifestError(
-  code: ManifestErrorCode,
+export function formatThinkerError(
+  code: ThinkerErrorCode,
   vars: Record<string, string | number> = {},
 ): string {
   const entry = THINKER_ERRORS[code];
@@ -96,20 +96,18 @@ export function formatManifestError(
     const value = vars[key];
     return value === undefined ? match : String(value);
   });
-  return `[${PEACOCK} Manifest ${code}] ${interpolated} See ${manifestErrorDocsUrl(code)}`;
+  return `[${PEACOCK} Thinker ${code}] ${interpolated} See ${thinkerErrorDocsUrl(code)}`;
 }
 
 /**
- * Pull a registered Manifest error code out of a rendered message or JSON body
+ * Pull a registered Thinker error code out of a rendered message or JSON body
  * that embeds one (provider-attempt rows store the peacock text in
  * error_message but need error_code for filters/analytics).
  */
-export function extractManifestErrorCode(
-  text: string | null | undefined,
-): ManifestErrorCode | null {
+export function extractThinkerErrorCode(text: string | null | undefined): ThinkerErrorCode | null {
   if (!text) return null;
   const match = text.match(THINKER_ERROR_CODE_RE);
   if (!match) return null;
-  const code = match[1] as ManifestErrorCode;
+  const code = match[1] as ThinkerErrorCode;
   return code in THINKER_ERRORS ? code : null;
 }

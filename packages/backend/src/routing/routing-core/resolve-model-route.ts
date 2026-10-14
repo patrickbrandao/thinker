@@ -21,7 +21,7 @@ export type FallbackRoutesResolution =
 const HINT_LIMIT = 20;
 
 /**
- * Whether `name` refers to this discovered model. Accepts every name Manifest
+ * Whether `name` refers to this discovered model. Accepts every name Thinker
  * publishes for it: the internal id discovery stores, the public id from
  * `/v1/models` (`openrouter/…`, a custom provider's `<alias>/…` or
  * `custom:<uuid>/…`, `…-subscription`), and a custom model's bare name.
