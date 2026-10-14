@@ -87,6 +87,9 @@ describe('local servers', () => {
       ['another scheme', 'ftp://gpu-box:1234', 'must use http:// or https://'],
       ['embedded credentials', 'http://user:secret@gpu-box:1234', 'must not embed credentials'],
       ['a query string', 'http://gpu-box:1234/v1?x=1', 'must not carry a query string'],
+      ['an empty trailing query', 'http://gpu-box:1234/v1?', 'must not carry a query string'],
+      ['an empty trailing fragment', 'http://gpu-box:1234/v1#', 'must not carry a query string'],
+      ['a fragment', 'http://gpu-box:1234#frag', 'must not carry a query string'],
     ])('ignores %s and uses the default', (_label, value, reason) => {
       process.env['THINKER_LMSTUDIO_BASE_URL'] = value;
       expect(getLocalServerBaseUrl('lmstudio')).toBe('http://localhost:1234');
@@ -116,10 +119,20 @@ describe('local servers', () => {
       expect(warn).toHaveBeenCalledTimes(2);
     });
 
-    it('accepts https and a valid value after a bad one', () => {
+    it('accepts https', () => {
       process.env['THINKER_LMSTUDIO_BASE_URL'] = 'https://lm.example.lan/v1';
       expect(getLocalServerBaseUrl('lmstudio')).toBe('https://lm.example.lan');
       expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('uses a valid value set after a bad one, without warning again', () => {
+      process.env['THINKER_LMSTUDIO_BASE_URL'] = 'lm-after-bad:1234';
+      expect(getLocalServerBaseUrl('lmstudio')).toBe('http://localhost:1234');
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      process.env['THINKER_LMSTUDIO_BASE_URL'] = 'http://lm-after-bad:1234/v1';
+      expect(getLocalServerBaseUrl('lmstudio')).toBe('http://lm-after-bad:1234');
+      expect(warn).toHaveBeenCalledTimes(1);
     });
 
     it('checks every override at boot', () => {
