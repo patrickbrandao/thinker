@@ -1,3 +1,5 @@
+import { LEGACY_RECORDING_PREFIX } from './recording-retention';
+
 describe('appConfig', () => {
   const originalEnv = process.env;
 
@@ -108,24 +110,30 @@ describe('appConfig', () => {
     expect(config.runMigrationsOnBoot).toBe(false);
   });
 
-  it('leaves request recording retention unset by default', async () => {
-    delete process.env['REQUEST_RECORDING_RETENTION_DAYS'];
+  it('defaults request recording retention to 30 days', async () => {
+    delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
     const config = await loadConfig();
-    expect(config.requestRecordingRetentionDays).toBeNull();
+    expect(config.requestRecordingRetentionDays).toBe(30);
   });
 
   it('reads a positive request recording retention override', async () => {
-    process.env['REQUEST_RECORDING_RETENTION_DAYS'] = '90';
+    process.env['THINKER_RECORDING_RETENTION_DAYS'] = '7';
     const config = await loadConfig();
-    expect(config.requestRecordingRetentionDays).toBe(90);
+    expect(config.requestRecordingRetentionDays).toBe(7);
+  });
+
+  it('ignores the legacy retention variable name', async () => {
+    delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
+    process.env[`${LEGACY_RECORDING_PREFIX}RETENTION_DAYS`] = '90';
+    const config = await loadConfig();
+    expect(config.requestRecordingRetentionDays).toBe(30);
   });
 
   it.each(['0', '-1', '1.5', 'invalid', '9007199254740992'])(
-    'ignores invalid request recording retention %s',
+    'fails on an invalid request recording retention %s',
     async (value) => {
-      process.env['REQUEST_RECORDING_RETENTION_DAYS'] = value;
-      const config = await loadConfig();
-      expect(config.requestRecordingRetentionDays).toBeNull();
+      process.env['THINKER_RECORDING_RETENTION_DAYS'] = value;
+      await expect(loadConfig()).rejects.toThrow(/THINKER_RECORDING_RETENTION_DAYS/);
     },
   );
 
@@ -174,16 +182,16 @@ describe('appConfig', () => {
   );
 
   it('defaults request recording storage selection to auto', async () => {
-    delete process.env['REQUEST_RECORDING_STORAGE'];
+    delete process.env['THINKER_RECORDING_STORAGE'];
     const config = await loadConfig();
     expect(config.requestRecordingStorage).toBe('auto');
   });
 
   it('reads request recording storage settings', async () => {
-    process.env['REQUEST_RECORDING_STORAGE'] = 's3';
-    process.env['REQUEST_RECORDING_S3_BUCKET'] = 'recordings';
-    process.env['REQUEST_RECORDING_S3_REGION'] = 'auto';
-    process.env['REQUEST_RECORDING_S3_FORCE_PATH_STYLE'] = 'true';
+    process.env['THINKER_RECORDING_STORAGE'] = 's3';
+    process.env['THINKER_RECORDING_S3_BUCKET'] = 'recordings';
+    process.env['THINKER_RECORDING_S3_REGION'] = 'auto';
+    process.env['THINKER_RECORDING_S3_FORCE_PATH_STYLE'] = 'true';
     const config = await loadConfig();
 
     expect(config.requestRecordingStorage).toBe('s3');

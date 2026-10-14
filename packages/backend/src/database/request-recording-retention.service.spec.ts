@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { LEGACY_RECORDING_PREFIX } from '../config/recording-retention';
 import { RequestRecordingRetentionService } from './request-recording-retention.service';
 
 describe('RequestRecordingRetentionService', () => {
@@ -8,7 +9,10 @@ describe('RequestRecordingRetentionService', () => {
   const queryRunner = { query, connect, release };
   const createQueryRunner = jest.fn(() => queryRunner);
   const get = jest.fn();
-  const storage = { delete: jest.fn() };
+  const storage: { delete: jest.Mock; backend: 'filesystem' | 's3' | null } = {
+    delete: jest.fn(),
+    backend: 'filesystem',
+  };
   let service: RequestRecordingRetentionService;
 
   beforeEach(() => {
@@ -35,7 +39,7 @@ describe('RequestRecordingRetentionService', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('deletes recordings older than the 365-day default, storage object first', async () => {
+  it('deletes recordings older than the 30-day default, storage object first', async () => {
     const expired = {
       attempt_id: 'attempt-1',
       storage_key: 'request-recordings/v1/attempt-1.json.gz',
@@ -54,7 +58,7 @@ describe('RequestRecordingRetentionService', () => {
     const select = query.mock.calls.find(([sql]) => String(sql).includes('FROM agent_messages'));
     expect(select).toBeDefined();
     expect(select![0]).not.toMatch(/subscription|tenants|plan/i);
-    expect(select![1]).toEqual([365]);
+    expect(select![1]).toEqual([30]);
     expect(storage.delete).toHaveBeenCalledWith(expired.storage_key);
     const deleteCall = query.mock.calls.findIndex(([sql]) =>
       String(sql).includes('UPDATE agent_messages'),
@@ -65,7 +69,7 @@ describe('RequestRecordingRetentionService', () => {
   });
 
   it('uses the global retention override when configured', async () => {
-    get.mockReturnValue(30);
+    get.mockReturnValue(7);
     service = new RequestRecordingRetentionService(
       { createQueryRunner } as never,
       { get } as never,
@@ -74,7 +78,42 @@ describe('RequestRecordingRetentionService', () => {
 
     await expect(service.deleteExpiredRecordings()).resolves.toBe(0);
 
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM agent_messages'), [30]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM agent_messages'), [7]);
+  });
+
+  it('logs the effective retention and storage backend at boot', () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    get.mockReturnValue(7);
+    storage.backend = 's3';
+    service = new RequestRecordingRetentionService(
+      { createQueryRunner } as never,
+      { get } as never,
+      storage as never,
+    );
+
+    service.onApplicationBootstrap();
+
+    expect(log).toHaveBeenCalledWith('Request recordings: retention 7 days, storage s3');
+    storage.backend = 'filesystem';
+  });
+
+  it('logs an unavailable backend and warns about legacy variable names', () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const legacyName = `${LEGACY_RECORDING_PREFIX}STORAGE`;
+    process.env[legacyName] = 's3';
+    storage.backend = null;
+    try {
+      service.onApplicationBootstrap();
+    } finally {
+      delete process.env[legacyName];
+      storage.backend = 'filesystem';
+    }
+
+    expect(log).toHaveBeenCalledWith('Request recordings: retention 30 days, storage unavailable');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(`${legacyName} -> THINKER_RECORDING_STORAGE`),
+    );
   });
 
   it('does no work when another replica owns the advisory lock', async () => {
