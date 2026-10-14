@@ -11,8 +11,9 @@ import { optionalPositiveInteger } from '../config/env.util';
 import { fetchClientMetadataResource } from './cimd-client-metadata-fetch';
 import { authOriginFromEnv, mcpAvailability } from './mcp-availability';
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
+import { DEFAULT_PORT } from '../common/constants/server.constants';
 
-const port = process.env['PORT'] ?? '3001';
+const port = process.env['PORT'] ?? String(DEFAULT_PORT);
 const isDev = (process.env['NODE_ENV'] ?? '') !== 'production';
 const hasEmailProvider = !!(
   (process.env['EMAIL_PROVIDER'] && process.env['EMAIL_API_KEY']) ||
@@ -67,7 +68,7 @@ function parseOriginHost(value: string | undefined): string | null {
  * `BETTER_AUTH_ALLOWED_HOSTS` (comma-separated patterns, `*.` wildcards
  * allowed). Unknown hosts fall back to the canonical origin, and dev keeps the
  * static origin so the Vite proxy on :3000 doesn't move the callback off the
- * registered :3001 URL.
+ * registered backend port URL.
  */
 function buildAuthBaseURL():
   string | { allowedHosts: string[]; fallback: string; protocol: 'http' | 'https' } {

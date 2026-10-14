@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manifest — self-host install and upgrade helper
+# Thinker — self-host install and upgrade helper
 #
 # Downloads the Docker Compose file and the `.env.example` template,
 # generates a BETTER_AUTH_SECRET and a THINKER_ENCRYPTION_KEY, writes them
@@ -10,13 +10,13 @@
 # walk you through creating the first admin account.
 #
 # Usage:
-#   bash install.sh                  # install into $HOME/manifest
-#   bash install.sh --dir /opt/mnfst # install into a custom directory
-#   bash install.sh --port 8080      # serve the dashboard on a different port
-#   bash install.sh --upgrade        # safely upgrade $HOME/manifest
-#   bash install.sh --upgrade --dir /opt/mnfst
-#   bash install.sh --dry-run        # print what would happen, do nothing
-#   bash install.sh --yes            # skip confirmation prompt (non-interactive)
+#   bash install.sh                    # install into $HOME/thinker
+#   bash install.sh --dir /opt/thinker # install into a custom directory
+#   bash install.sh --port 8080        # serve the dashboard on a different port
+#   bash install.sh --upgrade          # safely upgrade $HOME/thinker
+#   bash install.sh --upgrade --dir /opt/thinker
+#   bash install.sh --dry-run          # print what would happen, do nothing
+#   bash install.sh --yes              # skip confirmation prompt (non-interactive)
 #
 # Re-running against an existing install directory resumes it: the compose
 # file and the generated secrets are left alone and the stack is brought
@@ -24,26 +24,26 @@
 # file; `.env` and `docker-compose.override.yml` remain untouched.
 #
 # Review before running:
-#   curl -sSLO https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/install.sh
+#   curl -sSLO https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh
 #   less install.sh
 #   bash install.sh --dry-run
 #   bash install.sh
 #
 # If you trust the source, one-shot:
-#   bash <(curl -sSL https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker/install.sh)
+#   bash <(curl -sSL https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh)
 
 set -euo pipefail
 
-# Override via MANIFEST_INSTALLER_SOURCE when you need the installer to
+# Override via THINKER_INSTALLER_SOURCE when you need the installer to
 # pull files from somewhere other than `main` — a fork, a release branch,
 # or a local HTTP server hosting a pre-release copy (this is how the
 # Docker smoke CI exercises the script end-to-end against the branch
 # under test, not the published files on GitHub).
-REPO_RAW="${MANIFEST_INSTALLER_SOURCE:-https://raw.githubusercontent.com/mnfst/llm-gateway/main/docker}"
-# Default to $HOME/manifest so running the one-liner from inside another
+REPO_RAW="${THINKER_INSTALLER_SOURCE:-https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker}"
+# Default to $HOME/thinker so running the one-liner from inside another
 # project (a git worktree, a dotfiles checkout, etc.) doesn't silently
-# litter that directory with `./manifest/`.
-DEFAULT_DIR="${HOME:-.}/manifest"
+# litter that directory with `./thinker/`.
+DEFAULT_DIR="${HOME:-.}/thinker"
 INSTALL_DIR="$DEFAULT_DIR"
 HOST_PORT=2099
 DRY_RUN=0
@@ -122,7 +122,7 @@ elif [[ -e "$INSTALL_DIR" && -n "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]]
   if [[ -f "$INSTALL_DIR/docker-compose.yml" && -f "$INSTALL_DIR/.env" ]]; then
     RESUME=1
   else
-    die "$INSTALL_DIR already exists, is not empty, and does not look like a Manifest install (no docker-compose.yml + .env). Pass --dir to choose another location, or remove it first."
+    die "$INSTALL_DIR already exists, is not empty, and does not look like a Thinker install (no docker-compose.yml + .env). Pass --dir to choose another location, or remove it first."
   fi
 fi
 
@@ -179,7 +179,7 @@ else
   operation="install"
 fi
 
-log "Manifest self-host ${operation}"
+log "Thinker self-host ${operation}"
 printf '    Install directory: %s\n' "$INSTALL_DIR"
 printf '    Dashboard port:    %s\n' "$HOST_PORT"
 printf '    Source:            %s\n' "$REPO_RAW"
@@ -189,7 +189,7 @@ if [[ "$RESUME" -eq 1 && "$UPGRADE" -eq 0 ]]; then
 fi
 echo
 
-if [[ "$UPGRADE" -eq 1 ]] && ! grep -q '^# manifest-compose-version:' "$COMPOSE_PATH"; then
+if [[ "$UPGRADE" -eq 1 ]] && ! grep -q '^# thinker-compose-version:' "$COMPOSE_PATH"; then
   warn "This is the first managed Compose upgrade for this installation."
   warn "The current docker-compose.yml will be backed up and replaced."
   warn "Move custom edits to .env or docker-compose.override.yml after the upgrade."
@@ -240,8 +240,8 @@ if [[ "$UPGRADE" -eq 1 ]]; then
     NEW_COMPOSE_PATH="$(mktemp "$INSTALL_DIR/.docker-compose.yml.XXXXXX")"
     curl -sSLf "$REPO_RAW/docker-compose.yml" -o "$NEW_COMPOSE_PATH" \
       || die "Failed to download docker-compose.yml"
-    grep -qE '^# manifest-compose-version: [0-9]+$' "$NEW_COMPOSE_PATH" \
-      || die "Downloaded docker-compose.yml is not a managed Manifest Compose file."
+    grep -qE '^# thinker-compose-version: [0-9]+$' "$NEW_COMPOSE_PATH" \
+      || die "Downloaded docker-compose.yml is not a managed Thinker Compose file."
     docker compose --env-file "$ENV_PATH" -f "$NEW_COMPOSE_PATH" config --quiet \
       || die "Downloaded docker-compose.yml is invalid for the existing .env."
 
@@ -335,7 +335,7 @@ else
 fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  if [[ "$UPGRADE" -eq 1 && "${MANIFEST_INSTALLER_SKIP_PULL:-0}" != "1" ]]; then
+  if [[ "$UPGRADE" -eq 1 && "${THINKER_INSTALLER_SKIP_PULL:-0}" != "1" ]]; then
     printf '    \033[2m$ (cd %s && docker compose pull)\033[0m\n' "$INSTALL_DIR"
   fi
   printf '    \033[2m$ (cd %s && docker compose up -d)\033[0m\n' "$INSTALL_DIR"
@@ -343,7 +343,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
-if [[ "$UPGRADE" -eq 1 && "${MANIFEST_INSTALLER_SKIP_PULL:-0}" != "1" ]]; then
+if [[ "$UPGRADE" -eq 1 && "${THINKER_INSTALLER_SKIP_PULL:-0}" != "1" ]]; then
   log "Pulling release images"
   if ! (cd "$INSTALL_DIR" && docker compose pull); then
     restore_previous_compose 0
@@ -364,11 +364,11 @@ if ! (cd "$INSTALL_DIR" && docker compose up -d); then
   die "docker compose up failed"
 fi
 
-log "Waiting for Manifest to become healthy (up to 120s)"
+log "Waiting for Thinker to become healthy (up to 120s)"
 HEALTH_URL="http://127.0.0.1:${HOST_PORT}/api/v1/health"
 for _ in $(seq 1 24); do
   if curl -sSf "$HEALTH_URL" >/dev/null 2>&1; then
-    log "Manifest is up."
+    log "Thinker is up."
     if [[ "$UPGRADE" -eq 1 ]]; then
       cat <<EOF
 
@@ -392,11 +392,11 @@ EOF
   Config: $INSTALL_DIR/.env  (secrets, OAuth keys, email provider)
   Verify: curl -sSf http://localhost:${HOST_PORT}/api/v1/health
 
-  Note:   Port ${HOST_PORT} is bound to 127.0.0.1 only. To expose on your LAN,
-          edit $INSTALL_DIR/docker-compose.yml and change the ports line
-          from "127.0.0.1:\${PORT:-2099}:\${PORT:-2099}" to "\${PORT:-2099}:\${PORT:-2099}",
-          then set BETTER_AUTH_URL in .env to the host you'll reach it on
+  Note:   Port ${HOST_PORT} is bound to 127.0.0.1 only. To expose it on your LAN,
+          set HOST_BIND_ADDRESS=0.0.0.0 in $INSTALL_DIR/.env, then set
+          BETTER_AUTH_URL there to the host you'll reach it on
           (e.g. http://192.168.1.20:${HOST_PORT}) — it must match the browser URL.
+          Run the installer again (or docker compose up -d) to apply.
 
   Stop:  (cd $INSTALL_DIR && docker compose down)
   Wipe:  (cd $INSTALL_DIR && docker compose down -v)
@@ -408,9 +408,9 @@ done
 
 if [[ "$UPGRADE" -eq 1 ]]; then
   restore_previous_compose 1
-  die "Manifest did not become healthy after the upgrade. The previous Compose configuration was restored."
+  die "Thinker did not become healthy after the upgrade. The previous Compose configuration was restored."
 fi
 
-warn "Manifest did not become healthy within 120s. Check logs with:"
-warn "  (cd $INSTALL_DIR && docker compose logs -f manifest)"
+warn "Thinker did not become healthy within 120s. Check logs with:"
+warn "  (cd $INSTALL_DIR && docker compose logs -f thinker)"
 exit 1

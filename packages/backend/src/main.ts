@@ -25,6 +25,7 @@ import {
 import { createRateLimitReachedHandler } from './common/middleware/rate-limit-log';
 import { shouldCompress } from './routing/proxy/compression-filter';
 import { checkLocalServerBaseUrls } from './common/constants/local-servers';
+import { DEFAULT_PORT } from './common/constants/server.constants';
 import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
 
 export async function bootstrap() {
@@ -221,7 +222,7 @@ export async function bootstrap() {
     logger.warn(`Remote MCP server disabled: ${mcpDisabledReason}`);
   }
 
-  const port = Number(process.env['PORT'] ?? 3001);
+  const port = Number(process.env['PORT'] ?? DEFAULT_PORT);
   const host = process.env['BIND_ADDRESS'] ?? '127.0.0.1';
   await app.listen(port, host);
   logger.log(`Server running on http://${host}:${port}`);

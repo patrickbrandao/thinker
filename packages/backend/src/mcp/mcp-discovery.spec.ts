@@ -5,9 +5,9 @@ import { mountMcpDiscovery, mountMcpUnavailable } from './mcp-discovery';
 
 jest.mock('../auth/auth.instance', () => ({
   authInstance: {},
-  authOrigin: 'http://localhost:3001',
-  authIssuer: 'http://localhost:3001/api/auth',
-  mcpResource: 'http://localhost:3001/api/v1/mcp',
+  authOrigin: 'http://localhost:2099',
+  authIssuer: 'http://localhost:2099/api/auth',
+  mcpResource: 'http://localhost:2099/api/v1/mcp',
   MCP_SCOPES: ['mcp:read', 'mcp:write'],
 }));
 jest.mock('@better-auth/oauth-provider', () => ({
@@ -49,7 +49,7 @@ describe('mountMcpDiscovery', () => {
     oauthProviderAuthServerMetadata.mockReset();
     oauthProviderAuthServerMetadata.mockReturnValue(
       async () =>
-        new Response(JSON.stringify({ issuer: 'http://localhost:3001/api/auth' }), {
+        new Response(JSON.stringify({ issuer: 'http://localhost:2099/api/auth' }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         }),
@@ -64,8 +64,8 @@ describe('mountMcpDiscovery', () => {
     ]) {
       const res = await request(server).get(path).expect(200);
       expect(res.body).toMatchObject({
-        resource: 'http://localhost:3001/api/v1/mcp',
-        authorization_servers: ['http://localhost:3001/api/auth'],
+        resource: 'http://localhost:2099/api/v1/mcp',
+        authorization_servers: ['http://localhost:2099/api/auth'],
         scopes_supported: ['mcp:read', 'mcp:write'],
       });
       expect(res.headers['access-control-allow-origin']).toBe('*');
@@ -84,8 +84,8 @@ describe('mountMcpDiscovery', () => {
       .set('Host', 'other.example')
       .expect(200);
     expect(res.body).toMatchObject({
-      resource: 'http://localhost:3001/api/v1/mcp',
-      authorization_servers: ['http://localhost:3001/api/auth'],
+      resource: 'http://localhost:2099/api/v1/mcp',
+      authorization_servers: ['http://localhost:2099/api/auth'],
     });
   });
 
@@ -93,7 +93,7 @@ describe('mountMcpDiscovery', () => {
     const res = await request(await serveOnLoopback(makeApp()))
       .get('/.well-known/oauth-authorization-server/api/auth')
       .expect(200);
-    expect(res.body).toMatchObject({ issuer: 'http://localhost:3001/api/auth' });
+    expect(res.body).toMatchObject({ issuer: 'http://localhost:2099/api/auth' });
   });
 
   it('does not advertise registration that requires a signed-in user', async () => {
@@ -101,7 +101,7 @@ describe('mountMcpDiscovery', () => {
       async () =>
         new Response(
           JSON.stringify({
-            issuer: 'http://localhost:3001/api/auth',
+            issuer: 'http://localhost:2099/api/auth',
             registration_endpoint: '/register',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -110,7 +110,7 @@ describe('mountMcpDiscovery', () => {
     const res = await request(await serveOnLoopback(makeApp()))
       .get('/.well-known/oauth-authorization-server/api/auth')
       .expect(200);
-    expect(res.body).toEqual({ issuer: 'http://localhost:3001/api/auth' });
+    expect(res.body).toEqual({ issuer: 'http://localhost:2099/api/auth' });
   });
 
   it('builds authorization metadata on the canonical origin, not the Host header', async () => {
@@ -126,9 +126,9 @@ describe('mountMcpDiscovery', () => {
       .get('/.well-known/oauth-authorization-server/api/auth')
       .set('Host', 'other.example')
       .expect(200);
-    expect(res.body.issuer).toBe('http://localhost:3001/api/auth');
+    expect(res.body.issuer).toBe('http://localhost:2099/api/auth');
     expect(serve.mock.calls[0][0].url).toBe(
-      'http://localhost:3001/.well-known/oauth-authorization-server/api/auth',
+      'http://localhost:2099/.well-known/oauth-authorization-server/api/auth',
     );
   });
 

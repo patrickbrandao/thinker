@@ -11,7 +11,7 @@ import { registerRoutingTools } from './routing.tools';
 
 // The tool files read the server origin from the auth instance, which is
 // ESM-only and cannot be required by Jest on Node 22. The origin is all they use.
-jest.mock('../../auth/auth.instance', () => ({ authOrigin: 'http://localhost:3001' }));
+jest.mock('../../auth/auth.instance', () => ({ authOrigin: 'http://localhost:2099' }));
 
 type Handler = (args: Record<string, unknown>, ctx?: unknown) => Promise<unknown>;
 

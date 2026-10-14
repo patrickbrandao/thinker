@@ -117,7 +117,7 @@ describe('XaiOauthService', () => {
   });
 
   it('builds an xAI OAuth URL with PKCE and the subscription scopes', async () => {
-    const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:3001');
+    const url = await svc.generateAuthorizationUrl('agent-1', 'user-1', 'http://localhost:2099');
     const parsed = new URL(url);
 
     expect(parsed.origin + parsed.pathname).toBe('https://auth.x.ai/oauth2/authorize');
@@ -339,7 +339,7 @@ describe('XaiOauthService', () => {
     });
 
     it('starts the callback server and resolves once it is listening', async () => {
-      const p = devSvc.generateAuthorizationUrl('agent-1', 'tenant-1', 'http://localhost:3001');
+      const p = devSvc.generateAuthorizationUrl('agent-1', 'tenant-1', 'http://localhost:2099');
       expect(mockHttpControl.listenCb).toBeDefined();
       mockHttpControl.listenCb!();
       const url = await p;
@@ -386,7 +386,7 @@ describe('XaiOauthService', () => {
     });
 
     it('redirects to the app with ok=0 when the provider returns an error', async () => {
-      const p = devSvc.generateAuthorizationUrl('a', 't', 'http://localhost:3001');
+      const p = devSvc.generateAuthorizationUrl('a', 't', 'http://localhost:2099');
       mockHttpControl.listenCb!();
       const url = await p;
       const state = new URL(url).searchParams.get('state')!;

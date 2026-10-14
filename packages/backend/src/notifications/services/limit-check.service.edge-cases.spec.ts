@@ -58,7 +58,7 @@ describe('LimitCheckService — edge cases', () => {
     } as unknown as EmailProviderConfigService;
 
     const runtime = {
-      getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:3001'),
+      getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
     } as unknown as ManifestRuntimeService;
 
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);

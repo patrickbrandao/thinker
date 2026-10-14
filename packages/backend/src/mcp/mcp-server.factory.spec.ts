@@ -2,7 +2,7 @@ import { buildMcpServer } from './mcp-server.factory';
 import { McpToolDeps } from './tool-deps';
 import { McpOperator } from './mcp-auth';
 
-jest.mock('../auth/auth.instance', () => ({ authOrigin: 'http://localhost:3001' }));
+jest.mock('../auth/auth.instance', () => ({ authOrigin: 'http://localhost:2099' }));
 
 interface FakeServer {
   tools: string[];
