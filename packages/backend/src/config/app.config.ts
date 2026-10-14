@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { optionalPositiveInteger } from './env.util';
+import { parseRecordingRetentionDays } from './recording-retention';
 
 function resolveDatabaseUrl(): string {
   const url = process.env['DATABASE_URL'];
@@ -52,22 +53,22 @@ export const appConfig = registerAs('app', () => ({
   // routing during the post-SIGTERM deregistration lag (the rolling-deploy 5xx
   // spike). Must be shorter than Railway's `drainingSeconds`. 0 disables it.
   shutdownDrainMs: Number(process.env['SHUTDOWN_DRAIN_MS'] ?? 10000),
-  // Optional instance-wide override. When unset, request recordings are kept
-  // for the 365-day default.
-  requestRecordingRetentionDays: optionalPositiveInteger(
-    process.env['REQUEST_RECORDING_RETENTION_DAYS'],
+  // Instance-wide retention in days: 30 by default, overridden by
+  // THINKER_RECORDING_RETENTION_DAYS. An invalid value fails boot.
+  requestRecordingRetentionDays: parseRecordingRetentionDays(
+    process.env['THINKER_RECORDING_RETENTION_DAYS'],
   ),
   // Recording storage uses capability detection by default: complete S3
   // credentials win, otherwise self-hosted installs use their mounted
   // filesystem. The explicit selector is an escape hatch for custom setups.
-  requestRecordingStorage: process.env['REQUEST_RECORDING_STORAGE'] ?? 'auto',
-  requestRecordingFilesystemPath: process.env['REQUEST_RECORDING_FILESYSTEM_PATH'] ?? '',
-  requestRecordingS3Bucket: process.env['REQUEST_RECORDING_S3_BUCKET'] ?? '',
-  requestRecordingS3Endpoint: process.env['REQUEST_RECORDING_S3_ENDPOINT'] ?? '',
-  requestRecordingS3Region: process.env['REQUEST_RECORDING_S3_REGION'] ?? '',
-  requestRecordingS3AccessKeyId: process.env['REQUEST_RECORDING_S3_ACCESS_KEY_ID'] ?? '',
-  requestRecordingS3SecretAccessKey: process.env['REQUEST_RECORDING_S3_SECRET_ACCESS_KEY'] ?? '',
-  requestRecordingS3ForcePathStyle: process.env['REQUEST_RECORDING_S3_FORCE_PATH_STYLE'] === 'true',
+  requestRecordingStorage: process.env['THINKER_RECORDING_STORAGE'] ?? 'auto',
+  requestRecordingFilesystemPath: process.env['THINKER_RECORDING_FILESYSTEM_PATH'] ?? '',
+  requestRecordingS3Bucket: process.env['THINKER_RECORDING_S3_BUCKET'] ?? '',
+  requestRecordingS3Endpoint: process.env['THINKER_RECORDING_S3_ENDPOINT'] ?? '',
+  requestRecordingS3Region: process.env['THINKER_RECORDING_S3_REGION'] ?? '',
+  requestRecordingS3AccessKeyId: process.env['THINKER_RECORDING_S3_ACCESS_KEY_ID'] ?? '',
+  requestRecordingS3SecretAccessKey: process.env['THINKER_RECORDING_S3_SECRET_ACCESS_KEY'] ?? '',
+  requestRecordingS3ForcePathStyle: process.env['THINKER_RECORDING_S3_FORCE_PATH_STYLE'] === 'true',
   // Sliding lifetime (days) of a CLI-minted management PAT. Every successful
   // authentication pushes the key's `expires_at` this far into the future, so
   // an active CLI never has to re-login and an abandoned one lapses.

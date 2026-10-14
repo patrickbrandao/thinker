@@ -53,8 +53,8 @@ describe('ProviderService — transaction manager threading', () => {
   let originalSecret: string | undefined;
 
   beforeEach(() => {
-    originalSecret = process.env.BETTER_AUTH_SECRET;
-    process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+    originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+    process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
 
     providerRepo = makeRepo();
     accessRepo = makeRepo();
@@ -85,9 +85,9 @@ describe('ProviderService — transaction manager threading', () => {
 
   afterEach(() => {
     if (originalSecret === undefined) {
-      delete process.env.BETTER_AUTH_SECRET;
+      delete process.env.THINKER_ENCRYPTION_KEY;
     } else {
-      process.env.BETTER_AUTH_SECRET = originalSecret;
+      process.env.THINKER_ENCRYPTION_KEY = originalSecret;
     }
   });
 

@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource, QueryRunner } from 'typeorm';
 import { RequestRecordingStorageService } from '../common/services/request-recording-storage.service';
-
-const DEFAULT_RETENTION_DAYS = 365;
+import {
+  DEFAULT_RECORDING_RETENTION_DAYS,
+  legacyRecordingEnvWarning,
+} from '../config/recording-retention';
 const RETENTION_LOCK_KEY = 4011986;
 
 const TRY_LOCK_SQL = `
@@ -34,17 +36,28 @@ interface ExpiredRecording {
 }
 
 @Injectable()
-export class RequestRecordingRetentionService {
+export class RequestRecordingRetentionService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RequestRecordingRetentionService.name);
-  private readonly globalRetentionDays: number | null;
+  readonly retentionDays: number;
 
   constructor(
     private readonly dataSource: DataSource,
     config: ConfigService,
     private readonly storage: RequestRecordingStorageService,
   ) {
-    this.globalRetentionDays =
-      config.get<number | null>('app.requestRecordingRetentionDays') ?? null;
+    this.retentionDays =
+      config.get<number>('app.requestRecordingRetentionDays') ?? DEFAULT_RECORDING_RETENTION_DAYS;
+  }
+
+  /** Runs after every onModuleInit, so the storage backend is already prepared. */
+  onApplicationBootstrap(): void {
+    const legacy = legacyRecordingEnvWarning(process.env);
+    if (legacy) this.logger.warn(legacy);
+    this.logger.log(
+      `Request recordings: retention ${this.retentionDays} days, storage ${
+        this.storage.backend ?? 'unavailable'
+      }`,
+    );
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM, {
@@ -60,10 +73,7 @@ export class RequestRecordingRetentionService {
       acquired = lockRows[0]?.acquired === true;
       if (!acquired) return 0;
 
-      const recordings = await this.findAllExpired(
-        queryRunner,
-        this.globalRetentionDays ?? DEFAULT_RETENTION_DAYS,
-      );
+      const recordings = await this.findAllExpired(queryRunner, this.retentionDays);
       const deleted = await this.deleteRecordings(queryRunner, recordings);
 
       if (deleted > 0) {

@@ -454,15 +454,15 @@ describe('ProviderService — route-only cleanup paths', () => {
     let originalSecret: string | undefined;
 
     beforeEach(() => {
-      originalSecret = process.env.BETTER_AUTH_SECRET;
-      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     });
 
     afterEach(() => {
       if (originalSecret === undefined) {
-        delete process.env.BETTER_AUTH_SECRET;
+        delete process.env.THINKER_ENCRYPTION_KEY;
       } else {
-        process.env.BETTER_AUTH_SECRET = originalSecret;
+        process.env.THINKER_ENCRYPTION_KEY = originalSecret;
       }
     });
 
@@ -1138,14 +1138,14 @@ describe('ProviderService — route-only cleanup paths', () => {
     // there's no global setup. Keep the secret scoped to this describe.
     let originalSecret: string | undefined;
     beforeAll(() => {
-      originalSecret = process.env.BETTER_AUTH_SECRET;
-      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     });
     afterAll(() => {
       if (originalSecret === undefined) {
-        delete process.env.BETTER_AUTH_SECRET;
+        delete process.env.THINKER_ENCRYPTION_KEY;
       } else {
-        process.env.BETTER_AUTH_SECRET = originalSecret;
+        process.env.THINKER_ENCRYPTION_KEY = originalSecret;
       }
     });
 
@@ -1229,12 +1229,12 @@ describe('ProviderService — route-only cleanup paths', () => {
   describe('upsertProvider — MiniMax API-key region', () => {
     let originalSecret: string | undefined;
     beforeAll(() => {
-      originalSecret = process.env.BETTER_AUTH_SECRET;
-      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     });
     afterAll(() => {
-      if (originalSecret === undefined) delete process.env.BETTER_AUTH_SECRET;
-      else process.env.BETTER_AUTH_SECRET = originalSecret;
+      if (originalSecret === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+      else process.env.THINKER_ENCRYPTION_KEY = originalSecret;
     });
 
     it('persists region=cn on a MiniMax API-key row', async () => {
@@ -1298,14 +1298,14 @@ describe('ProviderService — route-only cleanup paths', () => {
   describe('upsertProvider — Z.ai subscription region', () => {
     let originalSecret: string | undefined;
     beforeAll(() => {
-      originalSecret = process.env.BETTER_AUTH_SECRET;
-      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     });
     afterAll(() => {
       if (originalSecret === undefined) {
-        delete process.env.BETTER_AUTH_SECRET;
+        delete process.env.THINKER_ENCRYPTION_KEY;
       } else {
-        process.env.BETTER_AUTH_SECRET = originalSecret;
+        process.env.THINKER_ENCRYPTION_KEY = originalSecret;
       }
     });
 
@@ -1410,14 +1410,14 @@ describe('ProviderService — route-only cleanup paths', () => {
   describe('upsertProvider — Xiaomi MiMo Token Plan region', () => {
     let originalSecret: string | undefined;
     beforeAll(() => {
-      originalSecret = process.env.BETTER_AUTH_SECRET;
-      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     });
     afterAll(() => {
       if (originalSecret === undefined) {
-        delete process.env.BETTER_AUTH_SECRET;
+        delete process.env.THINKER_ENCRYPTION_KEY;
       } else {
-        process.env.BETTER_AUTH_SECRET = originalSecret;
+        process.env.THINKER_ENCRYPTION_KEY = originalSecret;
       }
     });
 
@@ -1553,7 +1553,7 @@ describe('ProviderService — route-only cleanup paths', () => {
 });
 
 describe('ProviderService — symmetric provider↔agent auto-connect', () => {
-  const PREV_SECRET = process.env.BETTER_AUTH_SECRET;
+  const PREV_SECRET = process.env.THINKER_ENCRYPTION_KEY;
 
   // A query-builder mock whose insert chain records the enabled (agent, provider)
   // pairs so the symmetric auto-enable tests can assert exactly which pairs were enabled.
@@ -1599,11 +1599,11 @@ describe('ProviderService — symmetric provider↔agent auto-connect', () => {
   };
 
   beforeAll(() => {
-    process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+    process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
   });
   afterAll(() => {
-    if (PREV_SECRET === undefined) delete process.env.BETTER_AUTH_SECRET;
-    else process.env.BETTER_AUTH_SECRET = PREV_SECRET;
+    if (PREV_SECRET === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+    else process.env.THINKER_ENCRYPTION_KEY = PREV_SECRET;
   });
 
   describe('enableAllProvidersForAgent', () => {
