@@ -1,5 +1,6 @@
 import {
   ProviderParamSpecService,
+  extractModelparamsCatalogLiteral,
   parseModelParametersCatalog,
 } from '../provider-param-spec.service';
 
@@ -291,5 +292,31 @@ describe('parseModelParametersCatalog', () => {
     });
     expect(catalog?.[0].capabilities).toEqual(['tools']);
     expect(catalog?.[0].params).toEqual([]);
+  });
+});
+
+describe('extractModelparamsCatalogLiteral', () => {
+  const entries = [{ provider: 'openai', model: 'gpt-4o', note: 'a ]; b ] c ;' }];
+  const literal = JSON.stringify(entries, null, 2);
+
+  it('reads the pre-0.0.71 layout', () => {
+    const source = `export const CATALOG = ${literal};\nfunction authSuffix(a) {\n  return a;\n}\n`;
+    expect(JSON.parse(extractModelparamsCatalogLiteral(source))).toEqual(entries);
+  });
+
+  it('reads the 0.0.71+ layout', () => {
+    const source = `const GENERATED_CATALOG = ${literal};\nexport const CATALOG = GENERATED_CATALOG;\n`;
+    expect(JSON.parse(extractModelparamsCatalogLiteral(source))).toEqual(entries);
+  });
+
+  it('keeps string values that contain ] and ;', () => {
+    const source = `const GENERATED_CATALOG = ${JSON.stringify(entries)};\nexport const CATALOG = GENERATED_CATALOG;\n`;
+    expect(JSON.parse(extractModelparamsCatalogLiteral(source))[0].note).toBe('a ]; b ] c ;');
+  });
+
+  it('throws on an unknown layout', () => {
+    expect(() => extractModelparamsCatalogLiteral(`export default ${literal};\n`)).toThrow(
+      'modelparams package catalog file has an unknown shape',
+    );
   });
 });
