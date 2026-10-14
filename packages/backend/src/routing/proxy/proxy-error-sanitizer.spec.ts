@@ -1,4 +1,9 @@
-import { buildTransportErrorResponse, ProviderUrlBlockedError } from './proxy-transport';
+import {
+  buildTransportErrorResponse,
+  ProviderUrlBlockedError,
+  stripGatewayMarker,
+} from './proxy-transport';
+import { recordingResponseFromText } from './attempt-recording-capture';
 import {
   classifyProviderError,
   openAiErrorTypeForStatus,
@@ -530,6 +535,24 @@ describe('provider_url_blocked (#74)', () => {
     });
     expect(classifyProviderError(502, forged)).toBeNull();
     expect(sanitizeProviderError(502, forged, 'production')).not.toContain('SSRF policy');
+  });
+
+  it('strips the internal marker before storage, recording or logs (#167)', async () => {
+    const body = await blockedBody();
+    expect(body).toContain('thinker_gateway_error');
+    const stripped = stripGatewayMarker(body);
+    expect(stripped).not.toContain('thinker_gateway_error');
+    expect(JSON.parse(stripped).error.code).toBe('provider_url_blocked');
+    expect(normalizeProviderErrorForStorage(502, body)).not.toContain('thinker_gateway_error');
+    expect(JSON.stringify(recordingResponseFromText(body))).not.toContain('thinker_gateway_error');
+    // Classification still uses the raw body.
+    expect(classifyProviderError(502, body)?.code).toBe('provider_url_blocked');
+  });
+
+  it('leaves bodies without the marker untouched', () => {
+    for (const raw of ['not json', '{"error":{"code":"x"}}', '[1]', 'thinker_gateway_error']) {
+      expect(stripGatewayMarker(raw)).toBe(raw);
+    }
   });
 
   it('leaves other 502 bodies generic', () => {

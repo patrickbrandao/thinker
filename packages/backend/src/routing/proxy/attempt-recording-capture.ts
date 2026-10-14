@@ -1,4 +1,5 @@
 import { redactInlineImageDataUrls } from './inline-image-redaction';
+import { stripGatewayMarker } from './proxy-transport';
 import type { RecordingResponseBody, StoredAttemptRecording } from './attempt-recording.types';
 
 export interface AttemptRecordingCapture {
@@ -9,7 +10,8 @@ export interface AttemptRecordingCapture {
   buildRecording(): StoredAttemptRecording;
 }
 
-export function recordingResponseFromText(raw: string): RecordingResponseBody {
+export function recordingResponseFromText(rawBody: string): RecordingResponseBody {
+  const raw = stripGatewayMarker(rawBody);
   try {
     return { type: 'json', body: JSON.parse(raw) as unknown };
   } catch {

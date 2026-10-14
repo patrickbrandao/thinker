@@ -1,3 +1,4 @@
+import { stripGatewayMarker } from './proxy-transport';
 import { Logger } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
 import { Response as ExpressResponse } from 'express';
@@ -247,7 +248,7 @@ export async function handleProviderError(
   // otherwise survive in fragments. Some providers (Anthropic 401s) echo the
   // caller's Authorization / x-api-key header back inside the error body.
   logger.warn(
-    `Upstream error ${errorStatus}: provider=${meta.provider} model=${meta.model} tier=${meta.tier} body=${scrubSecrets(errorBody).slice(0, 500)}`,
+    `Upstream error ${errorStatus}: provider=${meta.provider} model=${meta.model} tier=${meta.tier} body=${scrubSecrets(stripGatewayMarker(errorBody)).slice(0, 500)}`,
   );
   res.status(errorStatus);
   setHeaders(res, metaHeaders);
@@ -336,7 +337,9 @@ function handleFallbackExhausted(
     'primary failure',
   );
 
-  logger.warn(`Fallback chain exhausted: ${scrubSecrets(errorBody).slice(0, 200)}`);
+  logger.warn(
+    `Fallback chain exhausted: ${scrubSecrets(stripGatewayMarker(errorBody)).slice(0, 200)}`,
+  );
   res.status(errorStatus);
   setHeaders(res, metaHeaders);
   res.setHeader('X-Thinker-Fallback-Exhausted', 'true');

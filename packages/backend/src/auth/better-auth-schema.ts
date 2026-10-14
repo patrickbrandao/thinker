@@ -30,7 +30,19 @@ export async function migrateAndVerifyBetterAuthSchema(
   ) => (await import('better-auth/db/migration')).getMigrations(options),
 ): Promise<string[]> {
   await ctx.runMigrations();
-  const { toBeCreated, toBeAdded, schemaProblems } = await plan(ctx.options);
+  let result: MigrationPlan;
+  try {
+    result = await plan(ctx.options);
+  } catch (err) {
+    // The migration itself succeeded; a failing verification must not stop boot.
+    logger.error(
+      `Could not verify the Better Auth database schema after migration: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return [];
+  }
+  const { toBeCreated, toBeAdded, schemaProblems } = result;
   const problems = [
     ...toBeCreated.map((t) => `missing table ${t.table}`),
     ...toBeAdded.flatMap((t) =>

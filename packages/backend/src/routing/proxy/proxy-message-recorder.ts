@@ -1,3 +1,4 @@
+import { stripGatewayMarker } from './proxy-transport';
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -671,7 +672,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       status: richStatus,
       error_http_status: status,
     });
-    const errorMessage = scrubSecrets(errorBody).trim().slice(0, 2000) || FAILED_WITHOUT_MESSAGE;
+    const errorMessage =
+      scrubSecrets(stripGatewayMarker(errorBody)).trim().slice(0, 2000) || FAILED_WITHOUT_MESSAGE;
     await this.messageRepo.update(
       { id: attempt.id },
       {

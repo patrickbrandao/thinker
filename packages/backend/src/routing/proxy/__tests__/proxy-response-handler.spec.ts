@@ -3323,6 +3323,32 @@ describe('proxy-response-handler', () => {
       return warnSpy.mock.calls.map((call) => String(call[0])).join('\n');
     }
 
+    it('never logs the internal gateway marker (#167)', async () => {
+      const { res } = mockResponse();
+      const recorder = mockRecorder();
+      const meta = makeMeta({ provider: 'custom:x', model: 'm' });
+      const body = await buildTransportErrorResponse(
+        new ProviderUrlBlockedError('h resolved to a cloud metadata address'),
+      ).text();
+      expect(body).toContain('thinker_gateway_error');
+
+      await handleProviderError(
+        res as any,
+        testCtx,
+        meta,
+        buildMetaHeaders(meta),
+        502,
+        body,
+        undefined,
+        recorder as any,
+      );
+
+      const logged = loggedLines();
+      expect(logged).toContain('Upstream error 502');
+      expect(logged).toContain('provider_url_blocked');
+      expect(logged).not.toContain('thinker_gateway_error');
+    });
+
     it('scrubs credentials from the "Upstream error" log line', async () => {
       const { res } = mockResponse();
       const recorder = mockRecorder();

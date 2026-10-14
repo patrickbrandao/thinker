@@ -44,6 +44,15 @@ describe('migrateAndVerifyBetterAuthSchema', () => {
     expect(String(logger.error.mock.calls[0][0])).toContain('schema mismatch after migration');
   });
 
+  it('logs an ERROR and keeps booting when the verification itself throws', async () => {
+    const { ctx, planFn, logger } = setup(emptyPlan);
+    planFn.mockRejectedValueOnce(new Error('introspection failed'));
+    await expect(migrateAndVerifyBetterAuthSchema(ctx, logger, planFn)).resolves.toEqual([]);
+    expect(ctx.runMigrations).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(String(logger.error.mock.calls[0][0])).toContain('introspection failed');
+  });
+
   it('propagates a migration failure without verifying', async () => {
     const { ctx, planFn, logger } = setup(emptyPlan);
     ctx.runMigrations.mockRejectedValueOnce(new Error('boom'));

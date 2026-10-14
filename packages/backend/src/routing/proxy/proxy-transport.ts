@@ -37,6 +37,24 @@ function issueGatewayMarker(): string {
   return marker;
 }
 
+/**
+ * Removes the internal marker from a body before it is logged, stored or
+ * recorded, so markers never leave the process. Other bodies pass unchanged.
+ */
+export function stripGatewayMarker(rawBody: string): string {
+  if (!rawBody.includes(GATEWAY_MARKER_FIELD)) return rawBody;
+  try {
+    const parsed = JSON.parse(rawBody) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return rawBody;
+    if (!(GATEWAY_MARKER_FIELD in parsed)) return rawBody;
+    const rest: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+    delete rest[GATEWAY_MARKER_FIELD];
+    return JSON.stringify(rest);
+  } catch {
+    return rawBody;
+  }
+}
+
 /** True only for a blocked-URL body this gateway process built itself. */
 export function isGatewayProviderUrlBlockedBody(rawBody: string): boolean {
   try {
