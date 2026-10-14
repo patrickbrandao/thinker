@@ -60,22 +60,22 @@ describe('classifyCaller', () => {
 
   it('classifies the n8n community node', () => {
     const result = classifyCaller({
-      'user-agent': 'n8n-nodes-manifest',
+      'user-agent': 'n8n-nodes-thinker',
       'x-title': 'n8n',
       'http-referer': 'https://n8n.io',
     });
     expect(result).toEqual({
-      sdk: 'n8n-nodes-manifest',
-      userAgent: 'n8n-nodes-manifest',
+      sdk: 'n8n-nodes-thinker',
+      userAgent: 'n8n-nodes-thinker',
       appName: 'n8n',
       appUrl: 'https://n8n.io',
     });
   });
 
   it('classifies a versioned n8n community node User-Agent', () => {
-    const result = classifyCaller({ 'user-agent': 'n8n-nodes-manifest/0.2.2' });
-    expect(result?.sdk).toBe('n8n-nodes-manifest');
-    expect(result?.sdkVersion).toBe('0.2.2');
+    const result = classifyCaller({ 'user-agent': 'n8n-nodes-thinker/0.1.0' });
+    expect(result?.sdk).toBe('n8n-nodes-thinker');
+    expect(result?.sdkVersion).toBe('0.1.0');
   });
 
   it('falls back to stainless-{lang} when UA does not match a known pattern', () => {
