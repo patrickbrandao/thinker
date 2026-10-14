@@ -7,6 +7,8 @@ import {
   checkMcpEnabled,
   resetSetupStatus,
   createFirstAdmin,
+  checkSignupEnabled,
+  SetupError,
 } from '../../src/services/setup-status';
 import * as setupStatus from '../../src/services/setup-status';
 
@@ -271,7 +273,52 @@ describe('setup-status service', () => {
     });
   });
 
+  describe('checkSignupEnabled', () => {
+    it('returns true when backend reports signupEnabled=true', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ needsSetup: false, signupEnabled: true }),
+        }),
+      );
+      expect(await checkSignupEnabled()).toBe(true);
+    });
+
+    it('defaults to false when backend omits signupEnabled', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ needsSetup: false }) }),
+      );
+      expect(await checkSignupEnabled()).toBe(false);
+    });
+
+    it('defaults to false on fetch failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
+      expect(await checkSignupEnabled()).toBe(false);
+    });
+  });
+
   describe('createFirstAdmin', () => {
+    it('rejects with a SetupError carrying the 403 status', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 403,
+          json: async () => ({ message: 'Invalid or missing setup token' }),
+        }),
+      );
+      const err = await createFirstAdmin({
+        email: 'a@b.com',
+        name: 'X',
+        password: '12345678',
+        setupToken: 'bad',
+      }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SetupError);
+      expect((err as SetupError).status).toBe(403);
+    });
+
     it('POSTs the admin payload as JSON', async () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
       vi.stubGlobal('fetch', fetchMock);
@@ -280,6 +327,7 @@ describe('setup-status service', () => {
         email: 'founder@example.com',
         name: 'Founder',
         password: 'secretpassword',
+        setupToken: 'tok',
       });
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -294,6 +342,7 @@ describe('setup-status service', () => {
         email: 'founder@example.com',
         name: 'Founder',
         password: 'secretpassword',
+        setupToken: 'tok',
       });
     });
 
@@ -307,7 +356,7 @@ describe('setup-status service', () => {
         }),
       );
       await expect(
-        createFirstAdmin({ email: 'a@b.com', name: 'X', password: '12345678' }),
+        createFirstAdmin({ email: 'a@b.com', name: 'X', password: '12345678', setupToken: 'tok' }),
       ).rejects.toThrow('Setup already completed');
     });
 
@@ -321,7 +370,7 @@ describe('setup-status service', () => {
         }),
       );
       await expect(
-        createFirstAdmin({ email: 'bad', name: '', password: '12345678' }),
+        createFirstAdmin({ email: 'bad', name: '', password: '12345678', setupToken: 'tok' }),
       ).rejects.toThrow('email must be valid, name is required');
     });
 
@@ -337,7 +386,7 @@ describe('setup-status service', () => {
         }),
       );
       await expect(
-        createFirstAdmin({ email: 'a@b.com', name: 'X', password: '12345678' }),
+        createFirstAdmin({ email: 'a@b.com', name: 'X', password: '12345678', setupToken: 'tok' }),
       ).rejects.toThrow('Setup failed (500)');
     });
 
@@ -356,7 +405,12 @@ describe('setup-status service', () => {
       const createMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
       vi.stubGlobal('fetch', createMock);
 
-      await createFirstAdmin({ email: 'a@b.com', name: 'X', password: '12345678' });
+      await createFirstAdmin({
+        email: 'a@b.com',
+        name: 'X',
+        password: '12345678',
+        setupToken: 'tok',
+      });
 
       // Next check should re-fetch
       const statusMock = vi.fn().mockResolvedValue({

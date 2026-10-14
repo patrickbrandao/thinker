@@ -43,8 +43,11 @@ describe('First-run setup wizard', () => {
         'localLlmHost',
         'mcpEnabled',
         'needsSetup',
+        'signupEnabled',
         'socialProviders',
       ]);
+      // Sign-up is closed before the first admin exists (#29).
+      expect(res.body.signupEnabled).toBe(false);
     });
 
     it('returns needsSetup=false after a user has been inserted', async () => {
@@ -65,6 +68,40 @@ describe('First-run setup wizard', () => {
   });
 
   describe('POST /api/v1/setup/admin', () => {
+    // #29: the real-server flow (token from the log, success, reuse) is in
+    // signup-lock.e2e-spec.ts; here Better Auth is not loaded, so only the
+    // refusals that happen before user creation are exercised.
+    it.each([
+      ['without a setup token', {}],
+      ['with a wrong setup token', { setupToken: 'not-the-token' }],
+    ])('rejects with 403 %s on an empty install', async (_label, extra) => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/setup/admin')
+        .send({
+          email: 'founder@example.com',
+          name: 'Founder',
+          password: 'secret-password',
+          ...extra,
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toMatch(/setup token/i);
+      const ds = app.get(DataSource);
+      expect(await ds.query(`SELECT id FROM "user"`)).toEqual([]);
+    });
+
+    it('rejects a non-string setup token with 400', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/setup/admin')
+        .send({
+          email: 'founder@example.com',
+          name: 'Founder',
+          password: 'secret-password',
+          setupToken: 42,
+        })
+        .expect(400);
+    });
+
     it('rejects with 409 when a user already exists', async () => {
       const ds = app.get(DataSource);
       await ds.query(`INSERT INTO "user" (id, email, "emailVerified") VALUES ($1, $2, true)`, [

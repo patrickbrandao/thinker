@@ -24,6 +24,7 @@ vi.mock("../../src/services/auth-client.js", () => ({
 }));
 
 vi.mock("../../src/services/setup-status.js", () => ({
+  checkSignupEnabled: () => Promise.resolve(false),
   checkEmailConfigured: (...args: unknown[]) => mockCheckEmailConfigured(...args),
 }));
 

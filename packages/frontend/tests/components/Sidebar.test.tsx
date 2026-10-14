@@ -31,6 +31,7 @@ vi.mock("@solidjs/router", () => ({
 // the nav entry goes with it.
 let mockMcpEnabled = true;
 vi.mock("../../src/services/setup-status.js", () => ({
+  checkSignupEnabled: () => Promise.resolve(false),
   checkMcpEnabled: () => Promise.resolve(mockMcpEnabled),
 }));
 

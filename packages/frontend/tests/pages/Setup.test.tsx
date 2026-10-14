@@ -24,6 +24,14 @@ vi.mock('../../src/services/auth-client.js', () => ({
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
+  SetupError: class SetupError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+    ) {
+      super(message);
+    }
+  },
   checkNeedsSetup: (...args: unknown[]) => mockCheckNeedsSetup(...args),
   createFirstAdmin: (...args: unknown[]) => mockCreateFirstAdmin(...args),
 }));
@@ -53,6 +61,9 @@ describe('Setup page', () => {
   }
 
   function fillValidForm(password = 'secretpassword', confirm = password) {
+    fireEvent.input(screen.getByPlaceholderText('Paste the one-time setup token'), {
+      target: { value: '  tok-123  ' },
+    });
     fireEvent.input(screen.getByPlaceholderText('Your name'), { target: { value: 'Founder' } });
     fireEvent.input(screen.getByPlaceholderText('you@example.com'), {
       target: { value: 'founder@example.com' },
@@ -103,8 +114,26 @@ describe('Setup page', () => {
         email: 'founder@example.com',
         name: 'Founder',
         password: 'secretpassword',
+        setupToken: 'tok-123',
       });
     });
+  });
+
+  it('tells the user where to find the setup token', async () => {
+    await renderSetup();
+    expect(screen.getByText(/one-time setup token/)).toBeDefined();
+  });
+
+  it('shows a friendly message when the setup token is rejected (403)', async () => {
+    const { SetupError } = await import('../../src/services/setup-status.js');
+    mockCreateFirstAdmin.mockRejectedValue(new SetupError('Invalid or missing setup token', 403));
+    const { container } = await renderSetup();
+    fillValidForm();
+    fireEvent.submit(container.querySelector('form')!);
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('setup token is invalid or missing');
+    });
+    expect(mockSignInEmail).not.toHaveBeenCalled();
   });
 
   it('auto-signs-in after successful setup', async () => {
@@ -215,11 +244,13 @@ describe('Setup page', () => {
     fireEvent.submit(container.querySelector('form')!);
 
     await waitFor(() => {
-      expect(mockCreateFirstAdmin).toHaveBeenCalledWith({
-        email: 'founder@example.com',
-        name: 'Founder',
-        password: '12345678',
-      });
+      expect(mockCreateFirstAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'founder@example.com',
+          name: 'Founder',
+          password: '12345678',
+        }),
+      );
     });
     // No length error should have been displayed
     expect(screen.queryByText('Password must be at least 8 characters')).toBeNull();
@@ -243,11 +274,13 @@ describe('Setup page', () => {
     fireEvent.submit(container.querySelector('form')!);
 
     await waitFor(() => {
-      expect(mockCreateFirstAdmin).toHaveBeenCalledWith({
-        email: 'founder@example.com',
-        name: 'Founder',
-        password: weird,
-      });
+      expect(mockCreateFirstAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'founder@example.com',
+          name: 'Founder',
+          password: weird,
+        }),
+      );
     });
   });
 
@@ -271,11 +304,13 @@ describe('Setup page', () => {
     fireEvent.submit(container.querySelector('form')!);
 
     await waitFor(() => {
-      expect(mockCreateFirstAdmin).toHaveBeenCalledWith({
-        email: '',
-        name: '',
-        password: 'secretpassword',
-      });
+      expect(mockCreateFirstAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: '',
+          name: '',
+          password: 'secretpassword',
+        }),
+      );
     });
     // The server error must surface to the user
     await waitFor(() => {

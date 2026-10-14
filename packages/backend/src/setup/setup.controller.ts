@@ -15,13 +15,16 @@ export class SetupController {
     localLlmHost: string;
     emailConfigured: boolean;
     mcpEnabled: boolean;
+    signupEnabled: boolean;
   }> {
+    const needsSetup = await this.setupService.needsSetup();
     return {
-      needsSetup: await this.setupService.needsSetup(),
+      needsSetup,
       socialProviders: this.setupService.getEnabledSocialProviders(),
       localLlmHost: this.setupService.getLocalLlmHost(),
       emailConfigured: this.setupService.isEmailConfigured(),
       mcpEnabled: this.setupService.isMcpEnabled(),
+      signupEnabled: await this.setupService.isSignupEnabled(needsSetup),
     };
   }
 

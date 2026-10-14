@@ -1,11 +1,11 @@
-import { A, useLocation } from '@solidjs/router';
+import { A, useLocation, useNavigate } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
 import { type Component, createSignal, createUniqueId, onCleanup, onMount, Show } from 'solid-js';
 import SocialButtons from '../components/SocialButtons.jsx';
 import { authClient } from '../services/auth-client.js';
 import { appendSearch } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
-import { checkSocialProviders } from '../services/setup-status.js';
+import { checkSignupEnabled, checkSocialProviders } from '../services/setup-status.js';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 // New accounts land on the onboarding flow, which hands off to the dashboard.
@@ -23,12 +23,18 @@ const Register: Component = () => {
   const [socialProviders, setSocialProviders] = createSignal<string[]>([]);
   const [lastAuthMethod] = createSignal(getLastAuthMethod());
   const location = useLocation();
+  const navigate = useNavigate();
   const nameId = createUniqueId();
   const emailId = createUniqueId();
   const passwordId = createUniqueId();
   const errorId = createUniqueId();
 
   onMount(async () => {
+    if (!(await checkSignupEnabled())) {
+      // Public sign-up is closed: new accounts come from an admin.
+      navigate(appendSearch('/login', location.search), { replace: true });
+      return;
+    }
     setSocialProviders(await checkSocialProviders());
   });
 
