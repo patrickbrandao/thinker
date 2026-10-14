@@ -2,6 +2,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import type { ModelRoute } from 'thinker-shared';
 import { auth } from '../auth/auth.instance';
+import { runAsServerUserCreation } from '../auth/signup-policy';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
 import { AgentApiKey } from '../entities/agent-api-key.entity';
@@ -97,9 +98,11 @@ async function seedCleanCohort(deps: CohortSeedDeps): Promise<void> {
 }
 
 async function seedLegacyCohort(deps: CohortSeedDeps): Promise<void> {
-  await auth.api.signUpEmail({
-    body: { email: OLD_USER_EMAIL, password: OLD_USER_PASSWORD, name: 'Old User' },
-  });
+  await runAsServerUserCreation(() =>
+    auth.api.signUpEmail({
+      body: { email: OLD_USER_EMAIL, password: OLD_USER_PASSWORD, name: 'Old User' },
+    }),
+  );
   await deps.dataSource.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
     OLD_USER_EMAIL,
   ]);

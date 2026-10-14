@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CATALOG_SYNC_ENV, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
+import {
+  catalogSyncBootWarning,
+  describeCatalogSyncSetting,
+  isCatalogSyncEnabled,
+} from '../common/utils/catalog-sync';
 
 interface OpenRouterModel {
   id: string;
@@ -38,9 +42,13 @@ export class PricingSyncService implements OnModuleInit {
   private initialLoad: Promise<void> | null = null;
 
   onModuleInit(): void {
+    // Once per boot: this service always loads, and it is the first of the
+    // catalog syncs.
+    const warning = catalogSyncBootWarning();
+    if (warning) this.logger.warn(warning);
     if (!isCatalogSyncEnabled()) {
       this.logger.log(
-        `${CATALOG_SYNC_ENV}=false: OpenRouter pricing sync disabled, using bundled data only`,
+        `${describeCatalogSyncSetting()}: OpenRouter pricing sync disabled, using bundled data only`,
       );
       return;
     }

@@ -9,6 +9,7 @@ interface SetupStatusResponse {
   localLlmHost?: string;
   emailConfigured?: boolean;
   mcpEnabled?: boolean;
+  signupEnabled?: boolean;
 }
 
 interface SetupStatusResult {
@@ -17,6 +18,7 @@ interface SetupStatusResult {
   localLlmHost: string;
   emailConfigured: boolean;
   mcpEnabled: boolean;
+  signupEnabled: boolean;
 }
 
 let cachedPromise: Promise<SetupStatusResult> | null = null;
@@ -34,6 +36,7 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
+        signupEnabled: false,
       };
     const data = (await res.json()) as SetupStatusResponse;
     return {
@@ -45,6 +48,9 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
       emailConfigured: data.emailConfigured !== false,
       // Same reasoning, plus a backend older than this field always serves MCP.
       mcpEnabled: data.mcpEnabled !== false,
+      // Closed unless the backend explicitly opens it: a missing field or a
+      // failed status call never advertises a sign-up page that would refuse.
+      signupEnabled: data.signupEnabled === true,
     };
   } catch {
     return {
@@ -53,6 +59,7 @@ async function fetchSetupStatus(): Promise<SetupStatusResult> {
       localLlmHost: 'localhost',
       emailConfigured: true,
       mcpEnabled: true,
+      signupEnabled: false,
     };
   }
 }
@@ -90,6 +97,15 @@ export async function checkMcpEnabled(): Promise<boolean> {
   return (await getSetupStatus()).mcpEnabled;
 }
 
+/**
+ * True only when the backend allows public self-registration
+ * (`THINKER_ALLOW_SIGNUP=true`). Sign-up links and the register page are
+ * hidden otherwise.
+ */
+export async function checkSignupEnabled(): Promise<boolean> {
+  return (await getSetupStatus()).signupEnabled;
+}
+
 /** Invalidate the cached status. Call this after a successful setup. */
 export function resetSetupStatus(): void {
   cachedPromise = null;
@@ -99,6 +115,18 @@ export interface CreateAdminInput {
   email: string;
   name: string;
   password: string;
+  setupToken: string;
+}
+
+/** Error from the setup endpoint, carrying the HTTP status. */
+export class SetupError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'SetupError';
+  }
 }
 
 export async function createFirstAdmin(input: CreateAdminInput): Promise<void> {
@@ -117,7 +145,7 @@ export async function createFirstAdmin(input: CreateAdminInput): Promise<void> {
     } catch {
       // not JSON — use default
     }
-    throw new Error(message);
+    throw new SetupError(message, res.status);
   }
   resetSetupStatus();
 }

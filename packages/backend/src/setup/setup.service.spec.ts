@@ -1,4 +1,5 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { isServerUserCreation, SIGNUP_VALVE_ENV } from '../auth/signup-policy';
 
 jest.mock('../auth/auth.instance', () => ({
   auth: {
@@ -38,11 +39,17 @@ describe('SetupService', () => {
   let runnerQuery: jest.Mock;
   let ds: ReturnType<typeof buildMockDataSource>;
   let service: SetupService;
+  const SETUP_TOKEN = 'unit-setup-token';
+  const setupToken = {
+    verify: jest.fn((token?: string) => token === SETUP_TOKEN),
+    ensureIssued: jest.fn(),
+    consume: jest.fn(),
+  };
 
   beforeEach(() => {
     runnerQuery = jest.fn();
     ds = buildMockDataSource(runnerQuery);
-    service = new SetupService(ds as never);
+    service = new SetupService(ds as never, setupToken as never);
     jest.clearAllMocks();
   });
 
@@ -243,7 +250,12 @@ describe('SetupService', () => {
   });
 
   describe('createFirstAdmin', () => {
-    const dto = { email: 'founder@example.com', name: 'Founder', password: 'secret-password' };
+    const dto = {
+      email: 'founder@example.com',
+      name: 'Founder',
+      password: 'secret-password',
+      setupToken: SETUP_TOKEN,
+    };
 
     function mockHappyPath(): void {
       runnerQuery
@@ -360,6 +372,24 @@ describe('SetupService', () => {
         expect(updateCall?.[1]).toEqual(['founder@example.com']);
       });
 
+      it('requires the setup token before completing a half-created admin', async () => {
+        runnerQuery
+          .mockResolvedValueOnce(undefined) // lock
+          .mockResolvedValueOnce([{ count: '1' }]) // count = 1
+          .mockResolvedValueOnce([{ email: 'founder@example.com' }]) // unverified match
+          .mockResolvedValueOnce(undefined); // unlock
+
+        await expect(
+          service.createFirstAdmin({ ...dto, setupToken: 'not-the-token' }),
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(setupToken.ensureIssued).toHaveBeenCalledTimes(1);
+        const updateCall = runnerQuery.mock.calls.find(
+          (c) => typeof c[0] === 'string' && c[0].includes('UPDATE "user"'),
+        );
+        expect(updateCall).toBeUndefined();
+      });
+
       it('throws ConflictException when count=1 but the existing user is already verified', async () => {
         runnerQuery
           .mockResolvedValueOnce(undefined) // lock
@@ -436,6 +466,81 @@ describe('SetupService', () => {
       await service.createFirstAdmin(dto);
 
       expect(ds.createQueryRunner).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates the user inside the trusted server-side context and consumes the token', async () => {
+      mockHappyPath();
+      let insideTrustedContext = false;
+      (auth.api.signUpEmail as jest.Mock).mockImplementationOnce(async () => {
+        insideTrustedContext = isServerUserCreation();
+        return {};
+      });
+
+      await service.createFirstAdmin(dto);
+
+      expect(insideTrustedContext).toBe(true);
+      expect(isServerUserCreation()).toBe(false);
+      expect(setupToken.consume).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['a wrong token', 'not-the-token'],
+      ['no token', undefined],
+    ])('refuses %s with 403 and re-prints a token, creating nothing', async (_label, token) => {
+      runnerQuery
+        .mockResolvedValueOnce(undefined) // pg_advisory_lock
+        .mockResolvedValueOnce([{ count: '0' }]) // count check
+        .mockResolvedValueOnce(undefined); // pg_advisory_unlock
+
+      await expect(service.createFirstAdmin({ ...dto, setupToken: token })).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      expect(auth.api.signUpEmail).not.toHaveBeenCalled();
+      expect(setupToken.ensureIssued).toHaveBeenCalledTimes(1);
+      expect(setupToken.consume).not.toHaveBeenCalled();
+      const unlockCall = runnerQuery.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('pg_advisory_unlock'),
+      );
+      expect(unlockCall).toBeDefined();
+    });
+
+    it('keeps the token when user creation fails', async () => {
+      runnerQuery
+        .mockResolvedValueOnce(undefined) // pg_advisory_lock
+        .mockResolvedValueOnce([{ count: '0' }]) // count check
+        .mockResolvedValueOnce(undefined); // pg_advisory_unlock
+      (auth.api.signUpEmail as jest.Mock).mockRejectedValueOnce(new Error('auth down'));
+
+      await expect(service.createFirstAdmin(dto)).rejects.toThrow('auth down');
+      expect(setupToken.consume).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('isSignupEnabled', () => {
+    afterEach(() => {
+      delete process.env[SIGNUP_VALVE_ENV];
+    });
+
+    it('is false by default, even after setup', async () => {
+      delete process.env[SIGNUP_VALVE_ENV];
+      await expect(service.isSignupEnabled(false)).resolves.toBe(false);
+    });
+
+    it('is false before setup even with the valve open', async () => {
+      process.env[SIGNUP_VALVE_ENV] = 'true';
+      await expect(service.isSignupEnabled(true)).resolves.toBe(false);
+    });
+
+    it('is true after setup with THINKER_ALLOW_SIGNUP=true', async () => {
+      process.env[SIGNUP_VALVE_ENV] = 'true';
+      await expect(service.isSignupEnabled(false)).resolves.toBe(true);
+    });
+
+    it('queries needsSetup when not given', async () => {
+      process.env[SIGNUP_VALVE_ENV] = 'true';
+      ds.query.mockResolvedValueOnce([{ count: '1' }]);
+      await expect(service.isSignupEnabled()).resolves.toBe(true);
     });
   });
 });

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { auth } from '../auth/auth.instance';
+import { runAsServerUserCreation } from '../auth/signup-policy';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
 import { AgentApiKey } from '../entities/agent-api-key.entity';
@@ -194,13 +195,16 @@ export class DatabaseSeederService implements OnModuleInit {
     const existing = await this.checkBetterAuthUser('admin@thinker.example.com');
     if (existing) return;
 
-    await auth.api.signUpEmail({
-      body: {
-        email: 'admin@thinker.example.com',
-        password: 'thinker',
-        name: 'Admin',
-      },
-    });
+    // Public sign-up is closed (#29); the dev seeder is trusted server code.
+    await runAsServerUserCreation(() =>
+      auth.api.signUpEmail({
+        body: {
+          email: 'admin@thinker.example.com',
+          password: 'thinker',
+          name: 'Admin',
+        },
+      }),
+    );
 
     await this.dataSource.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
       'admin@thinker.example.com',

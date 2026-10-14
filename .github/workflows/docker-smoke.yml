@@ -100,6 +100,8 @@ jobs:
           THINKER_RECORDING_S3_ACCESS_KEY_ID: access
           THINKER_RECORDING_S3_SECRET_ACCESS_KEY: secret
           THINKER_RECORDING_S3_FORCE_PATH_STYLE: "true"
+          THINKER_ALLOW_SIGNUP: "true"
+          THINKER_ENCRYPTION_KEY_PREVIOUS: previous-key-for-wiring-check
         run: |
           docker compose config --format json > /tmp/compose.json
           jq -e '
@@ -113,7 +115,9 @@ jobs:
             .services.thinker.environment.THINKER_RECORDING_S3_REGION == "auto" and
             .services.thinker.environment.THINKER_RECORDING_S3_ACCESS_KEY_ID == "access" and
             .services.thinker.environment.THINKER_RECORDING_S3_SECRET_ACCESS_KEY == "secret" and
-            .services.thinker.environment.THINKER_RECORDING_S3_FORCE_PATH_STYLE == "true"
+            .services.thinker.environment.THINKER_RECORDING_S3_FORCE_PATH_STYLE == "true" and
+            .services.thinker.environment.THINKER_ALLOW_SIGNUP == "true" and
+            .services.thinker.environment.THINKER_ENCRYPTION_KEY_PREVIOUS == "previous-key-for-wiring-check"
           ' /tmp/compose.json
 
       - name: Start mock OpenAI provider
@@ -227,10 +231,14 @@ jobs:
           prompt="persist this request through a container recreation"
           expected_answer="persisted through Docker volume"
 
+          # One-time setup token printed at first boot (#29).
+          setup_token=$(docker compose logs thinker | grep -oE 'one-time setup token: [A-Za-z0-9_-]+' | tail -1 | awk '{print $NF}')
+          test -n "$setup_token"
+          echo "::add-mask::$setup_token"
           curl -sSf -X POST "$base_url/api/v1/setup/admin" \
             -H 'Content-Type: application/json' \
             -H "Origin: $auth_origin" \
-            --data '{"email":"volume-smoke@example.com","name":"Volume Smoke","password":"volume-smoke-password"}' \
+            --data "{\"email\":\"volume-smoke@example.com\",\"name\":\"Volume Smoke\",\"password\":\"volume-smoke-password\",\"setupToken\":\"$setup_token\"}" \
             >/dev/null
           curl -sSf -c "$cookie_jar" -X POST "$base_url/api/auth/sign-in/email" \
             -H 'Content-Type: application/json' \

@@ -60,6 +60,11 @@ services:
       # Required at-rest encryption key for stored provider keys, OAuth tokens
       # and request recordings. Must differ from BETTER_AUTH_SECRET.
       - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:?THINKER_ENCRYPTION_KEY must be set in .env}
+      # Rotation only: the previous encryption key. Stored credentials are
+      # rewritten onto the current key after boot; remove it afterwards.
+      - THINKER_ENCRYPTION_KEY_PREVIOUS=${THINKER_ENCRYPTION_KEY_PREVIOUS:-}
+      # Public sign-up is closed; set to true to reopen it temporarily.
+      - THINKER_ALLOW_SIGNUP=${THINKER_ALLOW_SIGNUP:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The
       # OAuth callback and session cookie follow the request host, so set this
@@ -76,6 +81,9 @@ services:
       # Defaults to the host-installed Ollama. Override in .env if your
       # Ollama runs elsewhere (e.g. on another host on your LAN).
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Built-in LM Studio / llama.cpp servers. Empty uses the host default.
+      - THINKER_LMSTUDIO_BASE_URL=${THINKER_LMSTUDIO_BASE_URL:-}
+      - THINKER_LLAMACPP_BASE_URL=${THINKER_LLAMACPP_BASE_URL:-}
       - PROVIDER_TIMEOUT_MS=${PROVIDER_TIMEOUT_MS:-180000}
       - STREAM_WARMUP_MS=${STREAM_WARMUP_MS:-15000}
       - CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS=${CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS:-60000}

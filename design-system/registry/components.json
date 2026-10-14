@@ -580,6 +580,7 @@
         "auth-form__error",
         "auth-form__error-link",
         "auth-form__forgot",
+        "auth-form__hint",
         "auth-form__input",
         "auth-form__label",
         "auth-form__link-btn",
@@ -4639,7 +4640,7 @@
     "tokens": 79,
     "darkOverrides": 38,
     "blocks": 276,
-    "classes": 1513,
+    "classes": 1514,
     "canonicalRules": 47,
     "ghostRules": 47
   }

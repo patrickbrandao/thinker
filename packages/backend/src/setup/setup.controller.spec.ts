@@ -14,6 +14,7 @@ describe('SetupController', () => {
   let mockGetLocalLlmHost: jest.Mock;
   let mockIsEmailConfigured: jest.Mock;
   let mockIsMcpEnabled: jest.Mock;
+  let mockIsSignupEnabled: jest.Mock;
 
   beforeEach(async () => {
     mockNeedsSetup = jest.fn();
@@ -22,6 +23,7 @@ describe('SetupController', () => {
     mockGetLocalLlmHost = jest.fn().mockReturnValue('localhost');
     mockIsEmailConfigured = jest.fn().mockReturnValue(true);
     mockIsMcpEnabled = jest.fn().mockReturnValue(true);
+    mockIsSignupEnabled = jest.fn().mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SetupController],
@@ -35,6 +37,7 @@ describe('SetupController', () => {
             getLocalLlmHost: mockGetLocalLlmHost,
             isEmailConfigured: mockIsEmailConfigured,
             isMcpEnabled: mockIsMcpEnabled,
+            isSignupEnabled: mockIsSignupEnabled,
           },
         },
       ],
@@ -60,6 +63,7 @@ describe('SetupController', () => {
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
+        signupEnabled: false,
       });
     });
 
@@ -72,6 +76,7 @@ describe('SetupController', () => {
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
+        signupEnabled: false,
       });
     });
 
@@ -85,6 +90,7 @@ describe('SetupController', () => {
         localLlmHost: 'localhost',
         emailConfigured: true,
         mcpEnabled: true,
+        signupEnabled: false,
       });
     });
 
@@ -97,8 +103,17 @@ describe('SetupController', () => {
         'localLlmHost',
         'mcpEnabled',
         'needsSetup',
+        'signupEnabled',
         'socialProviders',
       ]);
+    });
+
+    it('reports signupEnabled from the service, passing the needsSetup it read', async () => {
+      mockNeedsSetup.mockResolvedValue(false);
+      mockIsSignupEnabled.mockResolvedValue(true);
+      const result = await controller.getStatus();
+      expect(result.signupEnabled).toBe(true);
+      expect(mockIsSignupEnabled).toHaveBeenCalledWith(false);
     });
 
     it('returns host.docker.internal as localLlmHost when running inside Docker', async () => {

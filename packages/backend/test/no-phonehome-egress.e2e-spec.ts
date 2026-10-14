@@ -18,6 +18,7 @@ import { createServer, type Server } from 'net';
 import { tmpdir } from 'os';
 import { join, sep } from 'path';
 import { DataSource } from 'typeorm';
+import { migrations } from '../src/database/data-source-definitions';
 import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const FORBIDDEN_DESTINATIONS = [
@@ -128,6 +129,45 @@ async function withDatabase(run: (db: DataSource) => Promise<void>, dropSchema =
   } finally {
     await db.destroy();
   }
+}
+
+/** Remote (non-loopback) hostnames resolved in a run. */
+function remoteDnsLookups(records: EgressRecord[]): string[] {
+  return records
+    .filter((record) => record.kind === 'dns')
+    .map((record) => record.target)
+    .filter((host) => !LOCAL_HOSTS.has(host));
+}
+
+/**
+ * Wipes the e2e database and applies the committed migrations, so a block that
+ * seeds rows before booting does not depend on an earlier block having
+ * migrated the schema (#75).
+ */
+async function resetMigratedSchema(): Promise<void> {
+  await withDatabase(async () => undefined, true);
+  const db = new DataSource({ type: 'postgres', url: resolveE2eDatabaseUrl(), migrations });
+  await db.initialize();
+  try {
+    await db.runMigrations({ transaction: 'each' });
+  } finally {
+    await db.destroy();
+  }
+}
+
+/** Registers an OpenCode Go provider, which gates the OpenCode Go doc fetch. */
+async function seedOpencodeGoProvider(): Promise<void> {
+  await withDatabase(async (db) => {
+    await db.query(
+      `INSERT INTO tenants (id, name) VALUES ('egress-tenant', 'egress-tenant')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    await db.query(
+      `INSERT INTO tenant_providers (id, tenant_id, provider, auth_type, label)
+       VALUES ('egress-opencode-go', 'egress-tenant', 'opencode-go', 'api_key', 'Default')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+  });
 }
 
 /**
@@ -293,9 +333,10 @@ describe('no phone-home egress', () => {
   });
 
   /**
-   * Each block boots the real server against the same database, in order: the
-   * first starts from an empty schema (the server migrates on boot), and the
-   * later ones register an OpenCode Go provider in it.
+   * Each block boots the real server against a database it prepares itself,
+   * so any block can run alone (`-t`) or in any order (#75): the first starts
+   * from an empty schema (the server migrates on boot), the others migrate it
+   * up front and register an OpenCode Go provider before booting.
    */
   describe('at boot (production mode, no opt-out variable)', () => {
     let server: BootedServer | undefined;
@@ -353,11 +394,7 @@ describe('no phone-home egress', () => {
     });
 
     it('resolves no remote hostname, so nothing bypasses fetch to reach the network', () => {
-      const remote = server!.records
-        .filter((record) => record.kind === 'dns')
-        .map((record) => record.target)
-        .filter((host) => !LOCAL_HOSTS.has(host));
-      expect(remote).toEqual([]);
+      expect(remoteDnsLookups(server!.records)).toEqual([]);
     });
 
     it('answers /setup/status without probing a local runner (#109)', async () => {
@@ -404,25 +441,12 @@ describe('no phone-home egress', () => {
   });
 
   describe('with an OpenCode Go provider registered', () => {
-    beforeAll(async () => {
-      // The schema exists: the boot above migrated it.
-      await withDatabase(async (db) => {
-        await db.query(
-          `INSERT INTO tenants (id, name) VALUES ('egress-tenant', 'egress-tenant')
-           ON CONFLICT (id) DO NOTHING`,
-        );
-        await db.query(
-          `INSERT INTO tenant_providers (id, tenant_id, provider, auth_type, label)
-           VALUES ('egress-opencode-go', 'egress-tenant', 'opencode-go', 'api_key', 'Default')
-           ON CONFLICT (id) DO NOTHING`,
-        );
-      });
-    }, 30_000);
-
     describe('and THINKER_CATALOG_SYNC=false', () => {
       let server: BootedServer | undefined;
 
       beforeAll(async () => {
+        await resetMigratedSchema();
+        await seedOpencodeGoProvider();
         server = await bootServer({ THINKER_CATALOG_SYNC: 'false' });
       }, 180_000);
 
@@ -438,12 +462,18 @@ describe('no phone-home egress', () => {
       it('fetches no catalog at all, nor anything else remote', () => {
         expect(remoteFetchHosts(server!.records)).toEqual([]);
       });
+
+      it('resolves no remote hostname', () => {
+        expect(remoteDnsLookups(server!.records)).toEqual([]);
+      });
     });
 
     describe('and catalog sync on (default)', () => {
       let server: BootedServer | undefined;
 
       beforeAll(async () => {
+        await resetMigratedSchema();
+        await seedOpencodeGoProvider();
         server = await bootServer();
       }, 180_000);
 
@@ -455,6 +485,10 @@ describe('no phone-home egress', () => {
         const remote = remoteFetchHosts(server!.records);
         expect(remote).toContain(OPENCODE_GO_DOC_HOST);
         expect(remote.filter((host) => !ADR_0003_CATALOG_HOSTS.has(host))).toEqual([]);
+      });
+
+      it('resolves no remote hostname', () => {
+        expect(remoteDnsLookups(server!.records)).toEqual([]);
       });
     });
   });

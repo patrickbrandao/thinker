@@ -1,6 +1,8 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { SetupTokenService } from './setup-token.service';
+import { isSignupValveOpen, runAsServerUserCreation } from '../auth/signup-policy';
 import { getContainerHostAlias } from '../common/utils/container-host';
 import { isEmailConfigured } from '../notifications/services/email-providers/send-email';
 import { mcpAvailability } from '../auth/mcp-availability';
@@ -16,7 +18,10 @@ const SETUP_ADVISORY_LOCK_KEY = 9001;
 export class SetupService {
   private readonly logger = new Logger(SetupService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly setupToken: SetupTokenService,
+  ) {}
 
   /**
    * Returns the hostname the backend should use to reach host-installed
@@ -65,6 +70,17 @@ export class SetupService {
   }
 
   /**
+   * True when the dashboard may offer self-service sign-up (#29): only after
+   * the first admin exists, and only with the provisional
+   * `THINKER_ALLOW_SIGNUP=true` valve. The first account always comes from the
+   * setup wizard.
+   */
+  async isSignupEnabled(needsSetup?: boolean): Promise<boolean> {
+    if (!isSignupValveOpen()) return false;
+    return !(needsSetup ?? (await this.needsSetup()));
+  }
+
+  /**
    * Returns true when no Better Auth user exists yet. The login flow uses
    * this to redirect visitors to the setup wizard instead of showing the
    * login form on a fresh install.
@@ -93,6 +109,11 @@ export class SetupService {
    * attempts serialize, and we add a recovery branch: if the only
    * existing user is unverified and matches the DTO email, we treat the
    * previous attempt as partial and complete the verification step.
+   *
+   * With no user yet, the caller must present the one-time setup token
+   * printed in the server log (#29). The user is created inside
+   * `runAsServerUserCreation`, the only context in which Better Auth's
+   * user-creation hook accepts the first account.
    */
   async createFirstAdmin(dto: CreateAdminDto): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -116,6 +137,9 @@ export class SetupService {
               [dto.email],
             )) as Array<{ email: string }>;
             if (unverified.length === 1) {
+              // Completing a half-created admin is still setup: it needs the
+              // token too, or anyone knowing the email could verify it.
+              this.assertSetupToken(dto.setupToken);
               await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
                 dto.email,
               ]);
@@ -126,17 +150,22 @@ export class SetupService {
           throw new ConflictException('Setup already completed — an admin user exists');
         }
 
+        this.assertSetupToken(dto.setupToken);
+
         // Lazy-require so jest unit and e2e tests that don't exercise
         // this path don't have to load Better Auth's ESM bundle.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { auth } = require('../auth/auth.instance');
-        await auth.api.signUpEmail({
-          body: {
-            email: dto.email,
-            password: dto.password,
-            name: dto.name,
-          },
-        });
+        await runAsServerUserCreation(() =>
+          auth.api.signUpEmail({
+            body: {
+              email: dto.email,
+              password: dto.password,
+              name: dto.name,
+            },
+          }),
+        );
+        this.setupToken.consume();
 
         await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
           dto.email,
@@ -149,5 +178,16 @@ export class SetupService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private assertSetupToken(token: string | undefined): void {
+    if (this.setupToken.verify(token)) return;
+    // No token pending (wiped database, or a recovery after a restart):
+    // print one now so the operator can retry.
+    this.setupToken.ensureIssued();
+    throw new ForbiddenException(
+      'Invalid or missing setup token. Find the one-time token in the server log ' +
+        '(for example `docker compose logs thinker`).',
+    );
   }
 }

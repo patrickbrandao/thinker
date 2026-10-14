@@ -2,7 +2,7 @@ import { useNavigate } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
 import { type Component, createSignal, onMount, Show } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
-import { checkNeedsSetup, createFirstAdmin } from '../services/setup-status.js';
+import { checkNeedsSetup, createFirstAdmin, SetupError } from '../services/setup-status.js';
 
 const Setup: Component = () => {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ const Setup: Component = () => {
   const [name, setName] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [confirmPassword, setConfirmPassword] = createSignal('');
+  const [setupToken, setSetupToken] = createSignal('');
   const [error, setError] = createSignal('');
   const [loading, setLoading] = createSignal(false);
   const [checking, setChecking] = createSignal(true);
@@ -38,7 +39,12 @@ const Setup: Component = () => {
 
     setLoading(true);
     try {
-      await createFirstAdmin({ email: email(), name: name(), password: password() });
+      await createFirstAdmin({
+        email: email(),
+        name: name(),
+        password: password(),
+        setupToken: setupToken().trim(),
+      });
 
       // Auto sign-in with the credentials just created.
       const { error: authError } = await authClient.signIn.email({
@@ -54,7 +60,13 @@ const Setup: Component = () => {
       // Full reload so the new session cookie is picked up by every guard.
       window.location.href = '/';
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Setup failed');
+      if (err instanceof SetupError && err.status === 403) {
+        setError(
+          'The setup token is invalid or missing. Copy the one-time setup token from the server log and try again.',
+        );
+      } else {
+        setError(err instanceof Error ? err.message : 'Setup failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -75,6 +87,24 @@ const Setup: Component = () => {
               {error()}
             </div>
           )}
+          <label class="auth-form__label">
+            Setup token
+            <input
+              class="auth-form__input"
+              type="text"
+              placeholder="Paste the one-time setup token"
+              value={setupToken()}
+              onInput={(e) => setSetupToken(e.currentTarget.value)}
+              required
+              autocomplete="off"
+              spellcheck={false}
+              aria-describedby="setup-token-help"
+            />
+            <span id="setup-token-help" class="auth-form__hint">
+              Find it in the server log, on the line that says "one-time setup token" (for example{' '}
+              <code>docker compose logs thinker</code>).
+            </span>
+          </label>
           <label class="auth-form__label">
             Name
             <input

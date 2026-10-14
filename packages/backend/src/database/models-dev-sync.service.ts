@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CATALOG_SYNC_ENV, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
+import { describeCatalogSyncSetting, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { normalizeProviderName, type ModelCapability, type ModelModality } from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../common/constants/providers';
 import {
@@ -286,7 +286,7 @@ export class ModelsDevSyncService implements OnModuleInit {
   onModuleInit(): void {
     if (!isCatalogSyncEnabled()) {
       this.logger.log(
-        `${CATALOG_SYNC_ENV}=false: models.dev sync disabled, using bundled data only`,
+        `${describeCatalogSyncSetting()}: models.dev sync disabled, using bundled data only`,
       );
       return;
     }

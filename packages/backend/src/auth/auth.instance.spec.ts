@@ -5,7 +5,20 @@ const mockBetterAuth = jest.fn().mockReturnValue({
   api: {},
 });
 
-jest.mock('better-auth', () => ({ betterAuth: mockBetterAuth }));
+jest.mock('better-auth', () => ({
+  betterAuth: mockBetterAuth,
+  APIError: class MockAPIError extends Error {
+    constructor(
+      public status: string,
+      public body: { message: string; code: string },
+    ) {
+      super(body.message);
+    }
+  },
+}));
+jest.mock('better-auth/api', () => ({
+  createAuthMiddleware: (fn: unknown) => fn,
+}));
 jest.mock('pg', () => ({ Pool: jest.fn() }));
 // The MCP/OAuth plugins are ESM-only. Jest (Node 22) cannot require them, so
 // this spec mocks them exactly as it already mocks `better-auth` itself.
@@ -103,6 +116,78 @@ describe('auth.instance', () => {
     expect(config.account.accountLinking).toEqual({
       enabled: true,
       trustedProviders: ['google', 'github', 'discord'],
+    });
+  });
+
+  describe('closed sign-up (#29)', () => {
+    type HookConfig = {
+      hooks: { before: (ctx: { path: string }) => Promise<void> };
+      databaseHooks: { user: { create: { before: () => Promise<void> } } };
+      socialProviders: Record<string, { disableSignUp: boolean }>;
+    };
+
+    function loadWithUsers(exists: boolean): { config: HookConfig; query: jest.Mock } {
+      const query = jest.fn().mockResolvedValue({ rows: [{ exists }] });
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Pool } = require('pg') as { Pool: jest.Mock };
+      Pool.mockImplementation(() => ({ query }));
+      loadModule();
+      return { config: mockBetterAuth.mock.calls[0][0] as HookConfig, query };
+    }
+
+    it('refuses every user creation by default, with a 403 SIGNUP_DISABLED', async () => {
+      delete process.env['THINKER_ALLOW_SIGNUP'];
+      const { config, query } = loadWithUsers(true);
+
+      await expect(config.databaseHooks.user.create.before()).rejects.toMatchObject({
+        status: 'FORBIDDEN',
+        body: { code: 'SIGNUP_DISABLED' },
+      });
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('refuses /sign-up/email before the endpoint runs and ignores other paths', async () => {
+      delete process.env['THINKER_ALLOW_SIGNUP'];
+      const { config } = loadWithUsers(true);
+
+      await expect(config.hooks.before({ path: '/sign-up/email' })).rejects.toMatchObject({
+        status: 'FORBIDDEN',
+      });
+      await expect(config.hooks.before({ path: '/sign-in/email' })).resolves.toBeUndefined();
+    });
+
+    it('allows the setup wizard context', async () => {
+      delete process.env['THINKER_ALLOW_SIGNUP'];
+      const { config } = loadWithUsers(false);
+      // Same module registry as auth.instance after resetModules.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const policy = require('./signup-policy') as typeof import('./signup-policy');
+
+      await expect(
+        policy.runAsServerUserCreation(() => config.databaseHooks.user.create.before()),
+      ).resolves.toBeUndefined();
+    });
+
+    it('with THINKER_ALLOW_SIGNUP=true allows sign-up once a user exists, never the first', async () => {
+      process.env['THINKER_ALLOW_SIGNUP'] = 'true';
+      const withAdmin = loadWithUsers(true);
+      await expect(withAdmin.config.databaseHooks.user.create.before()).resolves.toBeUndefined();
+      expect(withAdmin.config.socialProviders['google']!.disableSignUp).toBe(false);
+
+      jest.resetModules();
+      mockBetterAuth.mockClear();
+      const empty = loadWithUsers(false);
+      await expect(empty.config.databaseHooks.user.create.before()).rejects.toMatchObject({
+        status: 'FORBIDDEN',
+      });
+    });
+
+    it('disables social sign-up for every provider by default', () => {
+      delete process.env['THINKER_ALLOW_SIGNUP'];
+      const { config } = loadWithUsers(true);
+      for (const provider of ['google', 'github', 'discord']) {
+        expect(config.socialProviders[provider]!.disableSignUp).toBe(true);
+      }
     });
   });
 

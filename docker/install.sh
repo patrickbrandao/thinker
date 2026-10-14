@@ -386,6 +386,8 @@ EOF
   Open:   http://localhost:${HOST_PORT}
 
   Next:   1. Create your admin account — the first visit walks you through it.
+          The setup wizard asks for the one-time setup token printed in the logs:
+          (cd "$INSTALL_DIR" && docker compose logs thinker | grep 'setup token')
           2. Connect a provider: Providers → Usage-based (API key) or
              Subscriptions, in the dashboard sidebar.
           3. Copy your agent's thk_ key and point your agent at

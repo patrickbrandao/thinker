@@ -18,7 +18,7 @@ import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.de
 import { ProviderService } from './routing-core/provider.service';
 import { CustomProviderService } from './custom-provider/custom-provider.service';
 import { ResolveAgentService } from './routing-core/resolve-agent.service';
-import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
+import { resolveRoutingStatus } from './routing-status';
 import { TierService } from './routing-core/tier.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { OllamaSyncService } from '../database/ollama-sync.service';
@@ -78,29 +78,11 @@ export class ProviderController {
   @Get(':agentName/status')
   async getStatus(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    const providers = await this.providerService.getProviders(agent.tenant_id);
-    const hasActiveProvider = providers.some((p) => p.is_active);
-
-    if (!hasActiveProvider) {
-      return { enabled: false, reason: 'no_provider' as const };
-    }
-
-    const hasRoutableTier = await this.tierService.hasRoutableTier(agent.id);
-    if (!hasRoutableTier) {
-      // No tier resolves to a model. If the OpenRouter pricing cache is empty
-      // (e.g. first-boot fetch failed), surface that as a more actionable hint.
-      // With THINKER_CATALOG_SYNC=false the cache is empty by design, so the
-      // hint would point at the wrong cause.
-      const pricingCacheEmpty = isCatalogSyncEnabled() && this.pricingSync.getAll().size === 0;
-      return {
-        enabled: false,
-        reason: pricingCacheEmpty
-          ? ('pricing_cache_empty' as const)
-          : ('no_routable_models' as const),
-      };
-    }
-
-    return { enabled: true, reason: null };
+    return resolveRoutingStatus({
+      providers: await this.providerService.getProviders(agent.tenant_id),
+      hasRoutableTier: () => this.tierService.hasRoutableTier(agent.id),
+      pricingCacheSize: () => this.pricingSync.getAll().size,
+    });
   }
 
   @Get(':agentName/providers')

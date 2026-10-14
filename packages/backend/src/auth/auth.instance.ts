@@ -1,5 +1,6 @@
-import { betterAuth } from 'better-auth';
+import { APIError, betterAuth } from 'better-auth';
 import type { Auth } from 'better-auth';
+import { createAuthMiddleware } from 'better-auth/api';
 import { jwt } from 'better-auth/plugins';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
@@ -12,6 +13,7 @@ import { fetchClientMetadataResource } from './cimd-client-metadata-fetch';
 import { authOriginFromEnv, mcpAvailability } from './mcp-availability';
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
 import { DEFAULT_PORT } from '../common/constants/server.constants';
+import { decideUserCreation, isSignupValveOpen } from './signup-policy';
 
 const port = process.env['PORT'] ?? String(DEFAULT_PORT);
 const isDev = (process.env['NODE_ENV'] ?? '') !== 'production';
@@ -112,6 +114,28 @@ function createDatabaseConnection() {
 
 const database = createDatabaseConnection();
 
+async function databaseHasUsers(): Promise<boolean> {
+  const result = (await database.query('SELECT EXISTS (SELECT 1 FROM "user") AS "exists"')) as {
+    rows: Array<{ exists: boolean }>;
+  };
+  return result.rows[0]?.exists === true;
+}
+
+/**
+ * Public sign-up is closed (#29): see `signup-policy.ts`. Throws a 403 that
+ * Better Auth returns as-is from `/sign-up/email` and turns into an error
+ * redirect on a social callback.
+ */
+export async function assertUserCreationAllowed(): Promise<void> {
+  const decision = await decideUserCreation(databaseHasUsers);
+  if (!decision.allowed) {
+    throw new APIError('FORBIDDEN', { message: decision.message, code: 'SIGNUP_DISABLED' });
+  }
+}
+
+/** Social sign-in may still link and log in existing accounts, never create one. */
+const socialSignUpDisabled = !isSignupValveOpen();
+
 const betterAuthSecret = process.env['BETTER_AUTH_SECRET'] ?? '';
 const nodeEnv = process.env['NODE_ENV'] ?? '';
 
@@ -208,6 +232,26 @@ const pluginAuth = betterAuth({
     // session stays valid for at most maxAge; sign-out clears the cookie.
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
+  hooks: {
+    // Rejects `/sign-up/email` before the endpoint runs. The database hook
+    // below is the authoritative check, but on installs that require email
+    // verification Better Auth answers a 403 from user creation with a fake
+    // success (anti-enumeration), so the explicit refusal happens here.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/sign-up/email') await assertUserCreationAllowed();
+    }),
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Every user creation path (email/password, social, plugins) goes
+        // through here.
+        before: async () => {
+          await assertUserCreationAllowed();
+        },
+      },
+    },
+  },
   account: {
     accountLinking: {
       enabled: true,
@@ -256,17 +300,20 @@ const pluginAuth = betterAuth({
       clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
       clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
       enabled: !!(process.env['GOOGLE_CLIENT_ID'] && process.env['GOOGLE_CLIENT_SECRET']),
+      disableSignUp: socialSignUpDisabled,
     },
     github: {
       clientId: process.env['GITHUB_CLIENT_ID'] ?? '',
       clientSecret: process.env['GITHUB_CLIENT_SECRET'] ?? '',
       enabled: !!(process.env['GITHUB_CLIENT_ID'] && process.env['GITHUB_CLIENT_SECRET']),
+      disableSignUp: socialSignUpDisabled,
       scope: ['user:email'],
     },
     discord: {
       clientId: process.env['DISCORD_CLIENT_ID'] ?? '',
       clientSecret: process.env['DISCORD_CLIENT_SECRET'] ?? '',
       enabled: !!(process.env['DISCORD_CLIENT_ID'] && process.env['DISCORD_CLIENT_SECRET']),
+      disableSignUp: socialSignUpDisabled,
       scope: ['identify', 'email'],
     },
   },
