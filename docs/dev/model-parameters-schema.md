@@ -1,3 +1,5 @@
+> Referência de código (em inglês): especifica o formato JSON do catálogo de parâmetros de modelo (MPS) que `packages/shared/src/provider-params-spec.ts` consome. Mantenha os dois em sincronia.
+
 # MPS Schema
 
 MPS stands for Model Parameters Schema.

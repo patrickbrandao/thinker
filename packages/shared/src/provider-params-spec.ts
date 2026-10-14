@@ -34,7 +34,7 @@ export interface ParamApplicabilityCondition {
 
 /**
  * MPS applicability is a deliberately small JSON rule language.
- * Keep this in sync with docs/model-parameters-schema.md.
+ * Keep this in sync with docs/dev/model-parameters-schema.md.
  */
 export type ParamApplicabilityValue =
   JsonPrimitive | readonly JsonPrimitive[] | ParamApplicabilityCondition;
