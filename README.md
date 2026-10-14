@@ -1,84 +1,75 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-white.svg" />
-    <source media="(prefers-color-scheme: light)" srcset=".github/assets/logo-dark.svg" />
-    <img src=".github/assets/logo-dark.svg" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/thinker-logo-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/thinker-logo.svg" />
+    <img src=".github/assets/thinker-logo.svg" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
   </picture>
 </p>
 <p align="center">
-AI Agents that don't break
-</p>
-
-![thinker-gh](https://github.com/user-attachments/assets/7dd74fc2-f7d6-4558-a95a-014ed754a125)
-
----
-
-<p align="center">
-  <a href="https://render.com/deploy?repo=https://github.com/patrickbrandao/thinker" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-Render-46E3B7?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Deploy on Render" /></a>
-  <a href="https://ssh.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fpatrickbrandao%2Fthinker&amp;cloudshell_workspace=deploy%2Fgcp&amp;cloudshell_tutorial=TUTORIAL.md&amp;cloudshell_image=gcr.io/ds-artifacts-cloudshell/deploystack_custom_image&amp;shellonly=true" target="_blank" rel="nofollow"><img src="https://img.shields.io/badge/Deploy%20on-GCP-4285F4?style=for-the-badge&amp;logo=googlecloud&amp;logoColor=white" alt="Deploy on GCP" /></a>
+Gateway de LLM open source e auto-hospedado para agentes de IA
 </p>
 
 <p align="center">
-  <a href="https://github.com/patrickbrandao/thinker/stargazers"><img src="https://img.shields.io/github/stars/patrickbrandao/thinker?style=flat" alt="GitHub stars" /></a>
-  &nbsp;
   <a href="https://hub.docker.com/r/tmsoftbrasil/thinker"><img src="https://img.shields.io/docker/pulls/tmsoftbrasil/thinker?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
   &nbsp;
-  <a href="https://hub.docker.com/r/tmsoftbrasil/thinker/tags"><img src="https://img.shields.io/docker/image-size/tmsoftbrasil/thinker/latest?color=2496ED&label=image%20size" alt="Docker image size" /></a>
+  <a href="https://hub.docker.com/r/tmsoftbrasil/thinker/tags"><img src="https://img.shields.io/docker/image-size/tmsoftbrasil/thinker/latest?color=2496ED&label=image%20size" alt="Tamanho da imagem Docker" /></a>
   &nbsp;
-  <a href="https://github.com/patrickbrandao/thinker/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/patrickbrandao/thinker/ci.yml?branch=main&label=CI" alt="CI status" /></a>
+  <a href="https://github.com/patrickbrandao/thinker/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/patrickbrandao/thinker/ci.yml?branch=main&label=CI" alt="Status da CI" /></a>
   &nbsp;
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/patrickbrandao/thinker?color=blue" alt="license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/patrickbrandao/thinker?color=blue" alt="Licença" /></a>
 </p>
 
-## What is Thinker LLM Gateway?
+## O que é o Thinker
 
-Thinker LLM Gateway is an open-source LLM gateway for AI agents and apps. Connect your API keys, subscriptions, and local models to one OpenAI-compatible endpoint, and each query goes to the right model. No single-provider lock-in.
+O Thinker fica entre os seus agentes de IA (os "harnesses": Claude Code, Codex, OpenCode, OpenClaw, Hermes, aplicações com SDK) e os provedores de inferência (chaves de API, assinaturas, modelos locais, endpoints customizados). Ele expõe um endpoint compatível com OpenAI e Anthropic, escolhe o modelo certo para cada requisição e registra custo, tokens e o corpo completo de cada chamada.
 
-- 🔀 Custom Routing: API keys, Subscriptions, Local models, Custom providers
-- 💾 Full Body Logs for Success and Error Messages
-- 📊 Track every single dollar, setup notifications and limits
-- 🚑 Fallback on different models when queries fail, Self-heals your bad requests
+- **Roteamento:** chaves de API, assinaturas, modelos locais e provedores customizados, com tiers por complexidade da requisição.
+- **Fallback:** quando uma tentativa falha, o Thinker tenta os modelos de reserva configurados.
+- **Registro completo:** corpo de requisições e respostas, de sucesso e de erro, com retenção de 30 dias por padrão.
+- **Custos:** tokens e custo por requisição, por harness, provedor e modelo, com limites e notificações.
+- **Sem phone-home:** o produto não envia telemetria nem verifica atualizações. Veja [Privacidade](docs/usuario/privacidade.md).
 
-## Quick start
+## Início rápido
 
-### Self-hosted
-
-Thinker ships as a [Docker image](https://hub.docker.com/r/tmsoftbrasil/thinker). One command:
+O Thinker é distribuído como [imagem Docker](https://hub.docker.com/r/tmsoftbrasil/thinker) (`linux/amd64` e `linux/arm64`). O caminho oficial de instalação é Docker/Compose.
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh)
 ```
 
-Open [http://localhost:2099](http://localhost:2099) and sign up — the first account you create becomes the admin. Full self-hosting guide: [docker/DOCKER_README.md](docker/DOCKER_README.md).
+O instalador baixa o `docker-compose.yml`, gera `BETTER_AUTH_SECRET` e `THINKER_ENCRYPTION_KEY` e sobe a stack em `~/thinker`. Depois:
 
-### Deploy with one click
+1. Abra [http://localhost:2099/setup](http://localhost:2099/setup).
+2. O cadastro público é fechado. O primeiro administrador exige o **token de setup** impresso no log:
 
-| Platform                                                                   | Notes                                                                                                |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [Render](https://render.com/deploy?repo=https://github.com/patrickbrandao/thinker) | Blueprint includes Thinker, PostgreSQL, and a persistent recording disk.                            |
-| [DigitalOcean](deploy/digitalocean/TUTORIAL.md)                            | App Platform and PostgreSQL; provide a private Space for recordings.                                 |
-| [AWS](deploy/aws/TUTORIAL.md)                                              | CloudFormation provisions ECS, RDS, and a private recording bucket.                                  |
-| [GCP](deploy/gcp/TUTORIAL.md)                                              | DeployStack provisions Cloud Run, Cloud SQL, and Cloud Storage.                                      |
+   ```bash
+   cd ~/thinker && docker compose logs thinker | grep 'setup token'
+   ```
 
-> Every deployment path now uses durable request-recording storage. AWS, GCP, and Fly.io provision it natively; Render, Coolify, Easypanel, Docker, and Apple Containers mount persistent storage. DigitalOcean, Heroku, and Koyeb collect external S3-compatible settings during setup. Volume-backed templates are single-instance; use S3-compatible storage before scaling horizontally.
+3. Conecte um provedor, crie um harness (agente) e copie a chave `thk_`. Veja [Primeiros passos](docs/usuario/primeiros-passos.md).
 
-Full deployment guides: [DigitalOcean](deploy/digitalocean/TUTORIAL.md), [AWS](deploy/aws/TUTORIAL.md), [GCP](deploy/gcp/TUTORIAL.md), [Fly.io](deploy/fly/TUTORIAL.md), [Coolify](deploy/coolify/TUTORIAL.md), [Easypanel](deploy/easypanel/TUTORIAL.md), [Heroku](deploy/heroku/TUTORIAL.md), [Koyeb](deploy/koyeb/TUTORIAL.md), and [Apple Containers](deploy/apple-containers/TUTORIAL.md).
+Instalação manual com Compose, porta, proxy reverso e backup: [Instalação com Docker](docs/usuario/instalacao-docker.md).
 
-> The old npm-based self-hosting path is no longer supported. Use the Docker image or one of the deployment guides above.
+## Harnesses suportados
 
-## Providers
+| Harness | Superfície | Guia |
+| --- | --- | --- |
+| Claude Code | Anthropic Messages (`/v1/messages`) | [Conectar harnesses](docs/usuario/conectar-harnesses.md#claude-code) |
+| Codex | OpenAI Responses (`/v1/responses`) | [Conectar harnesses](docs/usuario/conectar-harnesses.md#codex) |
+| OpenCode | Chat Completions (`/v1/chat/completions`) | [Conectar harnesses](docs/usuario/conectar-harnesses.md#opencode) |
+| OpenClaw, Hermes, Nanobot, Craft | Chat Completions | [Conectar harnesses](docs/usuario/conectar-harnesses.md#openclaw-e-hermes) |
+| SDKs (OpenAI, Anthropic, Vercel AI SDK, LangChain), n8n, cURL | Chat Completions, Messages ou Responses | [Conectar harnesses](docs/usuario/conectar-harnesses.md#sdks) |
 
-Thinker connects to **300+ models through 35 built-in provider connections** plus any custom OpenAI/Anthropic-compatible endpoint. Bring your own API key, reuse one of **18 subscription flows**, or run models locally. Everything is routed through the same OpenAI-compatible endpoint — send `"model": "auto"` and Thinker picks the model.
+## Provedores
 
-Provider catalogs are discovered dynamically when credentials are connected. The examples below are representative, not exhaustive.
+O Thinker conecta dezenas de provedores embutidos e qualquer endpoint customizado compatível com OpenAI ou Anthropic. Use sua chave de API, reaproveite uma assinatura paga ou rode modelos localmente. Envie `"model": "auto"` e o Thinker escolhe o modelo. Os catálogos são descobertos quando as credenciais são conectadas; a tabela abaixo é representativa, não exaustiva.
 
-| Provider                                                                                 | API key / local | Subscription                 | Model catalog                                                   |
-| ---------------------------------------------------------------------------------------- | :-------------: | :--------------------------- | --------------------------------------------------------------- |
+| Provedor | API key / local | Assinatura | Catálogo de modelos |
+| --- | :---: | :--- | --- |
 | [**OpenAI**](https://platform.openai.com/)                                               |       ✅        | ✅ ChatGPT Plus / Pro / Team | GPT-5.6 (Sol / Terra / Luna), GPT-5.5, GPT-5.4, Codex, o-series |
 | [**Anthropic**](https://www.anthropic.com/)                                              |       ✅        | ✅ Claude Max / Pro          | Claude Opus 5, Sonnet 5, Fable 5, Haiku 4.5                     |
 | [**Google**](https://ai.google.dev/)                                                     |       ✅        | ✅ Sign in with Google       | Gemini 3.5 Flash, 3.1 Flash-Lite, Gemini 2.5                    |
 | [**Google Vertex AI**](https://cloud.google.com/vertex-ai)                               |       ✅        | —                            | Gemini models via Vertex AI                                     |
-| **Gemini Free**                                                                          | ✅ Managed key  | —                            | Free Gemini models through Thinker's managed gateway           |
 | [**Meta**](https://www.meta.ai/)                                                         |       ✅        | —                            | Muse Spark 1.2 / 1.1 + Contributor route (Meta Model API)       |
 | [**xAI**](https://x.ai/)                                                                 |       ✅        | ✅ Grok subscription         | Grok 4.5, Grok 4.3, Grok Build, Grok 4.20                       |
 | [**AWS Bedrock**](https://aws.amazon.com/bedrock/)                                       |       ✅        | —                            | Claude, GPT, Kimi, MiniMax, Nemotron, Nova via Bedrock          |
@@ -97,8 +88,8 @@ Provider catalogs are discovered dynamically when credentials are connected. The
 | [**NousResearch**](https://portal.nousresearch.com/)                                     |        —        | ✅ NousResearch subscription | NousResearch Portal model catalog                               |
 | [**OpenCode Go**](https://opencode.ai/)                                                  |        —        | ✅ OpenCode Go               | DeepSeek V4, Qwen 3.7, GLM, Kimi, MiMo                          |
 | [**Ollama / Ollama Cloud**](https://ollama.com/)                                         |    🖥️ Local     | ✅ Ollama Cloud              | Local tags: Llama, Qwen, Gemma. Cloud: DeepSeek V4, GLM, Kimi   |
-| [**LM Studio**](https://lmstudio.ai/)                                                    |    🖥️ Local     | —                            | Local GGUF models, port `1234`                                  |
-| [**llama.cpp**](https://github.com/ggml-org/llama.cpp)                                   |    🖥️ Local     | —                            | Local GGUF models, port `8080`                                  |
+| [**LM Studio**](https://lmstudio.ai/)                                                    |    🖥️ Local     | —                            | Modelos GGUF locais, porta `1234`                                  |
+| [**llama.cpp**](https://github.com/ggml-org/llama.cpp)                                   |    🖥️ Local     | —                            | Modelos GGUF locais, porta `8080`                                  |
 | [**OpenRouter**](https://openrouter.ai/)                                                 |       ✅        | —                            | 300+ models across labs                                         |
 | [**OpenCode Zen**](https://opencode.ai/)                                                 |       ✅        | —                            | Curated Claude, GPT, DeepSeek, MiMo, Nemotron                   |
 | [**Kilo**](https://kilo.ai/)                                                             |       ✅        | —                            | Kilo Gateway catalog                                            |
@@ -108,16 +99,29 @@ Provider catalogs are discovered dynamically when credentials are connected. The
 | [**Hugging Face**](https://huggingface.co/docs/inference-providers/)                     |       ✅        | —                            | Open models through Hugging Face Inference Providers            |
 | [**NVIDIA NIM**](https://build.nvidia.com/)                                              |       ✅        | —                            | Nemotron 3, GLM, Kimi, MiniMax, Qwen                            |
 | [**Pioneer**](https://pioneer.ai/)                                                       |       ✅        | —                            | OpenAI-compatible and fine-tuned Pioneer models                 |
-| **Custom**                                                                               |       ✅        | —                            | Any `/v1/chat/completions` or `/v1/messages` endpoint           |
+| **Custom**                                                                               |       ✅        | —                            | Qualquer endpoint `/v1/chat/completions` ou `/v1/messages`           |
 
-## Quick links
+Detalhes de configuração: [Provedores e roteamento](docs/usuario/provedores-e-roteamento.md) e [Provedores por assinatura](docs/providers/subscription-based-providers.md).
 
-- [Docs](docs/)
-- [n8n community node](integrations/n8n-nodes-thinker) — `n8n-nodes-thinker`, installed from a local `npm pack`
-- [Discussions](https://github.com/patrickbrandao/thinker/discussions)
-- [Contributing](CONTRIBUTING.md)
-- [GitHub](https://github.com/patrickbrandao/thinker)
+## Documentação
 
-## License
+- [Instalação com Docker](docs/usuario/instalacao-docker.md)
+- [Configuração (variáveis de ambiente)](docs/usuario/configuracao.md)
+- [Primeiros passos](docs/usuario/primeiros-passos.md)
+- [Conectar harnesses](docs/usuario/conectar-harnesses.md)
+- [Provedores e roteamento](docs/usuario/provedores-e-roteamento.md)
+- [CLI `thinker`](docs/usuario/cli.md)
+- [Solução de problemas](docs/usuario/solucao-de-problemas.md) e [códigos de erro](docs/erros.md)
+- [Privacidade e saída de rede](docs/usuario/privacidade.md)
+- [Templates de deploy da comunidade](docs/usuario/deploy-comunidade.md) (não testados oficialmente)
+- [Guia do desenvolvedor](docs/dev/guia.md), [decisões iniciais](docs/decisoes-iniciais.md) e [ADRs](docs/adr/)
+- [Notas de release](docs/releases/)
+- [Contribuindo](CONTRIBUTING.md) e [Discussions](https://github.com/patrickbrandao/thinker/discussions)
 
-[MIT](LICENSE). Thinker started from [mnfst/llm-gateway](https://github.com/mnfst/llm-gateway) (`manifest@6.28.6`, MIT).
+## Licença e atribuição
+
+O Thinker é distribuído sob a licença [MIT](LICENSE).
+
+O projeto nasceu de um snapshot de [mnfst/llm-gateway](https://github.com/mnfst/llm-gateway) (`manifest@6.28.6`, licença MIT, copyright MNFST, Inc.) e evolui de forma independente, sem obrigação de compatibilidade com o original.
+
+O logo do Thinker é um desenho original, inspirado em um ícone de cérebro de terceiros: geometria, proporções e trilhas são próprias, e nenhum traço do ícone de referência foi reaproveitado. Detalhes em [Marca do Thinker](docs/marca.md).

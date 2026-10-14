@@ -3,420 +3,150 @@
 <p>
   <a href="https://hub.docker.com/r/tmsoftbrasil/thinker"><img src="https://img.shields.io/docker/pulls/tmsoftbrasil/thinker?color=2496ED&label=docker%20pulls" alt="Docker pulls" /></a>
   &nbsp;
-  <a href="https://github.com/patrickbrandao/thinker/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="license" /></a>
+  <a href="https://github.com/patrickbrandao/thinker/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Licença MIT" /></a>
 </p>
 
-## What is Thinker?
+Gateway de LLM open source e auto-hospedado. O Thinker fica entre os seus agentes (Claude Code, Codex, OpenCode, OpenClaw, Hermes, aplicações com SDK) e os provedores de inferência (chaves de API, assinaturas, modelos locais, endpoints customizados), roteia cada requisição para o modelo certo e registra custo, tokens e o corpo completo das chamadas.
 
-Thinker is an open-source LLM gateway for agents and apps. It sits between your agents (Claude Code, Codex, OpenCode, SDK apps and others) and your inference providers (API keys, subscriptions, local models, custom endpoints), routes each request to the right model, and tracks cost, tokens and full request logs from one dashboard.
+O projeto nasceu de um snapshot de [mnfst/llm-gateway](https://github.com/mnfst/llm-gateway) (licença MIT) e evolui de forma independente. A imagem inclui `/app/LICENSE` e `/app/THIRD_PARTY_NOTICES`.
 
-Thinker is derived from an MIT-licensed upstream project and evolves independently. The image ships `/app/LICENSE` and `/app/THIRD_PARTY_NOTICES`.
+Imagem multi-arquitetura (`linux/amd64` e `linux/arm64`), executada como usuário não-root. Porta padrão: `2099`.
 
----
-
-## Table of contents
-
-- [Supported providers](#supported-providers)
-- [Installation](#installation)
-  - [Option 1: Quickstart install script (recommended)](#option-1-quickstart-install-script-recommended)
-  - [Option 2: Docker Compose (manual)](#option-2-docker-compose-manual)
-  - [Option 3: Docker Run (bring your own PostgreSQL)](#option-3-docker-run-bring-your-own-postgresql)
-  - [First request](#first-request)
-  - [Custom port](#custom-port)
-  - [Exposing on the LAN](#exposing-on-the-lan)
-- [Image tags](#image-tags)
-- [Upgrading](#upgrading)
-- [Backup & persistence](#backup--persistence)
-- [Connecting local LLM servers](#connecting-local-llm-servers)
-- [Environment variables](#environment-variables)
-- [Links](#links)
-
-## Supported providers
-
-Works with 300+ models across OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, Mistral, Qwen, MiniMax, Kimi, Amazon Nova, Z.ai, OpenRouter, Ollama, and any provider with an OpenAI-compatible API. Connect with an API key, or reuse an existing paid subscription (ChatGPT Plus/Pro, Claude Max/Pro, Kimi Coding Plan, GLM Coding Plan, etc.) where supported.
-
-## Installation
-
-Three paths, ordered from fastest to most hands-on. All three end in the same place: a running stack at [http://localhost:2099](http://localhost:2099) where you sign up. The first account you create becomes the admin. No demo credentials are pre-seeded.
-
-> **Heads up on network binding.** The bundled compose file binds port 2099 to `127.0.0.1` only, so the dashboard is reachable on the host machine but not over the LAN. See [Exposing on the LAN](#exposing-on-the-lan) to expose it beyond localhost.
-
-### Option 1: Quickstart install script (recommended)
-
-One command. The installer downloads the compose file, generates the secrets, and brings up the stack. First boot pulls the app image and Postgres, so give it up to a couple of minutes.
+## Instalação rápida
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh)
 ```
 
-<details>
-<summary><strong>Prefer to review the script before running it?</strong></summary>
+O instalador baixa o compose, gera os segredos e sobe a stack em `~/thinker`. Flags: `--dir`, `--port`, `--dry-run`, `--yes`, `--upgrade`.
 
-Download the script:
-
-```bash
-curl -sSLO https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/install.sh
-```
-
-Review it (optional):
-
-```bash
-less install.sh
-```
-
-Run it:
-
-```bash
-bash install.sh
-```
-
-</details>
-
-Useful flags: `--dir <path>` to install elsewhere, `--port <n>` to serve on a port other than 2099, `--dry-run` to preview, `--yes` to skip the confirmation prompt.
-
-Re-running the installer against an existing install directory resumes it — the compose file and your generated secrets are left untouched and the stack is brought back up.
-
-### Option 2: Docker Compose (manual)
-
-Same underlying flow as the install script, but you drive it yourself so you can edit the config before booting the stack.
-
-1. Download the compose file and the env template into the same directory:
+Manualmente, com Compose:
 
 ```bash
 curl -O https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/docker-compose.yml
 curl -O https://raw.githubusercontent.com/patrickbrandao/thinker/main/docker/.env.example
-cp .env.example .env
-```
-
-2. Open `.env` in your editor and set `BETTER_AUTH_SECRET` and
-   `THINKER_ENCRYPTION_KEY` to two **different** random strings. Generate each with:
-
-```bash
-openssl rand -hex 32
-```
-
-`THINKER_ENCRYPTION_KEY` encrypts the provider API keys, OAuth tokens and
-request recordings Thinker stores; the rest of the database is not encrypted
-by it. It is required: the server refuses to start when it is missing, shorter
-than 32 characters, or equal to `BETTER_AUTH_SECRET`, so a leaked
-session-signing secret never decrypts a stored credential or recording.
-Recordings written under a previous secret are not migrated: after the secret
-changes they can no longer be decrypted and the dashboard shows them as
-unavailable, while retention removes them on schedule.
-
-(Optional: to use a stronger database password, set BOTH `POSTGRES_PASSWORD` and `DATABASE_URL` in `.env`, they must agree, and any special characters in the password need to be percent-encoded in the URL.)
-
-3. Start the stack:
-
-```bash
+cp .env.example .env     # defina BETTER_AUTH_SECRET e THINKER_ENCRYPTION_KEY (openssl rand -hex 32, dois valores diferentes)
 docker compose up -d
 ```
 
-Give it up to a couple of minutes on a cold pull — you can watch startup with `docker compose logs -f thinker`.
+### Primeiro acesso
 
-4. Open [http://localhost:2099](http://localhost:2099) and sign up. The first account you create becomes the admin.
-
-5. Connect a provider and send your first request — see [First request](#first-request).
-
-To stop:
+O cadastro público é fechado. O primeiro administrador precisa do **token de setup** de uso único, impresso no log:
 
 ```bash
-docker compose down       # keeps data
-docker compose down -v    # deletes everything
+docker compose logs thinker | grep 'setup token'
 ```
 
-### Option 3: Docker Run (bring your own PostgreSQL)
+Abra [http://localhost:2099/setup](http://localhost:2099/setup), informe o token e crie o administrador. Com várias réplicas, cada processo tem o seu token: faça o primeiro setup na réplica cujo log o imprimiu. `THINKER_ALLOW_SIGNUP=true` reabre o cadastro depois que o administrador existe.
 
-If you already have PostgreSQL running, replace `user`, `pass`, and `host` with your actual database credentials, then run this in your terminal:
+### Teste
 
-<details open>
-<summary><strong>macOS / Linux (bash, zsh)</strong></summary>
+```bash
+curl -X POST http://localhost:2099/v1/chat/completions \
+  -H "Authorization: Bearer thk_SUA_CHAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "auto", "messages": [{"role": "user", "content": "Olá"}]}'
+```
+
+Conecte um provedor e crie um harness no dashboard para obter a chave `thk_`. O tier `default` do harness precisa de um modelo para o `auto` funcionar.
+
+## Docker Run (com seu PostgreSQL)
 
 ```bash
 docker run -d \
   -p 2099:2099 \
-  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker \
+  -e DATABASE_URL=postgresql://usuario:senha@host:5432/thinker \
   -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
   -e THINKER_ENCRYPTION_KEY=$(openssl rand -hex 32) \
   -e BETTER_AUTH_URL=http://localhost:2099 \
   tmsoftbrasil/thinker
 ```
 
-</details>
+`THINKER_ENCRYPTION_KEY` é obrigatória, tem 32 caracteres ou mais e precisa ser diferente de `BETTER_AUTH_SECRET`; não há fallback. Guarde-a: sem ela as credenciais armazenadas não podem ser lidas. As migrações rodam a cada boot.
 
-<details>
-<summary><strong>Windows (PowerShell)</strong></summary>
+## Tags
 
-```powershell
-$secret = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
-$encryptionKey = -join ((48..57 + 97..122) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
+- `X.Y.Z`: versão fixa (por exemplo `0.1.0`).
+- `X.Y`: último patch da minor (só versões estáveis).
+- `latest`: última versão estável.
+- `sha-<curto>`: commit exato, para rollback.
+- `X.Y.Z-rc.N`: candidatas a release; nunca movem `X.Y` nem `latest`.
 
-docker run -d `
-  -p 2099:2099 `
-  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker `
-  -e BETTER_AUTH_SECRET=$secret `
-  -e THINKER_ENCRYPTION_KEY=$encryptionKey `
-  -e BETTER_AUTH_URL=http://localhost:2099 `
-  tmsoftbrasil/thinker
-```
-
-</details>
-
-<details>
-<summary><strong>Windows (CMD)</strong></summary>
-
-Generate two different 64-character hex secrets with any tool you trust, then:
-
-```cmd
-docker run -d ^
-  -p 2099:2099 ^
-  -e DATABASE_URL=postgresql://user:pass@host:5432/thinker ^
-  -e BETTER_AUTH_SECRET=<your-64-char-secret> ^
-  -e THINKER_ENCRYPTION_KEY=<another-64-char-secret> ^
-  -e BETTER_AUTH_URL=http://localhost:2099 ^
-  tmsoftbrasil/thinker
-```
-
-</details>
-
-TypeORM migrations run automatically on every boot — fresh installs come up with the schema in place. Then visit [http://localhost:2099](http://localhost:2099) and complete the setup wizard to create your admin account.
-
-### First request
-
-Signing up leaves you with an empty instance. Three steps to a routed request:
-
-1. **Connect a provider.** In the sidebar, **Providers → Usage-based** to paste
-   an API key (OpenAI, Anthropic, Gemini, …), **Subscriptions** to reuse a plan
-   you already pay for, or **Local** for Ollama / LM Studio / llama.cpp.
-   Thinker discovers the available models as soon as the connection is saved.
-
-2. **Copy your agent's key.** Each agent has its own key, shown when you create
-   it and under the agent's **Settings**. It starts with `thk_`.
-
-3. **Point something at it.** The endpoint is OpenAI-compatible, so any SDK or
-   agent that takes a base URL works — use `http://localhost:2099/v1` and the
-   `thk_` key. To check it end to end:
-
-```bash
-curl -X POST http://localhost:2099/v1/chat/completions \
-  -H "Authorization: Bearer thk_YOUR_KEY_HERE" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "auto", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-`"model": "auto"` asks Thinker to route. Any other model name is treated as an
-explicit choice and falls back to your routing config if it matches nothing.
-
-Errors from Thinker itself carry an `M###` code and a plain-English cause —
-including `M100` (no provider connected yet) and `M003`/`M005` (bad or unknown key), the
-three you are most likely to hit on a fresh install.
-
-### Custom port
-
-**Compose installs — set `PORT` in `.env`, and nothing else:**
-
-```env
-PORT=8080
-```
-
-The compose file reads `${PORT:-2099}` for both the published host port and
-the backend's internal listener, and `BETTER_AUTH_URL` defaults to
-`http://localhost:${PORT:-2099}`, so one line covers all three. No YAML edit.
-The install script does this for you with `--port 8080`.
-
-**`docker run` installs** have no `.env`, so pass the mapping and the URL
-explicitly. Here the container keeps listening on 2099 and Docker remaps it:
-
-```bash
-docker run -d \
-  -p 8080:2099 \
-  -e BETTER_AUTH_URL=http://localhost:8080 \
-  ...
-```
-
-`BETTER_AUTH_URL` must match the URL you type in the browser — host and port
-both. A mismatch fails the login with "Invalid origin".
-
-### Exposing on the LAN
-
-By default the compose file binds port `2099` to `127.0.0.1` only. The dashboard is reachable from the host but not from other machines on the network. To expose it on the LAN:
-
-1. In `.env`, set `HOST_BIND_ADDRESS=0.0.0.0`. Editing `docker-compose.yml` by hand does not survive an upgrade; `.env` does.
-2. In `.env`, set `BETTER_AUTH_URL` to the host you'll reach the dashboard on, e.g. `http://192.168.1.20:2099` or `https://thinker.mydomain.com`. This MUST match the URL in the browser or Better Auth will reject the login with "Invalid origin".
-3. `docker compose up -d` to apply.
-
-If you see "Invalid origin" on the login page, `BETTER_AUTH_URL` doesn't match the URL you're accessing the dashboard on. The host matters as much as the port.
-
-If the dashboard loads as a **blank page on a LAN IP on an older image**, pull the latest image (`docker compose pull && docker compose up -d`). Older builds emitted an `upgrade-insecure-requests` CSP directive that made browsers rewrite `/assets/*.js` to HTTPS on private-IP hosts (10.x / 172.16-31.x / 192.168.x), which the server doesn't serve — the JS bundle failed to load and the page never mounted. This directive has been removed.
-
-## Image tags
-
-Every release is published with the following tags:
-
-- `{major}.{minor}.{patch}` - fully pinned (e.g. `0.1.0`)
-- `{major}.{minor}` - latest patch within a minor (e.g. `0.1`), stable releases only
-- `latest` - latest stable release
-- `sha-<short>` - exact commit for rollback
-- `{major}.{minor}.{patch}-rc.{n}` - release candidates; they never move `{major}.{minor}` or `latest`
-
-Images are built for both `linux/amd64` and `linux/arm64`.
-
-## Upgrading
-
-Thinker ships a new image on every release. To upgrade an existing compose install:
+## Atualização
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on boot, no manual steps. Your data in the `pgdata` volume is preserved across upgrades. To control when upgrades happen, pin a minor version with `THINKER_VERSION=0.1` in `.env`. The install script can also replace the managed compose file safely: `bash install.sh --upgrade`.
+Fixe `THINKER_VERSION=0.1` no `.env` para controlar quando atualizar. Leia as [notas de release](https://github.com/patrickbrandao/thinker/tree/main/docs/releases) antes de subir de versão.
 
-### Coming from Manifest
+### Trocar a chave de cifragem (rotação)
 
-Thinker 0.1 supports fresh installs only. Do a new install rather than pointing Thinker at an old Manifest stack. The Compose project, the PostgreSQL user and the PostgreSQL database are all called `thinker` now, so Compose creates new volumes (`thinker_pgdata`, `thinker_request_recordings`) and does not see the old data. The recording variables `REQUEST_RECORDING_*` were renamed to `THINKER_RECORDING_*`, and the old names are not read.
+Vale para uma rotação e para quem atualiza uma instalação que dependia do antigo fallback para `BETTER_AUTH_SECRET`:
 
-## Backup & persistence
+1. Defina a chave nova em `THINKER_ENCRYPTION_KEY`.
+2. Defina `THINKER_ENCRYPTION_KEY_PREVIOUS` com a chave antiga (no caso do fallback antigo, o valor de `BETTER_AUTH_SECRET`).
+3. Suba e espere no log a mensagem `Secret re-encryption complete` e a linha `Nothing left under an older secret`.
+4. Remova `THINKER_ENCRYPTION_KEY_PREVIOUS`.
 
-PostgreSQL state lives in the `thinker_pgdata` named volume mounted at `/var/lib/postgresql/data` in the `postgres` service. The Compose install also stores local request recordings in the `thinker_request_recordings` volume mounted at `/data/request-recordings`; those recordings are not included in a PostgreSQL dump. For ephemeral hosts or multiple instances, configure durable S3-compatible storage instead.
+Chaves de provedores e tokens OAuth são regravados; as gravações de requisições não, e ficam ilegíveis até a retenção apagá-las.
 
-**Back up** (from the host, with the stack running):
+## Backup
+
+Os dados ficam nos volumes `thinker_pgdata` (PostgreSQL) e `thinker_request_recordings` (gravações locais, fora do dump). Guarde também o `.env`.
 
 ```bash
 docker compose exec -T postgres pg_dump -U thinker thinker > thinker-backup-$(date +%F).sql
 ```
 
-**Restore** into a fresh stack:
+`docker compose down -v` apaga tudo.
 
-```bash
-docker compose up -d postgres
-cat thinker-backup-2026-04-12.sql | docker compose exec -T postgres psql -U thinker thinker
-docker compose up -d
-```
+## Acesso pela rede e proxy reverso
 
-To list / remove the volume manually:
+O compose publica a porta só em `127.0.0.1`. Para a LAN, ponha `HOST_BIND_ADDRESS=0.0.0.0` e `BETTER_AUTH_URL` com a URL exata do navegador no `.env`. Atrás de proxy reverso, defina `TRUST_PROXY` e uma `BETTER_AUTH_URL` HTTPS. `BETTER_AUTH_URL` precisa ser alcançável de dentro do container (o MCP busca o JWKS nela). Detalhes: [instalação com Docker](https://github.com/patrickbrandao/thinker/blob/main/docs/usuario/instalacao-docker.md).
 
-```bash
-docker volume ls | grep -E 'thinker_(pgdata|request_recordings)'
-docker compose down -v    # ⚠  destroys all data
-```
+## Modelos locais
 
-## Connecting local LLM servers
+O container alcança servidores do host por `host.docker.internal:<porta>`: Ollama (`OLLAMA_HOST`, padrão porta 11434), LM Studio (`THINKER_LMSTUDIO_BASE_URL`, 1234) e llama.cpp (`THINKER_LLAMACPP_BASE_URL`, 8080). Ligue o servidor em `0.0.0.0`.
 
-The self-hosted Thinker container can reach any OpenAI-compatible server running on your host via `host.docker.internal:<port>`. This works on Docker Desktop (macOS/Windows) out of the box, and on Linux with Docker Engine 20.10 or later.
+## Variáveis de ambiente
 
-Because the container detects self-hosted mode automatically (via `/.dockerenv`), it lets you add custom providers with `http://` and private/loopback URLs — cloud-metadata endpoints (169.254.169.254, etc.) stay blocked.
+As principais:
 
-### Ollama (built-in tile)
+| Variável | Obrigatória | Padrão | Descrição |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Sim | -- | Conexão PostgreSQL (o compose já define). |
+| `BETTER_AUTH_SECRET` | Sim | -- | Assinatura de sessões, 32+ caracteres. |
+| `THINKER_ENCRYPTION_KEY` | Sim | -- | Cifra credenciais e gravações, 32+ caracteres, diferente de `BETTER_AUTH_SECRET`. |
+| `THINKER_ENCRYPTION_KEY_PREVIOUS` | Não | -- | Chave antiga, só durante a rotação. |
+| `THINKER_ALLOW_SIGNUP` | Não | `false` | `true` reabre o cadastro depois do primeiro administrador. |
+| `BETTER_AUTH_URL` | Não | `http://localhost:${PORT}` | URL pública, igual à do navegador. |
+| `PORT` | Não | `2099` | Porta do servidor e do compose. |
+| `THINKER_RECORDING_RETENTION_DAYS` | Não | `30` | Retenção das gravações, em dias. |
+| `THINKER_CATALOG_SYNC` | Não | `true` | `false` desliga a busca dos catálogos públicos. |
 
-1. Install Ollama from [ollama.com](https://ollama.com) and pull a model:
+A referência completa está em [configuração](https://github.com/patrickbrandao/thinker/blob/main/docs/usuario/configuracao.md) e no [`.env.example`](https://github.com/patrickbrandao/thinker/blob/main/docker/.env.example). `NODE_ENV` e `SEED_DATA` são fixos pelo compose.
 
-```bash
-ollama pull llama3.1:8b
-```
+## Sem telemetria
 
-2. In the dashboard, go to Providers → API Keys → click the **Ollama** tile.
-3. Thinker reaches Ollama at `http://host.docker.internal:11434` and syncs the available models.
+O container não faz nenhuma chamada de saída por conta própria: sem telemetria de uso, sem verificação de atualização, sem relatório de erros. Ele só contata os provedores que você configurou e os destinos abaixo:
 
-### LM Studio
+| Destino | Quando |
+| --- | --- |
+| `openrouter.ai` (`/api/v1/models`) | No boot e uma vez por dia |
+| `models.dev` (`/api.json`) | No boot e uma vez por dia |
+| `raw.githubusercontent.com` (documento do OpenCode Go) | Só com um provedor OpenCode Go cadastrado; cache de 1 hora |
+| URL de metadados do cliente MCP (CIMD) | Quando um cliente MCP faz login por OAuth: o servidor busca o documento na URL HTTPS que o cliente informa como `client_id`. Só endereços públicos, salvo `THINKER_CIMD_ALLOW_PRIVATE=true`. Desligue o MCP com `MCP_ENABLED=false`. |
 
-1. Install LM Studio from https://lmstudio.ai, load at least one chat model, and start the local server. **Bind to `0.0.0.0`** so the Thinker container can reach it:
-   - GUI: Developer tab → enable "Serve on Local Network" (LM Studio persists this across restarts).
-   - CLI: `lms server start --bind 0.0.0.0 --port 1234 --cors`
-2. Providers → API Keys → click the **LM Studio** tile.
-3. Thinker probes `http://host.docker.internal:1234/v1`, discovers your loaded models, and connects them in one click.
-
-### llama.cpp
-
-1. Build `llama-server` from the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) repo (or grab a release binary), then start it with a GGUF model bound to `0.0.0.0` so the Thinker container can reach it:
-
-   ```bash
-   ./llama-server -m models/llama-3.1-8b-instruct.Q4_K_M.gguf --host 0.0.0.0 --port 8080
-   ```
-
-   `llama-server` only listens on `0.0.0.0` if you pass `--host 0.0.0.0`; the default bind isn't reachable from Docker.
-
-2. Providers → API Keys → click the **llama.cpp** tile.
-3. Thinker probes `http://host.docker.internal:8080/v1`, lists the model your server loaded, and connects it in one click. Pre-b3800 builds that don't expose `/v1/models` get a hint to upgrade or fall back to **Add custom provider**.
-
-### Any other OpenAI-compatible server
-
-For vLLM, text-generation-webui, TogetherAI proxies, Azure OpenAI gateways, or anything else that speaks OpenAI's HTTP API:
-
-1. Start your server on the host bound to `0.0.0.0`.
-2. Providers → API Keys → **Add custom provider** → type the URL (e.g. `http://host.docker.internal:8000/v1`).
-3. Click **Fetch models** to auto-populate the model list from the server's `/v1/models` endpoint.
-
-### Running Ollama on another machine
-
-If Ollama runs on a different host on your LAN, set `OLLAMA_HOST` in `.env` to the full URL (e.g. `http://192.168.1.20:11434`) and restart the stack. Private IPs are allowed in the self-hosted version.
-
-### Podman / rootless containers
-
-Podman doesn't ship `/.dockerenv` or `host.docker.internal`. The canonical
-hostname for reaching the host from inside a Podman container is
-`host.containers.internal` (Podman 4+ exposes this by default; older versions
-need `--add-host=host.containers.internal:host-gateway`), and Thinker suggests
-it when it finds `/run/.containerenv`.
-If you run Thinker as one Podman service and your LLM server (llama.cpp,
-Ollama, etc.) as another, point Thinker at the service name on the shared
-network — e.g. `http://llamacpp:8080/v1`. **Add custom provider** accepts
-LAN, loopback and `http://` URLs on any runtime, as long as the hostname
-resolves from inside the Thinker container. Cloud metadata and container
-credential endpoints (such as `169.254.169.254` or `169.254.170.2`) are always
-refused, including when a hostname starts resolving to them after it was saved.
-
-## Environment variables
-
-| Variable                           | Required    | Default                                      | Description                                                                                                                                                                                                |
-| ---------------------------------- | ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                     | Yes         | --                                           | PostgreSQL connection string                                                                                                                                                                               |
-| `BETTER_AUTH_SECRET`               | Yes         | --                                           | Session signing secret (min 32 chars)                                                                                                                                                                      |
-| `THINKER_ENCRYPTION_KEY`           | Yes         | --                                           | 32+ char key encrypting stored provider keys, OAuth tokens and request recordings. Must differ from `BETTER_AUTH_SECRET`; the server refuses to start otherwise. The install script generates one.          |
-| `BETTER_AUTH_URL`                  | No          | `http://localhost:${PORT}`                   | Public URL. Must match the URL in the browser                                                                                                                                                              |
-| `PORT`                             | No          | `2099`                                       | Dashboard port — sets both the published host port and the internal listener                                                                                                                               |
-| `OLLAMA_HOST`                      | No          | `http://host.docker.internal:11434`          | Ollama endpoint for the built-in tile. Override to point at a LAN-hosted Ollama.                                                                                                                           |
-| `THINKER_LMSTUDIO_BASE_URL`        | No          | `http://host.docker.internal:1234`           | LM Studio server for the built-in `lmstudio` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
-| `THINKER_LLAMACPP_BASE_URL`        | No          | `http://host.docker.internal:8080`           | llama.cpp server for the built-in `llamacpp` provider, with or without `/v1`. A value that is not an absolute `http(s)` URL is ignored with a boot warning |
-| `THINKER_CIMD_ALLOW_PRIVATE`       | No          | `false`                                      | Set `true` to let MCP clients whose Client ID Metadata Document URL resolves to a private or loopback address sign in. Off by default to block SSRF from unauthenticated clients.                          |
-| `TRUST_PROXY`                      | No          | `loopback` (compose)                         | Reverse proxy allowed to set `X-Forwarded-For`/`-Proto`: an address, CIDR or hop count                                                                                                                     |
-| `THINKER_DISABLE_HSTS`             | No          | unset                                        | Set `1` to silence the boot warning about serving over plain HTTP on a LAN                                                                                                                                 |
-| `THROTTLE_LIMIT` / `THROTTLE_TTL`  | No          | `100` / `60000`                              | Rate limit: requests per window, window in ms                                                                                                                                                              |
-| `THINKER_CATALOG_SYNC`             | No          | `true`                                       | Set `false` to stop fetching the public model catalogs (see [No telemetry](#no-telemetry)). Costs then come from the bundled data only, so most models show $0                                                |
-| `DB_POOL_MAX` / `AUTH_DB_POOL_MAX` | No          | `10` / `5`                                   | PostgreSQL pool sizes (app pool, Better Auth pool)                                                                                                                                                         |
-
-`NODE_ENV` and `SEED_DATA` are deliberately fixed by the compose file and are
-not knobs here: the image is a production artifact, and the demo-data seeder
-refuses to run under `NODE_ENV=production` regardless of `SEED_DATA`. Use the
-first-run setup wizard to create your admin account.
-
-Every variable the compose file passes through is listed, with comments, in
-[`.env.example`](https://github.com/patrickbrandao/thinker/blob/main/docker/.env.example).
-
-## No telemetry
-
-The container makes no outbound call of its own: no usage telemetry, no update
-check, no error reporting. It only reaches the inference providers you
-configure and these public model catalogs:
-
-| Destination                                    | When                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------ |
-| `openrouter.ai` (`/api/v1/models`)             | at boot and once a day                                       |
-| `models.dev` (`/api.json`)                     | at boot and once a day                                       |
-| `raw.githubusercontent.com` (OpenCode Go docs) | only when an OpenCode Go provider is registered, cached 1 h  |
-
-Set `THINKER_CATALOG_SYNC=false` to turn all three off, for example on an
-air-gapped host. Prices and capabilities then come only from the data bundled
-in the image, which covers few models: requests to most models are recorded
-without a known price and show as $0, OpenCode Go requests show $0, and the
-pricing refresh endpoint reports `sync_enabled: false`.
+`THINKER_CATALOG_SYNC=false` desliga os três primeiros, por exemplo num host isolado da internet; os preços passam a vir só dos dados embutidos, e a maioria dos modelos aparece com `$0`. Lista completa em [privacidade](https://github.com/patrickbrandao/thinker/blob/main/docs/usuario/privacidade.md).
 
 ## Links
 
 - [GitHub](https://github.com/patrickbrandao/thinker)
-- [Docs (PT-BR)](https://github.com/patrickbrandao/thinker/tree/main/docs)
+- [Documentação (PT-BR)](https://github.com/patrickbrandao/thinker/tree/main/docs)
 - [Issues](https://github.com/patrickbrandao/thinker/issues)
 
-## License
+## Licença
 
 [MIT](https://github.com/patrickbrandao/thinker/blob/main/LICENSE)

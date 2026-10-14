@@ -1,100 +1,100 @@
-# Subscription-based providers
+# Provedores por assinatura
 
-Reuse a paid plan you already have: ChatGPT Plus, Claude Max, GitHub Copilot, ModelArk Coding Plan, Command Code, Qwen Token Plan, Xiaomi MiMo Token Plan, Kimi Coding Plan, GLM Coding Plan, Google sign-in, MiniMax Coding Plan, Kiro, Grok, Ollama Cloud, or OpenCode Go.
+Reaproveite um plano pago que você já tem: ChatGPT Plus, Claude Max, GitHub Copilot, ModelArk Coding Plan, Command Code, Qwen Token Plan, Xiaomi MiMo Token Plan, Kimi Coding Plan, GLM Coding Plan, login com Google, MiniMax Coding Plan, Kiro, Grok, Ollama Cloud ou OpenCode Go.
 
-If you already pay for one of the plans below, Thinker can route through that subscription instead of an API key. Auth is browser OAuth, device code, or a subscription token depending on the provider.
+Se você já paga por um dos planos abaixo, o Thinker pode rotear pela assinatura em vez de uma chave de API. A autenticação é OAuth no navegador, código de dispositivo ou token de assinatura, conforme o provedor.
 
-## Supported subscriptions
+## Assinaturas suportadas
 
-| Provider                                                    | Plan                        | Auth flow            | Model catalog                                        |
-| ----------------------------------------------------------- | --------------------------- | -------------------- | ---------------------------------------------------- |
-| [OpenAI](https://openai.com)                                | ChatGPT Plus/Pro/Team       | OAuth (browser)      | Fixed ChatGPT and Codex model list                   |
-| [Anthropic](https://www.anthropic.com)                      | Claude Max / Pro            | Setup token          | `claude-opus-4`, `claude-sonnet-4`, `claude-haiku-4` |
-| [GitHub Copilot](https://github.com/features/copilot)       | GitHub Copilot subscription | Device code          | Fixed Copilot model list                             |
-| [BytePlus](https://www.byteplus.com/en/activity/codingplan) | ModelArk Coding Plan        | Subscription token   | Fixed ModelArk Coding Plan model list                |
-| [Command Code](https://commandcode.ai/studio)               | Command Code subscription   | Subscription token   | Dynamic Provider API catalog                         |
-| [Qwen](https://home.qwencloud.com/api-keys)                 | Qwen Token Plan             | Subscription token   | Dynamic Token Plan catalog                           |
-| [Xiaomi MiMo](https://platform.xiaomimimo.com)              | MiMo Token Plan             | Subscription token   | Fixed MiMo Token Plan model list                     |
-| [Moonshot](https://www.kimi.com/code/console)               | Kimi Coding Plan            | Subscription token   | Fixed Kimi Coding Plan model list                    |
-| [Z.ai](https://z.ai)                                        | GLM Coding Plan             | Subscription token   | Fixed GLM Coding Plan model list                     |
-| [Google](https://ai.google.dev)                             | Sign in with Google         | OAuth (browser)      | Fixed Gemini CodeAssist model list                   |
-| [MiniMax](https://www.minimax.io)                           | MiniMax Coding Plan         | Device code or token | Fixed MiniMax Coding Plan model list                 |
-| [Kiro](https://app.kiro.dev)                                | Kiro subscription           | Device code          | Fixed Kiro model list                                |
-| [xAI](https://x.ai)                                         | Grok subscription           | OAuth (browser)      | Dynamic xAI model catalog                            |
-| [Ollama Cloud](https://ollama.com)                          | Ollama Cloud subscription   | Subscription token   | Dynamic Ollama Cloud tag catalog                     |
-| [OpenCode Go](https://opencode.ai)                          | OpenCode Go (beta)          | Subscription token   | Dynamic OpenCode Go catalog                          |
+| Provedor | Plano | Autenticação | Catálogo de modelos |
+| --- | --- | --- | --- |
+| [OpenAI](https://openai.com) | ChatGPT Plus/Pro/Team | OAuth (navegador) | Lista fixa de modelos ChatGPT e Codex |
+| [Anthropic](https://www.anthropic.com) | Claude Max / Pro | Setup token | `claude-opus-4`, `claude-sonnet-4`, `claude-haiku-4` |
+| [GitHub Copilot](https://github.com/features/copilot) | Assinatura GitHub Copilot | Código de dispositivo | Lista fixa do Copilot |
+| [BytePlus](https://www.byteplus.com/en/activity/codingplan) | ModelArk Coding Plan | Token de assinatura | Lista fixa do ModelArk Coding Plan |
+| [Command Code](https://commandcode.ai/studio) | Assinatura Command Code | Token de assinatura | Catálogo dinâmico da API do provedor |
+| [Qwen](https://home.qwencloud.com/api-keys) | Qwen Token Plan | Token de assinatura | Catálogo dinâmico do Token Plan |
+| [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo Token Plan | Token de assinatura | Lista fixa do MiMo Token Plan |
+| [Moonshot](https://www.kimi.com/code/console) | Kimi Coding Plan | Token de assinatura | Lista fixa do Kimi Coding Plan |
+| [Z.ai](https://z.ai) | GLM Coding Plan | Token de assinatura | Lista fixa do GLM Coding Plan |
+| [Google](https://ai.google.dev) | Login com Google | OAuth (navegador) | Lista fixa do Gemini CodeAssist |
+| [MiniMax](https://www.minimax.io) | MiniMax Coding Plan | Código de dispositivo ou token | Lista fixa do MiniMax Coding Plan |
+| [Kiro](https://app.kiro.dev) | Assinatura Kiro | Código de dispositivo | Lista fixa do Kiro |
+| [xAI](https://x.ai) | Assinatura Grok | OAuth (navegador) | Catálogo dinâmico da xAI |
+| [Ollama Cloud](https://ollama.com) | Assinatura Ollama Cloud | Token de assinatura | Catálogo dinâmico de tags do Ollama Cloud |
+| [OpenCode Go](https://opencode.ai) | OpenCode Go (beta) | Token de assinatura | Catálogo dinâmico do OpenCode Go |
 
-## Connect a subscription
+## Conectar uma assinatura
 
-1. Open the Routing page in the dashboard.
-2. Click the provider tile.
-3. Pick the Subscription tab.
-4. Complete the provider's auth flow.
+1. Abra a página de roteamento no dashboard.
+2. Clique no bloco do provedor.
+3. Escolha a aba Subscription.
+4. Conclua o fluxo de autenticação do provedor.
 
-Providers that support both API keys and subscriptions show both tabs. Subscription-only providers show only the subscription flow. In routing pickers, subscription rows appear only after a usable subscription credential is saved (`has_api_key=true`).
+Provedores que aceitam chave de API e assinatura mostram as duas abas; os que só têm assinatura mostram apenas esse fluxo. Nos seletores de roteamento, as linhas de assinatura só aparecem depois que uma credencial de assinatura utilizável é salva (`has_api_key=true`).
 
-## How auth works per provider
+## Como a autenticação funciona em cada provedor
 
 ### OpenAI
 
-Thinker uses browser OAuth for ChatGPT Plus, Pro, and Team accounts. Once approved, requests route through the ChatGPT Codex backend instead of the public OpenAI API. Tokens refresh automatically.
+OAuth no navegador para contas ChatGPT Plus, Pro e Team. Depois de aprovado, as requisições passam pelo backend ChatGPT Codex, e não pela API pública da OpenAI. Os tokens são renovados automaticamente.
 
 ### Anthropic
 
-Run `claude setup-token` and paste the `sk-ant-oat` token into Thinker. Requests carry Anthropic subscription auth headers. Subscription mode does not support prompt caching or batching.
+Rode `claude setup-token` e cole o token `sk-ant-oat` no Thinker. As requisições levam os cabeçalhos de autenticação de assinatura da Anthropic. O modo assinatura não suporta cache de prompt nem batching.
 
 ### GitHub Copilot
 
-Thinker uses GitHub's device-code flow. Thinker gives you a short user code, you open `https://github.com/login/device`, paste the code, and approve access. Requests then route to the Copilot chat or responses endpoint with a short-lived token that Thinker refreshes.
+Fluxo de código de dispositivo do GitHub: o Thinker mostra um código curto, você abre `https://github.com/login/device`, cola o código e aprova. As requisições vão ao endpoint de chat ou responses do Copilot com um token de curta duração que o Thinker renova.
 
 ### BytePlus
 
-Paste a ModelArk Coding Plan API key from the BytePlus console. Thinker routes OpenAI-compatible and Anthropic-compatible coding-plan requests through BytePlus ModelArk endpoints.
+Cole uma chave de API do ModelArk Coding Plan, do console da BytePlus. O Thinker roteia as requisições compatíveis com OpenAI e com Anthropic do coding plan pelos endpoints ModelArk.
 
 ### Command Code
 
-Paste a Command Code API key from Command Code Studio. Command Code is subscription-only in Thinker and requires Command Code Pro or higher. Thinker discovers models dynamically from Command Code's public Provider API catalog.
+Cole uma chave de API do Command Code Studio. No Thinker, o Command Code é só por assinatura e exige o plano Pro ou superior. Os modelos são descobertos na API pública de provedor do Command Code.
 
 ### Qwen
 
-Paste a Qwen Token Plan API key. Token Plan keys use the `sk-sp-` prefix. Thinker discovers available models from Qwen's Token Plan endpoint and can route both chat-completions and responses-style requests where supported.
+Cole uma chave do Qwen Token Plan (prefixo `sk-sp-`). O Thinker descobre os modelos no endpoint do Token Plan e roteia requisições de chat completions e de estilo responses onde houver suporte.
 
 ### Xiaomi MiMo
 
-Paste a MiMo Token Plan API key. Token Plan keys use the `tp-` prefix. Thinker routes through MiMo's OpenAI-compatible Token Plan endpoint and lets self-hosted setups choose the China, Singapore, or Europe token-plan host.
+Cole uma chave do MiMo Token Plan (prefixo `tp-`). O Thinker roteia pelo endpoint compatível com OpenAI do Token Plan e deixa o operador escolher o host da China, de Singapura ou da Europa.
 
 ### Moonshot
 
-Paste a Kimi Code API key from the Kimi Code console. Requests route through Kimi Code's Anthropic-compatible endpoint for the fixed `k3`, `k3-256k`, `kimi-for-coding`, and `kimi-for-coding-highspeed` model catalog.
+Cole uma chave do Kimi Code, do console do Kimi Code. As requisições vão ao endpoint compatível com Anthropic do Kimi Code, com o catálogo fixo `k3`, `k3-256k`, `kimi-for-coding` e `kimi-for-coding-highspeed`.
 
 ### Z.ai
 
-Paste a GLM Coding Plan token from Z.ai. Thinker routes to the Z.ai coding-plan endpoint. Self-hosted setups can choose the global or China Mainland endpoint when both are available.
+Cole um token do GLM Coding Plan da Z.ai. O Thinker roteia para o endpoint de coding plan da Z.ai; o operador pode escolher o endpoint global ou o da China continental quando ambos existem.
 
 ### Google
 
-Thinker uses browser OAuth for Google's CodeAssist flow. The subscription route uses a fixed Gemini CodeAssist model list rather than the public Gemini API-key catalog.
+OAuth no navegador para o fluxo CodeAssist do Google. A rota de assinatura usa uma lista fixa de modelos Gemini CodeAssist, e não o catálogo da API pública do Gemini.
 
 ### MiniMax
 
-Thinker supports the MiniMax Coding Plan device-code flow. Users with a Coding Plan token can also paste the token directly when the UI offers the token alternative.
+O Thinker suporta o fluxo de código de dispositivo do MiniMax Coding Plan. Quem tem um token do Coding Plan também pode colar o token direto, quando a interface oferece a alternativa.
 
 ### Kiro
 
-Thinker uses Kiro's device-code flow. The Kiro subscription exposes `kiro/auto` plus curated Claude, DeepSeek, MiniMax, GLM, and Qwen routes behind one subscription.
+Fluxo de código de dispositivo do Kiro. A assinatura expõe `kiro/auto` e rotas selecionadas de Claude, DeepSeek, MiniMax, GLM e Qwen numa só assinatura.
 
 ### xAI
 
-Thinker uses browser OAuth for Grok subscriptions and fetches the model list dynamically from xAI's OpenAI-compatible models endpoint.
+OAuth no navegador para assinaturas Grok; a lista de modelos vem do endpoint de modelos compatível com OpenAI da xAI.
 
 ### Ollama Cloud
 
-Paste an Ollama Cloud API key. Ollama Cloud accepts generic API-key formats; Thinker does not require a fixed prefix. Models are discovered dynamically from the cloud tag catalog.
+Cole uma chave de API do Ollama Cloud. Ele aceita formatos genéricos de chave; o Thinker não exige prefixo fixo. Os modelos são descobertos no catálogo de tags da nuvem.
 
 ### OpenCode Go
 
-Sign in to OpenCode Go, copy your API key, and paste it into Thinker. Model discovery is dynamic. Depending on the model, Thinker can route through OpenAI-compatible or Anthropic-compatible wire formats.
+Entre no OpenCode Go, copie a chave de API e cole no Thinker. A descoberta de modelos é dinâmica e, conforme o modelo, o Thinker roteia por formato compatível com OpenAI ou com Anthropic.
 
-## Why mix subscriptions and API keys
+## Por que combinar assinaturas e chaves de API
 
-A common setup is a subscription as the primary route for predictable monthly cost, plus API-key providers as fallbacks for plan limits, provider outages, or models the subscription does not include. Pin subscription models to routing tiers and add API-key models to the fallback list. Thinker handles the switch.
+Uma configuração comum é usar a assinatura como rota principal, pelo custo mensal previsível, e provedores com chave de API como fallback para limites do plano, quedas do provedor ou modelos que a assinatura não inclui. Fixe os modelos de assinatura nos tiers de roteamento e ponha os modelos de chave de API na lista de fallback. O Thinker faz a troca.
