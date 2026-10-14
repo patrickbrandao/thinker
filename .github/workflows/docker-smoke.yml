@@ -234,10 +234,14 @@ jobs:
           prompt="persist this request through a container recreation"
           expected_answer="persisted through Docker volume"
 
+          # One-time setup token printed at first boot (#29).
+          setup_token=$(docker compose logs manifest | grep -oE 'one-time setup token: [A-Za-z0-9_-]+' | tail -1 | awk '{print $NF}')
+          test -n "$setup_token"
+          echo "::add-mask::$setup_token"
           curl -sSf -X POST "$base_url/api/v1/setup/admin" \
             -H 'Content-Type: application/json' \
             -H "Origin: $auth_origin" \
-            --data '{"email":"volume-smoke@example.com","name":"Volume Smoke","password":"volume-smoke-password"}' \
+            --data "{\"email\":\"volume-smoke@example.com\",\"name\":\"Volume Smoke\",\"password\":\"volume-smoke-password\",\"setupToken\":\"$setup_token\"}" \
             >/dev/null
           curl -sSf -c "$cookie_jar" -X POST "$base_url/api/auth/sign-in/email" \
             -H 'Content-Type: application/json' \

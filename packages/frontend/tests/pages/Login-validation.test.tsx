@@ -30,6 +30,7 @@ vi.mock("../../src/services/toast-store.js", () => ({
 
 const mockCheckSocialProviders = vi.fn().mockResolvedValue([]);
 vi.mock("../../src/services/setup-status.js", () => ({
+  checkSignupEnabled: () => Promise.resolve(false),
   checkSocialProviders: (...args: unknown[]) => mockCheckSocialProviders(...args),
 }));
 

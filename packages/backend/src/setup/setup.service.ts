@@ -137,6 +137,9 @@ export class SetupService {
               [dto.email],
             )) as Array<{ email: string }>;
             if (unverified.length === 1) {
+              // Completing a half-created admin is still setup: it needs the
+              // token too, or anyone knowing the email could verify it.
+              this.assertSetupToken(dto.setupToken);
               await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
                 dto.email,
               ]);
@@ -147,14 +150,7 @@ export class SetupService {
           throw new ConflictException('Setup already completed — an admin user exists');
         }
 
-        if (!this.setupToken.verify(dto.setupToken)) {
-          // A wiped database after boot has no token yet: print one now.
-          this.setupToken.ensureIssued();
-          throw new ForbiddenException(
-            'Invalid or missing setup token. Find the one-time token in the server log ' +
-              '(for example `docker compose logs thinker`).',
-          );
-        }
+        this.assertSetupToken(dto.setupToken);
 
         // Lazy-require so jest unit and e2e tests that don't exercise
         // this path don't have to load Better Auth's ESM bundle.
@@ -182,5 +178,16 @@ export class SetupService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private assertSetupToken(token: string | undefined): void {
+    if (this.setupToken.verify(token)) return;
+    // No token pending (wiped database, or a recovery after a restart):
+    // print one now so the operator can retry.
+    this.setupToken.ensureIssued();
+    throw new ForbiddenException(
+      'Invalid or missing setup token. Find the one-time token in the server log ' +
+        '(for example `docker compose logs thinker`).',
+    );
   }
 }

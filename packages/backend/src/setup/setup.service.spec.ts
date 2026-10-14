@@ -372,6 +372,24 @@ describe('SetupService', () => {
         expect(updateCall?.[1]).toEqual(['founder@example.com']);
       });
 
+      it('requires the setup token before completing a half-created admin', async () => {
+        runnerQuery
+          .mockResolvedValueOnce(undefined) // lock
+          .mockResolvedValueOnce([{ count: '1' }]) // count = 1
+          .mockResolvedValueOnce([{ email: 'founder@example.com' }]) // unverified match
+          .mockResolvedValueOnce(undefined); // unlock
+
+        await expect(
+          service.createFirstAdmin({ ...dto, setupToken: 'not-the-token' }),
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(setupToken.ensureIssued).toHaveBeenCalledTimes(1);
+        const updateCall = runnerQuery.mock.calls.find(
+          (c) => typeof c[0] === 'string' && c[0].includes('UPDATE "user"'),
+        );
+        expect(updateCall).toBeUndefined();
+      });
+
       it('throws ConflictException when count=1 but the existing user is already verified', async () => {
         runnerQuery
           .mockResolvedValueOnce(undefined) // lock
