@@ -250,6 +250,8 @@ if [[ "$UPGRADE" -eq 1 ]]; then
     cp -p "$COMPOSE_PATH" "$BACKUP_PATH"
     mv "$NEW_COMPOSE_PATH" "$COMPOSE_PATH"
     NEW_COMPOSE_PATH=""
+    # mktemp creates 0600 files; the compose file holds no secrets (.env does).
+    chmod 644 "$COMPOSE_PATH"
 
     if ! (cd "$INSTALL_DIR" && docker compose config --quiet); then
       restore_previous_compose 0
