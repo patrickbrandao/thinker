@@ -195,7 +195,7 @@ packages/
 
 Beyond `packages/`, the repo root also carries:
 
-- `integrations/n8n-nodes-manifest/` — the published n8n community node (`n8n-nodes-manifest` on npm); root-level `nodes/` and `credentials/` are identical mirrors of its sources for n8n's community-node scanner.
+- `integrations/n8n-nodes-thinker/` — the n8n community node (`n8n-nodes-thinker`, not published; installed from a local `npm pack`).
 - `contracts/gateway/` — gateway API contract tests.
 - `design-system/` — machine-readable design registry (generated `registry/components.json` + `registry/llms.txt`; generator `generate-registry.mjs`).
 - `deploy/` — one-click deployment templates (apple-containers, aws, coolify, digitalocean, easypanel, fly, gcp, heroku, koyeb).
@@ -801,7 +801,7 @@ Most workspace packages are **not published to npm**: `packages/backend`, `packa
 
 `packages/cli` (`thinker-cli`, binary `thinker`) is `private: true` too and is not published to any registry; users install it from a checkout (`npm install -g ./packages/cli` or a local `npm pack`). Its version **tracks the Thinker release**: it has no changeset target of its own and stays in the `.changeset/config.json` ignore list. `npm run set-version --workspace=packages/cli` stamps the version from `packages/thinker/package.json` onto the three files that carry it (`packages/cli/package.json`, `src/version.ts`, and the generated `SKILL_VERSION` in `src/skill-content.gen.ts`, which `skill-content.spec.ts` pins to package.json).
 
-The one npm-published artifact in the repo is the **n8n community node** `n8n-nodes-manifest` (`integrations/n8n-nodes-manifest/`, currently v0.2.2). It is standalone — outside the npm workspaces, Turborepo, and Changesets — with its own build and publish flow. The repo-root `nodes/` and `credentials/` directories are identical mirrors of its sources (required by n8n's community-node scanner, which looks at the repo root).
+The **n8n community node** `n8n-nodes-thinker` (`integrations/n8n-nodes-thinker/`, v0.1.0) is standalone — outside the npm workspaces, Turborepo, and Changesets — with its own `package-lock.json`, build (`npm run build`) and tests (`npm test`). It is not published to any registry; `dist/` is git-ignored and users install the tarball from `npm pack` as a community node. Its nodes are `Thinker` and `LmChatThinker`, its credential `ThinkerApi` (`thinkerApi`), and requests carry `User-Agent: n8n-nodes-thinker`, which `routing/proxy/caller-classifier.ts` recognises.
 
 ### `packages/manifest/` is the canonical version
 

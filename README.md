@@ -132,7 +132,7 @@ Provider catalogs are discovered dynamically when credentials are connected. The
 ## Quick links
 
 - [Docs](https://manifest.build/llm-gateway/docs/introduction/)
-- [n8n community node](integrations/n8n-nodes-manifest) — `n8n-nodes-manifest` on npm
+- [n8n community node](integrations/n8n-nodes-thinker) — `n8n-nodes-thinker`, installed from a local `npm pack`
 - [Discord](https://discord.com/invite/FepAked3W7)
 - [Discussions](https://github.com/mnfst/llm-gateway/discussions)
 - [Contributing](CONTRIBUTING.md)
