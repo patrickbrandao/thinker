@@ -20,7 +20,12 @@ import { scoreRequest, ScorerInput, MomentumInput, scanMessages } from '../../sc
 import { ResolveResponse } from '../dto/resolve-response';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { Agent } from '../../entities/agent.entity';
-import { DEFAULT_RESPONSE_MODE, DEFAULT_OUTPUT_MODALITY, DEFAULT_TIER_SLOT } from 'thinker-shared';
+import {
+  DEFAULT_RESPONSE_MODE,
+  DEFAULT_OUTPUT_MODALITY,
+  DEFAULT_TIER_SLOT,
+  TIERS,
+} from 'thinker-shared';
 import type {
   AuthType,
   ModelRoute,
@@ -191,6 +196,7 @@ export class ResolveService {
         score: result.score,
         reason: result.reason,
         override_model_unavailable: routeChain.unavailableOverrideModel ?? undefined,
+        no_route_detail: noRouteDetail(result.tier, assignment, tiers, true),
       };
     }
 
@@ -225,6 +231,8 @@ export class ResolveService {
         confidence: 1,
         score: 0,
         reason,
+        no_route_detail:
+          reason === 'default' ? noRouteDetail(tier, undefined, tiers, false) : undefined,
       };
     }
 
@@ -258,6 +266,10 @@ export class ResolveService {
         effectiveRoutes.primaryRoute || reason === 'heartbeat'
           ? undefined
           : (routeChain.unavailableOverrideModel ?? undefined),
+      no_route_detail:
+        effectiveRoutes.primaryRoute || reason !== 'default'
+          ? undefined
+          : noRouteDetail(tier, assignment, tiers, false),
     };
   }
 
@@ -587,6 +599,40 @@ export class ResolveService {
     if (pricing && pricing.provider !== 'OpenRouter') return pricing.provider;
     return null;
   }
+}
+
+/**
+ * Explain an empty route for M101. `auto` reads the default tier while
+ * complexity routing is off, so overrides set on the complexity tiers are
+ * ignored; that is the most common setup mistake on a fresh install.
+ */
+function noRouteDetail(
+  tier: TierSlot,
+  assignment: TierAssignment | undefined,
+  tiers: TierAssignment[],
+  complexityRouting: boolean,
+): string {
+  const override = assignment ? readOverrideRoute(assignment) : null;
+  if (override) {
+    return (
+      `The ${tier} tier points at "${override.model}", but its provider is not ` +
+      `connected or not enabled for this agent.`
+    );
+  }
+  if (complexityRouting) {
+    return `This request scored as the ${tier} tier, which has no model set.`;
+  }
+  const ignored = TIERS.filter((name) =>
+    tiers.some((t) => t.tier === name && readOverrideRoute(t)),
+  );
+  if (ignored.length > 0) {
+    return (
+      `Complexity routing is off for this agent, so "auto" uses the default tier, ` +
+      `which has no model set. The models set on the ${ignored.join('/')} tier(s) ` +
+      `only apply with complexity routing on.`
+    );
+  }
+  return `"auto" uses the default tier, which has no model set.`;
 }
 
 function matchesHeaderRule(headers: IncomingHttpHeaders, tier: HeaderTier): boolean {
