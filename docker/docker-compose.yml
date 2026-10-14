@@ -7,7 +7,8 @@
 # admin account via the setup wizard at /setup. No hardcoded credentials.
 #
 # Configuration comes from a `.env` file next to this compose file.
-# Copy `.env.example` to `.env` and set at least BETTER_AUTH_SECRET before
+# Copy `.env.example` to `.env` and set BETTER_AUTH_SECRET and
+# THINKER_ENCRYPTION_KEY (two different values) before
 # booting. The install script does this automatically.
 #
 # Connecting local LLM servers (Ollama, LM Studio, or any OpenAI-compatible server):
@@ -61,9 +62,9 @@ services:
       - PORT=${PORT:-2099}
       - DATABASE_URL=${DATABASE_URL:-postgresql://manifest:manifest@postgres:5432/manifest}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
-      # Optional dedicated at-rest encryption key for stored provider/OAuth
-      # credentials. When unset, the backend falls back to BETTER_AUTH_SECRET.
-      - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:-}
+      # Required at-rest encryption key for stored provider keys, OAuth tokens
+      # and request recordings. Must differ from BETTER_AUTH_SECRET.
+      - THINKER_ENCRYPTION_KEY=${THINKER_ENCRYPTION_KEY:?THINKER_ENCRYPTION_KEY must be set in .env}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The
       # OAuth callback and session cookie follow the request host, so set this

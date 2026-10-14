@@ -217,7 +217,7 @@ npm start         # node packages/backend/dist/main.js — serves frontend + API
 
 ### Starting the Dev Server
 
-The backend requires a `.env` file at `packages/backend/.env` with at least `BETTER_AUTH_SECRET` (32+ chars). The `auth.instance.ts` reads `process.env` at import time, before NestJS `ConfigModule` loads `.env`, so env vars must be available to the Node process.
+The backend requires a `.env` file at `packages/backend/.env` with at least `BETTER_AUTH_SECRET` and `THINKER_ENCRYPTION_KEY` (32+ chars each, different values). The `auth.instance.ts` reads `process.env` at import time, before NestJS `ConfigModule` loads `.env`, so env vars must be available to the Node process.
 
 **Quick start (run these in parallel):**
 
@@ -258,6 +258,7 @@ PORT=3001
 BIND_ADDRESS=127.0.0.1
 NODE_ENV=development
 BETTER_AUTH_SECRET=<random-hex-64-chars>
+THINKER_ENCRYPTION_KEY=<another-random-hex-64-chars>
 DATABASE_URL=postgresql://myuser:mypassword@localhost:5432/mydatabase
 API_KEY=dev-api-key-12345
 SEED_DATA=true
@@ -463,13 +464,13 @@ Every resource belongs to a tenant; users only authenticate and (optionally) app
 
 See `packages/backend/.env.example` for all variables. Key ones:
 
-Thinker reads only `THINKER_*` names (#21); the upstream-era names are not aliases. At boot, before migrations, `common/utils/legacy-env.ts` logs one warning naming every upstream-prefixed variable that is set (names only, never values) with its `THINKER_*` replacement, or says it no longer exists. When the old encryption-key name is set without `THINKER_ENCRYPTION_KEY`, `assertLegacyEncryptionKeyMigrated()` refuses to boot with an error naming both variables, because the backend would otherwise fall back to `BETTER_AUTH_SECRET` and fail to decrypt stored credentials. The Compose file only passes the variables it lists, so an old name left in `docker/.env` never reaches the container and is not reported.
+Thinker reads only `THINKER_*` names (#21); the upstream-era names are not aliases. At boot, before migrations, `common/utils/legacy-env.ts` logs one warning naming every upstream-prefixed variable that is set (names only, never values) with its `THINKER_*` replacement, or says it no longer exists. When the old encryption-key name is set without `THINKER_ENCRYPTION_KEY`, `assertLegacyEncryptionKeyMigrated()` refuses to boot with an error naming both variables, because that is the actionable message for a stale `.env` (the encryption-key check below would otherwise only say the key is missing). The Compose file only passes the variables it lists, so an old name left in `docker/.env` never reaches the container and is not reported.
 
 - `BETTER_AUTH_SECRET` — **Required.** Secret for Better Auth session signing (min 32 chars). Generate with `openssl rand -hex 32`.
 - `DATABASE_URL` — **Required** in every environment, `NODE_ENV=test` included (there is no default URL, see "Backend e2e database safety"). The app, Better Auth, the migration runner and the message-provider backfill CLI throw if it is unset (a blank `MIGRATION_DATABASE_URL`/`DATABASE_UNPOOLED_URL` does not override it). Format: `postgresql://user:password@host:port/database`.
 - `THINKER_E2E_ALLOW_DROP` — Test-only. Must be `1` for the backend e2e suite to run (together with a `DATABASE_URL` whose database name has `test` as a separate token), because the suite drops the schema. Never set it outside a disposable test database.
-- `THINKER_ENCRYPTION_KEY` — Recommended. AES-256-GCM key (min 32 chars) for encrypting stored provider API keys and OAuth tokens. Defaults to `BETTER_AUTH_SECRET` if unset — set this independently so a session-cookie leak doesn't also expose provider credentials.
-- `THINKER_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption always tries `THINKER_ENCRYPTION_KEY`, then this, then `BETTER_AUTH_SECRET`, so old rows stay readable. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `THINKER_ENCRYPTION_KEY` and `THINKER_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Introducing a dedicated key on an install that used the `BETTER_AUTH_SECRET` fallback: set `THINKER_ENCRYPTION_KEY` (old rows keep decrypting via the session secret); to move them onto the new key, set `PREVIOUS` to the session secret's value for one deploy. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
+- `THINKER_ENCRYPTION_KEY` — **Required** (#27). Secret (min 32 chars) from which the AES-256-GCM key for stored provider API keys, OAuth tokens and request recordings is derived (scrypt). There is no fallback to `BETTER_AUTH_SECRET`: `assertEncryptionKeyConfig()` (`common/utils/crypto.util.ts`) runs in `bootstrap()` before the app and its migrations start, and the process exits non-zero with a `Configuration error` naming the problem (never the value) when the key is missing, shorter than 32 chars, or equal to `BETTER_AUTH_SECRET`, or when `THINKER_ENCRYPTION_KEY_PREVIOUS` is set but shorter than 32 chars. The request path (`getEncryptionSecret()`) only reads the variable; the derived key stays cached. Unit tests get a test key from `test/support/unit-env.ts`; the e2e runner and CI set one too.
+- `THINKER_ENCRYPTION_KEY_PREVIOUS` — Optional, rotation only. A secret that stored values may still be encrypted under. Decryption tries `THINKER_ENCRYPTION_KEY`, then this, so old rows stay readable; `BETTER_AUTH_SECRET` is never a candidate. While it is set, one replica rewrites every row found under an older secret onto the current one after boot (`database/secret-reencryption.service.ts`, advisory-locked, never blocks or fails boot); a normal boot without it never scans. Rotation: set the new `THINKER_ENCRYPTION_KEY` and `THINKER_ENCRYPTION_KEY_PREVIOUS=<old>`, deploy, wait for the log line `Nothing left under an older secret`, then remove `PREVIOUS`. Request recordings are not rewritten by this pass: they decrypt under the current key only, so a key change makes older recordings unreadable until retention removes them.
 - `PORT` — Server port. Default: `3001`
 - `BIND_ADDRESS` — Bind address. Default: `127.0.0.1` (use `0.0.0.0` for Railway/Docker)
 - `NODE_ENV` — `development` or `production`. Dev allows the Vite dashboard origin (`CORS_ORIGIN`); production allows no cross-origin browser caller beyond `THINKER_CORS_ORIGINS`.

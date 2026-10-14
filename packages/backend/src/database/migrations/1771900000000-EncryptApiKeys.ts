@@ -6,12 +6,12 @@ export class EncryptApiKeys1771900000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const log = queryRunner.connection.logger;
-    const secret = process.env['THINKER_ENCRYPTION_KEY'] || process.env['BETTER_AUTH_SECRET'];
+    const secret = process.env['THINKER_ENCRYPTION_KEY'];
 
     if (!secret || secret.length < 32) {
       log.log(
         'warn',
-        'EncryptApiKeys: No encryption secret found. Skipping — set THINKER_ENCRYPTION_KEY or BETTER_AUTH_SECRET.',
+        'EncryptApiKeys: No encryption key found. Skipping — set THINKER_ENCRYPTION_KEY.',
       );
       return;
     }
