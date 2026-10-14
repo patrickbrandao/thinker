@@ -103,6 +103,31 @@ describe('BootBackfillConnection (#74)', () => {
     expect(app.destroy).not.toHaveBeenCalled();
   });
 
+  it('destroys a pool still opening when close() runs (#158)', async () => {
+    const direct = fakeDataSource().ds;
+    let finishInit!: () => void;
+    direct.initialize.mockImplementation(function (this: { isInitialized: boolean }) {
+      return new Promise<void>((resolve) => {
+        finishInit = () => {
+          this.isInitialized = true;
+          resolve();
+        };
+      });
+    });
+    const connection = new BootBackfillConnection(
+      fakeDataSource().ds,
+      { MIGRATION_DATABASE_URL: DIRECT },
+      () => direct,
+    );
+    const pending = connection.get();
+    const closing = connection.close();
+    finishInit();
+    await pending;
+    await closing;
+    expect(direct.destroy).toHaveBeenCalledTimes(1);
+    expect(direct.isInitialized).toBe(false);
+  });
+
   it('never logs the URL', async () => {
     const direct = fakeDataSource().ds;
     const connection = new BootBackfillConnection(

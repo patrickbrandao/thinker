@@ -20,6 +20,7 @@ import * as net from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_OTLP_KEY } from './helpers';
+import { closeServer, serveOnLoopback } from './loopback';
 
 const REBIND_HOST = 'rebind.thinker-e2e.example';
 
@@ -214,6 +215,132 @@ describe('Custom provider DNS rebinding to cloud metadata (e2e)', () => {
     expect(mockRebind.answers).toContain('169.254.169.254');
     expect(JSON.stringify(res.body)).not.toContain('recorded');
     expect(metadataConnections).toBe(0);
+  });
+
+  // #74 / #158: what the client sees when the SSRF policy blocks the provider.
+  describe('a blocked provider URL through the proxy', () => {
+    const TIERS = ['simple', 'standard', 'complex', 'reasoning', 'default'];
+    let blockedModel: string;
+    let fallbackModel: string;
+    let fallbackBox: import('http').Server;
+    let fallbackCalls = 0;
+
+    beforeAll(async () => {
+      fallbackBox = await serveOnLoopback(async (req, res) => {
+        for await (const _ of req) void _;
+        fallbackCalls += 1;
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            id: 'chatcmpl-fallback',
+            object: 'chat.completion',
+            model: 'fallback-model',
+            choices: [
+              {
+                index: 0,
+                message: { role: 'assistant', content: 'Hello from fallback' },
+                finish_reason: 'stop',
+              },
+            ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        );
+      });
+      const fallbackPort = (fallbackBox.address() as net.AddressInfo).port;
+
+      mockRebind.benign = '93.184.216.34';
+      mockRebind.benignAnswersLeft = 1; // create-time validation only
+      const blocked = await dashboard(api().post('/api/v1/routing/test-agent/custom-providers'))
+        .send({
+          name: 'Blocked Provider',
+          base_url: rebindUrl(),
+          apiKey: 'blocked-key',
+          models: [{ model_name: 'blocked-model' }],
+        })
+        .expect(201);
+      blockedModel = `custom:${blocked.body.id as string}/blocked-model`;
+
+      const fallback = await dashboard(api().post('/api/v1/routing/test-agent/custom-providers'))
+        .send({
+          name: 'Fallback Box',
+          base_url: `http://127.0.0.1:${fallbackPort}/v1`,
+          models: [{ model_name: 'fallback-model' }],
+        })
+        .expect(201);
+      fallbackModel = `custom:${fallback.body.id as string}/fallback-model`;
+
+      for (const tier of TIERS) {
+        await dashboard(api().put(`/api/v1/routing/test-agent/tiers/${tier}`))
+          .send({ model: blockedModel })
+          .expect(200);
+      }
+    }, 30_000);
+
+    afterAll(async () => {
+      await closeServer(fallbackBox);
+    });
+
+    beforeEach(() => {
+      mockRebind.benignAnswersLeft = 0; // every lookup now answers metadata
+      fallbackCalls = 0;
+    });
+
+    const expectBlocked = (res: request.Response) => {
+      expect(res.status).toBe(502);
+      expect(res.body.error).toMatchObject({
+        type: 'provider_url_blocked',
+        code: 'provider_url_blocked',
+      });
+      expect(String(res.body.error.message)).toContain('blocked by the SSRF policy');
+      expect(JSON.stringify(res.body)).not.toContain('169.254');
+      expect(metadataConnections).toBe(0);
+    };
+
+    it('answers 502 provider_url_blocked without streaming', async () => {
+      const res = await agent(api().post('/v1/chat/completions')).send({
+        model: blockedModel,
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: false,
+      });
+      expectBlocked(res);
+    });
+
+    it('answers 502 provider_url_blocked when streaming', async () => {
+      const res = await agent(api().post('/v1/chat/completions')).send({
+        model: blockedModel,
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: true,
+      });
+      expectBlocked(res);
+    });
+
+    it('answers 502 provider_url_blocked on the Anthropic Messages surface', async () => {
+      const res = await agent(api().post('/v1/messages')).send({
+        model: blockedModel,
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'hello' }],
+      });
+      expectBlocked(res);
+    });
+
+    it('still runs the fallback chain', async () => {
+      for (const tier of TIERS) {
+        await dashboard(api().put(`/api/v1/routing/test-agent/tiers/${tier}/fallbacks`))
+          .send({ models: [fallbackModel] })
+          .expect(200);
+      }
+      for (const stream of [false, true]) {
+        const res = await agent(api().post('/v1/chat/completions')).send({
+          model: 'auto',
+          messages: [{ role: 'user', content: 'hello' }],
+          stream,
+        });
+        expect(res.status).toBe(200);
+        expect(res.text).toContain('Hello from fallback');
+      }
+      expect(fallbackCalls).toBe(2);
+      expect(metadataConnections).toBe(0);
+    });
   });
 
   it('refuses a custom provider whose hostname does not resolve (.invalid)', async () => {

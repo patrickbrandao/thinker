@@ -1,4 +1,5 @@
 import {
+  buildOpenAiCompatibleError,
   buildMetaHeaders,
   handleProviderError,
   recordFallbackFailures,
@@ -3415,4 +3416,30 @@ describe('proxy-response-handler', () => {
       expect(logged).not.toContain('sk-ant-api03-AAAA');
     });
   });
+});
+
+describe('buildOpenAiCompatibleError: provider_url_blocked (#74)', () => {
+  const body = JSON.stringify({
+    error: {
+      message: 'Provider URL blocked by the SSRF policy: h resolved to a cloud metadata address',
+      type: 'provider_url_blocked',
+      code: 'provider_url_blocked',
+    },
+  });
+
+  it.each([undefined, 'chat_completions', 'messages', 'responses'] as const)(
+    'keeps type and code for api mode %p',
+    (apiMode) => {
+      const error = buildOpenAiCompatibleError(502, body, {
+        apiMode: apiMode as never,
+        provider: 'custom:x',
+      });
+      expect(error).toMatchObject({
+        type: 'provider_url_blocked',
+        code: 'provider_url_blocked',
+        status: 502,
+        message: 'Provider URL blocked by the SSRF policy. Check the base URL of this provider.',
+      });
+    },
+  );
 });

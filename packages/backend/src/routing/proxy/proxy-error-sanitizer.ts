@@ -1,4 +1,5 @@
 import { scrubSecrets } from '../../common/utils/secret-scrub';
+import { PROVIDER_URL_BLOCKED_CODE } from './proxy-transport';
 
 const KNOWN_ERROR_MESSAGES: Record<number, string> = {
   400: 'Bad request to upstream provider',
@@ -23,10 +24,19 @@ export type OpenAiCompatibleErrorType =
 
 export interface ClassifiedProviderError {
   message: string;
-  type: OpenAiCompatibleErrorType;
-  code: 'context_length_exceeded';
+  type: OpenAiCompatibleErrorType | 'provider_url_blocked';
+  code: 'context_length_exceeded' | 'provider_url_blocked';
   source: 'provider';
 }
+
+/**
+ * Code the gateway stamps on the synthetic 502 it answers when the SSRF policy
+ * refuses a provider URL (`ProviderUrlBlockedError`, #74). Kept through the
+ * production 5xx collapse with a fixed message, so clients can tell a blocked
+ * provider configuration from a provider outage.
+ */
+export const PROVIDER_URL_BLOCKED_MESSAGE =
+  'Provider URL blocked by the SSRF policy. Check the base URL of this provider.';
 
 export interface StructuredProviderError {
   message: string;
@@ -208,6 +218,14 @@ export function classifyProviderError(
   status: number,
   rawBody: string,
 ): ClassifiedProviderError | null {
+  if (status === 502 && extractProviderErrorCode(rawBody) === PROVIDER_URL_BLOCKED_CODE) {
+    return {
+      message: PROVIDER_URL_BLOCKED_MESSAGE,
+      type: PROVIDER_URL_BLOCKED_CODE,
+      code: PROVIDER_URL_BLOCKED_CODE,
+      source: 'provider',
+    };
+  }
   if (!isContextLengthError(status, rawBody)) return null;
   const message = extractProviderMessage(rawBody) ?? rawBody;
   return {

@@ -486,3 +486,39 @@ describe('openAiErrorTypeForStatus', () => {
     expect(openAiErrorTypeForStatus(status)).toBe(type);
   });
 });
+
+describe('provider_url_blocked (#74)', () => {
+  // The exact body buildTransportErrorResponse writes for ProviderUrlBlockedError.
+  const blockedBody = (
+    message = 'Provider URL blocked by the SSRF policy: evil.example resolved to a cloud metadata address 169.254.169.254',
+  ) =>
+    JSON.stringify({
+      error: { message, type: 'provider_url_blocked', code: 'provider_url_blocked' },
+    });
+
+  it('keeps the code and type with a fixed message, in production', () => {
+    expect(classifyProviderError(502, blockedBody())).toEqual({
+      message: 'Provider URL blocked by the SSRF policy. Check the base URL of this provider.',
+      type: 'provider_url_blocked',
+      code: 'provider_url_blocked',
+      source: 'provider',
+    });
+    const message = sanitizeProviderError(502, blockedBody(), 'production');
+    expect(message).toContain('Provider URL blocked by the SSRF policy');
+    expect(message).not.toContain('169.254');
+  });
+
+  it('only applies to a 502', () => {
+    expect(classifyProviderError(500, blockedBody())).toBeNull();
+    expect(sanitizeProviderError(503, blockedBody(), 'production')).toBe(
+      'Upstream provider temporarily unavailable',
+    );
+  });
+
+  it('leaves other 502 bodies generic', () => {
+    expect(classifyProviderError(502, '{"error":{"code":"bad_gateway"}}')).toBeNull();
+    expect(sanitizeProviderError(502, '{"error":{"message":"x"}}', 'production')).toBe(
+      'Upstream provider returned bad gateway',
+    );
+  });
+});

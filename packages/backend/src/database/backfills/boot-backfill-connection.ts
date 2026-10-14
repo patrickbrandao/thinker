@@ -55,15 +55,20 @@ export class BootBackfillConnection {
     const url = resolveDirectBackfillDatabaseUrl(this.env);
     if (!url) return this.appDataSource;
     if (this.direct?.isInitialized) return this.direct;
-    this.opening ??= this.open(url);
+    const opening = (this.opening ??= this.open(url));
     try {
-      return await this.opening;
+      return await opening;
     } finally {
-      this.opening = undefined;
+      if (this.opening === opening) this.opening = undefined;
     }
   }
 
   async close(): Promise<void> {
+    // A close() racing an open() still in flight must not leak the pool that
+    // open() is about to hand back: wait for it, then destroy it.
+    const opening = this.opening;
+    this.opening = undefined;
+    if (opening) await opening.catch(() => undefined);
     const direct = this.direct;
     this.direct = undefined;
     if (direct?.isInitialized) await direct.destroy().catch(() => undefined);
