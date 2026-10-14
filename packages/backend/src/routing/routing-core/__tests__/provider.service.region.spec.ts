@@ -38,8 +38,8 @@ describe('ProviderService — Qwen region resolution', () => {
   let originalSecret: string | undefined;
 
   beforeEach(() => {
-    originalSecret = process.env.BETTER_AUTH_SECRET;
-    process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+    originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+    process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
     detectQwenRegion.mockReset();
     svc = new ProviderService(
       makeRepo() as unknown as Repository<TenantProvider>,
@@ -56,8 +56,8 @@ describe('ProviderService — Qwen region resolution', () => {
   });
 
   afterEach(() => {
-    if (originalSecret === undefined) delete process.env.BETTER_AUTH_SECRET;
-    else process.env.BETTER_AUTH_SECRET = originalSecret;
+    if (originalSecret === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+    else process.env.THINKER_ENCRYPTION_KEY = originalSecret;
   });
 
   const resolve = (

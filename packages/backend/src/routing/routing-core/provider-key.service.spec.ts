@@ -5,9 +5,9 @@ import { encrypt } from '../../common/utils/crypto.util';
 import type { TenantProvider } from '../../entities/tenant-provider.entity';
 import type { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 
-// getEncryptionSecret() falls back to BETTER_AUTH_SECRET; set it so the
-// per-agent filter tests can produce real ciphertext that decryptOne resolves.
-process.env['BETTER_AUTH_SECRET'] = 'a'.repeat(64);
+// Set the encryption key so the per-agent filter tests can produce real
+// ciphertext that decryptOne resolves.
+process.env['THINKER_ENCRYPTION_KEY'] = 'a'.repeat(64);
 
 /**
  * Focused unit coverage for the key-selection projections. The proxy specs
@@ -230,7 +230,7 @@ describe('ProviderKeyService — selection projections', () => {
  * dropped `enabledIds.has(p.id)` check fails loudly.
  */
 describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)', () => {
-  const SECRET = process.env['BETTER_AUTH_SECRET'] as string;
+  const SECRET = process.env['THINKER_ENCRYPTION_KEY'] as string;
 
   const tenantProvider = (over: Partial<TenantProvider>): TenantProvider =>
     ({

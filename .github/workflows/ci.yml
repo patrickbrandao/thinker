@@ -170,6 +170,7 @@ jobs:
       DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/thinker_e2e_test
       THINKER_E2E_ALLOW_DROP: "1"
       BETTER_AUTH_SECRET: ci-test-secret-at-least-32-characters-long!!
+      THINKER_ENCRYPTION_KEY: ci-test-encryption-key-at-least-32-characters!!
       NODE_ENV: test
       TZ: ${{ matrix.tz }}
     steps:
