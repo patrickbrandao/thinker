@@ -17,6 +17,23 @@ describe('DropAutofixSchema1803400000000', () => {
     expect(sql[0]).toBe(`SET LOCAL lock_timeout = '10s'`);
   });
 
+  it('sets a session lock timeout on revert and resets it, even on failure (#68)', async () => {
+    const sql = await run('down');
+    expect(sql[0]).toBe(`SET lock_timeout = '10s'`);
+    expect(sql.at(-1)).toBe('RESET lock_timeout');
+
+    const query = jest.fn(async (statement: string) => {
+      if (statement.includes('ADD COLUMN IF NOT EXISTS "autofix_enabled"')) {
+        throw new Error('lock timeout');
+      }
+      return [];
+    });
+    await expect(new DropAutofixSchema1803400000000().down({ query } as never)).rejects.toThrow(
+      'lock timeout',
+    );
+    expect(query.mock.calls.at(-1)?.[0]).toBe('RESET lock_timeout');
+  });
+
   it('drops every repair column, index and constraint idempotently', async () => {
     const sql = (await run('up')).join('\n');
 
