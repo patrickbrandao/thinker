@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { PricingSyncService } from './pricing-sync.service';
 
 let fetchSpy: jest.SpyInstance;
@@ -35,6 +36,40 @@ describe('PricingSyncService', () => {
     it('makes the cron and the refresh endpoint a no-op', async () => {
       await expect(service.refreshCache()).resolves.toBe(0);
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('THINKER_CATALOG_SYNC logging (#75)', () => {
+    const previous = process.env['THINKER_CATALOG_SYNC'];
+    let warn: jest.SpyInstance;
+    let log: jest.SpyInstance;
+    beforeEach(() => {
+      warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      fetchSpy.mockResolvedValue({ ok: false, status: 503 } as Response);
+    });
+    afterEach(() => {
+      warn.mockRestore();
+      log.mockRestore();
+      if (previous === undefined) delete process.env['THINKER_CATALOG_SYNC'];
+      else process.env['THINKER_CATALOG_SYNC'] = previous;
+    });
+
+    it('warns at boot on an unrecognized value without echoing it, and keeps syncing', async () => {
+      process.env['THINKER_CATALOG_SYNC'] = 'disabled';
+      service.onModuleInit();
+      await service.whenInitialized();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toContain('unrecognized value');
+      expect(String(warn.mock.calls[0]![0])).not.toContain('disabled');
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    it('logs the configured off value', () => {
+      process.env['THINKER_CATALOG_SYNC'] = 'off';
+      service.onModuleInit();
+      expect(warn).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('THINKER_CATALOG_SYNC=off:'));
     });
   });
 
