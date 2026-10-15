@@ -54,4 +54,4 @@ You are the Principal agent. You talk to the user (in Portuguese), plan, and del
 
 ## Codebase reference
 
-Until the v0.1 cleanup rewrites it, the technical guide inherited from upstream is [`docs/dev/manifest-guide.md`](docs/dev/manifest-guide.md) (architecture, commands, auth, routing, env vars, migrations) and [`docs/dev/manifest-agents.md`](docs/dev/manifest-agents.md) (domain terminology). Read the relevant section before working in an area. Treat everything in it about Manifest Cloud, billing, telemetry, Autofix/Phoenix, Wingman and API Bot as **slated for removal**, and update the guide as the code changes.
+The technical guide is [`docs/dev/guia.md`](docs/dev/guia.md) (architecture, commands, auth, routing, env vars, migrations, tests, releases) and the domain terminology is [`docs/dev/terminologia.md`](docs/dev/terminologia.md). Both are in Portuguese. Read the relevant section before working in an area, and update the guide as the code changes.
