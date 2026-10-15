@@ -12,6 +12,15 @@ name: Release
 #   4. creates or updates the GitHub release with the Portuguese notes from
 #      docs/releases/X.Y.Z.md, marked latest for stable versions.
 #
+# Only GitHub-owned actions plus docker/setup-buildx-action and
+# docker/build-push-action are on the repository's allowed-actions list, so
+# Docker Hub login and tag computation are plain shell steps. Using any other
+# third-party action makes GitHub reject the run with startup_failure.
+#
+# workflow_dispatch runs a dry run: same preflight, both architectures are
+# built, tags are computed and printed, but nothing is pushed and no release
+# is created. The Docker Hub secrets are not required in a dry run.
+#
 # This is the only workflow allowed to use DOCKERHUB_USERNAME / DOCKERHUB_TOKEN.
 # It calls no service other than GitHub and Docker Hub.
 
@@ -20,6 +29,7 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -30,6 +40,7 @@ concurrency:
 
 env:
   IMAGE: tmsoftbrasil/thinker
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   preflight:
@@ -52,6 +63,10 @@ jobs:
           missing=0
           for name in DOCKERHUB_USERNAME DOCKERHUB_TOKEN; do
             if [ -z "${!name}" ]; then
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "::warning::Repository secret $name is not set (ignored in dry run)."
+                continue
+              fi
               echo "::error::Repository secret $name is not set. Add it under Settings > Secrets and variables > Actions, then re-run this workflow." >&2
               missing=1
             fi
@@ -64,8 +79,16 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          version="${TAG#v}"
           pkg=$(node -p "require('./packages/thinker/package.json').version")
+          if [ "$DRY_RUN" = "true" ]; then
+            version="$pkg"
+          else
+            version="${TAG#v}"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            echo "::error::Version $version is not X.Y.Z or X.Y.Z-rc.N." >&2
+            exit 1
+          fi
           if [ "$version" != "$pkg" ]; then
             echo "::error::Tag $TAG does not match packages/thinker/package.json version $pkg." >&2
             exit 1
@@ -102,10 +125,12 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: env.DRY_RUN != 'true'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Build and push by digest
         id: build
@@ -115,7 +140,7 @@ jobs:
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
           # No cache-from: release images are built from scratch.
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ env.DRY_RUN != 'true' }}
           labels: |
             org.opencontainers.image.title=thinker
             org.opencontainers.image.version=${{ needs.preflight.outputs.version }}
@@ -124,6 +149,7 @@ jobs:
             org.opencontainers.image.licenses=MIT
 
       - name: Export digest
+        if: env.DRY_RUN != 'true'
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
@@ -131,6 +157,7 @@ jobs:
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: env.DRY_RUN != 'true'
         with:
           name: digest-${{ matrix.slug }}
           path: ${{ runner.temp }}/digests/*
@@ -146,6 +173,7 @@ jobs:
       digest: ${{ steps.inspect.outputs.digest }}
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: env.DRY_RUN != 'true'
         with:
           path: ${{ runner.temp }}/digests
           pattern: digest-*
@@ -153,24 +181,43 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: env.DRY_RUN != 'true'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Compute tags
         id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: latest=false
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.preflight.outputs.prerelease == 'false' }}
-            type=raw,value=latest,enable=${{ needs.preflight.outputs.prerelease == 'false' }}
-            type=sha,prefix=sha-,format=short
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          PRERELEASE: ${{ needs.preflight.outputs.prerelease }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          tags=("$IMAGE:$VERSION")
+          if [ "$PRERELEASE" = "false" ]; then
+            tags+=("$IMAGE:${VERSION%.*}" "$IMAGE:latest")
+          fi
+          tags+=("$IMAGE:sha-${SHA:0:7}")
+          printf '%s\n' "${tags[@]}"
+          {
+            echo "tags<<EOF_TAGS"
+            printf '%s\n' "${tags[@]}"
+            echo "EOF_TAGS"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$DRY_RUN" = "true" ]; then
+            {
+              echo "### Dry run: nothing pushed"
+              echo '```'
+              printf '%s\n' "${tags[@]}"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Create and push the manifest list
+        if: env.DRY_RUN != 'true'
         working-directory: ${{ runner.temp }}/digests
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
@@ -183,6 +230,7 @@ jobs:
           docker buildx imagetools create "${args[@]}" "${sources[@]}"
 
       - name: Inspect
+        if: env.DRY_RUN != 'true'
         id: inspect
         env:
           VERSION: ${{ needs.preflight.outputs.version }}
@@ -205,6 +253,7 @@ jobs:
   github-release:
     name: GitHub release
     needs: [preflight, manifest]
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
