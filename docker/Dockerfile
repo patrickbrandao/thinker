@@ -7,7 +7,7 @@
 # pinned by digest.
 
 # Stage 1: Install all dependencies (including dev deps) for the build.
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
 WORKDIR /app
 COPY package.json package-lock.json turbo.json ./
 COPY packages/shared/package.json packages/shared/
@@ -31,7 +31,7 @@ RUN npx turbo build --filter=thinker-backend --filter=thinker-frontend --filter=
 # optionalDependencies; without it, npm hoists @esbuild/linux-x64 (a Go
 # binary) into node_modules even though `--omit=dev` strips its parent,
 # and CVE scanners then flag the embedded Go stdlib.
-FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS prod-deps
+FROM node:24-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS prod-deps
 WORKDIR /app
 RUN mkdir -p /app/request-recordings
 COPY package.json package-lock.json ./
@@ -62,7 +62,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Stage 4: Distroless runtime. Runs as the built-in `nonroot` user (UID
 # 65532) by default. No shell, no apk/apt, minimal CVE surface.
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runtime
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:59c479c9b8c123e66047315c968aa2d35e31ae5149c856e4110a79c8b3563f0b AS runtime
 WORKDIR /app
 
 # No base.digest label: a hand-written digest drifts from the FROM pin above
