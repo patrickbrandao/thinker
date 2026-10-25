@@ -64,7 +64,9 @@ docker compose logs thinker | grep 'setup token'
 
 A linha tem o formato `No admin account exists yet. Open /setup and enter this one-time setup token: <token>`. Abra [http://localhost:2099/setup](http://localhost:2099/setup), informe o token e crie a conta de administrador. O token deixa de valer assim que o primeiro administrador existe.
 
-Se o container reiniciar antes do setup, um token novo é impresso (o token fica só na memória do processo). Depois do primeiro administrador, o cadastro continua fechado. Enquanto a criação de contas pelo administrador não existe (prevista para a v0.3), a válvula provisória `THINKER_ALLOW_SIGNUP=true` reabre o cadastro por e-mail e login social; desligue-a depois de criar as contas (veja [Configuração](configuracao.md)).
+Para escolher o token em vez de procurá-lo no log, defina `THINKER_SETUP_TOKEN` no `.env` antes de subir (mínimo de 16 caracteres; gere com `openssl rand -hex 24`). O log então só avisa que o token vem dessa variável, sem imprimi-lo, e ele vale em todas as réplicas.
+
+Sem `THINKER_SETUP_TOKEN`, se o container reiniciar antes do setup, um token novo é impresso (o token fica só na memória do processo). Depois do primeiro administrador, o cadastro continua fechado. Enquanto a criação de contas pelo administrador não existe (prevista para a v0.3), a válvula provisória `THINKER_ALLOW_SIGNUP=true` reabre o cadastro por e-mail e login social; desligue-a depois de criar as contas (veja [Configuração](configuracao.md)).
 
 > **Várias réplicas:** cada processo guarda o seu próprio token. Num deploy com mais de uma réplica, faça o primeiro setup na réplica cujo log imprimiu o token, ou rode com uma única réplica até o administrador existir. Em deploys assim, desligue as migrações nas demais com `RUN_MIGRATIONS_ON_BOOT=false` e use armazenamento S3 para as gravações.
 

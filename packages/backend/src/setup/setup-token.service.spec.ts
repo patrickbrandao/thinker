@@ -62,4 +62,37 @@ describe('SetupTokenService', () => {
   it('generates a different token each time', () => {
     expect(service.issue()).not.toBe(service.issue());
   });
+
+  describe('THINKER_SETUP_TOKEN', () => {
+    const configured = 'operator-chosen-token-1234';
+
+    beforeEach(() => {
+      process.env['THINKER_SETUP_TOKEN'] = `  ${configured}  `;
+      service = new SetupTokenService({ query } as never);
+    });
+
+    afterEach(() => {
+      delete process.env['THINKER_SETUP_TOKEN'];
+    });
+
+    it('uses the configured token and never logs it', async () => {
+      query.mockResolvedValue([{ exists: false }]);
+      await service.onApplicationBootstrap();
+      expect(service.verify(configured)).toBe(true);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('THINKER_SETUP_TOKEN'));
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining(configured));
+    });
+
+    it('accepts the configured token again after a re-issue', () => {
+      service.issue();
+      service.consume();
+      service.ensureIssued();
+      expect(service.verify(configured)).toBe(true);
+    });
+
+    it('rejects a configured token that is too short', () => {
+      process.env['THINKER_SETUP_TOKEN'] = 'short';
+      expect(() => new SetupTokenService({ query } as never)).toThrow(/at least 16/);
+    });
+  });
 });

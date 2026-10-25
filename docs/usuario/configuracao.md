@@ -24,6 +24,7 @@ O passo a passo, inclusive para quem dependia do antigo fallback para `BETTER_AU
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
+| `THINKER_SETUP_TOKEN` | vazio | Token do primeiro setup escolhido pelo operador (mínimo de 16 caracteres; gere com `openssl rand -hex 24`). Com ele, dá para subir o serviço e enviar o token a quem vai criar o administrador, sem consultar o log. Ele nunca é impresso e deixa de valer quando o primeiro administrador existe. Vazio: o Thinker gera um token aleatório e o imprime no log. Valor com menos de 16 caracteres impede o boot. |
 | `THINKER_ALLOW_SIGNUP` | `false` | Válvula provisória (removida na v0.3, quando o administrador criar as contas). Com `true`, reabre o cadastro por e-mail e login social, mas só depois que o primeiro administrador existe. O primeiro administrador sempre vem do assistente `/setup`, com o token de uso único do log. |
 | `BETTER_AUTH_URL` | `http://localhost:<PORT>` | URL pública. Deve ser igual à do navegador e alcançável de dentro do container (o MCP busca o JWKS nela). |
 | `BETTER_AUTH_ALLOWED_HOSTS` | vazio | Hosts extras que podem servir o dashboard e a API, separados por vírgula (aceita `*.exemplo.com`). |
