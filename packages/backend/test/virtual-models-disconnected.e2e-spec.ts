@@ -11,9 +11,12 @@
  * A connected provider whose discovery has no models yet (cold discovery)
  * keeps counting as available, with an unknown window.
  *
- * Providers are connected and removed through the real API. Model discovery
- * is stubbed to follow the database: the agent's catalog lists the models of
- * its active, enabled providers, except those marked cold.
+ * Providers are connected through the real API. Disabling or disconnecting a
+ * provider a virtual model routes to is now blocked with 409, so the dangling
+ * state (rows left by an older version, or a provider deactivated outside the
+ * API) is reproduced straight in the database after asserting the 409. Model
+ * discovery is stubbed to follow the database: the agent's catalog lists the
+ * models of its active, enabled providers, except those marked cold.
  */
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -204,9 +207,15 @@ describe('virtual models and a provider the agent no longer has', () => {
 
   it('drops the routes of a provider disabled for the agent', async () => {
     const deepseekId = await tenantProviderId('deepseek');
+    // The API refuses: virtual models still route to deepseek.
     await admin(api().delete(`/api/v1/agents/test-agent/enabled-providers/${deepseekId}`)).expect(
-      200,
+      409,
     );
+    await ds.query(
+      `DELETE FROM agent_enabled_providers WHERE agent_id = $1 AND tenant_provider_id = $2`,
+      [TEST_AGENT_ID, deepseekId],
+    );
+    invalidateCaches();
     try {
       expect(await views()).toMatchObject({
         'deepseek-only': { routable: false, context_length: null },
@@ -242,7 +251,14 @@ describe('virtual models and a provider the agent no longer has', () => {
   });
 
   it('drops the routes of a disconnected provider', async () => {
-    await admin(api().delete(`${ROUTING}/providers/deepseek`)).expect(200);
+    // The API refuses: virtual models still route to deepseek.
+    await admin(api().delete(`${ROUTING}/providers/deepseek`)).expect(409);
+    const deepseekId = await tenantProviderId('deepseek');
+    await ds.query(`UPDATE tenant_providers SET is_active = false WHERE id = $1`, [deepseekId]);
+    await ds.query(`DELETE FROM agent_enabled_providers WHERE tenant_provider_id = $1`, [
+      deepseekId,
+    ]);
+    invalidateCaches();
 
     expect(await views()).toMatchObject({
       'deepseek-only': { routable: false, context_length: null },
@@ -264,6 +280,12 @@ describe('virtual models and a provider the agent no longer has', () => {
     expect((await views())['deepseek-only'].routable).toBe(false);
   });
 });
+
+function invalidateCaches(): void {
+  const cache = app.get(RoutingCacheService);
+  cache.invalidateAgent(TEST_AGENT_ID);
+  cache.invalidateTenant(TEST_TENANT_ID);
+}
 
 async function vmId(name: string): Promise<string> {
   const res = await admin(api().get(VM_BASE)).expect(200);

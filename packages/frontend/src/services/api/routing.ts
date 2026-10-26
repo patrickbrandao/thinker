@@ -386,6 +386,14 @@ export interface EnabledProviders {
 
 export interface AgentProviderDisableImpact {
   affected_tiers: Array<{ tier: string; model: string; position: string }>;
+  /** Virtual models (ADR 0004) whose own override or fallbacks use the provider. */
+  affected_virtual_models?: Array<{
+    id: string;
+    name: string;
+    agent: string;
+    model: string;
+    position: string;
+  }>;
 }
 
 function enabledProvidersPath(agentName: string, suffix = ''): string {
