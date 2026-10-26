@@ -122,6 +122,7 @@ export {
   modelParamsScopeForRouting,
   modelParamsScopeForSpecificity,
   modelParamsScopeForTier,
+  modelParamsScopeForVirtualModel,
 } from './model-params-scope';
 export type { ModelParamsRoutingScopeInput } from './model-params-scope';
 export { API_KEY_PREFIX } from './api-key';
@@ -196,3 +197,23 @@ export {
   isReservedCustomProviderAlias,
   normalizeCustomProviderAlias,
 } from './custom-provider-alias';
+export {
+  MAX_VIRTUAL_MODEL_FALLBACKS,
+  VIRTUAL_MODEL_NAME_MAX_LENGTH,
+  VIRTUAL_MODEL_NAME_MESSAGE,
+  VIRTUAL_MODEL_NAME_PATTERN,
+  isReservedVirtualModelName,
+  validateVirtualModelName,
+} from './virtual-model';
+export type {
+  CreateVirtualModelRequest,
+  ReorderVirtualModelsRequest,
+  SetVirtualModelFallbacksRequest,
+  SetVirtualModelOverrideRequest,
+  ToggleVirtualModelRequest,
+  UpdateVirtualModelRequest,
+  VirtualModel,
+  VirtualModelNameValidation,
+  VirtualModelRouteInput,
+  VirtualModelView,
+} from './virtual-model';

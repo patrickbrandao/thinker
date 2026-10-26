@@ -10,6 +10,7 @@ import { OAuthModule } from './oauth/oauth.module';
 import { CustomProviderModule } from './custom-provider/custom-provider.module';
 import { ResolveModule } from './resolve/resolve.module';
 import { HeaderTiersModule } from './header-tiers/header-tiers.module';
+import { VirtualModelsModule } from './virtual-models/virtual-models.module';
 import { ProviderController } from './provider.controller';
 import { TierController } from './tier.controller';
 import { ModelController } from './model.controller';
@@ -51,6 +52,7 @@ import { HeaderTier } from '../entities/header-tier.entity';
     CustomProviderModule,
     ResolveModule,
     HeaderTiersModule,
+    VirtualModelsModule,
     RouteModelParamsModule,
   ],
   controllers: [
