@@ -18,7 +18,7 @@
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^0.16.3",
     "better-auth": "1.7.13",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.12.0",
     "marked": "^18.1.0",
     "motion": "^12.43.0",
@@ -31,9 +31,9 @@
     "@types/dompurify": "^3.2.0",
     "@types/node": "^22.20.5",
     "@vitest/coverage-v8": "^5.0.5",
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.3",
     "typescript": "^5.7.0",
-    "vite": "^6.4.4",
+    "vite": "^6.4.5",
     "vite-plugin-solid": "^2.11.14",
     "vitest": "^5.0.3"
   }
