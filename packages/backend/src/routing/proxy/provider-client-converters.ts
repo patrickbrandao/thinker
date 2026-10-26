@@ -229,8 +229,80 @@ export function createReasoningContentStreamTransformer(
   };
 }
 
-function normalizeOpenAiMessages(messages: unknown, endpointKey: string): unknown {
-  if (!Array.isArray(messages)) return messages;
+/**
+ * Endpoints that reject a tool-call history out of sequence: every assistant
+ * `tool_calls` entry must be answered by a `tool` message right after it, and a
+ * `tool` message must answer such an entry. Histories built against laxer
+ * providers (DeepSeek, for example) break this when a fallback lands here.
+ */
+const STRICT_TOOL_SEQUENCE_ENDPOINTS = new Set(['openai']);
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Keeps complete tool-call blocks (an assistant turn with `tool_calls` followed
+ * immediately by exactly one `tool` reply per call id) and drops the rest: the
+ * incomplete assistant turn keeps its text without `tool_calls`, and its replies
+ * and any other orphan `tool` message are removed.
+ */
+function stripIncompleteToolCallBlocks(messages: unknown[]): unknown[] {
+  const result: unknown[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    if (!isJsonRecord(message)) {
+      result.push(message);
+      continue;
+    }
+    // A tool message reached here is not part of a complete block: orphan.
+    if (message.role === 'tool') continue;
+    if (
+      message.role !== 'assistant' ||
+      !Array.isArray(message.tool_calls) ||
+      message.tool_calls.length === 0
+    ) {
+      result.push(message);
+      continue;
+    }
+
+    const ids = message.tool_calls.map((call) =>
+      isJsonRecord(call) && typeof call.id === 'string' && call.id ? call.id : null,
+    );
+    let end = i + 1;
+    while (end < messages.length) {
+      const next = messages[end];
+      if (!isJsonRecord(next) || next.role !== 'tool') break;
+      end += 1;
+    }
+    const replies = messages.slice(i + 1, end) as Record<string, unknown>[];
+    const pending = new Set(ids);
+    const complete =
+      !pending.has(null) &&
+      pending.size === ids.length &&
+      replies.length === ids.length &&
+      replies.every(
+        (reply) => typeof reply.tool_call_id === 'string' && pending.delete(reply.tool_call_id),
+      );
+
+    if (complete) {
+      result.push(message, ...replies);
+    } else {
+      const cleaned = { ...message };
+      delete cleaned.tool_calls;
+      if (cleaned.content === null || cleaned.content === undefined) cleaned.content = '';
+      result.push(cleaned);
+    }
+    i = end - 1;
+  }
+  return result;
+}
+
+function normalizeOpenAiMessages(rawMessages: unknown, endpointKey: string): unknown {
+  if (!Array.isArray(rawMessages)) return rawMessages;
+  const messages = STRICT_TOOL_SEQUENCE_ENDPOINTS.has(endpointKey)
+    ? stripIncompleteToolCallBlocks(rawMessages)
+    : rawMessages;
 
   const isMistral = endpointKey === 'mistral';
   const mistralIdMap = new Map<string, string>();

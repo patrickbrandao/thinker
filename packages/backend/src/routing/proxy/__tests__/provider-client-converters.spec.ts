@@ -23,6 +23,39 @@ describe('provider-client-converters', () => {
       expect(result).toHaveProperty('stream_options');
     });
 
+    it('drops incomplete tool-call blocks and orphan tool replies for openai only', () => {
+      const call = (id: string) => ({
+        id,
+        type: 'function',
+        function: { name: 'search', arguments: '{}' },
+      });
+      const complete = [
+        { role: 'assistant', content: null, tool_calls: [call('call_ok')] },
+        { role: 'tool', tool_call_id: 'call_ok', content: 'ok' },
+      ];
+      const body = {
+        messages: [
+          { role: 'user', content: 'Go.' },
+          ...complete,
+          { role: 'assistant', content: null, tool_calls: [call('call_a'), call('call_b')] },
+          { role: 'tool', tool_call_id: 'call_a', content: 'a' },
+          { role: 'tool', tool_call_id: 'call_x', content: 'x' },
+          { role: 'user', content: 'Continue.' },
+          { role: 'tool', tool_call_id: 'call_a', content: 'late' },
+          { role: 'user', content: 'Next.' },
+        ],
+      };
+
+      expect(sanitizeOpenAiBody(body, 'openai', 'gpt-4o').messages).toEqual([
+        { role: 'user', content: 'Go.' },
+        ...complete,
+        { role: 'assistant', content: '' },
+        { role: 'user', content: 'Continue.' },
+        { role: 'user', content: 'Next.' },
+      ]);
+      expect(sanitizeOpenAiBody(body, 'deepseek', 'deepseek-chat').messages).toEqual(body.messages);
+    });
+
     it('should strip OpenAI-only fields for non-passthrough providers', () => {
       const body = {
         messages: [{ role: 'user', content: 'Hi' }],
