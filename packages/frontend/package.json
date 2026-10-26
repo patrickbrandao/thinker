@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@solidjs/meta": "^0.29.4",
-    "@solidjs/router": "^0.16.3",
+    "@solidjs/router": "^1.0.0",
     "better-auth": "1.7.13",
     "dompurify": "^3.4.16",
     "highlight.js": "^11.12.0",
     "marked": "^18.1.0",
-    "motion": "^12.43.0",
+    "motion": "^14.6.0",
     "solid-js": "^1.9.17",
     "thinker-shared": "*",
     "uplot": "^1.6.31"
