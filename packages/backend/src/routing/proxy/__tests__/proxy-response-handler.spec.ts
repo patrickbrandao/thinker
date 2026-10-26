@@ -1967,6 +1967,58 @@ describe('proxy-response-handler', () => {
       };
     }
 
+    it('unwraps the ClinePass { data, success } envelope', async () => {
+      const { res } = mockResponse();
+      const client = mockProviderClient();
+      const inner = {
+        id: 'chatcmpl-cp-1',
+        object: 'chat.completion',
+        model: 'cline-pass/qwen3.7-plus',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 1 },
+      };
+      const forward = mockForward({ data: inner, success: true });
+
+      const usage = await handleNonStreamResponse(
+        res as any,
+        forward as any,
+        makeMeta({ provider: 'cline-pass' }),
+        {},
+        client as any,
+      );
+
+      expect(usage).toMatchObject({ prompt_tokens: 10, completion_tokens: 1 });
+      expect(res.json).toHaveBeenCalledWith(inner);
+    });
+
+    it.each([
+      [
+        'a top-level choices array',
+        {
+          data: [{ foo: 'bar' }],
+          success: true,
+          choices: [{ index: 0, message: { role: 'assistant', content: 'x' } }],
+        },
+      ],
+      ['no success flag', { data: { choices: [] } }],
+      ['a data payload that is not a chat completion', { data: { id: 'x' }, success: false }],
+    ])('leaves bodies with %s untouched', async (_label, body) => {
+      const { res } = mockResponse();
+      const client = mockProviderClient();
+
+      await handleNonStreamResponse(
+        res as any,
+        mockForward(body) as any,
+        makeMeta(),
+        {},
+        client as any,
+      );
+
+      expect(res.json).toHaveBeenCalledWith(body);
+    });
+
     it('should convert Google response and extract usage', async () => {
       const { res } = mockResponse();
       const client = mockProviderClient();

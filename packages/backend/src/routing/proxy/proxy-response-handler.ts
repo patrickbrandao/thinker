@@ -808,7 +808,7 @@ export async function handleNonStreamResponse(
       );
     }
   } else {
-    responseBody = await forward.response.json();
+    responseBody = unwrapSuccessEnvelope(await forward.response.json());
     if (supportsReasoningContent(meta.provider, meta.model, reasoningCache?.modelCatalog)) {
       cacheReasoningContent(responseBody, reasoningCache, sessionKey);
     }
@@ -854,6 +854,21 @@ export async function handleNonStreamResponse(
   setHeaders(res, metaHeaders);
   res.json(responseBody);
   return streamUsage;
+}
+
+/**
+ * ClinePass wraps non-streaming chat completions in a `{ data, success }`
+ * envelope, which strict OpenAI SDKs reject. Unwrap it only when the shape is
+ * unambiguous: a boolean `success`, no top-level `choices`, and a `data` object
+ * that is itself a chat completion.
+ */
+export function unwrapSuccessEnvelope(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const envelope = body as Record<string, unknown>;
+  if ('choices' in envelope || typeof envelope.success !== 'boolean') return body;
+  const data = envelope.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return body;
+  return Array.isArray((data as Record<string, unknown>).choices) ? data : body;
 }
 
 async function readNativeResponsesBody(response: Response): Promise<unknown> {

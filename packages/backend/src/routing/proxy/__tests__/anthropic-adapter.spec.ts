@@ -774,6 +774,34 @@ describe('Anthropic Adapter', () => {
       expect(content[0].content).toBe('{"result":"data"}');
     });
 
+    it('converts tool message content parts into tool_result blocks', () => {
+      const body = {
+        messages: [
+          {
+            role: 'tool',
+            tool_call_id: 'call_1',
+            content: [
+              { type: 'text', text: 'line 1' },
+              { type: 'text', text: 'line 2' },
+              { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+            ],
+          },
+        ],
+      };
+      const result = toAnthropicRequest(body, 'claude-sonnet-4-20250514');
+      const messages = result.messages as Array<{ role: string; content: unknown }>;
+      const content = messages[0].content as Array<Record<string, unknown>>;
+      expect(content[0]).toEqual({
+        type: 'tool_result',
+        tool_use_id: 'call_1',
+        content: [
+          { type: 'text', text: 'line 1' },
+          { type: 'text', text: 'line 2' },
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } },
+        ],
+      });
+    });
+
     it('converts tool message with null content', () => {
       const body = {
         messages: [{ role: 'tool', tool_call_id: 'call_1', content: null }],
@@ -1361,6 +1389,78 @@ describe('Anthropic Adapter', () => {
       expect(result).toContain('data: ');
       const data = JSON.parse(result!.replace('data: ', '').trim());
       expect(data.choices[0].delta.content).toBe('Hi');
+    });
+  });
+
+  describe('stop reasons and reasoning_content', () => {
+    it('maps refusal to content_filter', () => {
+      const resp = {
+        content: [{ type: 'text', text: 'I cannot help with that.' }],
+        stop_reason: 'refusal',
+      };
+      const result = fromAnthropicResponse(resp, 'claude-sonnet-4-20250514');
+      const choices = result.choices as Array<{ finish_reason: string }>;
+      expect(choices[0].finish_reason).toBe('content_filter');
+    });
+
+    it('maps model_context_window_exceeded to length', () => {
+      const resp = {
+        content: [{ type: 'text', text: 'truncated' }],
+        stop_reason: 'model_context_window_exceeded',
+      };
+      const result = fromAnthropicResponse(resp, 'claude-sonnet-4-20250514');
+      const choices = result.choices as Array<{ finish_reason: string }>;
+      expect(choices[0].finish_reason).toBe('length');
+    });
+
+    it.each([
+      ['refusal', 'content_filter'],
+      ['model_context_window_exceeded', 'length'],
+    ])('maps a streamed %s stop_reason to %s', (stopReason, finishReason) => {
+      const chunk = `event: message_delta\n{"type":"message_delta","delta":{"stop_reason":"${stopReason}"},"usage":{"output_tokens":4}}`;
+      const result = transformAnthropicStreamChunk(chunk, 'claude-sonnet-4-20250514');
+      const finish = JSON.parse(result!.split('\n\n')[0].replace('data: ', ''));
+      expect(finish.choices[0].finish_reason).toBe(finishReason);
+    });
+
+    it('joins thinking blocks into message.reasoning_content and skips redacted_thinking', () => {
+      const resp = {
+        content: [
+          { type: 'thinking', thinking: 'Step one. ', signature: 'sig1' },
+          { type: 'redacted_thinking', data: 'encrypted' },
+          { type: 'thinking', thinking: 'Step two.', signature: 'sig2' },
+          { type: 'text', text: 'Answer' },
+        ],
+        stop_reason: 'end_turn',
+      };
+      const result = fromAnthropicResponse(resp, 'claude-sonnet-4-20250514');
+      const choices = result.choices as Array<{ message: Record<string, unknown> }>;
+      expect(choices[0].message.reasoning_content).toBe('Step one. Step two.');
+      expect(choices[0].message.content).toBe('Answer');
+    });
+
+    it('omits reasoning_content when there is no readable thinking', () => {
+      const resp = { content: [{ type: 'text', text: 'Hi' }], stop_reason: 'end_turn' };
+      const result = fromAnthropicResponse(resp, 'claude-sonnet-4-20250514');
+      const choices = result.choices as Array<{ message: Record<string, unknown> }>;
+      expect(choices[0].message).not.toHaveProperty('reasoning_content');
+    });
+
+    it('streams thinking_delta as delta.reasoning_content and drops empty deltas', () => {
+      const transform = createAnthropicStreamTransformer('claude-sonnet-4-20250514');
+      transform(
+        'event: content_block_start\n{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}',
+      );
+      const out = transform(
+        'event: content_block_delta\n{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hmm"}}',
+      );
+      const parsed = JSON.parse(out!.replace('data: ', '').trim());
+      expect(parsed.choices[0].delta).toEqual({ reasoning_content: 'hmm' });
+      expect(
+        transform(
+          'event: content_block_delta\n{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}',
+        ),
+      ).toBeNull();
     });
   });
 
@@ -1992,17 +2092,17 @@ describe('Anthropic Adapter', () => {
           ),
         ).toBeNull();
 
-        // two thinking_delta events
+        // two thinking_delta events, each surfaced as reasoning_content
         expect(
           transform(
             'event: content_block_delta\n{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Let me "}}',
           ),
-        ).toBeNull();
+        ).toContain('"reasoning_content":"Let me "');
         expect(
           transform(
             'event: content_block_delta\n{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"reason."}}',
           ),
-        ).toBeNull();
+        ).toContain('"reasoning_content":"reason."');
 
         // signature_delta
         expect(

@@ -29,6 +29,7 @@ import { getZaiCodingPlanBaseUrl, normalizeZaiCodingPlanBaseUrl } from '../routi
 import { buildLocalServerHeaders, getLocalServerBaseUrl } from '../common/constants/local-servers';
 import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
 import { OpencodeGoCatalogService } from './opencode-go-catalog.service';
+import { PROVIDER_ENDPOINTS } from '../routing/proxy/provider-endpoints';
 import {
   buildKiroHeaders,
   KIRO_BASE_URL,
@@ -65,6 +66,9 @@ const OPENCODE_GO_MODELS_URL = 'https://opencode.ai/zen/go/v1/models';
 const PIONEER_MODELS_URL = 'https://api.pioneer.ai/v1/models';
 const PIONEER_BASE_MODELS_URL = 'https://api.pioneer.ai/base-models';
 const META_MODELS_URL = 'https://api.meta.ai/v1/models';
+// Same host the ClinePass inference endpoint uses, so discovery only talks to
+// the provider the operator configured (ADR 0003).
+const CLINE_PASS_RECOMMENDED_MODELS_URL = `${PROVIDER_ENDPOINTS['cline-pass'].baseUrl}/api/v1/ai/cline/recommended-models`;
 const COPILOT_AI_CREDIT_USD = 0.01;
 
 /* ── Generic parser factory ── */
@@ -1121,7 +1125,7 @@ export class ProviderModelFetcherService {
     } else if (configKey === 'opencode-go') {
       return this.fetchOpencodeGoModels(apiKey, options?.forceRefresh === true);
     } else if (configKey === 'cline-pass') {
-      return this.fetchClinePassKnownModels();
+      return this.fetchClinePassModels();
     } else if (configKey === 'gemini' && authType === 'subscription') {
       // CodeAssist (`cloudcode-pa.googleapis.com`) does not expose a
       // `/models` endpoint; the discovery fallback chain pulls Gemini
@@ -1511,11 +1515,10 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private fetchClinePassKnownModels(): DiscoveredModel[] {
-    const known = getSubscriptionKnownModels('cline-pass') ?? [];
+  private async fetchClinePassModels(): Promise<DiscoveredModel[]> {
     const contextWindow =
       getSubscriptionCapabilities('cline-pass')?.maxContextWindow ?? DEFAULT_CONTEXT_WINDOW;
-    return known.map((id) => ({
+    const toDiscovered = (id: string): DiscoveredModel => ({
       id,
       displayName: id,
       provider: 'cline-pass',
@@ -1525,6 +1528,46 @@ export class ProviderModelFetcherService {
       capabilityReasoning: true,
       capabilityCode: true,
       qualityScore: 3,
-    }));
+    });
+
+    const live = await this.fetchClinePassRecommendedModels();
+    if (live.length > 0) return live.map(toDiscovered);
+
+    // Fall back to the bundled list when the recommended-models endpoint is
+    // unreachable or lists no ClinePass entries.
+    const known = getSubscriptionKnownModels('cline-pass') ?? [];
+    return known.map(toDiscovered);
+  }
+
+  /**
+   * ClinePass publishes its current lineup at a public recommended-models
+   * endpoint on its own API host. The response is unauthenticated, so the
+   * operator's key is not sent.
+   */
+  private async fetchClinePassRecommendedModels(): Promise<string[]> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(CLINE_PASS_RECOMMENDED_MODELS_URL, { signal: controller.signal });
+      if (!res.ok) {
+        this.logger.warn(`cline-pass returned ${res.status} from recommended-models`);
+        return [];
+      }
+      const body = (await res.json()) as { clinePass?: unknown } | null;
+      const entries = body?.clinePass;
+      if (!Array.isArray(entries)) return [];
+      const ids = new Set<string>();
+      for (const entry of entries) {
+        const id = (entry as { id?: unknown } | null)?.id;
+        if (typeof id === 'string' && id.startsWith('cline-pass/')) ids.add(id);
+      }
+      return [...ids];
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to fetch cline-pass recommended models: ${message}`);
+      return [];
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

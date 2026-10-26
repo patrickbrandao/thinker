@@ -4,6 +4,7 @@ jest.mock('../../../common/utils/ssrf-safe-fetch', () => ({
 }));
 import { Buffer } from 'node:buffer';
 import { ProviderClient } from '../provider-client';
+import { messagesToChatCompletionsRequest } from '../anthropic-messages-adapter';
 import { buildCustomEndpoint, buildEndpointOverride } from '../provider-endpoints';
 import { ThinkingBlockCache, type ThinkingBlockRouteContext } from '../thinking-block-cache';
 import { ModelsDevReasoningCatalog } from '../reasoning-model-catalog';
@@ -763,6 +764,82 @@ describe('ProviderClient', () => {
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.max_completion_tokens).toBe(512);
       expect(sentBody.max_tokens).toBeUndefined();
+    });
+
+    describe('reasoning_effort on Bedrock Runtime GPT Chat Completions', () => {
+      // Runtime applies a default reasoning effort and then rejects it next to
+      // function tools (mnfst/llm-gateway#3065).
+      const tools = [
+        {
+          type: 'function',
+          function: { name: 'get_weather', parameters: { type: 'object', properties: {} } },
+        },
+      ];
+      const sentBodyFor = async (model: string, extra: Record<string, unknown>) => {
+        mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+        await client.forward({
+          provider: 'bedrock',
+          apiKey: 'bedrock-api-key-test',
+          model,
+          body: { ...body, ...extra },
+          stream: false,
+          apiMode: 'chat_completions',
+        });
+        return JSON.parse(mockFetch.mock.calls[0][1].body);
+      };
+
+      it('sends reasoning_effort none when function tools come without an effort', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', { tools });
+
+        expect(sent.reasoning_effort).toBe('none');
+        expect(sent.tools).toEqual(tools);
+      });
+
+      it('sends reasoning_effort none for an Anthropic Messages request with tools', async () => {
+        mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+        const messagesBody = {
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: 'Hello' }],
+          tools: [{ name: 'get_weather', input_schema: { type: 'object', properties: {} } }],
+        };
+        await client.forward({
+          provider: 'bedrock',
+          apiKey: 'bedrock-api-key-test',
+          model: 'us.openai.gpt-6-luna',
+          body: messagesBody,
+          resolveChatBody: async () => messagesToChatCompletionsRequest(messagesBody),
+          stream: false,
+          apiMode: 'messages',
+        });
+
+        expect(mockFetch.mock.calls[0][0]).toBe(
+          'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
+        );
+        const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+        expect(sent.tools[0].type).toBe('function');
+        expect(sent.reasoning_effort).toBe('none');
+      });
+
+      it.each([{ tools }, {}])('forwards the caller reasoning_effort (%o)', async (extra) => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', {
+          ...extra,
+          reasoning_effort: 'high',
+        });
+
+        expect(sent.reasoning_effort).toBe('high');
+      });
+
+      it('leaves reasoning_effort out when neither tools nor an effort are sent', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', {});
+
+        expect(sent.reasoning_effort).toBeUndefined();
+      });
+
+      it('leaves reasoning_effort out for Runtime models outside the GPT family', async () => {
+        const sent = await sentBodyFor('global.moonshotai.kimi-k3', { tools });
+
+        expect(sent.reasoning_effort).toBeUndefined();
+      });
     });
 
     it('keeps max_tokens for Bedrock Runtime models that accept it', async () => {
@@ -1647,6 +1724,86 @@ describe('ProviderClient', () => {
       expect((anthropicBody.tools[1] as Record<string, unknown>).cache_control).toBeUndefined();
       expect(result.wireFormat).toBe('anthropic_messages');
       expect(resolveChatBody).not.toHaveBeenCalled();
+    });
+
+    it('drops Anthropic provider-defined tools when forwarding Messages to a chat-completions provider (mnfst/llm-gateway#2754)', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      const anthropicBody = {
+        model: 'MiniMax-M2',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: 'find cats' }],
+        tools: [
+          { type: 'web_search_20250305', name: 'web_search' },
+          { type: 'bash_20250124', name: 'bash' },
+          {
+            name: 'lookup',
+            input_schema: { type: 'object', properties: { q: { type: 'string' } } },
+          },
+        ],
+        tool_choice: { type: 'tool', name: 'web_search' },
+      };
+      // What the routing layer derives from `anthropicBody` before forwarding.
+      const chatBody = {
+        model: 'MiniMax-M2',
+        messages: [{ role: 'user', content: 'find cats' }],
+        tools: [
+          { type: 'function', function: { name: 'web_search' } },
+          { type: 'function', function: { name: 'bash' } },
+          { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+        ],
+        tool_choice: { type: 'function', function: { name: 'web_search' } },
+      };
+
+      await client.forward({
+        provider: 'minimax',
+        apiKey: 'sk-test',
+        model: 'MiniMax-M2',
+        body: anthropicBody,
+        resolveChatBody: jest.fn().mockResolvedValue(chatBody),
+        stream: false,
+        apiMode: 'messages',
+      });
+
+      const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+      // Only the client tool the provider can actually run survives.
+      expect(sent.tools).toEqual([
+        { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+      ]);
+      // tool_choice pinned to a dropped tool is relaxed to auto.
+      expect(sent.tool_choice).toBe('auto');
+    });
+
+    it('omits the tools array entirely when every Anthropic tool is provider-executed', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      const anthropicBody = {
+        model: 'MiniMax-M2',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: 'find cats' }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        tool_choice: { type: 'any' },
+      };
+      const chatBody = {
+        model: 'MiniMax-M2',
+        messages: [{ role: 'user', content: 'find cats' }],
+        tools: [{ type: 'function', function: { name: 'web_search' } }],
+        tool_choice: 'required',
+      };
+
+      await client.forward({
+        provider: 'minimax',
+        apiKey: 'sk-test',
+        model: 'MiniMax-M2',
+        body: anthropicBody,
+        resolveChatBody: jest.fn().mockResolvedValue(chatBody),
+        stream: false,
+        apiMode: 'messages',
+      });
+
+      const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sent).not.toHaveProperty('tools');
+      expect(sent.tool_choice).toBe('auto');
     });
 
     it('still uses toAnthropicRequest for chat_completions inbound forwarded to an Anthropic upstream', async () => {
