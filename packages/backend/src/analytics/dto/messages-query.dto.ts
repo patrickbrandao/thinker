@@ -177,4 +177,13 @@ export class MessagesQueryDto {
   @IsBoolean()
   @Transform(({ value }) => value === true || value === 'true' || value === '1')
   include_filter_options?: boolean;
+
+  /**
+   * Drop requests made by the reserved Playground agent (`agents.is_playground`),
+   * as the Overview's Recent Requests panel does.
+   */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  exclude_playground?: boolean;
 }

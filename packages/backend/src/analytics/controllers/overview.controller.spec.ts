@@ -188,6 +188,16 @@ describe('OverviewController', () => {
     expect(ts.getActiveSkills).not.toHaveBeenCalled();
   });
 
+  it('returns only the model usage panel with the details filters', async () => {
+    ts.getCostByModel.mockResolvedValueOnce([{ model: 'gpt-5', tokens: 10 }]);
+    await expect(
+      controller.getOverviewModelUsage({ range: '7d', agent_name: 'bot' }, ctx as never),
+    ).resolves.toEqual({ cost_by_model: [{ model: 'gpt-5', tokens: 10 }] });
+    expect(ts.getCostByModel).toHaveBeenCalledWith('7d', 'tenant-123', 'bot', true, true);
+    expect(agg.getRequestReliability).not.toHaveBeenCalled();
+    expect(ts.getActiveSkills).not.toHaveBeenCalled();
+  });
+
   it('loads slow overview details independently', async () => {
     const requestItems = [{ id: 'request-1' }];
     const messagesQuery = { getMessages: jest.fn().mockResolvedValue({ items: requestItems }) };

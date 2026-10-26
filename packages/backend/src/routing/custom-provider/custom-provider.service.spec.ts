@@ -474,6 +474,17 @@ describe('CustomProviderService', () => {
         );
       });
 
+      it('turns a lost race on the name unique index into a 409', async () => {
+        const { svc, insert } = makeDeps({ findOneResults: [null] });
+        insert.mockRejectedValueOnce(
+          Object.assign(new Error('duplicate key'), {
+            code: '23505',
+            constraint: 'IDX_custom_providers_tenant_name',
+          }),
+        );
+        await expect(svc.create('tenant-1', dto)).rejects.toBeInstanceOf(ConflictException);
+      });
+
       it('rethrows other insert failures untouched', async () => {
         const { svc, insert } = makeDeps({ findOneResults: [null] });
         const boom = Object.assign(new Error('other index'), {
