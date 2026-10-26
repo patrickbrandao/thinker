@@ -14,7 +14,8 @@ const apiMocks = vi.hoisted(() => ({
   getGlobalProviders: vi.fn(),
   getGlobalProviderUsage: vi.fn(),
   getOverview: vi.fn(),
-  getOverviewDetails: vi.fn(),
+  getRecentRequests: vi.fn(),
+  getModelUsage: vi.fn(),
   getOverviewAgentUsage: vi.fn(),
   getOverviewProviderUsage: vi.fn(),
   navigate: vi.fn(),
@@ -23,6 +24,7 @@ const apiMocks = vi.hoisted(() => ({
 const sseMocks = vi.hoisted(() => ({
   bumpAgent: undefined as undefined | (() => void),
   bumpAnalytics: undefined as undefined | (() => void),
+  bumpMessage: undefined as undefined | (() => void),
   bumpRouting: undefined as undefined | (() => void),
   reset: undefined as undefined | (() => void),
 }));
@@ -55,6 +57,7 @@ vi.mock('../../src/services/api.js', async () => {
     getAgents: (...args: unknown[]) => apiMocks.getAgents(...args),
     getGlobalProviders: (...args: unknown[]) => apiMocks.getGlobalProviders(...args),
     getGlobalProviderUsage: (...args: unknown[]) => apiMocks.getGlobalProviderUsage(...args),
+    getRecentRequests: (...args: unknown[]) => apiMocks.getRecentRequests(...args),
     mergeUsage: providers.mergeUsage,
   };
 });
@@ -92,7 +95,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
       },
     ]),
   getOverview: (...args: unknown[]) => apiMocks.getOverview(...args),
-  getOverviewDetails: (...args: unknown[]) => apiMocks.getOverviewDetails(...args),
+  getModelUsage: (...args: unknown[]) => apiMocks.getModelUsage(...args),
   getOverviewAgentUsage: (...args: unknown[]) => apiMocks.getOverviewAgentUsage(...args),
   getOverviewProviderUsage: (...args: unknown[]) => apiMocks.getOverviewProviderUsage(...args),
   getAttemptStats: () =>
@@ -213,15 +216,18 @@ vi.mock('../../src/services/sse.js', async () => {
   const [agentPing, setAgentPing] = createSignal(0);
   const [analyticsPing, setAnalyticsPing] = createSignal(0);
   const [routingPing, setRoutingPing] = createSignal(0);
+  const [messagePing, setMessagePing] = createSignal(0);
   sseMocks.bumpAgent = () => setAgentPing((n) => n + 1);
   sseMocks.bumpAnalytics = () => setAnalyticsPing((n) => n + 1);
   sseMocks.bumpRouting = () => setRoutingPing((n) => n + 1);
+  sseMocks.bumpMessage = () => setMessagePing((n) => n + 1);
   sseMocks.reset = () => {
     setAgentPing(0);
     setAnalyticsPing(0);
     setRoutingPing(0);
+    setMessagePing(0);
   };
-  return { agentPing, analyticsPing, routingPing };
+  return { agentPing, analyticsPing, messagePing, routingPing };
 });
 
 vi.mock('../../src/services/scroll-fade.js', () => ({
@@ -328,7 +334,8 @@ beforeEach(() => {
   apiMocks.getGlobalProviders.mockResolvedValue(providersResponse);
   apiMocks.getGlobalProviderUsage.mockResolvedValue({ providers: [] });
   apiMocks.getOverview.mockResolvedValue(overviewResponse);
-  apiMocks.getOverviewDetails.mockResolvedValue({});
+  apiMocks.getRecentRequests.mockResolvedValue({ items: [] });
+  apiMocks.getModelUsage.mockResolvedValue({ cost_by_model: [] });
   apiMocks.getOverviewAgentUsage.mockResolvedValue(providerUsageTimeseries);
   apiMocks.getOverviewProviderUsage.mockResolvedValue(providerUsageTimeseries);
 });
@@ -346,7 +353,8 @@ describe('GlobalOverview filter onUnselectAll', () => {
     expect(apiMocks.getGlobalProviders).toHaveBeenCalledTimes(1);
     expect(apiMocks.getGlobalProviderUsage).toHaveBeenCalledTimes(1);
     expect(apiMocks.getOverviewProviderUsage).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(apiMocks.getOverviewDetails).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledTimes(1));
+    expect(apiMocks.getRecentRequests).toHaveBeenCalledTimes(1);
 
     sseMocks.bumpAnalytics?.();
 
@@ -355,7 +363,30 @@ describe('GlobalOverview filter onUnselectAll', () => {
     expect(apiMocks.getGlobalProviders).toHaveBeenCalledTimes(1);
     expect(apiMocks.getGlobalProviderUsage).toHaveBeenCalledTimes(2);
     expect(apiMocks.getOverviewProviderUsage).toHaveBeenCalledTimes(2);
-    expect(apiMocks.getOverviewDetails).toHaveBeenCalledTimes(1);
+    // Model usage is an aggregate: it refreshes at the analytics cadence.
+    await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledTimes(2));
+    // Recent Requests follows the message feed, not the analytics ping.
+    expect(apiMocks.getRecentRequests).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches only Recent Requests when a message SSE ping lands', async () => {
+    render(() => <GlobalOverview />);
+    await waitFor(() => expect(apiMocks.getRecentRequests).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledTimes(1));
+
+    sseMocks.bumpMessage?.();
+
+    await waitFor(() => expect(apiMocks.getRecentRequests).toHaveBeenCalledTimes(2));
+    expect(apiMocks.getModelUsage).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads Recent Requests and Model usage without waiting for the overview', async () => {
+    apiMocks.getOverview.mockReturnValue(new Promise(() => {}));
+    render(() => <GlobalOverview />);
+
+    await waitFor(() => expect(apiMocks.getRecentRequests).toHaveBeenCalledWith('7d'));
+    await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledWith('7d'));
   });
 
   it('shows the skeleton on a range change but not on a background ping refetch', async () => {
