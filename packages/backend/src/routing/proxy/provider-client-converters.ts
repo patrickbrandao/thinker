@@ -154,9 +154,11 @@ const OPENAI_MAX_COMPLETION_TOKENS_RE = /^(o\d|gpt-5)/i;
  * Endpoints that ultimately hit OpenAI infrastructure and therefore need
  * `max_tokens` rewritten to `max_completion_tokens` for o-series / GPT-5+.
  * Copilot belongs here because GitHub Copilot proxies these models to OpenAI
- * (issue mnfst/llm-gateway#1849).
+ * (issue mnfst/llm-gateway#1849). Custom OpenAI-compatible endpoints (Azure
+ * AI Foundry, vLLM, LiteLLM) serving these models reject `max_tokens` the same
+ * way (mnfst/llm-gateway#2415).
  */
-const OPENAI_MAX_COMPLETION_TOKENS_ENDPOINTS = new Set(['openai', 'copilot']);
+const OPENAI_MAX_COMPLETION_TOKENS_ENDPOINTS = new Set(['openai', 'copilot', 'custom']);
 
 function usesOpenAiMaxCompletionTokens(endpointKey: string, bareModel: string): boolean {
   return (

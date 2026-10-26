@@ -814,6 +814,27 @@ describe('provider-client-converters', () => {
       expect(result).toHaveProperty('max_tokens', 1000);
     });
 
+    it.each(['gpt-5.2', 'o3-mini', 'azure/gpt-5-mini'])(
+      'converts max_tokens to max_completion_tokens for custom endpoints serving %s',
+      (model) => {
+        const body = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: 4096 };
+
+        const result = sanitizeOpenAiBody(body, 'custom', model);
+
+        expect(result).toHaveProperty('max_completion_tokens', 4096);
+        expect(result).not.toHaveProperty('max_tokens');
+      },
+    );
+
+    it('keeps max_tokens for custom endpoints serving other models', () => {
+      const body = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: 4096 };
+
+      const result = sanitizeOpenAiBody(body, 'custom', 'llama-3.3-70b');
+
+      expect(result).toHaveProperty('max_tokens', 4096);
+      expect(result).not.toHaveProperty('max_completion_tokens');
+    });
+
     it('should not convert max_tokens for non-OpenAI providers', () => {
       const body = {
         messages: [{ role: 'user', content: 'Hi' }],
