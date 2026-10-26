@@ -66,30 +66,26 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/solid-js') || id.includes('node_modules/@solidjs/')) {
-            return 'vendor';
-          }
-          if (id.includes('node_modules/uplot')) {
-            return 'charts';
-          }
-          if (id.includes('node_modules/better-auth')) {
-            return 'auth';
-          }
-          // Syntax highlighting (highlight.js) is only pulled in by the
-          // recorded-message viewer. Pin it to a stable named chunk so it
-          // caches independently of the route chunks that lazy-load it.
-          if (id.includes('node_modules/highlight.js')) {
-            return 'syntax';
-          }
-          // Markdown rendering (marked + dompurify) is shared across the
-          // few surfaces that render model output. A dedicated chunk keeps
-          // its hash stable across route-chunk changes.
-          if (id.includes('node_modules/marked') || id.includes('node_modules/dompurify')) {
-            return 'markdown';
-          }
+        // Named chunks for the heavy third-party libraries. Their names stay
+        // stable across releases so browsers keep them cached while the route
+        // chunks churn. Each group also pulls in the module's own transitive
+        // dependencies (Rolldown's `includeDependenciesRecursively` default).
+        codeSplitting: {
+          groups: [
+            { name: 'vendor', test: /node_modules[\\/](solid-js|@solidjs)[\\/]/ },
+            { name: 'charts', test: /node_modules[\\/]uplot[\\/]/ },
+            { name: 'auth', test: /node_modules[\\/]better-auth[\\/]/ },
+            // Syntax highlighting (highlight.js) is only pulled in by the
+            // recorded-message viewer. Pin it to a stable named chunk so it
+            // caches independently of the route chunks that lazy-load it.
+            { name: 'syntax', test: /node_modules[\\/]highlight\.js[\\/]/ },
+            // Markdown rendering (marked + dompurify) is shared across the
+            // few surfaces that render model output. A dedicated chunk keeps
+            // its hash stable across route-chunk changes.
+            { name: 'markdown', test: /node_modules[\\/](marked|dompurify)[\\/]/ },
+          ],
         },
       },
     },
