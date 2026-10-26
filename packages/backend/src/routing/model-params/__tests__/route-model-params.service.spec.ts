@@ -46,6 +46,7 @@ function setup(
     tiers?: unknown[];
     headerTiers?: unknown[];
     virtualModels?: unknown[];
+    catalog?: unknown[];
     saved?: Record<string, unknown> | null;
   } = {},
 ) {
@@ -96,14 +97,18 @@ function setup(
         model === 'gpt-5' ? gpt5Specs : [],
       ),
   };
+  const discovery = {
+    getModelsForAgent: jest.fn().mockResolvedValue(overrides.catalog ?? []),
+  };
   const service = new RouteModelParamsService(
     tiers as never,
     headerTiers as never,
     virtualModels as never,
     modelParams as never,
     specs as never,
+    discovery as never,
   );
-  return { service, tiers, headerTiers, virtualModels, modelParams, specs };
+  return { service, tiers, headerTiers, virtualModels, modelParams, specs, discovery };
 }
 
 describe('RouteModelParamsService.get', () => {
@@ -468,5 +473,110 @@ describe('RouteModelParamsService with a virtual model target', () => {
       'subscription',
       'claude-sonnet',
     );
+  });
+});
+
+describe('RouteModelParamsService model names', () => {
+  const CUSTOM = { provider: 'custom:abc', authType: 'api_key', model: 'custom:abc/gpt-4o' };
+  const OPENAI = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
+  const CATALOG = [
+    {
+      id: 'custom:abc/gpt-4o',
+      provider: 'custom:abc',
+      providerAlias: 'fake2',
+      authType: 'api_key',
+    },
+    { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+  ];
+  const withChain = (primary: unknown, fallbacks: unknown[] = []) =>
+    setup({
+      catalog: CATALOG,
+      virtualModels: [
+        {
+          id: 'vm1',
+          name: 'flash',
+          enabled: true,
+          override_route: primary,
+          fallback_routes: fallbacks,
+        },
+      ],
+    });
+
+  it('accepts the public id, the native id and the stored id of a custom provider route', async () => {
+    const { service, modelParams, discovery } = withChain(OPENAI, [CUSTOM]);
+    for (const name of ['fake2/gpt-4o', 'custom:abc/gpt-4o']) {
+      const view = await service.get(AGENT, { virtual: 'flash' }, name, 'tenant-1');
+      expect(view.route).toEqual(CUSTOM);
+      expect(view.public_model).toBe('fake2/gpt-4o');
+    }
+    expect(discovery.getModelsForAgent).toHaveBeenCalledWith('tenant-1', AGENT);
+    expect(modelParams.get).toHaveBeenLastCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'custom:abc',
+      'api_key',
+      'custom:abc/gpt-4o',
+    );
+
+    const only = withChain(CUSTOM);
+    const view = await only.service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(CUSTOM);
+  });
+
+  it('lists public ids next to the stored ones', async () => {
+    const { service } = withChain(OPENAI, [CUSTOM]);
+    const view = await service.get(AGENT, { virtual: 'flash' }, undefined, 'tenant-1');
+    expect(view.models).toEqual(['gpt-4o', 'custom:abc/gpt-4o']);
+    expect(view.public_models).toEqual(['openai/gpt-4o', 'fake2/gpt-4o']);
+    expect(view.public_model).toBe('openai/gpt-4o');
+  });
+
+  it('treats a native id two connections share as ambiguous, and the public ids as exact', async () => {
+    const { service } = withChain(OPENAI, [CUSTOM]);
+    await expect(service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).rejects.toThrow(
+      /more than one connection in virtual model "flash"; name it by its public id \(openai\/gpt-4o, fake2\/gpt-4o\)/,
+    );
+    const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(OPENAI);
+  });
+
+  it('names the public ids in the not-routed error', async () => {
+    const { service } = withChain(CUSTOM);
+    await expect(service.get(AGENT, { virtual: 'flash' }, 'nope', 'tenant-1')).rejects.toThrow(
+      'Model "nope" is not routed by virtual model "flash". Models: custom:abc/gpt-4o (fake2/gpt-4o)',
+    );
+  });
+
+  it('applies to tiers too, and writes under the stored id', async () => {
+    const { service, modelParams } = setup({
+      catalog: CATALOG,
+      tiers: [{ tier: 'default', override_route: CUSTOM, fallback_routes: [] }],
+    });
+    await service
+      .update(AGENT, 'default', 'fake2/gpt-4o', { unset: ['legacy'] }, 'tenant-1')
+      .catch(() => undefined);
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'tier:default',
+      'custom:abc',
+      'api_key',
+      'custom:abc/gpt-4o',
+    );
+  });
+
+  it('without a tenant, an alias cannot resolve but route-derived names still do', async () => {
+    const { service, discovery } = withChain(CUSTOM);
+    await expect(service.get(AGENT, { virtual: 'flash' }, 'fake2/gpt-4o')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect((await service.get(AGENT, { virtual: 'flash' }, 'gpt-4o')).route).toEqual(CUSTOM);
+    expect(discovery.getModelsForAgent).not.toHaveBeenCalled();
+  });
+
+  it('keeps working when the catalog cannot be read', async () => {
+    const { service, discovery } = withChain(OPENAI);
+    discovery.getModelsForAgent.mockRejectedValueOnce(new Error('db down'));
+    const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(OPENAI);
   });
 });

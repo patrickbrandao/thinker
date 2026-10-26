@@ -25,6 +25,9 @@ import {
   readOverrideRoute,
 } from '../routing-core/route-helpers';
 import { normalizeProviderModel } from '../../common/utils/anthropic-model-id';
+import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
+import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
+import { openAiModelId } from '../routing-core/public-model-id';
 import { sanitizeModelParams } from './sanitize-model-params';
 
 export const DEFAULT_TIER_NAME = 'default';
@@ -53,8 +56,12 @@ export interface RouteModelParamsView {
   /** Set when the target is a virtual model: its name as stored. */
   virtual?: string;
   route: { provider: string; authType: AuthType; model: string };
+  /** The public id of `route` (as `/v1/models` publishes it), e.g. `<alias>/<model>`. */
+  public_model: string;
   /** Every model the tier or virtual model routes to, primary first — the valid `model` inputs. */
   models: string[];
+  /** The public ids of `models`, in the same order; also valid `model` inputs. */
+  public_models: string[];
   params: RouteModelParamView[];
 }
 
@@ -67,6 +74,8 @@ interface ResolvedRoute {
   /** The id the proxy forwards; specs are catalogued under it (see normalizeProviderModel). */
   paramsModel: string;
   models: string[];
+  publicModel: string;
+  publicModels: string[];
 }
 
 interface RouteFamily {
@@ -75,6 +84,48 @@ interface RouteFamily {
   scope: string;
   primary: ModelRoute | null;
   fallbacks: ModelRoute[];
+}
+
+/**
+ * The public id of a stored route: `openAiModelId` of its catalog entry
+ * (`<alias>/<model>` for an aliased custom provider, `<provider>/<model>`
+ * otherwise). A route the catalog no longer lists gets the id derived from
+ * the route alone, which is the same except for a custom provider's alias.
+ */
+function publicModelId(route: ModelRoute, catalog: readonly DiscoveredModel[]): string {
+  const provider = route.provider.toLowerCase();
+  const entry = catalog.find(
+    (m) =>
+      m.provider.toLowerCase() === provider &&
+      m.authType === route.authType &&
+      m.id === route.model,
+  );
+  return openAiModelId(
+    entry ??
+      ({ id: route.model, provider: route.provider, authType: route.authType } as DiscoveredModel),
+  );
+}
+
+/**
+ * Every name a caller may use for a route's model: the stored id, the public
+ * id, and the native id with and without its provider prefix (for a custom
+ * provider, the model name after `custom:<id>/`). Anthropic short ids
+ * normalize as before.
+ */
+function routeModelNames(route: ModelRoute, publicId: string): Set<string> {
+  const provider = route.provider.toLowerCase();
+  const prefix = `${route.provider}/`;
+  const names = new Set([route.model, publicId]);
+  if (provider.startsWith('custom:')) {
+    if (route.model.startsWith(prefix)) names.add(route.model.slice(prefix.length));
+  } else {
+    const native = route.model.toLowerCase().startsWith(`${provider}/`)
+      ? route.model.slice(provider.length + 1)
+      : route.model;
+    names.add(native);
+    names.add(`${provider}/${native}`);
+  }
+  return names;
 }
 
 /**
@@ -92,15 +143,22 @@ export class RouteModelParamsService {
     private readonly virtualModels: VirtualModelService,
     private readonly modelParams: AgentModelParamsService,
     private readonly specs: ProviderParamSpecService,
+    private readonly discovery: ModelDiscoveryService,
   ) {}
 
-  /** `target` is a tier name (the default tier when omitted) or `{ virtual }`. */
+  /**
+   * `target` is a tier name (the default tier when omitted) or `{ virtual }`.
+   * `model` may be the stored, public or native id of one of the routes.
+   * `tenantId` lets public ids of aliased custom providers resolve (they need
+   * the agent's catalog); without it only route-derived names match.
+   */
   async get(
     agentId: string,
     target: string | RouteParamsTarget = DEFAULT_TIER_NAME,
     model?: string,
+    tenantId?: string,
   ): Promise<RouteModelParamsView> {
-    const resolved = await this.resolve(agentId, target, model);
+    const resolved = await this.resolve(agentId, target, model, tenantId);
     const specs = await this.specsFor(resolved);
     return this.view(agentId, resolved, specs);
   }
@@ -110,6 +168,7 @@ export class RouteModelParamsService {
     target: string | RouteParamsTarget | undefined,
     model: string | undefined,
     change: RouteModelParamsChange,
+    tenantId?: string,
   ): Promise<RouteModelParamsView> {
     const setEntries = Object.entries(change.set ?? {});
     const unset = change.unset ?? [];
@@ -121,7 +180,7 @@ export class RouteModelParamsService {
       if (!isProviderParamPath(path)) throw new BadRequestException(`Invalid param path "${path}"`);
     }
 
-    const resolved = await this.resolve(agentId, target ?? DEFAULT_TIER_NAME, model);
+    const resolved = await this.resolve(agentId, target ?? DEFAULT_TIER_NAME, model, tenantId);
     const { route, scope } = resolved;
     const specs = await this.specsFor(resolved);
     const saved = (await this.savedParams(agentId, resolved)) ?? {};
@@ -166,6 +225,7 @@ export class RouteModelParamsService {
     agentId: string,
     target: string | RouteParamsTarget,
     model?: string,
+    tenantId?: string,
   ): Promise<ResolvedRoute> {
     const family =
       typeof target === 'string'
@@ -177,6 +237,13 @@ export class RouteModelParamsService {
     const label = kind === 'virtual' ? `virtual model "${name}"` : `tier "${name}"`;
     const routes = [primary, ...fallbacks].filter((r): r is ModelRoute => r !== null);
     const models = [...new Set(routes.map((r) => r.model))];
+    const catalog =
+      tenantId && routes.length > 0
+        ? await this.discovery.getModelsForAgent(tenantId, agentId).catch(() => [])
+        : [];
+    const publicIds = new Map(routes.map((r) => [r, publicModelId(r, catalog)]));
+    const publicModels = models.map((m) => publicIds.get(routes.find((r) => r.model === m)!) ?? m);
+    const ids = { models, publicModels, publicIds };
 
     if (model === undefined) {
       if (!primary) {
@@ -187,28 +254,45 @@ export class RouteModelParamsService {
               : ''),
         );
       }
-      return this.resolved(family, primary, models);
+      return this.resolved(family, primary, ids);
     }
 
+    // One pass over every accepted name, so a native id that two connections
+    // share is reported as ambiguous instead of picking one.
     const wanted = (r: ModelRoute) => normalizeProviderModel(r.provider, model);
     const matches = routes.filter(
-      (r) => r.model === model || normalizeProviderModel(r.provider, r.model) === wanted(r),
+      (r) =>
+        routeModelNames(r, publicIds.get(r)!).has(model) ||
+        normalizeProviderModel(r.provider, r.model) === wanted(r),
     );
     if (matches.length === 0) {
+      // A custom provider's stored id is an internal key: show the public
+      // id the operator knows next to it.
+      const listed = models.map((m, i) =>
+        m.startsWith('custom:') && publicModels[i] !== m ? `${m} (${publicModels[i]})` : m,
+      );
       throw new BadRequestException(
-        `Model "${model}" is not routed by ${label}. Models: ${models.join(', ')}`,
+        `Model "${model}" is not routed by ${label}. Models: ${listed.join(', ')}`,
       );
     }
     const connections = new Set(matches.map((r) => `${r.provider.toLowerCase()}|${r.authType}`));
     if (connections.size > 1) {
+      const options = [...new Set(matches.map((r) => publicIds.get(r)!))];
       throw new BadRequestException(
-        `Model "${model}" is routed through more than one connection in ${label}; set its params from the dashboard`,
+        `Model "${model}" is routed through more than one connection in ${label}; ` +
+          (options.length > 1
+            ? `name it by its public id (${options.join(', ')})`
+            : 'set its params from the dashboard'),
       );
     }
-    return this.resolved(family, matches[0], models);
+    return this.resolved(family, matches[0], ids);
   }
 
-  private resolved(family: RouteFamily, route: ModelRoute, models: string[]): ResolvedRoute {
+  private resolved(
+    family: RouteFamily,
+    route: ModelRoute,
+    ids: { models: string[]; publicModels: string[]; publicIds: Map<ModelRoute, string> },
+  ): ResolvedRoute {
     const paramsModel = normalizeProviderModel(route.provider, route.model);
     return {
       kind: family.kind,
@@ -216,7 +300,9 @@ export class RouteModelParamsService {
       scope: family.scope,
       route,
       paramsModel,
-      models,
+      models: ids.models,
+      publicModel: ids.publicIds.get(route) ?? route.model,
+      publicModels: ids.publicModels,
     };
   }
 
@@ -296,7 +382,9 @@ export class RouteModelParamsService {
     return {
       ...(resolved.kind === 'virtual' ? { virtual: resolved.name } : { tier: resolved.name }),
       route: { provider, authType, model },
+      public_model: resolved.publicModel,
       models: resolved.models,
+      public_models: resolved.publicModels,
       params: specs.map(
         ({ provider: _p, authType: _a, model: _m, ...definition }): RouteModelParamView => ({
           ...definition,

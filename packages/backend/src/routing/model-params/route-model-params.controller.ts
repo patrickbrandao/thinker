@@ -34,7 +34,7 @@ export class RouteModelParamsController {
     @Query() query: TierModelParamsQueryDto,
   ): Promise<RouteModelParamsView> {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.routeParams.get(agent.id, params.tier, query.model);
+    return this.routeParams.get(agent.id, params.tier, query.model, agent.tenant_id);
   }
 
   @Patch(':agentName/tiers/:tier/model-params')
@@ -45,10 +45,16 @@ export class RouteModelParamsController {
     @Body() body: UpdateTierModelParamsBodyDto,
   ): Promise<RouteModelParamsView> {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.routeParams.update(agent.id, params.tier, query.model, {
-      set: body.set,
-      unset: body.unset,
-    });
+    return this.routeParams.update(
+      agent.id,
+      params.tier,
+      query.model,
+      {
+        set: body.set,
+        unset: body.unset,
+      },
+      agent.tenant_id,
+    );
   }
 
   @Get(':agentName/virtual-model-params')
@@ -58,7 +64,7 @@ export class RouteModelParamsController {
     @Query() query: VirtualModelParamsQueryDto,
   ): Promise<RouteModelParamsView> {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.routeParams.get(agent.id, { virtual: query.virtual }, query.model);
+    return this.routeParams.get(agent.id, { virtual: query.virtual }, query.model, agent.tenant_id);
   }
 
   @Patch(':agentName/virtual-model-params')
@@ -69,9 +75,15 @@ export class RouteModelParamsController {
     @Body() body: UpdateTierModelParamsBodyDto,
   ): Promise<RouteModelParamsView> {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.routeParams.update(agent.id, { virtual: query.virtual }, query.model, {
-      set: body.set,
-      unset: body.unset,
-    });
+    return this.routeParams.update(
+      agent.id,
+      { virtual: query.virtual },
+      query.model,
+      {
+        set: body.set,
+        unset: body.unset,
+      },
+      agent.tenant_id,
+    );
   }
 }

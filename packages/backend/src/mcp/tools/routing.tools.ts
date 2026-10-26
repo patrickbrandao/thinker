@@ -250,7 +250,7 @@ export function registerRoutingTools(
         (async () => {
           const target = paramsTarget(tier, virtual);
           const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-          return deps.routeModelParams.get(agent.id, target, model);
+          return deps.routeModelParams.get(agent.id, target, model, agent.tenant_id);
         })(),
       ),
   );
@@ -281,10 +281,13 @@ export function registerRoutingTools(
           (async () => {
             const target = paramsTarget(tier, virtual);
             const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-            return deps.routeModelParams.update(agent.id, target, model, {
-              set: set as Record<string, JsonValue> | undefined,
-              unset,
-            });
+            return deps.routeModelParams.update(
+              agent.id,
+              target,
+              model,
+              { set: set as Record<string, JsonValue> | undefined, unset },
+              agent.tenant_id,
+            );
           })(),
         ),
     );

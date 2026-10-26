@@ -60,6 +60,11 @@ const CATALOG: DiscoveredModel[] = [
   model('gpt-4o', 'openai', 128000),
   model('gpt-4o-mini', 'openai', 128000),
   model('deepseek-chat', 'deepseek', 64000),
+  // A custom provider published under its alias as `fake2/deepseek-chat`.
+  {
+    ...model('custom:cp-1/deepseek-chat', 'custom:cp-1', 128000),
+    providerAlias: 'fake2',
+  } as DiscoveredModel,
 ];
 
 function operator(tenantId = TEST_TENANT_ID): McpOperator {
@@ -423,5 +428,62 @@ describe('MCP virtual model tools', () => {
       error: true,
       text: 'Virtual model "deepseek/flash" not found for "test-agent" (it has no virtual models)',
     });
+  });
+
+  it('addresses a model of the chain by its public or native id', async () => {
+    const created = await call('thinker_routing_virtual_create', {
+      agent: 'test-agent',
+      name: 'aliased',
+      model: 'fake2/deepseek-chat',
+      fallbacks: ['deepseek/deepseek-chat'],
+    });
+    expect(created.error).toBe(false);
+    expect(created.data).toMatchObject({
+      virtual_model: {
+        override_route: { provider: 'custom:cp-1', model: 'custom:cp-1/deepseek-chat' },
+        fallback_routes: [{ provider: 'deepseek', model: 'deepseek-chat' }],
+      },
+    });
+
+    const byPublic = await api()
+      .get(`${BASE}/virtual-model-params`)
+      .query({ virtual: 'aliased', model: 'fake2/deepseek-chat' })
+      .set('x-api-key', TEST_API_KEY)
+      .expect(200);
+    expect(byPublic.body).toMatchObject({
+      route: { provider: 'custom:cp-1', model: 'custom:cp-1/deepseek-chat' },
+      public_model: 'fake2/deepseek-chat',
+      models: ['custom:cp-1/deepseek-chat', 'deepseek-chat'],
+      public_models: ['fake2/deepseek-chat', 'deepseek/deepseek-chat'],
+    });
+
+    const byStored = await call('thinker_routing_params_get', {
+      agent: 'test-agent',
+      virtual: 'aliased',
+      model: 'custom:cp-1/deepseek-chat',
+    });
+    expect(byStored.data).toMatchObject({ public_model: 'fake2/deepseek-chat' });
+
+    // The bare native id names both connections of this chain.
+    const ambiguous = await call('thinker_routing_params_get', {
+      agent: 'test-agent',
+      virtual: 'aliased',
+      model: 'deepseek-chat',
+    });
+    expect(ambiguous.error).toBe(true);
+    expect(ambiguous.text).toContain('name it by its public id (fake2/deepseek-chat, deepseek/deepseek-chat)');
+
+    const native = await call('thinker_routing_params_set', {
+      agent: 'test-agent',
+      virtual: 'aliased',
+      model: 'deepseek/deepseek-chat',
+      set: { temperature: 0.4 },
+    });
+    expect(native.error).toBe(false);
+    const rows = await ds.query(
+      `SELECT provider, model_name FROM agent_model_params WHERE agent_id = $1 AND scope_key LIKE 'virtual:%'`,
+      [TEST_AGENT_ID],
+    );
+    expect(rows).toEqual([{ provider: 'deepseek', model_name: 'deepseek-chat' }]);
   });
 });

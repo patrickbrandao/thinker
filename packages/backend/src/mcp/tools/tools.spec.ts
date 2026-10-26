@@ -623,7 +623,7 @@ describe('MCP tools', () => {
         model: 'gpt-5',
       });
       expect(got.data).toEqual({ tier: 'default', params: [] });
-      expect(deps.routeModelParams.get).toHaveBeenCalledWith('agent-1', 'deep', 'gpt-5');
+      expect(deps.routeModelParams.get).toHaveBeenCalledWith('agent-1', 'deep', 'gpt-5', TENANT);
 
       const set = await call(tools, 'thinker_routing_params_set', {
         agent: 'demo',
@@ -633,10 +633,13 @@ describe('MCP tools', () => {
         unset: ['temperature'],
       });
       expect(set.error).toBe(false);
-      expect(deps.routeModelParams.update).toHaveBeenCalledWith('agent-1', 'deep', 'gpt-5', {
-        set: { 'reasoning.effort': 'high' },
-        unset: ['temperature'],
-      });
+      expect(deps.routeModelParams.update).toHaveBeenCalledWith(
+        'agent-1',
+        'deep',
+        'gpt-5',
+        { set: { 'reasoning.effort': 'high' }, unset: ['temperature'] },
+        TENANT,
+      );
     });
 
     it('addresses model params by virtual model, exclusive with tier', async () => {
@@ -651,6 +654,7 @@ describe('MCP tools', () => {
         'agent-1',
         { virtual: 'deepseek/flash' },
         undefined,
+        TENANT,
       );
 
       await call(tools, 'thinker_routing_params_set', {
@@ -664,6 +668,7 @@ describe('MCP tools', () => {
         { virtual: 'deepseek/flash' },
         'gpt-4o',
         { set: { temperature: 0.2 }, unset: undefined },
+        TENANT,
       );
 
       const both = await call(tools, 'thinker_routing_params_get', {
