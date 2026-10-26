@@ -185,6 +185,31 @@ export function chainContextLength(
   responseMode: ResponseMode | null | undefined,
   catalog: readonly DiscoveredModel[],
 ): number | null {
+  const window = chainContextWindow(chain, responseMode, catalog);
+  return window.kind === 'known' ? window.value : null;
+}
+
+/**
+ * What one catalog snapshot says about the context window of a chain:
+ * - `known`: every route that could serve the request has a known window,
+ *   and `value` is the smallest;
+ * - `unknown`: some such route has an unknown window or unknown availability;
+ * - `empty`: no route is left after the availability and transport filters.
+ */
+export type ChainContextWindow =
+  { kind: 'known'; value: number } | { kind: 'unknown' } | { kind: 'empty' };
+
+/**
+ * chainContextLength with "no route left" and "window unknown" kept apart,
+ * for callers that combine several chains: the `auto` entry of `/v1/models`
+ * with complexity routing on skips a destination that cannot serve a request,
+ * but must not skip one whose window it cannot judge.
+ */
+export function chainContextWindow(
+  chain: readonly ModelRoute[],
+  responseMode: ResponseMode | null | undefined,
+  catalog: readonly DiscoveredModel[],
+): ChainContextWindow {
   const candidates: Array<{ route: ModelRoute; state: SnapshotRouteState }> = [];
   for (const route of chain) {
     const state = snapshotRouteState(route, catalog);
@@ -195,13 +220,47 @@ export function chainContextLength(
   const routes = effective.primaryRoute
     ? [effective.primaryRoute, ...(effective.fallbackRoutes ?? [])]
     : [];
-  if (routes.length === 0) return null;
+  if (routes.length === 0) return { kind: 'empty' };
 
   let min = Infinity;
   for (const route of routes) {
     const state = candidates.find((c) => c.route === route)!.state;
-    if (state.state !== 'available' || state.contextWindow === null) return null;
+    if (state.state !== 'available' || state.contextWindow === null) return { kind: 'unknown' };
     if (state.contextWindow < min) min = state.contextWindow;
   }
-  return min;
+  return { kind: 'known', value: min };
+}
+
+/**
+ * Whether a tier's override counts as available when only a catalog snapshot
+ * is at hand (see tierChainRoutes). An override the snapshot cannot judge
+ * counts as reachable: the legacy auto-assigned route then stays out, and the
+ * unknown route makes the context window unknown (the conservative answer).
+ */
+export function snapshotOverrideAvailable(
+  route: ModelRoute,
+  catalog: readonly DiscoveredModel[],
+): boolean {
+  return snapshotRouteState(route, catalog).state !== 'unavailable';
+}
+
+/**
+ * ADR 0004, section 7: `context_length` of a virtual model from one catalog
+ * snapshot. The chain is the virtual model's own plus, with
+ * `continue_on_default`, the Default tier's, filtered with the virtual
+ * model's response mode.
+ */
+export async function virtualModelContextLength(
+  virtualModel: VirtualModelChainSource & Pick<VirtualModel, 'response_mode'>,
+  defaultTier: DefaultTierChainSource | null | undefined,
+  catalog: readonly DiscoveredModel[],
+): Promise<number | null> {
+  const chain = await buildVirtualModelChain(virtualModel, defaultTier, {
+    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, catalog),
+  });
+  return chainContextLength(
+    chain.map((entry) => entry.route),
+    virtualModel.response_mode,
+    catalog,
+  );
 }

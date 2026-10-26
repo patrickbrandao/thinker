@@ -36,10 +36,8 @@ import {
 } from '../routing-core/resolve-model-route';
 import { assertStreamableResponseMode } from '../routing-core/response-mode-guard';
 import {
-  buildVirtualModelChain,
-  chainContextLength,
   computeShadows,
-  snapshotRouteState,
+  virtualModelContextLength,
   type DefaultTierChainSource,
 } from './virtual-model-chain';
 
@@ -397,13 +395,8 @@ export class VirtualModelService {
     const defaultTier = rows.some((r) => r.continue_on_default)
       ? await this.defaultTier(agentId)
       : null;
-    // An override whose availability the snapshot cannot judge counts as
-    // reachable: the legacy auto-assigned route stays out, and the unknown
-    // route makes context_length null (the conservative answer).
-    const isDefaultOverrideAvailable = (route: ModelRoute) =>
-      snapshotRouteState(route, catalog).state !== 'unavailable';
-    const chains = await Promise.all(
-      rows.map((row) => buildVirtualModelChain(row, defaultTier, { isDefaultOverrideAvailable })),
+    const contextLengths = await Promise.all(
+      rows.map((row) => virtualModelContextLength(row, defaultTier, catalog)),
     );
     return rows.map((row, i) => ({
       id: row.id,
@@ -419,11 +412,7 @@ export class VirtualModelService {
       created_at: row.created_at,
       updated_at: row.updated_at,
       shadows: computeShadows(row.name, catalog),
-      context_length: chainContextLength(
-        chains[i].map((entry) => entry.route),
-        row.response_mode,
-        catalog,
-      ),
+      context_length: contextLengths[i],
     }));
   }
 

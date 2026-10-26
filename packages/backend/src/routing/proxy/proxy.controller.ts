@@ -69,6 +69,10 @@ import {
   createAttemptRecordingCapture,
   recordingResponseFromText,
 } from './attempt-recording-capture';
+import {
+  ModelListRoutingService,
+  type ModelListRouting,
+} from '../virtual-models/model-list-routing.service';
 
 const MAX_SEEN_TENANTS = 10_000;
 const SEEN_TENANT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -79,6 +83,12 @@ interface OpenAiModelObject {
   object: 'model';
   created: number;
   owned_by: string;
+  /**
+   * Smallest context window (tokens) among the routes the entry can be
+   * served by. Published only for `auto` and virtual models, and omitted
+   * when any of those windows is unknown (ADR 0004, section 7).
+   */
+  context_length?: number;
   provider_model_id?: string;
   auth_type?: string;
   capabilities?: OpenAiModelCapabilities;
@@ -140,6 +150,10 @@ export class ProxyController {
     private readonly recordingConfig?: AgentRecordingConfigService,
     @Optional()
     private readonly attemptRecording?: AttemptRecordingService,
+    // Always provided by ProxyModule (VirtualModelsModule). Optional only so
+    // unit tests that build the controller by hand keep the plain listing.
+    @Optional()
+    private readonly modelListRouting?: ModelListRoutingService,
   ) {}
 
   @Get('models')
@@ -152,25 +166,37 @@ export class ProxyController {
     const includeCapabilities = capabilities === 'true';
     const includeCost = cost === 'true';
     const includeRouteMetadata = routeMetadata === 'true';
-    const models = await this.modelDiscovery.getModelsForAgent(
-      req.ingestionContext.tenantId,
-      req.ingestionContext.agentId,
-    );
-    // The synthetic `auto` route never carries metadata — it resolves to a
-    // different concrete model per request, so any claim would be wrong.
+    const { tenantId, agentId } = req.ingestionContext;
+    // One catalog snapshot per request: the real models and every
+    // context_length below are judged from it (ADR 0004, section 7).
+    const models = await this.modelDiscovery.getModelsForAgent(tenantId, agentId);
+    const routing: ModelListRouting = this.modelListRouting
+      ? await this.modelListRouting.forAgent(agentId, tenantId, models)
+      : { autoContextLength: null, virtuals: [] };
+
+    // The synthetic `auto` route and the agent's virtual models never carry
+    // capabilities, cost or route metadata: they resolve to a different
+    // concrete model per request (availability, fallbacks), so any claim
+    // would be wrong. Only the smallest context window is safe to publish.
+    const routed = (id: string, contextLength: number | null): OpenAiModelObject => ({
+      id,
+      object: 'model',
+      created: MODEL_CREATED_UNKNOWN,
+      owned_by: 'thinker',
+      ...(contextLength !== null ? { context_length: contextLength } : {}),
+    });
     const data: OpenAiModelObject[] = [
-      {
-        id: 'auto',
-        object: 'model',
-        created: MODEL_CREATED_UNKNOWN,
-        owned_by: 'thinker',
-      },
+      routed('auto', routing.autoContextLength),
+      ...routing.virtuals.map((v) => routed(v.name, v.context_length)),
     ];
     const seen = new Set(data.map((model) => model.id));
+    // An enabled virtual model shadows the real model whose public id equals
+    // its name, ignoring case (ADR 0004, sections 6 and 7).
+    const shadowed = new Set(routing.virtuals.map((v) => v.name.toLowerCase()));
 
     for (const model of models) {
       const id = openAiModelId(model);
-      if (seen.has(id)) continue;
+      if (seen.has(id) || shadowed.has(id.toLowerCase())) continue;
       seen.add(id);
       const entry: OpenAiModelObject = {
         id,
