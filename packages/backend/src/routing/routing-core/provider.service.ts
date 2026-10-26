@@ -13,6 +13,7 @@ import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
 import { Agent } from '../../entities/agent.entity';
 import { HeaderTier } from '../../entities/header-tier.entity';
+import { VirtualModel } from '../../entities/virtual-model.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { RoutingCacheService } from './routing-cache.service';
@@ -62,10 +63,16 @@ const SUBSCRIPTION_REFRESH_IDLE_TIMEOUT = '20s';
 interface ProviderRouteReference {
   agentId: string;
   agentName: string;
-  surface: 'tier' | 'specificity' | 'header';
+  surface: 'tier' | 'specificity' | 'header' | 'virtual model';
   name: string;
   model: string;
   position: string;
+}
+
+function formatRouteSurface(ref: ProviderRouteReference): string {
+  return ref.surface === 'virtual model'
+    ? `virtual model "${ref.name}"`
+    : `${ref.surface} ${ref.name}`;
 }
 
 interface OwnedAgentRouteTarget {
@@ -92,6 +99,8 @@ export class ProviderService {
     private readonly routingCache: RoutingCacheService,
     @InjectRepository(AgentEnabledProvider)
     private readonly enabledProviderRepo: Repository<AgentEnabledProvider> | null = null,
+    @InjectRepository(VirtualModel)
+    private readonly virtualModelRepo: Repository<VirtualModel> | null = null,
   ) {}
 
   /**
@@ -928,7 +937,7 @@ export class ProviderService {
 
     throw new ConflictException(
       `Cannot disconnect provider while its models are assigned to routing. ` +
-        `Update routing first (agent "${first.agentName}", ${first.surface} ${first.name}, ` +
+        `Update routing first (agent "${first.agentName}", ${formatRouteSurface(first)}, ` +
         `${first.position}: ${first.model}).`,
     );
   }
@@ -997,6 +1006,29 @@ export class ProviderService {
         providerRowsForAgent(tier.agent_id),
       );
       if (match) return match;
+    }
+
+    // Virtual models (ADR 0004): enabled and disabled rows both count, since a
+    // disabled row keeps its chain and would come back with a dangling route.
+    // Routes a virtual inherits from Default are not stored on the row and are
+    // already protected by the tier scan above.
+    if (this.virtualModelRepo) {
+      const virtualModels = await this.virtualModelRepo.find({
+        where: { tenant_id: tenantId, agent_id: In(agentIds) },
+        order: { sort_order: 'ASC' },
+      });
+      for (const vm of virtualModels) {
+        const match = this.findProviderRouteReferenceInRoutes(
+          vm.agent_id,
+          agentName(vm.agent_id),
+          'virtual model',
+          vm.name,
+          vm.override_route,
+          vm.fallback_routes,
+          providerRowsForAgent(vm.agent_id),
+        );
+        if (match) return match;
+      }
     }
 
     return null;
@@ -1323,6 +1355,34 @@ export class ProviderService {
     }
     if (headerTiersToSave.length > 0) await this.headerTierRepo.save(headerTiersToSave);
 
+    // Virtual models (ADR 0004) pin keys the same way. Without this a virtual
+    // pinned to a renamed key would fall back to the provider's first key and
+    // bill another account. Enabled and disabled rows alike, as for the guard.
+    if (this.virtualModelRepo) {
+      const virtualModels = await this.virtualModelRepo.find({ where: { tenant_id: tenantId } });
+      const virtualModelsToSave: VirtualModel[] = [];
+      for (const vm of virtualModels) {
+        let mutated = false;
+        if (routeMatchesKey(vm.override_route)) {
+          vm.override_route = replaceKeyLabel(vm.override_route!);
+          mutated = true;
+        }
+        if (vm.fallback_routes && vm.fallback_routes.some(routeMatchesKey)) {
+          vm.fallback_routes = vm.fallback_routes.map((r) =>
+            routeMatchesKey(r) ? replaceKeyLabel(r) : r,
+          );
+          mutated = true;
+        }
+        if (mutated) {
+          vm.updated_at = now;
+          virtualModelsToSave.push(vm);
+          mutatedAgentIds.add(vm.agent_id);
+        }
+      }
+      if (virtualModelsToSave.length > 0) await this.virtualModelRepo.save(virtualModelsToSave);
+    }
+
+    // invalidateAgent() also drops the agent's virtual-model cache.
     // invalidateTenant() doesn't clear per-agent tier caches, so flush every
     // agent whose rows were rewritten or stale routes would keep serving.
     for (const id of mutatedAgentIds) this.routingCache.invalidateAgent(id);

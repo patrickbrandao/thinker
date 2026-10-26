@@ -65,6 +65,9 @@ services:
       - THINKER_ENCRYPTION_KEY_PREVIOUS=${THINKER_ENCRYPTION_KEY_PREVIOUS:-}
       # Public sign-up is closed; set to true to reopen it temporarily.
       - THINKER_ALLOW_SIGNUP=${THINKER_ALLOW_SIGNUP:-}
+      # Fixed first-setup token (16+ chars). Empty prints a random one-time
+      # token to the log instead.
+      - THINKER_SETUP_TOKEN=${THINKER_SETUP_TOKEN:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:${HOST_PORT:-${PORT:-2099}}}
       # Extra hosts that may serve the dashboard/API, comma-separated. The
       # OAuth callback and session cookie follow the request host, so set this

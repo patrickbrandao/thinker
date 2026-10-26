@@ -129,6 +129,11 @@ export function buildMetaHeaders(meta: RoutingMeta): Record<string, string> {
   if (meta.specificity_category) {
     headers['X-Thinker-Specificity'] = meta.specificity_category;
   }
+  // Virtual model names are restricted to header-safe characters (ADR 0004,
+  // section 3), so the spelling the operator chose goes out as is.
+  if (meta.virtual_model_name) {
+    headers['X-Thinker-Virtual-Model'] = meta.virtual_model_name;
+  }
   if (meta.fallbackFromModel) {
     headers['X-Thinker-Fallback-From'] = meta.fallbackFromModel;
     headers['X-Thinker-Fallback-Index'] = String(meta.fallbackIndex ?? 0);
@@ -239,6 +244,8 @@ export async function handleProviderError(
       headerTierId: meta.header_tier_id,
       headerTierName: meta.header_tier_name,
       headerTierColor: meta.header_tier_color,
+      virtualModelId: meta.virtual_model_id,
+      virtualModelName: meta.virtual_model_name,
       apiMode,
     }),
     'provider error',
@@ -299,6 +306,8 @@ function handleFallbackExhausted(
       headerTierId: meta.header_tier_id,
       headerTierName: meta.header_tier_name,
       headerTierColor: meta.header_tier_color,
+      virtualModelId: meta.virtual_model_id,
+      virtualModelName: meta.virtual_model_name,
     }),
     'fallback errors',
   );
@@ -329,6 +338,8 @@ function handleFallbackExhausted(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
+        virtualModelId: meta.virtual_model_id,
+        virtualModelName: meta.virtual_model_name,
         httpStatus: errorStatus,
         terminalHttpStatus: errorStatus,
         apiMode,
@@ -451,10 +462,14 @@ export function recordFallbackFailures(
         providerKeyLabel: meta.primaryKeyLabel ?? meta.provider_key_label,
         callerAttribution,
         requestHeaders,
-        requestParams: meta.request_params,
+        // meta.request_params is the winning fallback's snapshot in this flow.
+        requestParams:
+          meta.primaryRequestParams !== undefined ? meta.primaryRequestParams : meta.request_params,
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
+        virtualModelId: meta.virtual_model_id,
+        virtualModelName: meta.virtual_model_name,
         httpStatus: meta.primaryErrorStatus,
       },
     ),
@@ -477,6 +492,8 @@ export function recordFallbackFailures(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
+        virtualModelId: meta.virtual_model_id,
+        virtualModelName: meta.virtual_model_name,
       }),
       'fallback errors',
     );
@@ -885,6 +902,8 @@ export function recordSuccess(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
+        virtualModelId: meta.virtual_model_id,
+        virtualModelName: meta.virtual_model_name,
         apiMode,
       }),
       'fallback success',
@@ -911,6 +930,8 @@ export function recordSuccess(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
+        virtualModelId: meta.virtual_model_id,
+        virtualModelName: meta.virtual_model_name,
         apiMode,
       }),
       'success message',

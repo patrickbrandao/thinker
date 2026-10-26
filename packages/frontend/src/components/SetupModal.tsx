@@ -4,6 +4,7 @@ import { installOrigin } from '../services/install-endpoints.js';
 import { platformIcon } from 'thinker-shared';
 import ErrorState from './ErrorState.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
+import { createActiveVirtualModelNames } from './VirtualModelsHint.jsx';
 
 const SetupModal: Component<{
   open: boolean;
@@ -19,6 +20,8 @@ const SetupModal: Component<{
     () => (props.open ? props.agentName : null),
     (n) => (n ? getAgentKey(n) : null),
   );
+
+  const virtualModels = createActiveVirtualModelNames(() => (props.open ? props.agentName : null));
 
   const baseUrl = () => {
     return `${installOrigin()}/v1`;
@@ -98,6 +101,7 @@ const SetupModal: Component<{
               keyPrefix={apiKeyData()?.keyPrefix ?? null}
               baseUrl={baseUrl()}
               platform={props.agentPlatform}
+              virtualModels={virtualModels()}
             />
           </Show>
 

@@ -62,6 +62,12 @@ export const COMMANDS: Record<string, Handler> = {
   'routing custom list': routing.routingCustom.list,
   'routing custom create': routing.routingCustom.create,
   'routing custom delete': routing.routingCustom.delete,
+  'routing virtual list': routing.routingVirtual.list,
+  'routing virtual create': routing.routingVirtual.create,
+  'routing virtual update': routing.routingVirtual.update,
+  'routing virtual delete': routing.routingVirtual.delete,
+  'routing virtual enable': routing.routingVirtual.enable,
+  'routing virtual disable': routing.routingVirtual.disable,
   'routing recording get': routing.routingRecording.get,
   'routing recording set': routing.routingRecording.set,
   'routing params get': routing.routingParams.get,
@@ -127,17 +133,25 @@ Models
   thinker models <agent> [--provider <p>] [--cost] [--capabilities] (like /v1/models: bare ids; flags opt into metadata)
   thinker model prices [--provider <p>]                (install-wide price list — no agent needed)
 
-Routing readouts + custom-tier lifecycle (route writes go through thinker agent configure; params set writes model params)
-  thinker routing status <agent>
+Routing readouts, custom tiers and virtual models (default-route writes go through thinker agent configure; params set writes model params)
+  thinker routing status <agent>                      (default route, custom tiers, virtual models, recording)
   thinker routing test <agent> [prompt...] [--tier <t>] [--model <m>] [--as <platform>]
-    (one real request through the surface the agent's platform uses — anthropic-family via /v1/messages)
+    (one real request through the surface the agent's platform uses — anthropic-family via /v1/messages;
+     --model may name a virtual model: the output then shows virtual_model and routing_reason)
   thinker routing fallbacks get|clear <agent> [--yes]
   thinker routing custom list <agent>
   thinker routing custom create <agent> --name <n> --model <m> --provider <p> [--auth-type <a>] [--fallbacks <m1,m2>] [--header-key <k>] [--header-value <v>] [--force]
   thinker routing custom delete <agent> <name> --yes
+  thinker routing virtual list <agent>
+  thinker routing virtual create <agent> --name <n> [--model <m>] [--provider <p>] [--auth-type <a>] [--key-label <l>] [--fallback <m> ...] [--continue-on-default] [--response-mode buffered|stream]
+  thinker routing virtual update <agent> <name> [--name <new>] [--model <m> [--provider <p>] [--auth-type <a>] [--key-label <l>]] [--fallback <m> ... | --clear-fallbacks] [--clear-model] [--[no-]continue-on-default] [--response-mode <r>]
+  thinker routing virtual enable|disable <agent> <name>
+  thinker routing virtual delete <agent> <name> --yes
+    (a virtual model is a name the harness sends as model, listed by /v1/models after auto; its chain is
+     the primary, up to 5 fallbacks, then the Default chain with --continue-on-default; routes are checked server-side)
   thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false
-  thinker routing params get <agent> [--tier <t>] [--model <m>]
-  thinker routing params set <agent> [--tier <t>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]
+  thinker routing params get <agent> [--tier <t> | --virtual <v>] [--model <m>]
+  thinker routing params set <agent> [--tier <t> | --virtual <v>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]
 
 Requests (paginated, mirrors the API: opaque cursor, one page per call)
   thinker requests get [--agent <name>] [--range <r>] [--status <s>] [--provider <p>] [--origin <o>] [--limit <1-200>] [--cursor <c>] [--full]

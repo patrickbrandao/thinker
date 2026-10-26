@@ -58,6 +58,9 @@ export interface MessageDetailResponse {
     header_tier_id: string | null;
     header_tier_name: string | null;
     header_tier_color: string | null;
+    /** Virtual model (ADR 0004) the request was sent to, as named at the time. */
+    virtual_model_id?: string | null;
+    virtual_model_name?: string | null;
     caller_attribution: {
       sdk?: string;
       sdkVersion?: string;

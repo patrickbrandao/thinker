@@ -187,6 +187,9 @@ const THINKER_REASON_TO_CLASSIFICATION: Record<
   provider_cooldown: { origin: 'policy', errorClass: 'rate_limit' },
   thinker_invalid_request: { origin: 'request', errorClass: 'invalid_request' },
   model_not_available: { origin: 'request', errorClass: 'not_found' },
+  // M301: a virtual model matched but none of its routes is reachable — the
+  // operator's chain needs fixing, like M101 for a tier with no model.
+  virtual_model_unavailable: { origin: 'config', errorClass: 'no_provider' },
   thinker_internal_error: { origin: 'internal', errorClass: 'internal' },
   // Legacy alias of `thinker_internal_error`, kept for rows already written.
   friendly_error: { origin: 'internal', errorClass: 'internal' },

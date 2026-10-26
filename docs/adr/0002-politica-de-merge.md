@@ -1,6 +1,6 @@
 # ADR 0002 — Política de merge autônomo
 
-- **Status:** aceito
+- **Status:** substituído pelo [ADR 0005](0005-modo-autonomo.md)
 - **Data:** 2026-10-10
 
 ## Contexto

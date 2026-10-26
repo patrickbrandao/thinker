@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { AuthType, ModelRoute } from 'thinker-shared';
+import type { AuthType, ModelRoute, RequestParamDefaults } from 'thinker-shared';
 import { applyRequestParamDefaults } from 'thinker-shared';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
@@ -15,10 +15,18 @@ import { ProviderParamSpecService } from '../routing-core/provider-param-spec.se
  * impossible; we no longer need a provider-keyed filter, and Thinker's
  * old tier-aware opinion layer is gone too (only the user's explicit
  * config and the provider's natural default participate).
+ *
+ * The scope is per route (ADR 0004, section 9): a virtual model's chain mixes
+ * its own routes (`virtual:<id>`) with the ones it appends from the Default
+ * tier (`tier:default`). Other origins answer one scope for every route.
  */
 export interface ParamMergeContext {
   agentId: string;
-  scopeKey: string;
+  /**
+   * `agent_model_params` scope of one route of the resolved chain. Null for a
+   * fallback the legacy inference path built without a structured route.
+   */
+  scopeFor(route: ModelRoute | null | undefined): string;
 }
 
 interface ForwardProviderOptions {
@@ -49,6 +57,8 @@ interface ForwardProviderOptions {
   /** The caller's raw `anthropic-beta` header, merged in when the endpoint is Anthropic. */
   clientAnthropicBeta?: string | string[];
   paramMergeContext?: ParamMergeContext;
+  /** The chain route this attempt serves; picks its params scope. */
+  paramsRoute?: ModelRoute | null;
   tenantProviderId?: string | null;
   startProviderAttempt?: StartProviderAttempt;
 }
@@ -135,6 +145,11 @@ export interface FailedFallback {
   attempt?: ProviderAttemptRef;
   /** False when the route was rejected locally (for example by a cooldown). */
   providerCallStarted?: boolean;
+  /**
+   * Params snapshot of this hop, under its own route's scope. Filled by the
+   * proxy after the chain runs; absent rows fall back to the request's.
+   */
+  requestParams?: RequestParamDefaults | null;
 }
 
 @Injectable()
@@ -174,6 +189,7 @@ export class ProxyFallbackService {
   private async applyParamMerge(
     body: Record<string, unknown>,
     ctx: ParamMergeContext | undefined,
+    route: ModelRoute | null | undefined,
     provider: string,
     authType: AuthType | string | undefined,
     model: string,
@@ -181,7 +197,7 @@ export class ProxyFallbackService {
     if (!ctx || !authType) return body;
     const modelParams = await this.modelParamsService.get(
       ctx.agentId,
-      ctx.scopeKey,
+      ctx.scopeFor(route),
       provider,
       authType as AuthType,
       model,
@@ -348,6 +364,7 @@ export class ProxyFallbackService {
           thinkingLookup,
           clientAnthropicBeta,
           paramMergeContext,
+          paramsRoute: route,
           tenantProviderId,
           startProviderAttempt,
         }),
@@ -784,6 +801,7 @@ export class ProxyFallbackService {
     let body = await this.applyParamMerge(
       opts.body,
       opts.paramMergeContext,
+      opts.paramsRoute,
       provider,
       authType,
       opts.model,
@@ -840,6 +858,7 @@ export class ProxyFallbackService {
             resolved = await this.applyParamMerge(
               resolved,
               opts.paramMergeContext,
+              opts.paramsRoute,
               provider,
               authType,
               opts.model,
