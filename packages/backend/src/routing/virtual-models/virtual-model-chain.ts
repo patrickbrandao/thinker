@@ -67,7 +67,7 @@ export interface BuildVirtualModelChainOptions {
    * Whether the Default tier's override is available, which decides whether
    * its legacy auto-assigned route can be reached (see tierChainRoutes). The
    * proxy passes ProviderKeyService.isRouteAvailable; the admin listing
-   * judges it from its catalog snapshot. Required, so no caller can reach the
+   * judges it from its route snapshot. Required, so no caller can reach the
    * legacy route by accident when the override is in fact usable.
    */
   isDefaultOverrideAvailable: (route: ModelRoute) => MaybePromise<boolean>;
@@ -140,41 +140,79 @@ export function computeShadows(name: string, catalog: readonly DiscoveredModel[]
   return shadows;
 }
 
-/** What one catalog snapshot says about a route. */
+/**
+ * An active, usable provider record the agent has enabled, as
+ * ProviderKeyService.getRouteProviderRecords returns it.
+ */
+export interface RouteProviderRecord {
+  provider: string;
+  authType: string | null;
+}
+
+/**
+ * Everything the snapshot judgement of a route needs, loaded once per request:
+ * the agent's discovery catalog and its credential rows. Together they cover
+ * both halves of ProviderKeyService.isRouteAvailable without one query per
+ * route.
+ */
+export interface RouteSnapshot {
+  catalog: readonly DiscoveredModel[];
+  providers: readonly RouteProviderRecord[];
+}
+
+/** What one route snapshot says about a route. */
 export type SnapshotRouteState =
   | { state: 'available'; contextWindow: number | null }
   | { state: 'unavailable' }
   | { state: 'unknown' };
 
 /**
- * Availability of a route judged from a catalog snapshot alone, with the
- * discovery half of ProviderKeyService.isRouteAvailable: the connection's
- * models include the route's model → available; the connection lists models
- * but not this one → unavailable. A connection with no models in the snapshot
- * (cold discovery) is unknown: isRouteAvailable would fall back to the
- * credential rows, which the snapshot cannot see.
+ * Availability of a route judged from a route snapshot, with the same rules
+ * as ProviderKeyService.isRouteAvailable:
+ * - the connection's models include the route's model: available;
+ * - the connection lists models but not this one: unavailable;
+ * - the connection has no models (cold discovery, or a provider the agent no
+ *   longer has): Qwen/Alibaba is unavailable; with an active, usable record
+ *   for the pinned provider/authType the route is unknown (cold discovery:
+ *   reachable, window unknown); without one it is unavailable (provider
+ *   disconnected, or disabled for the agent).
+ * A route without a provider pin is unknown: isRouteAvailable resolves it by
+ * name alone, which the snapshot cannot replay.
  */
-export function snapshotRouteState(
-  route: ModelRoute,
-  catalog: readonly DiscoveredModel[],
-): SnapshotRouteState {
+export function snapshotRouteState(route: ModelRoute, snapshot: RouteSnapshot): SnapshotRouteState {
   const providerNames = expandProviderNames([route.provider]);
-  const connectionModels = catalog.filter(
+  const connectionModels = snapshot.catalog.filter(
     (m) =>
       providerNames.has(m.provider.toLowerCase()) &&
       (!route.authType || !m.authType || m.authType === route.authType),
   );
-  if (connectionModels.length === 0) return { state: 'unknown' };
+  if (connectionModels.length === 0) return coldRouteState(route, providerNames, snapshot);
   const windows = connectionModels.filter((m) => m.id === route.model).map((m) => m.contextWindow);
   if (windows.length === 0) return { state: 'unavailable' };
   const known = windows.filter((w) => Number.isFinite(w) && w > 0);
   return { state: 'available', contextWindow: known.length > 0 ? Math.min(...known) : null };
 }
 
+/** The credential-row fallback of isRouteAvailable, for a connection with no models. */
+function coldRouteState(
+  route: ModelRoute,
+  providerNames: ReadonlySet<string>,
+  snapshot: RouteSnapshot,
+): SnapshotRouteState {
+  if (!route.provider) return { state: 'unknown' };
+  if (providerNames.has('qwen') || providerNames.has('alibaba')) return { state: 'unavailable' };
+  const hasRecord = snapshot.providers.some(
+    (r) =>
+      providerNames.has(r.provider.toLowerCase()) &&
+      (!route.authType || r.authType === route.authType),
+  );
+  return hasRecord ? { state: 'unknown' } : { state: 'unavailable' };
+}
+
 /**
  * ADR 0004, section 7: the smallest context window among the available
  * routes of the effective chain (availability, then the response-mode
- * filter), from one catalog snapshot. Null when no route is left, or when any
+ * filter), from one route snapshot. Null when no route is left, or when any
  * route that could serve the request has an unknown window or unknown
  * availability: publishing a window larger than one of the routes can take
  * would let a client overflow it after a fallback.
@@ -182,14 +220,14 @@ export function snapshotRouteState(
 export function chainContextLength(
   chain: readonly ModelRoute[],
   responseMode: ResponseMode | null | undefined,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): number | null {
-  const window = chainContextWindow(chain, responseMode, catalog);
+  const window = chainContextWindow(chain, responseMode, snapshot);
   return window.kind === 'known' ? window.value : null;
 }
 
 /**
- * What one catalog snapshot says about the context window of a chain:
+ * What one route snapshot says about the context window of a chain:
  * - `known`: every route that could serve the request has a known window,
  *   and `value` is the smallest;
  * - `unknown`: some such route has an unknown window or unknown availability;
@@ -207,11 +245,11 @@ export type ChainContextWindow =
 export function chainContextWindow(
   chain: readonly ModelRoute[],
   responseMode: ResponseMode | null | undefined,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): ChainContextWindow {
   const candidates: Array<{ route: ModelRoute; state: SnapshotRouteState }> = [];
   for (const route of chain) {
-    const state = snapshotRouteState(route, catalog);
+    const state = snapshotRouteState(route, snapshot);
     if (state.state !== 'unavailable') candidates.push({ route, state });
   }
   const [primary, ...rest] = candidates.map((c) => c.route);
@@ -231,20 +269,17 @@ export function chainContextWindow(
 }
 
 /**
- * Whether a tier's override counts as available when only a catalog snapshot
+ * Whether a tier's override counts as available when only a route snapshot
  * is at hand (see tierChainRoutes). An override the snapshot cannot judge
  * counts as reachable: the legacy auto-assigned route then stays out, and the
  * unknown route makes the context window unknown (the conservative answer).
  */
-export function snapshotOverrideAvailable(
-  route: ModelRoute,
-  catalog: readonly DiscoveredModel[],
-): boolean {
-  return snapshotRouteState(route, catalog).state !== 'unavailable';
+export function snapshotOverrideAvailable(route: ModelRoute, snapshot: RouteSnapshot): boolean {
+  return snapshotRouteState(route, snapshot).state !== 'unavailable';
 }
 
 /**
- * ADR 0004, section 7: `context_length` of a virtual model from one catalog
+ * ADR 0004, section 7: `context_length` of a virtual model from one route
  * snapshot. The chain is the virtual model's own plus, with
  * `continue_on_default`, the Default tier's, filtered with the virtual
  * model's response mode.
@@ -252,20 +287,20 @@ export function snapshotOverrideAvailable(
 export async function virtualModelContextLength(
   virtualModel: VirtualModelChainSource & Pick<VirtualModel, 'response_mode'>,
   defaultTier: DefaultTierChainSource | null | undefined,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): Promise<number | null> {
   const chain = await buildVirtualModelChain(virtualModel, defaultTier, {
-    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, catalog),
+    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, snapshot),
   });
   return chainContextLength(
     chain.map((entry) => entry.route),
     virtualModel.response_mode,
-    catalog,
+    snapshot,
   );
 }
 
 /**
- * Whether a virtual model can take traffic per one catalog snapshot: enabled,
+ * Whether a virtual model can take traffic per one route snapshot: enabled,
  * and its effective chain (own routes, then the Default slot's chain with
  * `continue_on_default`, the same chain the proxy builds) keeps at least one
  * route after the availability and transport filters. Only the `default`
@@ -274,17 +309,17 @@ export async function virtualModelContextLength(
 export async function virtualModelRoutable(
   virtualModel: VirtualModelChainSource & Pick<VirtualModel, 'response_mode' | 'enabled'>,
   defaultTier: DefaultTierChainSource | null | undefined,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): Promise<boolean> {
   if (!virtualModel.enabled) return false;
   const chain = await buildVirtualModelChain(virtualModel, defaultTier, {
-    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, catalog),
+    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, snapshot),
   });
   return (
     chainContextWindow(
       chain.map((entry) => entry.route),
       virtualModel.response_mode,
-      catalog,
+      snapshot,
     ).kind !== 'empty'
   );
 }

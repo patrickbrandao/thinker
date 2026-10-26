@@ -53,6 +53,7 @@ describe('ModelListRoutingService', () => {
   let tierService: { getTiers: jest.Mock };
   let specificityService: { getActiveAssignments: jest.Mock };
   let agentRepo: { findOne: jest.Mock };
+  let providerKeyService: { getRouteProviderRecords: jest.Mock };
   let service: ModelListRoutingService;
 
   beforeEach(() => {
@@ -72,10 +73,19 @@ describe('ModelListRoutingService', () => {
     agentRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'agent-1', complexity_routing_enabled: false }),
     };
+    providerKeyService = {
+      getRouteProviderRecords: jest.fn().mockResolvedValue(
+        ['openai', 'deepseek', 'anthropic'].map((provider) => ({
+          provider,
+          authType: 'api_key',
+        })),
+      ),
+    };
     service = new ModelListRoutingService(
       virtualModels as never,
       tierService as never,
       specificityService as never,
+      providerKeyService as never,
       agentRepo as never,
     );
   });
@@ -110,12 +120,44 @@ describe('ModelListRoutingService', () => {
     ]);
   });
 
-  it('reads the agent within its tenant', async () => {
+  it('reads the agent and its credential rows within its tenant, once per request', async () => {
+    virtualModels.list.mockResolvedValue([vmRow('a'), vmRow('b'), vmRow('c')]);
     await service.forAgent('agent-1', 'tenant-1', CATALOG);
 
     expect(agentRepo.findOne).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'agent-1', tenant_id: 'tenant-1' } }),
     );
+    expect(providerKeyService.getRouteProviderRecords).toHaveBeenCalledTimes(1);
+    expect(providerKeyService.getRouteProviderRecords).toHaveBeenCalledWith('tenant-1', 'agent-1');
+  });
+
+  it('leaves a route of a disconnected provider out of the window', async () => {
+    // Mistral is neither in the catalog nor among the agent's credential rows.
+    virtualModels.list.mockResolvedValue([
+      vmRow('mixed', { fallback_routes: [route('mistral', 'mistral-large')] }),
+      vmRow('gone', { override_route: route('mistral', 'mistral-large') }),
+    ]);
+
+    const res = await service.forAgent('agent-1', 'tenant-1', CATALOG);
+
+    expect(res.virtuals).toEqual([
+      { name: 'mixed', context_length: 128000 },
+      { name: 'gone', context_length: null },
+    ]);
+  });
+
+  it('keeps the window unknown on cold discovery of a connected provider', async () => {
+    providerKeyService.getRouteProviderRecords.mockResolvedValue([
+      { provider: 'openai', authType: 'api_key' },
+      { provider: 'mistral', authType: 'api_key' },
+    ]);
+    virtualModels.list.mockResolvedValue([
+      vmRow('mixed', { fallback_routes: [route('mistral', 'mistral-large')] }),
+    ]);
+
+    const res = await service.forAgent('agent-1', 'tenant-1', CATALOG);
+
+    expect(res.virtuals).toEqual([{ name: 'mixed', context_length: null }]);
   });
 
   it('uses the Default chain for auto with complexity routing off', async () => {

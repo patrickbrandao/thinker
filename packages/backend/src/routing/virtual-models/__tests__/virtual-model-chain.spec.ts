@@ -10,6 +10,8 @@ import {
   tierChainRoutes,
   virtualModelContextLength,
   virtualModelRoutable,
+  type RouteProviderRecord,
+  type RouteSnapshot,
 } from '../virtual-model-chain';
 
 const route = (
@@ -219,42 +221,95 @@ describe('computeShadows', () => {
   });
 });
 
+/**
+ * A route snapshot whose credential rows are every connection in the catalog
+ * plus `cold` (connected providers whose discovery returned no models yet).
+ */
+const snap = (catalog: DiscoveredModel[], cold: RouteProviderRecord[] = []): RouteSnapshot => {
+  const providers: RouteProviderRecord[] = [...cold];
+  for (const m of catalog) {
+    const authType = m.authType ?? null;
+    if (!providers.some((p) => p.provider === m.provider && p.authType === authType)) {
+      providers.push({ provider: m.provider, authType });
+    }
+  }
+  return { catalog, providers };
+};
+
 describe('snapshotRouteState', () => {
   const catalog = [
     discovered('gpt-4o', 'openai', 128000),
     discovered('gemini-2.5-pro', 'gemini', 0),
   ];
+  const snapshot = snap(catalog, [{ provider: 'mistral', authType: 'api_key' }]);
 
   it('is available with the window when the connection lists the model', () => {
-    expect(snapshotRouteState(route('openai', 'gpt-4o'), catalog)).toEqual({
+    expect(snapshotRouteState(route('openai', 'gpt-4o'), snapshot)).toEqual({
       state: 'available',
       contextWindow: 128000,
     });
   });
 
   it('reports an unknown window as null', () => {
-    expect(snapshotRouteState(route('gemini', 'gemini-2.5-pro'), catalog)).toEqual({
+    expect(snapshotRouteState(route('gemini', 'gemini-2.5-pro'), snapshot)).toEqual({
       state: 'available',
       contextWindow: null,
     });
   });
 
   it('is unavailable when the connection lists other models only', () => {
-    expect(snapshotRouteState(route('openai', 'gpt-3.5'), catalog)).toEqual({
+    expect(snapshotRouteState(route('openai', 'gpt-3.5'), snapshot)).toEqual({
       state: 'unavailable',
     });
   });
 
   it('honors the auth type', () => {
-    expect(snapshotRouteState(route('openai', 'gpt-4o', 'subscription'), catalog)).toEqual({
+    // No subscription record for openai: the api_key connection does not count.
+    expect(snapshotRouteState(route('openai', 'gpt-4o', 'subscription'), snapshot)).toEqual({
+      state: 'unavailable',
+    });
+    // A connected subscription with cold discovery is unknown.
+    expect(
+      snapshotRouteState(
+        route('openai', 'gpt-4o', 'subscription'),
+        snap(catalog, [{ provider: 'openai', authType: 'subscription' }]),
+      ),
+    ).toEqual({ state: 'unknown' });
+  });
+
+  it('is unknown on cold discovery of a connected provider', () => {
+    expect(snapshotRouteState(route('mistral', 'mistral-large'), snapshot)).toEqual({
       state: 'unknown',
     });
   });
 
-  it('is unknown when the connection has no models in the snapshot', () => {
-    expect(snapshotRouteState(route('mistral', 'mistral-large'), catalog)).toEqual({
-      state: 'unknown',
+  it('is unavailable when the provider is disconnected or disabled for the agent', () => {
+    // Neither in the catalog nor in the agent's credential rows: removed, or
+    // not enabled for the agent (getRouteProviderRecords filters both out).
+    expect(snapshotRouteState(route('deepseek', 'deepseek-chat'), snapshot)).toEqual({
+      state: 'unavailable',
     });
+    expect(snapshotRouteState(route('mistral', 'mistral-large'), snap(catalog))).toEqual({
+      state: 'unavailable',
+    });
+  });
+
+  it('matches provider aliases and ignores case in the credential rows', () => {
+    expect(
+      snapshotRouteState(
+        route('mistral', 'mistral-large'),
+        snap(catalog, [{ provider: 'Mistral', authType: 'api_key' }]),
+      ),
+    ).toEqual({ state: 'unknown' });
+  });
+
+  it('keeps Qwen unavailable on cold discovery, as isRouteAvailable does', () => {
+    expect(
+      snapshotRouteState(
+        route('qwen', 'qwen-max'),
+        snap(catalog, [{ provider: 'qwen', authType: 'api_key' }]),
+      ),
+    ).toEqual({ state: 'unavailable' });
   });
 });
 
@@ -266,13 +321,14 @@ describe('chainContextLength', () => {
     // A model without stream support in the capability table would be
     // filtered in stream mode; see the stream test below.
   ];
+  const snapshot = snap(catalog, [{ provider: 'mistral', authType: 'api_key' }]);
 
   it('is the smallest window among available routes', () => {
     expect(
       chainContextLength(
         [route('anthropic', 'claude-opus-4-6'), route('openai', 'gpt-4o')],
         'buffered',
-        catalog,
+        snapshot,
       ),
     ).toBe(128000);
   });
@@ -282,7 +338,7 @@ describe('chainContextLength', () => {
       chainContextLength(
         [route('openai', 'gone'), route('anthropic', 'claude-opus-4-6')],
         'buffered',
-        catalog,
+        snapshot,
       ),
     ).toBe(200000);
   });
@@ -292,7 +348,7 @@ describe('chainContextLength', () => {
       chainContextLength(
         [route('anthropic', 'claude-opus-4-6'), route('deepseek', 'mystery')],
         'buffered',
-        catalog,
+        snapshot,
       ),
     ).toBeNull();
   });
@@ -302,14 +358,14 @@ describe('chainContextLength', () => {
       chainContextLength(
         [route('anthropic', 'claude-opus-4-6'), route('mistral', 'mistral-large')],
         'buffered',
-        catalog,
+        snapshot,
       ),
     ).toBeNull();
   });
 
   it('is null for an empty or fully unavailable chain', () => {
-    expect(chainContextLength([], 'buffered', catalog)).toBeNull();
-    expect(chainContextLength([route('openai', 'gone')], 'buffered', catalog)).toBeNull();
+    expect(chainContextLength([], 'buffered', snapshot)).toBeNull();
+    expect(chainContextLength([route('openai', 'gone')], 'buffered', snapshot)).toBeNull();
   });
 
   it('applies the response-mode filter before taking the minimum', () => {
@@ -318,7 +374,7 @@ describe('chainContextLength', () => {
       chainContextLength(
         [route('anthropic', 'claude-opus-4-6'), route('openai', 'gpt-4o')],
         'stream',
-        catalog,
+        snapshot,
       ),
     ).toBe(128000);
   });
@@ -330,23 +386,24 @@ describe('chainContextWindow', () => {
     discovered('claude-opus-4-6', 'anthropic', 200000),
     discovered('mystery', 'deepseek', 0),
   ];
+  const snapshot = snap(catalog, [{ provider: 'mistral', authType: 'api_key' }]);
 
   it('keeps "no route left" apart from "window unknown"', () => {
-    expect(chainContextWindow([], 'buffered', catalog)).toEqual({ kind: 'empty' });
-    expect(chainContextWindow([route('openai', 'gone')], 'buffered', catalog)).toEqual({
+    expect(chainContextWindow([], 'buffered', snapshot)).toEqual({ kind: 'empty' });
+    expect(chainContextWindow([route('openai', 'gone')], 'buffered', snapshot)).toEqual({
       kind: 'empty',
     });
-    expect(chainContextWindow([route('deepseek', 'mystery')], 'buffered', catalog)).toEqual({
+    expect(chainContextWindow([route('deepseek', 'mystery')], 'buffered', snapshot)).toEqual({
       kind: 'unknown',
     });
-    expect(chainContextWindow([route('mistral', 'm')], 'buffered', catalog)).toEqual({
+    expect(chainContextWindow([route('mistral', 'm')], 'buffered', snapshot)).toEqual({
       kind: 'unknown',
     });
     expect(
       chainContextWindow(
         [route('anthropic', 'claude-opus-4-6'), route('openai', 'gpt-4o')],
         'buffered',
-        catalog,
+        snapshot,
       ),
     ).toEqual({ kind: 'known', value: 128000 });
   });
@@ -354,12 +411,15 @@ describe('chainContextWindow', () => {
 
 describe('snapshotOverrideAvailable', () => {
   const catalog = [discovered('gpt-4o', 'openai', 128000)];
+  const snapshot = snap(catalog, [{ provider: 'mistral', authType: 'api_key' }]);
 
   it('is false only when the connection lists models but not this one', () => {
-    expect(snapshotOverrideAvailable(route('openai', 'gpt-4o'), catalog)).toBe(true);
-    expect(snapshotOverrideAvailable(route('openai', 'gone'), catalog)).toBe(false);
+    expect(snapshotOverrideAvailable(route('openai', 'gpt-4o'), snapshot)).toBe(true);
+    expect(snapshotOverrideAvailable(route('openai', 'gone'), snapshot)).toBe(false);
     // Cold discovery: the snapshot cannot judge it, so it counts as reachable.
-    expect(snapshotOverrideAvailable(route('mistral', 'm'), catalog)).toBe(true);
+    expect(snapshotOverrideAvailable(route('mistral', 'm'), snapshot)).toBe(true);
+    // Disconnected provider: unavailable, as the proxy judges it.
+    expect(snapshotOverrideAvailable(route('deepseek', 'm'), snapshot)).toBe(false);
   });
 });
 
@@ -370,6 +430,7 @@ describe('virtualModelContextLength', () => {
     discovered('deepseek-chat', 'deepseek', 64000),
     discovered('mystery', 'mistral', 0),
   ];
+  const snapshot = snap(catalog);
   const virtual = (overrides: Partial<Parameters<typeof virtualModelContextLength>[0]> = {}) => ({
     ...vm(),
     response_mode: 'buffered' as const,
@@ -382,12 +443,16 @@ describe('virtualModelContextLength', () => {
   };
 
   it('uses only the virtual chain without continue_on_default', async () => {
-    expect(await virtualModelContextLength(virtual(), defaultTier, catalog)).toBe(128000);
+    expect(await virtualModelContextLength(virtual(), defaultTier, snapshot)).toBe(128000);
   });
 
   it('adds the Default chain with continue_on_default', async () => {
     expect(
-      await virtualModelContextLength(virtual({ continue_on_default: true }), defaultTier, catalog),
+      await virtualModelContextLength(
+        virtual({ continue_on_default: true }),
+        defaultTier,
+        snapshot,
+      ),
     ).toBe(64000);
   });
 
@@ -400,7 +465,7 @@ describe('virtualModelContextLength', () => {
           auto_assigned_route: route('deepseek', 'deepseek-chat'),
           fallback_routes: null,
         },
-        catalog,
+        snapshot,
       ),
     ).toBe(64000);
   });
@@ -410,14 +475,14 @@ describe('virtualModelContextLength', () => {
       await virtualModelContextLength(
         virtual({ override_route: null, fallback_routes: null }),
         null,
-        catalog,
+        snapshot,
       ),
     ).toBeNull();
     expect(
       await virtualModelContextLength(
         virtual({ fallback_routes: [route('mistral', 'mystery')] }),
         null,
-        catalog,
+        snapshot,
       ),
     ).toBeNull();
   });
@@ -428,6 +493,7 @@ describe('virtualModelRoutable', () => {
     discovered('gpt-4o', 'openai', 128000),
     discovered('deepseek-chat', 'deepseek', 64000),
   ];
+  const snapshot = snap(catalog);
   const onDefault = (overrides: Record<string, unknown> = {}) => ({
     ...vm({ override_route: null, fallback_routes: null, continue_on_default: true }),
     enabled: true,
@@ -446,7 +512,7 @@ describe('virtualModelRoutable', () => {
       await virtualModelRoutable(
         { ...vm(), enabled: true, response_mode: 'buffered' },
         null,
-        catalog,
+        snapshot,
       ),
     ).toBe(true);
   });
@@ -456,7 +522,7 @@ describe('virtualModelRoutable', () => {
       await virtualModelRoutable(
         { ...vm(), enabled: false, response_mode: 'buffered' },
         null,
-        catalog,
+        snapshot,
       ),
     ).toBe(false);
     expect(
@@ -467,45 +533,112 @@ describe('virtualModelRoutable', () => {
           response_mode: 'buffered',
         },
         null,
-        catalog,
+        snapshot,
       ),
     ).toBe(false);
   });
 
   it('with continue_on_default, only the default slot counts', async () => {
     // Empty default slot: other tiers may route, the proxy still appends nothing.
-    expect(await virtualModelRoutable(onDefault(), tier(), catalog)).toBe(false);
-    expect(await virtualModelRoutable(onDefault(), null, catalog)).toBe(false);
+    expect(await virtualModelRoutable(onDefault(), tier(), snapshot)).toBe(false);
+    expect(await virtualModelRoutable(onDefault(), null, snapshot)).toBe(false);
     // Override, legacy auto-assigned route, or an available fallback.
     expect(
       await virtualModelRoutable(
         onDefault(),
         tier({ override_route: route('openai', 'gpt-4o') }),
-        catalog,
+        snapshot,
       ),
     ).toBe(true);
     expect(
       await virtualModelRoutable(
         onDefault(),
         tier({ auto_assigned_route: route('deepseek', 'deepseek-chat') }),
-        catalog,
+        snapshot,
       ),
     ).toBe(true);
     expect(
       await virtualModelRoutable(
         onDefault(),
         tier({ fallback_routes: [route('deepseek', 'deepseek-chat')] }),
-        catalog,
+        snapshot,
       ),
     ).toBe(true);
-    // A default fallback the catalog no longer offers does not count.
+    // A default fallback the snapshot no longer offers does not count.
     expect(
       await virtualModelRoutable(
         onDefault(),
         tier({ fallback_routes: [route('openai', 'gone')] }),
-        catalog,
+        snapshot,
       ),
     ).toBe(false);
+  });
+
+  describe('provider connection', () => {
+    const own = (routes: ModelRoute[]) => ({
+      ...vm({ override_route: routes[0], fallback_routes: routes.slice(1) }),
+      enabled: true,
+      response_mode: 'buffered' as const,
+    });
+
+    it('is false when every route belongs to a disconnected provider', async () => {
+      // Mistral was removed: no models and no credential row for the agent.
+      expect(
+        await virtualModelRoutable(own([route('mistral', 'mistral-large')]), null, snapshot),
+      ).toBe(false);
+    });
+
+    it('is false when the provider is disabled for the agent', async () => {
+      // The agent's catalog and credential rows both leave a disabled
+      // provider out, even when the tenant still has it.
+      const withoutDeepseek = snap(catalog.filter((m) => m.provider !== 'deepseek'));
+      expect(
+        await virtualModelRoutable(
+          own([route('deepseek', 'deepseek-chat')]),
+          null,
+          withoutDeepseek,
+        ),
+      ).toBe(false);
+    });
+
+    it('is true on cold discovery of a connected provider', async () => {
+      const cold = snap(catalog, [{ provider: 'mistral', authType: 'api_key' }]);
+      expect(await virtualModelRoutable(own([route('mistral', 'mistral-large')]), null, cold)).toBe(
+        true,
+      );
+    });
+
+    it('is true when one route is available and another is disconnected', async () => {
+      const mixed = own([route('mistral', 'mistral-large'), route('openai', 'gpt-4o')]);
+      expect(await virtualModelRoutable(mixed, null, snapshot)).toBe(true);
+      // The disconnected route does not count toward the window either.
+      expect(await virtualModelContextLength(mixed, null, snapshot)).toBe(128000);
+    });
+
+    it('drops a disconnected Default fallback with continue_on_default', async () => {
+      expect(
+        await virtualModelRoutable(
+          onDefault(),
+          tier({ fallback_routes: [route('mistral', 'mistral-large')] }),
+          snapshot,
+        ),
+      ).toBe(false);
+    });
+
+    it('reaches the legacy auto-assigned route when the Default override is disconnected', async () => {
+      // The proxy finds the override unavailable and falls to the legacy
+      // auto-assigned route; the snapshot now does the same.
+      expect(
+        await virtualModelRoutable(
+          onDefault(),
+          tier({
+            override_route: route('mistral', 'mistral-large'),
+            auto_assigned_route: route('deepseek', 'deepseek-chat'),
+          }),
+          snapshot,
+        ),
+      ).toBe(true);
+    });
   });
 
   it('does not use the Default chain when continue_on_default is off', async () => {
@@ -513,7 +646,7 @@ describe('virtualModelRoutable', () => {
       await virtualModelRoutable(
         onDefault({ continue_on_default: false }),
         tier({ override_route: route('openai', 'gpt-4o') }),
-        catalog,
+        snapshot,
       ),
     ).toBe(false);
   });

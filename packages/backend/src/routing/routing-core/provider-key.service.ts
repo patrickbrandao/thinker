@@ -451,6 +451,28 @@ export class ProviderKeyService {
   }
 
   /**
+   * The (provider, authType) pairs of the active, usable provider records the
+   * agent has enabled: the credential rows isRouteAvailable falls back to when
+   * discovery has no models for a pinned connection. Callers that judge many
+   * routes from one catalog snapshot (the virtual-model listing, `/v1/models`)
+   * load this once per request instead of asking isRouteAvailable per route.
+   */
+  async getRouteProviderRecords(
+    tenantId: string,
+    agentId?: string,
+  ): Promise<Array<{ provider: string; authType: AuthType | null }>> {
+    const records = (
+      await this.filterProvidersForAgent(
+        await this.providerRepo.find({
+          where: { tenant_id: tenantId, is_active: true },
+        }),
+        agentId,
+      )
+    ).filter(isThinkerUsableProvider);
+    return records.map((r) => ({ provider: r.provider, authType: r.auth_type ?? null }));
+  }
+
+  /**
    * Filters a list of global tenant providers down to only those the given
    * agent has enabled. If no agentId is provided, or if the
    * enabled-provider repo is not available, returns the full list unchanged.

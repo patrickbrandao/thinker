@@ -143,7 +143,8 @@ export function registerRoutingTools(
           // for "auto" only. With no active provider nothing routes, virtual
           // models included.
           // `routable` is computed on the chain the proxy builds (own routes,
-          // then only the `default` slot's chain), from the catalog snapshot.
+          // then only the `default` slot's chain), from the catalog snapshot
+          // and the agent's provider records, as the proxy judges availability.
           const active =
             status.reason === 'no_provider'
               ? []

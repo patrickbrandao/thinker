@@ -7,6 +7,7 @@ import {
   type SpecificityContextSource,
   type TierContextSource,
 } from '../model-list-context';
+import type { RouteSnapshot } from '../virtual-model-chain';
 
 const route = (provider: string, model: string): ModelRoute => ({
   provider,
@@ -35,6 +36,15 @@ const CATALOG: DiscoveredModel[] = [
   discovered('deepseek-chat', 'deepseek', 64000),
   discovered('mystery', 'mistral', 0),
 ];
+
+/** Every connection in the catalog is connected for the agent. */
+const SNAPSHOT: RouteSnapshot = {
+  catalog: CATALOG,
+  providers: ['openai', 'anthropic', 'deepseek', 'mistral'].map((provider) => ({
+    provider,
+    authType: 'api_key',
+  })),
+};
 
 const tier = (name: string, overrides: Partial<TierContextSource> = {}): TierContextSource => ({
   tier: name,
@@ -69,7 +79,7 @@ describe('tierContextWindow', () => {
           // Never reached while the override is available.
           auto_assigned_route: route('deepseek', 'deepseek-chat'),
         }),
-        CATALOG,
+        SNAPSHOT,
       ),
     ).toEqual({ kind: 'known', value: 128000 });
   });
@@ -78,7 +88,7 @@ describe('tierContextWindow', () => {
     expect(
       tierContextWindow(
         tier('default', { auto_assigned_route: route('deepseek', 'deepseek-chat') }),
-        CATALOG,
+        SNAPSHOT,
       ),
     ).toEqual({ kind: 'known', value: 64000 });
   });
@@ -91,18 +101,45 @@ describe('tierContextWindow', () => {
           fallback_routes: [route('anthropic', 'claude-sonnet-4-5')],
           auto_assigned_route: route('deepseek', 'deepseek-chat'),
         }),
-        CATALOG,
+        SNAPSHOT,
       ),
     ).toEqual({ kind: 'known', value: 64000 });
   });
 
   it('is empty without any route', () => {
-    expect(tierContextWindow(tier('default'), CATALOG)).toEqual({ kind: 'empty' });
+    expect(tierContextWindow(tier('default'), SNAPSHOT)).toEqual({ kind: 'empty' });
+  });
+
+  it('skips a route of a disconnected provider', () => {
+    // Groq is neither in the catalog nor in the agent's credential rows.
+    expect(
+      tierContextWindow(
+        tier('default', {
+          override_route: route('groq', 'llama-3.3-70b'),
+          fallback_routes: [route('openai', 'gpt-4o')],
+          auto_assigned_route: route('deepseek', 'deepseek-chat'),
+        }),
+        SNAPSHOT,
+      ),
+    ).toEqual({ kind: 'known', value: 64000 });
+    expect(
+      tierContextWindow(tier('default', { override_route: route('groq', 'llama') }), SNAPSHOT),
+    ).toEqual({ kind: 'empty' });
+  });
+
+  it('is unknown on cold discovery of a connected provider', () => {
+    const cold: RouteSnapshot = {
+      ...SNAPSHOT,
+      providers: [...SNAPSHOT.providers, { provider: 'groq', authType: 'api_key' }],
+    };
+    expect(
+      tierContextWindow(tier('default', { override_route: route('groq', 'llama') }), cold),
+    ).toEqual({ kind: 'unknown' });
   });
 
   it('is unknown when a route window is unknown', () => {
     expect(
-      tierContextWindow(tier('default', { override_route: route('mistral', 'mystery') }), CATALOG),
+      tierContextWindow(tier('default', { override_route: route('mistral', 'mystery') }), SNAPSHOT),
     ).toEqual({ kind: 'unknown' });
   });
 });
@@ -115,20 +152,20 @@ describe('specificityContextWindow', () => {
           override_route: route('anthropic', 'claude-sonnet-4-5'),
           fallback_routes: [route('openai', 'gpt-4o-mini')],
         }),
-        CATALOG,
+        SNAPSHOT,
       ),
     ).toEqual({ kind: 'known', value: 100000 });
   });
 
   it('is unreachable (empty) without an override or with an unavailable one', () => {
-    expect(specificityContextWindow(specificity(), CATALOG)).toEqual({ kind: 'empty' });
+    expect(specificityContextWindow(specificity(), SNAPSHOT)).toEqual({ kind: 'empty' });
     expect(
       specificityContextWindow(
         specificity({
           override_route: route('openai', 'gpt-retired'),
           fallback_routes: [route('openai', 'gpt-4o')],
         }),
-        CATALOG,
+        SNAPSHOT,
       ),
     ).toEqual({ kind: 'empty' });
   });
@@ -149,7 +186,7 @@ describe('autoContextLength', () => {
             simple: { override_route: route('openai', 'gpt-4o-mini') },
           }),
           specificity: [specificity({ override_route: route('openai', 'gpt-4o-mini') })],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(64000);
     });
@@ -160,13 +197,13 @@ describe('autoContextLength', () => {
           complexityRoutingEnabled: false,
           tiers: allTiers({ default: { auto_assigned_route: route('openai', 'gpt-4o') } }),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(128000);
     });
 
     it('is omitted when the Default is empty or missing', () => {
-      const input = { complexityRoutingEnabled: false, specificity: [], catalog: CATALOG };
+      const input = { complexityRoutingEnabled: false, specificity: [], snapshot: SNAPSHOT };
       expect(autoContextLength({ ...input, tiers: allTiers() })).toBeNull();
       expect(autoContextLength({ ...input, tiers: [] })).toBeNull();
     });
@@ -182,7 +219,7 @@ describe('autoContextLength', () => {
             },
           }),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBeNull();
     });
@@ -193,7 +230,7 @@ describe('autoContextLength', () => {
           complexityRoutingEnabled: false,
           tiers: allTiers({ default: { override_route: route('groq', 'llama-3') } }),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBeNull();
     });
@@ -211,7 +248,7 @@ describe('autoContextLength', () => {
           complexityRoutingEnabled: true,
           tiers,
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(128000);
       expect(
@@ -219,7 +256,7 @@ describe('autoContextLength', () => {
           complexityRoutingEnabled: true,
           tiers,
           specificity: [specificity({ override_route: route('deepseek', 'deepseek-chat') })],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(64000);
     });
@@ -233,7 +270,7 @@ describe('autoContextLength', () => {
             reasoning: { override_route: route('openai', 'gpt-4o-mini') },
           }),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(100000);
     });
@@ -248,7 +285,7 @@ describe('autoContextLength', () => {
             complex: { override_route: route('openai', 'gpt-retired') },
           }),
           specificity: [specificity({ override_route: route('deepseek', 'gone') })],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(200000);
     });
@@ -262,7 +299,7 @@ describe('autoContextLength', () => {
             simple: { override_route: route('mistral', 'mystery') },
           }),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBeNull();
     });
@@ -273,7 +310,7 @@ describe('autoContextLength', () => {
           complexityRoutingEnabled: true,
           tiers: allTiers(),
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBeNull();
     });
@@ -287,7 +324,7 @@ describe('autoContextLength', () => {
             tier('legacy-slot', { override_route: route('deepseek', 'deepseek-chat') }),
           ],
           specificity: [],
-          catalog: CATALOG,
+          snapshot: SNAPSHOT,
         }),
       ).toBe(128000);
     });

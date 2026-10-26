@@ -85,7 +85,7 @@ describe('VirtualModelService', () => {
     invalidateAgent: jest.Mock;
   };
   let discovery: { getModelsForAgent: jest.Mock };
-  let providerKeys: { getProviderKeys: jest.Mock };
+  let providerKeys: { getProviderKeys: jest.Mock; getRouteProviderRecords: jest.Mock };
   let tiers: { getTiers: jest.Mock };
   let svc: VirtualModelService;
 
@@ -102,6 +102,13 @@ describe('VirtualModelService', () => {
         { id: 'k1', label: 'Default', priority: 0, apiKey: 'x', region: null },
         { id: 'k2', label: 'Work', priority: 1, apiKey: 'y', region: null },
       ]),
+      // Mistral is connected with cold discovery (no models in CATALOG).
+      getRouteProviderRecords: jest.fn().mockResolvedValue(
+        ['openai', 'anthropic', 'deepseek', 'mistral'].map((provider) => ({
+          provider,
+          authType: 'api_key',
+        })),
+      ),
     };
     tiers = { getTiers: jest.fn().mockResolvedValue([]) };
     svc = new VirtualModelService(
@@ -190,6 +197,43 @@ describe('VirtualModelService', () => {
       ]);
       const [view] = await svc.listViews('agent-1', 'tenant-1');
       expect(view.context_length).toBe(64000);
+    });
+
+    it('loads the credential rows once per request, within the tenant', async () => {
+      repo.find.mockResolvedValue([
+        row({ id: 'a', override_route: route('openai', 'gpt-4o') }),
+        row({ id: 'b', name: 'other', override_route: route('mistral', 'm') }),
+      ]);
+      await svc.listViews('agent-1', 'tenant-1');
+      expect(providerKeys.getRouteProviderRecords).toHaveBeenCalledTimes(1);
+      expect(providerKeys.getRouteProviderRecords).toHaveBeenCalledWith('tenant-1', 'agent-1');
+    });
+
+    it('is not routable when its provider is disconnected or disabled for the agent', async () => {
+      providerKeys.getRouteProviderRecords.mockResolvedValue([
+        { provider: 'openai', authType: 'api_key' },
+      ]);
+      discovery.getModelsForAgent.mockResolvedValue(CATALOG.filter((m) => m.provider === 'openai'));
+      repo.find.mockResolvedValue([
+        row({ id: 'gone', override_route: route('deepseek', 'deepseek-chat') }),
+        row({
+          id: 'mixed',
+          name: 'mixed',
+          sort_order: 1,
+          override_route: route('deepseek', 'deepseek-chat'),
+          fallback_routes: [route('openai', 'gpt-4o')],
+        }),
+      ]);
+      const [gone, mixed] = await svc.listViews('agent-1', 'tenant-1');
+      expect(gone).toMatchObject({ routable: false, context_length: null });
+      // The disconnected primary does not count toward the window.
+      expect(mixed).toMatchObject({ routable: true, context_length: 128000 });
+    });
+
+    it('stays routable on cold discovery of a connected provider', async () => {
+      repo.find.mockResolvedValue([row({ override_route: route('mistral', 'mistral-large') })]);
+      const [view] = await svc.listViews('agent-1', 'tenant-1');
+      expect(view).toMatchObject({ routable: true, context_length: null });
     });
 
     it('reaches the auto-assigned route when the Default override is unavailable', async () => {

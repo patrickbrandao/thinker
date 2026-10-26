@@ -1,13 +1,13 @@
 import { DEFAULT_TIER_SLOT, TIER_SLOTS, type ModelRoute } from 'thinker-shared';
 import type { TierAssignment } from '../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
-import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { readFallbackRoutes, readOverrideRoute } from '../routing-core/route-helpers';
 import {
   chainContextWindow,
   snapshotOverrideAvailable,
   tierChainRoutes,
   type ChainContextWindow,
+  type RouteSnapshot,
 } from './virtual-model-chain';
 
 export type TierContextSource = Pick<
@@ -21,7 +21,7 @@ export type SpecificityContextSource = Pick<
 >;
 
 /**
- * Context window of one tier slot, from a catalog snapshot: the chain
+ * Context window of one tier slot, from a route snapshot: the chain
  * ResolveService.buildResolvedRouteChain would build for it (override and its
  * fallbacks, or the legacy auto-assigned route when there is no usable
  * override), filtered with the slot's own response mode, as resolveForTier
@@ -29,11 +29,11 @@ export type SpecificityContextSource = Pick<
  */
 export function tierContextWindow(
   tier: TierContextSource,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): ChainContextWindow {
   const override = readOverrideRoute(tier);
-  const overrideAvailable = override ? snapshotOverrideAvailable(override, catalog) : false;
-  return chainContextWindow(tierChainRoutes(tier, overrideAvailable), tier.response_mode, catalog);
+  const overrideAvailable = override ? snapshotOverrideAvailable(override, snapshot) : false;
+  return chainContextWindow(tierChainRoutes(tier, overrideAvailable), tier.response_mode, snapshot);
 }
 
 /**
@@ -43,12 +43,12 @@ export function tierContextWindow(
  */
 export function specificityContextWindow(
   assignment: SpecificityContextSource,
-  catalog: readonly DiscoveredModel[],
+  snapshot: RouteSnapshot,
 ): ChainContextWindow {
   const override = readOverrideRoute(assignment);
-  if (!override || !snapshotOverrideAvailable(override, catalog)) return { kind: 'empty' };
+  if (!override || !snapshotOverrideAvailable(override, snapshot)) return { kind: 'empty' };
   const chain: ModelRoute[] = [override, ...(readFallbackRoutes(assignment) ?? [])];
-  return chainContextWindow(chain, assignment.response_mode, catalog);
+  return chainContextWindow(chain, assignment.response_mode, snapshot);
 }
 
 /**
@@ -71,7 +71,7 @@ export interface AutoContextInput {
   tiers: readonly TierContextSource[];
   /** Active specificity assignments; ignored with complexity routing off. */
   specificity: readonly SpecificityContextSource[];
-  catalog: readonly DiscoveredModel[];
+  snapshot: RouteSnapshot;
 }
 
 /**
@@ -85,18 +85,18 @@ export interface AutoContextInput {
  * Null (omitted) when a window is unknown or nothing can serve the request.
  */
 export function autoContextLength(input: AutoContextInput): number | null {
-  const { catalog } = input;
+  const { snapshot } = input;
   if (!input.complexityRoutingEnabled) {
     const defaultTier = input.tiers.find((t) => t.tier === DEFAULT_TIER_SLOT);
     if (!defaultTier) return null;
-    const window = tierContextWindow(defaultTier, catalog);
+    const window = tierContextWindow(defaultTier, snapshot);
     return window.kind === 'known' ? window.value : null;
   }
 
   const slots = new Set<string>(TIER_SLOTS);
   const windows: ChainContextWindow[] = [
-    ...input.tiers.filter((t) => slots.has(t.tier)).map((t) => tierContextWindow(t, catalog)),
-    ...input.specificity.map((a) => specificityContextWindow(a, catalog)),
+    ...input.tiers.filter((t) => slots.has(t.tier)).map((t) => tierContextWindow(t, snapshot)),
+    ...input.specificity.map((a) => specificityContextWindow(a, snapshot)),
   ];
   return minAcross(windows);
 }

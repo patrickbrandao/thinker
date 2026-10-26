@@ -40,6 +40,7 @@ import {
   virtualModelContextLength,
   virtualModelRoutable,
   type DefaultTierChainSource,
+  type RouteSnapshot,
 } from './virtual-model-chain';
 
 const PG_UNIQUE_VIOLATION = '23505';
@@ -383,8 +384,11 @@ export class VirtualModelService {
   }
 
   /**
-   * `shadows` and `context_length` for every row from one catalog snapshot
-   * (ADR 0004, section 7): a request never reloads discovery per route.
+   * `shadows`, `context_length` and `routable` for every row from one catalog
+   * snapshot plus the agent's credential rows, both loaded once (ADR 0004,
+   * section 7): a request never reloads discovery or queries providers per
+   * route. A route of a provider the agent no longer has (disconnected or
+   * disabled) is unavailable, as in the proxy.
    */
   private async toViews(
     agentId: string,
@@ -392,15 +396,17 @@ export class VirtualModelService {
     rows: readonly VirtualModel[],
     snapshot?: readonly DiscoveredModel[],
   ): Promise<VirtualModelView[]> {
-    const catalog = snapshot ?? (await this.catalog(agentId, tenantId));
-    const defaultTier = rows.some((r) => r.continue_on_default)
-      ? await this.defaultTier(agentId)
-      : null;
+    const [catalog, providers, defaultTier] = await Promise.all([
+      snapshot ?? this.catalog(agentId, tenantId),
+      this.providerKeyService.getRouteProviderRecords(tenantId, agentId),
+      rows.some((r) => r.continue_on_default) ? this.defaultTier(agentId) : null,
+    ]);
+    const routeSnapshot: RouteSnapshot = { catalog, providers };
     const contextLengths = await Promise.all(
-      rows.map((row) => virtualModelContextLength(row, defaultTier, catalog)),
+      rows.map((row) => virtualModelContextLength(row, defaultTier, routeSnapshot)),
     );
     const routable = await Promise.all(
-      rows.map((row) => virtualModelRoutable(row, defaultTier, catalog)),
+      rows.map((row) => virtualModelRoutable(row, defaultTier, routeSnapshot)),
     );
     return rows.map((row, i) => ({
       id: row.id,
