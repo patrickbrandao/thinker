@@ -163,6 +163,14 @@ describe('GET /api/v1/messages', () => {
     }
   });
 
+  it('accepts exclude_playground', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/messages?range=24h&exclude_playground=true')
+      .set('x-api-key', TEST_API_KEY)
+      .expect(200);
+    expect(res.body.items.length).toBeGreaterThan(0);
+  });
+
   it('rejects an invalid status value with 400', async () => {
     await request(app.getHttpServer())
       .get('/api/v1/messages?range=24h&status=bogus')

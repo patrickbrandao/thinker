@@ -161,6 +161,25 @@ export class OverviewController {
     };
   }
 
+  /**
+   * Just the "Model usage" panel (`cost_by_model` of `overview/details`, same
+   * filters), so the dashboard can poll it without the whole details payload.
+   */
+  @Get('overview/model-usage')
+  async getOverviewModelUsage(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
+    const range = query.range ?? '24h';
+    const agentName = query.agent_name;
+    return {
+      cost_by_model: await this.timeseries.getCostByModel(
+        range,
+        ctx.tenantId,
+        agentName,
+        true,
+        !!agentName,
+      ),
+    };
+  }
+
   @Get('overview/per-agent-timeseries')
   async getPerAgentTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
     const { range, hourly } = this.deriveTimeseriesArgs(query);

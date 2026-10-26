@@ -92,6 +92,13 @@ describe('MessagesController', () => {
     });
   });
 
+  it('forwards exclude_playground to the query service', async () => {
+    await controller.getMessages({ exclude_playground: true } as never, ctx as never);
+    expect(mockGetMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ exclude_playground: true }),
+    );
+  });
+
   it('splits the model filter into a trimmed list, dropping empty entries', async () => {
     await controller.getMessages({ model: 'gpt-4o, , claude-3.5-sonnet ' } as never, ctx as never);
 
