@@ -194,7 +194,9 @@ Valores de `X-Thinker-Reason`:
 | `default` | Tier `default` (roteamento por complexidade desligado ou sem tier atribuído). |
 | `direct` | O `model` nomeou um modelo real (ID explícito). |
 
-Respostas de erro do próprio Thinker (códigos `M…`, veja [Erros](../erros.md)) saem com os mesmos cabeçalhos: `X-Thinker-Reason` traz o motivo do bloqueio (`no_provider`, `no_provider_key`, `subscription_credentials_unusable`, `key_expired`, `limit_exceeded`, `thinker_rate_limited`, `thinker_ip_rate_limited`, `thinker_concurrency_limited`, `thinker_invalid_request`, `model_not_available`, `virtual_model_unavailable` ou `thinker_internal_error`), `X-Thinker-Tier` vale `simple` (ou `default` no `M301`, que também traz `X-Thinker-Virtual-Model`) e `X-Thinker-Provider` e `X-Thinker-Model` valem `thinker`.
+As respostas de erro que o Thinker gera depois de começar a rotear (`M100`, `M101`, `M102`, `M200`, `M301` e `M302`, veja [Erros](../erros.md)) saem com os mesmos cabeçalhos. `X-Thinker-Reason` traz o motivo: `no_provider_key` (`M100`), `no_provider` (`M101`), `subscription_credentials_unusable` (`M102`), `limit_exceeded` (`M200`), `virtual_model_unavailable` (`M301`) ou `model_not_available` (`M302`). `X-Thinker-Tier` vale `simple` (`M100`, `M102`, `M200` e `M302`), o tier resolvido no `M101` e `default` no `M301`, que também traz `X-Thinker-Virtual-Model`. `X-Thinker-Provider` e `X-Thinker-Model` valem `thinker`.
+
+Os demais erros chegam **sem** cabeçalhos `X-Thinker-*`: autenticação (`M001` a `M006`, inclusive chave expirada), limite de taxa (`M201` a `M203`), corpo inválido (`M300`) e erro interno (`M500`). O motivo deles fica no log de mensagens.
 
 ## Limites e custos
 
