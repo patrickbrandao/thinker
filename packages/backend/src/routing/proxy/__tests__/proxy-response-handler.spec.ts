@@ -116,6 +116,30 @@ describe('proxy-response-handler', () => {
 
       expect(headers).not.toHaveProperty('X-Thinker-Specificity');
     });
+
+    it('names the virtual model with the spelling the operator chose', () => {
+      const headers = buildMetaHeaders(
+        makeMeta({
+          tier: 'default',
+          reason: 'virtual-model',
+          virtual_model_id: 'vm-1',
+          virtual_model_name: 'DeepSeek/Flash',
+          fallbackFromModel: 'gpt-4o',
+          fallbackIndex: 1,
+        }),
+      );
+
+      expect(headers['X-Thinker-Virtual-Model']).toBe('DeepSeek/Flash');
+      expect(headers['X-Thinker-Reason']).toBe('virtual-model');
+      expect(headers['X-Thinker-Tier']).toBe('default');
+      // Fallback headers keep working inside a virtual chain.
+      expect(headers['X-Thinker-Fallback-From']).toBe('gpt-4o');
+      expect(headers['X-Thinker-Fallback-Index']).toBe('1');
+    });
+
+    it('omits the virtual model header for other origins', () => {
+      expect(buildMetaHeaders(makeMeta())).not.toHaveProperty('X-Thinker-Virtual-Model');
+    });
   });
 
   /* ── handleProviderError ── */
@@ -2679,6 +2703,40 @@ describe('proxy-response-handler', () => {
   /* ── recordSuccess ── */
 
   describe('recordSuccess', () => {
+    it('stamps the virtual model on the success row and on a fallback success', () => {
+      const recorder = mockRecorder();
+      const usage: StreamUsage = { prompt_tokens: 1, completion_tokens: 1 };
+      const virtual = { virtual_model_id: 'vm-1', virtual_model_name: 'DeepSeek/Flash' };
+
+      recordSuccess(testCtx, makeMeta(virtual), usage, undefined, recorder as any);
+      recordSuccess(
+        testCtx,
+        makeMeta({ ...virtual, fallbackFromModel: 'gpt-4o', fallbackIndex: 0 }),
+        usage,
+        '2025-01-01T00:00:00Z',
+        recorder as any,
+      );
+
+      const expected = expect.objectContaining({
+        virtualModelId: 'vm-1',
+        virtualModelName: 'DeepSeek/Flash',
+      });
+      expect(recorder.recordSuccessMessage).toHaveBeenCalledWith(
+        testCtx,
+        'gpt-4o',
+        'standard',
+        'auto',
+        usage,
+        expected,
+      );
+      expect(recorder.recordFallbackSuccess).toHaveBeenCalledWith(
+        testCtx,
+        'gpt-4o',
+        'standard',
+        expected,
+      );
+    });
+
     it('should record fallback success when fallbackFromModel is set with timestamp', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({ fallbackFromModel: 'gpt-4o', fallbackIndex: 1 });

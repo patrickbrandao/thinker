@@ -173,17 +173,21 @@ Organizações e papéis chegam na v0.3.
 
 ## Roteamento e proxy
 
-O proxy (`routing/proxy/`) expõe `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages` e `GET /v1/models`. A resolução (`routing/resolve/resolve.service.ts`) segue esta ordem:
+O proxy (`routing/proxy/`) expõe `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages` e `GET /v1/models`. A precedência fica em `ProxyService.resolveRouting` ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), seção 5):
 
-1. **Tier por cabeçalho** (`routing/header-tiers/`): regra com `header_key`/`header_value` (por padrão `x-thinker-tier: <nome>`) tem prioridade.
-2. **`model` explícito** no corpo; `auto` significa "roteie".
-3. **Complexidade**, se `agents.complexity_routing_enabled` (padrão `false`): `scoring/` classifica em `simple`, `standard`, `complex` ou `reasoning`. Com a opção desligada, tudo vai ao tier `default`.
-4. Atribuição de tier → provedor/modelo → encaminhamento.
+1. **Modelo virtual** (`ResolveService.resolveVirtualModel`): um virtual ativo do agente cujo nome é igual ao `model`, sem diferenciar maiúsculas e sem outra normalização.
+2. **Tier por cabeçalho** (`ResolveService.resolveHeaderTier`, `routing/header-tiers/`): regra com `header_key`/`header_value` (por padrão `x-thinker-tier: <nome>`). É um passo comum aos caminhos `auto` e explícito; um heartbeat (`auto` com `HEARTBEAT_OK`) pula este passo e vai direto ao tier `simple`.
+3. **`auto`** → `resolveLazy`: complexidade, se `agents.complexity_routing_enabled` (padrão `false`), com `scoring/` classificando em `simple`, `standard`, `complex` ou `reasoning`; com a opção desligada, tudo vai ao tier `default`. **ID real** → rota explícita (`resolveExplicitModel`). **Desconhecido** → `M302`.
+
+`ResolveService.resolve()` / `resolveLazy()` não consultam header tiers, então `POST /api/v1/routing/resolve` também não.
 
 Um tier pontuado sem modelo cai no tier `default`; se o `default` também não tem rota, é `M101`. Um tier com modelo configurado porém indisponível **não** cai no `default` (aparece `M302`/`M101`).
 
-**Modelos virtuais** ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), `routing/virtual-models/`): nomes públicos por harness (tabela `virtual_models`), cada um com principal, até 5 fallbacks, `continue_on_default`, `response_mode` e `output_modality`. Por enquanto só existe a API administrativa em `/api/v1/routing/:agentName/virtual-models` (CRUD, `toggle`, `reorder`, `override`, `fallbacks`, `response-mode`); o proxy e o `/v1/models` ainda não os usam. Regras que valem desde já:
+**Modelos virtuais** ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), `routing/virtual-models/`): nomes públicos por harness (tabela `virtual_models`), cada um com principal, até 5 fallbacks, `continue_on_default`, `response_mode` e `output_modality`. A API administrativa fica em `/api/v1/routing/:agentName/virtual-models` (CRUD, `toggle`, `reorder`, `override`, `fallbacks`, `response-mode`); o `/v1/models` ainda não os publica. Regras:
 
+- **No proxy**, `resolveVirtualModel` monta a cadeia com `buildVirtualModelChain` (`enrichRouteKeyLabel` como `normalize`, antes da deduplicação por `(provider, authType, model, keyLabel)`; `isRouteAvailable` decide se o override do Default está disponível). As rotas do virtual passam por `isRouteAvailable`; a parte do Default segue `buildResolvedRouteChain` (override disponível ou primeira rota com credencial na frente, as demais com `isRouteAvailable`). Depois vem o filtro de transporte com o `response_mode` do virtual. Não passa pelo scorer, pela especificidade nem pelo momentum. Sem rota, `M301`, sem queda para outra regra.
+- **Observabilidade:** `X-Thinker-Reason: virtual-model`, `X-Thinker-Virtual-Model: <nome>`, `X-Thinker-Tier: default` e os `X-Thinker-Fallback-*` de sempre. Toda linha de `agent_messages` do pedido (pendente, tentativas, sucesso, erros, `M301`) grava `virtual_model_id` e `virtual_model_name`; o `routing_reason` é `virtual-model` (ou `virtual_model_unavailable` no `M301`) e os `header_tier_*` ficam nulos.
+- **Parâmetros por modelo** são escopados por rota: `ParamMergeContext.scopeFor(route)` responde `virtual:<id>` para as rotas do virtual e `tier:default` para as que vieram do Default (`route_params_scopes` no `ResolveResponse`). O mesmo vale para o snapshot `request_params` do principal e para a re-derivação quando um fallback vence. Um pedido para um virtual não é `explicit_model_override`.
 - O nome segue `validateVirtualModelName` de `thinker-shared` (1 a 64 caracteres, `auto` reservado) e é único por agente sem diferenciar maiúsculas: o serviço devolve 409, e o índice único `(agent_id, LOWER(name))` fica só na migração, como em `header_tiers`.
 - A validação das rotas na escrita é **estrita**, ao contrário dos header tiers: uma rota que não resolve no catálogo do agente (`getModelsForAgent`, já filtrado pelos provedores habilitados) devolve 400, e um `keyLabel` enviado que não existe para o provedor também. Sem `keyLabel`, a rota é guardada sem rótulo; a chave padrão é escolhida na hora do pedido.
 - A listagem calcula `shadows` (IDs reais que o nome sombreia) e `context_length` com um único snapshot do catálogo por requisição, sem `isRouteAvailable` rota a rota (`virtual-model-chain.ts`).

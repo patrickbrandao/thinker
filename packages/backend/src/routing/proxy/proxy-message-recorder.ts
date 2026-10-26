@@ -46,7 +46,17 @@ export interface HeaderTierRef {
   headerTierColor?: string | null;
 }
 
-export interface ProviderErrorOpts extends HeaderTierRef {
+/**
+ * The virtual model a request named (ADR 0004). Stamped on every row of the
+ * request, with the name as spelled at the time, so renames and deletes keep
+ * old rows readable.
+ */
+export interface VirtualModelRef {
+  virtualModelId?: string | null;
+  virtualModelName?: string | null;
+}
+
+export interface ProviderErrorOpts extends HeaderTierRef, VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -127,6 +137,8 @@ export interface ThinkerBlockedRouting {
   headerTierId?: string;
   headerTierName?: string;
   headerTierColor?: string;
+  virtualModelId?: string;
+  virtualModelName?: string;
 }
 
 export interface PendingRequestOpts {
@@ -151,7 +163,7 @@ export interface CancelledRequestOpts {
   apiMode?: ProxyApiMode;
 }
 
-export interface FallbackSuccessOpts extends HeaderTierRef {
+export interface FallbackSuccessOpts extends HeaderTierRef, VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -188,7 +200,7 @@ export interface FallbackSuccessOpts extends HeaderTierRef {
   apiMode?: ProxyApiMode;
 }
 
-export interface SuccessMessageOpts extends HeaderTierRef {
+export interface SuccessMessageOpts extends HeaderTierRef, VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -604,6 +616,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         // Stamped from the start so an attempt that never reaches a terminal
         // writer still names the connection it used.
         provider_key_label: start.keyLabel ?? null,
+        virtual_model_id: start.virtualModelId ?? null,
+        virtual_model_name: start.virtualModelName ?? null,
       }),
     );
     return true;
@@ -623,6 +637,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       auth_type: opts.attemptStart?.authType ?? null,
       tenant_provider_id: opts.attemptStart?.tenantProviderId ?? null,
       provider_key_label: opts.attemptStart?.keyLabel ?? null,
+      virtual_model_id: opts.attemptStart?.virtualModelId ?? null,
+      virtual_model_name: opts.attemptStart?.virtualModelName ?? null,
       error_message: null,
       error_http_status: null,
     });
@@ -716,6 +732,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
+      virtualModelId,
+      virtualModelName,
       apiMode,
     } = opts ?? {};
     if (httpStatus === 429 && !attempt && !skipAttempt && this.shouldSkipRateLimitRecord(ctx)) {
@@ -758,6 +776,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
+      virtual_model_id: virtualModelId ?? null,
+      virtual_model_name: virtualModelName ?? null,
     });
     await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row, attempt);
@@ -828,6 +848,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: routing?.headerTierId ?? null,
       header_tier_name: routing?.headerTierName ?? null,
       header_tier_color: routing?.headerTierColor ?? null,
+      virtual_model_id: routing?.virtualModelId ?? null,
+      virtual_model_name: routing?.virtualModelName ?? null,
     });
     await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row);
@@ -856,6 +878,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId?: string | null;
       headerTierName?: string | null;
       headerTierColor?: string | null;
+      virtualModelId?: string | null;
+      virtualModelName?: string | null;
     },
   ): Promise<void> {
     const {
@@ -874,6 +898,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
+      virtualModelId,
+      virtualModelName,
     } = opts ?? {};
     if (failures.length === 0) return;
     // primaryModel is loop-invariant — canonicalize once.
@@ -943,6 +969,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           header_tier_id: headerTierId ?? null,
           header_tier_name: headerTierName ?? null,
           header_tier_color: headerTierColor ?? null,
+          virtual_model_id: virtualModelId ?? null,
+          virtual_model_name: virtualModelName ?? null,
         }),
       );
     }
@@ -985,6 +1013,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId?: string | null;
       headerTierName?: string | null;
       headerTierColor?: string | null;
+      virtualModelId?: string | null;
+      virtualModelName?: string | null;
       /** Provider status for the superseded primary. */
       httpStatus?: number | null;
       /** HTTP status returned to the caller when every fallback was exhausted. */
@@ -1028,6 +1058,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: opts?.headerTierId ?? null,
       header_tier_name: opts?.headerTierName ?? null,
       header_tier_color: opts?.headerTierColor ?? null,
+      virtual_model_id: opts?.virtualModelId ?? null,
+      virtual_model_name: opts?.virtualModelName ?? null,
     });
     const requestOutcome = opts?.terminalHttpStatus
       ? {
@@ -1074,6 +1106,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
+      virtualModelId,
+      virtualModelName,
       apiMode,
     } = opts ?? {};
 
@@ -1133,6 +1167,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
+      virtual_model_id: virtualModelId ?? null,
+      virtual_model_name: virtualModelName ?? null,
     });
     await this.persistRequest(ctx, requestId, row, true, apiMode);
     await this.persistAttempt(row, attempt);
@@ -1165,6 +1201,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierId,
       headerTierName,
       headerTierColor,
+      virtualModelId,
+      virtualModelName,
       apiMode,
     } = opts ?? {};
     const requestId = providedRequestId ?? uuid();
@@ -1230,6 +1268,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
+      virtual_model_id: virtualModelId ?? null,
+      virtual_model_name: virtualModelName ?? null,
     });
     await this.persistRequest(ctx, requestId, requestRow, true, apiMode);
     await this.persistAttempt(requestRow, attempt);

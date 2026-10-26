@@ -102,6 +102,31 @@ describe('ProxyMessageRecorder', () => {
       );
     });
 
+    it('stamps the virtual model on the pending row', async () => {
+      const attempt: ProviderAttemptRef = {
+        id: 'attempt-virtual',
+        attemptNumber: 1,
+        startedAtMs: 1_000,
+        startedAt: '1970-01-01T00:00:01.000Z',
+        pendingWrite: Promise.resolve(true),
+      };
+
+      await recorder.recordPendingProviderAttempt(ctx, 'request-1', attempt, {
+        provider: 'openai',
+        model: 'gpt-4o',
+        virtualModelId: 'vm-1',
+        virtualModelName: 'DeepSeek/Flash',
+      });
+
+      expect(insertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'attempt-virtual',
+          virtual_model_id: 'vm-1',
+          virtual_model_name: 'DeepSeek/Flash',
+        }),
+      );
+    });
+
     it('does not complete an attempt whose pending insert failed', async () => {
       const attempt: ProviderAttemptRef = {
         id: 'attempt-missing',
@@ -831,6 +856,29 @@ describe('ProxyMessageRecorder', () => {
       });
     });
 
+    it('names the virtual model on an M301 row and keeps tiers empty', async () => {
+      await recorder.recordThinkerBlockedRequest(ctx, {
+        errorMessage: '[🦚 Thinker M301] Virtual model "DeepSeek/Flash" has no available route',
+        errorCode: 'M301',
+        reason: 'virtual_model_unavailable',
+        model: 'deepseek/flash',
+        routing: { virtualModelId: 'vm-1', virtualModelName: 'DeepSeek/Flash' },
+      });
+
+      expect(insertMock.mock.calls[0][0]).toMatchObject({
+        error_code: 'M301',
+        routing_reason: 'virtual_model_unavailable',
+        error_origin: 'config',
+        error_class: 'no_provider',
+        provider: null,
+        routing_tier: null,
+        header_tier_id: null,
+        header_tier_name: null,
+        virtual_model_id: 'vm-1',
+        virtual_model_name: 'DeepSeek/Flash',
+      });
+    });
+
     it('leaves error_code null when a Thinker row carries no documented code', async () => {
       await recorder.recordThinkerBlockedRequest(ctx, {
         errorMessage: 'something went sideways',
@@ -972,6 +1020,42 @@ describe('ProxyMessageRecorder', () => {
         { id: 'fallback-attempt-2' },
         expect.objectContaining({ request_id: 'request-fallbacks', attempt_number: 3 }),
       );
+    });
+
+    it('stamps the virtual model on every failed fallback row', async () => {
+      await recorder.recordFailedFallbacks(
+        ctx,
+        'default',
+        'gpt-4o',
+        [
+          {
+            model: 'claude-opus-4-6',
+            provider: 'anthropic',
+            status: 503,
+            errorBody: 'x',
+            fallbackIndex: 0,
+          },
+          {
+            model: 'deepseek-chat',
+            provider: 'deepseek',
+            status: 503,
+            errorBody: 'y',
+            fallbackIndex: 1,
+          },
+        ],
+        { reason: 'virtual-model', virtualModelId: 'vm-1', virtualModelName: 'DeepSeek/Flash' },
+      );
+
+      const rows = insertMock.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row).toMatchObject({
+          routing_reason: 'virtual-model',
+          virtual_model_id: 'vm-1',
+          virtual_model_name: 'DeepSeek/Flash',
+          header_tier_id: null,
+        });
+      }
     });
 
     // Connection attribution on failure rows: the label must follow the key

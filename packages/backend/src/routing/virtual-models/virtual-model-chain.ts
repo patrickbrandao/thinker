@@ -67,9 +67,10 @@ export interface BuildVirtualModelChainOptions {
    * Whether the Default tier's override is available, which decides whether
    * its legacy auto-assigned route can be reached (see tierChainRoutes). The
    * proxy passes ProviderKeyService.isRouteAvailable; the admin listing
-   * judges it from its catalog snapshot. Defaults to available.
+   * judges it from its catalog snapshot. Required, so no caller can reach the
+   * legacy route by accident when the override is in fact usable.
    */
-  isDefaultOverrideAvailable?: (route: ModelRoute) => MaybePromise<boolean>;
+  isDefaultOverrideAvailable: (route: ModelRoute) => MaybePromise<boolean>;
   /**
    * Normalizes each route before deduplication, e.g. with the request-time
    * key label (ResolveService.enrichRouteKeyLabel), so `(…, keyLabel: null)`
@@ -93,7 +94,7 @@ export interface BuildVirtualModelChainOptions {
 export async function buildVirtualModelChain(
   virtualModel: VirtualModelChainSource,
   defaultTier: DefaultTierChainSource | null | undefined,
-  options: BuildVirtualModelChainOptions = {},
+  options: BuildVirtualModelChainOptions,
 ): Promise<VirtualModelChainEntry[]> {
   const normalize = options.normalize ?? ((route: ModelRoute) => route);
   const chain: VirtualModelChainEntry[] = [];
@@ -111,9 +112,7 @@ export async function buildVirtualModelChain(
   if (virtualModel.continue_on_default && defaultTier) {
     const defaultScope = modelParamsScopeForTier(DEFAULT_TIER_SLOT);
     const override = readOverrideRoute(defaultTier);
-    const overrideAvailable = override
-      ? await (options.isDefaultOverrideAvailable?.(override) ?? true)
-      : false;
+    const overrideAvailable = override ? await options.isDefaultOverrideAvailable(override) : false;
     for (const route of tierChainRoutes(defaultTier, overrideAvailable)) {
       await push(route, defaultScope, true);
     }

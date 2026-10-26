@@ -9,6 +9,11 @@ import type {
 
 export type { AuthType } from 'thinker-shared';
 
+export interface RouteParamsScope {
+  route: ModelRoute;
+  paramsScope: string;
+}
+
 export interface ResolveResponse {
   tier: TierSlot;
   confidence: number;
@@ -34,6 +39,22 @@ export interface ResolveResponse {
   header_tier_id?: string;
   header_tier_name?: string;
   header_tier_color?: string;
+  /** Virtual model the request named (ADR 0004). Set with reason `virtual-model`. */
+  virtual_model_id?: string;
+  /** The virtual model's name as the operator spelled it. */
+  virtual_model_name?: string;
+  /**
+   * `agent_model_params` scope of each route of a virtual model's chain
+   * (`virtual:<id>` for its own routes, `tier:default` for the ones appended
+   * from the Default tier). Other origins use one scope for every route and
+   * leave this unset.
+   */
+  route_params_scopes?: RouteParamsScope[];
+  /**
+   * Set when a virtual model matched but none of its routes is available. The
+   * proxy turns it into M301 instead of falling through to other routing.
+   */
+  virtual_model_unavailable?: string;
   /**
    * Model named by a pinned routing override that could not be resolved even
    * though its provider connection exists. The proxy turns this into M302

@@ -126,6 +126,20 @@ function openAiModelCost(
   };
 }
 
+/** The virtual model a Thinker-authored row should name, when the request named one. */
+function virtualModelRouting(meta: RoutingMeta | undefined): {
+  routing?: { virtualModelId: string; virtualModelName?: string };
+} {
+  return meta?.virtual_model_id
+    ? {
+        routing: {
+          virtualModelId: meta.virtual_model_id,
+          virtualModelName: meta.virtual_model_name,
+        },
+      }
+    : {};
+}
+
 @Controller('v1')
 @Public()
 @UseGuards(AgentKeyAuthGuard)
@@ -567,6 +581,9 @@ export class ProxyController {
         requestHeaders,
         durationMs,
         apiMode,
+        // Stubs carry no routing decision, but a stub raised for a virtual
+        // model (M301, or a credential failure in its chain) names it.
+        ...virtualModelRouting(meta),
       })
       .catch((e) => this.logger.warn(`Failed to record Thinker stub: ${e}`));
   }
@@ -685,6 +702,8 @@ export class ProxyController {
                 headerTierId: meta.header_tier_id,
                 headerTierName: meta.header_tier_name,
                 headerTierColor: meta.header_tier_color,
+                virtualModelId: meta.virtual_model_id,
+                virtualModelName: meta.virtual_model_name,
               }
             : {}),
           traceId,
@@ -878,6 +897,7 @@ export class ProxyController {
         apiMode,
         // A friendly stub's meta is a placeholder (provider 'thinker', tier
         // 'simple'), not a routing decision, so only a real route stamps tiers.
+        // The virtual model the caller named is real either way.
         ...(meta && meta.provider !== 'thinker'
           ? {
               routing: {
@@ -886,9 +906,11 @@ export class ProxyController {
                 headerTierId: meta.header_tier_id,
                 headerTierName: meta.header_tier_name,
                 headerTierColor: meta.header_tier_color,
+                virtualModelId: meta.virtual_model_id,
+                virtualModelName: meta.virtual_model_name,
               },
             }
-          : {}),
+          : virtualModelRouting(meta)),
       })
       .catch((e) => this.logger.warn(`Failed to record Thinker-blocked request: ${e}`));
   }
