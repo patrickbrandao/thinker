@@ -89,6 +89,8 @@ Na página de roteamento do harness, na seção **Virtual models** (separada dos
 
 Cada rota é validada ao salvar: um modelo que o harness não consegue rotear (provedor não habilitado, modelo desconhecido, rótulo de chave inexistente) é recusado com HTTP 400. Os cartões podem ser reordenados por arraste; essa ordem vale também em `/v1/models`. Pela linha de comando, veja [CLI](cli.md#modelos-virtuais).
 
+Um provedor usado pela cadeia de um virtual (principal ou fallback, com o virtual ativo ou desativado) não pode ser desconectado, desabilitado no harness nem removido, no caso de um provedor custom, até a rota sair do virtual: a operação responde 409 e cita o virtual, como já acontece com os tiers. As rotas que o virtual herda pelo Continue on Default não contam, porque já são protegidas pelo tier `default`.
+
 ### Regras de nome
 
 - De 1 a 64 caracteres entre letras, números, `.`, `_`, `:`, `-` e `/`.

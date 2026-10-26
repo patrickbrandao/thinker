@@ -6,6 +6,7 @@ import {
   getEnabledProviders,
   getAgentProviderDisableImpact,
   getCustomProviders,
+  type AgentProviderDisableImpact,
 } from '../services/api.js';
 import { getProviders as getGlobalProviders } from '../services/api/providers.js';
 import { PROVIDERS } from '../services/providers.js';
@@ -113,20 +114,25 @@ const AgentProviders: Component = () => {
     // disabled — that would silently strip live tier assignments. Block it with
     // an error and tell the user to update routing first, rather than removing
     // the assignments for them.
-    let affectedTiers: Array<{ tier: string; model: string; position: string }>;
+    let impact: AgentProviderDisableImpact;
     try {
-      affectedTiers = (await getAgentProviderDisableImpact(agentName(), connection.userProviderId))
-        .affected_tiers;
+      impact = await getAgentProviderDisableImpact(agentName(), connection.userProviderId);
     } catch {
       setBusy(null);
       toast.error("Couldn't check this provider's routing impact. Please try again.");
       return;
     }
 
-    if (affectedTiers.length > 0) {
+    const affectedVirtuals = impact.affected_virtual_models ?? [];
+    if (impact.affected_tiers.length > 0 || affectedVirtuals.length > 0) {
       setBusy(null);
+      const virtualNames = [...new Set(affectedVirtuals.map((v) => `"${v.name}"`))];
+      const usedBy =
+        impact.affected_tiers.length === 0
+          ? ` Used by virtual model${virtualNames.length > 1 ? 's' : ''} ${virtualNames.join(', ')}.`
+          : '';
       toast.error(
-        `Can't disable ${providerName(connection.provider)}. Its models are assigned to this harness's routing. Update routing to stop using them first.`,
+        `Can't disable ${providerName(connection.provider)}. Its models are assigned to this harness's routing.${usedBy} Update routing to stop using them first.`,
       );
       return;
     }

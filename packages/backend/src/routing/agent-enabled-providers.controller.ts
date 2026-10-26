@@ -17,8 +17,14 @@ import { TenantProvider } from '../entities/tenant-provider.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { HeaderTier } from '../entities/header-tier.entity';
+import { VirtualModel } from '../entities/virtual-model.entity';
 import { ProviderService } from './routing-core/provider.service';
-import type { ModelRoute } from 'thinker-shared';
+import {
+  agentDisableBlockedMessage,
+  collectAffectedVirtualModels,
+  makeAgentProviderRouteMatcher,
+  type AffectedVirtualModel,
+} from './routing-core/agent-provider-impact';
 
 @Controller('api/v1/agents/:agentName/enabled-providers')
 export class AgentEnabledProvidersController {
@@ -36,6 +42,8 @@ export class AgentEnabledProvidersController {
     @InjectRepository(HeaderTier)
     private readonly headerTierRepo: Repository<HeaderTier>,
     private readonly providerService: ProviderService,
+    @InjectRepository(VirtualModel)
+    private readonly virtualModelRepo: Repository<VirtualModel>,
   ) {}
 
   private async resolveAgent(agentName: string, tenantId: string | null) {
@@ -80,31 +88,30 @@ export class AgentEnabledProvidersController {
     // inconsistent ownership contract across the three handlers.
     if (!provider) throw new HttpException('Provider not found', HttpStatus.NOT_FOUND);
 
-    return { affected_tiers: await this.findAffectedRoutes(agent.id, provider) };
+    return {
+      affected_tiers: await this.findAffectedRoutes(agent.id, provider),
+      affected_virtual_models: await this.findAffectedVirtualModels(agent, provider),
+    };
+  }
+
+  /**
+   * Virtual models of this harness (enabled or not) whose own override or
+   * fallbacks run on the provider. Routes inherited from Default are covered by
+   * the tier scan above.
+   */
+  private async findAffectedVirtualModels(
+    agent: Agent,
+    provider: TenantProvider,
+  ): Promise<AffectedVirtualModel[]> {
+    const rows = await this.virtualModelRepo.find({
+      where: { agent_id: agent.id, tenant_id: agent.tenant_id },
+      order: { sort_order: 'ASC' },
+    });
+    return collectAffectedVirtualModels(rows, agent.name, makeAgentProviderRouteMatcher(provider));
   }
 
   private async findAffectedRoutes(agentId: string, provider: TenantProvider) {
-    const providerModels = new Set(
-      (Array.isArray(provider.cached_models) ? provider.cached_models : []).map((m) => m.id),
-    );
-    const providerName = provider.provider.toLowerCase();
-    const providerAuthType = provider.auth_type;
-    const providerLabel = provider.label?.toLowerCase();
-    const routeBelongsToDisabledProvider = (route: ModelRoute | null): boolean => {
-      if (!route) return false;
-      if (route.provider) {
-        if (route.provider.toLowerCase() !== providerName) return false;
-        if (route.authType && route.authType !== providerAuthType) return false;
-        if (route.keyLabel && providerLabel && route.keyLabel.toLowerCase() !== providerLabel) {
-          return false;
-        }
-        if (!route.keyLabel && provider.priority !== 0 && providerLabel !== 'default') {
-          return false;
-        }
-        return true;
-      }
-      return providerModels.has(route.model);
-    };
+    const routeBelongsToDisabledProvider = makeAgentProviderRouteMatcher(provider);
 
     const tiers = await this.tierRepo.find({ where: { agent_id: agentId } });
     const affected: Array<{ tier: string; model: string; position: string }> = [];
@@ -195,10 +202,9 @@ export class AgentEnabledProvidersController {
     });
     if (provider) {
       const affected = await this.findAffectedRoutes(agent.id, provider);
-      if (affected.length > 0) {
-        throw new ConflictException(
-          "Can't disable provider while its models are assigned to this harness's routing. Update routing first.",
-        );
+      const affectedVirtuals = await this.findAffectedVirtualModels(agent, provider);
+      if (affected.length > 0 || affectedVirtuals.length > 0) {
+        throw new ConflictException(agentDisableBlockedMessage(affected.length, affectedVirtuals));
       }
     }
 

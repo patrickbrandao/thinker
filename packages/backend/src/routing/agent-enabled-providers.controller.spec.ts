@@ -6,6 +6,7 @@ import type { TenantProvider } from '../entities/tenant-provider.entity';
 import type { TierAssignment } from '../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import type { HeaderTier } from '../entities/header-tier.entity';
+import type { VirtualModel } from '../entities/virtual-model.entity';
 
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
 
@@ -57,6 +58,11 @@ function makeController(overrides: Record<string, unknown> = {}) {
     ...((overrides.headerTierRepo as object) ?? {}),
   };
 
+  const virtualModelRepo = {
+    find: jest.fn().mockResolvedValue([]),
+    ...((overrides.virtualModelRepo as object) ?? {}),
+  };
+
   const providerService = {
     recalculateTiers: jest.fn().mockResolvedValue(undefined),
     ...((overrides.providerService as object) ?? {}),
@@ -71,7 +77,9 @@ function makeController(overrides: Record<string, unknown> = {}) {
       specificityRepo as never,
       headerTierRepo as never,
       providerService as never,
+      virtualModelRepo as never,
     ),
+    virtualModelRepo,
     enabledProviderRepo,
     agentRepo,
     tenantProviderRepo,
@@ -219,7 +227,7 @@ describe('AgentEnabledProvidersController', () => {
         },
       });
       const result = await controller.getDisableImpact(ctx, 'my-agent', PROVIDER_ID);
-      expect(result).toEqual({ affected_tiers: [] });
+      expect(result).toEqual({ affected_tiers: [], affected_virtual_models: [] });
     });
 
     it('handles non-array cached_models gracefully (treats as empty, no crash)', async () => {
@@ -235,7 +243,7 @@ describe('AgentEnabledProvidersController', () => {
         },
       });
       const result = await controller.getDisableImpact(ctx, 'my-agent', PROVIDER_ID);
-      expect(result).toEqual({ affected_tiers: [] });
+      expect(result).toEqual({ affected_tiers: [], affected_virtual_models: [] });
     });
 
     it('ignores historical auto_assigned_route rows when previewing disable impact', async () => {
@@ -801,6 +809,134 @@ describe('AgentEnabledProvidersController', () => {
 
       expect(enabledProviderRepo.delete).not.toHaveBeenCalled();
       expect(tier.fallback_routes).toHaveLength(2);
+    });
+  });
+
+  describe('virtual models (ADR 0004)', () => {
+    const OPENAI: Partial<TenantProvider> = {
+      id: PROVIDER_ID,
+      tenant_id: TENANT_ID,
+      provider: 'openai',
+      auth_type: 'api_key',
+      label: 'Default',
+      priority: 0,
+      cached_models: [{ id: 'gpt-4o' }] as never,
+    };
+    const openaiRoute = { provider: 'openai', authType: 'api_key' as const, model: 'gpt-4o' };
+    const otherRoute = { provider: 'anthropic', authType: 'api_key' as const, model: 'claude' };
+    const vm = (over: Partial<VirtualModel>): Partial<VirtualModel> => ({
+      id: 'vm-1',
+      tenant_id: TENANT_ID,
+      agent_id: AGENT_ID,
+      name: 'deepseek/flash',
+      enabled: true,
+      override_route: null,
+      fallback_routes: null,
+      continue_on_default: false,
+      ...over,
+    });
+
+    it('reports affected_virtual_models (primary and fallback) in the impact preview', async () => {
+      const { controller, virtualModelRepo } = makeController({
+        tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
+        virtualModelRepo: {
+          find: jest.fn().mockResolvedValue([
+            vm({ override_route: openaiRoute }),
+            vm({
+              id: 'vm-2',
+              name: 'cheap',
+              enabled: false,
+              override_route: otherRoute,
+              fallback_routes: [otherRoute, openaiRoute],
+            }),
+          ]),
+        },
+      });
+
+      const result = await controller.getDisableImpact(ctx, 'my-agent', PROVIDER_ID);
+
+      expect(result.affected_tiers).toEqual([]);
+      expect(result.affected_virtual_models).toEqual([
+        {
+          id: 'vm-1',
+          name: 'deepseek/flash',
+          agent: 'my-agent',
+          position: 'primary',
+          model: 'gpt-4o',
+        },
+        { id: 'vm-2', name: 'cheap', agent: 'my-agent', position: 'fallback 2', model: 'gpt-4o' },
+      ]);
+      // Scoped to the resolved agent and its tenant.
+      expect(virtualModelRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { agent_id: AGENT_ID, tenant_id: TENANT_ID } }),
+      );
+    });
+
+    it('blocks disable with 409 naming the virtual model when an active virtual uses the provider', async () => {
+      const { controller, enabledProviderRepo, providerService } = makeController({
+        tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
+        virtualModelRepo: {
+          find: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
+        },
+      });
+
+      await expect(controller.disable(ctx, 'my-agent', PROVIDER_ID)).rejects.toThrow(
+        'Update routing first (agent "my-agent", virtual model "deepseek/flash", primary: gpt-4o).',
+      );
+      expect(enabledProviderRepo.delete).not.toHaveBeenCalled();
+      expect(providerService.recalculateTiers).not.toHaveBeenCalled();
+    });
+
+    it('blocks disable when only a disabled virtual uses the provider in a fallback', async () => {
+      const { controller, enabledProviderRepo } = makeController({
+        tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
+        virtualModelRepo: {
+          find: jest
+            .fn()
+            .mockResolvedValue([
+              vm({ enabled: false, override_route: otherRoute, fallback_routes: [openaiRoute] }),
+            ]),
+        },
+      });
+
+      await expect(controller.disable(ctx, 'my-agent', PROVIDER_ID)).rejects.toThrow(
+        /virtual model "deepseek\/flash", fallback 1: gpt-4o/,
+      );
+      expect(enabledProviderRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('keeps the historical message when a tier also uses the provider', async () => {
+      const { controller } = makeController({
+        tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
+        tierRepo: {
+          find: jest
+            .fn()
+            .mockResolvedValue([
+              { tier: 'default', override_route: openaiRoute, fallback_routes: null },
+            ]),
+        },
+        virtualModelRepo: {
+          find: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
+        },
+      });
+
+      await expect(controller.disable(ctx, 'my-agent', PROVIDER_ID)).rejects.toThrow(
+        "Can't disable provider while its models are assigned to this harness's routing. Update routing first.",
+      );
+    });
+
+    it('does not count a virtual that only continues on Default (no own route on the provider)', async () => {
+      const { controller, enabledProviderRepo } = makeController({
+        tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
+        virtualModelRepo: {
+          find: jest
+            .fn()
+            .mockResolvedValue([vm({ override_route: otherRoute, continue_on_default: true })]),
+        },
+      });
+
+      await expect(controller.disable(ctx, 'my-agent', PROVIDER_ID)).resolves.toEqual({ ok: true });
+      expect(enabledProviderRepo.delete).toHaveBeenCalled();
     });
   });
 });

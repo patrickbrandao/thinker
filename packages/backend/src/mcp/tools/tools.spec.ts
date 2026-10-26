@@ -455,6 +455,8 @@ describe('MCP tools', () => {
       (deps.tiers.getTiers as jest.Mock).mockResolvedValueOnce([
         { tier: 'default', override_route: null, fallback_routes: [] },
       ]);
+      // The fixture virtual model also routes to openai; clear it too.
+      (deps.virtualModels.list as jest.Mock).mockResolvedValueOnce([]);
       expect(
         (
           await call(tools, 'thinker_agent_provider_disable', {
@@ -473,6 +475,29 @@ describe('MCP tools', () => {
           })
         ).error,
       ).toBe(true);
+    });
+
+    it('blocks disable when only a virtual model (enabled or not) routes to the provider', async () => {
+      const deps = makeDeps();
+      (deps.tiers.getTiers as jest.Mock).mockResolvedValue([
+        { tier: 'default', override_route: null, fallback_routes: [] },
+      ]);
+      (deps.headerTiers.list as jest.Mock).mockResolvedValue([]);
+      (deps.virtualModels.list as jest.Mock).mockResolvedValue([
+        {
+          ...VIRTUAL_ROW,
+          enabled: false,
+          override_route: { provider: 'anthropic', authType: 'api_key', model: 'claude' },
+          fallback_routes: [{ provider: 'openai', authType: 'api_key', model: 'gpt-4o' }],
+        },
+      ]);
+      const blocked = await call(registerAll(deps), 'thinker_agent_provider_disable', {
+        agent: 'demo',
+        provider: 'openai',
+      });
+      expect(blocked.error).toBe(true);
+      expect(JSON.stringify(blocked)).toContain('virtual model');
+      expect(deps.agentEnabledProviderRepo.delete).not.toHaveBeenCalled();
     });
 
     it('covers the specificity branch of the route-impact scan', async () => {
