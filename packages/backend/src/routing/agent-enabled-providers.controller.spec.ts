@@ -58,9 +58,9 @@ function makeController(overrides: Record<string, unknown> = {}) {
     ...((overrides.headerTierRepo as object) ?? {}),
   };
 
-  const virtualModelRepo = {
-    find: jest.fn().mockResolvedValue([]),
-    ...((overrides.virtualModelRepo as object) ?? {}),
+  const virtualModelService = {
+    list: jest.fn().mockResolvedValue([]),
+    ...((overrides.virtualModelService as object) ?? {}),
   };
 
   const providerService = {
@@ -77,9 +77,9 @@ function makeController(overrides: Record<string, unknown> = {}) {
       specificityRepo as never,
       headerTierRepo as never,
       providerService as never,
-      virtualModelRepo as never,
+      virtualModelService as never,
     ),
-    virtualModelRepo,
+    virtualModelService,
     enabledProviderRepo,
     agentRepo,
     tenantProviderRepo,
@@ -837,10 +837,10 @@ describe('AgentEnabledProvidersController', () => {
     });
 
     it('reports affected_virtual_models (primary and fallback) in the impact preview', async () => {
-      const { controller, virtualModelRepo } = makeController({
+      const { controller, virtualModelService, agentRepo } = makeController({
         tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
-        virtualModelRepo: {
-          find: jest.fn().mockResolvedValue([
+        virtualModelService: {
+          list: jest.fn().mockResolvedValue([
             vm({ override_route: openaiRoute }),
             vm({
               id: 'vm-2',
@@ -866,17 +866,18 @@ describe('AgentEnabledProvidersController', () => {
         },
         { id: 'vm-2', name: 'cheap', agent: 'my-agent', position: 'fallback 2', model: 'gpt-4o' },
       ]);
-      // Scoped to the resolved agent and its tenant.
-      expect(virtualModelRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { agent_id: AGENT_ID, tenant_id: TENANT_ID } }),
+      // Scoped to the agent resolved inside the caller's tenant.
+      expect(agentRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenant_id: TENANT_ID }) }),
       );
+      expect(virtualModelService.list).toHaveBeenCalledWith(AGENT_ID);
     });
 
     it('blocks disable with 409 naming the virtual model when an active virtual uses the provider', async () => {
       const { controller, enabledProviderRepo, providerService } = makeController({
         tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
-        virtualModelRepo: {
-          find: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
+        virtualModelService: {
+          list: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
         },
       });
 
@@ -890,8 +891,8 @@ describe('AgentEnabledProvidersController', () => {
     it('blocks disable when only a disabled virtual uses the provider in a fallback', async () => {
       const { controller, enabledProviderRepo } = makeController({
         tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
-        virtualModelRepo: {
-          find: jest
+        virtualModelService: {
+          list: jest
             .fn()
             .mockResolvedValue([
               vm({ enabled: false, override_route: otherRoute, fallback_routes: [openaiRoute] }),
@@ -915,8 +916,8 @@ describe('AgentEnabledProvidersController', () => {
               { tier: 'default', override_route: openaiRoute, fallback_routes: null },
             ]),
         },
-        virtualModelRepo: {
-          find: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
+        virtualModelService: {
+          list: jest.fn().mockResolvedValue([vm({ override_route: openaiRoute })]),
         },
       });
 
@@ -928,8 +929,8 @@ describe('AgentEnabledProvidersController', () => {
     it('does not count a virtual that only continues on Default (no own route on the provider)', async () => {
       const { controller, enabledProviderRepo } = makeController({
         tenantProviderRepo: { findOne: jest.fn().mockResolvedValue(OPENAI) },
-        virtualModelRepo: {
-          find: jest
+        virtualModelService: {
+          list: jest
             .fn()
             .mockResolvedValue([vm({ override_route: otherRoute, continue_on_default: true })]),
         },

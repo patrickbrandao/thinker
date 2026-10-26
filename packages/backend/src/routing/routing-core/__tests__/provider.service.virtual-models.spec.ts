@@ -84,6 +84,7 @@ function memoryRepo<T extends object>(rows: T[]) {
     remove: jest.fn(async (input: T) => input),
     delete: jest.fn(async () => undefined),
     update: jest.fn(async () => undefined),
+    manager: { getRepository: () => ({ delete: jest.fn(async () => undefined) }) },
   };
 }
 
@@ -151,7 +152,7 @@ function build(setup: Setup = {}) {
     enabledRepo as unknown as Repository<AgentEnabledProvider>,
     vmRepo as unknown as Repository<VirtualModel>,
   );
-  return { svc, providerRepo, vmRepo, enabledRepo };
+  return { svc, providerRepo, vmRepo, enabledRepo, routingCache };
 }
 
 describe('ProviderService — virtual model route guards', () => {
@@ -286,5 +287,73 @@ describe('ProviderService — virtual model route guards', () => {
     await expect(svc.removeProvider(null, TENANT, 'openai')).rejects.toThrow(
       /agent "a", tier default, primary: gpt-4o/,
     );
+  });
+});
+
+describe('ProviderService — key relabels reach virtual models', () => {
+  const pin = (label: string, model: string): ModelRoute => ({ ...openai(model), keyLabel: label });
+  const keys = () => [providerRow(), providerRow({ id: 'p-work', label: 'Work', priority: 1 })];
+
+  it('renameKey rewrites override and fallback pins (enabled or not) and invalidates the agents', async () => {
+    const { svc, vmRepo, routingCache } = build({
+      providers: keys(),
+      virtualModels: [
+        vm({
+          id: 'vm-a',
+          enabled: false,
+          override_route: pin('Work', 'gpt-4o'),
+          fallback_routes: [pin('Default', 'gpt-4o-mini'), pin('work', 'o3')],
+        }),
+        vm({ id: 'vm-b', agent_id: 'agent-b', override_route: anthropic() }),
+        // Same label string on another tenant: untouched.
+        vm({
+          id: 'vm-x',
+          tenant_id: OTHER_TENANT,
+          agent_id: 'agent-x',
+          override_route: pin('Work', 'gpt-4o'),
+        }),
+      ],
+    });
+
+    await svc.renameKey(null, TENANT, 'openai', 'api_key', 'Work', 'Job');
+
+    const [a, b, x] = vmRepo.rows;
+    expect(a.override_route?.keyLabel).toBe('Job');
+    expect(a.fallback_routes?.map((r) => r.keyLabel)).toEqual(['Default', 'Job']);
+    expect(b.override_route).toEqual(anthropic());
+    expect(x.override_route?.keyLabel).toBe('Work');
+    expect(vmRepo.save).toHaveBeenCalledWith([a]);
+    expect(routingCache.invalidateAgent).toHaveBeenCalledWith('agent-a');
+    expect(routingCache.invalidateAgent).not.toHaveBeenCalledWith('agent-x');
+  });
+
+  it('renameKey leaves pins of another provider with the same label alone', async () => {
+    const { svc, vmRepo } = build({
+      providers: keys(),
+      virtualModels: [vm({ override_route: { ...anthropic(), keyLabel: 'Work' } })],
+    });
+
+    await svc.renameKey(null, TENANT, 'openai', 'api_key', 'Work', 'Job');
+
+    expect(vmRepo.rows[0].override_route?.keyLabel).toBe('Work');
+    expect(vmRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('deleting an inactive key clears its pin on virtual models', async () => {
+    const { svc, vmRepo, providerRepo } = build({
+      providers: [
+        providerRow(),
+        providerRow({ id: 'p-work', label: 'Work', priority: 1, is_active: false }),
+      ],
+      virtualModels: [
+        vm({ override_route: pin('Work', 'gpt-4o'), fallback_routes: [pin('Work', 'o3')] }),
+      ],
+    });
+
+    await svc.removeProvider(null, TENANT, 'openai', 'api_key', 'Work');
+
+    expect(providerRepo.remove).toHaveBeenCalled();
+    expect(vmRepo.rows[0].override_route?.keyLabel).toBeNull();
+    expect(vmRepo.rows[0].fallback_routes?.[0].keyLabel).toBeNull();
   });
 });

@@ -17,8 +17,8 @@ import { TenantProvider } from '../entities/tenant-provider.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { HeaderTier } from '../entities/header-tier.entity';
-import { VirtualModel } from '../entities/virtual-model.entity';
 import { ProviderService } from './routing-core/provider.service';
+import { VirtualModelService } from './virtual-models/virtual-model.service';
 import {
   agentDisableBlockedMessage,
   collectAffectedVirtualModels,
@@ -42,8 +42,7 @@ export class AgentEnabledProvidersController {
     @InjectRepository(HeaderTier)
     private readonly headerTierRepo: Repository<HeaderTier>,
     private readonly providerService: ProviderService,
-    @InjectRepository(VirtualModel)
-    private readonly virtualModelRepo: Repository<VirtualModel>,
+    private readonly virtualModels: VirtualModelService,
   ) {}
 
   private async resolveAgent(agentName: string, tenantId: string | null) {
@@ -103,10 +102,9 @@ export class AgentEnabledProvidersController {
     agent: Agent,
     provider: TenantProvider,
   ): Promise<AffectedVirtualModel[]> {
-    const rows = await this.virtualModelRepo.find({
-      where: { agent_id: agent.id, tenant_id: agent.tenant_id },
-      order: { sort_order: 'ASC' },
-    });
+    // The resolved agent is already tenant-scoped; list() serves the rows in
+    // publish order through the routing cache.
+    const rows = await this.virtualModels.list(agent.id);
     return collectAffectedVirtualModels(rows, agent.name, makeAgentProviderRouteMatcher(provider));
   }
 

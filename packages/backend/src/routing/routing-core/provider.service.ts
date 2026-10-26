@@ -1355,6 +1355,34 @@ export class ProviderService {
     }
     if (headerTiersToSave.length > 0) await this.headerTierRepo.save(headerTiersToSave);
 
+    // Virtual models (ADR 0004) pin keys the same way. Without this a virtual
+    // pinned to a renamed key would fall back to the provider's first key and
+    // bill another account. Enabled and disabled rows alike, as for the guard.
+    if (this.virtualModelRepo) {
+      const virtualModels = await this.virtualModelRepo.find({ where: { tenant_id: tenantId } });
+      const virtualModelsToSave: VirtualModel[] = [];
+      for (const vm of virtualModels) {
+        let mutated = false;
+        if (routeMatchesKey(vm.override_route)) {
+          vm.override_route = replaceKeyLabel(vm.override_route!);
+          mutated = true;
+        }
+        if (vm.fallback_routes && vm.fallback_routes.some(routeMatchesKey)) {
+          vm.fallback_routes = vm.fallback_routes.map((r) =>
+            routeMatchesKey(r) ? replaceKeyLabel(r) : r,
+          );
+          mutated = true;
+        }
+        if (mutated) {
+          vm.updated_at = now;
+          virtualModelsToSave.push(vm);
+          mutatedAgentIds.add(vm.agent_id);
+        }
+      }
+      if (virtualModelsToSave.length > 0) await this.virtualModelRepo.save(virtualModelsToSave);
+    }
+
+    // invalidateAgent() also drops the agent's virtual-model cache.
     // invalidateTenant() doesn't clear per-agent tier caches, so flush every
     // agent whose rows were rewritten or stale routes would keep serving.
     for (const id of mutatedAgentIds) this.routingCache.invalidateAgent(id);

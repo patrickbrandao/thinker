@@ -36,6 +36,8 @@ let secondAgentId: string;
 let bAgentId: string;
 let bTenantId: string;
 
+let nextSortOrder = 0;
+
 async function seedVirtual(row: {
   id: string;
   tenantId?: string;
@@ -49,7 +51,7 @@ async function seedVirtual(row: {
   await ds.query(
     `INSERT INTO virtual_models
        (id, tenant_id, agent_id, name, sort_order, enabled, override_route, fallback_routes, continue_on_default)
-     VALUES ($1, $2, $3, $4, 0, $5, $6::jsonb, $7::jsonb, $8)`,
+     VALUES ($1, $2, $3, $4, $9, $5, $6::jsonb, $7::jsonb, $8)`,
     [
       row.id,
       row.tenantId ?? TEST_TENANT_ID,
@@ -59,6 +61,8 @@ async function seedVirtual(row: {
       row.override ? JSON.stringify(row.override) : null,
       row.fallbacks ? JSON.stringify(row.fallbacks) : null,
       row.continueOnDefault ?? false,
+      // Publish order follows seeding order, so "first match" is deterministic.
+      nextSortOrder++,
     ],
   );
   const cache = app.get(RoutingCacheService);
@@ -66,7 +70,13 @@ async function seedVirtual(row: {
 }
 
 async function dropVirtual(id: string): Promise<void> {
+  const rows: Array<{ agent_id: string }> = await ds.query(
+    `SELECT agent_id FROM virtual_models WHERE id = $1`,
+    [id],
+  );
   await ds.query(`DELETE FROM virtual_models WHERE id = $1`, [id]);
+  // The REST guard reads virtual models through the routing cache.
+  for (const row of rows) app.get(RoutingCacheService).invalidateAgent(row.agent_id);
 }
 
 async function providerId(tenantId: string, provider: string): Promise<string> {
@@ -276,5 +286,82 @@ describe('virtual models block provider disconnect, disable and removal', () => 
     ).expect(200);
     expect(res.body).toEqual({ affected_tiers: [], affected_virtual_models: [] });
     await asA(api().delete(`/api/v1/agents/${AGENT}/enabled-providers/${deepseekId}`)).expect(200);
+  });
+});
+
+describe('key renames and inactive key deletion follow virtual model pins', () => {
+  const pinned = (label: string, model: string): ModelRoute => ({
+    provider: 'anthropic',
+    authType: 'api_key',
+    model,
+    keyLabel: label,
+  });
+
+  async function routesOf(id: string) {
+    const rows: Array<{ override_route: ModelRoute | null; fallback_routes: ModelRoute[] | null }> =
+      await ds.query(`SELECT override_route, fallback_routes FROM virtual_models WHERE id = $1`, [
+        id,
+      ]);
+    return rows[0];
+  }
+
+  it('renaming a key rewrites the pin on virtual models of the same tenant only', async () => {
+    await asA(api().post(`/api/v1/routing/${AGENT}/providers`))
+      .send({ provider: 'anthropic', apiKey: 'sk-ant-guard-default-000000' })
+      .expect(201);
+    await asA(api().post(`/api/v1/routing/${AGENT}/providers`))
+      .send({ provider: 'anthropic', apiKey: 'sk-ant-guard-work-000000', label: 'Work' })
+      .expect(201);
+    await seedVirtual({
+      id: 'g-pin',
+      name: 'pinned',
+      enabled: false,
+      override: pinned('Work', 'claude-a'),
+      fallbacks: [pinned('Default', 'claude-b'), pinned('Work', 'claude-c')],
+    });
+    // Tenant B's row with the same label string must not be touched.
+    await seedVirtual({
+      id: 'g-pin-b',
+      tenantId: bTenantId,
+      agentId: bAgentId,
+      name: 'pinned-b',
+      override: pinned('Work', 'claude-a'),
+    });
+    // Warm the virtual-model cache so the rename has to invalidate it.
+    await asA(api().get(`/api/v1/routing/${AGENT}/virtual-models`)).expect(200);
+
+    await asA(api().patch(`/api/v1/routing/${AGENT}/providers/anthropic/keys/Work`))
+      .send({ newLabel: 'Job' })
+      .expect(200);
+
+    const mine = await routesOf('g-pin');
+    expect(mine.override_route?.keyLabel).toBe('Job');
+    expect(mine.fallback_routes?.map((r) => r.keyLabel)).toEqual(['Default', 'Job']);
+    expect((await routesOf('g-pin-b')).override_route?.keyLabel).toBe('Work');
+
+    // The cached admin listing reflects the rename.
+    const list = await asA(api().get(`/api/v1/routing/${AGENT}/virtual-models`)).expect(200);
+    const view = (list.body as Array<{ id: string; override_route: ModelRoute | null }>).find(
+      (v) => v.id === 'g-pin',
+    );
+    expect(view?.override_route?.keyLabel).toBe('Job');
+  });
+
+  it('deleting an inactive key clears the pin on virtual models', async () => {
+    await ds.query(
+      `UPDATE tenant_providers SET is_active = false
+        WHERE tenant_id = $1 AND provider = 'anthropic' AND label = 'Job'`,
+      [TEST_TENANT_ID],
+    );
+    await asA(
+      api().delete(`/api/v1/routing/${AGENT}/providers/anthropic?authType=api_key&label=Job`),
+    ).expect(200);
+
+    const mine = await routesOf('g-pin');
+    expect(mine.override_route?.keyLabel ?? null).toBeNull();
+    expect(mine.fallback_routes?.map((r) => r.keyLabel ?? null)).toEqual(['Default', null]);
+    expect((await routesOf('g-pin-b')).override_route?.keyLabel).toBe('Work');
+    await dropVirtual('g-pin');
+    await dropVirtual('g-pin-b');
   });
 });

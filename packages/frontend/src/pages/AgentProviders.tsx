@@ -128,7 +128,7 @@ const AgentProviders: Component = () => {
       setBusy(null);
       const virtualNames = [...new Set(affectedVirtuals.map((v) => `"${v.name}"`))];
       const usedBy =
-        impact.affected_tiers.length === 0
+        virtualNames.length > 0
           ? ` Used by virtual model${virtualNames.length > 1 ? 's' : ''} ${virtualNames.join(', ')}.`
           : '';
       toast.error(

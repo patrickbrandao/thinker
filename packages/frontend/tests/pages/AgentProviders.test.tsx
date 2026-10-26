@@ -256,6 +256,34 @@ describe('AgentProviders', () => {
     expect(mockDisableEnabledProviders).not.toHaveBeenCalled();
   });
 
+  it('also names the virtual models when a tier uses the provider too', async () => {
+    mockGetAgentProviderDisableImpact.mockResolvedValue({
+      affected_tiers: [{ tier: 'default', model: 'gpt-4o', position: 'primary' }],
+      affected_virtual_models: [
+        {
+          id: 'vm-1',
+          name: 'deepseek/flash',
+          agent: 'demo-agent',
+          model: 'gpt-4o',
+          position: 'primary',
+        },
+      ],
+    });
+    render(() => <AgentProviders />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText('Disable OpenAI Work'));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringContaining('Used by virtual model "deepseek/flash".'),
+      );
+    });
+    expect(mockDisableEnabledProviders).not.toHaveBeenCalled();
+  });
+
   it('disables directly with DELETE when no models are routed', async () => {
     mockGetAgentProviderDisableImpact.mockResolvedValue({ affected_tiers: [] });
     render(() => <AgentProviders />);
