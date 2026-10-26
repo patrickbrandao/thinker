@@ -15,9 +15,6 @@
   "transformIgnorePatterns": [
     "node_modules/(?!(better-auth|better-call|@better-auth)/)"
   ],
-  "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/src/$1"
-  },
   "collectCoverageFrom": [
     "src/**/*.ts",
     "!src/**/*.spec.ts",

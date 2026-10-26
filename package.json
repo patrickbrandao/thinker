@@ -66,7 +66,10 @@
     },
     "undici@^6": "^6.28.1",
     "form-data": "^4.0.6",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "@nestjs/cli": {
+      "typescript": "$typescript"
+    }
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.71.1",
@@ -77,6 +80,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
-    "turbo": "^2"
+    "turbo": "^2",
+    "typescript": "^6.0.3"
   }
 }

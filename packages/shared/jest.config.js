@@ -1,6 +1,10 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
+  // tsconfig.test.json adds the jest globals; the build tsconfigs load no
+  // ambient types.
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+  },
   testEnvironment: 'node',
   roots: ['<rootDir>/__tests__'],
   testMatch: ['**/*.spec.ts'],
