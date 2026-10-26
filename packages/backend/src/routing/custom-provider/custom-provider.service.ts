@@ -111,6 +111,7 @@ function authTypeForCustomProvider(name: string): AuthType {
 }
 
 const ALIAS_UNIQUE_INDEX = 'IDX_custom_providers_tenant_alias';
+const NAME_UNIQUE_INDEX = 'IDX_custom_providers_tenant_name';
 const PG_UNIQUE_VIOLATION = '23505';
 
 /**
@@ -119,9 +120,18 @@ const PG_UNIQUE_VIOLATION = '23505';
  * `constraint` onto the QueryFailedError it throws, so the loser is
  * recognisable and gets the same 409 the pre-check would have produced.
  */
-function isAliasUniqueViolation(err: unknown): boolean {
+function isUniqueViolation(err: unknown, index: string): boolean {
   const pg = err as { code?: unknown; constraint?: unknown } | null;
-  return pg?.code === PG_UNIQUE_VIOLATION && pg.constraint === ALIAS_UNIQUE_INDEX;
+  return pg?.code === PG_UNIQUE_VIOLATION && pg.constraint === index;
+}
+
+function isAliasUniqueViolation(err: unknown): boolean {
+  return isUniqueViolation(err, ALIAS_UNIQUE_INDEX);
+}
+
+/** Same race as the alias, on the (tenant_id, LOWER(name)) index. */
+function isNameUniqueViolation(err: unknown): boolean {
+  return isUniqueViolation(err, NAME_UNIQUE_INDEX);
 }
 
 @Injectable()
@@ -365,6 +375,9 @@ export class CustomProviderService {
       if (isAliasUniqueViolation(err)) {
         throw new ConflictException(`Alias "${alias}" is already used by another provider`);
       }
+      if (isNameUniqueViolation(err)) {
+        throw new ConflictException(`Custom provider "${dto.name}" already exists`);
+      }
       throw err;
     }
 
@@ -437,6 +450,9 @@ export class CustomProviderService {
     } catch (err) {
       if (isAliasUniqueViolation(err)) {
         throw new ConflictException(`Alias "${cp.alias}" is already used by another provider`);
+      }
+      if (isNameUniqueViolation(err)) {
+        throw new ConflictException(`Custom provider "${cp.name}" already exists`);
       }
       throw err;
     }
