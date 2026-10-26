@@ -495,6 +495,7 @@ describe('M301 and continue_on_default', () => {
 
       expect(JSON.stringify(res.body)).toContain('M301');
       expect(JSON.stringify(res.body)).toContain('broken');
+      expect(JSON.stringify(res.body)).toContain('turn on \\"Continue on Default\\"');
       expect(res.headers['x-thinker-virtual-model']).toBe('broken');
       expect(upstream).toHaveLength(0);
       const rows = await rowsAfter(1);
@@ -535,7 +536,10 @@ describe('M301 and continue_on_default', () => {
 
     const res = await send('/v1/chat/completions', 'broken').expect(200);
 
-    expect(JSON.stringify(res.body)).toContain('M301');
+    const text = JSON.stringify(res.body);
+    expect(text).toContain('M301');
+    expect(text).toContain('the Default tier it continues on has no available route either');
+    expect(text).not.toContain('turn on');
     expect(upstream).toHaveLength(0);
   });
 });
@@ -627,24 +631,49 @@ describe('per-route params scope', () => {
     flush();
   }
 
-  it('merges virtual:<id> into its own routes and tier:default into the borrowed ones', async () => {
+  it.each([false, true])(
+    'records every row with the params of its own route (stream: %s)',
+    async (stream) => {
+      const id = await createVirtual('scoped', { fallbacks: [FALLBACK], continueOnDefault: true });
+      await params(`virtual:${id}`, 'gpt-4o', 0.1);
+      await params(`virtual:${id}`, 'gpt-4o-mini', 0.3);
+      // A row under the virtual scope for the Default's model must not apply
+      // to the route the chain borrowed from the Default.
+      await params(`virtual:${id}`, 'gpt-4.1', 0.5);
+      await params('tier:default', 'gpt-4.1', 0.9);
+      failing.set('gpt-4o', 503);
+      failing.set('gpt-4o-mini', 503);
+
+      await send('/v1/chat/completions', 'scoped', { extra: { stream } }).expect(200);
+
+      expect(upstream.map((c) => [c.body.model, c.body.temperature])).toEqual([
+        ['gpt-4o', 0.1],
+        ['gpt-4o-mini', 0.3],
+        ['gpt-4.1', 0.9],
+      ]);
+      const rows = await rowsAfter(3);
+      expect(rows.map((r) => [r.model, r.status, (r.request_params ?? {}).temperature])).toEqual([
+        ['gpt-4o', 'failed', 0.1],
+        ['gpt-4o-mini', 'failed', 0.3],
+        ['gpt-4.1', 'success', 0.9],
+      ]);
+    },
+  );
+
+  it('records the exhausted chain rows with their own params', async () => {
     const id = await createVirtual('scoped', { continueOnDefault: true });
     await params(`virtual:${id}`, 'gpt-4o', 0.1);
-    // A row under the virtual scope for the Default's model must not apply
-    // to the route the chain borrowed from the Default.
-    await params(`virtual:${id}`, 'gpt-4.1', 0.5);
     await params('tier:default', 'gpt-4.1', 0.9);
     failing.set('gpt-4o', 503);
+    failing.set('gpt-4.1', 503);
 
-    await send('/v1/chat/completions', 'scoped').expect(200);
+    await send('/v1/chat/completions', 'scoped').expect(503);
 
-    expect(upstream.map((c) => [c.body.model, c.body.temperature])).toEqual([
+    const rows = await rowsAfter(2);
+    expect(rows.map((r) => [r.model, (r.request_params ?? {}).temperature])).toEqual([
       ['gpt-4o', 0.1],
       ['gpt-4.1', 0.9],
     ]);
-    const rows = await rowsAfter(2);
-    const success = rows.find((r) => r.status === 'success');
-    expect(success?.request_params).toMatchObject({ temperature: 0.9 });
   });
 
   it('uses tier:default for a primary that came from the Default tier', async () => {

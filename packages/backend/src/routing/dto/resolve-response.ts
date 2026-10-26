@@ -56,6 +56,11 @@ export interface ResolveResponse {
    */
   virtual_model_unavailable?: string;
   /**
+   * With `virtual_model_unavailable`: whether the virtual model continues on
+   * the Default tier, so M301 can say the Default had no route either.
+   */
+  virtual_model_continues_on_default?: boolean;
+  /**
    * Model named by a pinned routing override that could not be resolved even
    * though its provider connection exists. The proxy turns this into M302
    * ("model not available") instead of M101 ("no model to route to").

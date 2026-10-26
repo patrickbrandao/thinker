@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { AuthType, ModelRoute } from 'thinker-shared';
+import type { AuthType, ModelRoute, RequestParamDefaults } from 'thinker-shared';
 import { applyRequestParamDefaults } from 'thinker-shared';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
@@ -145,6 +145,11 @@ export interface FailedFallback {
   attempt?: ProviderAttemptRef;
   /** False when the route was rejected locally (for example by a cooldown). */
   providerCallStarted?: boolean;
+  /**
+   * Params snapshot of this hop, under its own route's scope. Filled by the
+   * proxy after the chain runs; absent rows fall back to the request's.
+   */
+  requestParams?: RequestParamDefaults | null;
 }
 
 @Injectable()

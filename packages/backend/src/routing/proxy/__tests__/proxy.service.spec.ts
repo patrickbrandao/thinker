@@ -2893,6 +2893,95 @@ describe('ProxyService — orchestration', () => {
       });
       expect(result.meta.thinker_error_message).toContain('[🦚 Thinker M301]');
       expect(result.meta.thinker_error_message).toContain('"DeepSeek/Flash"');
+      // Option off: point at the option.
+      expect(result.meta.thinker_error_message).toContain('turn on "Continue on Default"');
+    });
+
+    it('says the Default came up empty when the virtual already continues on it', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: null,
+          fallback_routes: null,
+          route_params_scopes: undefined,
+          virtual_model_unavailable: 'DeepSeek/Flash',
+          virtual_model_continues_on_default: true,
+        }),
+      );
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(result.meta.thinker_error_code).toBe('M301');
+      expect(result.meta.thinker_error_message).toContain(
+        'the Default tier it continues on has no available route either',
+      );
+      expect(result.meta.thinker_error_message).not.toContain('turn on');
+    });
+
+    it('snapshots each attempt under the scope of its own route', async () => {
+      // Same model on two keys: the virtual's own route and one borrowed from
+      // the Default, configured differently under their scopes.
+      const ds = route('deepseek', 'api_key', 'deepseek-v4-flash');
+      const dsWork = { ...ds, keyLabel: 'Work' };
+      const dsSpare = { ...ds, keyLabel: 'Spare' };
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: ds,
+          fallback_routes: [dsWork, dsSpare],
+          route_params_scopes: [
+            { route: ds, paramsScope: 'virtual:vm-1' },
+            { route: dsWork, paramsScope: 'tier:default' },
+            { route: dsSpare, paramsScope: 'tier:default-spare' },
+          ],
+        }),
+      );
+      modelParamsService.get.mockImplementation(async (_agent: string, scope: string) =>
+        scope === 'virtual:vm-1'
+          ? { thinking: { type: 'disabled' } }
+          : scope === 'tier:default'
+            ? { thinking: { type: 'enabled' } }
+            : null,
+      );
+      fallbackService.tryForwardToProvider.mockResolvedValue({
+        response: new Response('overloaded', { status: 503 }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+      fallbackService.tryFallbacks.mockResolvedValue({
+        success: {
+          forward: ok(),
+          model: 'deepseek-v4-flash',
+          provider: 'deepseek',
+          fallbackIndex: 1,
+          authType: 'api_key',
+          tenantProviderId: 'up-spare',
+        },
+        failures: [
+          {
+            model: 'deepseek-v4-flash',
+            provider: 'deepseek',
+            fallbackIndex: 0,
+            status: 503,
+            errorBody: 'down',
+            authType: 'api_key',
+          },
+        ],
+      });
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(result.meta.primaryRequestParams).toMatchObject({ thinking: { type: 'disabled' } });
+      expect(result.failedFallbacks?.[0].requestParams).toMatchObject({
+        thinking: { type: 'enabled' },
+      });
+      // The winner is looked up under its own route's scope.
+      expect(modelParamsService.get).toHaveBeenCalledWith(
+        'agent-1',
+        'tier:default-spare',
+        'deepseek',
+        'api_key',
+        'deepseek-v4-flash',
+      );
     });
 
     it('merges params per route and is never an explicit override', async () => {

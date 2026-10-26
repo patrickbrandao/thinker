@@ -965,7 +965,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           provider_key_label: f.keyLabel ?? providerKeyLabel ?? null,
           caller_attribution: callerAttribution ?? null,
           request_headers: requestHeaders ?? null,
-          request_params: requestParams ?? null,
+          // Each hop's own snapshot when the proxy computed one.
+          request_params: (f.requestParams !== undefined ? f.requestParams : requestParams) ?? null,
           header_tier_id: headerTierId ?? null,
           header_tier_name: headerTierName ?? null,
           header_tier_color: headerTierColor ?? null,

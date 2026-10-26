@@ -1011,6 +1011,21 @@ describe('proxy-response-handler', () => {
       expect(recorder.recordPrimaryFailure).toHaveBeenCalled();
     });
 
+    it("records the failed primary with its own params, not the winner's", () => {
+      const recorder = mockRecorder();
+      const meta = makeMeta({
+        fallbackFromModel: 'gpt-4o',
+        request_params: { temperature: 0.9 },
+        primaryRequestParams: { temperature: 0.1 },
+      });
+
+      recordFallbackFailures(testCtx, meta, undefined, recorder as never);
+
+      expect(recorder.recordPrimaryFailure.mock.calls[0][6]).toMatchObject({
+        requestParams: { temperature: 0.1 },
+      });
+    });
+
     it('should record failed fallbacks when present', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({ fallbackFromModel: 'gpt-4o' });

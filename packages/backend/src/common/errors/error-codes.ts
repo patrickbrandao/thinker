@@ -71,7 +71,7 @@ export const THINKER_ERRORS = {
   M301: {
     title: 'Virtual model has no available route',
     template:
-      'Virtual model "{name}" has no available route right now: none of its models can be reached for this agent. Fix its chain, or turn on "Continue on Default", here: {dashboardUrl}',
+      'Virtual model "{name}" has no available route right now: none of its models can be reached for this agent{detail} here: {dashboardUrl}',
   },
   M302: {
     title: 'Model not available',

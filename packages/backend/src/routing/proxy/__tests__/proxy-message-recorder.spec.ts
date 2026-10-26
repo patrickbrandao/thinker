@@ -1022,6 +1022,38 @@ describe('ProxyMessageRecorder', () => {
       );
     });
 
+    it('records each hop with its own params snapshot when it carries one', async () => {
+      await recorder.recordFailedFallbacks(
+        ctx,
+        'default',
+        'gpt-4o',
+        [
+          {
+            model: 'gpt-4.1',
+            provider: 'openai',
+            status: 503,
+            errorBody: 'x',
+            fallbackIndex: 0,
+            requestParams: { temperature: 0.9 },
+          },
+          {
+            model: 'gpt-4o-mini',
+            provider: 'openai',
+            status: 503,
+            errorBody: 'y',
+            fallbackIndex: 1,
+          },
+        ],
+        { requestParams: { temperature: 0.1 } },
+      );
+
+      const rows = insertMock.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(rows.map((r) => r.request_params)).toEqual([
+        { temperature: 0.9 },
+        { temperature: 0.1 },
+      ]);
+    });
+
     it('stamps the virtual model on every failed fallback row', async () => {
       await recorder.recordFailedFallbacks(
         ctx,

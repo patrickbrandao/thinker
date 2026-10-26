@@ -177,6 +177,7 @@ describe('ResolveService.resolveVirtualModel (ADR 0004)', () => {
         reason: 'virtual-model',
         virtual_model_id: 'vm-1',
         virtual_model_unavailable: 'DeepSeek/Flash',
+        virtual_model_continues_on_default: false,
       });
       // The Default tier is never read with the option off.
       expect(tierService.getTiers).not.toHaveBeenCalled();
@@ -250,7 +251,9 @@ describe('ResolveService.resolveVirtualModel (ADR 0004)', () => {
       ]);
       providerKeyService.isRouteAvailable.mockResolvedValue(false);
 
-      expect((await resolveVm())?.virtual_model_unavailable).toBe('DeepSeek/Flash');
+      const result = await resolveVm();
+      expect(result?.virtual_model_unavailable).toBe('DeepSeek/Flash');
+      expect(result?.virtual_model_continues_on_default).toBe(true);
     });
 
     it('signals M301 when the agent has no Default row', async () => {

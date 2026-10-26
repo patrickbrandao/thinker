@@ -168,6 +168,12 @@ export interface RoutingMeta {
   primaryAttempt?: ProviderAttemptRef;
   /** Whether the primary/retry actually crossed the provider transport boundary. */
   primaryProviderCallStarted?: boolean;
+  /**
+   * Params snapshot of the failed primary when a fallback succeeded.
+   * `request_params` then holds the winner's, which can differ in model and,
+   * for a virtual chain, in scope.
+   */
+  primaryRequestParams?: RequestParamDefaults | null;
 }
 
 export interface ProxyResult {
@@ -327,6 +333,7 @@ export class ProxyService {
             stream,
             agentName,
             resolved.virtual_model_unavailable,
+            resolved.virtual_model_continues_on_default === true,
           ),
           resolved,
         );
@@ -1044,32 +1051,58 @@ export class ProxyService {
     this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
     this.recordCategoryIfValid(sessionMomentumKey, resolved.specificity_category);
 
-    if (success) {
-      // Re-snapshot for the fallback's actual provider — its model-scoped
-      // params row (if any) is what was actually applied. Different model
-      // → different lookup → different snapshot, matching the wire. The scope
-      // is the winning route's own (a virtual chain mixes two). The two
-      // lookups are independent, so resolve them together.
-      const successRoute = fallbackRoutes[success.fallbackIndex] ?? null;
-      const [fallbackModelParams, fallbackSpecs] = await Promise.all([
-        success.authType
-          ? this.modelParamsService.get(
-              args.paramMergeContext.agentId,
-              args.paramMergeContext.scopeFor(successRoute),
-              success.provider,
-              success.authType,
-              success.model,
+    // Every row records the params of its own attempt (ADR 0004, section 9):
+    // the primary under its scope, each hop under the scope of its route. A
+    // virtual chain mixes two scopes, so no row may borrow another's snapshot.
+    const primaryRequestParams =
+      primaryProvider && primaryAuth && resolved.route
+        ? await this.attemptRequestParams(
+            args.paramMergeContext,
+            resolved.route,
+            primaryProvider,
+            primaryAuth,
+            primaryModel,
+            body,
+          )
+        : snapshotRequestParams({
+            body: body as Record<string, unknown>,
+            modelParams: null,
+            specs: [],
+          });
+    const scopedFailures: FailedFallback[] = await Promise.all(
+      failures.map(async (failure) => ({
+        ...failure,
+        requestParams: failure.authType
+          ? await this.attemptRequestParams(
+              args.paramMergeContext,
+              fallbackRoutes[failure.fallbackIndex] ?? null,
+              failure.provider,
+              failure.authType,
+              failure.model,
+              body,
             )
           : null,
-        success.authType
-          ? this.providerParamSpecs.getSpecs(success.provider, success.authType, success.model)
-          : [],
-      ]);
-      const fallbackRequestParams = snapshotRequestParams({
-        body: body as Record<string, unknown>,
-        modelParams: fallbackModelParams,
-        specs: fallbackSpecs,
-      });
+      })),
+    );
+
+    if (success) {
+      // Re-snapshot for the fallback's actual provider — its model-scoped
+      // params row (if any) is what was actually applied. The scope is the
+      // winning route's own.
+      const fallbackRequestParams = success.authType
+        ? await this.attemptRequestParams(
+            args.paramMergeContext,
+            fallbackRoutes[success.fallbackIndex] ?? null,
+            success.provider,
+            success.authType,
+            success.model,
+            body,
+          )
+        : snapshotRequestParams({
+            body: body as Record<string, unknown>,
+            modelParams: null,
+            specs: [],
+          });
       return {
         forward: success.forward,
         meta: this.buildBaseMeta(resolved, success.model, {
@@ -1089,12 +1122,13 @@ export class ProxyService {
           primaryTenantProviderId: args.primaryTenantProviderId,
           primaryAttempt: forward.attempt,
           primaryProviderCallStarted: forward.providerCallStarted,
+          primaryRequestParams,
           attempt: success.forward.attempt,
           providerCallStarted: success.forward.providerCallStarted,
           tenantProviderId: success.tenantProviderId,
           request_params: fallbackRequestParams,
         }),
-        failedFallbacks: failures,
+        failedFallbacks: scopedFailures,
       };
     }
 
@@ -1107,33 +1141,9 @@ export class ProxyService {
     safeHeaders.delete('transfer-encoding');
     const rebuilt = new Response(primaryErrorBody, { status: primaryStatus, headers: safeHeaders });
 
-    // Fallback exhausted — recorded against the primary provider, so use
-    // the primary-provider snapshot for the row. Look up the primary's
-    // model-params one more time so the snapshot reflects what was sent
-    // before the chain failed.
-    const [primaryModelParams, exhaustedSpecs] = await Promise.all([
-      primaryProvider && primaryAuth && resolved.route
-        ? this.modelParamsService.get(
-            args.paramMergeContext.agentId,
-            args.paramMergeContext.scopeFor(resolved.route),
-            primaryProvider,
-            primaryAuth as 'api_key' | 'subscription' | 'local',
-            primaryModel,
-          )
-        : null,
-      primaryProvider && primaryAuth && resolved.route
-        ? this.providerParamSpecs.getSpecs(
-            primaryProvider,
-            primaryAuth as 'api_key' | 'subscription' | 'local',
-            primaryModel,
-          )
-        : [],
-    ]);
-    const exhaustedRequestParams = snapshotRequestParams({
-      body: body as Record<string, unknown>,
-      modelParams: primaryModelParams,
-      specs: exhaustedSpecs,
-    });
+    // Fallback exhausted — recorded against the primary provider, so the
+    // row carries the primary's snapshot.
+    const exhaustedRequestParams = primaryRequestParams;
     return {
       forward: {
         response: rebuilt,
@@ -1154,8 +1164,30 @@ export class ProxyService {
         providerCallStarted:
           failures[failures.length - 1]?.providerCallStarted ?? forward.providerCallStarted,
       }),
-      failedFallbacks: failures,
+      failedFallbacks: scopedFailures,
     };
+  }
+
+  /** Snapshot of the params one attempt sent, under the scope of its own route. */
+  private async attemptRequestParams(
+    ctx: ParamMergeContext,
+    route: ModelRoute | null,
+    provider: string,
+    authType: AuthType | string,
+    model: string,
+    body: ProxyRequestOptions['body'],
+  ): Promise<RequestParamDefaults | null> {
+    const [modelParams, specs] = await Promise.all([
+      this.modelParamsService.get(
+        ctx.agentId,
+        ctx.scopeFor(route),
+        provider,
+        authType as AuthType,
+        model,
+      ),
+      this.providerParamSpecs.getSpecs(provider, authType as AuthType, model),
+    ]);
+    return snapshotRequestParams({ body: body as Record<string, unknown>, modelParams, specs });
   }
 
   private buildBaseMeta(
@@ -1296,9 +1328,15 @@ export class ProxyService {
     stream: boolean,
     agentName: string | undefined,
     name: string,
+    continuesOnDefault: boolean,
   ): ProxyResult {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-    const content = formatThinkerError('M301', { name, dashboardUrl });
+    // With "Continue on Default" already on, the Default came up empty too,
+    // so suggesting the option would send the operator in a circle.
+    const detail = continuesOnDefault
+      ? ', and the Default tier it continues on has no available route either. Fix its chain or the Default tier'
+      : '. Fix its chain, or turn on "Continue on Default"';
+    const content = formatThinkerError('M301', { name, detail, dashboardUrl });
     return buildFriendlyResponse(
       content,
       stream,

@@ -125,7 +125,6 @@ export class ResolveService {
    * (ADR 0004, section 5), and `POST /api/v1/routing/resolve` has no headers
    * to match.
    */
-
   async resolveLazy(
     agentId: string,
     tenantId: string,
@@ -493,7 +492,13 @@ export class ResolveService {
       virtual_model_name: match.name,
     };
     if (!effective.primaryRoute) {
-      return { ...base, route: null, fallback_routes: null, virtual_model_unavailable: match.name };
+      return {
+        ...base,
+        route: null,
+        fallback_routes: null,
+        virtual_model_unavailable: match.name,
+        virtual_model_continues_on_default: match.continue_on_default,
+      };
     }
     return {
       ...base,

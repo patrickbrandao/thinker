@@ -462,7 +462,9 @@ export function recordFallbackFailures(
         providerKeyLabel: meta.primaryKeyLabel ?? meta.provider_key_label,
         callerAttribution,
         requestHeaders,
-        requestParams: meta.request_params,
+        // meta.request_params is the winning fallback's snapshot in this flow.
+        requestParams:
+          meta.primaryRequestParams !== undefined ? meta.primaryRequestParams : meta.request_params,
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
