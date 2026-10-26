@@ -1,6 +1,6 @@
 # ADR 0004 — Modelos virtuais por harness
 
-- **Status:** proposto
+- **Status:** aceito
 - **Data:** 2026-10-25
 - **Issue:** #176
 
@@ -25,7 +25,7 @@ Estado verificado no código (`main` em `ee0770b`):
 - O catálogo de erros (`common/errors/error-codes.ts`, `docs/erros.md`) usa M300 e M302 na faixa M3xx. M303 já existiu (rejeição cloud-only, removida) e não deve ser reaproveitado. **M301 está livre.**
 - As ferramentas MCP de tiers custom são `thinker_routing_custom_list`, `_create` e `_delete` (`mcp/tools/routing.tools.ts`). A CLI tem `thinker routing custom ...` (`packages/cli/src/commands/routing.ts`).
 
-As decisões de produto deste ADR foram tomadas com o mantenedor em 25/10/2026. Os itens que ainda são recomendação estão listados em "Pontos a confirmar na revisão".
+As decisões de produto deste ADR foram tomadas com o mantenedor em 25/10/2026. Os itens que eram recomendação foram confirmados pelo mantenedor na revisão do PR #185 e estão listados em "Pontos confirmados na revisão".
 
 ## Decisão
 
@@ -351,9 +351,9 @@ PRs em sequência, cada um com o seu changeset. O mesmo plano vai para a #176.
    - O mantenedor aprova o merge do PR de versão e a publicação.
    - Dependências: PRs 1 a 7.
 
-## Pontos a confirmar na revisão
+## Pontos confirmados na revisão
 
-Itens que este ADR adota como recomendação e que o mantenedor ainda não confirmou:
+Itens que este ADR propôs como recomendação e que o mantenedor confirmou em 25/10/2026:
 
 1. **Regra do nome:** 1 a 64 caracteres de `[A-Za-z0-9._:/-]`, sem `/` no início ou no fim nem `//`, único por agente sem diferenciar maiúsculas (desativados incluídos), só `auto` reservado.
 2. **Campos da cadeia iguais aos dos tiers:** `response_mode`, `output_modality` e `keyLabel` por rota. O `response_mode` e o `output_modality` do virtual também valem para a parte da cadeia que vem do Default.
