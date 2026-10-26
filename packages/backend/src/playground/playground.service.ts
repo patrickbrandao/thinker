@@ -31,6 +31,7 @@ import { scrubSecrets } from '../common/utils/secret-scrub';
 import { IngestEventBusService } from '../common/services/ingest-event-bus.service';
 import { TenantContext } from '../common/decorators/tenant-context.decorator';
 import { initSseHeaders } from '../routing/proxy/stream-writer';
+import { buildProviderExtraHeaders } from '../routing/proxy/provider-hooks';
 import { whitelistResponseHeaders } from './playground-response-headers';
 import { sanitizeRequestHeaders } from './request-header-sanitizer';
 import { PlaygroundHistoryService } from './playground-history.service';
@@ -178,7 +179,12 @@ export class PlaygroundService {
       return this.sendPreStreamError(res, status, message);
     }
 
-    const extraHeaders = sanitizeRequestHeaders(dto.requestHeaders);
+    const extraHeaders = mergePlaygroundHeaders(
+      // Headers the provider requires (e.g. x-opencode-session for OpenCode
+      // Go/Zen), keyed per agent like the proxy does when no session key exists.
+      buildProviderExtraHeaders(dto.provider, undefined, `${agent.tenant_id}\u0000${agent.id}`),
+      sanitizeRequestHeaders(dto.requestHeaders),
+    );
     const abort = new AbortController();
     res.on('close', () => abort.abort());
 
@@ -684,4 +690,21 @@ export class PlaygroundService {
     const snippet = scrubSecrets(bodyText).slice(0, 500).trim();
     return snippet ? `Provider returned ${status}: ${snippet}` : `Provider returned ${status}`;
   }
+}
+
+/**
+ * Provider-required headers first, then the request editor's headers, which win
+ * on a case-insensitive name clash.
+ */
+export function mergePlaygroundHeaders(
+  providerHeaders: Record<string, string> | undefined,
+  userHeaders: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!providerHeaders) return userHeaders;
+  const userLower = new Set(Object.keys(userHeaders ?? {}).map((k) => k.toLowerCase()));
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(providerHeaders)) {
+    if (!userLower.has(k.toLowerCase())) out[k] = v;
+  }
+  return { ...out, ...userHeaders };
 }

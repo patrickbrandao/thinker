@@ -1337,6 +1337,25 @@ describe('PlaygroundService.runStream', () => {
     expect(forwardArgs.stream).toBe(true);
   });
 
+  it('adds x-opencode-session for OpenCode Go and lets the request editor override it', async () => {
+    const { service, mocks } = buildService();
+    mocks.providerClient.forward.mockResolvedValue(
+      okStream(['data: {"usage":{"prompt_tokens":0,"completion_tokens":0}}\n\n']),
+    );
+
+    await service.runStream(CTX, makeDto({ provider: 'opencode-go' }), asRes(mockRes()));
+    const auto = mocks.providerClient.forward.mock.calls[0][0].extraHeaders;
+    expect(auto['x-opencode-session']).toMatch(/^thinker-[0-9a-f]{32}$/);
+
+    await service.runStream(
+      CTX,
+      makeDto({ provider: 'opencode-go', requestHeaders: { 'X-OpenCode-Session': 'mine' } }),
+      asRes(mockRes()),
+    );
+    const overridden = mocks.providerClient.forward.mock.calls[1][0].extraHeaders;
+    expect(overridden).toEqual({ 'X-OpenCode-Session': 'mine' });
+  });
+
   it('send() is a no-op once the response has ended (no write after end)', async () => {
     const { service, mocks } = buildService();
     // Stream that ends the response itself before the done event would be sent.
