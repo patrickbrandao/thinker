@@ -70,10 +70,33 @@ jobs:
       # The other workspaces resolve thinker-shared's types from its build
       # output, so it is built first.
       - run: npm run build --workspace=packages/shared
-      # `tsc --noEmit` with each workspace's own TypeScript (5.9). The root
-      # one is a different major (see #82). The backend run covers src/ and
-      # test/ (tsconfig.test.json).
+      # `tsc6 --noEmit` (TypeScript 6, the `typescript` alias to
+      # @typescript/typescript6) in every workspace. The backend run covers
+      # src/ and test/ (tsconfig.test.json).
       - run: npm run typecheck --workspaces --if-present
+
+  typecheck-ts7:
+    # TypeScript 7 (tsgo, #87, option B): type-check only. Emit, tests, lint
+    # and migrations stay on TypeScript 6, so nothing this job runs reaches
+    # the image. Same tsconfig files as the TS 6 job.
+    name: Typecheck (TypeScript 7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=packages/shared
+      - name: tsgo version
+        run: node -p "'TypeScript ' + require('@typescript/native/package.json').version"
+      # scripts/tsgo.mjs runs @typescript/native (typescript@7) with
+      # --noEmit in each workspace.
+      - run: npm run typecheck:ts7
 
   build:
     name: Build

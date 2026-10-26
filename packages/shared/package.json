@@ -14,14 +14,15 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "build": "tsc6 -p tsconfig.cjs.json && tsc6 -p tsconfig.esm.json",
+    "typecheck": "tsc6 -p tsconfig.json --noEmit && tsc6 -p tsconfig.test.json",
+    "typecheck:ts7": "node ../../scripts/tsgo.mjs -p tsconfig.json --noEmit && node ../../scripts/tsgo.mjs -p tsconfig.test.json --noEmit",
     "test": "jest"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "jest": "^30.5.1",
     "ts-jest": "^29.4.14",
-    "typescript": "^6.0.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

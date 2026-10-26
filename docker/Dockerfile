@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.npm \
            --prefer-offline --no-audit --no-fund --loglevel=error && \
     node /tmp/third-party-notices.mjs /app /app/THIRD_PARTY_NOTICES && \
     mkdir -p packages/backend/node_modules && \
-    rm -rf node_modules/typescript node_modules/@types \
+    rm -rf node_modules/typescript node_modules/@typescript node_modules/@types \
            node_modules/ts-node node_modules/acorn \
            node_modules/create-require node_modules/v8-compile-cache-lib && \
     find . -path "*/node_modules/@esbuild" -type d -exec rm -rf {} + 2>/dev/null; \
