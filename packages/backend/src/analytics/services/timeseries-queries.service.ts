@@ -1067,7 +1067,7 @@ export class TimeseriesQueriesService {
   private async withCompatibilitySnapshot<T>(
     read: (runner?: QueryRunner) => Promise<T>,
   ): Promise<T> {
-    const dataSource = this.dataSource ?? this.turnRepo.manager?.connection;
+    const dataSource = this.dataSource ?? this.turnRepo.manager?.dataSource;
     if (!dataSource) return read();
     const runner = dataSource.createQueryRunner();
     await runner.connect();

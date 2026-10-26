@@ -16,7 +16,7 @@ export class AgentRecordingConfigService {
     // Read it fresh so a choice changed on one replica applies to all replicas.
     const agent = await this.agentRepo.findOne({
       where: { id: agentId },
-      select: ['id', 'record_messages'],
+      select: { id: true, record_messages: true },
     });
     return agent?.record_messages === true;
   }

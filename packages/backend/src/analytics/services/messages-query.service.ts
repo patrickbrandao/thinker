@@ -745,7 +745,7 @@ export class MessagesQueryService {
     if (!tenantId || ids.length === 0 || !this.tenantProviderRepo) return [];
     const rows = await this.tenantProviderRepo.find({
       where: { tenant_id: tenantId, id: In(ids) },
-      select: ['id', 'provider', 'auth_type', 'label'],
+      select: { id: true, provider: true, auth_type: true, label: true },
     });
     return rows.map((r) => ({
       id: r.id,
@@ -768,7 +768,7 @@ export class MessagesQueryService {
   private async withCompatibilitySnapshot<T>(
     read: (runner?: QueryRunner) => Promise<T>,
   ): Promise<T> {
-    const dataSource = this.dataSource ?? this.turnRepo.manager?.connection;
+    const dataSource = this.dataSource ?? this.turnRepo.manager?.dataSource;
     if (!dataSource) return read();
     const runner = dataSource.createQueryRunner();
     await runner.connect();

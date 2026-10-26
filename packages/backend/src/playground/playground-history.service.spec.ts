@@ -661,7 +661,7 @@ describe('PlaygroundHistoryService', () => {
       expect(best).toBe('col-1');
       expect(columnRepo.findOne).toHaveBeenCalledWith({
         where: { id: 'col-1', playground_run_id: 'run-1' },
-        select: ['id'],
+        select: { id: true },
       });
       expect(updateQb.set).toHaveBeenCalledWith({ best_column_id: 'col-1' });
       expect(updateQb.where).toHaveBeenCalledWith('id = :runId AND tenant_id = :tenantId', {

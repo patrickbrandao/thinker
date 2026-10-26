@@ -181,6 +181,14 @@ import { AddAutofixAccessGrant1799000400000 } from './migrations/1799000400000-A
 import { AddRequestsAndProviderAttempts1801000000000 } from './migrations/1801000000000-AddRequestsAndProviderAttempts';
 import { AddProviderAttemptOrdering1801100000000 } from './migrations/1801100000000-AddProviderAttemptOrdering';
 
+/**
+ * Null/undefined in a high-level TypeORM `where` (find*, count*, exists*,
+ * update, delete) throws. This is TypeORM 1.x's default; it is pinned here so
+ * both DataSources share it and a missing tenant/agent id can never turn into
+ * "no filter". Use IsNull() to match NULL.
+ */
+export const INVALID_WHERE_VALUES_BEHAVIOR = { null: 'throw', undefined: 'throw' } as const;
+
 export const entities = [
   AgentMessage,
   ThinkerRequest,

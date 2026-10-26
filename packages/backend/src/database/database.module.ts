@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { entities, migrations } from './data-source-definitions';
+import { entities, INVALID_WHERE_VALUES_BEHAVIOR, migrations } from './data-source-definitions';
 // Entities referenced directly below via TypeOrmModule.forFeature(); the full
 // registry for the DataSource lives in ./data-source-definitions.
 import { Tenant } from '../entities/tenant.entity';
@@ -37,6 +37,11 @@ import { SecretReencryptionService } from './secret-reencryption.service';
         url: config.get<string>('app.databaseUrl'),
         entities,
         synchronize: false,
+        // TypeORM 1.x default, spelled out so nobody flips it: a null/undefined
+        // value in a high-level `where` throws instead of being dropped from the
+        // filter (0.3 silently matched every row — a tenant-isolation hazard).
+        // Match NULL with IsNull(). Never set this to 'ignore'.
+        invalidWhereValuesBehavior: INVALID_WHERE_VALUES_BEHAVIOR,
         // Run migrations on boot by default. `synchronize: false` is permanent,
         // so committed migrations are the only source of schema changes, and a
         // single instance (dev, self-hosted) must boot with the schema applied
