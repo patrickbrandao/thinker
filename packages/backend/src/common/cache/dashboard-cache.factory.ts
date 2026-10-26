@@ -1,4 +1,11 @@
-import { createKeyv, type Keyv } from 'cacheable';
+import { createKeyv } from 'cacheable';
+// `@nestjs/cache-manager` 12 is ESM-only, so its typings resolve keyv through
+// the `import` condition while this CommonJS build resolves it through
+// `require`: the same Keyv class is declared twice and TypeScript treats the two
+// as unrelated. Name the store with the ESM-side declaration that CacheModule
+// expects; at runtime there is a single object, which CacheModule accepts by
+// duck typing (`isKeyvInstance`), not `instanceof`.
+import type { Keyv } from 'cacheable' with { 'resolution-mode': 'import' };
 import {
   DASHBOARD_CACHE_MAX_ENTRIES,
   DASHBOARD_CACHE_SWEEP_MS,
@@ -19,13 +26,14 @@ import {
  * `createKeyv` returns a `Keyv` backed by `CacheableMemory`, adding a hard LRU
  * cap (`lruSize`) plus an active, `unref`'d sweep of expired entries
  * (`checkInterval`). Using the helper (rather than a hand-built `new Keyv()`)
- * yields the `Keyv` instance `@nestjs/cache-manager` recognises via
- * `instanceof Keyv`, so it is used as-is instead of being rejected.
+ * yields a full `Keyv` instance that `@nestjs/cache-manager` recognises and
+ * uses as-is instead of wrapping it in a fresh, unbounded `Keyv`.
  */
 export function buildDashboardCacheStore(): Keyv {
-  return createKeyv({
+  const store = createKeyv({
     ttl: DASHBOARD_CACHE_TTL_MS,
     lruSize: DASHBOARD_CACHE_MAX_ENTRIES,
     checkInterval: DASHBOARD_CACHE_SWEEP_MS,
   });
+  return store as unknown as Keyv;
 }

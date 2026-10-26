@@ -19,7 +19,7 @@ Monorepo com npm workspaces e Turborepo:
 ```text
 packages/
 ├── shared/     thinker-shared    tipos e helpers usados por backend, frontend e CLI (provedores, tiers, snippets)
-├── backend/    thinker-backend   NestJS 11, TypeORM 0.3, PostgreSQL 18, Better Auth
+├── backend/    thinker-backend   NestJS 12, TypeORM 0.3, PostgreSQL 18, Better Auth
 ├── frontend/   thinker-frontend  SolidJS + Vite, dashboard
 ├── cli/        thinker-cli       CLI `thinker` (privada, não publicada)
 └── thinker/    thinker           pacote sem código que guarda a versão canônica
@@ -69,11 +69,11 @@ npm run test:scripts                           # testes dos scripts do repositó
 
 ### Servidor de desenvolvimento
 
-O backend precisa de um `packages/backend/.env` com, no mínimo, `BETTER_AUTH_SECRET` e `THINKER_ENCRYPTION_KEY` (32+ caracteres, valores diferentes) e `DATABASE_URL`. O `auth.instance.ts` lê `process.env` na importação, antes do `ConfigModule`, por isso o `dotenv` é pré-carregado:
+O backend precisa de um `packages/backend/.env` com, no mínimo, `BETTER_AUTH_SECRET` e `THINKER_ENCRYPTION_KEY` (32+ caracteres, valores diferentes) e `DATABASE_URL`. O `auth.instance.ts` lê `process.env` na importação, antes do `ConfigModule`, por isso o `.env` é pré-carregado pela opção `--env-file` do `nest start` (o Node lê o arquivo nativamente; o projeto não depende do `dotenv`):
 
 ```bash
 # backend
-cd packages/backend && NODE_OPTIONS='-r dotenv/config' npx nest start --watch
+cd packages/backend && npx nest start --watch --env-file .env
 # frontend (em outro terminal)
 cd packages/frontend && npx vite
 ```
@@ -102,6 +102,10 @@ SEED_DATA=true
 | CLI | `npm test --workspace=packages/cli` |
 | Backend e2e (Docker) | `npm run test:e2e:docker --workspace=packages/backend` |
 | Contratos do gateway | `THINKER_BASE_URL=http://127.0.0.1:2099 node --test contracts/gateway/tests/*.test.mjs` |
+
+**NestJS 12 é só ESM.** O backend continua CommonJS e carrega os `@nestjs/*` por `require(esm)`, que o Node faz nativamente (20.19+, 22.12+ e 24). No Jest, isso depende da API `vm` de módulos, que fica atrás de `--experimental-vm-modules`; por isso os scripts `test`, `test:watch` e `test:e2e` do backend acrescentam essa flag ao `NODE_OPTIONS`. Rode o Jest sempre por esses scripts (ou passe a flag você mesmo): `npx jest` puro falha com `Must use import to load ES Module`. Pelo guia oficial, a CLI e os schematics do Nest 12 pedem Node 24.15+ (as imagens fixadas no `docker/Dockerfile` usam a 24.22).
+
+Os CLIs avulsos (migrações e backfills) carregam o `.env` com `process.loadEnvFile()` em `src/database/load-env-file.ts`; o projeto não depende do `dotenv`.
 
 **E2E só por `test:e2e:docker`.** A suíte usa `dropSchema: true` (apaga o banco). O script `packages/backend/scripts/test-e2e-docker.mjs` escolhe uma porta livre em `127.0.0.1`, sobe um `postgres:18-alpine` com nome único e dados em tmpfs montado em `/var/lib/postgresql` (banco `thinker_e2e_test`), roda as migrações, executa a suíte em série e remove o contêiner no fim (sucesso, falha ou Ctrl-C). A imagem é a mesma, com o mesmo digest, de `docker/docker-compose.yml` e do job `Backend e2e (PostgreSQL)` da CI (`THINKER_E2E_PG_IMAGE` troca a imagem). Ao atualizar o digest, atualize os três lugares e `deploy/coolify/docker-compose.yml`. Argumentos extras vão para o Jest:
 
