@@ -68,6 +68,25 @@ describe("HeaderTierSnippetModal", () => {
     expect(code?.textContent).toBe("gpt-4o");
   });
 
+  it("shows a custom provider's model by its public id", () => {
+    const route = {
+      provider: "custom:cp-1",
+      authType: "api_key" as const,
+      model: "custom:cp-1/llama",
+    };
+    const desc = (alias: string | null) =>
+      render(() => (
+        <HeaderTierSnippetModal
+          agentName="demo"
+          tier={{ ...baseTier, override_route: route }}
+          customProviders={[{ id: "cp-1", alias } as never]}
+          onClose={vi.fn()}
+        />
+      )).container.querySelector(".modal-card__desc code")?.textContent;
+    expect(desc("local")).toBe("local/llama");
+    expect(desc(null)).toBe("custom:cp-1/llama");
+  });
+
   it("falls back to placeholder text when override_route is null", () => {
     const tier = { ...baseTier, override_route: null };
     const { container } = render(() => (

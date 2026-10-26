@@ -65,6 +65,11 @@ vi.mock('../../src/components/VirtualModelModal.js', () => ({
       >
         save
       </button>
+      {props.onPartialSave && (
+        <button onClick={() => props.onPartialSave({ ...props.editing, name: 'renamed' })}>
+          partial
+        </button>
+      )}
       {props.onDelete && (
         <button onClick={() => props.onDelete(props.editing.id)}>modal-delete</button>
       )}
@@ -197,15 +202,51 @@ describe('RoutingVirtualModelsSection', () => {
     expect(screen.getByTestId('card-a')).toBeTruthy();
   });
 
-  it('sets the primary and applies fallback updates', async () => {
+  it('sets the primary and applies fallback updates, reloading after each', async () => {
+    const f = { provider: 'p', authType: 'api_key' as const, model: 'f' };
     mockList.mockResolvedValue([vm('a')]);
     mockOverride.mockResolvedValue(vm('a'));
     renderSection();
     fireEvent.click(await screen.findByText('override'));
     expect(mockOverride).toHaveBeenCalledWith('demo', 'a', 'm', 'p', 'api_key', 'Main');
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+    mockList.mockResolvedValue([vm('a', 'a', { fallback_routes: [f] })]);
     fireEvent.click(screen.getByText('fallbacks'));
     expect(screen.getByTestId('fb-a').textContent).toBe('f');
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(3));
     fireEvent.click(screen.getByText('reset'));
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(4));
+  });
+
+  it('reloads the list after a card write, for the computed context length and shadows', async () => {
+    mockList.mockResolvedValueOnce([vm('a')]);
+    mockList.mockResolvedValueOnce([vm('a', 'a', { context_length: 64000, shadows: ['x'] })]);
+    mockOverride.mockResolvedValue(vm('a'));
+    renderSection();
+    const card = await screen.findByTestId('card-a');
+    fireEvent.click(screen.getByText('override'));
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+    // The reload reconciles by id: the card is kept, not remounted.
+    expect(screen.getByTestId('card-a')).toBe(card);
+  });
+
+  it('keeps the list when a reload fails', async () => {
+    mockList.mockResolvedValueOnce([vm('a')]).mockRejectedValueOnce(new Error('down'));
+    mockOverride.mockResolvedValue(vm('a'));
+    renderSection();
+    fireEvent.click(await screen.findByText('override'));
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('down'));
+    expect(screen.getByTestId('card-a')).toBeTruthy();
+  });
+
+  it('updates the card with what a partly failed edit saved', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    renderSection();
+    fireEvent.click(await screen.findByText('edit'));
+    fireEvent.click(await screen.findByText('partial'));
+    await screen.findByTestId('card-renamed');
+    // The modal stays open with its inline error.
+    expect(screen.getByTestId('vm-modal')).toBeTruthy();
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
   });
 
@@ -219,6 +260,7 @@ describe('RoutingVirtualModelsSection', () => {
     renderSection();
     await screen.findByTestId('card-a');
     fireEvent.click(screen.getAllByText('delete')[0]!);
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/per-model parameters/));
     expect(mockDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getAllByText('delete')[0]!);
     await waitFor(() => expect(screen.queryByTestId('card-a')).toBeNull());
@@ -260,11 +302,20 @@ describe('RoutingVirtualModelsSection', () => {
     mockReorder.mockResolvedValue({ ok: true });
     renderSection();
     await screen.findByTestId('card-a');
-    fireEvent.keyDown(screen.getByLabelText(/Reorder b/), { key: 'ArrowUp' });
+    const handle = screen.getByLabelText(/Reorder b/);
+    handle.focus();
+    fireEvent.keyDown(handle, { key: 'ArrowUp' });
     expect(order()).toEqual(['b', 'a']);
+    // Focus stays on the moved card's handle, and the move is announced.
+    expect(document.activeElement).toBe(screen.getByLabelText(/Reorder b/));
+    expect(screen.getByRole('status').textContent).toBe('"b" moved to position 1 of 2');
     // Moving past the edge does nothing.
     fireEvent.keyDown(screen.getByLabelText(/Reorder b/), { key: 'ArrowLeft' });
     expect(mockReorder).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(order()).toEqual(['a', 'b']);
+    expect(document.activeElement).toBe(screen.getByLabelText(/Reorder b/));
+    expect(screen.getByRole('status').textContent).toBe('"b" moved to position 2 of 2');
   });
 
   it('reorders by drag and drop and reloads when the save fails', async () => {

@@ -59,16 +59,22 @@ export function toggleVirtualModel(agentName: string, id: string, enabled: boole
   });
 }
 
+/** Silent on request, for the edit modal, which shows the message inline. */
 export function setVirtualModelResponseMode(
   agentName: string,
   id: string,
   responseMode: ResponseMode,
+  options?: { silent?: boolean },
 ) {
-  return fetchMutate<VirtualModel>(itemPath(agentName, id, '/response-mode'), {
-    method: 'PATCH',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ response_mode: responseMode }),
-  });
+  return fetchMutate<VirtualModel>(
+    itemPath(agentName, id, '/response-mode'),
+    {
+      method: 'PATCH',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ response_mode: responseMode }),
+    },
+    { silent: options?.silent ?? false },
+  );
 }
 
 export function deleteVirtualModel(agentName: string, id: string) {

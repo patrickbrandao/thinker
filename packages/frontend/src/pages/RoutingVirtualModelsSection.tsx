@@ -7,7 +7,9 @@ import {
   Suspense,
   type Accessor,
   type Component,
+  type Signal,
 } from 'solid-js';
+import { createStore, reconcile, unwrap } from 'solid-js/store';
 import VirtualModelCard from '../components/VirtualModelCard.js';
 import VirtualModelSnippetModal from '../components/VirtualModelSnippetModal.js';
 import {
@@ -30,6 +32,7 @@ import type {
   RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { deleteVirtualModelPrompt } from '../services/virtual-model-form.js';
 import '../styles/routing-header-tiers.css';
 import '../styles/routing-virtual-models.css';
 
@@ -68,18 +71,38 @@ export function moveId(ids: readonly string[], from: number, to: number): string
 }
 
 /**
+ * Resource storage that reconciles by `id`: a refetch or a reorder keeps each
+ * row's object, so `<For>` moves the cards instead of remounting them (and
+ * whatever has focus inside a card survives a reload).
+ */
+function createReconciledSignal<T>(value: T): Signal<T> {
+  const [store, setStore] = createStore({ value });
+  return [
+    () => store.value,
+    (next: unknown) => {
+      const resolved =
+        typeof next === 'function' ? (next as (prev: T) => T)(unwrap(store.value)) : next;
+      setStore('value', reconcile(resolved as T, { key: 'id' }));
+      return store.value;
+    },
+  ] as Signal<T>;
+}
+
+/**
  * "Virtual models" on a harness's Routing page (ADR 0004): model names the
  * harness can send in `model`, each with its own chain. Kept apart from the
  * custom (header) tiers, which match on headers instead.
  */
 const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> = (props) => {
-  const [list, { refetch, mutate }] = createResource(
+  const [list, { refetch, mutate }] = createResource<VirtualModel[], string>(
     () => props.agentName(),
-    (name) =>
+    (name, info) =>
       listVirtualModels(name).catch((err) => {
         toast.error(err instanceof Error ? err.message : 'Failed to load virtual models');
-        return [] as VirtualModel[];
+        // A failed reload keeps what is on screen.
+        return info.refetching ? (info.value ?? []) : ([] as VirtualModel[]);
       }),
+    { storage: (init) => createReconciledSignal(init) },
   );
   const items = (): VirtualModel[] => list() ?? [];
 
@@ -89,14 +112,23 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
   const [dragId, setDragId] = createSignal<string | null>(null);
   const [dropId, setDropId] = createSignal<string | null>(null);
   const [armedId, setArmedId] = createSignal<string | null>(null);
+  const [announcement, setAnnouncement] = createSignal('');
+  let listEl: HTMLDivElement | undefined;
 
   const replace = (saved: VirtualModel) =>
     mutate((prev) => prev?.map((v) => (v.id === saved.id ? saved : v)));
+
+  /**
+   * `shadows` and `context_length` are computed on read, and a chain or name
+   * change moves them: reload the list after every write.
+   */
+  const reload = () => void refetch();
 
   const runBusy = async (id: string, field: BusyField, action: () => Promise<VirtualModel>) => {
     setBusy({ id, field });
     try {
       replace(await action());
+      reload();
     } catch {
       // fetchMutate already showed the backend message.
     } finally {
@@ -144,18 +176,18 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
           keyLabel,
         ),
       );
+      reload();
     } catch {
       // fetchMutate already showed the backend message.
     }
   };
 
   const handleFallbacksUpdate = (vm: VirtualModel, routes: ModelRoute[] | null | undefined) => {
-    // A reset clears the primary too; reload instead of guessing the result.
-    if (routes === undefined) {
-      void refetch();
-      return;
+    // A reset clears the primary too: only the reload knows the result.
+    if (routes !== undefined) {
+      mutate((prev) => prev?.map((v) => (v.id === vm.id ? { ...v, fallback_routes: routes } : v)));
     }
-    mutate((prev) => prev?.map((v) => (v.id === vm.id ? { ...v, fallback_routes: routes } : v)));
+    reload();
   };
 
   const handleDelete = async (vm: Pick<VirtualModel, 'id' | 'name'>) => {
@@ -168,7 +200,15 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
     }
   };
 
-  const reorder = async (from: number, to: number) => {
+  /** Focus the moved card's handle again, after `<For>` has moved it. */
+  const focusHandle = (id: string) => {
+    const handle = [...(listEl?.querySelectorAll<HTMLElement>('[data-vm-handle]') ?? [])].find(
+      (el) => el.dataset.vmHandle === id,
+    );
+    handle?.focus();
+  };
+
+  const reorder = async (from: number, to: number, opts: { refocus?: boolean } = {}) => {
     const current = items();
     if (from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) {
       return;
@@ -179,7 +219,11 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
       to,
     );
     const byId = new Map(current.map((v) => [v.id, v]));
+    const moved = current[from]!;
     mutate(ids.map((id, i) => ({ ...byId.get(id)!, sort_order: i })));
+    // Moving a node out of the DOM drops its focus, even when it is reused.
+    if (opts.refocus) focusHandle(moved.id);
+    setAnnouncement(`"${moved.name}" moved to position ${to + 1} of ${ids.length}`);
     try {
       await reorderVirtualModels(props.agentName(), ids);
     } catch {
@@ -232,7 +276,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
           </Show>
         }
       >
-        <div class="routing-cards virtual-model-list" role="list">
+        <div class="routing-cards virtual-model-list" role="list" ref={listEl}>
           <For each={items()}>
             {(vm, index) => (
               <div
@@ -275,7 +319,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                   onResponseModeChange={(mode) => void handleResponseMode(vm, mode)}
                   onEdit={() => setModal(vm)}
                   onDelete={() => {
-                    if (confirm(`Delete virtual model "${vm.name}"?`)) void handleDelete(vm);
+                    if (confirm(deleteVirtualModelPrompt(vm.name))) void handleDelete(vm);
                   }}
                   onShowExample={() => setSnippetFor(vm)}
                   onMoveUp={index() > 0 ? () => void reorder(index(), index() - 1) : undefined}
@@ -291,6 +335,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                       <button
                         type="button"
                         class="virtual-model-card__drag"
+                        data-vm-handle={vm.id}
                         aria-label={`Reorder ${vm.name}. Drag, or use the arrow keys.`}
                         title="Drag to reorder"
                         onPointerDown={() => setArmedId(vm.id)}
@@ -300,10 +345,10 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
                             e.preventDefault();
-                            void reorder(index(), index() - 1);
+                            void reorder(index(), index() - 1, { refocus: true });
                           } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
                             e.preventDefault();
-                            void reorder(index(), index() + 1);
+                            void reorder(index(), index() + 1, { refocus: true });
                           }
                         }}
                       >
@@ -353,6 +398,11 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                 } else {
                   replace(saved);
                 }
+                reload();
+              }}
+              onPartialSave={(saved) => {
+                replace(saved);
+                reload();
               }}
               onDelete={
                 state === 'new'
@@ -366,6 +416,10 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
           </Suspense>
         )}
       </Show>
+
+      <div class="sr-only" role="status" aria-live="polite">
+        {announcement()}
+      </div>
 
       <Show when={snippetFor()} keyed>
         {(vm) => (

@@ -1,6 +1,7 @@
 import { validateVirtualModelName } from 'thinker-shared';
 import type { AvailableModel, CustomProviderData, ModelRoute } from './api.js';
 import { ApiError } from './api/core.js';
+import { customProviderAliases, publicModelId } from './public-model-id.js';
 
 /**
  * Pure helpers behind the virtual model create/edit modal (ADR 0004). The
@@ -24,7 +25,9 @@ export function virtualModelNameError(
 
 /**
  * Preview of the real ids a name would shadow, from the catalog the page has
- * loaded: native model ids and `provider/model` ids, ignoring case. The
+ * loaded, ignoring case. Mirrors the backend's `computeShadows`: every model's
+ * public id (`publicModelId`, which covers custom aliases and the
+ * `-subscription` suffix) plus the native id of non-custom models. The
  * backend's `shadows` list (computed on every read) is authoritative; this
  * only warns while typing, before the name is saved.
  */
@@ -35,27 +38,23 @@ export function previewShadows(
 ): string[] {
   const lower = name.trim().toLowerCase();
   if (!lower) return [];
-  const aliases = new Map(customProviders.map((cp) => [`custom:${cp.id}`, cp.alias]));
+  const aliases = customProviderAliases(customProviders);
   const found = new Set<string>();
   const consider = (id: string) => {
     if (id.toLowerCase() === lower) found.add(id);
   };
   for (const m of models) {
-    if (m.provider.startsWith('custom:')) {
-      // A custom provider's model is `custom:<uuid>/<model>`; with an alias
-      // its public id is `<alias>/<model>` instead.
-      consider(m.model_name);
-      const alias = aliases.get(m.provider);
-      const prefix = `${m.provider}/`;
-      if (alias && m.model_name.startsWith(prefix)) {
-        consider(`${alias}/${m.model_name.slice(prefix.length)}`);
-      }
-      continue;
-    }
-    consider(m.model_name);
-    consider(`${m.provider.toLowerCase()}/${m.model_name}`);
+    consider(
+      publicModelId({ model: m.model_name, provider: m.provider, authType: m.auth_type }, aliases),
+    );
+    if (!m.provider.toLowerCase().startsWith('custom:')) consider(m.model_name);
   }
   return [...found].sort();
+}
+
+/** The delete confirmation: the per-model parameters go with the virtual model. */
+export function deleteVirtualModelPrompt(name: string): string {
+  return `Delete virtual model "${name}"? Its per-model parameters are deleted too.`;
 }
 
 /** Routes of a chain that cannot stream, by their catalog capabilities. */

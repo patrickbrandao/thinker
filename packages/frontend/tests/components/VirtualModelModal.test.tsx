@@ -227,7 +227,34 @@ describe('VirtualModelModal', () => {
     fireEvent.click(screen.getByText('Save changes'));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockSetResponseMode).toHaveBeenCalledWith('demo', 'vm-1', 'stream');
+    expect(mockSetResponseMode).toHaveBeenCalledWith('demo', 'vm-1', 'stream', { silent: true });
+  });
+
+  it('keeps a partly saved edit: error inline once, the card gets the rename', async () => {
+    const streamable = {
+      ...existing,
+      override_route: { ...existing.override_route!, model: 'gpt-5.5' },
+    };
+    const renamed = { ...streamable, name: 'renamed' };
+    mockUpdate.mockResolvedValue(renamed);
+    mockSetResponseMode.mockRejectedValueOnce(new ApiError('Mode change failed', 400));
+    const onPartialSave = vi.fn();
+    const { onSaved, type } = renderModal({ editing: streamable, onPartialSave });
+    type('renamed');
+    fireEvent.click(screen.getByRole('switch', { name: 'Stream mode' }));
+    fireEvent.click(screen.getByText('Save changes'));
+    await screen.findByText('Mode change failed');
+    expect(onPartialSave).toHaveBeenCalledWith(renamed);
+    expect(onSaved).not.toHaveBeenCalled();
+    // Both calls are silent: no toast on top of the inline message.
+    expect(mockUpdate).toHaveBeenCalledWith('demo', 'vm-1', { name: 'renamed' });
+    expect(mockSetResponseMode).toHaveBeenCalledWith('demo', 'vm-1', 'stream', { silent: true });
+
+    // A retry only sends what is left.
+    mockSetResponseMode.mockResolvedValueOnce({ ...renamed, response_mode: 'stream' });
+    fireEvent.click(screen.getByText('Save changes'));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('deletes after confirmation', () => {
