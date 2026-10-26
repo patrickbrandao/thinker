@@ -415,6 +415,18 @@ export function storeOpenAILang(id: OpenAILangId): void {
   }
 }
 
+/**
+ * Swap the `"auto"` model literal of a toolkit snippet for another model
+ * name, such as a virtual model (ADR 0004). Every toolkit snippet quotes the
+ * model as `"auto"` and has no other `"auto"` literal. Virtual model names
+ * cannot contain quotes or backslashes, so the JSON-quoted name is valid in
+ * Python, TypeScript and the cURL JSON body alike.
+ */
+export function withSnippetModel(snippet: Snippet, model: string): Snippet {
+  if (model === 'auto') return snippet;
+  return { ...snippet, code: snippet.code.split('"auto"').join(JSON.stringify(model)) };
+}
+
 export function getSnippetForToolkit(
   id: ToolkitId,
   baseUrl: string,
@@ -422,6 +434,21 @@ export function getSnippetForToolkit(
   openaiLang: OpenAILangId = 'python',
   customHeaders?: CustomHeaders,
   openaiApi: OpenAIApiId = 'responses',
+  model = 'auto',
+): Snippet {
+  return withSnippetModel(
+    getAutoSnippetForToolkit(id, baseUrl, apiKey, openaiLang, customHeaders, openaiApi),
+    model,
+  );
+}
+
+function getAutoSnippetForToolkit(
+  id: ToolkitId,
+  baseUrl: string,
+  apiKey: string,
+  openaiLang: OpenAILangId,
+  customHeaders: CustomHeaders | undefined,
+  openaiApi: OpenAIApiId,
 ): Snippet {
   switch (id) {
     case 'openai-sdk':

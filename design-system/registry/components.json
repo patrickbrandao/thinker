@@ -2750,6 +2750,8 @@
         "routing-card--cta",
         "routing-card--disabled",
         "routing-card--header-tier",
+        "routing-card--virtual-model",
+        "routing-card--virtual-model-inactive",
         "routing-card__actions",
         "routing-card__auto-tag",
         "routing-card__body",
@@ -2795,6 +2797,7 @@
       "files": [
         "routing-header-tiers.css",
         "routing-specificity.css",
+        "routing-virtual-models.css",
         "routing.css"
       ]
     },
@@ -2998,6 +3001,7 @@
       "classes": [
         "routing-section",
         "routing-section--dimmed",
+        "routing-section--virtual-models",
         "routing-section__controls",
         "routing-section__cta",
         "routing-section__empty",
@@ -3013,6 +3017,7 @@
         "routing-header-tiers.css",
         "routing-specificity.css",
         "routing-tabs.css",
+        "routing-virtual-models.css",
         "routing.css"
       ]
     },
@@ -3314,6 +3319,15 @@
         "controls.css"
       ]
     },
+    "setup-virtual-models": {
+      "classes": [
+        "setup-virtual-models",
+        "setup-virtual-models__names"
+      ],
+      "files": [
+        "wizard.css"
+      ]
+    },
     "sidebar": {
       "classes": [
         "sidebar",
@@ -3515,7 +3529,8 @@
         "tier-badge--reasoning",
         "tier-badge--simple",
         "tier-badge--specificity",
-        "tier-badge--standard"
+        "tier-badge--standard",
+        "tier-badge--virtual"
       ],
       "files": [
         "data.css",
@@ -3724,6 +3739,75 @@
       "files": [
         "analytics-overview.css",
         "cards.css"
+      ]
+    },
+    "virtual-model-card": {
+      "classes": [
+        "virtual-model-card__details",
+        "virtual-model-card__drag",
+        "virtual-model-card__inactive",
+        "virtual-model-card__model",
+        "virtual-model-card__switch",
+        "virtual-model-card__switch-spinner",
+        "virtual-model-card__switches"
+      ],
+      "files": [
+        "routing-virtual-models.css"
+      ]
+    },
+    "virtual-model-modal": {
+      "classes": [
+        "virtual-model-modal",
+        "virtual-model-modal__chain",
+        "virtual-model-modal__close",
+        "virtual-model-modal__hint",
+        "virtual-model-modal__name",
+        "virtual-model-modal__route",
+        "virtual-model-modal__route--invalid",
+        "virtual-model-modal__route-model",
+        "virtual-model-modal__route-position",
+        "virtual-model-modal__route-provider",
+        "virtual-model-modal__route-remove",
+        "virtual-model-modal__server-error",
+        "virtual-model-modal__switch-row"
+      ],
+      "files": [
+        "routing-virtual-models.css"
+      ]
+    },
+    "virtual-model-shadow": {
+      "classes": [
+        "virtual-model-shadow",
+        "virtual-model-shadow__desc",
+        "virtual-model-shadow__icon",
+        "virtual-model-shadow__list",
+        "virtual-model-shadow__title"
+      ],
+      "files": [
+        "routing-virtual-models.css"
+      ]
+    },
+    "virtual-model-slot": {
+      "classes": [
+        "virtual-model-slot",
+        "virtual-model-slot--dragging",
+        "virtual-model-slot--drop-target"
+      ],
+      "files": [
+        "routing-virtual-models.css"
+      ]
+    },
+    "virtual-model-snippet-modal": {
+      "classes": [
+        "virtual-model-snippet-modal",
+        "virtual-model-snippet-modal__desc",
+        "virtual-model-snippet-modal__footer",
+        "virtual-model-snippet-modal__header",
+        "virtual-model-snippet-modal__inactive",
+        "virtual-model-snippet-modal__title"
+      ],
+      "files": [
+        "routing-virtual-models.css"
       ]
     },
     "waiting-banner": {
@@ -4368,7 +4452,7 @@
       "prop": "background",
       "value": "hsl(var(--muted-foreground) / 0.1)",
       "file": "data.css",
-      "line": 252,
+      "line": 264,
       "losesTo": "overview.css:105"
     },
     {
@@ -4376,7 +4460,7 @@
       "prop": "color",
       "value": "hsl(var(--muted-foreground))",
       "file": "data.css",
-      "line": 253,
+      "line": 265,
       "losesTo": "overview.css:106"
     },
     {
@@ -4384,7 +4468,7 @@
       "prop": "align-items",
       "value": "flex-start",
       "file": "data.css",
-      "line": 460,
+      "line": 472,
       "losesTo": "theme.css:586"
     },
     {
@@ -4392,7 +4476,7 @@
       "prop": "gap",
       "value": "12px",
       "file": "data.css",
-      "line": 461,
+      "line": 473,
       "losesTo": "theme.css:587"
     },
     {
@@ -4400,7 +4484,7 @@
       "prop": "padding",
       "value": "12px 0",
       "file": "data.css",
-      "line": 462,
+      "line": 474,
       "losesTo": "theme.css:588"
     },
     {
@@ -4602,7 +4686,8 @@
       "components/RoutingDeprecationNotice.tsx"
     ],
     "routing-header-tiers.css": [
-      "pages/RoutingHeaderTiersSection.tsx"
+      "pages/RoutingHeaderTiersSection.tsx",
+      "pages/RoutingVirtualModelsSection.tsx"
     ],
     "routing-modal.css": [
       "pages/Welcome.tsx"
@@ -4612,6 +4697,9 @@
     ],
     "routing-specificity.css": [
       "pages/RoutingSpecificitySection.tsx"
+    ],
+    "routing-virtual-models.css": [
+      "pages/RoutingVirtualModelsSection.tsx"
     ],
     "routing-tabs.css": [
       "(via @import)"
@@ -4639,8 +4727,8 @@
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 276,
-    "classes": 1514,
+    "blocks": 282,
+    "classes": 1554,
     "canonicalRules": 47,
     "ghostRules": 47
   }
