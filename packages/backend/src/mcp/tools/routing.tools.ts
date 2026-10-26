@@ -12,11 +12,7 @@ import {
   resolveModelRoute,
 } from '../../routing/routing-core/resolve-model-route';
 import type { RouteParamsTarget } from '../../routing/model-params/route-model-params.service';
-import {
-  registerVirtualModelTools,
-  routableVirtualModelNames,
-  summarizeVirtualModel,
-} from './virtual-models.tools';
+import { registerVirtualModelTools, summarizeVirtualModel } from './virtual-models.tools';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 const ROUTE_TEST_TIMEOUT_MS = 120_000;
@@ -141,15 +137,17 @@ export function registerRoutingTools(
               hasRoutableTier: () => deps.tiers.hasRoutableTier(agent.id),
               pricingCacheSize: () => deps.pricingSync.getAll().size,
             }),
-            deps.virtualModels.list(agent.id),
+            deps.virtualModels.listViews(agent.id, agent.tenant_id),
           ]);
           // The shared RoutingStatus (also served to the dashboard) answers
           // for "auto" only. With no active provider nothing routes, virtual
           // models included.
+          // `routable` is computed on the chain the proxy builds (own routes,
+          // then only the `default` slot's chain), from the catalog snapshot.
           const active =
             status.reason === 'no_provider'
               ? []
-              : routableVirtualModelNames(virtualModels, status.enabled);
+              : virtualModels.filter((v) => v.routable === true).map((v) => v.name);
           const onlyVirtual = !status.enabled && active.length > 0;
           return {
             status_for: 'auto' as const,

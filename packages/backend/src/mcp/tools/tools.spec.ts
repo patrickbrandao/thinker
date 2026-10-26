@@ -55,7 +55,7 @@ const VIRTUAL_ROW = {
   response_mode: 'buffered',
   output_modality: 'text',
 };
-const VIRTUAL_VIEW = { ...VIRTUAL_ROW, shadows: [], context_length: 128000 };
+const VIRTUAL_VIEW = { ...VIRTUAL_ROW, shadows: [], context_length: 128000, routable: true };
 
 function makeDeps(): McpToolDeps {
   const chainable = {
@@ -534,7 +534,7 @@ describe('MCP tools', () => {
       // These are the auto-route verdicts; virtual models are covered below.
       const depsWithoutVirtualModels = () => {
         const d = makeDeps();
-        (d.virtualModels.list as jest.Mock).mockResolvedValue([]);
+        (d.virtualModels.listViews as jest.Mock).mockResolvedValue([]);
         return d;
       };
       const deps = depsWithoutVirtualModels();
@@ -734,18 +734,12 @@ describe('MCP tools', () => {
         active_virtual_models: ['DeepSeek/Flash'],
       });
 
-      // Disabled, empty, or continuing on a Default chain that cannot route:
-      // none of them routes, so the auto reason stands.
-      (deps.virtualModels.list as jest.Mock).mockResolvedValue([
-        { ...VIRTUAL_ROW, enabled: false },
-        {
-          ...VIRTUAL_ROW,
-          id: 'vm-2',
-          name: 'empty',
-          override_route: null,
-          continue_on_default: false,
-        },
-        { ...VIRTUAL_ROW, id: 'vm-3', name: 'onDefault', override_route: null },
+      // The service decides `routable` on the proxy's chain (only the
+      // `default` slot is appended); the tool trusts it, whatever other tiers
+      // hasRoutableTier saw.
+      (deps.virtualModels.listViews as jest.Mock).mockResolvedValue([
+        { ...VIRTUAL_VIEW, routable: false },
+        { ...VIRTUAL_VIEW, id: 'vm-3', name: 'onDefault', routable: false },
       ]);
       const none = await call(registerAll(deps), 'thinker_routing_status', { agent: 'demo' });
       expect(none.data).toMatchObject({
@@ -754,16 +748,14 @@ describe('MCP tools', () => {
         routes_by_virtual_model: false,
         active_virtual_models: [],
       });
-
-      // A virtual model with only fallbacks, or on a Default that routes, counts.
       (deps.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(true);
-      const withDefault = await call(registerAll(deps), 'thinker_routing_status', {
+      const otherTierRoutes = await call(registerAll(deps), 'thinker_routing_status', {
         agent: 'demo',
       });
-      expect(withDefault.data).toMatchObject({
+      expect(otherTierRoutes.data).toMatchObject({
         enabled: true,
-        reason: null,
-        active_virtual_models: ['onDefault'],
+        routes_by_virtual_model: false,
+        active_virtual_models: [],
       });
 
       // With no active provider nothing routes, virtual models included.

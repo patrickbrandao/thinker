@@ -531,13 +531,17 @@ describe('RouteModelParamsService model names', () => {
     expect(view.public_model).toBe('openai/gpt-4o');
   });
 
-  it('treats a native id two connections share as ambiguous, and the public ids as exact', async () => {
+  it("prefers the stored id to a custom route's native name, and resolves public ids", async () => {
     const { service } = withChain(OPENAI, [CUSTOM]);
-    await expect(service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).rejects.toThrow(
-      /more than one connection in virtual model "flash"; name it by its public id \(openai\/gpt-4o, fake2\/gpt-4o\)/,
+    // "gpt-4o" is OPENAI's stored id (layer 1); CUSTOM only derives it (layer 3).
+    expect((await service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).route).toEqual(
+      OPENAI,
     );
     const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
     expect(view.route).toEqual(OPENAI);
+    expect(
+      (await service.get(AGENT, { virtual: 'flash' }, 'fake2/gpt-4o', 'tenant-1')).route,
+    ).toEqual(CUSTOM);
   });
 
   it('names the public ids in the not-routed error', async () => {
@@ -578,5 +582,72 @@ describe('RouteModelParamsService model names', () => {
     discovery.getModelsForAgent.mockRejectedValueOnce(new Error('db down'));
     const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
     expect(view.route).toEqual(OPENAI);
+  });
+
+  it("lets the stored id win over another route's derived name", async () => {
+    // B stores the OpenRouter id "openai/gpt-4o"; A's derived name is the same
+    // string. The stored id names B alone, as before.
+    const A = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
+    const B = { provider: 'openrouter', authType: 'api_key', model: 'openai/gpt-4o' };
+    const catalog = [
+      { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+      { id: 'openai/gpt-4o', provider: 'openrouter', authType: 'api_key' },
+    ];
+    const virtual = setup({
+      catalog,
+      virtualModels: [
+        { id: 'vm1', name: 'flash', enabled: true, override_route: A, fallback_routes: [B] },
+      ],
+    });
+    expect(
+      (await virtual.service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1')).route,
+    ).toEqual(B);
+    expect(
+      (await virtual.service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).route,
+    ).toEqual(A);
+    expect(
+      (
+        await virtual.service.get(
+          AGENT,
+          { virtual: 'flash' },
+          'openrouter/openai/gpt-4o',
+          'tenant-1',
+        )
+      ).route,
+    ).toEqual(B);
+
+    const tier = setup({
+      catalog,
+      tiers: [{ tier: 'default', override_route: A, fallback_routes: [B] }],
+    });
+    expect((await tier.service.get(AGENT, 'default', 'openai/gpt-4o', 'tenant-1')).route).toEqual(
+      B,
+    );
+    expect((await tier.service.get(AGENT, 'default', 'gpt-4o')).route).toEqual(A);
+  });
+
+  it('suggests only names that select a single route', async () => {
+    // Two custom providers without alias share the native "gpt-4o"; the
+    // public id of each is its stored custom:<id>/gpt-4o, which is unique.
+    const C1 = { provider: 'custom:a', authType: 'api_key', model: 'custom:a/gpt-4o' };
+    const C2 = { provider: 'custom:b', authType: 'api_key', model: 'custom:b/gpt-4o' };
+    const { service } = setup({
+      tiers: [{ tier: 'default', override_route: C1, fallback_routes: [C2] }],
+    });
+    await expect(service.get(AGENT, 'default', 'gpt-4o')).rejects.toThrow(
+      /name it by one of: custom:a\/gpt-4o, custom:b\/gpt-4o$/,
+    );
+
+    // The same model on two keys of one connection is not ambiguous.
+    const keys = setup({
+      tiers: [
+        {
+          tier: 'default',
+          override_route: { ...C1, keyLabel: 'one' },
+          fallback_routes: [{ ...C1, keyLabel: 'two' }],
+        },
+      ],
+    });
+    expect((await keys.service.get(AGENT, 'default', 'gpt-4o')).route).toMatchObject(C1);
   });
 });

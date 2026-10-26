@@ -37,7 +37,18 @@ export async function findVirtualModel(
 }
 
 /** The compact readback `thinker_routing_status` prints for each virtual model. */
-export function summarizeVirtualModel(row: VirtualModel) {
+export function summarizeVirtualModel(
+  row: Pick<
+    VirtualModel,
+    | 'id'
+    | 'name'
+    | 'enabled'
+    | 'override_route'
+    | 'fallback_routes'
+    | 'continue_on_default'
+    | 'response_mode'
+  >,
+) {
   return {
     id: row.id,
     name: row.name,
@@ -47,27 +58,6 @@ export function summarizeVirtualModel(row: VirtualModel) {
     continue_on_default: row.continue_on_default,
     response_mode: row.response_mode,
   };
-}
-
-/**
- * Names of the virtual models that can take traffic: enabled, with a route of
- * their own, or continuing on a Default chain that routes. This is the
- * configuration, not a live availability check (the proxy re-checks each
- * route per request and answers M301 when none is available).
- */
-export function routableVirtualModelNames(
-  rows: readonly VirtualModel[],
-  autoRoutable: boolean,
-): string[] {
-  return rows
-    .filter(
-      (row) =>
-        row.enabled &&
-        (row.override_route != null ||
-          (row.fallback_routes?.length ?? 0) > 0 ||
-          (row.continue_on_default && autoRoutable)),
-    )
-    .map((row) => row.name);
 }
 
 const routeFields = {

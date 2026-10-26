@@ -43,12 +43,12 @@ function parseModelsList(raw: string): string[] {
 interface TierAssignmentRow {
   tier?: string;
   override_route?: unknown;
-  auto_assigned_route?: unknown;
   fallback_routes?: unknown;
 }
 
 interface VirtualModelListRow {
   name?: string;
+  routable?: boolean;
   enabled?: boolean;
   override_route?: unknown;
   fallback_routes?: unknown;
@@ -110,17 +110,13 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       shadows: Array.isArray(v.shadows) ? v.shadows : [],
     }));
 
-  // Virtual models that can take traffic as configured: enabled, with a
-  // route of their own, or continuing on a Default chain that has a route.
-  // The proxy still checks each route's availability per request (M301).
-  const defaultRoutes = Boolean(defaultTier?.override_route ?? defaultTier?.auto_assigned_route);
-  const activeVirtual = virtual
+  // The server decides `routable` on the chain the proxy builds (own routes,
+  // then only the `default` slot's chain with continue_on_default) from the
+  // agent's catalog, so the CLI and the MCP status agree.
+  const activeVirtual = (Array.isArray(virtualModels) ? virtualModels : [])
     .filter(
-      (v) =>
-        v.enabled === true &&
-        (v.route !== null ||
-          (Array.isArray(v.fallbacks) && v.fallbacks.length > 0) ||
-          (v.continue_on_default && defaultRoutes)),
+      (v): v is VirtualModelListRow =>
+        typeof v === 'object' && v !== null && (v as VirtualModelListRow).routable === true,
     )
     .map((v) => v.name);
 

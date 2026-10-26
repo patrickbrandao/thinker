@@ -327,11 +327,20 @@ describe('routing status with virtual models', () => {
       { status: 200, body: { enabled: true } },
     ]);
 
-  it('reports routing by virtual model when the default route is empty', async () => {
+  it('reports routing by virtual model from the server-computed routable flag', async () => {
     const { io } = status(null, [
-      VIEW,
-      { ...VIEW, id: 'vm-2', name: 'off', enabled: false },
-      { ...VIEW, id: 'vm-3', name: 'onDefault', override_route: null, continue_on_default: true },
+      { ...VIEW, routable: true },
+      { ...VIEW, id: 'vm-2', name: 'off', enabled: false, routable: false },
+      // continue_on_default over an empty default slot: the server says no,
+      // even if other tiers have routes.
+      {
+        ...VIEW,
+        id: 'vm-3',
+        name: 'onDefault',
+        override_route: null,
+        continue_on_default: true,
+        routable: false,
+      },
     ]);
     expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
     expect(io.lastJson()).toMatchObject({
@@ -341,23 +350,13 @@ describe('routing status with virtual models', () => {
     });
   });
 
-  it('counts a continue-on-Default virtual model only when the default route exists', async () => {
-    const onDefault = {
-      ...VIEW,
-      name: 'onDefault',
-      override_route: null,
-      continue_on_default: true,
-    };
-    const { io } = status(null, [onDefault]);
+  it('reports none when no virtual model is routable, or the server sends no flag', async () => {
+    const { io } = status({ model: 'gpt-4o' }, [{ ...VIEW, routable: false }, VIEW]);
     expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
     expect(io.lastJson()).toMatchObject({
       routes_by_virtual_model: false,
       active_virtual_models: [],
     });
-
-    const { io: io2 } = status({ model: 'gpt-4o' }, [onDefault]);
-    expect(await run(io2, ['routing', 'status', 'john'])).toBe(0);
-    expect(io2.lastJson()).toMatchObject({ active_virtual_models: ['onDefault'] });
   });
 });
 

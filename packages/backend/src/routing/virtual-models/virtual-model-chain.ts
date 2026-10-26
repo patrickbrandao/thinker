@@ -263,3 +263,28 @@ export async function virtualModelContextLength(
     catalog,
   );
 }
+
+/**
+ * Whether a virtual model can take traffic per one catalog snapshot: enabled,
+ * and its effective chain (own routes, then the Default slot's chain with
+ * `continue_on_default`, the same chain the proxy builds) keeps at least one
+ * route after the availability and transport filters. Only the `default`
+ * slot is ever appended, whatever the other tiers hold.
+ */
+export async function virtualModelRoutable(
+  virtualModel: VirtualModelChainSource & Pick<VirtualModel, 'response_mode' | 'enabled'>,
+  defaultTier: DefaultTierChainSource | null | undefined,
+  catalog: readonly DiscoveredModel[],
+): Promise<boolean> {
+  if (!virtualModel.enabled) return false;
+  const chain = await buildVirtualModelChain(virtualModel, defaultTier, {
+    isDefaultOverrideAvailable: (route) => snapshotOverrideAvailable(route, catalog),
+  });
+  return (
+    chainContextWindow(
+      chain.map((entry) => entry.route),
+      virtualModel.response_mode,
+      catalog,
+    ).kind !== 'empty'
+  );
+}

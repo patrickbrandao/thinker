@@ -107,16 +107,15 @@ function publicModelId(route: ModelRoute, catalog: readonly DiscoveredModel[]): 
 }
 
 /**
- * Every name a caller may use for a route's model: the stored id, the public
- * id, and the native id with and without its provider prefix (for a custom
- * provider, the model name after `custom:<id>/`). Anthropic short ids
- * normalize as before.
+ * Names derived from a route's native model id: the id without its provider
+ * prefix and `<provider>/<native>` (for a custom provider, the model name
+ * after `custom:<id>/`).
  */
-function routeModelNames(route: ModelRoute, publicId: string): Set<string> {
+function derivedModelNames(route: ModelRoute): Set<string> {
   const provider = route.provider.toLowerCase();
-  const prefix = `${route.provider}/`;
-  const names = new Set([route.model, publicId]);
+  const names = new Set<string>();
   if (provider.startsWith('custom:')) {
+    const prefix = `${route.provider}/`;
     if (route.model.startsWith(prefix)) names.add(route.model.slice(prefix.length));
   } else {
     const native = route.model.toLowerCase().startsWith(`${provider}/`)
@@ -126,6 +125,36 @@ function routeModelNames(route: ModelRoute, publicId: string): Set<string> {
     names.add(`${provider}/${native}`);
   }
   return names;
+}
+
+/**
+ * The routes a model name selects, in layers: (1) the stored id (Anthropic
+ * short ids normalized as before), (2) the public id, (3) the derived native
+ * names. The first layer with a match wins, so an id that names one route
+ * exactly is never made ambiguous by another route's derived name; only
+ * matches within the winning layer can be ambiguous.
+ */
+function matchRoutes(
+  name: string,
+  routes: readonly ModelRoute[],
+  publicIds: ReadonlyMap<ModelRoute, string>,
+): ModelRoute[] {
+  const layers: Array<(r: ModelRoute) => boolean> = [
+    (r) =>
+      r.model === name ||
+      normalizeProviderModel(r.provider, r.model) === normalizeProviderModel(r.provider, name),
+    (r) => publicIds.get(r) === name,
+    (r) => derivedModelNames(r).has(name),
+  ];
+  for (const layer of layers) {
+    const hits = routes.filter(layer);
+    if (hits.length > 0) return hits;
+  }
+  return [];
+}
+
+function connectionKey(route: ModelRoute): string {
+  return `${route.provider.toLowerCase()}|${route.authType}`;
 }
 
 /**
@@ -257,14 +286,7 @@ export class RouteModelParamsService {
       return this.resolved(family, primary, ids);
     }
 
-    // One pass over every accepted name, so a native id that two connections
-    // share is reported as ambiguous instead of picking one.
-    const wanted = (r: ModelRoute) => normalizeProviderModel(r.provider, model);
-    const matches = routes.filter(
-      (r) =>
-        routeModelNames(r, publicIds.get(r)!).has(model) ||
-        normalizeProviderModel(r.provider, r.model) === wanted(r),
-    );
+    const matches = matchRoutes(model, routes, publicIds);
     if (matches.length === 0) {
       // A custom provider's stored id is an internal key: show the public
       // id the operator knows next to it.
@@ -275,14 +297,28 @@ export class RouteModelParamsService {
         `Model "${model}" is not routed by ${label}. Models: ${listed.join(', ')}`,
       );
     }
-    const connections = new Set(matches.map((r) => `${r.provider.toLowerCase()}|${r.authType}`));
+    const connections = new Set(matches.map(connectionKey));
     if (connections.size > 1) {
-      const options = [...new Set(matches.map((r) => publicIds.get(r)!))];
+      // Suggest, per matched route, a name (public id first, then stored id)
+      // that selects that route's connection alone.
+      const unique = (name: string, route: ModelRoute) => {
+        const hits = new Set(matchRoutes(name, routes, publicIds).map(connectionKey));
+        return hits.size === 1 && hits.has(connectionKey(route));
+      };
+      const options = [
+        ...new Set(
+          matches
+            .map((r) => [publicIds.get(r)!, r.model].find((name) => unique(name, r)))
+            .filter((name): name is string => name !== undefined),
+        ),
+      ];
       throw new BadRequestException(
         `Model "${model}" is routed through more than one connection in ${label}; ` +
           (options.length > 1
-            ? `name it by its public id (${options.join(', ')})`
-            : 'set its params from the dashboard'),
+            ? `name it by one of: ${options.join(', ')}`
+            : options.length === 1
+              ? `name it by ${options[0]}`
+              : 'set its params from the dashboard'),
       );
     }
     return this.resolved(family, matches[0], ids);

@@ -265,6 +265,67 @@ describe('MCP virtual model tools', () => {
     }
   });
 
+  it('appends only the default slot for continue_on_default, as the proxy does', async () => {
+    const created = await call('thinker_routing_virtual_create', {
+      agent: 'test-agent',
+      name: 'onDefault',
+      continue_on_default: true,
+    });
+    expect(created.error).toBe(false);
+    const id = (created.data as { virtual_model: { id: string } }).virtual_model.id;
+    jest
+      .spyOn(app.get(ProviderService), 'getProviders')
+      .mockResolvedValue([{ is_active: true }] as never);
+    const cache = app.get(RoutingCacheService);
+    try {
+      // Default slot routes: the virtual model continues on it.
+      let status = await call('thinker_routing_status', { agent: 'test-agent' });
+      expect((status.data as { active_virtual_models: string[] }).active_virtual_models).toEqual([
+        'Deep',
+        'onDefault',
+      ]);
+
+      // Empty default slot while another slot has a route: hasRoutableTier
+      // may say yes, but the proxy appends nothing, so it does not count.
+      await ds.query(
+        `UPDATE tier_assignments SET override_route = NULL, auto_assigned_route = NULL, fallback_routes = NULL
+         WHERE agent_id = $1 AND tier = 'default'`,
+        [TEST_AGENT_ID],
+      );
+      await ds.query(
+        `INSERT INTO tier_assignments (id, agent_id, tier, override_route, updated_at)
+         VALUES ('vm-mcp-simple', $1, 'simple', $2::jsonb, now())
+         ON CONFLICT (agent_id, tier) DO UPDATE SET override_route = EXCLUDED.override_route`,
+        [
+          TEST_AGENT_ID,
+          JSON.stringify({ provider: 'openai', authType: 'api_key', model: 'gpt-4o' }),
+        ],
+      );
+      cache.invalidateAgent(TEST_AGENT_ID);
+      status = await call('thinker_routing_status', { agent: 'test-agent' });
+      expect(status.data).toMatchObject({ active_virtual_models: ['Deep'] });
+      const views = await api()
+        .get(`${BASE}/virtual-models`)
+        .set('x-api-key', TEST_API_KEY)
+        .expect(200);
+      expect(views.body.find((v: { id: string }) => v.id === id)).toMatchObject({
+        routable: false,
+      });
+    } finally {
+      jest.mocked(app.get(ProviderService).getProviders).mockRestore();
+      await ds.query(
+        `UPDATE tier_assignments SET override_route = $2::jsonb WHERE agent_id = $1 AND tier = 'default'`,
+        [
+          TEST_AGENT_ID,
+          JSON.stringify({ provider: 'openai', authType: 'api_key', model: 'gpt-4o' }),
+        ],
+      );
+      await ds.query(`DELETE FROM tier_assignments WHERE id = 'vm-mcp-simple'`);
+      await call('thinker_routing_virtual_delete', { agent: 'test-agent', virtual: id });
+      cache.invalidateAgent(TEST_AGENT_ID);
+    }
+  });
+
   it('sets params under virtual:<id>, apart from the custom tier of the same name', async () => {
     const set = await call('thinker_routing_params_set', {
       agent: 'test-agent',
@@ -464,14 +525,14 @@ describe('MCP virtual model tools', () => {
     });
     expect(byStored.data).toMatchObject({ public_model: 'fake2/deepseek-chat' });
 
-    // The bare native id names both connections of this chain.
-    const ambiguous = await call('thinker_routing_params_get', {
+    // The bare id is the deepseek route's stored id, so it wins over the
+    // custom route's derived native name.
+    const bare = await call('thinker_routing_params_get', {
       agent: 'test-agent',
       virtual: 'aliased',
       model: 'deepseek-chat',
     });
-    expect(ambiguous.error).toBe(true);
-    expect(ambiguous.text).toContain('name it by its public id (fake2/deepseek-chat, deepseek/deepseek-chat)');
+    expect(bare.data).toMatchObject({ route: { provider: 'deepseek', model: 'deepseek-chat' } });
 
     const native = await call('thinker_routing_params_set', {
       agent: 'test-agent',
