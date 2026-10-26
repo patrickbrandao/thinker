@@ -6,8 +6,8 @@ Thanks for your interest in contributing to Thinker! This guide will help you ge
 
 | Layer    | Technology                                       |
 | -------- | ------------------------------------------------ |
-| Frontend | SolidJS, uPlot, custom CSS theme                 |
-| Backend  | NestJS 11, TypeORM, PostgreSQL 18                |
+| Frontend | SolidJS, Vite 8, uPlot, custom CSS theme         |
+| Backend  | NestJS 12, TypeORM 1.1, PostgreSQL 18            |
 | Auth     | Better Auth (auto-login on localhost)            |
 | Routing  | OpenAI-compatible proxy (`/v1/chat/completions`) |
 | Build    | Turborepo + npm workspaces                       |
