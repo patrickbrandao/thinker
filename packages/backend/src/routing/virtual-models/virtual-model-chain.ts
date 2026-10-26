@@ -97,25 +97,37 @@ export async function buildVirtualModelChain(
   options: BuildVirtualModelChainOptions,
 ): Promise<VirtualModelChainEntry[]> {
   const normalize = options.normalize ?? ((route: ModelRoute) => route);
-  const chain: VirtualModelChainEntry[] = [];
-  const push = async (route: ModelRoute, paramsScope: string, fromDefault: boolean) => {
-    const normalized = await normalize(route, { paramsScope, fromDefault });
-    if (chain.some((entry) => routeMatches(entry.route, normalized))) return;
-    chain.push({ route: normalized, paramsScope, fromDefault });
+  // Every route is normalized concurrently; deduplication then runs over the
+  // results in chain order, so the first occurrence still wins.
+  const pending: Array<Promise<VirtualModelChainEntry>> = [];
+  const add = (route: ModelRoute, paramsScope: string, fromDefault: boolean) => {
+    pending.push(
+      Promise.resolve(normalize(route, { paramsScope, fromDefault })).then((normalized) => ({
+        route: normalized,
+        paramsScope,
+        fromDefault,
+      })),
+    );
   };
 
   const ownScope = modelParamsScopeForVirtualModel(virtualModel.id);
   const primary = readOverrideRoute(virtualModel);
-  if (primary) await push(primary, ownScope, false);
-  for (const route of readFallbackRoutes(virtualModel) ?? []) await push(route, ownScope, false);
+  if (primary) add(primary, ownScope, false);
+  for (const route of readFallbackRoutes(virtualModel) ?? []) add(route, ownScope, false);
 
   if (virtualModel.continue_on_default && defaultTier) {
     const defaultScope = modelParamsScopeForTier(DEFAULT_TIER_SLOT);
     const override = readOverrideRoute(defaultTier);
     const overrideAvailable = override ? await options.isDefaultOverrideAvailable(override) : false;
     for (const route of tierChainRoutes(defaultTier, overrideAvailable)) {
-      await push(route, defaultScope, true);
+      add(route, defaultScope, true);
     }
+  }
+
+  const chain: VirtualModelChainEntry[] = [];
+  for (const entry of await Promise.all(pending)) {
+    if (chain.some((kept) => routeMatches(kept.route, entry.route))) continue;
+    chain.push(entry);
   }
   return chain;
 }
@@ -160,6 +172,51 @@ export interface RouteSnapshot {
   providers: readonly RouteProviderRecord[];
 }
 
+interface RouteSnapshotIndex {
+  catalog: ReadonlyMap<string, readonly DiscoveredModel[]>;
+  providers: ReadonlyMap<string, readonly RouteProviderRecord[]>;
+}
+
+/**
+ * Catalog and credential rows grouped by lowercase provider name, built once
+ * per snapshot (one per request) so judging each route reads only its own
+ * provider's entries instead of filtering the whole catalog.
+ */
+const snapshotIndexes = new WeakMap<RouteSnapshot, RouteSnapshotIndex>();
+
+function snapshotIndex(snapshot: RouteSnapshot): RouteSnapshotIndex {
+  let index = snapshotIndexes.get(snapshot);
+  if (!index) {
+    index = {
+      catalog: groupByProvider(snapshot.catalog),
+      providers: groupByProvider(snapshot.providers),
+    };
+    snapshotIndexes.set(snapshot, index);
+  }
+  return index;
+}
+
+function groupByProvider<T extends { provider: string }>(items: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.provider.toLowerCase();
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  return groups;
+}
+
+/** Entries of every provider name in `names`, in snapshot-group order. */
+function bucketsFor<T>(groups: ReadonlyMap<string, readonly T[]>, names: ReadonlySet<string>): T[] {
+  const out: T[] = [];
+  for (const name of names) {
+    const group = groups.get(name);
+    if (group) out.push(...group);
+  }
+  return out;
+}
+
 /** What one route snapshot says about a route. */
 export type SnapshotRouteState =
   | { state: 'available'; contextWindow: number | null }
@@ -181,10 +238,9 @@ export type SnapshotRouteState =
  */
 export function snapshotRouteState(route: ModelRoute, snapshot: RouteSnapshot): SnapshotRouteState {
   const providerNames = expandProviderNames([route.provider]);
-  const connectionModels = snapshot.catalog.filter(
-    (m) =>
-      providerNames.has(m.provider.toLowerCase()) &&
-      (!route.authType || !m.authType || m.authType === route.authType),
+  const index = snapshotIndex(snapshot);
+  const connectionModels = bucketsFor(index.catalog, providerNames).filter(
+    (m) => !route.authType || !m.authType || m.authType === route.authType,
   );
   if (connectionModels.length === 0) return coldRouteState(route, providerNames, snapshot);
   const windows = connectionModels.filter((m) => m.id === route.model).map((m) => m.contextWindow);
@@ -201,10 +257,8 @@ function coldRouteState(
 ): SnapshotRouteState {
   if (!route.provider) return { state: 'unknown' };
   if (providerNames.has('qwen') || providerNames.has('alibaba')) return { state: 'unavailable' };
-  const hasRecord = snapshot.providers.some(
-    (r) =>
-      providerNames.has(r.provider.toLowerCase()) &&
-      (!route.authType || r.authType === route.authType),
+  const hasRecord = bucketsFor(snapshotIndex(snapshot).providers, providerNames).some(
+    (r) => !route.authType || r.authType === route.authType,
   );
   return hasRecord ? { state: 'unknown' } : { state: 'unavailable' };
 }

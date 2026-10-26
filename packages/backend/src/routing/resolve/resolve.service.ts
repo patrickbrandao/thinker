@@ -413,9 +413,23 @@ export class ResolveService {
         null)
       : null;
     const defaultOverride = defaultTier ? readOverrideRoute(defaultTier) : null;
+    // One default-key lookup per (provider, authType) for the whole request:
+    // chain routes often share a connection, and the Default override is
+    // normalized again below.
+    const keyLabels = new Map<string, Promise<ModelRoute>>();
+    const normalize = (route: ModelRoute): Promise<ModelRoute> => {
+      if (route.keyLabel) return Promise.resolve(route);
+      const key = `${route.provider}\u0000${route.authType ?? ''}`;
+      let labelled = keyLabels.get(key);
+      if (!labelled) {
+        labelled = this.enrichRouteKeyLabel(agentId, tenantId, route);
+        keyLabels.set(key, labelled);
+      }
+      return labelled.then((r) => (r.keyLabel ? { ...route, keyLabel: r.keyLabel } : route));
+    };
     let defaultOverrideAvailable = false;
     const chain = await buildVirtualModelChain(match, defaultTier, {
-      normalize: (route) => this.enrichRouteKeyLabel(agentId, tenantId, route),
+      normalize,
       isDefaultOverrideAvailable: async (route) => {
         defaultOverrideAvailable = await this.providerKeyService.isRouteAvailable(
           tenantId,
@@ -426,28 +440,40 @@ export class ResolveService {
       },
     });
     const normalizedDefaultOverride =
-      defaultOverride && defaultOverrideAvailable
-        ? await this.enrichRouteKeyLabel(agentId, tenantId, defaultOverride)
-        : null;
+      defaultOverride && defaultOverrideAvailable ? await normalize(defaultOverride) : null;
 
     // Availability (section 4, steps 1 and 2). The virtual's own routes pass
     // the header-tier check. The Default part follows buildResolvedRouteChain:
     // an available override heads it, otherwise the first route with
     // credentials does, and the routes after that head pass the same check as
-    // the virtual's own routes.
-    const available: VirtualModelChainEntry[] = [];
-    let defaultHeadChosen = false;
-    for (const entry of chain) {
-      let ok: boolean;
-      if (!entry.fromDefault || defaultHeadChosen) {
-        ok = await this.providerKeyService.isRouteAvailable(tenantId, entry.route, agentId);
-      } else {
-        ok =
-          (normalizedDefaultOverride !== null &&
-            routeMatches(entry.route, normalizedDefaultOverride)) ||
-          (await this.providerKeyService.hasRouteCredentials(tenantId, entry.route, agentId));
-        if (ok) defaultHeadChosen = true;
+    // the virtual's own routes. Independent checks run concurrently; only the
+    // search for the Default head is sequential, since each step depends on
+    // the previous one. Results are read back in chain order.
+    const isAvailable = (route: ModelRoute) =>
+      this.providerKeyService.isRouteAvailable(tenantId, route, agentId);
+    const ownChecks = chain.filter((e) => !e.fromDefault).map((e) => isAvailable(e.route));
+    const defaultEntries = chain.filter((e) => e.fromDefault);
+    const defaultChecks = (async (): Promise<boolean[]> => {
+      const results: boolean[] = [];
+      let i = 0;
+      for (; i < defaultEntries.length; i++) {
+        const route = defaultEntries[i].route;
+        const ok =
+          (normalizedDefaultOverride !== null && routeMatches(route, normalizedDefaultOverride)) ||
+          (await this.providerKeyService.hasRouteCredentials(tenantId, route, agentId));
+        results.push(ok);
+        if (ok) break;
       }
+      const after = await Promise.all(defaultEntries.slice(i + 1).map((e) => isAvailable(e.route)));
+      return [...results, ...after];
+    })();
+    const [ownResults, defaultResults] = await Promise.all([Promise.all(ownChecks), defaultChecks]);
+
+    const available: VirtualModelChainEntry[] = [];
+    let ownIndex = 0;
+    let defaultIndex = 0;
+    for (const entry of chain) {
+      const ok = entry.fromDefault ? defaultResults[defaultIndex++] : ownResults[ownIndex++];
       if (ok) {
         available.push(entry);
         continue;

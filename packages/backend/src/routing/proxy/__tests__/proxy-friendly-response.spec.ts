@@ -17,19 +17,19 @@ describe('proxy-friendly-response', () => {
 
     it('returns agent Overview URL when agentName provided without section', () => {
       expect(getDashboardUrl(prodConfig, 'my-agent')).toBe(
-        'https://app.thinker.example.com/agents/my-agent',
+        'https://app.thinker.example.com/harnesses/my-agent',
       );
     });
 
     it('returns agent Routing URL when section is "routing"', () => {
       expect(getDashboardUrl(prodConfig, 'my-agent', 'routing')).toBe(
-        'https://app.thinker.example.com/agents/my-agent/routing',
+        'https://app.thinker.example.com/harnesses/my-agent/routing',
       );
     });
 
     it('returns agent Limits URL when section is "limits"', () => {
-      expect(getDashboardUrl(prodConfig, 'my-agent', 'limits')).toBe(
-        'https://app.thinker.example.com/agents/my-agent/limits',
+      expect(getDashboardUrl(prodConfig, 'my-agent', 'guardrails')).toBe(
+        'https://app.thinker.example.com/harnesses/my-agent/guardrails',
       );
     });
 
@@ -53,7 +53,7 @@ describe('proxy-friendly-response', () => {
       } as unknown as ConfigService;
 
       expect(getDashboardUrl(config, 'demo', 'routing')).toBe(
-        'http://localhost:4000/agents/demo/routing',
+        'http://localhost:4000/harnesses/demo/routing',
       );
     });
 
@@ -65,8 +65,8 @@ describe('proxy-friendly-response', () => {
         }),
       } as unknown as ConfigService;
 
-      expect(getDashboardUrl(config, 'my agent', 'limits')).toBe(
-        'http://localhost:2099/agents/my%20agent/limits',
+      expect(getDashboardUrl(config, 'my agent', 'guardrails')).toBe(
+        'http://localhost:2099/harnesses/my%20agent/guardrails',
       );
     });
   });

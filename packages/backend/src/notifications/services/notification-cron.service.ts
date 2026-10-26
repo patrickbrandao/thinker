@@ -133,7 +133,7 @@ export class NotificationCronService implements OnModuleInit {
           actualValue: actual,
           period: rule.period,
           timestamp: now,
-          agentUrl: `${this.runtime.getAuthBaseUrl()}/agents/${encodeURIComponent(rule.agent_name)}`,
+          agentUrl: `${this.runtime.getAuthBaseUrl()}/harnesses/${encodeURIComponent(rule.agent_name)}`,
           alertType: 'soft',
         },
         fullConfig ?? undefined,

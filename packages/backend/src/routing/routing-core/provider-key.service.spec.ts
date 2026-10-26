@@ -270,8 +270,10 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
     enabledFind: jest.Mock;
     setProviderKeys: jest.Mock;
     providerFind: jest.Mock;
+    getProviders: jest.Mock;
   } => {
     const providerRepo = { find: jest.fn().mockResolvedValue(opts.tenantProviders) };
+    const getProviders = jest.fn().mockResolvedValue(opts.tenantProviders);
     const setProviderKeys = jest.fn();
     const routingCache = {
       getProviderKeys: jest.fn().mockReturnValue(undefined),
@@ -285,10 +287,10 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
       {} as never, // pricingCache
       {} as never, // discoveryService
       routingCache as never, // routingCache
-      {} as never, // providerService
+      { getProviders } as never, // providerService
       enabledRepo as never, // enabledProviderRepo
     );
-    return { svc, enabledFind, setProviderKeys, providerFind: providerRepo.find };
+    return { svc, enabledFind, setProviderKeys, providerFind: providerRepo.find, getProviders };
   };
 
   it('returns [] when the agent has no enabled-provider rows (empty gate)', async () => {
@@ -366,14 +368,16 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
 
   describe('getRouteProviderRecords', () => {
     it('returns the active records the agent has enabled, scoped to the tenant', async () => {
-      const { svc, providerFind } = buildService({
+      const { svc, getProviders } = buildService({
         tenantProviders: [
           tenantProvider({ id: 'tp-openai', provider: 'openai' }),
           tenantProvider({ id: 'tp-deepseek', provider: 'deepseek' }),
           tenantProvider({ id: 'tp-local', provider: 'ollama', auth_type: 'local' }),
+          tenantProvider({ id: 'tp-xai', provider: 'xai', is_active: false }),
         ],
-        // DeepSeek stays connected for the tenant but is disabled for the agent.
-        enabledRows: [enabledRow('tp-openai'), enabledRow('tp-local')],
+        // DeepSeek stays connected for the tenant but is disabled for the agent;
+        // xAI is enabled but inactive.
+        enabledRows: [enabledRow('tp-openai'), enabledRow('tp-local'), enabledRow('tp-xai')],
       });
 
       const records = await svc.getRouteProviderRecords('tenant-1', 'agent-1');
@@ -382,9 +386,8 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
         { provider: 'openai', authType: 'api_key' },
         { provider: 'ollama', authType: 'local' },
       ]);
-      expect(providerFind).toHaveBeenCalledWith({
-        where: { tenant_id: 'tenant-1', is_active: true },
-      });
+      // Reads the cached tenant rows instead of querying tenant_providers.
+      expect(getProviders).toHaveBeenCalledWith('tenant-1');
     });
 
     it('returns [] when the agent has enabled nothing', async () => {
