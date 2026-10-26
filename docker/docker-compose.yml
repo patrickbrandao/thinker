@@ -43,6 +43,9 @@ name: thinker
 services:
   thinker:
     image: tmsoftbrasil/thinker:${THINKER_VERSION:-latest}
+    # Longer than SHUTDOWN_DRAIN_MS (10s by default): Docker's own 10s default
+    # would SIGKILL the container right at the end of the drain (exit 137).
+    stop_grace_period: 30s
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-${PORT:-2099}}:${PORT:-2099}"
     # Lets the container reach LLM servers running on the host (Ollama,
