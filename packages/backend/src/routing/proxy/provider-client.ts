@@ -48,6 +48,7 @@ import {
 import { CodexSessionAffinity } from './codex-session-affinity';
 import { ModelsDevReasoningCatalog } from './reasoning-model-catalog';
 import { toNativeResponsesRequest } from './responses-adapter';
+import { dropUnsupportedAnthropicTools } from './anthropic-messages-adapter';
 import { responsesToolNames, ResponsesToolNames } from './responses-tools';
 import { forwardKiroChat } from './kiro-adapter';
 import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
@@ -395,7 +396,14 @@ export class ProviderClient {
       opts.apiMode !== undefined &&
       opts.apiMode !== 'chat_completions' &&
       INPUT_WIRE_FORMATS[opts.apiMode] !== resolvedWireFormat;
-    const chatBody = needsChatBody ? await opts.resolveChatBody?.() : undefined;
+    const resolvedChatBody = needsChatBody ? await opts.resolveChatBody?.() : undefined;
+    // Anthropic Messages forwarded to a protocol that cannot execute Anthropic
+    // provider-defined tools: strip them from the translated wire body. Native
+    // Anthropic routes leave the chat body undefined and keep the server tools.
+    const chatBody =
+      opts.apiMode === 'messages' && resolvedChatBody
+        ? dropUnsupportedAnthropicTools(resolvedChatBody, body)
+        : resolvedChatBody;
 
     const bareModel = stripModelPrefix(model, endpointKey);
     if (endpoint.format === 'kiro') {
