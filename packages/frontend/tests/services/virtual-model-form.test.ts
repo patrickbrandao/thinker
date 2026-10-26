@@ -68,6 +68,16 @@ describe('previewShadows', () => {
     expect(previewShadows('custom:cp-2/small', custom, providers)).toEqual(['custom:cp-2/small']);
     expect(previewShadows('custom:cp-2/gpt-5.5', custom, providers)).toEqual([]);
   });
+
+  it('matches the -subscription public id of subscription models, as the backend does', () => {
+    const sub = [{ ...model('gpt-5.5', 'OpenAI'), auth_type: 'subscription' as const }];
+    expect(previewShadows('openai/gpt-5.5-subscription', sub)).toEqual([
+      'openai/gpt-5.5-subscription',
+    ]);
+    expect(previewShadows('gpt-5.5', sub)).toEqual(['gpt-5.5']);
+    // A subscription model publishes only the suffixed id.
+    expect(previewShadows('openai/gpt-5.5', sub)).toEqual([]);
+  });
 });
 
 describe('nonStreamingRoutes', () => {

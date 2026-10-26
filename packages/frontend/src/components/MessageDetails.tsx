@@ -129,7 +129,8 @@ export default function MessageDetails(props: MessageDetailsProps): JSX.Element 
                   <MetaField
                     label="Routing"
                     value={
-                      m.virtual_model_name ??
+                      // The name itself is in "Virtual model" just below.
+                      (m.virtual_model_name ? 'virtual model' : null) ??
                       m.header_tier_name ??
                       (m.specificity_category
                         ? m.specificity_category.replace(/_/g, ' ')

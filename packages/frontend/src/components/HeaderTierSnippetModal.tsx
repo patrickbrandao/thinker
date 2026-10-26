@@ -3,10 +3,14 @@ import FrameworkSnippets from './FrameworkSnippets.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import type { HeaderTier } from '../services/api/header-tiers.js';
+import type { CustomProviderData } from '../services/api.js';
+import { customProviderAliases, publicModelId } from '../services/public-model-id.js';
 
 interface Props {
   agentName: string;
   tier: HeaderTier;
+  /** For the public `<alias>/<model>` id of a custom provider's model. */
+  customProviders?: CustomProviderData[];
   onClose: () => void;
 }
 
@@ -29,8 +33,14 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
     [props.tier.header_key]: props.tier.header_value,
   });
 
-  const modelText = (): string =>
-    props.tier.override_route?.model ?? 'no model assigned (falls back to default routing)';
+  // A custom provider's model shows its public id (`<alias>/<model>` when the
+  // provider has an alias), not the internal `custom:<uuid>/<model>` key.
+  const modelText = (): string => {
+    const route = props.tier.override_route;
+    if (!route) return 'no model assigned (falls back to default routing)';
+    if (!route.provider?.startsWith('custom:')) return route.model;
+    return publicModelId(route, customProviderAliases(props.customProviders));
+  };
 
   return (
     <div

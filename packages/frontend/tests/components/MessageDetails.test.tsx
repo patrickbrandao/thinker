@@ -484,7 +484,7 @@ describe('MessageDetails', () => {
       const items = [...container.querySelectorAll('.msg-detail__meta-item')].map(
         (el) => el.textContent,
       );
-      expect(items).toContain('Routingdeepseek/flash');
+      expect(items).toContain('Routingvirtual model');
       expect(items).toContain('Virtual modeldeepseek/flash');
       expect(items).toContain('Reasonvirtual-model');
     });

@@ -348,6 +348,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
           <HeaderTierSnippetModal
             agentName={props.agentName()}
             tier={t}
+            customProviders={props.customProviders()}
             onClose={() => setSnippetTier(null)}
           />
         )}

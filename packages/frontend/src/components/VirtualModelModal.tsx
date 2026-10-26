@@ -17,6 +17,7 @@ import type {
 } from '../services/api.js';
 import type { VirtualModelRouteInput } from 'thinker-shared';
 import {
+  deleteVirtualModelPrompt,
   mapVirtualModelError,
   nonStreamingRoutes,
   previewShadows,
@@ -34,6 +35,12 @@ interface Props {
   connectedProviders: RoutingProvider[];
   onClose: () => void;
   onSaved: (saved: VirtualModel) => void;
+  /**
+   * Edit only: part of the save went through (the rename or switch) before a
+   * later step failed. The modal stays open with the error inline; the card
+   * takes what was saved.
+   */
+  onPartialSave?: (saved: VirtualModel) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -139,6 +146,9 @@ const VirtualModelModal: Component<Props> = (props) => {
     setFallbacks((prev) => prev.filter((_, i) => i !== index - 1));
   };
 
+  /** The latest row the backend returned during this edit, if any. */
+  let savedBase: VirtualModel | undefined;
+
   const isValid = () => virtualModelNameError(name(), otherNames()) === undefined;
 
   const submit = async (): Promise<void> => {
@@ -147,20 +157,28 @@ const VirtualModelModal: Component<Props> = (props) => {
     setSubmitting(true);
     clearServerErrors();
     const responseMode: ResponseMode = streamMode() ? 'stream' : 'buffered';
+    // Set once the PUT went through, so a failed PATCH after it still reaches
+    // the card (and a retry only sends what is left).
+    let partial: VirtualModel | undefined;
     try {
       let saved: VirtualModel;
       if (editing) {
+        const base = savedBase ?? editing;
         const patch: { name?: string; continue_on_default?: boolean } = {};
-        if (name().trim() !== editing.name) patch.name = name().trim();
-        if (continueOnDefault() !== editing.continue_on_default) {
+        if (name().trim() !== base.name) patch.name = name().trim();
+        if (continueOnDefault() !== base.continue_on_default) {
           patch.continue_on_default = continueOnDefault();
         }
-        saved =
-          Object.keys(patch).length > 0
-            ? await updateVirtualModel(props.agentName, editing.id, patch)
-            : editing;
+        if (Object.keys(patch).length > 0) {
+          saved = await updateVirtualModel(props.agentName, editing.id, patch);
+          partial = saved;
+        } else {
+          saved = base;
+        }
         if (saved.response_mode !== responseMode) {
-          saved = await setVirtualModelResponseMode(props.agentName, editing.id, responseMode);
+          saved = await setVirtualModelResponseMode(props.agentName, editing.id, responseMode, {
+            silent: true,
+          });
         }
       } else {
         const p = primary();
@@ -174,6 +192,10 @@ const VirtualModelModal: Component<Props> = (props) => {
       }
       props.onSaved(saved);
     } catch (err) {
+      if (partial) {
+        savedBase = partial;
+        props.onPartialSave?.(partial);
+      }
       const mapped = mapVirtualModelError(
         err,
         chainRows().map((r) => r.route.model),
@@ -422,7 +444,7 @@ const VirtualModelModal: Component<Props> = (props) => {
                 type="button"
                 class="btn btn--outline header-tier-modal__delete-btn"
                 onClick={() => {
-                  if (confirm(`Delete virtual model "${editing!.name}"?`)) {
+                  if (confirm(deleteVirtualModelPrompt(editing!.name))) {
                     props.onDelete!(editing!.id);
                   }
                 }}

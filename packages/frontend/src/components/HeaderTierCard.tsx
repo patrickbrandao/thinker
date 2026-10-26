@@ -131,6 +131,7 @@ const HeaderTierCard: Component<Props> = (props) => {
         <HeaderTierSnippetModal
           agentName={props.agentName}
           tier={props.tier}
+          customProviders={props.customProviders}
           onClose={() => setSnippetOpen(false)}
         />
       </Show>
