@@ -40,6 +40,8 @@ interface Attempt {
   trace_id?: string;
   routing_tier?: string;
   routing_reason?: string;
+  /** Virtual model (ADR 0004) the request named; shared by every attempt. */
+  virtual_model_name?: string;
   service_type?: string;
   session_key?: string;
   description?: string;
@@ -131,6 +133,7 @@ function buildAttempts(msg: any): Attempt[] {
       model_id: att.model_id ?? undefined,
       trace_id: att.trace_id ?? msg.trace_id,
       routing_tier: att.routing_tier ?? undefined,
+      virtual_model_name: msg.virtual_model_name ?? undefined,
       routing_reason: att.routing_reason ?? undefined,
       service_type: att.service_type ?? msg.service_type,
       session_key: att.session_key ?? msg.session_key,
@@ -166,6 +169,7 @@ function buildAttempts(msg: any): Attempt[] {
       model_id: msg.model_id,
       trace_id: msg.trace_id,
       routing_tier: msg.routing_tier,
+      virtual_model_name: msg.virtual_model_name ?? undefined,
       routing_reason: msg.routing_reason,
       service_type: msg.service_type,
       session_key: msg.session_key,
@@ -305,6 +309,14 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                         {authBadgeFor(headerAuthType(), 8)}
                       </span>
                       {headerModel()}
+                    </span>
+                  </Show>
+                  <Show when={msg().virtual_model_name}>
+                    <span
+                      class="tier-badge tier-badge--virtual"
+                      title={`Virtual model: ${msg().virtual_model_name}`}
+                    >
+                      {msg().virtual_model_name}
                     </span>
                   </Show>
                   <Show when={msg().timestamp}>
@@ -465,6 +477,16 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                   <div class="drawer-kv">
                                     <span class="drawer-kv__key">Trace ID</span>
                                     <span>{att().trace_id}</span>
+                                  </div>
+                                </Show>
+                                <Show when={att().virtual_model_name}>
+                                  <div class="drawer-kv">
+                                    <span class="drawer-kv__key">Virtual model</span>
+                                    <span>
+                                      <span class="tier-badge tier-badge--virtual">
+                                        {att().virtual_model_name}
+                                      </span>
+                                    </span>
                                   </div>
                                 </Show>
                                 <Show when={att().routing_tier}>

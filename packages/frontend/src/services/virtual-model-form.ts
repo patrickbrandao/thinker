@@ -1,5 +1,5 @@
 import { validateVirtualModelName } from 'thinker-shared';
-import type { AvailableModel, ModelRoute } from './api.js';
+import type { AvailableModel, CustomProviderData, ModelRoute } from './api.js';
 import { ApiError } from './api/core.js';
 
 /**
@@ -28,14 +28,32 @@ export function virtualModelNameError(
  * backend's `shadows` list (computed on every read) is authoritative; this
  * only warns while typing, before the name is saved.
  */
-export function previewShadows(name: string, models: readonly AvailableModel[]): string[] {
+export function previewShadows(
+  name: string,
+  models: readonly AvailableModel[],
+  customProviders: readonly Pick<CustomProviderData, 'id' | 'alias'>[] = [],
+): string[] {
   const lower = name.trim().toLowerCase();
   if (!lower) return [];
+  const aliases = new Map(customProviders.map((cp) => [`custom:${cp.id}`, cp.alias]));
   const found = new Set<string>();
+  const consider = (id: string) => {
+    if (id.toLowerCase() === lower) found.add(id);
+  };
   for (const m of models) {
-    if (m.model_name.toLowerCase() === lower) found.add(m.model_name);
-    const prefixed = `${m.provider.toLowerCase()}/${m.model_name}`;
-    if (prefixed.toLowerCase() === lower) found.add(prefixed);
+    if (m.provider.startsWith('custom:')) {
+      // A custom provider's model is `custom:<uuid>/<model>`; with an alias
+      // its public id is `<alias>/<model>` instead.
+      consider(m.model_name);
+      const alias = aliases.get(m.provider);
+      const prefix = `${m.provider}/`;
+      if (alias && m.model_name.startsWith(prefix)) {
+        consider(`${alias}/${m.model_name.slice(prefix.length)}`);
+      }
+      continue;
+    }
+    consider(m.model_name);
+    consider(`${m.provider.toLowerCase()}/${m.model_name}`);
   }
   return [...found].sort();
 }

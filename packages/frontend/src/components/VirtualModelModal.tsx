@@ -75,7 +75,7 @@ const VirtualModelModal: Component<Props> = (props) => {
       return { ids: editing.shadows ?? [], preview: false };
     }
     if (virtualModelNameError(typed, []) !== undefined) return { ids: [], preview: true };
-    return { ids: previewShadows(typed, props.models), preview: true };
+    return { ids: previewShadows(typed, props.models, props.customProviders), preview: true };
   };
 
   const chainRows = (): { route: VirtualModelRouteInput; position: string }[] => {

@@ -54,6 +54,20 @@ describe('previewShadows', () => {
     expect(previewShadows('deepseek', models)).toEqual([]);
     expect(previewShadows('  ', models)).toEqual([]);
   });
+
+  it('uses a custom provider alias, or the custom id without one', () => {
+    const custom = [
+      model('custom:cp-1/gpt-5.5', 'custom:cp-1'),
+      model('custom:cp-2/small', 'custom:cp-2'),
+    ];
+    const providers = [
+      { id: 'cp-1', alias: 'fake' },
+      { id: 'cp-2', alias: null },
+    ];
+    expect(previewShadows('FAKE/gpt-5.5', custom, providers)).toEqual(['fake/gpt-5.5']);
+    expect(previewShadows('custom:cp-2/small', custom, providers)).toEqual(['custom:cp-2/small']);
+    expect(previewShadows('custom:cp-2/gpt-5.5', custom, providers)).toEqual([]);
+  });
 });
 
 describe('nonStreamingRoutes', () => {
