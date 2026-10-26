@@ -61,6 +61,17 @@ describe('sanitizeRequestHeaders', () => {
     expect(result).toEqual({ 'user-agent': 'curl/8.18.0' });
   });
 
+  it('drops Google Cloud edge headers that carry the caller IP or trace ids', () => {
+    const result = sanitizeRequestHeaders({
+      Forwarded: 'for="193.33.57.199";proto=https',
+      Via: '1.1 google',
+      'X-Cloud-Trace-Context': '105445aa7843bc8bf206b12000100000/1;o=1',
+      Traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+      'User-Agent': 'curl/8.18.0',
+    });
+    expect(result).toEqual({ 'user-agent': 'curl/8.18.0' });
+  });
+
   it('flattens array values with comma-space separator', () => {
     expect(sanitizeRequestHeaders({ 'x-multi': ['a', 'b', 'c'] })).toEqual({
       'x-multi': 'a, b, c',

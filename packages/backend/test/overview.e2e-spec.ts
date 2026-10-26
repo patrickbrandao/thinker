@@ -184,6 +184,16 @@ describe('GET /api/v1/overview', () => {
     }
   });
 
+  it('returns only the model usage panel from /overview/model-usage', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/overview/model-usage?range=24h')
+      .set('x-api-key', TEST_API_KEY)
+      .expect(200);
+
+    expect(Object.keys(res.body)).toEqual(['cost_by_model']);
+    expect(res.body.cost_by_model.length).toBeGreaterThan(0);
+  });
+
   it('rejects request without API key with 401', async () => {
     await request(app.getHttpServer()).get('/api/v1/overview?range=24h').expect(401);
   });
