@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../load-env-file';
 import { DataSource } from 'typeorm';
 
 import { BackfillState } from '../../entities/backfill-state.entity';
