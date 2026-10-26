@@ -217,3 +217,4 @@ export type {
   VirtualModelRouteInput,
   VirtualModelView,
 } from './virtual-model';
+export { resolveToolCallIndex } from './tool-call-index';
