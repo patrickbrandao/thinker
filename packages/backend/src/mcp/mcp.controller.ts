@@ -35,6 +35,7 @@ import { resolveMcpOperator } from './mcp-auth';
 import { buildMcpServer } from './mcp-server.factory';
 import { McpToolDeps } from './tool-deps';
 import { RouteModelParamsService } from '../routing/model-params/route-model-params.service';
+import { VirtualModelService } from '../routing/virtual-models/virtual-model.service';
 
 /**
  * The remote MCP endpoint.
@@ -69,6 +70,7 @@ export class McpController {
     private readonly specificity: SpecificityService,
     private readonly resolveAgentService: ResolveAgentService,
     private readonly headerTiers: HeaderTierService,
+    private readonly virtualModels: VirtualModelService,
     private readonly customProviders: CustomProviderService,
     private readonly routeModelParams: RouteModelParamsService,
     private readonly modelDiscovery: ModelDiscoveryService,
@@ -98,6 +100,7 @@ export class McpController {
       specificity: this.specificity,
       resolveAgent: this.resolveAgentService,
       headerTiers: this.headerTiers,
+      virtualModels: this.virtualModels,
       customProviders: this.customProviders,
       routeModelParams: this.routeModelParams,
       modelDiscovery: this.modelDiscovery,

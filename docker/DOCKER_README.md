@@ -37,7 +37,7 @@ O cadastro público é fechado. O primeiro administrador precisa do **token de s
 docker compose logs thinker | grep 'setup token'
 ```
 
-Abra [http://localhost:2099/setup](http://localhost:2099/setup), informe o token e crie o administrador. Com várias réplicas, cada processo tem o seu token: faça o primeiro setup na réplica cujo log o imprimiu. `THINKER_ALLOW_SIGNUP=true` reabre o cadastro depois que o administrador existe.
+Abra [http://localhost:2099/setup](http://localhost:2099/setup), informe o token e crie o administrador. Com várias réplicas, cada processo tem o seu token: faça o primeiro setup na réplica cujo log o imprimiu. Para não depender do log, defina o token antes de subir com `THINKER_SETUP_TOKEN` (16+ caracteres). `THINKER_ALLOW_SIGNUP=true` reabre o cadastro depois que o administrador existe.
 
 ### Teste
 
@@ -120,6 +120,7 @@ As principais:
 | `BETTER_AUTH_SECRET` | Sim | -- | Assinatura de sessões, 32+ caracteres. |
 | `THINKER_ENCRYPTION_KEY` | Sim | -- | Cifra credenciais e gravações, 32+ caracteres, diferente de `BETTER_AUTH_SECRET`. |
 | `THINKER_ENCRYPTION_KEY_PREVIOUS` | Não | -- | Chave antiga, só durante a rotação. |
+| `THINKER_SETUP_TOKEN` | Não | aleatório no log | Token do primeiro setup definido pelo operador (16+ caracteres). Não aparece no log. |
 | `THINKER_ALLOW_SIGNUP` | Não | `false` | `true` reabre o cadastro depois do primeiro administrador. |
 | `BETTER_AUTH_URL` | Não | `http://localhost:${PORT}` | URL pública, igual à do navegador. |
 | `PORT` | Não | `2099` | Porta do servidor e do compose. |

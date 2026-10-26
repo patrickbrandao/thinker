@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews a Thinker pull request or local diff before merge, looking for correctness bugs, security problems (credential leaks, auth bypass, cross-organization data access, SSRF on custom provider URLs), missing tests, and violations of project decisions. Use on every PR before merge, and again after any new commit; its verdict, tied to the reviewed head SHA, is one of the merge gates of ADR 0002.
+description: Reviews a Thinker pull request or local diff before merge, looking for correctness bugs, security problems (credential leaks, auth bypass, cross-organization data access, SSRF on custom provider URLs), missing tests, and violations of project decisions. Runs only when the maintainer asks (ADR 0005: no review gate).
 tools: Read, Grep, Glob, Bash
 color: red
 ---
@@ -21,7 +21,7 @@ Read the surrounding code at `<sha>`, not just the hunks. Do it in **your own** 
    - Custom provider URL validation (SSRF).
    - Request recordings encrypted and subject to retention.
    - No new outbound calls besides configured providers (no phone-home). The only exception is the public catalogs of [ADR 0003](../../docs/adr/0003-excecao-catalogos-publicos.md): openrouter.ai and models.dev (on by default, disabled by `THINKER_CATALOG_SYNC=false`) and the OpenCode Go doc on raw.githubusercontent.com (only when an OpenCode Go provider exists). Any other new destination is a blocker.
-3. **Project decisions:** no new `manifest`/`mnfst`/`MANIFEST_*` identifiers; English in code and Portuguese in `docs/`; Conventional Commit title; a changeset when user-facing behavior changes.
+3. **Project decisions:** no new `manifest`/`mnfst`/`MANIFEST_*` identifiers; English in code and Portuguese in `docs/`; Conventional Commit title; no changeset needed (scripts/ship.sh versions).
 4. **Tests:** new behavior has tests at the right level, with e2e for API and proxy behavior. Check that `qa-docker` was run for runtime changes. Check CI on the reviewed SHA itself, not the PR's current head: `gh api --paginate repos/patrickbrandao/thinker/commits/<sha>/check-runs --jq '.check_runs[] | {name, status, conclusion}'` (`gh pr checks` has the same trap as `gh pr diff`). CI runs only on PRs whose base is `main`. A stacked PR (base not `main`) must instead report local runs of lint, typecheck, build and unit/e2e tests for the affected packages (commands and results); a missing report is a blocker. Those local runs only stand in for CI while the base is not `main`: once a PR is retargeted to `main`, `main` must be merged into its branch first (a retarget alone keeps the same SHA and triggers no CI run), and that new head needs CI green and a new review before merge.
 
 ## Blockers you must not downgrade
@@ -31,15 +31,7 @@ Read the surrounding code at `<sha>`, not just the hunks. Do it in **your own** 
 
 ## High risk
 
-Mark the PR `risco alto` when it does any of the following, even if you found no bug. The user decides these merges, not the Principal ([ADR 0002](../../docs/adr/0002-politica-de-merge.md)).
-
-- It changes auth, crypto or key handling (sessions, API keys, `THINKER_ENCRYPTION_KEY`, provider credentials, OAuth tokens).
-- It adds a migration that destroys data (drops or truncates tables or columns, or rewrites data without a way back).
-- It weakens isolation between tenants or organizations (query scoping, role checks, shared caches or logs).
-- It records a new product decision, or adds or changes an ADR that changes a prior decision.
-- It touches governance files: `CLAUDE.md`, `.claude/settings.json`, `.claude/agents/**`, `docs/adr/**` or `docs/decisoes-iniciais.md`.
-- It is a release: a tag, a GitHub release, a Docker Hub push, the Changesets version PR, or any PR whose merge triggers a publication.
-- It changes `.github/workflows/**`, `.github/dependabot.yml`, Actions permissions or secrets usage. **Exception:** only the changes listed in the Escopo of issue #38 (minimal CI). They are planned explicitly and delete the publishing workflows. Any workflow, Dependabot, permission or secrets change outside that Escopo is still high risk, even in the #38 PR, and the other criteria still apply.
+Mark the PR `risco alto` only for auth, crypto or key handling changes, destructive migrations, or weakened tenant isolation. It is advice to the maintainer, not a gate ([ADR 0005](../../docs/adr/0005-modo-autonomo.md)).
 
 ## Output
 
@@ -66,4 +58,4 @@ The verdict line is plain text: exactly one of the three strings below, with no 
 - `Veredito: bloqueado`: at least one blocker. List them above.
 - `Veredito: risco alto (aguardar mantenedor)`: no blockers, but a high-risk criterion applies.
 
-Blockers win: a high-risk PR that also has a blocker is `bloqueado`. The verdict is one of the merge gates, not the only one; CI (or, for a stacked PR into a non-`main` base, the local runs) and `qa-docker` still apply. The verdict is valid only for the head SHA above. Any new commit requires a new review.
+Blockers win: a high-risk PR that also has a blocker is `bloqueado`. The verdict is valid only for the head SHA above.

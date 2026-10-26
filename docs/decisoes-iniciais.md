@@ -67,12 +67,12 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 | `devops` | CI, Dockerfile, multi-arch, Docker Hub, Changesets/release, templates de deploy | herda |
 | `docs-ptbr` | Documentação em PT-BR e notas de release em português | Sonnet |
 
-- **Novos agentes**: o Principal propõe o arquivo, que só entra com sua aprovação e é registrado em `docs/agentes.md`.
+- **Novos agentes**: o Principal cria o arquivo quando for útil e o registra em `docs/agentes.md`.
 - **Agente Manifest** roda numa **rotina semanal na nuvem** (Claude Code) e também sob demanda. Para cada item relevante, abre uma issue com label `upstream`, classificada como `adotar` ou `adaptar` (labels `upstream`, `upstream:adotar`, `upstream:adaptar`). Itens a **ignorar** não geram issue: aparecem apenas no resumo da execução. Atualiza [`upstream/STATE.md`](../upstream/STATE.md) via PR. **Nunca altera código.**
 
 ## 6. Fluxo de trabalho
 
-- `main` protegida: branch → PR → CI (lint, testes, build da imagem) + revisão do `reviewer` → squash merge. Conventional Commits. Quem faz o merge e o que espera por você seguem o [ADR 0002](adr/0002-politica-de-merge.md), que substitui a regra original "você aprova o merge".
+- **Modo autônomo** ([ADR 0005](adr/0005-modo-autonomo.md), que substitui o ADR 0002): perguntas só no início do pedido, implementação rápida, testes mínimos e envio imediato com `scripts/ship.sh` (commit na `main`, versão nova, tag, Docker Hub `latest` e GitHub release latest). Conventional Commits.
 - GitHub Issues + **milestones**; labels **por área** (`area:*`). Não há labels de agente: o agente responsável é nomeado no corpo da issue.
 - A label `decisão` marca issues que aguardam uma decisão sua (o mantenedor); o Arquiteto e o Principal a usam para decisões de produto em aberto.
 - Documentação em Markdown no próprio repo (`docs/`), com ADRs em `docs/adr/`.

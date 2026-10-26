@@ -58,6 +58,12 @@ vi.mock('../../src/services/api/header-tiers.js', () => ({
   toggleHeaderTier: (...args: unknown[]) => mockToggleHeaderTier(...args),
 }));
 
+// The virtual models section has its own tests; here it only needs to render.
+const mockListVirtualModels = vi.fn().mockResolvedValue([]);
+vi.mock('../../src/services/api/virtual-models.js', () => ({
+  listVirtualModels: (...args: unknown[]) => mockListVirtualModels(...args),
+}));
+
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastWarning = vi.fn();
@@ -795,6 +801,14 @@ describe('Routing page', () => {
       expect(screen.getByTestId('default-section')).toBeDefined();
     });
     expect(container.querySelector('h1')).toBeNull();
+  });
+
+  it('renders the virtual models section apart from the custom tiers', async () => {
+    render(() => <Routing />);
+    await waitFor(() => {
+      expect(screen.getByText('Virtual models')).toBeDefined();
+    });
+    expect(mockListVirtualModels).toHaveBeenCalledWith('demo');
   });
 
   it('renders the empty providers state when no providers are connected', async () => {

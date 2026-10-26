@@ -1,0 +1,294 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, fireEvent, screen, waitFor } from '@solidjs/testing-library';
+
+const mockList = vi.fn();
+const mockToggle = vi.fn();
+const mockUpdate = vi.fn();
+const mockResponseMode = vi.fn();
+const mockDelete = vi.fn();
+const mockReorder = vi.fn();
+const mockOverride = vi.fn();
+vi.mock('../../src/services/api/virtual-models.js', () => ({
+  listVirtualModels: (...a: unknown[]) => mockList(...a),
+  toggleVirtualModel: (...a: unknown[]) => mockToggle(...a),
+  updateVirtualModel: (...a: unknown[]) => mockUpdate(...a),
+  setVirtualModelResponseMode: (...a: unknown[]) => mockResponseMode(...a),
+  deleteVirtualModel: (...a: unknown[]) => mockDelete(...a),
+  reorderVirtualModels: (...a: unknown[]) => mockReorder(...a),
+  setVirtualModelOverride: (...a: unknown[]) => mockOverride(...a),
+}));
+
+const mockToastError = vi.fn();
+const mockToastSuccess = vi.fn();
+vi.mock('../../src/services/toast-store.js', () => ({
+  toast: {
+    error: (...a: unknown[]) => mockToastError(...a),
+    success: (...a: unknown[]) => mockToastSuccess(...a),
+  },
+}));
+
+// The card and the modals have their own tests; a light stand-in exposes the
+// callbacks the section wires up.
+vi.mock('../../src/components/VirtualModelCard.js', () => ({
+  default: (props: Record<string, any>) => (
+    <div data-testid={`card-${props.virtualModel.name}`}>
+      <span>{props.virtualModel.name}</span>
+      <span data-testid={`busy-${props.virtualModel.name}`}>{String(props.busy ?? '')}</span>
+      {props.dragHandle}
+      <button onClick={() => props.onToggle(!props.virtualModel.enabled)}>toggle</button>
+      <button onClick={() => props.onContinueOnDefaultChange(true)}>cod</button>
+      <button onClick={() => props.onResponseModeChange('stream')}>stream</button>
+      <button onClick={() => props.onDelete()}>delete</button>
+      <button onClick={() => props.onEdit()}>edit</button>
+      <button onClick={() => props.onShowExample()}>example</button>
+      <button onClick={() => props.onOverride('m', 'p', 'api_key', 'Main')}>override</button>
+      <button onClick={() => props.onFallbacksUpdate(['f'], [{ model: 'f' }])}>fallbacks</button>
+      <button onClick={() => props.onFallbacksUpdate([], undefined)}>reset</button>
+      {props.onMoveUp && <button onClick={() => props.onMoveUp()}>up</button>}
+      {props.onMoveDown && <button onClick={() => props.onMoveDown()}>down</button>}
+      <span data-testid={`fb-${props.virtualModel.name}`}>
+        {(props.virtualModel.fallback_routes ?? [])
+          .map((r: { model: string }) => r.model)
+          .join(',')}
+      </span>
+    </div>
+  ),
+}));
+vi.mock('../../src/components/VirtualModelModal.js', () => ({
+  default: (props: Record<string, any>) => (
+    <div data-testid="vm-modal">
+      <span>{props.editing ? `editing ${props.editing.name}` : 'creating'}</span>
+      <button
+        onClick={() =>
+          props.onSaved({ ...vm('created', 'vm-new'), name: props.editing?.name ?? 'created' })
+        }
+      >
+        save
+      </button>
+      {props.onDelete && (
+        <button onClick={() => props.onDelete(props.editing.id)}>modal-delete</button>
+      )}
+    </div>
+  ),
+}));
+vi.mock('../../src/components/VirtualModelSnippetModal.js', () => ({
+  default: (props: Record<string, any>) => (
+    <div data-testid="snippet">snippet for {props.virtualModel.name}</div>
+  ),
+}));
+
+import RoutingVirtualModelsSection, { moveId } from '../../src/pages/RoutingVirtualModelsSection';
+import type { VirtualModel } from '../../src/services/api/virtual-models';
+
+function vm(name: string, id = name, extra: Partial<VirtualModel> = {}): VirtualModel {
+  return {
+    id,
+    agent_id: 'agent-1',
+    name,
+    sort_order: 0,
+    enabled: true,
+    override_route: null,
+    fallback_routes: null,
+    continue_on_default: false,
+    response_mode: 'buffered',
+    output_modality: 'text',
+    created_at: '',
+    updated_at: '',
+    shadows: [],
+    context_length: null,
+    ...extra,
+  };
+}
+
+function renderSection() {
+  return render(() => (
+    <RoutingVirtualModelsSection
+      agentName={() => 'demo'}
+      models={() => []}
+      customProviders={() => []}
+      connectedProviders={() => []}
+    />
+  ));
+}
+
+const order = () =>
+  screen.getAllByTestId(/^card-/).map((el) => el.getAttribute('data-testid')!.slice(5));
+
+describe('moveId', () => {
+  it('moves an id and clamps the target', () => {
+    expect(moveId(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a']);
+    expect(moveId(['a', 'b', 'c'], 2, 0)).toEqual(['c', 'a', 'b']);
+    expect(moveId(['a', 'b'], 0, 9)).toEqual(['b', 'a']);
+    expect(moveId(['a'], 5, 0)).toEqual(['a']);
+  });
+});
+
+describe('RoutingVirtualModelsSection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows the empty state and opens the create modal', async () => {
+    mockList.mockResolvedValue([]);
+    renderSection();
+    await screen.findByText('No virtual models yet');
+    expect(screen.getByText('Virtual models')).toBeTruthy();
+    fireEvent.click(screen.getByText('Create virtual model'));
+    await screen.findByText('creating');
+  });
+
+  it('opens the example after a create and adds the card', async () => {
+    mockList.mockResolvedValue([]);
+    renderSection();
+    fireEvent.click(await screen.findByText('Create virtual model'));
+    fireEvent.click(await screen.findByText('save'));
+    await screen.findByTestId('card-created');
+    expect(screen.getByTestId('snippet').textContent).toContain('created');
+    expect(mockToastSuccess).toHaveBeenCalledWith('Created "created"');
+  });
+
+  it('lists every virtual model, active or not, in order', async () => {
+    mockList.mockResolvedValue([vm('a'), vm('b', 'b', { enabled: false })]);
+    renderSection();
+    await screen.findByTestId('card-a');
+    expect(order()).toEqual(['a', 'b']);
+    expect(mockList).toHaveBeenCalledWith('demo');
+  });
+
+  it('toasts when the list cannot load', async () => {
+    mockList.mockRejectedValue(new Error('nope'));
+    renderSection();
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('nope'));
+  });
+
+  it('toggles, switches continue on default and the response mode with the saved row', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    let resolveToggle!: (v: VirtualModel) => void;
+    mockToggle.mockReturnValue(new Promise((r) => (resolveToggle = r)));
+    mockUpdate.mockResolvedValue(vm('a', 'a', { enabled: false, continue_on_default: true }));
+    mockResponseMode.mockResolvedValue(vm('a', 'a', { response_mode: 'stream' }));
+    renderSection();
+    fireEvent.click(await screen.findByText('toggle'));
+    expect(screen.getByTestId('busy-a').textContent).toBe('enabled');
+    resolveToggle(vm('a', 'a', { enabled: false }));
+    await waitFor(() => expect(screen.getByTestId('busy-a').textContent).toBe(''));
+    expect(mockToggle).toHaveBeenCalledWith('demo', 'a', false);
+    expect(mockToastSuccess).toHaveBeenCalledWith('"a" is inactive');
+
+    fireEvent.click(screen.getByText('cod'));
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'demo',
+        'a',
+        { continue_on_default: true },
+        { silent: false },
+      ),
+    );
+    fireEvent.click(screen.getByText('stream'));
+    await waitFor(() => expect(mockResponseMode).toHaveBeenCalledWith('demo', 'a', 'stream'));
+  });
+
+  it('keeps the row when a switch fails', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    mockToggle.mockRejectedValue(new Error('bad'));
+    renderSection();
+    fireEvent.click(await screen.findByText('toggle'));
+    await waitFor(() => expect(screen.getByTestId('busy-a').textContent).toBe(''));
+    expect(screen.getByTestId('card-a')).toBeTruthy();
+  });
+
+  it('sets the primary and applies fallback updates', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    mockOverride.mockResolvedValue(vm('a'));
+    renderSection();
+    fireEvent.click(await screen.findByText('override'));
+    expect(mockOverride).toHaveBeenCalledWith('demo', 'a', 'm', 'p', 'api_key', 'Main');
+    fireEvent.click(screen.getByText('fallbacks'));
+    expect(screen.getByTestId('fb-a').textContent).toBe('f');
+    fireEvent.click(screen.getByText('reset'));
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+  });
+
+  it('deletes after confirmation', async () => {
+    mockList.mockResolvedValue([vm('a'), vm('b')]);
+    mockDelete.mockResolvedValue(undefined);
+    const confirm = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    renderSection();
+    await screen.findByTestId('card-a');
+    fireEvent.click(screen.getAllByText('delete')[0]!);
+    expect(mockDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByText('delete')[0]!);
+    await waitFor(() => expect(screen.queryByTestId('card-a')).toBeNull());
+    expect(mockDelete).toHaveBeenCalledWith('demo', 'a');
+    confirm.mockRestore();
+  });
+
+  it('edits and deletes from the modal', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    mockDelete.mockResolvedValue(undefined);
+    renderSection();
+    fireEvent.click(await screen.findByText('edit'));
+    await screen.findByText('editing a');
+    fireEvent.click(screen.getByText('modal-delete'));
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('demo', 'a'));
+    expect(screen.queryByTestId('vm-modal')).toBeNull();
+  });
+
+  it('opens the example from a card', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    renderSection();
+    fireEvent.click(await screen.findByText('example'));
+    expect(screen.getByTestId('snippet').textContent).toContain('a');
+  });
+
+  it('reorders with the menu and posts every id', async () => {
+    mockList.mockResolvedValue([vm('a'), vm('b'), vm('c')]);
+    mockReorder.mockResolvedValue({ ok: true });
+    renderSection();
+    await screen.findByTestId('card-a');
+    expect(screen.getAllByText('up').length).toBe(2);
+    fireEvent.click(screen.getAllByText('down')[0]!);
+    expect(order()).toEqual(['b', 'a', 'c']);
+    expect(mockReorder).toHaveBeenCalledWith('demo', ['b', 'a', 'c']);
+  });
+
+  it('reorders with the keyboard on the drag handle', async () => {
+    mockList.mockResolvedValue([vm('a'), vm('b')]);
+    mockReorder.mockResolvedValue({ ok: true });
+    renderSection();
+    await screen.findByTestId('card-a');
+    fireEvent.keyDown(screen.getByLabelText(/Reorder b/), { key: 'ArrowUp' });
+    expect(order()).toEqual(['b', 'a']);
+    // Moving past the edge does nothing.
+    fireEvent.keyDown(screen.getByLabelText(/Reorder b/), { key: 'ArrowLeft' });
+    expect(mockReorder).toHaveBeenCalledTimes(1);
+  });
+
+  it('reorders by drag and drop and reloads when the save fails', async () => {
+    mockList.mockResolvedValue([vm('a'), vm('b'), vm('c')]);
+    mockReorder.mockRejectedValue(new Error('bad'));
+    renderSection();
+    await screen.findByTestId('card-a');
+    const slots = () => screen.getAllByRole('listitem');
+    fireEvent.pointerDown(screen.getByLabelText(/Reorder c/));
+    expect(slots()[2]!.getAttribute('draggable')).toBe('true');
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' };
+    fireEvent.dragStart(slots()[2]!, { dataTransfer });
+    fireEvent.dragOver(slots()[0]!, { dataTransfer });
+    expect(slots()[0]!.classList.contains('virtual-model-slot--drop-target')).toBe(true);
+    fireEvent.drop(slots()[0]!, { dataTransfer });
+    expect(order()).toEqual(['c', 'a', 'b']);
+    expect(mockReorder).toHaveBeenCalledWith('demo', ['c', 'a', 'b']);
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+  });
+
+  it('hides the drag handle with a single virtual model', async () => {
+    mockList.mockResolvedValue([vm('a')]);
+    renderSection();
+    await screen.findByTestId('card-a');
+    expect(screen.queryByLabelText(/Reorder a/)).toBeNull();
+  });
+});

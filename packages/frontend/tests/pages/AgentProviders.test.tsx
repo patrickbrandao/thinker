@@ -21,8 +21,7 @@ vi.mock('../../src/services/api/providers.js', () => ({
 
 vi.mock('../../src/services/api.js', () => ({
   getEnabledProviders: (...args: unknown[]) => mockGetEnabledProviders(...args),
-  getAgentProviderDisableImpact: (...args: unknown[]) =>
-    mockGetAgentProviderDisableImpact(...args),
+  getAgentProviderDisableImpact: (...args: unknown[]) => mockGetAgentProviderDisableImpact(...args),
   enableProviderForAgent: (...args: unknown[]) => mockEnableEnabledProviders(...args),
   disableProviderForAgent: (...args: unknown[]) => mockDisableEnabledProviders(...args),
   getCustomProviders: (...args: unknown[]) => mockGetCustomProviders(...args),
@@ -217,6 +216,70 @@ describe('AgentProviders', () => {
     await waitFor(() => {
       expect(mockGetAgentProviderDisableImpact).toHaveBeenCalledWith('demo-agent', 'up-openai');
       expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("Can't disable OpenAI"));
+    });
+    expect(mockDisableEnabledProviders).not.toHaveBeenCalled();
+  });
+
+  it('blocks disable and names the virtual models when only virtual models use the provider', async () => {
+    mockGetAgentProviderDisableImpact.mockResolvedValue({
+      affected_tiers: [],
+      affected_virtual_models: [
+        {
+          id: 'vm-1',
+          name: 'deepseek/flash',
+          agent: 'demo-agent',
+          model: 'gpt-4o',
+          position: 'primary',
+        },
+        {
+          id: 'vm-1',
+          name: 'deepseek/flash',
+          agent: 'demo-agent',
+          model: 'gpt-4o-mini',
+          position: 'fallback 1',
+        },
+        { id: 'vm-2', name: 'cheap', agent: 'demo-agent', model: 'gpt-4o', position: 'fallback 2' },
+      ],
+    });
+    render(() => <AgentProviders />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText('Disable OpenAI Work'));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringContaining('Used by virtual models "deepseek/flash", "cheap".'),
+      );
+    });
+    expect(mockDisableEnabledProviders).not.toHaveBeenCalled();
+  });
+
+  it('also names the virtual models when a tier uses the provider too', async () => {
+    mockGetAgentProviderDisableImpact.mockResolvedValue({
+      affected_tiers: [{ tier: 'default', model: 'gpt-4o', position: 'primary' }],
+      affected_virtual_models: [
+        {
+          id: 'vm-1',
+          name: 'deepseek/flash',
+          agent: 'demo-agent',
+          model: 'gpt-4o',
+          position: 'primary',
+        },
+      ],
+    });
+    render(() => <AgentProviders />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText('Disable OpenAI Work'));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringContaining('Used by virtual model "deepseek/flash".'),
+      );
     });
     expect(mockDisableEnabledProviders).not.toHaveBeenCalled();
   });

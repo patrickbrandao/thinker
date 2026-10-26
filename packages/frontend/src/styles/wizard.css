@@ -410,6 +410,18 @@
   line-height: 1.5;
 }
 
+/* Active virtual models (ADR 0004) listed under a harness's setup snippet. */
+.setup-virtual-models {
+  margin-top: var(--gap-md);
+}
+
+.setup-virtual-models__names {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: baseline;
+}
+
 .setup-method__code {
   position: relative;
   background: hsl(var(--background));

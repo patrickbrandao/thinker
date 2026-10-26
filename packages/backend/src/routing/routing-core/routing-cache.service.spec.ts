@@ -4,6 +4,7 @@ import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
 import { AgentModelParams } from '../../entities/agent-model-params.entity';
+import { VirtualModel } from '../../entities/virtual-model.entity';
 
 // Minimal stand-ins for the TypeORM entities. The cache is entity-agnostic — it
 // only stores arrays by reference, so shape fidelity is unnecessary.
@@ -216,6 +217,35 @@ describe('RoutingCacheService', () => {
       svc.invalidateModelParams('a');
       expect(svc.getModelParams('a')).toBeNull();
       expect(svc.getTiers('a')).not.toBeNull();
+    });
+  });
+
+  describe('virtual models cache', () => {
+    const virtualModel = (name: string): VirtualModel => ({ id: name }) as unknown as VirtualModel;
+
+    it('returns null until set, is scoped per agent, and expires after the TTL', () => {
+      expect(svc.getVirtualModels('a')).toBeNull();
+      const rows = [virtualModel('vm1')];
+      svc.setVirtualModels('a', rows);
+      expect(svc.getVirtualModels('a')).toBe(rows);
+      expect(svc.getVirtualModels('b')).toBeNull();
+      jest.advanceTimersByTime(120_001);
+      expect(svc.getVirtualModels('a')).toBeNull();
+    });
+
+    it('is dropped by invalidateAgent (tier writes reach virtual models through it)', () => {
+      svc.setVirtualModels('a', [virtualModel('vm1')]);
+      svc.setVirtualModels('b', [virtualModel('vm2')]);
+      svc.invalidateAgent('a');
+      expect(svc.getVirtualModels('a')).toBeNull();
+      expect(svc.getVirtualModels('b')).not.toBeNull();
+    });
+
+    it('survives invalidateModelParams and invalidateTenant', () => {
+      svc.setVirtualModels('a', [virtualModel('vm1')]);
+      svc.invalidateModelParams('a');
+      svc.invalidateTenant('tenant-1');
+      expect(svc.getVirtualModels('a')).not.toBeNull();
     });
   });
 

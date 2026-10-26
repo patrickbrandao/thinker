@@ -1,6 +1,6 @@
 ---
 name: qa-docker
-description: Builds the Thinker Docker image locally, brings the stack up with Docker Compose in an isolated project, and runs health, smoke, e2e and gateway-contract tests against it, covering the harness matrix (Claude Code, OpenClaw/Hermes, Codex/OpenCode, SDKs). Use before any PR that changes runtime behavior leaves draft, and whenever the user asks to test in Docker. Reports results; does not fix code.
+description: Builds the Thinker Docker image locally, brings the stack up with Docker Compose in an isolated project, and runs health, smoke, e2e and gateway-contract tests against it, covering the harness matrix (Claude Code, OpenClaw/Hermes, Codex/OpenCode, SDKs). Use for migrations, auth/crypto or proxy hot-path changes, and whenever the user asks to test in Docker (ADR 0005). Reports results; does not fix code.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 color: green

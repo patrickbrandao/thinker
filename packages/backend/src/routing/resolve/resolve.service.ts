@@ -8,16 +8,22 @@ import { RoutingCacheService } from '../routing-core/routing-cache.service';
 import { SpecificityService } from '../routing-core/specificity.service';
 import { SpecificityPenaltyService } from '../routing-core/specificity-penalty.service';
 import { HeaderTierService } from '../header-tiers/header-tier.service';
+import { VirtualModelService } from '../virtual-models/virtual-model.service';
+import {
+  buildVirtualModelChain,
+  type VirtualModelChainEntry,
+} from '../virtual-models/virtual-model-chain';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import {
   readAutoAssignedRoute,
   readFallbackRoutes,
   readOverrideRoute,
+  routeMatches,
 } from '../routing-core/route-helpers';
 import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
 import { scoreRequest, ScorerInput, MomentumInput, scanMessages } from '../../scoring';
-import { ResolveResponse } from '../dto/resolve-response';
+import { ResolveResponse, RouteParamsScope } from '../dto/resolve-response';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { Agent } from '../../entities/agent.entity';
 import {
@@ -77,6 +83,7 @@ export class ResolveService {
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
     private readonly routingCache: RoutingCacheService,
+    private readonly virtualModelService: VirtualModelService,
   ) {
     // Bridge the central routing-cache invalidation to the discovered-model
     // cache. Every provider mutation already calls routingCache.invalidateAgent;
@@ -100,7 +107,6 @@ export class ResolveService {
     recentTiers?: MomentumInput['recentTiers'],
     specificityOverride?: string,
     recentCategories?: readonly SpecificityCategory[],
-    headers?: IncomingHttpHeaders,
   ): Promise<ResolveResponse> {
     return this.resolveLazy(
       agentId,
@@ -109,10 +115,16 @@ export class ResolveService {
       recentTiers,
       specificityOverride,
       recentCategories,
-      headers,
     );
   }
 
+  /**
+   * Automatic routing for `auto`: the Default tier, or specificity then
+   * complexity when complexity routing is on. Header tiers are not consulted
+   * here: the proxy applies them as a step of its own before this
+   * (ADR 0004, section 5), and `POST /api/v1/routing/resolve` has no headers
+   * to match.
+   */
   async resolveLazy(
     agentId: string,
     tenantId: string,
@@ -120,13 +132,7 @@ export class ResolveService {
     recentTiers?: MomentumInput['recentTiers'],
     specificityOverride?: string,
     recentCategories?: readonly SpecificityCategory[],
-    headers?: IncomingHttpHeaders,
   ): Promise<ResolveResponse> {
-    if (headers) {
-      const headerTierResult = await this.resolveHeaderTier(agentId, tenantId, headers);
-      if (headerTierResult) return headerTierResult;
-    }
-
     const agent = await this.agentRepo.findOne({ where: { id: agentId } });
     if (agent && !agent.complexity_routing_enabled) {
       return this.resolveForTier(agentId, tenantId, 'default', 'default');
@@ -376,6 +382,132 @@ export class ResolveService {
     };
   }
 
+  /**
+   * Step 1 of the proxy precedence (ADR 0004, section 5): the enabled virtual
+   * model of this agent whose name equals `requestedModel`, ignoring case and
+   * with no other normalization. Returns null when none matches, so the
+   * caller moves on to header tiers and then to auto/explicit routing.
+   *
+   * A match never falls through: with no route left, the result carries
+   * `virtual_model_unavailable` (M301 at the proxy). The chain skips the
+   * scorer, specificity and momentum.
+   */
+  async resolveVirtualModel(
+    agentId: string,
+    tenantId: string,
+    requestedModel: string,
+  ): Promise<ResolveResponse | null> {
+    const wanted = requestedModel.toLowerCase();
+    const rows = await this.virtualModelService.list(agentId);
+    const match = rows.find(
+      (row) =>
+        row.enabled &&
+        row.agent_id === agentId &&
+        row.tenant_id === tenantId &&
+        row.name.toLowerCase() === wanted,
+    );
+    if (!match) return null;
+
+    const defaultTier = match.continue_on_default
+      ? ((await this.tierService.getTiers(agentId)).find((t) => t.tier === DEFAULT_TIER_SLOT) ??
+        null)
+      : null;
+    const defaultOverride = defaultTier ? readOverrideRoute(defaultTier) : null;
+    let defaultOverrideAvailable = false;
+    const chain = await buildVirtualModelChain(match, defaultTier, {
+      normalize: (route) => this.enrichRouteKeyLabel(agentId, tenantId, route),
+      isDefaultOverrideAvailable: async (route) => {
+        defaultOverrideAvailable = await this.providerKeyService.isRouteAvailable(
+          tenantId,
+          route,
+          agentId,
+        );
+        return defaultOverrideAvailable;
+      },
+    });
+    const normalizedDefaultOverride =
+      defaultOverride && defaultOverrideAvailable
+        ? await this.enrichRouteKeyLabel(agentId, tenantId, defaultOverride)
+        : null;
+
+    // Availability (section 4, steps 1 and 2). The virtual's own routes pass
+    // the header-tier check. The Default part follows buildResolvedRouteChain:
+    // an available override heads it, otherwise the first route with
+    // credentials does, and the routes after that head pass the same check as
+    // the virtual's own routes.
+    const available: VirtualModelChainEntry[] = [];
+    let defaultHeadChosen = false;
+    for (const entry of chain) {
+      let ok: boolean;
+      if (!entry.fromDefault || defaultHeadChosen) {
+        ok = await this.providerKeyService.isRouteAvailable(tenantId, entry.route, agentId);
+      } else {
+        ok =
+          (normalizedDefaultOverride !== null &&
+            routeMatches(entry.route, normalizedDefaultOverride)) ||
+          (await this.providerKeyService.hasRouteCredentials(tenantId, entry.route, agentId));
+        if (ok) defaultHeadChosen = true;
+      }
+      if (ok) {
+        available.push(entry);
+        continue;
+      }
+      this.logger.warn(
+        `Virtual model "${match.name}" route ${entry.route.provider}/${entry.route.model} ` +
+          `is unavailable for agent=${agentId}` +
+          (entry.fromDefault ? ' (from the Default tier)' : '') +
+          ' — skipping it',
+      );
+    }
+
+    // Transport filter with the virtual's own response mode, over the whole
+    // chain (section 4, step 4). It keeps the route objects, so the scope of
+    // each surviving route is read back from its entry.
+    const responseMode = responseModeFor(match);
+    const outputModality = outputModalityFor(match);
+    const [primary, ...rest] = available.map((e) => e.route);
+    const effective = effectiveRoutesForResponseMode(responseMode, primary, rest);
+    const effectiveEntries = (
+      effective.primaryRoute ? [effective.primaryRoute, ...(effective.fallbackRoutes ?? [])] : []
+    ).map((route) => available.find((e) => e.route === route)!);
+    const scopes: RouteParamsScope[] = effectiveEntries.map((e) => ({
+      route: e.route,
+      paramsScope: e.paramsScope,
+    }));
+
+    this.logger.debug(
+      `Virtual model "${match.name}" matched for agent=${agentId}: ` +
+        `${effectiveEntries.length} route(s), ` +
+        `${effectiveEntries.filter((e) => e.fromDefault).length} from the Default tier`,
+    );
+
+    const base = {
+      tier: DEFAULT_TIER_SLOT,
+      output_modality: outputModality,
+      response_mode: responseMode,
+      confidence: 1,
+      score: 0,
+      reason: 'virtual-model' as const,
+      virtual_model_id: match.id,
+      virtual_model_name: match.name,
+    };
+    if (!effective.primaryRoute) {
+      return {
+        ...base,
+        route: null,
+        fallback_routes: null,
+        virtual_model_unavailable: match.name,
+        virtual_model_continues_on_default: match.continue_on_default,
+      };
+    }
+    return {
+      ...base,
+      route: effective.primaryRoute,
+      fallback_routes: effective.fallbackRoutes?.length ? effective.fallbackRoutes : null,
+      route_params_scopes: scopes,
+    };
+  }
+
   private async resolveSpecificity(
     agentId: string,
     tenantId: string,
@@ -569,9 +701,10 @@ export class ResolveService {
    * first key instead of the default key for the selected auth mode.
    *
    * authType is taken from the route itself, not from any assignment-level
-   * legacy field.
+   * legacy field. Public so virtual-model chains normalize their routes with
+   * it before deduplicating (ADR 0004, section 4).
    */
-  private async enrichRouteKeyLabel(
+  async enrichRouteKeyLabel(
     agentId: string,
     tenantId: string,
     route: ModelRoute,

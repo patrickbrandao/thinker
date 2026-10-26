@@ -11,6 +11,7 @@ import type { RoutingCacheService } from '../../routing-core/routing-cache.servi
 import type { SpecificityService } from '../../routing-core/specificity.service';
 import type { SpecificityPenaltyService } from '../../routing-core/specificity-penalty.service';
 import type { HeaderTierService } from '../../header-tiers/header-tier.service';
+import type { VirtualModelService } from '../../virtual-models/virtual-model.service';
 import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import type { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 
@@ -123,10 +124,19 @@ describe('ResolveService', () => {
       headerTierService as unknown as HeaderTierService,
       agentRepo as unknown as Repository<Agent>,
       routingCache as unknown as RoutingCacheService,
+      { list: jest.fn().mockResolvedValue([]) } as unknown as VirtualModelService,
     );
   });
 
   const messages = [{ role: 'user' as const, content: 'hello' }];
+
+  /**
+   * The proxy's steps 2 and 3 for `auto` (ADR 0004, section 5): a matching
+   * header tier, else automatic routing. resolve() itself never reads headers.
+   */
+  const resolveWithHeaders = async (headers: Record<string, string | string[]>) =>
+    (await svc.resolveHeaderTier('agent-1', 'user-1', headers)) ??
+    (await svc.resolve('agent-1', 'user-1', messages));
 
   describe('discovery cache invalidation bridge', () => {
     it('registers a routing-cache listener that invalidates the discovery cache', () => {
@@ -177,6 +187,13 @@ describe('ResolveService', () => {
   });
 
   describe('resolve — header tier match', () => {
+    it('resolve() itself never consults header tiers', async () => {
+      await svc.resolve('agent-1', 'user-1', messages);
+      await svc.resolveLazy('agent-1', 'user-1', async () => ({ messages }));
+
+      expect(headerTierService.list).not.toHaveBeenCalled();
+    });
+
     it('returns the header-tier route when the rule matches', async () => {
       const tier = {
         id: 'h1',
@@ -190,20 +207,7 @@ describe('ResolveService', () => {
       } as unknown as HeaderTier;
       headerTierService.list.mockResolvedValue([tier]);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        {
-          'x-tier': 'gold',
-        },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
 
       expect(result.reason).toBe('header-match');
       expect(result.route).toEqual(route('openai', 'api_key', 'gpt-4o'));
@@ -214,18 +218,7 @@ describe('ResolveService', () => {
 
     it('returns null when no header tiers exist', async () => {
       headerTierService.list.mockResolvedValue([]);
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       // Falls through to scored tier — reason should be 'scored', not 'header-match'.
       expect(result.reason).not.toBe('header-match');
     });
@@ -243,18 +236,7 @@ describe('ResolveService', () => {
       } as unknown as HeaderTier;
       headerTierService.list.mockResolvedValue([tier]);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).not.toBe('header-match');
     });
 
@@ -273,18 +255,7 @@ describe('ResolveService', () => {
       providerKeyService.isModelAvailable.mockResolvedValue(false);
       providerKeyService.isRouteAvailable.mockResolvedValue(false);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).not.toBe('header-match');
     });
 
@@ -307,18 +278,7 @@ describe('ResolveService', () => {
       providerKeyService.isModelAvailable.mockResolvedValue(false);
       providerKeyService.isRouteAvailable.mockResolvedValue(true);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).toBe('header-match');
       expect(result.route).toEqual(pinned);
       expect(providerKeyService.isRouteAvailable).toHaveBeenCalledWith('user-1', pinned, 'agent-1');
@@ -344,18 +304,7 @@ describe('ResolveService', () => {
         async (_tenantId: string, r: ModelRoute) => r === liveFallback || r === lastFallback,
       );
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).toBe('header-match');
       expect(result.route).toEqual(liveFallback);
       expect(result.fallback_routes).toEqual([lastFallback]);
@@ -374,18 +323,7 @@ describe('ResolveService', () => {
       } as unknown as HeaderTier;
       headerTierService.list.mockResolvedValue([tier]);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': ['silver', 'gold'] },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': ['silver', 'gold'] });
       expect(result.reason).toBe('header-match');
     });
 
@@ -402,18 +340,7 @@ describe('ResolveService', () => {
       } as unknown as HeaderTier;
       headerTierService.list.mockResolvedValue([tier]);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).not.toBe('header-match');
     });
 
@@ -443,18 +370,7 @@ describe('ResolveService', () => {
       // No provider resolved → route is null even though authType defaults exist.
       providerKeyService.getAuthType.mockResolvedValue('api_key');
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).toBe('header-match');
       expect(result.route).toBeNull();
     });
@@ -484,18 +400,7 @@ describe('ResolveService', () => {
       mockedInferProvider.mockReturnValue('openai');
       providerKeyService.hasActiveProvider.mockResolvedValue(true);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.reason).toBe('header-match');
       expect(result.route?.provider).toBe('openai');
     });
@@ -509,18 +414,7 @@ describe('ResolveService', () => {
         authType: 'api_key',
       } as never);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.route?.provider).toBe('openai');
     });
 
@@ -536,18 +430,7 @@ describe('ResolveService', () => {
         output_price_per_token: 0,
       } as never);
 
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.route?.provider).toBe('OpenAI');
     });
 
@@ -562,18 +445,7 @@ describe('ResolveService', () => {
         input_price_per_token: 0,
         output_price_per_token: 0,
       } as never);
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
       expect(result.route).toBeNull();
     });
   });

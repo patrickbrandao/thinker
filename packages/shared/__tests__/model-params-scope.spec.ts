@@ -3,7 +3,14 @@ import {
   modelParamsScopeForSpecificity,
   modelParamsScopeForHeaderTier,
   modelParamsScopeForRouting,
+  modelParamsScopeForVirtualModel,
 } from '../src/model-params-scope';
+
+describe('modelParamsScopeForVirtualModel', () => {
+  it('prefixes the virtual model id', () => {
+    expect(modelParamsScopeForVirtualModel('vm-1')).toBe('virtual:vm-1');
+  });
+});
 
 describe('modelParamsScopeForTier', () => {
   it('prefixes the tier', () => {

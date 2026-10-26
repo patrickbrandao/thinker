@@ -196,6 +196,14 @@ export class AgentMessage {
   @Column('varchar', { nullable: true })
   header_tier_color!: string | null;
 
+  // Virtual model the request named (ADR 0004), denormalized like header_tier_*
+  // so historical rows keep the name used at the time.
+  @Column('varchar', { nullable: true })
+  virtual_model_id!: string | null;
+
+  @Column('varchar', { nullable: true })
+  virtual_model_name!: string | null;
+
   @Column('varchar', { nullable: true })
   feedback_rating!: string | null;
 

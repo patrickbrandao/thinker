@@ -54,6 +54,12 @@ export interface ProviderAttemptStart {
    * the connection it was billed against.
    */
   keyLabel?: string;
+  /**
+   * Virtual model the request named (ADR 0004), stamped on the pending row so
+   * an attempt that never reaches a terminal writer still names it.
+   */
+  virtualModelId?: string;
+  virtualModelName?: string;
 }
 
 /** Identity and measured start of one Attempt. */

@@ -176,6 +176,38 @@ describe('RequestDrawer', () => {
     expect(container.querySelector('.drawer-kv:nth-child(2)')?.textContent).toContain(type);
   });
 
+  it('shows the virtual model in the header and on each attempt', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: { ...fullMessage, virtual_model_id: 'vm-1', virtual_model_name: 'deepseek/flash' },
+    });
+    const { container } = render(() => <RequestDrawer messageId="vm" onClose={vi.fn()} />);
+    await waitFor(() =>
+      expect(container.querySelector('.drawer__meta-row .tier-badge--virtual')).not.toBeNull(),
+    );
+    expect(container.querySelector('.drawer__meta-row .tier-badge--virtual')!.textContent).toBe(
+      'deepseek/flash',
+    );
+    expect(screen.getByText('Virtual model')).toBeDefined();
+  });
+
+  it('shows the virtual model of a request rejected before any attempt', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: { ...fullMessage, attempts: [], virtual_model_name: 'deepseek/flash' },
+    });
+    const { container } = render(() => <RequestDrawer messageId="m301" onClose={vi.fn()} />);
+    await waitFor(() =>
+      expect(container.querySelector('.drawer__meta-row .tier-badge--virtual')).not.toBeNull(),
+    );
+  });
+
+  it('omits the virtual model when none was used', async () => {
+    mockGetMessageDetails.mockResolvedValue({ message: fullMessage });
+    const { container } = render(() => <RequestDrawer messageId="plain" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Request request-1234')).toBeDefined());
+    expect(container.querySelector('.tier-badge--virtual')).toBeNull();
+    expect(screen.queryByText('Virtual model')).toBeNull();
+  });
+
   it('treats a present empty attempts array as an authoritative zero-attempt request', async () => {
     mockGetMessageDetails.mockResolvedValue({
       message: {

@@ -303,6 +303,28 @@ describe('StatusCell merged pill', () => {
 });
 
 describe('ModelCell', () => {
+  it('renders a virtual model badge, ahead of any tier badge', () => {
+    const row = baseRow({
+      virtual_model_id: 'vm-1',
+      virtual_model_name: 'deepseek/flash',
+      header_tier_name: 'Ignored',
+      routing_tier: 'default',
+    });
+    const { container } = render(() => (
+      <table>
+        <tbody>
+          <tr>{ModelCell(row)}</tr>
+        </tbody>
+      </table>
+    ));
+    const badge = container.querySelector('.tier-badge--virtual');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toBe('deepseek/flash');
+    expect(badge!.getAttribute('title')).toBe('Virtual model: deepseek/flash');
+    expect(container.querySelector('.tier-badge--custom')).toBeNull();
+    expect(container.querySelector('.tier-badge--default')).toBeNull();
+  });
+
   it('renders header tier badge when header_tier_name is set', () => {
     const row = baseRow({
       header_tier_name: 'My Custom Tier',

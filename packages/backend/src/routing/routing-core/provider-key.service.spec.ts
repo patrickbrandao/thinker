@@ -269,6 +269,7 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
     svc: ProviderKeyService;
     enabledFind: jest.Mock;
     setProviderKeys: jest.Mock;
+    providerFind: jest.Mock;
   } => {
     const providerRepo = { find: jest.fn().mockResolvedValue(opts.tenantProviders) };
     const setProviderKeys = jest.fn();
@@ -287,7 +288,7 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
       {} as never, // providerService
       enabledRepo as never, // enabledProviderRepo
     );
-    return { svc, enabledFind, setProviderKeys };
+    return { svc, enabledFind, setProviderKeys, providerFind: providerRepo.find };
   };
 
   it('returns [] when the agent has no enabled-provider rows (empty gate)', async () => {
@@ -361,6 +362,39 @@ describe('ProviderKeyService — filterProvidersForAgent (per-agent visibility)'
 
     expect(keys.map((k) => k.id).sort()).toEqual(['tp-a', 'tp-b']);
     expect(enabledFind).not.toHaveBeenCalled();
+  });
+
+  describe('getRouteProviderRecords', () => {
+    it('returns the active records the agent has enabled, scoped to the tenant', async () => {
+      const { svc, providerFind } = buildService({
+        tenantProviders: [
+          tenantProvider({ id: 'tp-openai', provider: 'openai' }),
+          tenantProvider({ id: 'tp-deepseek', provider: 'deepseek' }),
+          tenantProvider({ id: 'tp-local', provider: 'ollama', auth_type: 'local' }),
+        ],
+        // DeepSeek stays connected for the tenant but is disabled for the agent.
+        enabledRows: [enabledRow('tp-openai'), enabledRow('tp-local')],
+      });
+
+      const records = await svc.getRouteProviderRecords('tenant-1', 'agent-1');
+
+      expect(records).toEqual([
+        { provider: 'openai', authType: 'api_key' },
+        { provider: 'ollama', authType: 'local' },
+      ]);
+      expect(providerFind).toHaveBeenCalledWith({
+        where: { tenant_id: 'tenant-1', is_active: true },
+      });
+    });
+
+    it('returns [] when the agent has enabled nothing', async () => {
+      const { svc } = buildService({
+        tenantProviders: [tenantProvider({ id: 'tp-openai' })],
+        enabledRows: [],
+      });
+
+      expect(await svc.getRouteProviderRecords('tenant-1', 'agent-1')).toEqual([]);
+    });
   });
 
   it('null-repo short-circuit still returns all tenant providers even with an agentId', async () => {

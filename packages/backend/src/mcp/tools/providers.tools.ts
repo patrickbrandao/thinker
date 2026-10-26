@@ -7,10 +7,14 @@ import {
   SHARED_PROVIDERS,
   SUPPORTED_SUBSCRIPTION_PROVIDER_IDS,
   normalizeProviderName,
-  type ModelRoute,
 } from 'thinker-shared';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
+import {
+  agentDisableBlockedMessage,
+  collectAffectedVirtualModels,
+  makeAgentProviderRouteMatcher,
+} from '../../routing/routing-core/agent-provider-impact';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
@@ -390,10 +394,13 @@ async function setAgentProviderEnabled(
     // Disabling a connection that a route still points at would leave that
     // route unusable, so reject it exactly as the REST controller does.
     const affected = await findAffectedRoutes(deps, agent.id, connection);
-    if (affected.length > 0) {
-      throw new Error(
-        "Can't disable provider while its models are assigned to this harness's routing. Update routing first.",
-      );
+    const affectedVirtuals = collectAffectedVirtualModels(
+      await deps.virtualModels.list(agent.id),
+      agent.name,
+      makeAgentProviderRouteMatcher(connection),
+    );
+    if (affected.length > 0 || affectedVirtuals.length > 0) {
+      throw new Error(agentDisableBlockedMessage(affected.length, affectedVirtuals));
     }
     await deps.agentEnabledProviderRepo.delete({
       agent_id: agent.id,
@@ -405,34 +412,16 @@ async function setAgentProviderEnabled(
 }
 
 /**
- * Routes that would break if this connection were disabled: a tier or
- * specificity assignment whose primary route or fallback resolves to the
- * connection. Mirrors AgentEnabledProvidersController.findAffectedRoutes.
+ * Routes that would break if this connection were disabled: a tier, header
+ * tier or specificity assignment whose primary route or fallback resolves to
+ * the connection. Mirrors AgentEnabledProvidersController.findAffectedRoutes.
  */
 async function findAffectedRoutes(
   deps: McpToolDeps,
   agentId: string,
   provider: TenantProvider,
 ): Promise<string[]> {
-  const providerModels = new Set(
-    (Array.isArray(provider.cached_models) ? provider.cached_models : []).map((m) => m.id),
-  );
-  const providerName = provider.provider.toLowerCase();
-  const providerAuthType = provider.auth_type;
-  const providerLabel = provider.label?.toLowerCase();
-  const belongs = (route: ModelRoute | null): boolean => {
-    if (!route) return false;
-    if (route.provider) {
-      if (route.provider.toLowerCase() !== providerName) return false;
-      if (route.authType && route.authType !== providerAuthType) return false;
-      if (route.keyLabel && providerLabel && route.keyLabel.toLowerCase() !== providerLabel) {
-        return false;
-      }
-      if (!route.keyLabel && provider.priority !== 0 && providerLabel !== 'default') return false;
-      return true;
-    }
-    return providerModels.has(route.model);
-  };
+  const belongs = makeAgentProviderRouteMatcher(provider);
 
   const affected: string[] = [];
   const tiers = await deps.tiers.getTiers(agentId, provider.tenant_id);

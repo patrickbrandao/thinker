@@ -50,6 +50,8 @@ export interface MessageDetailResponse {
     header_tier_id: string | null;
     header_tier_name: string | null;
     header_tier_color: string | null;
+    virtual_model_id: string | null;
+    virtual_model_name: string | null;
     attempts?: Array<{
       id: string;
       model: string | null;
@@ -202,6 +204,8 @@ export class MessageDetailsService {
         header_tier_id: message?.header_tier_id ?? null,
         header_tier_name: message?.header_tier_name ?? null,
         header_tier_color: message?.header_tier_color ?? null,
+        virtual_model_id: message?.virtual_model_id ?? null,
+        virtual_model_name: message?.virtual_model_name ?? null,
         ...(request
           ? {
               // The drawer renders each attempt's full story (details, error

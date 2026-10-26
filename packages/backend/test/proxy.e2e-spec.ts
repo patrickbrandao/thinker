@@ -188,7 +188,15 @@ describe('Proxy E2E — /v1/models', () => {
     expect(res.body).toEqual({
       object: 'list',
       data: [
-        { id: 'auto', object: 'model', created: 0, owned_by: 'thinker' },
+        // `auto` routes only to gpt-4o-mini here, so it publishes that
+        // model's window (ADR 0004, section 7). Real models carry none.
+        {
+          id: 'auto',
+          object: 'model',
+          created: 0,
+          owned_by: 'thinker',
+          context_length: 128000,
+        },
         { id: 'openai/gpt-4o-mini', object: 'model', created: 0, owned_by: 'openai' },
       ],
     });
