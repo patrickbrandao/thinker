@@ -2431,6 +2431,58 @@ describe('ProxyController', () => {
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
+    it('records M301 with the virtual model and its header', async () => {
+      proxyService.proxyRequest.mockResolvedValue({
+        forward: {
+          response: new Response(
+            JSON.stringify({
+              choices: [{ message: { role: 'assistant', content: 'no route' } }],
+              usage: { prompt_tokens: 0, completion_tokens: 0 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: false,
+        },
+        meta: {
+          tier: 'default',
+          model: 'thinker',
+          provider: 'thinker',
+          confidence: 1,
+          reason: 'virtual_model_unavailable',
+          thinker_error_code: 'M301',
+          thinker_error_message: '[🦚 Thinker M301] Virtual model "DeepSeek/Flash" has no route.',
+          virtual_model_id: 'vm-1',
+          virtual_model_name: 'DeepSeek/Flash',
+        },
+        failedFallbacks: [],
+      });
+
+      const req = mockRequest({
+        messages: [{ role: 'user', content: 'hi' }],
+        model: 'deepseek/flash',
+      });
+      const { res, headers } = mockResponse();
+
+      await controller.chatCompletions(req as never, res as never);
+      await flushRecorderMicrotasks();
+
+      expect(headers['X-Thinker-Virtual-Model']).toBe('DeepSeek/Flash');
+      expect(mockMessageRepo.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'failed',
+          error_code: 'M301',
+          routing_reason: 'virtual_model_unavailable',
+          model: 'deepseek/flash',
+          provider: null,
+          routing_tier: null,
+          virtual_model_id: 'vm-1',
+          virtual_model_name: 'DeepSeek/Flash',
+        }),
+      );
+    });
+
     it('records an HTTP-200 friendly stub as a failed setup row, not a success', async () => {
       // What the user saw in the dashboard as "Failed: Setup": the proxy answered
       // 200 with a canned assistant message because no provider key was present.

@@ -85,7 +85,12 @@ describe('ProxyService — orchestration', () => {
   let resolveService: jest.Mocked<
     Pick<
       ResolveService,
-      'resolve' | 'resolveLazy' | 'resolveForTier' | 'resolveHeaderTier' | 'pinRouteKeyLabel'
+      | 'resolve'
+      | 'resolveLazy'
+      | 'resolveForTier'
+      | 'resolveHeaderTier'
+      | 'resolveVirtualModel'
+      | 'pinRouteKeyLabel'
     >
   >;
   let providerKeyService: jest.Mocked<
@@ -142,6 +147,7 @@ describe('ProxyService — orchestration', () => {
       }),
       resolveForTier: jest.fn(),
       resolveHeaderTier: jest.fn().mockResolvedValue(null),
+      resolveVirtualModel: jest.fn().mockResolvedValue(null),
       // Default: no connection pin configured — the route passes through.
       // Tests that exercise pinning override this per case.
       pinRouteKeyLabel: jest.fn(async (_agentId, _tenantId, route: ModelRoute) => route),
@@ -1681,7 +1687,11 @@ describe('ProxyService — orchestration', () => {
       // Body stays raw — the merge happens per-attempt inside the fallback
       // service so each fallback iteration looks up its own scoped route.
       expect(call.body).toEqual({ messages: [{ role: 'user', content: 'hi' }] });
-      expect(call.paramMergeContext).toEqual({ agentId: 'agent-1', scopeKey: 'tier:standard' });
+      expect(call.paramMergeContext).toEqual({
+        agentId: 'agent-1',
+        scopeFor: expect.any(Function),
+      });
+      expect(call.paramMergeContext!.scopeFor(call.paramsRoute)).toBe('tier:standard');
     });
 
     it('looks up the primary route model params for the snapshot', async () => {
@@ -2732,6 +2742,355 @@ describe('ProxyService — orchestration', () => {
       expect((scoringMessages as Array<{ role: string }>).every((m) => m.role === 'user')).toBe(
         true,
       );
+    });
+  });
+
+  describe('virtual models (ADR 0004)', () => {
+    const own = route('openai', 'api_key', 'gpt-4o');
+    const borrowed = route('deepseek', 'api_key', 'deepseek-v4-flash');
+    const virtualResolved = (overrides: Record<string, unknown> = {}) => ({
+      tier: 'default' as const,
+      route: own,
+      fallback_routes: [borrowed],
+      response_mode: 'buffered' as const,
+      output_modality: 'text' as const,
+      confidence: 1,
+      score: 0,
+      reason: 'virtual-model' as const,
+      virtual_model_id: 'vm-1',
+      virtual_model_name: 'DeepSeek/Flash',
+      route_params_scopes: [
+        { route: own, paramsScope: 'virtual:vm-1' },
+        { route: borrowed, paramsScope: 'tier:default' },
+      ],
+      ...overrides,
+    });
+    const ok = () => ({
+      response: okResponse(),
+      isGoogle: false as const,
+      isAnthropic: false as const,
+      isChatGpt: false as const,
+    });
+    const named = (model: string, extra: Record<string, unknown> = {}) =>
+      baseOpts({ body: { model, messages: [{ role: 'user', content: 'hi' }] }, ...extra });
+
+    it('routes a matching virtual model ahead of a matching header tier', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(virtualResolved());
+      resolveService.resolveHeaderTier.mockResolvedValue({
+        tier: 'standard',
+        route: route('anthropic', 'api_key', 'claude-opus-4-6'),
+        fallback_routes: null,
+        confidence: 1,
+        score: 0,
+        reason: 'header-match',
+        header_tier_id: 'ht-1',
+        header_tier_name: 'Deep',
+      });
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+
+      const result = await svc.proxyRequest(
+        named('deepseek/flash', { headers: { 'x-thinker-tier': 'deep' } }),
+      );
+
+      expect(resolveService.resolveVirtualModel).toHaveBeenCalledWith(
+        'agent-1',
+        'tenant-1',
+        'deepseek/flash',
+      );
+      expect(resolveService.resolveHeaderTier).not.toHaveBeenCalled();
+      expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'openai', model: 'gpt-4o' }),
+      );
+      expect(result.meta).toMatchObject({
+        tier: 'default',
+        reason: 'virtual-model',
+        model: 'gpt-4o',
+        virtual_model_id: 'vm-1',
+        virtual_model_name: 'DeepSeek/Flash',
+      });
+      expect(result.meta.header_tier_id).toBeUndefined();
+    });
+
+    it('falls through to the header tier, then to the explicit model, when no virtual matches', async () => {
+      modelDiscovery.getModelsForAgent.mockResolvedValue([
+        discoveredModel({ id: 'gpt-4o-mini', provider: 'openai', authType: 'api_key' }),
+      ]);
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+
+      const result = await svc.proxyRequest(
+        named('gpt-4o-mini', { headers: { 'x-thinker-tier': 'nothing' } }),
+      );
+
+      expect(resolveService.resolveVirtualModel).toHaveBeenCalled();
+      expect(resolveService.resolveHeaderTier).toHaveBeenCalled();
+      expect(result.meta.tier).toBe('direct');
+      expect(result.meta.virtual_model_id).toBeUndefined();
+    });
+
+    it('applies a header tier to auto without consulting virtual models', async () => {
+      resolveService.resolveHeaderTier.mockResolvedValue({
+        tier: 'standard',
+        route: route('anthropic', 'api_key', 'claude-opus-4-6'),
+        fallback_routes: null,
+        confidence: 1,
+        score: 0,
+        reason: 'header-match',
+        header_tier_id: 'ht-1',
+      });
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+
+      const result = await svc.proxyRequest(
+        named('auto', { headers: { 'x-thinker-tier': 'deep' } }),
+      );
+
+      expect(resolveService.resolveVirtualModel).not.toHaveBeenCalled();
+      expect(resolveService.resolve).not.toHaveBeenCalled();
+      expect(result.meta.reason).toBe('header-match');
+    });
+
+    it('sends an auto heartbeat to the simple tier even with a header tier header', async () => {
+      resolveService.resolveForTier.mockResolvedValue({
+        tier: 'simple',
+        route: route('openai', 'api_key', 'gpt-4o-mini'),
+        fallback_routes: null,
+        confidence: 1,
+        score: 0,
+        reason: 'heartbeat',
+      });
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+
+      await svc.proxyRequest(
+        baseOpts({
+          body: { messages: [{ role: 'user', content: 'HEARTBEAT_OK' }] },
+          headers: { 'x-thinker-tier': 'deep' },
+        }),
+      );
+
+      expect(resolveService.resolveHeaderTier).not.toHaveBeenCalled();
+      expect(resolveService.resolveForTier).toHaveBeenCalledWith('agent-1', 'tenant-1', 'simple');
+    });
+
+    it('returns M301 naming the virtual model when its chain has no route', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: null,
+          fallback_routes: null,
+          route_params_scopes: undefined,
+          virtual_model_unavailable: 'DeepSeek/Flash',
+        }),
+      );
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(fallbackService.tryForwardToProvider).not.toHaveBeenCalled();
+      expect(fallbackService.tryFallbacks).not.toHaveBeenCalled();
+      expect(result.meta).toMatchObject({
+        thinker_error_code: 'M301',
+        reason: 'virtual_model_unavailable',
+        tier: 'default',
+        virtual_model_id: 'vm-1',
+        virtual_model_name: 'DeepSeek/Flash',
+      });
+      expect(result.meta.thinker_error_message).toContain('[🦚 Thinker M301]');
+      expect(result.meta.thinker_error_message).toContain('"DeepSeek/Flash"');
+      // Option off: point at the option.
+      expect(result.meta.thinker_error_message).toContain('turn on "Continue on Default"');
+    });
+
+    it('says the Default came up empty when the virtual already continues on it', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: null,
+          fallback_routes: null,
+          route_params_scopes: undefined,
+          virtual_model_unavailable: 'DeepSeek/Flash',
+          virtual_model_continues_on_default: true,
+        }),
+      );
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(result.meta.thinker_error_code).toBe('M301');
+      expect(result.meta.thinker_error_message).toContain(
+        'the Default tier it continues on has no available route either',
+      );
+      expect(result.meta.thinker_error_message).not.toContain('turn on');
+    });
+
+    it('snapshots each attempt under the scope of its own route', async () => {
+      // Same model on two keys: the virtual's own route and one borrowed from
+      // the Default, configured differently under their scopes.
+      const ds = route('deepseek', 'api_key', 'deepseek-v4-flash');
+      const dsWork = { ...ds, keyLabel: 'Work' };
+      const dsSpare = { ...ds, keyLabel: 'Spare' };
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: ds,
+          fallback_routes: [dsWork, dsSpare],
+          route_params_scopes: [
+            { route: ds, paramsScope: 'virtual:vm-1' },
+            { route: dsWork, paramsScope: 'tier:default' },
+            { route: dsSpare, paramsScope: 'tier:default-spare' },
+          ],
+        }),
+      );
+      modelParamsService.get.mockImplementation(async (_agent: string, scope: string) =>
+        scope === 'virtual:vm-1'
+          ? { thinking: { type: 'disabled' } }
+          : scope === 'tier:default'
+            ? { thinking: { type: 'enabled' } }
+            : null,
+      );
+      fallbackService.tryForwardToProvider.mockResolvedValue({
+        response: new Response('overloaded', { status: 503 }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+      fallbackService.tryFallbacks.mockResolvedValue({
+        success: {
+          forward: ok(),
+          model: 'deepseek-v4-flash',
+          provider: 'deepseek',
+          fallbackIndex: 1,
+          authType: 'api_key',
+          tenantProviderId: 'up-spare',
+        },
+        failures: [
+          {
+            model: 'deepseek-v4-flash',
+            provider: 'deepseek',
+            fallbackIndex: 0,
+            status: 503,
+            errorBody: 'down',
+            authType: 'api_key',
+          },
+        ],
+      });
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(result.meta.primaryRequestParams).toMatchObject({ thinking: { type: 'disabled' } });
+      expect(result.failedFallbacks?.[0].requestParams).toMatchObject({
+        thinking: { type: 'enabled' },
+      });
+      // The winner is looked up under its own route's scope.
+      expect(modelParamsService.get).toHaveBeenCalledWith(
+        'agent-1',
+        'tier:default-spare',
+        'deepseek',
+        'api_key',
+        'deepseek-v4-flash',
+      );
+    });
+
+    it('merges params per route and is never an explicit override', async () => {
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+      resolveService.resolveVirtualModel.mockResolvedValue(virtualResolved());
+
+      await svc.proxyRequest(named('deepseek/flash'));
+
+      const call = fallbackService.tryForwardToProvider.mock.calls[0][0];
+      expect(call.paramsRoute).toBe(own);
+      const ctx = call.paramMergeContext!;
+      expect(ctx.scopeFor(own)).toBe('virtual:vm-1');
+      expect(ctx.scopeFor(borrowed)).toBe('tier:default');
+      expect(modelParamsService.get).toHaveBeenCalledWith(
+        'agent-1',
+        'virtual:vm-1',
+        'openai',
+        'api_key',
+        'gpt-4o',
+      );
+    });
+
+    it('uses tier:default for a primary that came from the Default tier', async () => {
+      // Every route of the virtual itself was unavailable.
+      resolveService.resolveVirtualModel.mockResolvedValue(
+        virtualResolved({
+          route: borrowed,
+          fallback_routes: null,
+          route_params_scopes: [{ route: borrowed, paramsScope: 'tier:default' }],
+        }),
+      );
+      modelParamsService.get.mockResolvedValue({ thinking: { type: 'disabled' } });
+      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(modelParamsService.get).toHaveBeenCalledWith(
+        'agent-1',
+        'tier:default',
+        'deepseek',
+        'api_key',
+        'deepseek-v4-flash',
+      );
+      expect(modelParamsService.get).not.toHaveBeenCalledWith(
+        'agent-1',
+        'virtual:vm-1',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(result.meta.request_params).toEqual({ thinking: { type: 'disabled' } });
+    });
+
+    it('runs the chain at runtime and re-derives request_params under the winner scope', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(virtualResolved());
+      fallbackService.tryForwardToProvider.mockResolvedValue({
+        response: new Response('overloaded', { status: 503 }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+      fallbackService.tryFallbacks.mockResolvedValue({
+        success: {
+          forward: ok(),
+          model: 'deepseek-v4-flash',
+          provider: 'deepseek',
+          fallbackIndex: 0,
+          authType: 'api_key',
+          tenantProviderId: 'up-ds',
+        },
+        failures: [],
+      });
+
+      const result = await svc.proxyRequest(named('deepseek/flash'));
+
+      expect(fallbackService.tryFallbacks).toHaveBeenCalled();
+      const fallbackCall = fallbackService.tryFallbacks.mock.calls[0];
+      expect(fallbackCall[14]).toEqual([borrowed]);
+      expect(modelParamsService.get).toHaveBeenLastCalledWith(
+        'agent-1',
+        'tier:default',
+        'deepseek',
+        'api_key',
+        'deepseek-v4-flash',
+      );
+      expect(result.meta).toMatchObject({
+        fallbackFromModel: 'gpt-4o',
+        fallbackIndex: 0,
+        reason: 'virtual-model',
+        virtual_model_name: 'DeepSeek/Flash',
+      });
+    });
+
+    it('stamps the virtual model on every attempt it starts', async () => {
+      resolveService.resolveVirtualModel.mockResolvedValue(virtualResolved());
+      const startProviderAttempt = jest.fn();
+      fallbackService.tryForwardToProvider.mockImplementation(async (opts) => {
+        opts.startProviderAttempt?.({ provider: 'openai', model: 'gpt-4o' });
+        return ok();
+      });
+
+      await svc.proxyRequest({ ...named('deepseek/flash'), startProviderAttempt });
+
+      expect(startProviderAttempt).toHaveBeenCalledWith({
+        provider: 'openai',
+        model: 'gpt-4o',
+        virtualModelId: 'vm-1',
+        virtualModelName: 'DeepSeek/Flash',
+      });
     });
   });
 });

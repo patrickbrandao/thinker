@@ -16,6 +16,7 @@ import { shouldTriggerFallback } from './fallback-status-codes';
 import { Tier, TIERS, ScorerMessage } from '../../scoring/types';
 import type {
   AuthType,
+  ModelRoute,
   RequestParamDefaults,
   ResponseMode,
   OutputModality,
@@ -24,6 +25,7 @@ import type {
 } from 'thinker-shared';
 import {
   DEFAULT_RESPONSE_MODE,
+  DEFAULT_TIER_SLOT,
   SPECIFICITY_CATEGORIES,
   modelParamsScopeForRouting,
   routeEquals,
@@ -103,6 +105,9 @@ export interface RoutingMeta {
   header_tier_id?: string;
   header_tier_name?: string;
   header_tier_color?: string;
+  /** Virtual model the request named (ADR 0004); stamped on every recorded row. */
+  virtual_model_id?: string;
+  virtual_model_name?: string;
   provider_key_label?: string;
   /**
    * The `tenant_providers` row id that served this attempt. Stamped on
@@ -163,12 +168,67 @@ export interface RoutingMeta {
   primaryAttempt?: ProviderAttemptRef;
   /** Whether the primary/retry actually crossed the provider transport boundary. */
   primaryProviderCallStarted?: boolean;
+  /**
+   * Params snapshot of the failed primary when a fallback succeeded.
+   * `request_params` then holds the winner's, which can differ in model and,
+   * for a virtual chain, in scope.
+   */
+  primaryRequestParams?: RequestParamDefaults | null;
 }
 
 export interface ProxyResult {
   forward: ForwardResult;
   meta: RoutingMeta;
   failedFallbacks?: FailedFallback[];
+}
+
+/**
+ * The `agent_model_params` scope of each route of a resolved chain (ADR 0004,
+ * section 9). A virtual model carries one scope per route: `virtual:<id>` for
+ * its own routes and `tier:default` for the ones appended from the Default
+ * tier. Every other origin (tier, specificity, header tier) has one scope for
+ * all of its routes. A route outside the resolved chain (the legacy
+ * fallback-inference path) takes the scope of the chain's primary.
+ */
+export function paramsScopeLookup(
+  resolved: Pick<
+    ResolvedRouting,
+    'tier' | 'specificity_category' | 'header_tier_id' | 'route_params_scopes'
+  >,
+): (route: ModelRoute | null | undefined) => string {
+  const scopes = resolved.route_params_scopes;
+  if (!scopes || scopes.length === 0) {
+    const scopeKey = modelParamsScopeForRouting({
+      tier: resolved.tier,
+      specificityCategory: resolved.specificity_category,
+      headerTierId: resolved.header_tier_id,
+    });
+    return () => scopeKey;
+  }
+  return (route) => {
+    if (!route) return scopes[0].paramsScope;
+    const entry =
+      scopes.find((s) => s.route === route) ?? scopes.find((s) => routeEquals(s.route, route));
+    return (entry ?? scopes[0]).paramsScope;
+  };
+}
+
+/** Fields that tie every row of a request to the virtual model it named. */
+function virtualModelFields(
+  resolved: Pick<ResolvedRouting, 'virtual_model_id' | 'virtual_model_name'>,
+): Pick<RoutingMeta, 'virtual_model_id' | 'virtual_model_name'> {
+  return resolved.virtual_model_id
+    ? {
+        virtual_model_id: resolved.virtual_model_id,
+        virtual_model_name: resolved.virtual_model_name,
+      }
+    : {};
+}
+
+/** Stamps the virtual model on a Thinker-authored response (M100/M102/M301 stubs). */
+function withVirtualModel(result: ProxyResult, resolved: ResolvedRouting): ProxyResult {
+  if (!resolved.virtual_model_id) return result;
+  return { ...result, meta: { ...result.meta, ...virtualModelFields(resolved) } };
 }
 
 /**
@@ -223,7 +283,6 @@ export class ProxyService {
       signal,
       specificityOverride,
       headers,
-      startProviderAttempt,
     } = opts;
     const apiMode = opts.apiMode ?? 'chat_completions';
     const routingSource = opts.routingBody ?? body;
@@ -252,11 +311,33 @@ export class ProxyService {
     );
     const responseMode = resolved.response_mode ?? DEFAULT_RESPONSE_MODE;
     const stream = body.stream === true || responseMode === 'stream';
+    // Pending and cancelled attempt rows are written before any terminal
+    // writer sees the meta, so the virtual model rides on each attempt start.
+    const startProviderAttempt: StartProviderAttempt | undefined =
+      opts.startProviderAttempt && resolved.virtual_model_id
+        ? (start) =>
+            opts.startProviderAttempt!({
+              ...start,
+              virtualModelId: resolved.virtual_model_id,
+              virtualModelName: resolved.virtual_model_name,
+            })
+        : opts.startProviderAttempt;
     if (!resolved.route) {
       this.logger.warn(
         `No route available for agent=${agentId}: ` +
           `tier=${resolved.tier} confidence=${resolved.confidence} reason=${resolved.reason}`,
       );
+      if (resolved.virtual_model_unavailable) {
+        return withVirtualModel(
+          this.buildVirtualModelUnavailableResult(
+            stream,
+            agentName,
+            resolved.virtual_model_unavailable,
+            resolved.virtual_model_continues_on_default === true,
+          ),
+          resolved,
+        );
+      }
       const unavailableModel =
         resolved.explicit_model_unavailable ?? resolved.override_model_unavailable;
       if (unavailableModel) {
@@ -284,15 +365,13 @@ export class ProxyService {
     // own (provider, auth_type, model) tuple in the model-params service.
     // Pass the agentId here as a thin context bag; the storage is already
     // route-scoped, so no per-provider filter is needed downstream.
+    // A virtual model is not an explicit route: its params apply, one scope
+    // per route of its chain (ADR 0004, section 9).
     const explicitModelOverride = resolved.explicit_model_override === true;
-    const scopeKey = modelParamsScopeForRouting({
-      tier: resolved.tier,
-      specificityCategory: resolved.specificity_category,
-      headerTierId: resolved.header_tier_id,
-    });
+    const scopeFor = paramsScopeLookup(resolved);
     const paramMergeContext: ParamMergeContext | undefined = explicitModelOverride
       ? undefined
-      : { agentId, scopeKey };
+      : { agentId, scopeFor };
 
     // Snapshot of which known param keys are *effectively in play* for the
     // primary attempt. Stored on every `agent_messages` row recorded for
@@ -308,7 +387,7 @@ export class ProxyService {
       : await Promise.all([
           this.modelParamsService.get(
             agentId,
-            scopeKey,
+            scopeFor(route),
             route.provider,
             route.authType,
             primaryModel,
@@ -388,11 +467,14 @@ export class ProxyService {
         if (fallbackResult) return fallbackResult;
       }
 
-      return buildFriendlyResponse(
-        credentialFailure.message,
-        stream,
-        credentialFailure.reason,
-        credentialFailure.code,
+      return withVirtualModel(
+        buildFriendlyResponse(
+          credentialFailure.message,
+          stream,
+          credentialFailure.reason,
+          credentialFailure.code,
+        ),
+        resolved,
       );
     }
 
@@ -421,6 +503,7 @@ export class ProxyService {
       thinkingLookup,
       clientAnthropicBeta: headers?.['anthropic-beta'],
       paramMergeContext,
+      paramsRoute: route,
       tenantProviderId: credentials.tenantProviderId,
       startProviderAttempt,
     });
@@ -620,6 +703,17 @@ export class ProxyService {
     };
   }
 
+  /**
+   * Routing precedence for the three proxy surfaces (ADR 0004, section 5):
+   *
+   * 1. an enabled virtual model whose name equals `model`, ignoring case;
+   * 2. a header tier matching the request headers;
+   * 3. `auto` → automatic routing; a real ID → explicit route; an unknown
+   *    name → M302.
+   *
+   * A heartbeat (`auto` only) skips step 2 and goes straight to the simple
+   * tier, as it always has.
+   */
   private async resolveRouting(
     agentId: string,
     tenantId: string,
@@ -631,11 +725,29 @@ export class ProxyService {
     apiMode: ProxyApiMode,
   ): Promise<ResolvedRouting> {
     const requestedModel = typeof body.model === 'string' ? body.model : undefined;
+    const isAuto = !requestedModel || requestedModel === OPENAI_MODEL_ID_AUTO;
+
+    // `auto` is reserved in any spelling, so no virtual model can match it.
+    if (requestedModel && !isAuto) {
+      const virtual = await this.resolveService.resolveVirtualModel(
+        agentId,
+        tenantId,
+        requestedModel,
+      );
+      if (virtual) return virtual;
+    }
+
+    const isHeartbeat = isAuto && this.detectHeartbeatBody(body, apiMode);
+    if (headers && !isHeartbeat) {
+      const headerTier = await this.resolveService.resolveHeaderTier(agentId, tenantId, headers);
+      if (headerTier) return headerTier;
+    }
+
     // Every public proxy surface treats a concrete model as an explicit route.
     // The resolver accepts both provider-qualified /v1/models IDs and the
     // unambiguous provider-native IDs required by Anthropic clients.
-    if (requestedModel && requestedModel !== OPENAI_MODEL_ID_AUTO) {
-      const explicit = await this.resolveExplicitModel(agentId, tenantId, requestedModel, headers);
+    if (requestedModel && !isAuto) {
+      const explicit = await this.resolveExplicitModel(agentId, tenantId, requestedModel);
       if (explicit) return explicit;
       return {
         tier: 'default' as const,
@@ -649,7 +761,8 @@ export class ProxyService {
       };
     }
 
-    const isHeartbeat = this.detectHeartbeatBody(body, apiMode);
+    if (isHeartbeat) return this.resolveService.resolveForTier(agentId, tenantId, 'simple');
+
     const recentTiers = sessionMomentumKey
       ? this.momentum.getRecentTiers(sessionMomentumKey)
       : undefined;
@@ -657,40 +770,33 @@ export class ProxyService {
       ? this.momentum.getRecentCategories(sessionMomentumKey)
       : undefined;
 
-    const baseResolved = await (isHeartbeat
-      ? this.resolveService.resolveForTier(agentId, tenantId, 'simple')
-      : this.resolveService.resolveLazy(
-          agentId,
-          tenantId,
-          async () => {
-            const scoringBody = resolveChatBody ? await resolveChatBody() : body;
-            // Not guaranteed to be an array: the scorer must tolerate a body
-            // whose `messages` field is missing or malformed.
-            const messages = (
-              Array.isArray(scoringBody.messages) ? scoringBody.messages : []
-            ) as ScorerMessage[];
-            return {
-              messages: this.filterScoringMessages(messages),
-              tools: Array.isArray(scoringBody.tools) ? scoringBody.tools : undefined,
-              tool_choice: scoringBody.tool_choice,
-              max_tokens: scoringBody.max_tokens as number | undefined,
-            };
-          },
-          recentTiers,
-          specificityOverride,
-          recentCategories,
-          headers,
-        ));
-
-    return baseResolved;
+    return this.resolveService.resolveLazy(
+      agentId,
+      tenantId,
+      async () => {
+        const scoringBody = resolveChatBody ? await resolveChatBody() : body;
+        // Not guaranteed to be an array: the scorer must tolerate a body
+        // whose `messages` field is missing or malformed.
+        const messages = (
+          Array.isArray(scoringBody.messages) ? scoringBody.messages : []
+        ) as ScorerMessage[];
+        return {
+          messages: this.filterScoringMessages(messages),
+          tools: Array.isArray(scoringBody.tools) ? scoringBody.tools : undefined,
+          tool_choice: scoringBody.tool_choice,
+          max_tokens: scoringBody.max_tokens as number | undefined,
+        };
+      },
+      recentTiers,
+      specificityOverride,
+      recentCategories,
+    );
   }
 
   /**
-   * Route the `model` a proxy client named in the body.
-   *
-   * A matching header tier wins: that rule is an override the operator
-   * configured on purpose, and the SDK's `model` field is mandatory, so most
-   * agents send a name they cannot change.
+   * Route the `model` a proxy client named in the body. Header tiers were
+   * already tried by resolveRouting, so a request that reaches this path is
+   * routed by its `model` alone.
    *
    * Exact catalog matches retain their published provider/auth identity. When
    * discovery has not learned the model yet, a provider-qualified or
@@ -705,13 +811,7 @@ export class ProxyService {
     agentId: string,
     tenantId: string,
     requestedModel: string,
-    headers: ProxyRequestOptions['headers'],
   ): Promise<ResolvedRouting | null> {
-    if (headers) {
-      const headerTier = await this.resolveService.resolveHeaderTier(agentId, tenantId, headers);
-      if (headerTier) return headerTier;
-    }
-
     const models = await this.modelDiscovery.getModelsForAgent(tenantId, agentId);
     const catalogRoute = routeForOpenAiModelId(requestedModel, models);
     if (catalogRoute) return this.explicitRouting(agentId, tenantId, catalogRoute);
@@ -951,30 +1051,58 @@ export class ProxyService {
     this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
     this.recordCategoryIfValid(sessionMomentumKey, resolved.specificity_category);
 
-    if (success) {
-      // Re-snapshot for the fallback's actual provider — its model-scoped
-      // params row (if any) is what was actually applied. Different model
-      // → different lookup → different snapshot, matching the wire. The two
-      // lookups are independent, so resolve them together.
-      const [fallbackModelParams, fallbackSpecs] = await Promise.all([
-        success.authType
-          ? this.modelParamsService.get(
-              args.paramMergeContext.agentId,
-              args.paramMergeContext.scopeKey,
-              success.provider,
-              success.authType,
-              success.model,
+    // Every row records the params of its own attempt (ADR 0004, section 9):
+    // the primary under its scope, each hop under the scope of its route. A
+    // virtual chain mixes two scopes, so no row may borrow another's snapshot.
+    const primaryRequestParams =
+      primaryProvider && primaryAuth && resolved.route
+        ? await this.attemptRequestParams(
+            args.paramMergeContext,
+            resolved.route,
+            primaryProvider,
+            primaryAuth,
+            primaryModel,
+            body,
+          )
+        : snapshotRequestParams({
+            body: body as Record<string, unknown>,
+            modelParams: null,
+            specs: [],
+          });
+    const scopedFailures: FailedFallback[] = await Promise.all(
+      failures.map(async (failure) => ({
+        ...failure,
+        requestParams: failure.authType
+          ? await this.attemptRequestParams(
+              args.paramMergeContext,
+              fallbackRoutes[failure.fallbackIndex] ?? null,
+              failure.provider,
+              failure.authType,
+              failure.model,
+              body,
             )
           : null,
-        success.authType
-          ? this.providerParamSpecs.getSpecs(success.provider, success.authType, success.model)
-          : [],
-      ]);
-      const fallbackRequestParams = snapshotRequestParams({
-        body: body as Record<string, unknown>,
-        modelParams: fallbackModelParams,
-        specs: fallbackSpecs,
-      });
+      })),
+    );
+
+    if (success) {
+      // Re-snapshot for the fallback's actual provider — its model-scoped
+      // params row (if any) is what was actually applied. The scope is the
+      // winning route's own.
+      const fallbackRequestParams = success.authType
+        ? await this.attemptRequestParams(
+            args.paramMergeContext,
+            fallbackRoutes[success.fallbackIndex] ?? null,
+            success.provider,
+            success.authType,
+            success.model,
+            body,
+          )
+        : snapshotRequestParams({
+            body: body as Record<string, unknown>,
+            modelParams: null,
+            specs: [],
+          });
       return {
         forward: success.forward,
         meta: this.buildBaseMeta(resolved, success.model, {
@@ -994,12 +1122,13 @@ export class ProxyService {
           primaryTenantProviderId: args.primaryTenantProviderId,
           primaryAttempt: forward.attempt,
           primaryProviderCallStarted: forward.providerCallStarted,
+          primaryRequestParams,
           attempt: success.forward.attempt,
           providerCallStarted: success.forward.providerCallStarted,
           tenantProviderId: success.tenantProviderId,
           request_params: fallbackRequestParams,
         }),
-        failedFallbacks: failures,
+        failedFallbacks: scopedFailures,
       };
     }
 
@@ -1012,33 +1141,9 @@ export class ProxyService {
     safeHeaders.delete('transfer-encoding');
     const rebuilt = new Response(primaryErrorBody, { status: primaryStatus, headers: safeHeaders });
 
-    // Fallback exhausted — recorded against the primary provider, so use
-    // the primary-provider snapshot for the row. Look up the primary's
-    // model-params one more time so the snapshot reflects what was sent
-    // before the chain failed.
-    const [primaryModelParams, exhaustedSpecs] = await Promise.all([
-      primaryProvider && primaryAuth && resolved.route
-        ? this.modelParamsService.get(
-            args.paramMergeContext.agentId,
-            args.paramMergeContext.scopeKey,
-            primaryProvider,
-            primaryAuth as 'api_key' | 'subscription' | 'local',
-            primaryModel,
-          )
-        : null,
-      primaryProvider && primaryAuth && resolved.route
-        ? this.providerParamSpecs.getSpecs(
-            primaryProvider,
-            primaryAuth as 'api_key' | 'subscription' | 'local',
-            primaryModel,
-          )
-        : [],
-    ]);
-    const exhaustedRequestParams = snapshotRequestParams({
-      body: body as Record<string, unknown>,
-      modelParams: primaryModelParams,
-      specs: exhaustedSpecs,
-    });
+    // Fallback exhausted — recorded against the primary provider, so the
+    // row carries the primary's snapshot.
+    const exhaustedRequestParams = primaryRequestParams;
     return {
       forward: {
         response: rebuilt,
@@ -1059,8 +1164,30 @@ export class ProxyService {
         providerCallStarted:
           failures[failures.length - 1]?.providerCallStarted ?? forward.providerCallStarted,
       }),
-      failedFallbacks: failures,
+      failedFallbacks: scopedFailures,
     };
+  }
+
+  /** Snapshot of the params one attempt sent, under the scope of its own route. */
+  private async attemptRequestParams(
+    ctx: ParamMergeContext,
+    route: ModelRoute | null,
+    provider: string,
+    authType: AuthType | string,
+    model: string,
+    body: ProxyRequestOptions['body'],
+  ): Promise<RequestParamDefaults | null> {
+    const [modelParams, specs] = await Promise.all([
+      this.modelParamsService.get(
+        ctx.agentId,
+        ctx.scopeFor(route),
+        provider,
+        authType as AuthType,
+        model,
+      ),
+      this.providerParamSpecs.getSpecs(provider, authType as AuthType, model),
+    ]);
+    return snapshotRequestParams({ body: body as Record<string, unknown>, modelParams, specs });
   }
 
   private buildBaseMeta(
@@ -1081,6 +1208,7 @@ export class ProxyService {
       header_tier_id: resolved.header_tier_id,
       header_tier_name: resolved.header_tier_name,
       header_tier_color: resolved.header_tier_color,
+      ...virtualModelFields(resolved),
       output_modality: resolved.output_modality,
       response_mode: resolved.response_mode ?? DEFAULT_RESPONSE_MODE,
       ...overrides,
@@ -1194,6 +1322,28 @@ export class ProxyService {
     const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
     const content = formatThinkerError('M302', { model, dashboardUrl });
     return buildFriendlyResponse(content, stream, 'model_not_available', 'M302');
+  }
+
+  private buildVirtualModelUnavailableResult(
+    stream: boolean,
+    agentName: string | undefined,
+    name: string,
+    continuesOnDefault: boolean,
+  ): ProxyResult {
+    const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
+    // With "Continue on Default" already on, the Default came up empty too,
+    // so suggesting the option would send the operator in a circle.
+    const detail = continuesOnDefault
+      ? ', and the Default tier it continues on has no available route either. Fix its chain or the Default tier'
+      : '. Fix its chain, or turn on "Continue on Default"';
+    const content = formatThinkerError('M301', { name, detail, dashboardUrl });
+    return buildFriendlyResponse(
+      content,
+      stream,
+      'virtual_model_unavailable',
+      'M301',
+      DEFAULT_TIER_SLOT,
+    );
   }
 
   /** Session-scoped cache lookups threaded into every provider forward. */

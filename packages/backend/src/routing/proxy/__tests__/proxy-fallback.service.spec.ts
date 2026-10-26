@@ -913,7 +913,7 @@ describe('ProxyFallbackService', () => {
         stream: false,
         sessionKey: 'sess-1',
         authType: 'api_key',
-        paramMergeContext: { agentId: 'agent-1', scopeKey: 'tier:default' },
+        paramMergeContext: { agentId: 'agent-1', scopeFor: () => 'tier:default' },
       });
 
       expect(modelParamsService.get).toHaveBeenCalledWith(
@@ -960,7 +960,7 @@ describe('ProxyFallbackService', () => {
         sessionKey: 'sess-1',
         authType: 'api_key',
         apiMode: 'responses',
-        paramMergeContext: { agentId: 'agent-1', scopeKey: 'tier:default' },
+        paramMergeContext: { agentId: 'agent-1', scopeFor: () => 'tier:default' },
       });
 
       expect(resolveChatBody).toHaveBeenCalledTimes(1);
@@ -986,7 +986,7 @@ describe('ProxyFallbackService', () => {
         stream: false,
         sessionKey: 'sess-1',
         authType: 'api_key',
-        paramMergeContext: { agentId: 'agent-1', scopeKey: 'tier:default' },
+        paramMergeContext: { agentId: 'agent-1', scopeFor: () => 'tier:default' },
       });
 
       const forwarded = providerClient.forward.mock.calls[0][0];
@@ -1013,7 +1013,7 @@ describe('ProxyFallbackService', () => {
         stream: false,
         sessionKey: 'sess-1',
         authType: 'api_key',
-        paramMergeContext: { agentId: 'agent-1', scopeKey: 'tier:default' },
+        paramMergeContext: { agentId: 'agent-1', scopeFor: () => 'tier:default' },
       });
 
       const forwarded = providerClient.forward.mock.calls[0][0];

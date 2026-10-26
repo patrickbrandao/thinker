@@ -154,6 +154,8 @@ describe('MessageDetailsService', () => {
       header_tier_id: null,
       header_tier_name: null,
       header_tier_color: null,
+      virtual_model_id: null,
+      virtual_model_name: null,
     });
   });
 

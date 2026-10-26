@@ -11,6 +11,7 @@ import type { RoutingCacheService } from '../../routing-core/routing-cache.servi
 import type { SpecificityService } from '../../routing-core/specificity.service';
 import type { SpecificityPenaltyService } from '../../routing-core/specificity-penalty.service';
 import type { HeaderTierService } from '../../header-tiers/header-tier.service';
+import type { VirtualModelService } from '../../virtual-models/virtual-model.service';
 import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import type { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 
@@ -141,6 +142,7 @@ describe('ResolveService — edge cases', () => {
         addInvalidationListener: jest.fn(),
         addTenantInvalidationListener: jest.fn(),
       } as unknown as RoutingCacheService,
+      { list: jest.fn().mockResolvedValue([]) } as unknown as VirtualModelService,
     );
   });
 
@@ -160,18 +162,10 @@ describe('ResolveService — edge cases', () => {
 
       // Headers object exists but lacks the configured header_key — the rule
       // should not match and we should fall through to scored routing.
-      const result = await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'other-header': 'value' },
-      );
+      const result =
+        (await svc.resolveHeaderTier('agent-1', 'user-1', {
+          'other-header': 'value',
+        })) ?? (await svc.resolve('agent-1', 'user-1', messages));
 
       expect(result.reason).not.toBe('header-match');
       expect(result.reason).toBe('scored');
@@ -279,18 +273,7 @@ describe('ResolveService — edge cases', () => {
       headerTierService.list.mockResolvedValue([headerTierFixture({ override_route: null })]);
       tierService.getTiers.mockResolvedValue([fallbackTierAssignment()]);
 
-      await svc.resolve(
-        'agent-1',
-        'user-1',
-        messages,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { 'x-tier': 'gold' },
-      );
+      await svc.resolveHeaderTier('agent-1', 'user-1', { 'x-tier': 'gold' });
 
       expectMessageLogged(debugSpy, 'Header tier "Premium" matched but has no model configured');
     });

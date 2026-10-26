@@ -48,6 +48,7 @@ const vm = (overrides: Partial<Parameters<typeof buildVirtualModelChain>[0]> = {
 });
 
 describe('buildVirtualModelChain', () => {
+  const available = { isDefaultOverrideAvailable: () => true };
   const defaultTier = (overrides: Partial<Parameters<typeof tierChainRoutes>[0]> = {}) => ({
     override_route: route('deepseek', 'deepseek-chat'),
     auto_assigned_route: null,
@@ -56,7 +57,7 @@ describe('buildVirtualModelChain', () => {
   });
 
   it('lists the primary then the fallbacks under the virtual scope', async () => {
-    expect(await buildVirtualModelChain(vm(), null)).toEqual([
+    expect(await buildVirtualModelChain(vm(), null, available)).toEqual([
       { route: route('openai', 'gpt-4o'), paramsScope: 'virtual:vm-1', fromDefault: false },
       {
         route: route('anthropic', 'claude-opus-4-6'),
@@ -67,7 +68,7 @@ describe('buildVirtualModelChain', () => {
   });
 
   it('ignores the Default tier when continue_on_default is off', async () => {
-    expect(await buildVirtualModelChain(vm(), defaultTier())).toHaveLength(2);
+    expect(await buildVirtualModelChain(vm(), defaultTier(), available)).toHaveLength(2);
   });
 
   it('appends the Default chain under tier:default and drops repeated routes', async () => {
@@ -76,6 +77,7 @@ describe('buildVirtualModelChain', () => {
       defaultTier({
         fallback_routes: [route('openai', 'gpt-4o'), route('openai', 'gpt-4o', 'api_key', 'Work')],
       }),
+      available,
     );
     expect(chain.map((e) => [e.route.model, e.route.keyLabel ?? null, e.paramsScope])).toEqual([
       ['gpt-4o', null, 'virtual:vm-1'],
@@ -91,6 +93,7 @@ describe('buildVirtualModelChain', () => {
     const chain = await buildVirtualModelChain(
       vm({ continue_on_default: true }),
       defaultTier({ auto_assigned_route: route('legacy', 'old-model') }),
+      available,
     );
     expect(chain.map((e) => e.route.model)).toEqual(['gpt-4o', 'claude-opus-4-6', 'deepseek-chat']);
   });
@@ -120,7 +123,7 @@ describe('buildVirtualModelChain', () => {
     const chain = await buildVirtualModelChain(
       vm({ continue_on_default: true }),
       defaultTier({ fallback_routes: [route('openai', 'gpt-4o', 'api_key', 'Main')] }),
-      { normalize },
+      { ...available, normalize },
     );
     expect(chain.map((e) => [e.route.model, e.route.keyLabel ?? null])).toEqual([
       ['gpt-4o', 'Main'],
@@ -138,6 +141,7 @@ describe('buildVirtualModelChain', () => {
       await buildVirtualModelChain(
         vm({ override_route: null, fallback_routes: null, continue_on_default: true }),
         null,
+        available,
       ),
     ).toEqual([]);
   });

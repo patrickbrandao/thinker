@@ -44,6 +44,7 @@ describe('ProxyFallbackService.tryFallbacks — route-aware path', () => {
   let providerClient: jest.Mocked<ProviderClient>;
   let copilotToken: jest.Mocked<CopilotTokenService>;
   let pricingCache: jest.Mocked<ModelPricingCacheService>;
+  let modelParamsGet: jest.Mock;
 
   beforeEach(() => {
     providerKeyService = {
@@ -131,8 +132,9 @@ describe('ProxyFallbackService.tryFallbacks — route-aware path', () => {
       getByModel: jest.fn().mockReturnValue(null),
     } as unknown as jest.Mocked<ModelPricingCacheService>;
 
+    modelParamsGet = jest.fn().mockResolvedValue(null);
     const modelParamsService = {
-      get: jest.fn().mockResolvedValue(null),
+      get: modelParamsGet,
       list: jest.fn().mockResolvedValue([]),
       set: jest.fn(),
       delete: jest.fn(),
@@ -202,6 +204,71 @@ describe('ProxyFallbackService.tryFallbacks — route-aware path', () => {
 
     expect(providerClient.forward.mock.calls[0][0].clientAnthropicBeta).toBe(
       'structured-outputs-2025-11-13',
+    );
+  });
+
+  it('looks up each hop under the params scope of its own route (ADR 0004)', async () => {
+    // A virtual model's chain mixes its own routes with routes appended from
+    // the Default tier; each hop must merge the params configured where the
+    // operator set them.
+    providerClient.forward
+      .mockResolvedValueOnce({
+        response: new Response('upstream down', { status: 503 }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      })
+      .mockResolvedValueOnce({
+        response: new Response('{}', { status: 200 }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+    const own: ModelRoute = { provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' };
+    const fromDefault: ModelRoute = {
+      provider: 'deepseek',
+      authType: 'api_key',
+      model: 'deepseek-chat',
+    };
+    const scopeFor = jest.fn((route: ModelRoute | null | undefined) =>
+      route === fromDefault ? 'tier:default' : 'virtual:vm-1',
+    );
+
+    const result = await service.tryFallbacks(
+      'agent-1',
+      'user-1',
+      [own.model, fromDefault.model],
+      body,
+      false,
+      'sess-1',
+      'gpt-4o',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [own, fromDefault],
+      { agentId: 'agent-1', scopeFor },
+    );
+
+    expect(result.success?.fallbackIndex).toBe(1);
+    expect(scopeFor).toHaveBeenCalledWith(own);
+    expect(scopeFor).toHaveBeenCalledWith(fromDefault);
+    expect(modelParamsGet).toHaveBeenCalledWith(
+      'agent-1',
+      'virtual:vm-1',
+      'openai',
+      'api_key',
+      'gpt-4o-mini',
+    );
+    expect(modelParamsGet).toHaveBeenCalledWith(
+      'agent-1',
+      'tier:default',
+      'deepseek',
+      'api_key',
+      'deepseek-chat',
     );
   });
 
