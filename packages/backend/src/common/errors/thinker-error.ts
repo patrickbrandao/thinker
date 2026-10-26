@@ -21,6 +21,7 @@ export const THINKER_BLOCKED_REQUEST_REASONS = [
   // recorded before the single self-hosted mode still classify.
   'local_provider_unavailable',
   'model_not_available',
+  'virtual_model_unavailable',
   'thinker_internal_error',
 ] as const;
 export type ThinkerBlockedRequestReason = (typeof THINKER_BLOCKED_REQUEST_REASONS)[number];
@@ -55,6 +56,7 @@ export const THINKER_CODE_TO_REASON: Record<RecordableThinkerCode, ThinkerBlocke
   M202: 'thinker_ip_rate_limited',
   M203: 'thinker_concurrency_limited',
   M300: 'thinker_invalid_request',
+  M301: 'virtual_model_unavailable',
   M302: 'model_not_available',
   M500: 'thinker_internal_error',
 };

@@ -5,6 +5,7 @@ import CopyButton from '../components/CopyButton.jsx';
 import ErrorState from '../components/ErrorState.jsx';
 import AgentTypeGrid from '../components/AgentTypeGrid.jsx';
 import SetupStepAddProvider from '../components/SetupStepAddProvider.jsx';
+import { createActiveVirtualModelNames } from '../components/VirtualModelsHint.jsx';
 import SetupModal from '../components/SetupModal.jsx';
 import SettingsRecordingSection from './SettingsRecordingSection.jsx';
 import { agentDisplayName } from '../services/agent-display-name.js';
@@ -52,6 +53,7 @@ const Settings: Component = () => {
 
   const [agentInfo, { refetch: refetchInfo }] = createResource(() => agentName(), getAgentInfo);
   const [apiKeyData, { refetch: refetchKey }] = createResource(() => agentName(), getAgentKey);
+  const virtualModels = createActiveVirtualModelNames(agentName);
 
   const currentCategory = () => (agentInfo()?.agent_category as AgentCategory) ?? null;
   const currentPlatform = () => (agentInfo()?.agent_platform as AgentPlatform) ?? null;
@@ -324,6 +326,7 @@ const Settings: Component = () => {
               baseUrl={baseUrl()}
               hideFullKey
               platform={currentPlatform()}
+              virtualModels={virtualModels()}
             />
           </div>
         </Show>

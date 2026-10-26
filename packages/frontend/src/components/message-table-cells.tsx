@@ -230,7 +230,14 @@ export function ModelCell(item: MessageRow): JSX.Element {
             ? stripCustomPrefix(item.model)
             : getModelDisplayName(item.model)
           : '\u2014'}
-        {item.header_tier_name ? (
+        {item.virtual_model_name ? (
+          <span
+            class="tier-badge tier-badge--virtual"
+            title={`Virtual model: ${item.virtual_model_name}`}
+          >
+            {item.virtual_model_name}
+          </span>
+        ) : item.header_tier_name ? (
           <span
             class={`tier-badge tier-badge--custom tier-color--${item.header_tier_color ?? 'indigo'}`}
             title={item.header_tier_name}

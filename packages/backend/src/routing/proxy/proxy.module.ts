@@ -12,6 +12,7 @@ import { OAuthModule } from '../oauth/oauth.module';
 import { ResolveModule } from '../resolve/resolve.module';
 import { CustomProviderModule } from '../custom-provider/custom-provider.module';
 import { HeaderTiersModule } from '../header-tiers/header-tiers.module';
+import { VirtualModelsModule } from '../virtual-models/virtual-models.module';
 import { ProxyController } from './proxy.controller';
 import { ProxyService } from './proxy.service';
 import { ProxyFallbackService } from './proxy-fallback.service';
@@ -40,6 +41,7 @@ import { AttemptRecordingService } from './attempt-recording.service';
     ResolveModule,
     CustomProviderModule,
     HeaderTiersModule,
+    VirtualModelsModule,
   ],
   controllers: [ProxyController],
   providers: [

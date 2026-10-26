@@ -28,6 +28,13 @@ interface Props {
    * Used by the header-tier "How to send this" modal.
    */
   customHeaders?: Record<string, string>;
+  /** Model the snippets send. Defaults to `auto`. */
+  model?: string;
+  /**
+   * Extra model names the reader can pick from, next to `auto`: the
+   * harness's active virtual models (ADR 0004). Ignored when `model` is set.
+   */
+  modelOptions?: readonly string[];
 }
 
 const EyeOpen: Component = () => (
@@ -73,6 +80,13 @@ const FrameworkSnippets: Component<Props> = (props) => {
   const [openaiLang, setOpenaiLang] = createSignal<OpenAILangId>(getStoredOpenAILang());
   const [openaiApi, setOpenaiApi] = createSignal<OpenAIApiId>('responses');
   const [keyRevealed, setKeyRevealed] = createSignal(!props.hideFullKey);
+  const [pickedModel, setPickedModel] = createSignal('auto');
+  const modelChoices = (): string[] =>
+    props.model || !props.modelOptions?.length ? [] : ['auto', ...props.modelOptions];
+  const model = (): string => {
+    if (props.model) return props.model;
+    return modelChoices().includes(pickedModel()) ? pickedModel() : 'auto';
+  };
 
   createEffect(() => {
     if (props.defaultToolkit) setActiveTab(props.defaultToolkit);
@@ -104,6 +118,7 @@ const FrameworkSnippets: Component<Props> = (props) => {
       openaiLang(),
       props.customHeaders,
       openaiApi(),
+      model(),
     );
   const snippetForCopy = () =>
     getSnippetForToolkit(
@@ -113,6 +128,7 @@ const FrameworkSnippets: Component<Props> = (props) => {
       openaiLang(),
       props.customHeaders,
       openaiApi(),
+      model(),
     );
   const language = () => getLangForToolkit(activeTab(), openaiLang());
 
@@ -188,6 +204,27 @@ const FrameworkSnippets: Component<Props> = (props) => {
           </div>
         </Show>
 
+        <Show when={modelChoices().length > 0}>
+          <div class="framework-snippets__toggle-row">
+            <div class="toolkit-api-toggle" role="radiogroup" aria-label="Model">
+              <For each={modelChoices()}>
+                {(name) => (
+                  <button
+                    type="button"
+                    class="toolkit-api-toggle__btn"
+                    classList={{ 'toolkit-api-toggle__btn--active': model() === name }}
+                    onClick={() => setPickedModel(name)}
+                    role="radio"
+                    aria-checked={model() === name}
+                  >
+                    {name}
+                  </button>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
         <div class="setup-method-tabs__content">
           <div class="setup-cli-block">
             <div class="setup-cli-block__actions">
@@ -243,8 +280,8 @@ const FrameworkSnippets: Component<Props> = (props) => {
         <div class="setup-onboard-fields__row" role="listitem">
           <span class="setup-onboard-fields__label">Model</span>
           <span class="setup-onboard-fields__value">
-            <code>auto</code>
-            <CopyButton text="auto" />
+            <code>{model()}</code>
+            <CopyButton text={model()} />
           </span>
         </div>
         <For each={headerEntries()}>

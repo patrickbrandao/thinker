@@ -468,6 +468,35 @@ describe('MessageDetails', () => {
     });
   });
 
+  it('shows the virtual model the request used', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      ...detailsResponse,
+      message: {
+        ...detailsResponse.message,
+        routing_tier: 'default',
+        routing_reason: 'virtual-model',
+        virtual_model_id: 'vm-1',
+        virtual_model_name: 'deepseek/flash',
+      },
+    });
+    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => {
+      const items = [...container.querySelectorAll('.msg-detail__meta-item')].map(
+        (el) => el.textContent,
+      );
+      expect(items).toContain('Routingdeepseek/flash');
+      expect(items).toContain('Virtual modeldeepseek/flash');
+      expect(items).toContain('Reasonvirtual-model');
+    });
+  });
+
+  it('omits the virtual model field when none was used', async () => {
+    mockGetMessageDetails.mockResolvedValue(detailsResponse);
+    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => expect(container.textContent).toContain('Routing'));
+    expect(container.textContent).not.toContain('Virtual model');
+  });
+
   it('displays direct model overrides as DIRECT routing metadata', async () => {
     mockGetMessageDetails.mockResolvedValue({
       ...detailsResponse,

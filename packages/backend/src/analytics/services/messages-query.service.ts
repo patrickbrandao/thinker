@@ -588,6 +588,8 @@ export class MessagesQueryService {
       .addSelect(picked('at.header_tier_id'), 'header_tier_id')
       .addSelect(picked('at.header_tier_name'), 'header_tier_name')
       .addSelect(picked('at.header_tier_color'), 'header_tier_color')
+      .addSelect(picked('at.virtual_model_id'), 'virtual_model_id')
+      .addSelect(picked('at.virtual_model_name'), 'virtual_model_name')
       .addSelect(picked('at.provider_key_label'), 'provider_key_label')
       .addSelect(picked('cp.name'), 'custom_provider_name')
       .addSelect('COALESCE(SUM(at.cache_read_tokens), 0)', 'cache_read_tokens')

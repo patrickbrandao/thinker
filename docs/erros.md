@@ -58,6 +58,15 @@ Toda falha gerada pelo próprio Thinker (e não pelo provedor) traz um código `
 
 **Array `messages` ausente.** O corpo da requisição precisa do campo `messages`.
 
+## M301
+
+**Modelo virtual sem rota disponível.** O `model` pedido é um modelo virtual ativo do harness, mas nenhuma rota da cadeia dele está disponível agora: o provedor, o modelo ou a credencial de cada rota sumiu, ou nenhuma rota atende ao modo de resposta do virtual. O Thinker não cai para `auto` nem para outra regra. A mensagem muda conforme a opção "Continue on Default":
+
+- **desligada:** a mensagem sugere corrigir a cadeia ou ligar a opção;
+- **ligada:** a mensagem avisa que o tier Default também não tem rota disponível; corrija a cadeia do virtual ou o tier Default.
+
+As duas correções ficam na tela Routing do harness. O cabeçalho `X-Thinker-Virtual-Model` da resposta traz o nome do virtual.
+
 ## M302
 
 **Modelo indisponível.** O modelo pedido não está disponível para este agente. Use `GET /v1/models` para listar os IDs disponíveis, ou habilite o provedor para o agente no dashboard.

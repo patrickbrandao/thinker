@@ -739,9 +739,9 @@ describe('HeaderTierCard', () => {
     ));
     fireEvent.click(getByTestId('fb-persist') as HTMLButtonElement);
     await waitFor(() => {
-      // The mock stub passes "tier-id" — the closure should use this card's
-      // own tier id ("ht-1") not the FallbackList-side id.
-      expect(mockSetHeaderTierFallbacks).toHaveBeenCalledWith('demo', 'tier-id', ['m'], undefined);
+      // The mock stub passes "tier-id" — the closure uses this card's own
+      // tier id ("ht-1"), not the FallbackList-side id.
+      expect(mockSetHeaderTierFallbacks).toHaveBeenCalledWith('demo', 'ht-1', ['m'], undefined);
     });
   });
 
@@ -759,7 +759,7 @@ describe('HeaderTierCard', () => {
     ));
     fireEvent.click(getByTestId('fb-clear') as HTMLButtonElement);
     await waitFor(() => {
-      expect(mockClearHeaderTierFallbacks).toHaveBeenCalledWith('demo', 'tier-id');
+      expect(mockClearHeaderTierFallbacks).toHaveBeenCalledWith('demo', 'ht-1');
     });
   });
 

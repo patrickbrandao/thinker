@@ -13,13 +13,20 @@ import { DataSource } from 'typeorm';
  *
  * Each process keeps its own token: run the first setup against a single
  * replica.
+ *
+ * THINKER_SETUP_TOKEN lets the operator choose the token instead, so it can
+ * be handed to whoever finishes the setup without reading the logs. It is
+ * never printed, and every replica accepts it.
  */
 @Injectable()
 export class SetupTokenService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SetupTokenService.name);
   private tokenHash: Buffer | null = null;
+  private readonly configuredToken: string | null;
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource) {
+    this.configuredToken = resolveConfiguredToken();
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     try {
@@ -46,6 +53,13 @@ export class SetupTokenService implements OnApplicationBootstrap {
    * log. Returns it for callers that need it (tests).
    */
   issue(): string {
+    if (this.configuredToken) {
+      this.tokenHash = digest(this.configuredToken);
+      this.logger.warn(
+        'No admin account exists yet. Open /setup and enter the setup token set in THINKER_SETUP_TOKEN.',
+      );
+      return this.configuredToken;
+    }
     const token = randomBytes(24).toString('base64url');
     this.tokenHash = digest(token);
     this.logger.warn(
@@ -69,6 +83,20 @@ export class SetupTokenService implements OnApplicationBootstrap {
   consume(): void {
     this.tokenHash = null;
   }
+}
+
+const MIN_CONFIGURED_TOKEN_LENGTH = 16;
+
+/** Reads THINKER_SETUP_TOKEN; a value too short to resist guessing fails boot. */
+export function resolveConfiguredToken(env: NodeJS.ProcessEnv = process.env): string | null {
+  const token = env['THINKER_SETUP_TOKEN']?.trim();
+  if (!token) return null;
+  if (token.length < MIN_CONFIGURED_TOKEN_LENGTH) {
+    throw new Error(
+      `THINKER_SETUP_TOKEN must be at least ${MIN_CONFIGURED_TOKEN_LENGTH} characters. Generate one with: openssl rand -hex 24`,
+    );
+  }
+  return token;
 }
 
 function digest(value: string): Buffer {

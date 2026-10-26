@@ -31,6 +31,7 @@ import { CustomProvider } from '../src/entities/custom-provider.entity';
 import { EmailProviderConfig } from '../src/entities/email-provider-config.entity';
 import { SpecificityAssignment } from '../src/entities/specificity-assignment.entity';
 import { HeaderTier } from '../src/entities/header-tier.entity';
+import { VirtualModel } from '../src/entities/virtual-model.entity';
 import { AgentModelParams } from '../src/entities/agent-model-params.entity';
 import { PlaygroundRun } from '../src/entities/playground-run.entity';
 import { PlaygroundColumn } from '../src/entities/playground-column.entity';
@@ -74,6 +75,7 @@ const entities = [
   EmailProviderConfig,
   SpecificityAssignment,
   HeaderTier,
+  VirtualModel,
   AgentModelParams,
   PlaygroundRun,
   PlaygroundColumn,

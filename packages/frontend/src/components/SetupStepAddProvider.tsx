@@ -8,6 +8,7 @@ import N8nSetup from './N8nSetup.jsx';
 import ClaudeCodeSetup from './ClaudeCodeSetup.jsx';
 import OpenCodeSetup from './OpenCodeSetup.jsx';
 import CodexSetup from './CodexSetup.jsx';
+import VirtualModelsHint from './VirtualModelsHint.jsx';
 import type { ToolkitId } from '../services/framework-snippets.js';
 
 type SetupTab = 'toolkits' | 'agents';
@@ -19,6 +20,11 @@ interface Props {
   baseUrl: string;
   hideFullKey?: boolean;
   platform?: string | null;
+  /**
+   * Names of the harness's active virtual models (ADR 0004), offered as
+   * values of `model` next to `auto`.
+   */
+  virtualModels?: readonly string[];
 }
 
 const PLATFORM_TO_TOOLKIT: Record<string, ToolkitId> = {
@@ -41,6 +47,10 @@ const SetupStepAddProvider: Component<Props> = (props) => {
 
   const isFiltered = () => !!props.platform;
   const toolkitId = () => (props.platform ? PLATFORM_TO_TOOLKIT[props.platform] : undefined);
+  const virtualModels = (): readonly string[] => props.virtualModels ?? [];
+  /** Hint flavor: toolkit snippets carry their own model picker. */
+  const filteredHintPlatform = () =>
+    toolkitId() || props.platform === 'other' ? 'toolkits' : props.platform;
 
   return (
     <div>
@@ -96,6 +106,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
               {...snippetProps()}
               hideFullKey={props.hideFullKey}
               defaultToolkit={toolkitId()!}
+              modelOptions={virtualModels()}
             />
           </Match>
           <Match when={props.platform === 'other'}>
@@ -103,9 +114,11 @@ const SetupStepAddProvider: Component<Props> = (props) => {
               {...snippetProps()}
               hideFullKey={props.hideFullKey}
               defaultToolkit="curl"
+              modelOptions={virtualModels()}
             />
           </Match>
         </Switch>
+        <VirtualModelsHint names={virtualModels()} platform={filteredHintPlatform()} />
       </Show>
 
       {/* Default / "other": show full tabbed UI */}
@@ -137,7 +150,12 @@ const SetupStepAddProvider: Component<Props> = (props) => {
         </div>
 
         <Show when={activeTab() === 'toolkits'}>
-          <FrameworkSnippets {...snippetProps()} hideFullKey={props.hideFullKey} />
+          <FrameworkSnippets
+            {...snippetProps()}
+            hideFullKey={props.hideFullKey}
+            modelOptions={virtualModels()}
+          />
+          <VirtualModelsHint names={virtualModels()} platform="toolkits" />
         </Show>
 
         <Show when={activeTab() === 'agents'}>
@@ -275,6 +293,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
               <CodexSetup {...snippetProps()} />
             </Match>
           </Switch>
+          <VirtualModelsHint names={virtualModels()} platform={activeAgent()} />
         </Show>
       </Show>
     </div>

@@ -392,6 +392,8 @@ export const MESSAGE_ROW_SELECT_ALIASES = [
   'header_tier_id',
   'header_tier_name',
   'header_tier_color',
+  'virtual_model_id',
+  'virtual_model_name',
   'provider_key_label',
   'custom_provider_name',
 ] as const;
@@ -428,6 +430,8 @@ export function selectMessageRowColumns<T extends ObjectLiteral>(
     .addSelect('at.header_tier_id', 'header_tier_id')
     .addSelect('at.header_tier_name', 'header_tier_name')
     .addSelect('at.header_tier_color', 'header_tier_color')
+    .addSelect('at.virtual_model_id', 'virtual_model_id')
+    .addSelect('at.virtual_model_name', 'virtual_model_name')
     .addSelect('at.provider_key_label', 'provider_key_label')
     .addSelect('cp.name', 'custom_provider_name');
 }
