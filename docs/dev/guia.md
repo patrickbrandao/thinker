@@ -62,10 +62,31 @@ npm run build --workspace=packages/shared     # o shared precisa estar compilado
 npm run build                                  # turbo: frontend (Vite) e backend (Nest)
 npm start                                      # node packages/backend/dist/main.js (API + frontend)
 npm run lint
-npm run typecheck --workspaces --if-present
+npm run typecheck --workspaces --if-present   # TypeScript 6 (tsc6)
+npm run typecheck:ts7                          # TypeScript 7 (tsgo), só --noEmit
 npm test                                       # turbo test, todos os pacotes
 npm run test:scripts                           # testes dos scripts do repositório
 ```
+
+### TypeScript 6 e 7
+
+O repositório tem dois compiladores lado a lado (#87, opção B):
+
+| Pacote no `package.json` | Instala | Binário | Uso |
+| --- | --- | --- | --- |
+| `typescript` = `npm:@typescript/typescript6@^6.0.2` | TypeScript 6 (o `@typescript/typescript6` reexporta o `typescript@6` instalado como `@typescript/old`) | `tsc6` | emissão (`shared`, `cli`), `nest build`, `ts-jest`, `typescript-eslint`, `ts-node` (migrações e backfills) e o `typecheck` |
+| `@typescript/native` = `npm:typescript@^7.0.2` (só na raiz) | TypeScript 7, o compilador nativo (`tsgo`) | via `scripts/tsgo.mjs` | só `typecheck:ts7`, sempre com `--noEmit` |
+
+**Nunca chame `tsc` puro.** O `typescript@7` e o `typescript@6` (`@typescript/old`) declaram os dois um binário `tsc`, e o npm liga em `node_modules/.bin/tsc` o que processar por último; o resultado muda de uma instalação para outra. Use `tsc6` para o TypeScript 6 e `node scripts/tsgo.mjs ... --noEmit` para o 7 (o script recusa rodar sem `--noEmit` e confere que achou a versão 7). Os dois leem os mesmos `tsconfig*.json`. O job `Typecheck (TypeScript 7)` da CI roda `npm run typecheck:ts7`.
+
+O `@typescript/native` é devDependency da raiz, então o `--omit=dev` não o leva para a imagem. O TypeScript 6 entra na árvore de produção como peer do `ts-node` (via `typeorm`), e o estágio `prod-deps` do `docker/Dockerfile` apaga `node_modules/typescript` e `node_modules/@typescript`.
+
+**Adiado do TypeScript 7** (#87; acompanhamento em #230):
+
+- **Emitir JS com o `tsgo`** (opção C, descartada): poria na imagem um JS de outro compilador, com risco alto e pouco ganho. O build continua no `tsc6` e no `nest build`.
+- **Ferramentas no TS 7:** o TypeScript 7.0 não tem API programática (a nova chega no 7.1 e é diferente da atual). Por isso `ts-jest` (peer `typescript <7`), `typescript-eslint` (peer `<6.1.0`), `ts-node` (usa a API) e o `@nestjs/cli` (depende de `typescript ~6.0.2`) continuam no TS 6 pelo alias.
+- **Critérios de reabertura:** API do TS 7.1 estável; `ts-jest`, `typescript-eslint` e `@nestjs/cli` com suporte declarado ao 7; um substituto para o `ts-node` nas migrações e backfills. Trocar `ts-jest` por Vitest/SWC ou `ts-node` por `tsx` só para viabilizar o TS 7 vira issue própria.
+- **Dependabot e aliases `npm:`:** não confirmado se o Dependabot atualiza dependências declaradas como alias (`npm:pacote@faixa`). Fica para #97 conferir e, se preciso, ajustar a entrada do `typescript` no `.github/dependabot.yml`.
 
 ### Servidor de desenvolvimento
 
@@ -241,7 +262,7 @@ Workflows em `.github/workflows/` (ações fixadas por SHA, token somente leitur
 
 | Workflow | Gatilho | Conteúdo |
 | --- | --- | --- |
-| `ci.yml` | PRs e pushes na `main` | Lint, typecheck, build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 18 (`TZ=UTC` e `America/Sao_Paulo`), scripts |
+| `ci.yml` | PRs e pushes na `main` | Lint, typecheck (TypeScript 6 e, em job próprio, TypeScript 7 com `tsgo --noEmit`), build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 18 (`TZ=UTC` e `America/Sao_Paulo`), scripts |
 | `docker.yml` | PRs que tocam a imagem | Build `linux/amd64` e `linux/arm64`, sem publicar |
 | `docker-smoke.yml` | PRs que tocam imagem ou compose | Teste de fumaça do Compose (somente leitura) e `install.sh` ponta a ponta |
 | `codeql.yml` | PRs, pushes, semanal | Análise de código |

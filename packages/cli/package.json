@@ -36,8 +36,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && npm run gen && tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && npm run gen && tsc6 -p tsconfig.build.json",
+    "typecheck": "tsc6 -p tsconfig.json --noEmit",
+    "typecheck:ts7": "node ../../scripts/tsgo.mjs -p tsconfig.json --noEmit",
     "test": "jest",
     "gen": "node scripts/generate-provider-catalog.cjs && node scripts/generate-skill-content.cjs",
     "set-version": "node scripts/set-version.cjs"
@@ -49,6 +50,6 @@
     "prettier": "^3.9.10",
     "thinker-shared": "*",
     "ts-jest": "^29.4.14",
-    "typescript": "^6.0.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
