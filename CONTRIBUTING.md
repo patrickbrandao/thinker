@@ -154,7 +154,7 @@ The backend runs standalone and OpenClaw talks to it as a regular OpenAI-compati
 
 ### Backend (`packages/backend`)
 
-- **Framework**: NestJS 11 with TypeORM 0.3 and PostgreSQL 18
+- **Framework**: NestJS 12 with TypeORM 1.1 and PostgreSQL 18
 - **Auth**: Better Auth (email/password + Google, GitHub, Discord OAuth)
 - **Tests**: Jest for unit tests (`*.spec.ts`), Supertest for e2e tests (`test/`)
 - **Key directories**: `entities/` (data models), `analytics/` (dashboard queries), `routing/` (proxy, scoring, tier assignment), `auth/` (session management)

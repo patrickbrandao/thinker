@@ -17,6 +17,7 @@ import { RequestWithTenantContext } from '../src/common/decorators/tenant-contex
 import { appConfig } from '../src/config/app.config';
 import { IS_PUBLIC_KEY } from '../src/common/decorators/public.decorator';
 import { hashKey, keyPrefix } from '../src/common/utils/hash.util';
+import { INVALID_WHERE_VALUES_BEHAVIOR } from '../src/database/data-source-definitions';
 import { AgentMessage } from '../src/entities/agent-message.entity';
 import { ThinkerRequest } from '../src/entities/request.entity';
 import { ApiKey } from '../src/entities/api-key.entity';
@@ -157,6 +158,7 @@ function buildTypeOrmConfig(options: CreateTestAppOptions): TypeOrmModuleOptions
     synchronize: true,
     dropSchema: options.dropSchema ?? true,
     logging: false,
+    invalidWhereValuesBehavior: INVALID_WHERE_VALUES_BEHAVIOR,
   };
 }
 

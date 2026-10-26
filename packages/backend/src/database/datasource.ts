@@ -1,6 +1,6 @@
 import './load-env-file';
 import { DataSource } from 'typeorm';
-import { entities, migrations } from './data-source-definitions';
+import { entities, INVALID_WHERE_VALUES_BEHAVIOR, migrations } from './data-source-definitions';
 
 function createDataSource(): DataSource {
   // Prefer a direct (non-pooled) connection for migrations: the advisory lock in
@@ -30,6 +30,7 @@ function createDataSource(): DataSource {
     // stays in lockstep with the boot path in database.module.
     entities,
     migrations,
+    invalidWhereValuesBehavior: INVALID_WHERE_VALUES_BEHAVIOR,
   });
 }
 

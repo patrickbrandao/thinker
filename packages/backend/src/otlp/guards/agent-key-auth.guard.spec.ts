@@ -437,7 +437,7 @@ describe('AgentKeyAuthGuard', () => {
       });
       expect(mockFindOne).toHaveBeenCalledWith({
         where: { is_active: true },
-        relations: ['agent', 'tenant'],
+        relations: { agent: true, tenant: true },
       });
     });
 

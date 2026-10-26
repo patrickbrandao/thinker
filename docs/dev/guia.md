@@ -19,7 +19,7 @@ Monorepo com npm workspaces e Turborepo:
 ```text
 packages/
 ├── shared/     thinker-shared    tipos e helpers usados por backend, frontend e CLI (provedores, tiers, snippets)
-├── backend/    thinker-backend   NestJS 12, TypeORM 0.3, PostgreSQL 18, Better Auth
+├── backend/    thinker-backend   NestJS 12, TypeORM 1.1, PostgreSQL 18, Better Auth
 ├── frontend/   thinker-frontend  SolidJS + Vite, dashboard
 ├── cli/        thinker-cli       CLI `thinker` (privada, não publicada)
 └── thinker/    thinker           pacote sem código que guarda a versão canônica
@@ -125,6 +125,8 @@ SEED_DATA=true
 | Contratos do gateway | `THINKER_BASE_URL=http://127.0.0.1:2099 node --test contracts/gateway/tests/*.test.mjs` |
 
 **NestJS 12 é só ESM.** O backend continua CommonJS e carrega os `@nestjs/*` por `require(esm)`, que o Node faz nativamente (20.19+, 22.12+ e 24). No Jest, isso depende da API `vm` de módulos, que fica atrás de `--experimental-vm-modules`; por isso os scripts `test`, `test:watch` e `test:e2e` do backend acrescentam essa flag ao `NODE_OPTIONS`. Rode o Jest sempre por esses scripts (ou passe a flag você mesmo): `npx jest` puro falha com `Must use import to load ES Module`. Pelo guia oficial, a CLI e os schematics do Nest 12 pedem Node 24.15+ (as imagens fixadas no `docker/Dockerfile` usam a 24.22).
+
+**TypeORM 1.x: `null`/`undefined` no `where` lança erro.** As APIs de alto nível (`find*`, `count*`, `exists*`, `update`, `delete`, `setFindOptions`) recusam `null` ou `undefined` num filtro, em vez de ignorar a propriedade como a 0.3 fazia (o que transformava um `tenant_id` ausente em "sem filtro"). A regra está fixada em `INVALID_WHERE_VALUES_BEHAVIOR` (`database/data-source-definitions.ts`) e vale para o app, o CLI de migrações e o e2e; nunca a troque por `ignore`. Para buscar `NULL`, use `IsNull()`; para um filtro opcional, só inclua a chave quando houver valor. O `.where()` do QueryBuilder não passa por essa checagem. `select` e `relations` usam só a forma de objeto (`{ id: true }`).
 
 Os CLIs avulsos (migrações e backfills) carregam o `.env` com `process.loadEnvFile()` em `src/database/load-env-file.ts`; o projeto não depende do `dotenv`.
 

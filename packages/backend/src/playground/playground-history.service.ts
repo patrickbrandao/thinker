@@ -138,7 +138,12 @@ export class PlaygroundHistoryService {
 
     const columns = await this.columnRepo.find({
       where: { playground_run_id: In(runs.map((r) => r.id)) },
-      select: ['playground_run_id', 'model', 'display_name', 'position'],
+      select: {
+        playground_run_id: true,
+        model: true,
+        display_name: true,
+        position: true,
+      },
       order: { position: 'ASC' },
     });
 
@@ -252,7 +257,7 @@ export class PlaygroundHistoryService {
     if (columnId !== null) {
       const column = await this.columnRepo.findOne({
         where: { id: columnId, playground_run_id: runId },
-        select: ['id'],
+        select: { id: true },
       });
       if (!column) {
         throw new NotFoundException(

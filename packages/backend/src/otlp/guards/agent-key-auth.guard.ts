@@ -416,7 +416,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       seedKey ??
       (await this.keyRepo.findOne({
         where: { is_active: true },
-        relations: ['agent', 'tenant'],
+        relations: { agent: true, tenant: true },
       }));
 
     if (!keyRecord) return null;
