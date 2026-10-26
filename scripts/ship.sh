@@ -8,9 +8,14 @@
 #      rejects it, a PR that is squash-merged right away (auto-merge if checks
 #      are required);
 #   4. tags the landed commit vX.Y.Z and pushes the tag. The Release workflow
-#      then publishes tmsoftbrasil/thinker:latest and the GitHub release.
+#      then publishes tmsoftbrasil/thinker:latest and the GitHub release;
+#   5. when the repository has no DOCKERHUB_TOKEN secret (so release.yml fails
+#      at preflight), mirrors release.yml from the local Docker instead: a
+#      multi-arch buildx push with the same tags and labels, then the GitHub
+#      release marked latest. This needs a local `docker login` to Docker Hub.
 #
 # Usage: scripts/ship.sh "<conventional commit message>" [patch|minor|major]
+# Env:   THINKER_BUILDER  buildx builder for the local publish (default desktop-linux)
 set -euo pipefail
 
 msg=${1:?usage: scripts/ship.sh "<conventional commit message>" [patch|minor|major]}
@@ -66,7 +71,7 @@ else
   landed=$(git rev-parse origin/main)
 fi
 
-git tag "v$ver" "$landed"
+git tag -a "v$ver" -m "Thinker $ver" "$landed"
 git push -q origin "refs/tags/v$ver"
 
 if [ "$branch" = main ]; then
@@ -74,4 +79,46 @@ if [ "$branch" = main ]; then
   git reset -q --hard origin/main
 fi
 
-echo "Shipped v$ver ($landed). Release: https://github.com/patrickbrandao/thinker/actions/workflows/release.yml"
+if gh secret list --json name -q '.[].name' | grep -qx DOCKERHUB_TOKEN; then
+  echo "Shipped v$ver ($landed). Release: https://github.com/patrickbrandao/thinker/actions/workflows/release.yml"
+  exit 0
+fi
+
+# No Docker Hub secret in CI: publish from the local Docker, as release.yml would.
+image=tmsoftbrasil/thinker
+src=$(mktemp -d)/thinker-v$ver
+git worktree add -q --detach "$src" "v$ver"
+trap 'git worktree remove --force "$src"' EXIT
+
+echo "Building $image:$ver for linux/amd64,linux/arm64 locally..."
+docker buildx build --builder "${THINKER_BUILDER:-desktop-linux}" \
+  --platform linux/amd64,linux/arm64 --pull --no-cache \
+  -f "$src/docker/Dockerfile" \
+  -t "$image:$ver" -t "$image:${ver%.*}" -t "$image:latest" -t "$image:sha-${landed:0:7}" \
+  --label org.opencontainers.image.title=thinker \
+  --label "org.opencontainers.image.version=$ver" \
+  --label "org.opencontainers.image.revision=$landed" \
+  --label org.opencontainers.image.source=https://github.com/patrickbrandao/thinker \
+  --label org.opencontainers.image.licenses=MIT \
+  --push "$src"
+
+digest=$(docker buildx imagetools inspect "$image:$ver" --format '{{json .Manifest}}' | jq -r .digest)
+platforms=$(docker buildx imagetools inspect "$image:$ver" --format '{{json .Manifest}}' \
+  | jq -r '[.manifests[].platform | select(.os != "unknown") | .os + "/" + .architecture] | sort | join(",")')
+[ "$platforms" = "linux/amd64,linux/arm64" ] \
+  || { echo "Unexpected platforms for $image:$ver: $platforms" >&2; exit 1; }
+
+release_notes="$src/release-notes.md"
+{
+  cat "$src/docs/releases/$ver.md"
+  echo
+  echo "## Imagem Docker"
+  echo
+  echo '```'
+  echo "docker pull $image:$ver"
+  echo "# $image@$digest"
+  echo '```'
+} > "$release_notes"
+gh release create "v$ver" --verify-tag --title "Thinker $ver" --latest --notes-file "$release_notes"
+
+echo "Shipped v$ver ($landed), $image@$digest"
