@@ -129,9 +129,48 @@ Para o SDK da Anthropic, defina só `api_key` (vira `x-api-key`) **ou** `auth_to
 
 **Vercel AI SDK, LangChain, n8n e cURL** usam a superfície Chat Completions: URL base `http://localhost:2099/v1` e a chave `thk_`. Há também um nó da comunidade para n8n em [`integrations/n8n-nodes-thinker`](../../integrations/n8n-nodes-thinker).
 
+## Escolher um modelo virtual
+
+Um [modelo virtual](provedores-e-roteamento.md#modelos-virtuais) é um nome que você cria no harness (por exemplo `deepseek/flash`) e que o Thinker roteia pela cadeia dele. Em qualquer harness, ele entra no mesmo lugar do `auto`:
+
+| Harness | Onde colocar o nome |
+| --- | --- |
+| Claude Code | `"model"` em `~/.claude/settings.json`, ou `/model <nome>` na sessão. |
+| Codex | `model` em `~/.codex/config.toml`. |
+| OpenCode | A chave `model` (`thinker/<nome>`) e uma entrada em `models` do provedor. |
+| OpenClaw | `agents.defaults.model.primary` (`thinker/<nome>`) e uma entrada em `models`. |
+| Hermes | `default` em `config.yaml`. |
+| SDKs, LangChain, n8n, cURL | O parâmetro `model` da chamada. |
+
+Exemplo no Claude Code:
+
+```json
+{
+  "model": "deepseek/flash",
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:2099",
+    "ANTHROPIC_AUTH_TOKEN": "thk_SUA_CHAVE"
+  }
+}
+```
+
+Nos harnesses que listam os modelos pelo seletor (por exemplo o seletor de modelos de um editor), o nome aparece sozinho, porque vem de `GET /v1/models`. Os assistentes do dashboard já mostram os virtuais ativos ao lado de `auto` e explicam isso.
+
+`GET /v1/models` devolve, para a chave do harness, nesta ordem:
+
+1. `auto`;
+2. os virtuais **ativos** do harness, na ordem do dashboard;
+3. os modelos reais. Um modelo real com o mesmo ID de um virtual ativo (sem diferenciar maiúsculas) fica de fora, porque o virtual o [sombreia](provedores-e-roteamento.md#sombreamento-de-ids-reais).
+
+```json
+{ "id": "deepseek/flash", "object": "model", "created": 0, "owned_by": "thinker", "context_length": 128000 }
+```
+
+`auto` e os virtuais trazem `context_length`, a **menor** janela de contexto entre as rotas que podem atendê-los agora, para o cliente não estourar o contexto no modelo mais curto da cadeia. O campo é omitido quando a janela de alguma rota é desconhecida. Eles não trazem `capabilities`, `cost` nem metadados de rota, mesmo com `?capabilities=true` ou `?cost=true`, porque o modelo concreto muda conforme a disponibilidade. Os modelos reais não trazem `context_length`. Cada chave só vê os virtuais do próprio harness.
+
 ## Roteamento por cabeçalho
 
-Um harness pode ter **tiers customizados** ativados por um cabeçalho de requisição (por exemplo `x-thinker-tier: premium`), cada um com seu modelo e fallbacks. Veja [Provedores e roteamento](provedores-e-roteamento.md#tiers-customizados-por-cabeçalho).
+Um harness pode ter **tiers customizados** ativados por um cabeçalho de requisição (por exemplo `x-thinker-tier: premium`), cada um com seu modelo e fallbacks. Veja [Provedores e roteamento](provedores-e-roteamento.md#tiers-customizados-por-cabeçalho). Se o harness não deixa enviar cabeçalhos, use um modelo virtual. Um modelo virtual com o mesmo nome do `model` vence o tier por cabeçalho.
 
 ## Servidor MCP
 

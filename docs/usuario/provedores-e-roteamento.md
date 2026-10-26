@@ -50,10 +50,11 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 
 ### Ordem de resolução
 
-1. Tier customizado por cabeçalho, se alguma regra casar.
-2. `model` explícito no corpo da requisição.
-3. Pontuação de complexidade (se ligada) e atribuição de tier.
-4. Resolução do provedor e do modelo, e encaminhamento.
+1. Modelo virtual ativo cujo nome é igual ao `model` (veja [Modelos virtuais](#modelos-virtuais)).
+2. Tier customizado por cabeçalho, se alguma regra casar.
+3. `model` explícito no corpo da requisição (`auto` pede o roteamento do Thinker).
+4. Pontuação de complexidade (se ligada) e atribuição de tier.
+5. Resolução do provedor e do modelo, e encaminhamento.
 
 ### `model` explícito
 
@@ -69,7 +70,128 @@ Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, respo
 
 ## Tiers customizados por cabeçalho
 
-Além dos tiers padrão, você pode criar tiers que se ativam por um cabeçalho da requisição (por exemplo `x-thinker-tier: premium`), cada um com modelo principal e fallbacks. Quando uma regra casa, ela tem prioridade sobre o `model` do corpo e sobre a complexidade. O dashboard e a CLI (`thinker routing`) criam e editam essas regras.
+Além dos tiers padrão, você pode criar tiers que se ativam por um cabeçalho da requisição (por exemplo `x-thinker-tier: premium`), cada um com modelo principal e fallbacks. Quando uma regra casa, ela tem prioridade sobre o `model` do corpo e sobre a complexidade, mas perde para um [modelo virtual](#modelos-virtuais) com o mesmo nome do `model`. O dashboard e a CLI (`thinker routing`) criam e editam essas regras.
+
+## Modelos virtuais
+
+Um **modelo virtual** é um nome público que você cria em um harness, com uma cadeia própria de modelos. O harness manda esse nome no campo `model`, e o Thinker roteia pela cadeia, sem cabeçalho. Serve para harnesses que escolhem o modelo pelo nome e não deixam enviar cabeçalhos (Claude Code, seletores de modelo de editores), e para dar fallback a um nome que o cliente não deixa trocar.
+
+Um harness pode ter quantos virtuais quiser. Eles aparecem em `GET /v1/models` logo depois de `auto` e valem em `/v1/chat/completions`, `/v1/responses` e `/v1/messages`.
+
+### Criar pelo dashboard
+
+Na página de roteamento do harness, na seção **Virtual models** (separada dos tiers customizados), crie um virtual:
+
+1. Digite o nome. O dashboard valida enquanto você digita.
+2. Escolha o modelo principal e até 5 fallbacks (no modal de criação ou depois, no cartão do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
+3. Se quiser, ligue **Continue on Default** (veja abaixo) e escolha o modo de resposta (`buffered` ou `stream`).
+4. Use **Show a copyable example** para copiar um exemplo com a URL base do harness e `model: "<nome>"`.
+
+Cada rota é validada ao salvar: um modelo que o harness não consegue rotear (provedor não habilitado, modelo desconhecido, rótulo de chave inexistente) é recusado com HTTP 400. Os cartões podem ser reordenados por arraste; essa ordem vale também em `/v1/models`. Pela linha de comando, veja [CLI](cli.md#modelos-virtuais).
+
+### Regras de nome
+
+- De 1 a 64 caracteres entre letras, números, `.`, `_`, `:`, `-` e `/`.
+- A `/` separa partes (`deepseek/flash`), mas não pode abrir nem fechar o nome, nem aparecer duas vezes seguidas. Sem espaços nem aspas.
+- Único por harness, **sem diferenciar maiúsculas**: `DeepSeek` e `deepseek` são o mesmo nome. Um virtual desativado também ocupa o nome. Repetir um nome responde 409.
+- `auto` é reservado, em qualquer grafia.
+- O nome é guardado com a grafia que você digitou, e o Thinker o devolve assim em `X-Thinker-Virtual-Model`. O casamento com o `model` da requisição ignora maiúsculas, mas não faz nenhuma outra normalização.
+
+### Sombreamento de IDs reais
+
+Um virtual pode ter o mesmo nome de um modelo real, e isso é permitido. Enquanto o virtual estiver ativo, o pedido com esse `model` usa o virtual, e o modelo real some de `GET /v1/models`. O casamento é pela string enviada:
+
+- Um virtual `openai/gpt-5.5` sombreia o ID público `openai/gpt-5.5`.
+- Um virtual `claude-sonnet-4-5` (sem prefixo) sombreia o ID nativo que os clientes Anthropic mandam em `/v1/messages`, mesmo que ele não apareça em `/v1/models`.
+- Grafias diferentes do mesmo modelo não se sombreiam: `gpt-5.5` não captura `openai/gpt-5.5`.
+
+O dashboard mostra um aviso (**Shadows** na listagem, **This name matches** ao digitar) com os IDs reais afetados. A lista é calculada a cada leitura, então um virtual criado sem colisão pode passar a sombrear um modelo quando um provedor novo entra. A cadeia do virtual pode conter o próprio modelo sombreado, o que é útil para dar fallback a um nome fixo. Desativar o virtual devolve o ID real.
+
+### Cadeia, fallbacks e Continue on Default
+
+A cadeia é o **principal** seguido de **até 5 fallbacks**. Rotas cujo provedor, modelo ou credencial não está mais disponível saem da cadeia na hora do pedido. Em tempo de execução vale o mesmo [fallback](#fallback) dos tiers: se a primeira tentativa falha, o Thinker tenta a próxima.
+
+A cadeia só tem modelos concretos: um virtual não aponta para outro virtual, para `auto` nem para um tier customizado.
+
+**Continue on Default**, desligado por padrão, acrescenta ao fim da cadeia do virtual a cadeia do tier `default` (principal e fallbacks, sem duplicar rotas que já estão na cadeia). Ele entra nos dois casos:
+
+- na montagem, quando as rotas do virtual estão indisponíveis: a primeira rota que sobra, que pode ser a do `default`, vira o principal;
+- em tempo de execução, quando as rotas do virtual falham: a parte do Default é tentada como fallbacks comuns.
+
+O modo de resposta do virtual vale para a cadeia inteira, inclusive a parte do Default. Com as duas partes, a cadeia tem no máximo 12 tentativas. Um pedido para um virtual **não** passa pela pontuação de complexidade: a cadeia é sempre a mesma, e a parte do Default é a do tier `default`, com o roteamento por complexidade ligado ou desligado.
+
+### Precedência e virtual desativado
+
+Para cada requisição, o Thinker aplica nesta ordem a primeira regra que casa:
+
+1. **Modelo virtual ativo** com o nome igual ao `model`.
+2. **Tier por cabeçalho**, se algum casar.
+3. **`auto`** (roteamento do Thinker) ou **ID explícito** do modelo. Um ID desconhecido responde `M302`.
+
+Logo, quem manda o cabeçalho de um tier e `model: "deepseek"` recebe o virtual `deepseek`. O passo 1 não roda quando `model` falta ou é `auto`.
+
+Um virtual **desativado** é invisível: não aparece em `/v1/models`, não casa com pedidos e não sombreia nada. O pedido segue para os passos 2 e 3, e o ID real volta a resolver ou o pedido recebe `M302`.
+
+### Sem rota: M301
+
+Se nenhuma rota da cadeia está disponível, o Thinker responde [`M301`](../erros.md#m301), com o nome do virtual na mensagem. Não há queda silenciosa para `auto` nem para outra regra, para que uma configuração quebrada não envie o tráfego a um modelo que você não escolheu. Isso vale com Continue on Default ligado, se o `default` também estiver sem rota. Um virtual criado sem principal também responde `M301`, a menos que Continue on Default cubra a falta. Se todas as tentativas chegam ao provedor e falham, o cliente recebe o erro do último provedor, como em qualquer fallback.
+
+### Parâmetros por modelo
+
+Os parâmetros por modelo (por exemplo `reasoning.effort`, que você edita no dashboard ou com `thinker routing params`) se aplicam aos virtuais, com escopo próprio: o que você salva para o virtual vale para as rotas da cadeia dele, por modelo. As rotas que entram pelo Continue on Default usam os parâmetros do tier `default`. Um pedido para um virtual não é uma rota explícita, então os parâmetros salvos são aplicados. Apagar o virtual apaga os parâmetros dele. Pela CLI, use `thinker routing params get|set --virtual <nome>`.
+
+### Exemplo: `deepseek/flash`
+
+Um virtual `deepseek/flash` que usa o modelo barato e cai no `default` se ele falhar:
+
+```bash
+thinker routing virtual create meu-app --name deepseek/flash \
+  --model deepseek-chat --fallback deepseek-reasoner --continue-on-default
+```
+
+O harness usa o nome no campo `model`:
+
+```bash
+curl -i http://localhost:2099/v1/chat/completions \
+  -H "Authorization: Bearer thk_SUA_CHAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek/flash","messages":[{"role":"user","content":"Olá"}]}'
+```
+
+A resposta traz `X-Thinker-Reason: virtual-model` e `X-Thinker-Virtual-Model: deepseek/flash`. O modelo que vai ao provedor é sempre o da rota escolhida: o nome do virtual nunca chega ao upstream.
+
+## Cabeçalhos de resposta X-Thinker
+
+Toda resposta roteada pelo Thinker informa o que foi decidido. Os cabeçalhos valem para respostas normais e em streaming, e `thinker routing test` lê os mesmos.
+
+| Cabeçalho | Valor |
+| --- | --- |
+| `X-Thinker-Tier` | Tier que atendeu: `simple`, `standard`, `complex`, `reasoning` ou `default`. Um tier customizado, uma regra de especificidade e um ID explícito aparecem como `standard`, `standard` e `default`, e um modelo virtual como `default`, porque nenhum deles é um slot de complexidade. |
+| `X-Thinker-Model` | Modelo escolhido pela rota. |
+| `X-Thinker-Provider` | Provedor da rota. |
+| `X-Thinker-Confidence` | Confiança da decisão, de 0 a 1. É `1` para tiers por cabeçalho, virtuais e IDs explícitos. |
+| `X-Thinker-Reason` | Motivo da decisão (tabela abaixo). |
+| `X-Thinker-Virtual-Model` | Nome do virtual, com a grafia cadastrada. Só aparece quando um virtual atendeu. |
+| `X-Thinker-Output-Modality` | Modalidade de saída da rota (`text` por padrão). |
+| `X-Thinker-Response-Mode` | `buffered` ou `stream`. |
+| `X-Thinker-Specificity` | Categoria detectada, quando a regra de especificidade decidiu. |
+| `X-Thinker-Fallback-From` | Modelo da tentativa que falhou, quando a resposta veio de um fallback. |
+| `X-Thinker-Fallback-Index` | Posição do fallback que respondeu (a partir de 0), junto com `Fallback-From`. |
+| `X-Thinker-Fallback-Exhausted` | `true` quando todas as tentativas falharam; o corpo é o erro do último provedor. |
+
+Valores de `X-Thinker-Reason`:
+
+| Valor | Quando |
+| --- | --- |
+| `virtual-model` | O `model` casou com um modelo virtual ativo. |
+| `header-match` | Uma regra de tier customizado por cabeçalho casou. |
+| `specificity` | Uma atribuição de especificidade decidiu. |
+| `scored` | O roteamento por complexidade pontuou o pedido. |
+| `tool_detected`, `large_context`, `formal_logic_override`, `short_message` | A pontuação foi ajustada por ferramentas, contexto grande, lógica formal ou mensagem curta. |
+| `momentum` | A pontuação seguiu o tier das mensagens anteriores da conversa. |
+| `ambiguous` | A pontuação ficou abaixo da confiança mínima. |
+| `heartbeat` | Pedido `auto` detectado como heartbeat, enviado ao tier `simple`. |
+| `default` | Tier `default` (roteamento por complexidade desligado ou sem tier atribuído) ou `model` explícito. |
 
 ## Limites e custos
 
