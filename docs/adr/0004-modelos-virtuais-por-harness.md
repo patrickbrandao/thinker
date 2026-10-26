@@ -100,7 +100,7 @@ Resultado:
 
 - **Sobra rota:** o proxy tenta na ordem, com o mecanismo de fallback em tempo de execução que já existe (mesmos status de gatilho, aquecimento de stream, `X-Thinker-Fallback-*`). Com a opção ligada, a parte do Default vale tanto para indisponibilidade (passo 1) quanto para falha em tempo de execução: a cadeia acrescentada é tentada como fallbacks comuns.
 - **Não sobra rota:** o proxy responde com o novo erro **M301**, "Modelo virtual sem rota disponível", e o nome do virtual na mensagem. Isso vale com a opção desligada e também com ela ligada e o Default vazio. Não há queda silenciosa para `auto` nem para outra regra.
-- **Falha em tempo de execução que esgota a cadeia:** o comportamento atual de cadeia esgotada (`X-Thinker-Fallback-Exhausted`, erro do último provedor).
+- **Falha em tempo de execução que esgota a cadeia:** o comportamento atual de cadeia esgotada (`X-Thinker-Fallback-Exhausted`, com o status e o erro do provedor principal).
 
 **Interação com o roteamento por complexidade.** A cadeia acrescentada é sempre a do slot `default`, com o roteamento por complexidade ligado ou desligado. O pedido para um virtual **não** passa pelo scorer, pela especificidade nem pelo momentum. Os motivos:
 
@@ -253,7 +253,7 @@ Erros: 400 para nome inválido ou reservado, 409 para nome duplicado, 404 para `
 - `docs/erros.md` ganha o M301;
 - a seção de roteamento documenta os cabeçalhos de resposta `X-Thinker-*`, incluindo `X-Thinker-Virtual-Model` e o motivo `virtual-model` (hoje nenhuma página de `docs/` lista esses cabeçalhos);
 - a skill (`packages/cli/skill/SKILL.md` e o gerado `packages/cli/src/skill-content.gen.ts`) é atualizada;
-- `docs/dev/manifest-guide.md` é atualizado na seção de roteamento.
+- `docs/dev/guia.md` é atualizado na seção de roteamento.
 
 ### 13. Plano de testes (resumo)
 

@@ -65,7 +65,6 @@ npm run lint
 npm run typecheck --workspaces --if-present
 npm test                                       # turbo test, todos os pacotes
 npm run test:scripts                           # testes dos scripts do repositório
-npm run check:changesets
 ```
 
 ### Servidor de desenvolvimento
@@ -238,7 +237,7 @@ Workflows em `.github/workflows/` (ações fixadas por SHA, token somente leitur
 
 | Workflow | Gatilho | Conteúdo |
 | --- | --- | --- |
-| `ci.yml` | PRs e pushes na `main` | Lint, typecheck, build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 16 (`TZ=UTC` e `America/Sao_Paulo`), scripts, verificação de changeset |
+| `ci.yml` | PRs e pushes na `main` | Lint, typecheck, build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 16 (`TZ=UTC` e `America/Sao_Paulo`), scripts |
 | `docker.yml` | PRs que tocam a imagem | Build `linux/amd64` e `linux/arm64`, sem publicar |
 | `docker-smoke.yml` | PRs que tocam imagem ou compose | Teste de fumaça do Compose (somente leitura) e `install.sh` ponta a ponta |
 | `codeql.yml` | PRs, pushes, semanal | Análise de código |
@@ -247,19 +246,20 @@ Workflows em `.github/workflows/` (ações fixadas por SHA, token somente leitur
 
 Só os checks de `ci.yml` podem ser obrigatórios na `main`, porque os demais são filtrados por caminho.
 
-## Releases e Changesets
+## Releases
 
-Só o pacote `thinker` (`packages/thinker/`) é versionado; ele guarda a versão canônica da imagem. Os demais são `private` e ficam na lista `ignore` de `.changeset/config.json`. Todo changeset aponta para `thinker` (`patch` ou `minor`, nunca `major`); `npm run check:changesets` reprova um que mire um pacote ignorado.
+Só o pacote `thinker` (`packages/thinker/`) é versionado; ele guarda a versão canônica da imagem. Os demais pacotes são `private`.
 
-```bash
-npx changeset      # selecione "thinker", escolha patch/minor e escreva uma linha de resumo
-```
+Toda entrega sai por `scripts/ship.sh "<mensagem no formato Conventional Commits>" [patch|minor|major]` ([ADR 0005](../adr/0005-modo-autonomo.md)). O script:
 
-Faça commit do `.changeset/*.md` junto com o código quando houver mudança visível ao usuário. O PR de versão do Changesets (`npm run version-packages`) e a tag são ações do mantenedor.
+1. faz commit do que estiver pendente;
+2. sobe a versão de `packages/thinker` e escreve `docs/releases/X.Y.Z.md` a partir dos assuntos dos commits desde a última tag;
+3. integra na `main` (push direto ou, se a proteção recusar, PR com squash imediato);
+4. cria e envia a tag anotada `vX.Y.Z`.
 
-**Publicação:** um push de tag `vX.Y.Z` (ou `-rc.N`) dispara `release.yml`: confere que a tag bate com `packages/thinker/package.json` e que existe `docs/releases/X.Y.Z.md`, constrói a imagem nativamente em amd64 e arm64, envia por digest ao Docker Hub, junta num manifesto multi-arquitetura com as tags `X.Y.Z`, `X.Y`, `latest` e `sha-<curto>` (as `-rc.N` só recebem `X.Y.Z-rc.N` e `sha-<curto>`) e cria a release no GitHub com as notas em português. A CLI (`thinker-cli`) acompanha a versão do Thinker: `npm run set-version --workspace=packages/cli` carimba o número.
+**Publicação:** a tag dispara `release.yml`, que confere a tag contra `packages/thinker/package.json` e `docs/releases/X.Y.Z.md`, constrói amd64 e arm64, publica o manifesto multi-arquitetura com as tags `X.Y.Z`, `X.Y`, `latest` e `sha-<curto>` (as `-rc.N` só recebem `X.Y.Z-rc.N` e `sha-<curto>`) e cria a release no GitHub com as notas. Quando o repositório não tem os segredos do Docker Hub, o `ship.sh` faz o mesmo pelo Docker local logado na conta `tmsoftbrasil`. A CLI (`thinker-cli`) pode ser carimbada com `npm run set-version --workspace=packages/cli`.
 
-Notas de release (PT-BR) ficam em `docs/releases/X.Y.Z.md`, montadas a partir dos changesets e dos PRs integrados.
+O histórico até a 0.1.2 está em `packages/thinker/CHANGELOG.md` (gerado pelo Changesets, aposentado depois da 0.1.4). Daqui em diante, as notas ficam só em `docs/releases/`.
 
 ## Fluxo de trabalho: merge e agentes
 

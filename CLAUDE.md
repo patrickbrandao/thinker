@@ -45,6 +45,6 @@ New agents may be created when useful; register them in [`docs/agentes.md`](docs
 
 ## Codebase reference
 
-The technical guide inherited from upstream is [`docs/dev/manifest-guide.md`](docs/dev/manifest-guide.md) (architecture, commands, auth, routing, env vars, migrations) and [`docs/dev/manifest-agents.md`](docs/dev/manifest-agents.md) (domain terminology). Read only the section you need. Anything about Manifest Cloud, billing, telemetry, Autofix/Phoenix, Wingman and API Bot is dead.
+The technical guide is [`docs/dev/guia.md`](docs/dev/guia.md) (architecture, commands, auth, routing, env vars, migrations, tests, releases) and the domain terminology is [`docs/dev/terminologia.md`](docs/dev/terminologia.md). Both are in Portuguese. Read only the section you need, and update the guide when your change makes it stale.
 
 Decisions: [`docs/decisoes-iniciais.md`](docs/decisoes-iniciais.md) and [`docs/adr/`](docs/adr/).

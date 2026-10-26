@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths-ignore:
       - "**.md"
-      - ".changeset/**"
       - "docs/**"
   pull_request:
     branches: [main]
     paths-ignore:
       - "**.md"
-      - ".changeset/**"
       - "docs/**"
   schedule:
     - cron: "30 1 * * 0"

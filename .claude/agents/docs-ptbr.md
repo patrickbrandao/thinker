@@ -12,7 +12,7 @@ You write Thinker's documentation in Brazilian Portuguese (PT-BR). Keep code, co
 
 - `README.md`: what Thinker is, quick start with Docker, links to `docs/`, the logo credit, and attribution to the original project (mnfst/llm-gateway, MIT).
 - `docs/`: installation (Docker/Compose), configuration (every `THINKER_*` env var), connecting each harness (Claude Code, OpenClaw/Hermes, Codex/OpenCode, SDKs), providers (API keys, subscriptions, local, custom), organizations and roles, and operations (backup, upgrade, retention).
-- Release notes in Portuguese for each version, from the changesets and merged PRs. `devops` publishes them.
+- Release notes in Portuguese for each version, written by `scripts/ship.sh` from the commit subjects; improve the wording when a release deserves more than the commit list.
 
 ## Rules
 

@@ -178,20 +178,7 @@ The backend runs standalone and OpenClaw talks to it as a regular OpenAI-compati
 1. Create a branch from `main` for your change
 2. Make your changes in the relevant package(s)
 3. Write or update tests as needed
-4. Add a changeset if your change should appear in the release notes:
-
-```bash
-npx changeset
-# → select "thinker"
-# → choose patch / minor / major
-# → write a one-line summary
-```
-
-Always target `thinker` — it's the canonical release version for the whole project, and it's the only package changesets will accept. `thinker-backend`, `thinker-frontend`, and `thinker-shared` are ignored regardless of what you pick. Commit the generated `.changeset/*.md` alongside your code. Changesets are optional for internal/tooling changes; skip this step if the change doesn't need a CHANGELOG entry.
-
-See [`packages/thinker/README.md`](packages/thinker/README.md) for why this package exists.
-
-5. Run the test suite to make sure everything passes:
+4. Run the test suite to make sure everything passes:
 
 ```bash
 npm test --workspace=packages/shared
@@ -202,20 +189,17 @@ npm test --workspace=packages/frontend
 
 The backend e2e suite drops the schema of the database it connects to, so it refuses to run unless `DATABASE_URL` names a database with `test` as a separate word (e.g. `thinker_e2e_test` or `test_db`; `latest` or `contest` do not count) and `THINKER_E2E_ALLOW_DROP=1` is set. `test:e2e:docker` handles both with a disposable container; never point the suite at your development database.
 
-6. Verify the production build works:
+5. Verify the production build works:
 
 ```bash
 npm run build
 ```
 
-7. Open a pull request against `main`
+6. Open a pull request against `main`
 
 ### Cutting a Docker release
 
-Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Releases are cut by the maintainer:
-
-1. Contributions with user-facing changes add a changeset (`npx changeset`, package `thinker`, `patch` or `minor`). The maintainer then runs the Changesets version step (`npm run version-packages`), which bumps `packages/thinker/package.json` and `packages/thinker/CHANGELOG.md`, and merges that PR. Releases, tags and anything that publishes are never merged by an agent (see [ADR 0002](docs/adr/0002-politica-de-merge.md)).
-2. Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`, which checks that the tag matches `packages/thinker/package.json` and that `docs/releases/X.Y.Z.md` exists, builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>` (a `vX.Y.Z-rc.N` tag pushes only `X.Y.Z-rc.N` and `sha-<short>`), and creates the GitHub release with the Portuguese notes from `docs/releases/X.Y.Z.md`.
+Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Every release goes out through `scripts/ship.sh "<conventional commit message>" [patch|minor|major]` ([ADR 0005](docs/adr/0005-modo-autonomo.md)): it bumps `packages/thinker/package.json`, writes `docs/releases/X.Y.Z.md` from the commit subjects, lands the change on `main`, and pushes the `vX.Y.Z` tag. The tag runs `.github/workflows/release.yml`, which builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>`, and creates the GitHub release. When the repository has no Docker Hub secrets, `ship.sh` builds and publishes the same image and release from the local Docker instead.
 
 The full flow is in the [developer guide](docs/dev/guia.md).
 
