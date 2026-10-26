@@ -12,7 +12,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "moduleResolution": "node"
+    "moduleResolution": "bundler",
+    "types": []
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "__tests__"]
