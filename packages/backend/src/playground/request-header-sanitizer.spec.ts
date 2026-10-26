@@ -1,3 +1,4 @@
+import { SENSITIVE_HEADERS } from '../routing/proxy/request-headers';
 import { isBlockedHeaderName, sanitizeRequestHeaders } from './request-header-sanitizer';
 
 describe('sanitizeRequestHeaders', () => {
@@ -95,6 +96,16 @@ describe('sanitizeRequestHeaders', () => {
       'X-Custom-Trace': 'kept',
     });
     expect(out).toEqual({ 'X-Custom-Trace': 'kept' });
+  });
+
+  // Issue #64: the Playground must never forward a header the proxy treats as
+  // secret-bearing. Drift guard against the proxy's own list.
+  it.each([...SENSITIVE_HEADERS])('blocks the proxy-sensitive header %s', (name) => {
+    expect(isBlockedHeaderName(name)).toBe(true);
+    expect(isBlockedHeaderName(name.toUpperCase())).toBe(true);
+    expect(sanitizeRequestHeaders({ [name]: 'secret', 'X-Title': 'kept' })).toEqual({
+      'X-Title': 'kept',
+    });
   });
 
   it('blocks names after trimming surrounding whitespace', () => {
