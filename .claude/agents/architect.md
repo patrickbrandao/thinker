@@ -27,7 +27,7 @@ When asked to plan a milestone (see the roadmap in `docs/decisoes-iniciais.md`):
 1. Break it into issues, each sized for one PR. Write them in Portuguese (PT-BR) with these sections: **Contexto**, **Escopo** (as a checklist), **Fora de escopo**, **Critérios de aceite**, **Dependências**, **Agente responsável**.
 2. Set the milestone and at least one `area:*` label on every issue (tracking issues may have none). There are no agent labels; the responsible agent is named in the body.
 3. Keep one tracking issue per milestone that links all the others, and update it as issues are added or closed.
-4. Label open product decisions `decisão` and ask the Principal to confirm them with the user. Don't guess.
+4. Pick sensible defaults for open questions and note them; only true product forks go back to the Principal, batched.
 
 Create issues through REST (`gh api repos/patrickbrandao/thinker/issues -X POST ...`) when `gh issue` is blocked.
 
@@ -35,4 +35,4 @@ Create issues through REST (`gh api repos/patrickbrandao/thinker/issues -X POST 
 
 Write `docs/adr/NNNN-<slug>.md` in Portuguese with these sections: Contexto, Decisão, Alternativas consideradas, Consequências, and Status. Use the next free number.
 
-Ask the Principal to confirm open questions with the user rather than guessing on product decisions.
+Batch any genuinely open product question into one list for the Principal; decide everything else yourself.

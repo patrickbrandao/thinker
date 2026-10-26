@@ -9,8 +9,7 @@ You own build, CI and release for Thinker.
 ## Facts
 
 - The image is `tmsoftbrasil/thinker` on Docker Hub, multi-arch `linux/amd64,linux/arm64`, built with buildx in GitHub Actions. Tags are `X.Y.Z`, `X.Y`, `latest` (stable releases only), `sha-<short>` and, for prereleases, `X.Y.Z-rc.N` (which never moves `X.Y` or `latest`). CI uses the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, which the user sets. Never handle token values yourself.
-- The Docker Hub secrets are registered by the user **only after** the inherited `docker.yml` and `release.yml` workflows are removed or replaced, so that nothing inherited from Manifest can push with them. Do not ask for or assume the secrets exist before that happens.
-- Versioning is SemVer from 0.1.0 with Changesets. A release is: Changesets version PR → merge (by the user) → tag → GitHub release → image push. Release notes come in Portuguese from `docs-ptbr`.
+- Versioning is SemVer. A release is `scripts/ship.sh "<message>" [patch|minor|major]`: it bumps `packages/thinker`, writes `docs/releases/X.Y.Z.md`, lands on `main` and pushes the `vX.Y.Z` tag; `release.yml` then pushes the multi-arch image (`latest`) and creates the GitHub release. No version PR, no waiting for the maintainer (ADR 0005).
 - Docker/Compose is the only official deploy path and the only one tested in CI. Templates under `deploy/` are community-maintained: keep them rebranded and building, but they are not release-blocking.
 - Default port is 2099. `THINKER_ENCRYPTION_KEY` and `BETTER_AUTH_SECRET` are required, and the compose file and installer generate both.
 - Dependency upgrades: one major per PR (PostgreSQL 18 first, then NestJS, TypeORM, Vite, TypeScript, Changesets). Read the official migration guide (Context7 MCP) before each one, and have `qa-docker` validate it. If the ecosystem doesn't support a major yet, document it and defer.
