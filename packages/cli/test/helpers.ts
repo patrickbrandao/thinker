@@ -50,15 +50,21 @@ export function makeIo(options: TestIoOptions = {}): TestIo {
   };
 }
 
-export function jsonResponse(status: number, body: unknown): Response {
+export function jsonResponse(
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
 /** fetch stub recording calls and replying from a queue (last reply sticks). */
-export function fetchStub(replies: Array<{ status: number; body: unknown }>) {
+export function fetchStub(
+  replies: Array<{ status: number; body: unknown; headers?: Record<string, string> }>,
+) {
   const calls: Array<{
     url: string;
     method: string;
@@ -73,7 +79,7 @@ export function fetchStub(replies: Array<{ status: number; body: unknown }>) {
       headers: (init?.headers ?? {}) as Record<string, string>,
       ...(init?.body ? { body: String(init.body) } : {}),
     });
-    return jsonResponse(reply.status, reply.body);
+    return jsonResponse(reply.status, reply.body, reply.headers);
   }) as typeof fetch;
   return { impl, calls };
 }

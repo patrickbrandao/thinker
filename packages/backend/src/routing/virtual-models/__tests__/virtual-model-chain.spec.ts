@@ -9,6 +9,7 @@ import {
   snapshotRouteState,
   tierChainRoutes,
   virtualModelContextLength,
+  virtualModelRoutable,
 } from '../virtual-model-chain';
 
 const route = (
@@ -419,5 +420,101 @@ describe('virtualModelContextLength', () => {
         catalog,
       ),
     ).toBeNull();
+  });
+});
+
+describe('virtualModelRoutable', () => {
+  const catalog = [
+    discovered('gpt-4o', 'openai', 128000),
+    discovered('deepseek-chat', 'deepseek', 64000),
+  ];
+  const onDefault = (overrides: Record<string, unknown> = {}) => ({
+    ...vm({ override_route: null, fallback_routes: null, continue_on_default: true }),
+    enabled: true,
+    response_mode: 'buffered' as const,
+    ...overrides,
+  });
+  const tier = (overrides: Record<string, unknown> = {}) => ({
+    override_route: null,
+    auto_assigned_route: null,
+    fallback_routes: null,
+    ...overrides,
+  });
+
+  it('counts an enabled virtual model with an available route of its own', async () => {
+    expect(
+      await virtualModelRoutable(
+        { ...vm(), enabled: true, response_mode: 'buffered' },
+        null,
+        catalog,
+      ),
+    ).toBe(true);
+  });
+
+  it('never counts a disabled one, or one whose routes are all gone', async () => {
+    expect(
+      await virtualModelRoutable(
+        { ...vm(), enabled: false, response_mode: 'buffered' },
+        null,
+        catalog,
+      ),
+    ).toBe(false);
+    expect(
+      await virtualModelRoutable(
+        {
+          ...vm({ override_route: route('openai', 'gone'), fallback_routes: null }),
+          enabled: true,
+          response_mode: 'buffered',
+        },
+        null,
+        catalog,
+      ),
+    ).toBe(false);
+  });
+
+  it('with continue_on_default, only the default slot counts', async () => {
+    // Empty default slot: other tiers may route, the proxy still appends nothing.
+    expect(await virtualModelRoutable(onDefault(), tier(), catalog)).toBe(false);
+    expect(await virtualModelRoutable(onDefault(), null, catalog)).toBe(false);
+    // Override, legacy auto-assigned route, or an available fallback.
+    expect(
+      await virtualModelRoutable(
+        onDefault(),
+        tier({ override_route: route('openai', 'gpt-4o') }),
+        catalog,
+      ),
+    ).toBe(true);
+    expect(
+      await virtualModelRoutable(
+        onDefault(),
+        tier({ auto_assigned_route: route('deepseek', 'deepseek-chat') }),
+        catalog,
+      ),
+    ).toBe(true);
+    expect(
+      await virtualModelRoutable(
+        onDefault(),
+        tier({ fallback_routes: [route('deepseek', 'deepseek-chat')] }),
+        catalog,
+      ),
+    ).toBe(true);
+    // A default fallback the catalog no longer offers does not count.
+    expect(
+      await virtualModelRoutable(
+        onDefault(),
+        tier({ fallback_routes: [route('openai', 'gone')] }),
+        catalog,
+      ),
+    ).toBe(false);
+  });
+
+  it('does not use the Default chain when continue_on_default is off', async () => {
+    expect(
+      await virtualModelRoutable(
+        onDefault({ continue_on_default: false }),
+        tier({ override_route: route('openai', 'gpt-4o') }),
+        catalog,
+      ),
+    ).toBe(false);
   });
 });

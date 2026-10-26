@@ -38,6 +38,7 @@ import { assertStreamableResponseMode } from '../routing-core/response-mode-guar
 import {
   computeShadows,
   virtualModelContextLength,
+  virtualModelRoutable,
   type DefaultTierChainSource,
 } from './virtual-model-chain';
 
@@ -398,6 +399,9 @@ export class VirtualModelService {
     const contextLengths = await Promise.all(
       rows.map((row) => virtualModelContextLength(row, defaultTier, catalog)),
     );
+    const routable = await Promise.all(
+      rows.map((row) => virtualModelRoutable(row, defaultTier, catalog)),
+    );
     return rows.map((row, i) => ({
       id: row.id,
       agent_id: row.agent_id,
@@ -413,6 +417,7 @@ export class VirtualModelService {
       updated_at: row.updated_at,
       shadows: computeShadows(row.name, catalog),
       context_length: contextLengths[i],
+      routable: routable[i],
     }));
   }
 

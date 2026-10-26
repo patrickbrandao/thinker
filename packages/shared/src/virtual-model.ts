@@ -86,6 +86,16 @@ export interface VirtualModelView extends VirtualModel {
    * when the chain is empty or any of its routes has an unknown window.
    */
   context_length: number | null;
+  /**
+   * Whether the virtual model can take traffic: enabled, and at least one
+   * route of its effective chain (its own, then the Default slot's chain when
+   * `continue_on_default` is on) survives the availability and transport
+   * filters on the agent's catalog snapshot, the same chain `context_length`
+   * is computed on. A route the snapshot cannot judge counts. The proxy
+   * re-checks every route per request and answers M301 when none is left.
+   * Always sent by the API; optional only for older clients' fixtures.
+   */
+  routable?: boolean;
 }
 
 /** A route as a client sends it: only the model name is required. */

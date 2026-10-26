@@ -17,6 +17,7 @@ import { ResolveAgentService } from '../routing/routing-core/resolve-agent.servi
 import { HeaderTierService } from '../routing/header-tiers/header-tier.service';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
 import { RouteModelParamsService } from '../routing/model-params/route-model-params.service';
+import { VirtualModelService } from '../routing/virtual-models/virtual-model.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelPricesService } from '../model-prices/model-prices.service';
@@ -41,6 +42,7 @@ export interface McpToolDeps {
   specificity: SpecificityService;
   resolveAgent: ResolveAgentService;
   headerTiers: HeaderTierService;
+  virtualModels: VirtualModelService;
   customProviders: CustomProviderService;
   routeModelParams: RouteModelParamsService;
   modelDiscovery: ModelDiscoveryService;

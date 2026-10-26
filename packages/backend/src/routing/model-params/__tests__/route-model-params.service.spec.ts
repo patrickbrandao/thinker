@@ -45,6 +45,8 @@ function setup(
   overrides: {
     tiers?: unknown[];
     headerTiers?: unknown[];
+    virtualModels?: unknown[];
+    catalog?: unknown[];
     saved?: Record<string, unknown> | null;
   } = {},
 ) {
@@ -69,6 +71,20 @@ function setup(
         ],
       ),
   };
+  const virtualModels = {
+    list: jest.fn().mockResolvedValue(
+      overrides.virtualModels ?? [
+        {
+          id: 'vm1',
+          name: 'DeepSeek/Flash',
+          enabled: true,
+          override_route: PRIMARY,
+          fallback_routes: [FALLBACK],
+        },
+        { id: 'vm2', name: 'empty', enabled: false, override_route: null, fallback_routes: null },
+      ],
+    ),
+  };
   const modelParams = {
     get: jest.fn().mockResolvedValue(overrides.saved === undefined ? null : overrides.saved),
     set: jest.fn().mockResolvedValue({}),
@@ -81,13 +97,18 @@ function setup(
         model === 'gpt-5' ? gpt5Specs : [],
       ),
   };
+  const discovery = {
+    getModelsForAgent: jest.fn().mockResolvedValue(overrides.catalog ?? []),
+  };
   const service = new RouteModelParamsService(
     tiers as never,
     headerTiers as never,
+    virtualModels as never,
     modelParams as never,
     specs as never,
+    discovery as never,
   );
-  return { service, tiers, headerTiers, modelParams, specs };
+  return { service, tiers, headerTiers, virtualModels, modelParams, specs, discovery };
 }
 
 describe('RouteModelParamsService.get', () => {
@@ -363,5 +384,270 @@ describe('RouteModelParamsService.update', () => {
       service.update(AGENT, 'default', undefined, { set: { max_tokens: 100 } }),
     ).rejects.toThrow(/Param "max_tokens" does not apply with the current settings/);
     expect(modelParams.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('RouteModelParamsService with a virtual model target', () => {
+  it('resolves the virtual model by name ignoring case and reads the virtual:<id> scope', async () => {
+    const { service, modelParams } = setup({ saved: { temperature: 0.3 } });
+
+    const view = await service.get(AGENT, { virtual: 'deepseek/flash' });
+
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'openai',
+      'api_key',
+      'gpt-5',
+    );
+    expect(view.virtual).toBe('DeepSeek/Flash');
+    expect(view).not.toHaveProperty('tier');
+    expect(view.route).toEqual(PRIMARY);
+    expect(view.models).toEqual(['gpt-5', 'claude-sonnet']);
+    expect(view.params.find((p) => p.path === 'temperature')?.current).toBe(0.3);
+  });
+
+  it('addresses a fallback of the virtual chain by model', async () => {
+    const { service, modelParams } = setup();
+    await service.get(AGENT, { virtual: 'DeepSeek/Flash' }, 'claude-sonnet');
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'anthropic',
+      'subscription',
+      'claude-sonnet',
+    );
+  });
+
+  it('writes under the virtual:<id> scope, never the tier of the same name', async () => {
+    const { service, modelParams, headerTiers } = setup({
+      headerTiers: [
+        { id: 'h1', name: 'DeepSeek/Flash', override_route: PRIMARY, fallback_routes: null },
+      ],
+    });
+    const view = await service.update(AGENT, { virtual: 'deepseek/flash' }, undefined, {
+      set: { 'reasoning.effort': 'low' },
+    });
+    expect(modelParams.set).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'openai',
+      'api_key',
+      'gpt-5',
+      { reasoning: { effort: 'low' } },
+    );
+    expect(headerTiers.list).not.toHaveBeenCalled();
+    expect(view.virtual).toBe('DeepSeek/Flash');
+  });
+
+  it('404s an unknown virtual model, listing the existing ones', async () => {
+    const { service } = setup();
+    await expect(service.get(AGENT, { virtual: 'nope' })).rejects.toThrow(NotFoundException);
+    await expect(service.get(AGENT, { virtual: 'nope' })).rejects.toThrow(
+      /Available virtual models: DeepSeek\/Flash, empty/,
+    );
+    const none = setup({ virtualModels: [] });
+    await expect(none.service.get(AGENT, { virtual: 'x' })).rejects.toThrow(
+      /has no virtual models/,
+    );
+  });
+
+  it('rejects a virtual model with no primary, and a model outside its chain', async () => {
+    const { service } = setup();
+    await expect(service.get(AGENT, { virtual: 'EMPTY' })).rejects.toThrow(
+      /Virtual model "empty" has no model yet; routes it borrows from the Default tier/,
+    );
+    await expect(service.get(AGENT, { virtual: 'deepseek/flash' }, 'gpt-4o')).rejects.toThrow(
+      /Model "gpt-4o" is not routed by virtual model "DeepSeek\/Flash"/,
+    );
+  });
+
+  it('still accepts an explicit tier target object', async () => {
+    const { service, modelParams } = setup();
+    const view = await service.get(AGENT, { tier: 'deep' });
+    expect(view.tier).toBe('Deep');
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'header:h1',
+      'anthropic',
+      'subscription',
+      'claude-sonnet',
+    );
+  });
+});
+
+describe('RouteModelParamsService model names', () => {
+  const CUSTOM = { provider: 'custom:abc', authType: 'api_key', model: 'custom:abc/gpt-4o' };
+  const OPENAI = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
+  const CATALOG = [
+    {
+      id: 'custom:abc/gpt-4o',
+      provider: 'custom:abc',
+      providerAlias: 'fake2',
+      authType: 'api_key',
+    },
+    { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+  ];
+  const withChain = (primary: unknown, fallbacks: unknown[] = []) =>
+    setup({
+      catalog: CATALOG,
+      virtualModels: [
+        {
+          id: 'vm1',
+          name: 'flash',
+          enabled: true,
+          override_route: primary,
+          fallback_routes: fallbacks,
+        },
+      ],
+    });
+
+  it('accepts the public id, the native id and the stored id of a custom provider route', async () => {
+    const { service, modelParams, discovery } = withChain(OPENAI, [CUSTOM]);
+    for (const name of ['fake2/gpt-4o', 'custom:abc/gpt-4o']) {
+      const view = await service.get(AGENT, { virtual: 'flash' }, name, 'tenant-1');
+      expect(view.route).toEqual(CUSTOM);
+      expect(view.public_model).toBe('fake2/gpt-4o');
+    }
+    expect(discovery.getModelsForAgent).toHaveBeenCalledWith('tenant-1', AGENT);
+    expect(modelParams.get).toHaveBeenLastCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'custom:abc',
+      'api_key',
+      'custom:abc/gpt-4o',
+    );
+
+    const only = withChain(CUSTOM);
+    const view = await only.service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(CUSTOM);
+  });
+
+  it('lists public ids next to the stored ones', async () => {
+    const { service } = withChain(OPENAI, [CUSTOM]);
+    const view = await service.get(AGENT, { virtual: 'flash' }, undefined, 'tenant-1');
+    expect(view.models).toEqual(['gpt-4o', 'custom:abc/gpt-4o']);
+    expect(view.public_models).toEqual(['openai/gpt-4o', 'fake2/gpt-4o']);
+    expect(view.public_model).toBe('openai/gpt-4o');
+  });
+
+  it("prefers the stored id to a custom route's native name, and resolves public ids", async () => {
+    const { service } = withChain(OPENAI, [CUSTOM]);
+    // "gpt-4o" is OPENAI's stored id (layer 1); CUSTOM only derives it (layer 3).
+    expect((await service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).route).toEqual(
+      OPENAI,
+    );
+    const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(OPENAI);
+    expect(
+      (await service.get(AGENT, { virtual: 'flash' }, 'fake2/gpt-4o', 'tenant-1')).route,
+    ).toEqual(CUSTOM);
+  });
+
+  it('names the public ids in the not-routed error', async () => {
+    const { service } = withChain(CUSTOM);
+    await expect(service.get(AGENT, { virtual: 'flash' }, 'nope', 'tenant-1')).rejects.toThrow(
+      'Model "nope" is not routed by virtual model "flash". Models: custom:abc/gpt-4o (fake2/gpt-4o)',
+    );
+  });
+
+  it('applies to tiers too, and writes under the stored id', async () => {
+    const { service, modelParams } = setup({
+      catalog: CATALOG,
+      tiers: [{ tier: 'default', override_route: CUSTOM, fallback_routes: [] }],
+    });
+    await service
+      .update(AGENT, 'default', 'fake2/gpt-4o', { unset: ['legacy'] }, 'tenant-1')
+      .catch(() => undefined);
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'tier:default',
+      'custom:abc',
+      'api_key',
+      'custom:abc/gpt-4o',
+    );
+  });
+
+  it('without a tenant, an alias cannot resolve but route-derived names still do', async () => {
+    const { service, discovery } = withChain(CUSTOM);
+    await expect(service.get(AGENT, { virtual: 'flash' }, 'fake2/gpt-4o')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect((await service.get(AGENT, { virtual: 'flash' }, 'gpt-4o')).route).toEqual(CUSTOM);
+    expect(discovery.getModelsForAgent).not.toHaveBeenCalled();
+  });
+
+  it('keeps working when the catalog cannot be read', async () => {
+    const { service, discovery } = withChain(OPENAI);
+    discovery.getModelsForAgent.mockRejectedValueOnce(new Error('db down'));
+    const view = await service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1');
+    expect(view.route).toEqual(OPENAI);
+  });
+
+  it("lets the stored id win over another route's derived name", async () => {
+    // B stores the OpenRouter id "openai/gpt-4o"; A's derived name is the same
+    // string. The stored id names B alone, as before.
+    const A = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
+    const B = { provider: 'openrouter', authType: 'api_key', model: 'openai/gpt-4o' };
+    const catalog = [
+      { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+      { id: 'openai/gpt-4o', provider: 'openrouter', authType: 'api_key' },
+    ];
+    const virtual = setup({
+      catalog,
+      virtualModels: [
+        { id: 'vm1', name: 'flash', enabled: true, override_route: A, fallback_routes: [B] },
+      ],
+    });
+    expect(
+      (await virtual.service.get(AGENT, { virtual: 'flash' }, 'openai/gpt-4o', 'tenant-1')).route,
+    ).toEqual(B);
+    expect(
+      (await virtual.service.get(AGENT, { virtual: 'flash' }, 'gpt-4o', 'tenant-1')).route,
+    ).toEqual(A);
+    expect(
+      (
+        await virtual.service.get(
+          AGENT,
+          { virtual: 'flash' },
+          'openrouter/openai/gpt-4o',
+          'tenant-1',
+        )
+      ).route,
+    ).toEqual(B);
+
+    const tier = setup({
+      catalog,
+      tiers: [{ tier: 'default', override_route: A, fallback_routes: [B] }],
+    });
+    expect((await tier.service.get(AGENT, 'default', 'openai/gpt-4o', 'tenant-1')).route).toEqual(
+      B,
+    );
+    expect((await tier.service.get(AGENT, 'default', 'gpt-4o')).route).toEqual(A);
+  });
+
+  it('suggests only names that select a single route', async () => {
+    // Two custom providers without alias share the native "gpt-4o"; the
+    // public id of each is its stored custom:<id>/gpt-4o, which is unique.
+    const C1 = { provider: 'custom:a', authType: 'api_key', model: 'custom:a/gpt-4o' };
+    const C2 = { provider: 'custom:b', authType: 'api_key', model: 'custom:b/gpt-4o' };
+    const { service } = setup({
+      tiers: [{ tier: 'default', override_route: C1, fallback_routes: [C2] }],
+    });
+    await expect(service.get(AGENT, 'default', 'gpt-4o')).rejects.toThrow(
+      /name it by one of: custom:a\/gpt-4o, custom:b\/gpt-4o$/,
+    );
+
+    // The same model on two keys of one connection is not ambiguous.
+    const keys = setup({
+      tiers: [
+        {
+          tier: 'default',
+          override_route: { ...C1, keyLabel: 'one' },
+          fallback_routes: [{ ...C1, keyLabel: 'two' }],
+        },
+      ],
+    });
+    expect((await keys.service.get(AGENT, 'default', 'gpt-4o')).route).toMatchObject(C1);
   });
 });

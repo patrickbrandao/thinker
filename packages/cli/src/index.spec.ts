@@ -157,7 +157,18 @@ describe('run', () => {
     expect(USAGE).toContain(
       'thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false',
     );
-    expect(USAGE).toContain('thinker routing params get <agent> [--tier <t>] [--model <m>]\n');
+    expect(USAGE).toContain(
+      'thinker routing params get <agent> [--tier <t> | --virtual <v>] [--model <m>]\n',
+    );
+    // Virtual models: create/update take routes, delete confirms, enable/disable toggle.
+    expect(USAGE).toMatch(
+      /routing virtual create <agent> --name <n>[^\n]*--fallback <m> \.\.\.[^\n]*--continue-on-default/,
+    );
+    expect(USAGE).toMatch(
+      /routing virtual update <agent> <name>[^\n]*--\[no-\]continue-on-default/,
+    );
+    expect(USAGE).toContain('thinker routing virtual delete <agent> <name> --yes\n');
+    expect(USAGE).toContain('thinker routing virtual enable|disable <agent> <name>\n');
     expect(USAGE).toMatch(
       /routing params set <agent>[^\n]*--set <path>=<value>[^\n]*--unset <path>/,
     );
