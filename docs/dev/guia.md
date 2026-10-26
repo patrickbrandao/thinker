@@ -132,7 +132,7 @@ Regras:
 
 - Migração antiga é **imutável**. Para remover algo, crie uma migração nova (como `DropBillingSchema`, `DropAutofixSchema`).
 - Use um timestamp único; nunca reaproveite o de outra migração.
-- Importe a nova migração em `database.module.ts` e inclua-a no array `migrations`.
+- Importe a nova migração em `database/data-source-definitions.ts` e inclua-a no array `migrations` (o spec `data-source-definitions.spec.ts` falha se faltar). Entidades novas entram no array `entities` do mesmo arquivo, no `TypeOrmModule.forFeature` de `database.module.ts` e na lista de `test/helpers.ts`.
 - O modo de transação é `each` (uma transação por migração), porque algumas migrações de índice usam `CONCURRENTLY`.
 - Migrações costumam ter um spec ao lado; mudanças de dados ganham também um e2e.
 - As tabelas do Better Auth têm migrações próprias, geridas por ele: `DatabaseSeederService` chama `ctx.runMigrations()` no boot. A checagem de schema do Better Auth na inicialização (`advanced.database.validateSchema`) fica desligada, porque roda antes dessa migração e registrava um falso "Database schema mismatch" em todo banco novo. `auth/better-auth-schema.ts` faz a mesma checagem logo depois da migração e só registra ERROR quando há divergência real.
@@ -181,6 +181,14 @@ O proxy (`routing/proxy/`) expõe `POST /v1/chat/completions`, `POST /v1/respons
 4. Atribuição de tier → provedor/modelo → encaminhamento.
 
 Um tier pontuado sem modelo cai no tier `default`; se o `default` também não tem rota, é `M101`. Um tier com modelo configurado porém indisponível **não** cai no `default` (aparece `M302`/`M101`).
+
+**Modelos virtuais** ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), `routing/virtual-models/`): nomes públicos por harness (tabela `virtual_models`), cada um com principal, até 5 fallbacks, `continue_on_default`, `response_mode` e `output_modality`. Por enquanto só existe a API administrativa em `/api/v1/routing/:agentName/virtual-models` (CRUD, `toggle`, `reorder`, `override`, `fallbacks`, `response-mode`); o proxy e o `/v1/models` ainda não os usam. Regras que valem desde já:
+
+- O nome segue `validateVirtualModelName` de `thinker-shared` (1 a 64 caracteres, `auto` reservado) e é único por agente sem diferenciar maiúsculas: o serviço devolve 409, e o índice único `(agent_id, LOWER(name))` fica só na migração, como em `header_tiers`.
+- A validação das rotas na escrita é **estrita**, ao contrário dos header tiers: uma rota que não resolve no catálogo do agente (`getModelsForAgent`, já filtrado pelos provedores habilitados) devolve 400, e um `keyLabel` enviado que não existe para o provedor também. Sem `keyLabel`, a rota é guardada sem rótulo; a chave padrão é escolhida na hora do pedido.
+- A listagem calcula `shadows` (IDs reais que o nome sombreia) e `context_length` com um único snapshot do catálogo por requisição, sem `isRouteAvailable` rota a rota (`virtual-model-chain.ts`).
+- A lista do agente fica em cache no `RoutingCacheService` (`getVirtualModels`) e cai junto com `invalidateAgent`, o que cobre as escritas no tier `default`.
+- Apagar um virtual apaga as linhas de `agent_model_params` com `scope_key = 'virtual:<id>'` (`modelParamsScopeForVirtualModel`).
 
 **Fallback**: cada tier tem um modelo principal e até 5 de reserva (`routing/dto/routing.dto.ts`). Qualquer status HTTP >= 400 (`fallback-status-codes.ts`), timeout de tentativa (`PROVIDER_TIMEOUT_MS`), falta de primeiro trecho (`STREAM_WARMUP_MS`) ou silêncio em streaming (`STREAM_IDLE_TIMEOUT_MS`) leva à próxima rota (`proxy-fallback.service.ts`). Se todas falham, o cliente recebe o erro do provedor da última tentativa (não um código `M###`).
 
