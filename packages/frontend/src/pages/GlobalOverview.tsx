@@ -208,10 +208,17 @@ const GlobalOverview: Component = () => {
     const result = overviewResult();
     if (!overviewResult.loading && result !== undefined) setLoadedRange(result.range);
   });
-  const [overviewDetailsResult] = createResource(loadedRange, async (range) => ({
-    range,
-    data: (await getOverviewDetails(range)) as OverviewDetails,
-  }));
+  // Recent Requests and Model usage load in parallel with the overview instead
+  // of waiting for it, and refresh at the analytics cadence so they no longer
+  // go stale until the range changes or the page reloads. Each result keeps the
+  // range it was loaded for, so a range change never shows the previous rows.
+  const [overviewDetailsResult] = createResource(
+    () => ({ range: chartRange(), _ping: analyticsPing() }),
+    async (p) => ({
+      range: p.range,
+      data: (await getOverviewDetails(p.range)) as OverviewDetails,
+    }),
+  );
   const overviewDetails = () => {
     const result = overviewDetailsResult();
     return result?.range === chartRange() ? result.data : undefined;

@@ -355,7 +355,16 @@ describe('GlobalOverview filter onUnselectAll', () => {
     expect(apiMocks.getGlobalProviders).toHaveBeenCalledTimes(1);
     expect(apiMocks.getGlobalProviderUsage).toHaveBeenCalledTimes(2);
     expect(apiMocks.getOverviewProviderUsage).toHaveBeenCalledTimes(2);
-    expect(apiMocks.getOverviewDetails).toHaveBeenCalledTimes(1);
+    // Recent Requests and Model usage refresh with the rest of the dashboard.
+    await waitFor(() => expect(apiMocks.getOverviewDetails).toHaveBeenCalledTimes(2));
+  });
+
+  it('loads Recent Requests and Model usage without waiting for the overview', async () => {
+    apiMocks.getOverview.mockReturnValue(new Promise(() => {}));
+    render(() => <GlobalOverview />);
+
+    await waitFor(() => expect(apiMocks.getOverviewDetails).toHaveBeenCalledTimes(1));
+    expect(apiMocks.getOverviewDetails).toHaveBeenCalledWith('7d');
   });
 
   it('shows the skeleton on a range change but not on a background ping refetch', async () => {
