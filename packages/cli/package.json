@@ -43,9 +43,9 @@
     "set-version": "node scripts/set-version.cjs"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
-    "jest": "^29.7.0",
+    "jest": "^30.5.1",
     "prettier": "^3.9.10",
     "thinker-shared": "*",
     "ts-jest": "^29.4.14",
