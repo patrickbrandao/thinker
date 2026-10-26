@@ -408,8 +408,17 @@ function exhaustedMessage(
   attempts: Array<{ provider: string; model: string; status: number }>,
 ): string {
   const lead = /[.!?]$/.test(primaryMessage) ? primaryMessage : `${primaryMessage}.`;
-  const list = attempts.map((a) => `${a.provider}/${a.model} ${a.status}`).join(', ');
+  const list = attempts.map((a) => `${attemptLabel(a.provider, a.model)} ${a.status}`).join(', ');
   return `${lead} Every attempt failed: ${list}.`;
+}
+
+/**
+ * `<provider>/<model>` for one chain hop. Custom provider models already carry
+ * their `custom:<uuid>/` prefix, so it is not repeated.
+ */
+export function attemptLabel(provider: string, model: string): string {
+  const prefix = `${provider}/`;
+  return model.toLowerCase().startsWith(prefix.toLowerCase()) ? model : `${prefix}${model}`;
 }
 
 export function recordFallbackFailures(

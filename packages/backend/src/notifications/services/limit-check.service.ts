@@ -125,7 +125,7 @@ export class LimitCheckService {
           actualValue: actual,
           period: rule.period,
           timestamp: now,
-          agentUrl: `${this.runtime.getAuthBaseUrl()}/agents/${encodeURIComponent(rule.agent_name)}`,
+          agentUrl: `${this.runtime.getAuthBaseUrl()}/harnesses/${encodeURIComponent(rule.agent_name)}`,
           alertType: 'hard',
           periodResetDate: computePeriodResetDate(rule.period),
         },

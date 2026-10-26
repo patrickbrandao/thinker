@@ -456,6 +456,10 @@ export class ProviderKeyService {
    * discovery has no models for a pinned connection. Callers that judge many
    * routes from one catalog snapshot (the virtual-model listing, `/v1/models`)
    * load this once per request instead of asking isRouteAvailable per route.
+   *
+   * Reads the tenant's rows from ProviderService.getProviders (routing cache,
+   * already limited to usable records and cleared by invalidateTenant on every
+   * provider write), then applies the same active and per-agent filters.
    */
   async getRouteProviderRecords(
     tenantId: string,
@@ -463,9 +467,7 @@ export class ProviderKeyService {
   ): Promise<Array<{ provider: string; authType: AuthType | null }>> {
     const records = (
       await this.filterProvidersForAgent(
-        await this.providerRepo.find({
-          where: { tenant_id: tenantId, is_active: true },
-        }),
+        (await this.providerService.getProviders(tenantId)).filter((r) => r.is_active),
         agentId,
       )
     ).filter(isThinkerUsableProvider);

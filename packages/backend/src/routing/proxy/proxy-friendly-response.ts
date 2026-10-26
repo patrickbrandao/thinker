@@ -34,7 +34,7 @@ export interface FriendlyResult {
   };
 }
 
-export type DashboardSection = 'routing' | 'limits';
+export type DashboardSection = 'routing' | 'guardrails';
 
 export function getDashboardUrl(
   config: ConfigService,
@@ -46,7 +46,7 @@ export function getDashboardUrl(
     `http://localhost:${config.get<number>('app.port', DEFAULT_PORT)}`;
   if (!agentName) return baseUrl;
   const suffix = section ? `/${section}` : '';
-  return `${baseUrl}/agents/${encodeURIComponent(agentName)}${suffix}`;
+  return `${baseUrl}/harnesses/${encodeURIComponent(agentName)}${suffix}`;
 }
 
 export function buildFriendlyResponse(

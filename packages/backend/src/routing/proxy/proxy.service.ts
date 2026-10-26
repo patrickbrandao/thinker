@@ -1238,7 +1238,7 @@ export class ProxyService {
       exceeded.metricType === 'cost'
         ? `$${Number(exceeded.threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : Number(exceeded.threshold).toLocaleString(undefined, { maximumFractionDigits: 0 });
-    const dashboardUrl = getDashboardUrl(this.config, agentName, 'limits');
+    const dashboardUrl = getDashboardUrl(this.config, agentName, 'guardrails');
     return formatThinkerError('M200', {
       metric: exceeded.metricType,
       used: fmt,

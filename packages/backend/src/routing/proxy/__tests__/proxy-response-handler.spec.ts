@@ -6,6 +6,7 @@ import {
   handleStreamResponse,
   handleNonStreamResponse,
   recordSuccess,
+  attemptLabel,
 } from '../proxy-response-handler';
 import { buildTransportErrorResponse, ProviderUrlBlockedError } from '../proxy-transport';
 import { RoutingMeta } from '../proxy.service';
@@ -983,6 +984,25 @@ describe('proxy-response-handler', () => {
       expect(error.message).toContain(
         'Every attempt failed: openai/gpt-5.4-mini 400, xai/grok-4.5 403, opencode-go/deepseek-flash 422.',
       );
+    });
+  });
+
+  describe('attemptLabel', () => {
+    const uuid = '6f1c2d3e-0000-4000-8000-000000000001';
+
+    it('does not repeat the custom provider prefix the model already carries', () => {
+      expect(attemptLabel(`custom:${uuid}`, `custom:${uuid}/alpha-fast`)).toBe(
+        `custom:${uuid}/alpha-fast`,
+      );
+    });
+
+    it('prefixes a bare custom model name once', () => {
+      expect(attemptLabel(`custom:${uuid}`, 'alpha-fast')).toBe(`custom:${uuid}/alpha-fast`);
+    });
+
+    it('keeps the provider/model form for catalog providers', () => {
+      expect(attemptLabel('openai', 'gpt-5.4-mini')).toBe('openai/gpt-5.4-mini');
+      expect(attemptLabel('openrouter', 'openrouter/auto')).toBe('openrouter/auto');
     });
   });
 
