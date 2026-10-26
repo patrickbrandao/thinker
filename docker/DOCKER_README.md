@@ -102,6 +102,8 @@ docker compose exec -T postgres pg_dump -U thinker thinker > thinker-backup-$(da
 
 `docker compose down -v` apaga tudo.
 
+O PostgreSQL é o 18: o volume `thinker_pgdata` é montado em `/var/lib/postgresql` e os dados ficam em `/var/lib/postgresql/18/docker`. Não há migração de um volume PostgreSQL 16 (não existem instalações anteriores); com um volume antigo o PostgreSQL 18 recusa subir. Nesse caso, faça dump, `down -v`, suba de novo e restaure.
+
 ## Acesso pela rede e proxy reverso
 
 O compose publica a porta só em `127.0.0.1`. Para a LAN, ponha `HOST_BIND_ADDRESS=0.0.0.0` e `BETTER_AUTH_URL` com a URL exata do navegador no `.env`. Atrás de proxy reverso, defina `TRUST_PROXY` e uma `BETTER_AUTH_URL` HTTPS. `BETTER_AUTH_URL` precisa ser alcançável de dentro do container (o MCP busca o JWKS nela). Detalhes: [instalação com Docker](https://github.com/patrickbrandao/thinker/blob/main/docs/usuario/instalacao-docker.md).

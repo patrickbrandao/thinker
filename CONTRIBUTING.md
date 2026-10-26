@@ -7,7 +7,7 @@ Thanks for your interest in contributing to Thinker! This guide will help you ge
 | Layer    | Technology                                       |
 | -------- | ------------------------------------------------ |
 | Frontend | SolidJS, uPlot, custom CSS theme                 |
-| Backend  | NestJS 11, TypeORM, PostgreSQL 16                |
+| Backend  | NestJS 11, TypeORM, PostgreSQL 18                |
 | Auth     | Better Auth (auto-login on localhost)            |
 | Routing  | OpenAI-compatible proxy (`/v1/chat/completions`) |
 | Build    | Turborepo + npm workspaces                       |
@@ -70,7 +70,7 @@ docker run --name thinker-postgres \
   -e POSTGRES_PASSWORD=mypassword \
   -e POSTGRES_DB=mydatabase \
   -p 5432:5432 \
-  -d postgres:16
+  -d postgres:18
 ```
 
 That container matches the sample `DATABASE_URL` above:
@@ -154,7 +154,7 @@ The backend runs standalone and OpenClaw talks to it as a regular OpenAI-compati
 
 ### Backend (`packages/backend`)
 
-- **Framework**: NestJS 11 with TypeORM 0.3 and PostgreSQL 16
+- **Framework**: NestJS 11 with TypeORM 0.3 and PostgreSQL 18
 - **Auth**: Better Auth (email/password + Google, GitHub, Discord OAuth)
 - **Tests**: Jest for unit tests (`*.spec.ts`), Supertest for e2e tests (`test/`)
 - **Key directories**: `entities/` (data models), `analytics/` (dashboard queries), `routing/` (proxy, scoring, tier assignment), `auth/` (session management)
@@ -217,7 +217,7 @@ Write clear, concise commit messages that explain **why** the change was made. U
 
 - **Single-service deployment**: In production, NestJS serves both the API and the frontend static files from the same port via `@nestjs/serve-static`.
 - **Dev mode**: Vite on `:3000` proxies `/api` and `/v1` to the backend on `:3001`. CORS is enabled only in development.
-- **Database**: PostgreSQL 16 for both local development and production. Schema changes are managed via TypeORM migrations (`migrationsRun: true` on boot). After modifying an entity, generate a migration with `npm run migration:generate -- src/database/migrations/Name`.
+- **Database**: PostgreSQL 18 for both local development and production. Schema changes are managed via TypeORM migrations (`migrationsRun: true` on boot). After modifying an entity, generate a migration with `npm run migration:generate -- src/database/migrations/Name`.
 - **Validation**: Global `ValidationPipe` with `whitelist: true` and `forbidNonWhitelisted: true`.
 - **TypeScript**: Strict mode across all packages.
 

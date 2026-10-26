@@ -13,7 +13,7 @@
 #
 # Usage:
 #   DATABASE_URL=postgresql://...direct, not PgBouncer... scripts/db-reindex-bloated.sh [index ...]
-#   PSQL="docker run --rm -i --network host postgres:17 psql" DATABASE_URL=... scripts/db-reindex-bloated.sh
+#   PSQL="docker run --rm -i --network host postgres:18 psql" DATABASE_URL=... scripts/db-reindex-bloated.sh
 #
 # With no arguments it rebuilds the default list below, smallest first. It
 # stops at the first failure after dropping the "<name>_ccnew" leftover, and

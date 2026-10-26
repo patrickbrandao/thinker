@@ -98,7 +98,7 @@ export function e2eGuardMessage(reason: string): string {
     '',
     '  npm run test:e2e:docker --workspace=packages/backend',
     '',
-    'That starts a throwaway postgres:16-alpine container on a free port, runs the',
+    'That starts a throwaway postgres:18-alpine container on a free port, runs the',
     'migrations and the suite, and removes the container afterwards.',
     '',
     'To use a database you manage yourself, it must be dedicated to tests:',

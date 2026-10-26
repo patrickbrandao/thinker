@@ -189,7 +189,7 @@ THINKER_PG_VOLUME=my-thinker-data ./deploy/apple-containers/start.sh up
 THINKER_RECORDINGS_VOLUME=my-thinker-recordings ./deploy/apple-containers/start.sh up
 ```
 
-The script mounts the named volume at `/var/lib/postgresql/data` and uses `/var/lib/postgresql/data/pgdata` as `PGDATA`. The nested directory is required because a newly formatted Apple Containers volume may contain a root-level `lost+found` directory.
+The script mounts the named volume at `/var/lib/postgresql`. PostgreSQL 18 images keep their data in the version-specific `PGDATA` `/var/lib/postgresql/18/docker`, a nested directory, so a root-level `lost+found` directory on a newly formatted Apple Containers volume does not get in the way. A volume created by an earlier version of this script (PostgreSQL 16, data under `pgdata/`) is not migrated: start with a new volume.
 
 `down` never deletes either named volume. Use Apple Containers volume commands to inspect or deliberately remove them:
 
@@ -226,11 +226,7 @@ container logs thinker-app
 
 ### PostgreSQL stops during initialization
 
-If logs mention `lost+found`, confirm the script sets:
-
-```text
-PGDATA=/var/lib/postgresql/data/pgdata
-```
+If logs mention `lost+found`, confirm the volume is mounted at `/var/lib/postgresql` (not at the data directory itself) and that `PGDATA` is not overridden, so PostgreSQL uses its default `/var/lib/postgresql/18/docker`.
 
 If logs mention `chmod` or `chown` being denied, do not replace the named volume with a macOS bind mount. The official PostgreSQL image needs filesystem ownership changes that Apple Containers bind mounts do not provide.
 

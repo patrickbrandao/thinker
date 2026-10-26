@@ -19,7 +19,7 @@ Monorepo com npm workspaces e Turborepo:
 ```text
 packages/
 ├── shared/     thinker-shared    tipos e helpers usados por backend, frontend e CLI (provedores, tiers, snippets)
-├── backend/    thinker-backend   NestJS 11, TypeORM 0.3, PostgreSQL 16, Better Auth
+├── backend/    thinker-backend   NestJS 11, TypeORM 0.3, PostgreSQL 18, Better Auth
 ├── frontend/   thinker-frontend  SolidJS + Vite, dashboard
 ├── cli/        thinker-cli       CLI `thinker` (privada, não publicada)
 └── thinker/    thinker           pacote sem código que guarda a versão canônica
@@ -103,7 +103,7 @@ SEED_DATA=true
 | Backend e2e (Docker) | `npm run test:e2e:docker --workspace=packages/backend` |
 | Contratos do gateway | `THINKER_BASE_URL=http://127.0.0.1:2099 node --test contracts/gateway/tests/*.test.mjs` |
 
-**E2E só por `test:e2e:docker`.** A suíte usa `dropSchema: true` (apaga o banco). O script `packages/backend/scripts/test-e2e-docker.mjs` escolhe uma porta livre em `127.0.0.1`, sobe um `postgres:16-alpine` com nome único e dados em tmpfs (banco `thinker_e2e_test`), roda as migrações, executa a suíte em série e remove o contêiner no fim (sucesso, falha ou Ctrl-C). Argumentos extras vão para o Jest:
+**E2E só por `test:e2e:docker`.** A suíte usa `dropSchema: true` (apaga o banco). O script `packages/backend/scripts/test-e2e-docker.mjs` escolhe uma porta livre em `127.0.0.1`, sobe um `postgres:18-alpine` com nome único e dados em tmpfs montado em `/var/lib/postgresql` (banco `thinker_e2e_test`), roda as migrações, executa a suíte em série e remove o contêiner no fim (sucesso, falha ou Ctrl-C). A imagem é a mesma, com o mesmo digest, de `docker/docker-compose.yml` e do job `Backend e2e (PostgreSQL)` da CI (`THINKER_E2E_PG_IMAGE` troca a imagem). Ao atualizar o digest, atualize os três lugares e `deploy/coolify/docker-compose.yml`. Argumentos extras vão para o Jest:
 
 ```bash
 npm run test:e2e:docker --workspace=packages/backend -- test/limits.e2e-spec.ts
@@ -237,7 +237,7 @@ Workflows em `.github/workflows/` (ações fixadas por SHA, token somente leitur
 
 | Workflow | Gatilho | Conteúdo |
 | --- | --- | --- |
-| `ci.yml` | PRs e pushes na `main` | Lint, typecheck, build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 16 (`TZ=UTC` e `America/Sao_Paulo`), scripts |
+| `ci.yml` | PRs e pushes na `main` | Lint, typecheck, build, testes unitários por pacote (o do backend também com `TZ=America/Sao_Paulo`), e2e com PostgreSQL 18 (`TZ=UTC` e `America/Sao_Paulo`), scripts |
 | `docker.yml` | PRs que tocam a imagem | Build `linux/amd64` e `linux/arm64`, sem publicar |
 | `docker-smoke.yml` | PRs que tocam imagem ou compose | Teste de fumaça do Compose (somente leitura) e `install.sh` ponta a ponta |
 | `codeql.yml` | PRs, pushes, semanal | Análise de código |

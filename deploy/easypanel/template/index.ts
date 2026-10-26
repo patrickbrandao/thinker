@@ -54,7 +54,7 @@ export function generate(input: Input): Output {
     type: "postgres",
     data: {
       serviceName: input.databaseServiceName,
-      image: "postgres:16",
+      image: "postgres:18",
       password: databasePassword,
     },
   });
