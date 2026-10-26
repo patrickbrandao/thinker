@@ -140,6 +140,7 @@ Um [modelo virtual](provedores-e-roteamento.md#modelos-virtuais) é um nome que 
 | OpenCode | A chave `model` (`thinker/<nome>`) e uma entrada em `models` do provedor. |
 | OpenClaw | `agents.defaults.model.primary` (`thinker/<nome>`) e uma entrada em `models`. |
 | Hermes | `default` em `config.yaml`. |
+| Nanobot | `agents.defaults.model` em `~/.nanobot/config.json`. |
 | SDKs, LangChain, n8n, cURL | O parâmetro `model` da chamada. |
 
 Exemplo no Claude Code:

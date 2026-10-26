@@ -54,7 +54,7 @@ As rotas são validadas no servidor: um modelo que o harness não consegue rotea
 
 `thinker routing status <agente>` inclui `virtual_models` (cadeia, `continue_on_default`, `response_mode` e `shadows` de cada um) e dois campos novos:
 
-- `active_virtual_models`: os nomes dos virtuais ativos que têm rota disponível agora;
+- `active_virtual_models`: os nomes dos virtuais ativos que têm rota segundo o catálogo do agente (calculado a partir do catálogo; o proxy ainda confere cada rota a cada pedido);
 - `routes_by_virtual_model`: `true` quando há pelo menos um.
 
 O `default` do status diz só o que `model: "auto"` roteia. Um harness com o `default` vazio ainda roteia os pedidos que citam um virtual com rota; olhe `routes_by_virtual_model`.
@@ -75,4 +75,4 @@ thinker routing params set meu-app --virtual deepseek/flash --model deepseek-cha
   --set reasoning.effort=high --unset temperature
 ```
 
-`--virtual <nome>` e `--tier <nome>` são exclusivos, porque um tier customizado e um virtual podem ter o mesmo nome. `--model` aceita o ID que `GET /v1/models` publica (por exemplo `<alias>/<modelo>` de um provedor customizado), o ID guardado na rota ou o ID nativo sem prefixo, este último quando só uma conexão da cadeia o tem; a saída lista `models` e `public_models`. Só a cadeia do próprio virtual é editável aqui: as rotas que entram por Continue on Default usam os parâmetros do tier `default`.
+`--virtual <nome>` e `--tier <nome>` são exclusivos, porque um tier customizado e um virtual podem ter o mesmo nome. `--model` aceita o ID que `GET /v1/models` publica (por exemplo `<alias>/<modelo>` de um provedor customizado), o ID guardado na rota ou o ID nativo sem prefixo, este último quando só uma conexão da cadeia o tem. O casamento é em camadas e a primeira com resultado vence: o ID guardado, depois o ID público, depois o nativo. Só há ambiguidade dentro da camada que casou. A saída lista `models` e `public_models`. Só a cadeia do próprio virtual é editável aqui: as rotas que entram por Continue on Default usam os parâmetros do tier `default`.

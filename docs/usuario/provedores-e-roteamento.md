@@ -51,7 +51,7 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 ### Ordem de resolução
 
 1. Modelo virtual ativo cujo nome é igual ao `model` (veja [Modelos virtuais](#modelos-virtuais)).
-2. Tier customizado por cabeçalho, se alguma regra casar.
+2. Tier customizado por cabeçalho, se alguma regra casar. Um heartbeat `auto` pula este passo e vai direto ao tier `simple`.
 3. `model` explícito no corpo da requisição (`auto` pede o roteamento do Thinker).
 4. Pontuação de complexidade (se ligada) e atribuição de tier.
 5. Resolução do provedor e do modelo, e encaminhamento.
@@ -85,7 +85,7 @@ Na página de roteamento do harness, na seção **Virtual models** (separada dos
 1. Digite o nome. O dashboard valida enquanto você digita.
 2. Escolha o modelo principal e até 5 fallbacks (no modal de criação ou depois, no cartão do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
 3. Se quiser, ligue **Continue on Default** (veja abaixo) e escolha o modo de resposta (`buffered` ou `stream`).
-4. Use **Show a copyable example** para copiar um exemplo com a URL base do harness e `model: "<nome>"`.
+4. Clique em `model: "<nome>"` no cartão (ou em **Copy example** no menu do cartão) para copiar um exemplo com a URL base do harness e o nome.
 
 Cada rota é validada ao salvar: um modelo que o harness não consegue rotear (provedor não habilitado, modelo desconhecido, rótulo de chave inexistente) é recusado com HTTP 400. Os cartões podem ser reordenados por arraste; essa ordem vale também em `/v1/models`. Pela linha de comando, veja [CLI](cli.md#modelos-virtuais).
 
@@ -134,7 +134,7 @@ Um virtual **desativado** é invisível: não aparece em `/v1/models`, não casa
 
 ### Sem rota: M301
 
-Se nenhuma rota da cadeia está disponível, o Thinker responde [`M301`](../erros.md#m301), com o nome do virtual na mensagem. Não há queda silenciosa para `auto` nem para outra regra, para que uma configuração quebrada não envie o tráfego a um modelo que você não escolheu. Isso vale com Continue on Default ligado, se o `default` também estiver sem rota. Um virtual criado sem principal também responde `M301`, a menos que Continue on Default cubra a falta. Se todas as tentativas chegam ao provedor e falham, o cliente recebe o erro do último provedor, como em qualquer fallback.
+Se nenhuma rota da cadeia está disponível, o Thinker responde [`M301`](../erros.md#m301), com o nome do virtual na mensagem. Não há queda silenciosa para `auto` nem para outra regra, para que uma configuração quebrada não envie o tráfego a um modelo que você não escolheu. Isso vale com Continue on Default ligado, se o `default` também estiver sem rota. Um virtual criado sem principal também responde `M301`, a menos que Continue on Default cubra a falta. Se todas as tentativas chegam ao provedor e falham, vale o comportamento de qualquer fallback esgotado: o cliente recebe o status e o erro do provedor principal, com `X-Thinker-Fallback-Exhausted: true`.
 
 ### Parâmetros por modelo
 
@@ -166,18 +166,18 @@ Toda resposta roteada pelo Thinker informa o que foi decidido. Os cabeçalhos va
 
 | Cabeçalho | Valor |
 | --- | --- |
-| `X-Thinker-Tier` | Tier que atendeu: `simple`, `standard`, `complex`, `reasoning` ou `default`. Um tier customizado, uma regra de especificidade e um ID explícito aparecem como `standard`, `standard` e `default`, e um modelo virtual como `default`, porque nenhum deles é um slot de complexidade. |
-| `X-Thinker-Model` | Modelo escolhido pela rota. |
-| `X-Thinker-Provider` | Provedor da rota. |
+| `X-Thinker-Tier` | Tier que atendeu: `simple`, `standard`, `complex`, `reasoning` ou `default`. Um tier customizado e uma regra de especificidade aparecem como `standard`, um modelo virtual como `default` e um ID explícito como `direct`, porque nenhum deles é um slot de complexidade. |
+| `X-Thinker-Model` | Modelo escolhido pela rota (`thinker` nas respostas de erro do próprio Thinker). |
+| `X-Thinker-Provider` | Provedor da rota (`thinker` nas respostas de erro do próprio Thinker). |
 | `X-Thinker-Confidence` | Confiança da decisão, de 0 a 1. É `1` para tiers por cabeçalho, virtuais e IDs explícitos. |
 | `X-Thinker-Reason` | Motivo da decisão (tabela abaixo). |
 | `X-Thinker-Virtual-Model` | Nome do virtual, com a grafia cadastrada. Só aparece quando um virtual atendeu. |
 | `X-Thinker-Output-Modality` | Modalidade de saída da rota (`text` por padrão). |
 | `X-Thinker-Response-Mode` | `buffered` ou `stream`. |
 | `X-Thinker-Specificity` | Categoria detectada, quando a regra de especificidade decidiu. |
-| `X-Thinker-Fallback-From` | Modelo da tentativa que falhou, quando a resposta veio de um fallback. |
+| `X-Thinker-Fallback-From` | Sempre o modelo **principal** (que falhou), quando a resposta veio de um fallback. |
 | `X-Thinker-Fallback-Index` | Posição do fallback que respondeu (a partir de 0), junto com `Fallback-From`. |
-| `X-Thinker-Fallback-Exhausted` | `true` quando todas as tentativas falharam; o corpo é o erro do último provedor. |
+| `X-Thinker-Fallback-Exhausted` | `true` quando todas as tentativas falharam. O status HTTP e o erro são os do provedor **principal**, e o corpo traz `primary_model`, `primary_provider` e a lista `attempted_fallbacks`, com uma entrada por tentativa. |
 
 Valores de `X-Thinker-Reason`:
 
@@ -191,7 +191,10 @@ Valores de `X-Thinker-Reason`:
 | `momentum` | A pontuação seguiu o tier das mensagens anteriores da conversa. |
 | `ambiguous` | A pontuação ficou abaixo da confiança mínima. |
 | `heartbeat` | Pedido `auto` detectado como heartbeat, enviado ao tier `simple`. |
-| `default` | Tier `default` (roteamento por complexidade desligado ou sem tier atribuído) ou `model` explícito. |
+| `default` | Tier `default` (roteamento por complexidade desligado ou sem tier atribuído). |
+| `direct` | O `model` nomeou um modelo real (ID explícito). |
+
+Respostas de erro do próprio Thinker (códigos `M…`, veja [Erros](../erros.md)) saem com os mesmos cabeçalhos: `X-Thinker-Reason` traz o motivo do bloqueio (`no_provider`, `no_provider_key`, `subscription_credentials_unusable`, `key_expired`, `limit_exceeded`, `thinker_rate_limited`, `thinker_ip_rate_limited`, `thinker_concurrency_limited`, `thinker_invalid_request`, `model_not_available`, `virtual_model_unavailable` ou `thinker_internal_error`), `X-Thinker-Tier` vale `simple` (ou `default` no `M301`, que também traz `X-Thinker-Virtual-Model`) e `X-Thinker-Provider` e `X-Thinker-Model` valem `thinker`.
 
 ## Limites e custos
 

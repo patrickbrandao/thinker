@@ -62,7 +62,7 @@ Toda falha gerada pelo próprio Thinker (e não pelo provedor) traz um código `
 
 **Modelo virtual sem rota disponível.** O `model` pedido é um modelo virtual ativo do harness, mas nenhuma rota da cadeia dele está disponível agora: o provedor, o modelo ou a credencial de cada rota sumiu, ou nenhuma rota atende ao modo de resposta do virtual. Um virtual sem nenhum modelo cai no mesmo caso. O Thinker não cai para `auto` nem para outra regra, e o pedido não chega a nenhum provedor. A mensagem muda conforme a opção "Continue on Default":
 
-- **desligada:** a mensagem termina com `Fix its chain, or turn on "Continue on Default"`, isto é, corrija a cadeia ou ligue a opção;
+- **desligada:** a mensagem sugere `Fix its chain, or turn on "Continue on Default"`, isto é, corrija a cadeia ou ligue a opção;
 - **ligada:** a mensagem diz que o tier Default em que ele continua também não tem rota disponível (`Fix its chain or the Default tier`); corrija a cadeia do virtual ou o tier `default`.
 
 As duas correções ficam na tela Routing do harness. O cabeçalho `X-Thinker-Virtual-Model` da resposta traz o nome do virtual (veja [os cabeçalhos](usuario/provedores-e-roteamento.md#cabeçalhos-de-resposta-x-thinker)).
