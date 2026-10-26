@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './helpers';
 
@@ -20,7 +20,7 @@ async function insertMessage(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, error_origin, error_class, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [
-      uuid(),
+      randomUUID(),
       TEST_TENANT_ID,
       TEST_AGENT_ID,
       now,

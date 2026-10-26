@@ -1,5 +1,3 @@
-jest.mock('uuid', () => ({ v4: () => 'test-uuid-1234' }));
-
 jest.mock('@react-email/render', () => ({
   render: jest.fn().mockResolvedValue('<html>test</html>'),
 }));

@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import {
   createTestApp,
@@ -21,7 +21,7 @@ beforeAll(async () => {
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
 
   // A tenant-global OpenAI connection (agent_id NULL = global under the new schema).
-  connectionId = uuid();
+  connectionId = randomUUID();
   await ds.query(
     `INSERT INTO tenant_providers (id, tenant_id, created_by_user_id, agent_id, provider, key_prefix, auth_type, label, is_active, connected_at, updated_at, cached_models)
      VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,true,$8,$8,$9)`,
@@ -48,7 +48,7 @@ beforeAll(async () => {
     await ds.query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, provider, auth_type, provider_key_label, tenant_provider_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, description, service_type, agent_name, user_id)
        VALUES ($1,$2,$3,$4,'ok',$5,'openai','subscription','My OpenAI',$6,$7,$8,0,0,$9,'msg','agent','test-agent',$10)`,
-      [uuid(), TEST_TENANT_ID, TEST_AGENT_ID, now, model, connectionId, inTok, outTok, 0.01, TEST_USER_ID],
+      [randomUUID(), TEST_TENANT_ID, TEST_AGENT_ID, now, model, connectionId, inTok, outTok, 0.01, TEST_USER_ID],
     );
   }
 
@@ -57,7 +57,7 @@ beforeAll(async () => {
   // (a.name = at.agent_name) would match BOTH this row and the live agent for
   // every `test-agent` message, doubling every per-agent SUM. The id-based
   // join (a.id = at.agent_id) matches only the live agent, so totals stay exact.
-  const ghostAgentId = uuid();
+  const ghostAgentId = randomUUID();
   await ds.query(
     `INSERT INTO agents (id, name, display_name, description, is_active, complexity_routing_enabled, tenant_id, created_at, updated_at, deleted_at)
      VALUES ($1,'test-agent','Old Test Agent','recreated slug',false,true,$2,$3,$3,$3)`,
@@ -71,12 +71,12 @@ beforeAll(async () => {
   await ds.query(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, provider, auth_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, description, service_type, agent_name, user_id)
      VALUES ($1,$2,$3,$4,'ok','ghost-model','ghostprovider','api_key',5000,5000,0,0,0.5,'msg','agent','test-agent',$5)`,
-    [uuid(), TEST_TENANT_ID, ghostAgentId, now, TEST_USER_ID],
+    [randomUUID(), TEST_TENANT_ID, ghostAgentId, now, TEST_USER_ID],
   );
 
   // Finding 1: a reserved Playground (is_playground) agent whose usage must NOT
   // pollute provider analytics aggregates or the connection breakdown.
-  const playgroundAgentId = uuid();
+  const playgroundAgentId = randomUUID();
   await ds.query(
     `INSERT INTO agents (id, name, display_name, description, is_active, is_playground, complexity_routing_enabled, tenant_id, created_at, updated_at)
      VALUES ($1,'Playground','Playground','reserved',true,true,true,$2,$3,$3)`,
@@ -85,7 +85,7 @@ beforeAll(async () => {
   await ds.query(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, provider, auth_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, description, service_type, agent_name, user_id)
      VALUES ($1,$2,$3,$4,'ok','gpt-4o','openai','subscription',9000,9000,0,0,0.99,'msg','agent','Playground',$5)`,
-    [uuid(), TEST_TENANT_ID, playgroundAgentId, now, TEST_USER_ID],
+    [randomUUID(), TEST_TENANT_ID, playgroundAgentId, now, TEST_USER_ID],
   );
 
   // P2 leak case: an ORPHAN Playground message with a NULL agent_id but
@@ -98,14 +98,14 @@ beforeAll(async () => {
   await ds.query(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, provider, auth_type, provider_key_label, tenant_provider_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, description, service_type, agent_name, user_id)
      VALUES ($1,$2,NULL,$3,'ok','gpt-4o','openai','subscription','My OpenAI',$4,7000,7000,0,0,0.77,'msg','agent','Playground',$5)`,
-    [uuid(), TEST_TENANT_ID, now, connectionId, TEST_USER_ID],
+    [randomUUID(), TEST_TENANT_ID, now, connectionId, TEST_USER_ID],
   );
 
   // Finding 2: two connections sharing provider+auth_type but differing by
   // label. Each has one message tagged with its provider_key_label; the
   // connection-detail endpoint must keep their usage separate.
-  workConnectionId = uuid();
-  personalConnectionId = uuid();
+  workConnectionId = randomUUID();
+  personalConnectionId = randomUUID();
   for (const [id, label] of [
     [workConnectionId, 'Work'],
     [personalConnectionId, 'Personal'],
@@ -130,7 +130,7 @@ beforeAll(async () => {
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, provider, auth_type, provider_key_label, tenant_provider_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, description, service_type, agent_name, user_id)
        VALUES ($1,$2,$3,$4,'ok','claude','anthropic','api_key',$5,$6,$7,$7,0,0,0.02,'msg','agent','test-agent',$8)`,
       [
-        uuid(),
+        randomUUID(),
         TEST_TENANT_ID,
         TEST_AGENT_ID,
         now,
@@ -375,7 +375,7 @@ describe('GET /api/v1/provider-analytics', () => {
 
   it('returns an empty shape for a connection that does not belong to the user', async () => {
     const res = await request(app.getHttpServer())
-      .get(`/api/v1/provider-analytics/connection-detail?connection_id=${uuid()}`)
+      .get(`/api/v1/provider-analytics/connection-detail?connection_id=${randomUUID()}`)
       .set('x-api-key', TEST_API_KEY)
       .expect(200);
     expect(res.body.connection).toBeNull();

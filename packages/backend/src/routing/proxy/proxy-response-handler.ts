@@ -1,6 +1,6 @@
 import { stripGatewayMarker } from './proxy-transport';
 import { Logger } from '@nestjs/common';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { Response as ExpressResponse } from 'express';
 import { IngestionContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { RoutingMeta } from './proxy.service';
@@ -196,7 +196,7 @@ export async function handleProviderError(
   traceId?: string,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  requestId: string = uuid(),
+  requestId: string = randomUUID(),
   requestDurationMs?: number,
   apiMode?: ProxyApiMode,
 ): Promise<void> {
@@ -428,7 +428,7 @@ export function recordFallbackFailures(
   recorder: ProxyMessageRecorder,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  requestId: string = uuid(),
+  requestId: string = randomUUID(),
 ): string | undefined {
   if (!meta.fallbackFromModel) return undefined;
 
@@ -898,7 +898,7 @@ export function recordSuccess(
   startTime?: number,
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
-  requestId: string = uuid(),
+  requestId: string = randomUUID(),
   attemptNumber: number = PRIMARY_ATTEMPT_NUMBER,
   apiMode?: ProxyApiMode,
 ): void {

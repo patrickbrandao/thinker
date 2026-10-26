@@ -10,12 +10,12 @@ import { keyPrefix, verifyKey } from '../../common/utils/hash.util';
 import { decrypt } from '../../common/utils/crypto.util';
 import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
 
-jest.mock('uuid', () => ({ v4: jest.fn() }));
 jest.mock('crypto', () => {
   const actual = jest.requireActual('crypto');
   return {
     ...actual,
     randomBytes: jest.fn(),
+    randomUUID: jest.fn(),
   };
 });
 
@@ -29,10 +29,9 @@ jest.mock('../../common/utils/crypto.util', () => {
   };
 });
 
-import { v4 as uuidv4 } from 'uuid';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 
-const mockedUuidv4 = uuidv4 as jest.Mock;
+const mockedRandomUUID = randomUUID as jest.Mock;
 const mockedRandomBytes = randomBytes as jest.Mock;
 
 describe('API_KEY_PREFIX constant', () => {
@@ -117,14 +116,14 @@ describe('ApiKeyGeneratorService', () => {
     service = module.get<ApiKeyGeneratorService>(ApiKeyGeneratorService);
 
     // Reset module-level mocks before configuring
-    mockedUuidv4.mockReset();
+    mockedRandomUUID.mockReset();
     mockedRandomBytes.mockReset();
 
     // Default: randomBytes returns a deterministic buffer
     mockedRandomBytes.mockReturnValue(Buffer.from('a'.repeat(32), 'utf8'));
     // Default: sequential UUIDs for the new-tenant path
     // Order: tenantId, agentId, keyId
-    mockedUuidv4
+    mockedRandomUUID
       .mockReturnValueOnce('uuid-tenant-1')
       .mockReturnValueOnce('uuid-agent-1')
       .mockReturnValueOnce('uuid-key-1');

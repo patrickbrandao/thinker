@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './helpers';
 
@@ -32,7 +32,7 @@ async function insertRequest(
   opts: { requestedModel: string; status?: string; attemptModels?: string[] },
 ): Promise<string> {
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
-  const requestId = uuid();
+  const requestId = randomUUID();
   await ds.query(
     `INSERT INTO requests (id, tenant_id, agent_id, timestamp, status, requested_model, agent_name, user_id, api_mode)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -53,7 +53,7 @@ async function insertRequest(
       `INSERT INTO agent_messages (id, request_id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
-        uuid(),
+        randomUUID(),
         requestId,
         TEST_TENANT_ID,
         TEST_AGENT_ID,

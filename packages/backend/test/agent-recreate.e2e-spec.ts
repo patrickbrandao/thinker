@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID } from './helpers';
 
@@ -33,7 +33,7 @@ describe('agent delete + recreate (issue #1765)', () => {
     await ds.query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id, cost_usd)
        VALUES ($1, $2, $3, $4, 'ok', 'gpt-4o', 100, 50, 0, 0, $5, 'test-user-001', 0.001)`,
-      [uuid(), TEST_TENANT_ID, v1Id, now, agentName],
+      [randomUUID(), TEST_TENANT_ID, v1Id, now, agentName],
     );
     // A 'simple' tier row may already exist (tier rows are created lazily per
     // agent). Upsert the override onto it rather than inserting a colliding
@@ -43,7 +43,7 @@ describe('agent delete + recreate (issue #1765)', () => {
        VALUES ($1, $2, 'simple', $3::jsonb)
        ON CONFLICT (agent_id, tier) DO UPDATE SET override_route = EXCLUDED.override_route`,
       [
-        uuid(),
+        randomUUID(),
         v1Id,
         JSON.stringify({ provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' }),
       ],

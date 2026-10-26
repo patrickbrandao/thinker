@@ -51,5 +51,21 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
+  {
+    files: ['packages/backend/src/**/*.ts', 'packages/backend/test/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'uuid',
+              message: "Use randomUUID from 'node:crypto' instead of the uuid package.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettierConfig,
 ];

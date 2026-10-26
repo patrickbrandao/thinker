@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { LimitCheckService } from '../src/notifications/services/limit-check.service';
 import { createTestApp, TEST_API_KEY } from './helpers';
 
@@ -167,7 +167,7 @@ describe('Limit windows include usage recorded in the current second', () => {
     return app.get(DataSource).query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
        VALUES ($1, $2, $3, $4, 'ok', 'test-model', $5, $6, 0, 0, $7, 'test-user-001')`,
-      [uuid(), tenantId, agentId, new Date(), inputTokens, outputTokens, agentName],
+      [randomUUID(), tenantId, agentId, new Date(), inputTokens, outputTokens, agentName],
     );
   };
 

@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './helpers';
 
@@ -22,7 +22,7 @@ beforeAll(async () => {
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
-      uuid(),
+      randomUUID(),
       TEST_TENANT_ID,
       TEST_AGENT_ID,
       now,
@@ -43,7 +43,7 @@ beforeAll(async () => {
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
-      uuid(),
+      randomUUID(),
       TEST_TENANT_ID,
       TEST_AGENT_ID,
       now,
@@ -67,7 +67,7 @@ beforeAll(async () => {
     `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id, routing_tier, routing_reason)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
     [
-      uuid(),
+      randomUUID(),
       TEST_TENANT_ID,
       TEST_AGENT_ID,
       now,
@@ -89,7 +89,7 @@ beforeAll(async () => {
   // The same thing in the request-first shape: a parent `requests` row with a
   // linked attempt. `routing_reason` lives only on the attempt, so this is the
   // row that exercises the NOT EXISTS path rather than the legacy unlinked one.
-  const linkedRequestId = uuid();
+  const linkedRequestId = randomUUID();
   await ds.query(
     `INSERT INTO requests (id, tenant_id, agent_id, agent_name, user_id, timestamp, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -99,7 +99,7 @@ beforeAll(async () => {
     `INSERT INTO agent_messages (id, tenant_id, agent_id, request_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id, routing_tier, routing_reason)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
-      uuid(),
+      randomUUID(),
       TEST_TENANT_ID,
       TEST_AGENT_ID,
       linkedRequestId,

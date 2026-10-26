@@ -137,7 +137,7 @@ describe('ST-02: Create agent', () => {
 describe('ST-03: Seed agent data', () => {
   it('inserts a message row for the smoke agent', async () => {
     const { DataSource } = await import('typeorm');
-    const { v4: uuidv4 } = await import('uuid');
+    const { randomUUID } = await import('node:crypto');
     const ds = app.get(DataSource);
 
     // Look up tenant and agent IDs created by ST-02
@@ -165,7 +165,7 @@ describe('ST-03: Seed agent data', () => {
     await ds.query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [uuidv4(), tenantId, agentId, past, 'ok', 'test-model', 500, 200, 0, 0, smokeAgentName, 'test-user-001'],
+      [randomUUID(), tenantId, agentId, past, 'ok', 'test-model', 500, 200, 0, 0, smokeAgentName, 'test-user-001'],
     );
 
     // Verify message is visible in the API

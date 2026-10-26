@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID } from './helpers';
 
@@ -54,7 +54,7 @@ async function seedRequest(
     attempts: Attempt[];
   },
 ): Promise<void> {
-  const id = uuid();
+  const id = randomUUID();
   seeded[key] = id;
   const msAgo = opts.msAgo ?? HOUR;
   await ds.query(
@@ -76,7 +76,7 @@ async function seedRequest(
       `INSERT INTO agent_messages (id, request_id, attempt_number, tenant_id, agent_id, agent_name, user_id, timestamp, status, provider, model, fallback_from_model, input_tokens, output_tokens, service_type)
        VALUES ($1, $2, $3, $4, $5, $6, 'test-user-001', $7, $8, $9, $10, $11, 10, 5, 'agent')`,
       [
-        uuid(),
+        randomUUID(),
         id,
         index + 1,
         TEST_TENANT_ID,

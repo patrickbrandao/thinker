@@ -13,7 +13,7 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import {
   createTestApp,
@@ -33,8 +33,8 @@ const USER_B = 'isolation-user-b';
 const B_AGENT_NAME = 'b-agent';
 
 // Tenant A's resource identifiers (the attack targets).
-const A_MESSAGE_ID = uuid();
-const A_RUN_ID = uuid();
+const A_MESSAGE_ID = randomUUID();
+const A_RUN_ID = randomUUID();
 const A_CUSTOM_PROVIDER_ID = 'cp-isolation-a';
 const A_HEADER_TIER_ID = 'ht-isolation-a';
 let aRuleId: string;
@@ -95,7 +95,7 @@ beforeAll(async () => {
         cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id)
      VALUES ($1,$2,$3,$4,'ok','gpt-4o','openai','api_key','Default',$5,100,50,0,0,
              'Tenant A connection secret','agent','test-agent',$6)`,
-    [uuid(), TEST_TENANT_ID, TEST_AGENT_ID, now, aProviderConnectionId, TEST_USER_ID],
+    [randomUUID(), TEST_TENANT_ID, TEST_AGENT_ID, now, aProviderConnectionId, TEST_USER_ID],
   );
 
   // A custom provider (tenant-scoped).
@@ -151,7 +151,7 @@ beforeAll(async () => {
        (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens,
         cache_read_tokens, cache_creation_tokens, description, service_type, agent_name, user_id)
      VALUES ($1,$2,$3,$4,'ok','gpt-4o',10,5,0,0,'Tenant B message','agent',$5,$6)`,
-    [uuid(), bTenantId, bAgentId, now, B_AGENT_NAME, USER_B],
+    [randomUUID(), bTenantId, bAgentId, now, B_AGENT_NAME, USER_B],
   );
 }, 30000);
 

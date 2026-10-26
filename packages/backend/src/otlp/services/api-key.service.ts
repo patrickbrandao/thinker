@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { randomBytes } from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
+import { randomBytes, randomUUID } from 'crypto';
 import { Tenant } from '../../entities/tenant.entity';
 import { Agent } from '../../entities/agent.entity';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
@@ -57,7 +56,7 @@ export class ApiKeyGeneratorService {
       if (existing) {
         tenantId = existing.id;
       } else {
-        tenantId = uuidv4();
+        tenantId = randomUUID();
         await this.tenantRepo.insert({
           id: tenantId,
           // `name` keeps mirroring the owner id until it's repurposed as a
@@ -73,7 +72,7 @@ export class ApiKeyGeneratorService {
       throw new NotFoundException('No tenant available for agent onboarding');
     }
 
-    const agentId = uuidv4();
+    const agentId = randomUUID();
     await this.agentRepo.insert({
       id: agentId,
       name: params.agentName,
@@ -89,7 +88,7 @@ export class ApiKeyGeneratorService {
     });
 
     const rawKey = this.generateKey();
-    const keyId = uuidv4();
+    const keyId = randomUUID();
     await this.keyRepo.insert({
       id: keyId,
       key: encrypt(rawKey, getEncryptionSecret()),
@@ -146,7 +145,7 @@ export class ApiKeyGeneratorService {
     this.otlpAuthGuard.clearCache();
 
     const rawKey = this.generateKey();
-    const keyId = uuidv4();
+    const keyId = randomUUID();
     await this.keyRepo.insert({
       id: keyId,
       key: encrypt(rawKey, getEncryptionSecret()),

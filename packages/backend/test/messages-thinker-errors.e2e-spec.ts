@@ -8,7 +8,7 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_AGENT_ID } from './helpers';
 
@@ -27,7 +27,7 @@ async function seed(
     error_class: string | null;
   },
 ): Promise<string> {
-  const id = uuid();
+  const id = randomUUID();
   const now = new Date().toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
   await ds.query(
     `INSERT INTO agent_messages

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { NotificationRule } from '../../entities/notification-rule.entity';
 import { NotificationLog } from '../../entities/notification-log.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
@@ -60,7 +60,7 @@ export class NotificationRulesService {
     dto: CreateNotificationRuleDto,
   ): Promise<NotificationRule> {
     const agent = await this.resolveAgent(tenantId, dto.agent_name);
-    const id = uuid();
+    const id = randomUUID();
     const now = toSqlTimestamp();
 
     const rule: Partial<NotificationRule> = {
