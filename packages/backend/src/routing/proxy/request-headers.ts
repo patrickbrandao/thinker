@@ -6,7 +6,9 @@ const MAX_TOTAL_BYTES = 8192;
 const ELLIPSIS_BYTES = Buffer.byteLength('…', 'utf8');
 
 // Headers that can carry secrets — dropped entirely so they never hit the DB.
-const SENSITIVE_HEADERS = new Set<string>([
+// The Playground blocklist (thinker-shared) must cover every name here; a spec
+// in playground/request-header-sanitizer.spec.ts guards that.
+export const SENSITIVE_HEADERS: ReadonlySet<string> = new Set<string>([
   'authorization',
   'cookie',
   'set-cookie',
