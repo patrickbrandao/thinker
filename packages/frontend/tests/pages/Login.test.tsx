@@ -74,7 +74,7 @@ describe('Login', () => {
   it('dev-only button signs in with the seed admin credentials', async () => {
     mockSignInEmail.mockResolvedValue({ error: null });
     render(() => <Login />);
-    fireEvent.click(screen.getByRole('button', { name: /sign in as dev/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /sign in as dev/i }));
     await vi.waitFor(() => {
       expect(mockSignInEmail).toHaveBeenCalledWith({
         email: 'admin@thinker.example.com',
@@ -87,7 +87,7 @@ describe('Login', () => {
   it('dev-only button surfaces an error when sign-in fails', async () => {
     mockSignInEmail.mockResolvedValue({ error: {} });
     const { container } = render(() => <Login />);
-    fireEvent.click(screen.getByRole('button', { name: /sign in as dev/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /sign in as dev/i }));
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Dev sign-in failed');
     });

@@ -1,6 +1,14 @@
 import { A, useLocation, useSearchParams } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
-import { type Component, createSignal, createUniqueId, onCleanup, onMount, Show } from 'solid-js';
+import {
+  type Component,
+  createSignal,
+  createUniqueId,
+  lazy,
+  onCleanup,
+  onMount,
+  Show,
+} from 'solid-js';
 import SocialButtons from '../components/SocialButtons.jsx';
 import { authClient } from '../services/auth-client.js';
 import { appendSearch, getAuthDestination } from '../services/auth-redirects.js';
@@ -9,12 +17,12 @@ import { checkSignupEnabled, checkSocialProviders } from '../services/setup-stat
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
-// Dev-only seed credentials (see packages/backend/src/database/database-seeder.service.ts,
-// seeded only when SEED_DATA=true / non-production). Referenced solely inside the
-// `import.meta.env.DEV` branch below, so Vite strips both the button and these literals
-// from production builds — they never ship. The account exists only in a dev database.
-const DEV_EMAIL = 'admin@thinker.example.com';
-const DEV_PASSWORD = 'thinker';
+// Dev-only seed-admin shortcut. The dynamic import sits inside the
+// `import.meta.env.DEV` branch, so production builds drop the module together
+// with the seed credentials and the button template (#229).
+const DevSignInButton = import.meta.env.DEV
+  ? lazy(() => import('../components/DevSignInButton.jsx'))
+  : null;
 
 const Login: Component = () => {
   const [email, setEmail] = createSignal('');
@@ -104,15 +112,15 @@ const Login: Component = () => {
   };
 
   // Dev shortcut: fill + submit the seed admin. One click, no credentials in the URL;
-  // compiled out of production (see DEV_EMAIL/DEV_PASSWORD).
-  const signInAsDev = async () => {
-    setEmail(DEV_EMAIL);
-    setPassword(DEV_PASSWORD);
+  // the credentials live in DevSignInButton, which production builds never include.
+  const signInAsDev = async (devEmail: string, devPassword: string) => {
+    setEmail(devEmail);
+    setPassword(devPassword);
     setError('');
     setLoading(true);
     const { error: authError } = await authClient.signIn.email({
-      email: DEV_EMAIL,
-      password: DEV_PASSWORD,
+      email: devEmail,
+      password: devPassword,
     });
     setLoading(false);
     if (authError) {
@@ -162,16 +170,8 @@ const Login: Component = () => {
       </Show>
 
       <form class="auth-form" onSubmit={handleSubmit}>
-        {import.meta.env.DEV && (
-          <button
-            type="button"
-            class="auth-form__submit"
-            onClick={signInAsDev}
-            disabled={loading()}
-            style="background:#f59e0b;color:#1f1400;font-weight:700;margin-bottom:0.75rem;"
-          >
-            ⚡ Sign in as dev, admin@thinker.example.com
-          </button>
+        {import.meta.env.DEV && DevSignInButton && (
+          <DevSignInButton disabled={loading()} onSignIn={signInAsDev} />
         )}
         {error() && (
           <div id={errorId} class="auth-form__error" role="alert">
