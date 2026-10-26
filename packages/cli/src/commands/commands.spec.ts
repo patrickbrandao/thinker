@@ -2180,6 +2180,22 @@ describe('routing commands', () => {
           },
         ],
       },
+      {
+        status: 200,
+        body: [
+          {
+            id: 'vm-1',
+            name: 'DeepSeek/Flash',
+            enabled: false,
+            override_route: { model: 'deepseek-chat' },
+            fallback_routes: null,
+            continue_on_default: true,
+            response_mode: 'buffered',
+            shadows: [],
+            context_length: 64000,
+          },
+        ],
+      },
       { status: 200, body: { enabled: false } },
     ]);
     expect(await run(io, ['routing', 'status', 'John'])).toBe(0);
@@ -2188,6 +2204,7 @@ describe('routing commands', () => {
       [
         `${HOST}/api/v1/routing/john/tiers`,
         `${HOST}/api/v1/routing/john/header-tiers`,
+        `${HOST}/api/v1/routing/john/virtual-models`,
         `${HOST}/api/v1/routing/john/recording`,
       ].sort(),
     );
@@ -2206,6 +2223,17 @@ describe('routing commands', () => {
           fallbacks: [],
         },
       ],
+      virtual_models: [
+        {
+          name: 'DeepSeek/Flash',
+          enabled: false,
+          route: { model: 'deepseek-chat' },
+          fallbacks: [],
+          continue_on_default: true,
+          response_mode: 'buffered',
+          shadows: [],
+        },
+      ],
       recording: false,
     });
   });
@@ -2214,12 +2242,14 @@ describe('routing commands', () => {
     const { io } = authedIo([
       { status: 200, body: [] },
       { status: 200, body: [] },
+      { status: 200, body: [] },
       { status: 200, body: { enabled: false } },
     ]);
     expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
     expect(io.lastJson()).toMatchObject({
       default: { route: null, fallbacks: [] },
       custom_tiers: [],
+      virtual_models: [],
     });
   });
 

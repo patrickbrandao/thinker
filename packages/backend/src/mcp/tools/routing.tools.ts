@@ -11,6 +11,8 @@ import {
   matchesModelName,
   resolveModelRoute,
 } from '../../routing/routing-core/resolve-model-route';
+import type { RouteParamsTarget } from '../../routing/model-params/route-model-params.service';
+import { registerVirtualModelTools, summarizeVirtualModel } from './virtual-models.tools';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 const ROUTE_TEST_TIMEOUT_MS = 120_000;
@@ -79,6 +81,18 @@ function parseResponsesSurface(parsed: Record<string, unknown>): SurfaceResult {
   };
 }
 
+/**
+ * `tier` and `virtual` are separate selectors (ADR 0004, section 9): a custom
+ * tier and a virtual model may share a name, so neither may stand in for the
+ * other.
+ */
+function paramsTarget(tier?: string, virtual?: string): string | RouteParamsTarget | undefined {
+  if (tier !== undefined && virtual !== undefined) {
+    throw new Error('Pass tier or virtual, not both');
+  }
+  return virtual !== undefined ? { virtual } : tier;
+}
+
 function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): boolean {
   const nonEmpty = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
   if (surface === 'messages') return nonEmpty(parsed['content']);
@@ -88,9 +102,10 @@ function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): bo
 
 /**
  * Routing tools: readiness, default-tier fallbacks, per-agent recording
- * switch, and the custom (header) tier lifecycle. "Custom tier" is the CLI's
- * name for a header tier — a rule that overrides the route when a request
- * carries a matching header.
+ * switch, the custom (header) tier lifecycle and the virtual models. "Custom
+ * tier" is the CLI's name for a header tier — a rule that overrides the route
+ * when a request carries a matching header. A virtual model is a public name
+ * the harness sends as `model` (see virtual-models.tools.ts).
  */
 export function registerRoutingTools(
   server: McpServer,
@@ -102,7 +117,9 @@ export function registerRoutingTools(
     'thinker_routing_status',
     {
       title: 'Routing status',
-      description: 'Report whether a harness can route yet, and why not.',
+      description:
+        'Report whether a harness can route yet, and why not, and list its virtual models ' +
+        '(names it can send as `model`) with their chains.',
       inputSchema: z.object({ agent: z.string().min(1) }),
       annotations: { readOnlyHint: true },
     },
@@ -110,11 +127,15 @@ export function registerRoutingTools(
       result(
         (async () => {
           const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-          return resolveRoutingStatus({
-            providers: await deps.providers.getProviders(agent.tenant_id),
-            hasRoutableTier: () => deps.tiers.hasRoutableTier(agent.id),
-            pricingCacheSize: () => deps.pricingSync.getAll().size,
-          });
+          const [status, virtualModels] = await Promise.all([
+            resolveRoutingStatus({
+              providers: await deps.providers.getProviders(agent.tenant_id),
+              hasRoutableTier: () => deps.tiers.hasRoutableTier(agent.id),
+              pricingCacheSize: () => deps.pricingSync.getAll().size,
+            }),
+            deps.virtualModels.list(agent.id),
+          ]);
+          return { ...status, virtual_models: virtualModels.map(summarizeVirtualModel) };
         })(),
       ),
   );
@@ -187,21 +208,24 @@ export function registerRoutingTools(
       title: 'Get model params',
       description:
         'List the params a routed model accepts (type, allowed values, description) with their saved ' +
-        'values, e.g. reasoning.effort or temperature. tier is "default" or a custom tier name; model ' +
-        'defaults to the tier primary and may name one of its fallbacks. current: null means the ' +
-        'provider default applies.',
+        'values, e.g. reasoning.effort or temperature. Address the route by tier ("default" or a ' +
+        'custom tier name) or by virtual (a virtual model name), not both; model defaults to the ' +
+        'primary and may name one of its fallbacks. Routes a virtual model borrows from the ' +
+        'Default chain use the default tier params. current: null means the provider default applies.',
       inputSchema: z.object({
         agent: z.string().min(1),
         tier: z.string().min(1).optional(),
+        virtual: z.string().min(1).optional(),
         model: z.string().min(1).optional(),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ agent: agentName, tier, model }) =>
+    async ({ agent: agentName, tier, virtual, model }) =>
       result(
         (async () => {
+          const target = paramsTarget(tier, virtual);
           const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-          return deps.routeModelParams.get(agent.id, tier, model);
+          return deps.routeModelParams.get(agent.id, target, model);
         })(),
       ),
   );
@@ -213,23 +237,26 @@ export function registerRoutingTools(
         title: 'Set model params',
         description:
           'Set or unset params on a routed model. Saved params override the values the caller sends ' +
-          'on routed requests (model "auto" or a matching custom-tier header); a request naming a ' +
-          'concrete model skips them. ' +
+          'on routed requests (model "auto", a virtual model name, or a matching custom-tier ' +
+          'header); a request naming a concrete model skips them. Address the route by tier or by ' +
+          'virtual, not both. ' +
           'set maps a param path to its value ({"reasoning.effort": "high"}); unset lists paths to ' +
           'remove. Other saved params are kept. Read thinker_routing_params_get first for valid paths.',
         inputSchema: z.object({
           agent: z.string().min(1),
           tier: z.string().min(1).optional(),
+          virtual: z.string().min(1).optional(),
           model: z.string().min(1).optional(),
           set: z.record(z.string().min(1), z.unknown()).optional(),
           unset: z.array(z.string().min(1)).max(50).optional(),
         }),
       },
-      async ({ agent: agentName, tier, model, set, unset }) =>
+      async ({ agent: agentName, tier, virtual, model, set, unset }) =>
         result(
           (async () => {
+            const target = paramsTarget(tier, virtual);
             const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-            return deps.routeModelParams.update(agent.id, tier, model, {
+            return deps.routeModelParams.update(agent.id, target, model, {
               set: set as Record<string, JsonValue> | undefined,
               unset,
             });
@@ -296,12 +323,18 @@ export function registerRoutingTools(
       {
         title: 'Test a route end-to-end',
         description:
-          'Send one real request through the harness route and the platform surface it uses. Spends provider tokens.',
+          'Send one real request through the harness route and the platform surface it uses. ' +
+          'model defaults to "auto" and may be a virtual model name or a concrete model id; the ' +
+          'result reports the routing reason and, for a virtual model, its name. Spends provider tokens.',
         inputSchema: z.object({
           agent: z.string().min(1),
           prompt: z.string().min(1).optional(),
           tier: z.string().min(1).optional(),
-          model: z.string().min(1).optional(),
+          model: z
+            .string()
+            .min(1)
+            .optional()
+            .describe('"auto" (default), a virtual model name, or a concrete model id.'),
           as: z.string().min(1).optional().describe('Force a platform surface (e.g. claude-code).'),
         }),
       },
@@ -416,6 +449,10 @@ export function registerRoutingTools(
             if (/^\[🦚 Thinker M\d+\]/.test(surfaceResult.reply)) {
               throw new Error(surfaceResult.reply);
             }
+            // How the proxy routed it: `virtual-model` plus the stored name
+            // when `model` matched an enabled virtual model (ADR 0004, §8).
+            const routingReason = response.headers.get('x-thinker-reason');
+            const virtualModel = response.headers.get('x-thinker-virtual-model');
             return {
               agent: info.agent_name,
               ok: true,
@@ -424,6 +461,8 @@ export function registerRoutingTools(
               requested_model: requestedModel,
               ...(tier ? { tier } : {}),
               ...(tierHeader ? { tier_header: `${tierHeader.key}: ${tierHeader.value}` } : {}),
+              ...(routingReason ? { routing_reason: routingReason } : {}),
+              ...(virtualModel ? { virtual_model: virtualModel } : {}),
               served_model: surfaceResult.servedModel,
               duration_ms: durationMs,
               ...(surfaceResult.tokens !== undefined ? { tokens: surfaceResult.tokens } : {}),
@@ -677,4 +716,6 @@ export function registerRoutingTools(
           })(),
         ),
     );
+
+  registerVirtualModelTools(server, deps, operator);
 }

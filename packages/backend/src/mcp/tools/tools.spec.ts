@@ -42,6 +42,21 @@ const CONNECTION = {
   tenant_id: TENANT,
 };
 
+const VIRTUAL_ROW = {
+  id: 'vm-1',
+  agent_id: 'agent-1',
+  tenant_id: TENANT,
+  name: 'DeepSeek/Flash',
+  sort_order: 0,
+  enabled: true,
+  override_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
+  fallback_routes: null,
+  continue_on_default: true,
+  response_mode: 'buffered',
+  output_modality: 'text',
+};
+const VIRTUAL_VIEW = { ...VIRTUAL_ROW, shadows: [], context_length: 128000 };
+
 function makeDeps(): McpToolDeps {
   const chainable = {
     insert: jest.fn().mockReturnThis(),
@@ -112,6 +127,19 @@ function makeDeps(): McpToolDeps {
       list: jest.fn().mockResolvedValue([{ id: 'h1', name: 'tier' }]),
       create: jest.fn().mockResolvedValue({ id: 'h1', name: 'tier' }),
       setOverride: jest.fn().mockResolvedValue({}),
+      setFallbacks: jest.fn().mockResolvedValue([]),
+      clearFallbacks: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    virtualModels: {
+      list: jest.fn().mockResolvedValue([VIRTUAL_ROW]),
+      listViews: jest.fn().mockResolvedValue([VIRTUAL_VIEW]),
+      create: jest.fn().mockResolvedValue(VIRTUAL_VIEW),
+      update: jest.fn().mockResolvedValue(VIRTUAL_VIEW),
+      setEnabled: jest.fn().mockResolvedValue(VIRTUAL_VIEW),
+      setResponseMode: jest.fn().mockResolvedValue(VIRTUAL_VIEW),
+      setOverride: jest.fn().mockResolvedValue(VIRTUAL_VIEW),
+      clearOverride: jest.fn().mockResolvedValue(undefined),
       setFallbacks: jest.fn().mockResolvedValue([]),
       clearFallbacks: jest.fn().mockResolvedValue(undefined),
       delete: jest.fn().mockResolvedValue(undefined),
@@ -605,10 +633,282 @@ describe('MCP tools', () => {
       });
     });
 
+    it('addresses model params by virtual model, exclusive with tier', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const got = await call(tools, 'thinker_routing_params_get', {
+        agent: 'demo',
+        virtual: 'deepseek/flash',
+      });
+      expect(got.error).toBe(false);
+      expect(deps.routeModelParams.get).toHaveBeenCalledWith(
+        'agent-1',
+        { virtual: 'deepseek/flash' },
+        undefined,
+      );
+
+      await call(tools, 'thinker_routing_params_set', {
+        agent: 'demo',
+        virtual: 'deepseek/flash',
+        model: 'gpt-4o',
+        set: { temperature: 0.2 },
+      });
+      expect(deps.routeModelParams.update).toHaveBeenCalledWith(
+        'agent-1',
+        { virtual: 'deepseek/flash' },
+        'gpt-4o',
+        { set: { temperature: 0.2 }, unset: undefined },
+      );
+
+      const both = await call(tools, 'thinker_routing_params_get', {
+        agent: 'demo',
+        tier: 'default',
+        virtual: 'deepseek/flash',
+      });
+      expect(both.error).toBe(true);
+      expect(both.text).toBe('Pass tier or virtual, not both');
+      const bothSet = await call(tools, 'thinker_routing_params_set', {
+        agent: 'demo',
+        tier: 'default',
+        virtual: 'x',
+        set: { temperature: 1 },
+      });
+      expect(bothSet.error).toBe(true);
+      expect(deps.routeModelParams.update).toHaveBeenCalledTimes(1);
+    });
+
     it('hides the params write tool from a read-only token', () => {
       const tools = registerAll(makeDeps(), { ...OPERATOR, scopes: new Set(['mcp:read']) });
       expect(tools.has('thinker_routing_params_get')).toBe(true);
       expect(tools.has('thinker_routing_params_set')).toBe(false);
+    });
+
+    it('lists the virtual models in the routing status', async () => {
+      const { data } = await call(registerAll(makeDeps()), 'thinker_routing_status', {
+        agent: 'demo',
+      });
+      expect(data).toEqual({
+        enabled: true,
+        reason: null,
+        virtual_models: [
+          {
+            id: 'vm-1',
+            name: 'DeepSeek/Flash',
+            enabled: true,
+            route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
+            fallbacks: [],
+            continue_on_default: true,
+            response_mode: 'buffered',
+          },
+        ],
+      });
+    });
+
+    it('lists virtual models with their computed fields', async () => {
+      const deps = makeDeps();
+      const { data } = await call(registerAll(deps), 'thinker_routing_virtual_list', {
+        agent: 'demo',
+      });
+      expect(data).toEqual({ virtual_models: [VIRTUAL_VIEW] });
+      expect(deps.virtualModels.listViews).toHaveBeenCalledWith('agent-1', TENANT);
+    });
+
+    it('creates a virtual model with its chain in one service call', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const res = await call(tools, 'thinker_routing_virtual_create', {
+        agent: 'demo',
+        name: 'deepseek',
+        model: 'deepseek-chat',
+        provider: 'deepseek',
+        auth_type: 'api_key',
+        key_label: 'Work',
+        fallbacks: ['gpt-4o'],
+        continue_on_default: true,
+        response_mode: 'stream',
+      });
+      expect(res.data).toEqual({ virtual_model: VIRTUAL_VIEW });
+      expect(deps.virtualModels.create).toHaveBeenCalledWith('agent-1', TENANT, {
+        name: 'deepseek',
+        override_route: {
+          model: 'deepseek-chat',
+          provider: 'deepseek',
+          authType: 'api_key',
+          keyLabel: 'Work',
+        },
+        fallback_routes: [{ model: 'gpt-4o' }],
+        continue_on_default: true,
+        response_mode: 'stream',
+      });
+
+      // A name-only virtual model (pure "continue on Default") is valid.
+      await call(tools, 'thinker_routing_virtual_create', { agent: 'demo', name: 'alias' });
+      expect(deps.virtualModels.create).toHaveBeenLastCalledWith('agent-1', TENANT, {
+        name: 'alias',
+        override_route: null,
+        fallback_routes: [],
+      });
+    });
+
+    it('rejects fallbacks or route pins without a primary, and surfaces service errors', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const noPrimary = await call(tools, 'thinker_routing_virtual_create', {
+        agent: 'demo',
+        name: 'x',
+        fallbacks: ['gpt-4o'],
+      });
+      expect(noPrimary.error).toBe(true);
+      expect(noPrimary.text).toContain('fallbacks require a model');
+      const pinOnly = await call(tools, 'thinker_routing_virtual_create', {
+        agent: 'demo',
+        name: 'x',
+        provider: 'openai',
+      });
+      expect(pinOnly.text).toContain('need a model');
+      expect(deps.virtualModels.create).not.toHaveBeenCalled();
+
+      (deps.virtualModels.create as jest.Mock).mockRejectedValueOnce(
+        new Error('A virtual model named "x" already exists on this agent'),
+      );
+      const dup = await call(tools, 'thinker_routing_virtual_create', { agent: 'demo', name: 'x' });
+      expect(dup.error).toBe(true);
+      expect(dup.text).toContain('already exists');
+    });
+
+    it('updates a virtual model found by name, routes first', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const order: string[] = [];
+      for (const method of [
+        'setOverride',
+        'setFallbacks',
+        'setResponseMode',
+        'update',
+        'setEnabled',
+      ] as const) {
+        (deps.virtualModels[method] as jest.Mock).mockImplementation(async () => {
+          order.push(method);
+          return VIRTUAL_VIEW;
+        });
+      }
+      const res = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'deepseek/FLASH',
+        name: 'flash',
+        model: 'gpt-4o-mini',
+        fallbacks: ['gpt-4o'],
+        continue_on_default: false,
+        response_mode: 'stream',
+        enabled: false,
+      });
+      expect(res.data).toEqual({ virtual_model: VIRTUAL_VIEW });
+      expect(order).toEqual([
+        'setOverride',
+        'setFallbacks',
+        'setResponseMode',
+        'update',
+        'setEnabled',
+      ]);
+      expect(deps.virtualModels.setOverride).toHaveBeenCalledWith('agent-1', TENANT, 'vm-1', {
+        model: 'gpt-4o-mini',
+      });
+      expect(deps.virtualModels.setFallbacks).toHaveBeenCalledWith('agent-1', TENANT, 'vm-1', [
+        'gpt-4o',
+      ]);
+      expect(deps.virtualModels.update).toHaveBeenCalledWith('agent-1', TENANT, 'vm-1', {
+        name: 'flash',
+        continue_on_default: false,
+      });
+      expect(deps.virtualModels.setEnabled).toHaveBeenCalledWith('agent-1', TENANT, 'vm-1', false);
+    });
+
+    it('clears fallbacks with [], the primary with clear_model, and finds by id', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        fallbacks: [],
+      });
+      expect(deps.virtualModels.clearFallbacks).toHaveBeenCalledWith('agent-1', 'vm-1');
+      expect(deps.virtualModels.update).not.toHaveBeenCalled();
+
+      await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        clear_model: true,
+        fallbacks: [],
+      });
+      expect(deps.virtualModels.clearOverride).toHaveBeenCalledWith('agent-1', 'vm-1');
+      expect(deps.virtualModels.clearFallbacks).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an empty, contradictory or unknown update', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const nothing = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'deepseek/flash',
+      });
+      expect(nothing.text).toBe('Nothing to change');
+      const clash = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'deepseek/flash',
+        clear_model: true,
+        model: 'gpt-4o',
+      });
+      expect(clash.text).toContain('clear_model cannot be combined');
+      const unknown = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'ghost',
+        enabled: true,
+      });
+      expect(unknown.error).toBe(true);
+      expect(unknown.text).toBe(
+        'Virtual model "ghost" not found for "demo" (virtual models: DeepSeek/Flash)',
+      );
+
+      (deps.virtualModels.list as jest.Mock).mockResolvedValue([
+        { ...VIRTUAL_ROW, override_route: null },
+      ]);
+      const orphan = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'deepseek/flash',
+        fallbacks: ['gpt-4o'],
+      });
+      expect(orphan.text).toContain('fallbacks require a model');
+      expect(deps.virtualModels.setFallbacks).not.toHaveBeenCalled();
+    });
+
+    it('deletes a virtual model by name, and reports an unknown one', async () => {
+      const deps = makeDeps();
+      const tools = registerAll(deps);
+      const res = await call(tools, 'thinker_routing_virtual_delete', {
+        agent: 'demo',
+        virtual: 'DEEPSEEK/flash',
+      });
+      expect(res.data).toEqual({ ok: true, deleted: { id: 'vm-1', name: 'DeepSeek/Flash' } });
+      expect(deps.virtualModels.delete).toHaveBeenCalledWith('agent-1', 'vm-1');
+
+      (deps.virtualModels.list as jest.Mock).mockResolvedValue([]);
+      const none = await call(tools, 'thinker_routing_virtual_delete', {
+        agent: 'demo',
+        virtual: 'x',
+      });
+      expect(none.text).toBe('Virtual model "x" not found for "demo" (it has no virtual models)');
+    });
+
+    it('keeps the virtual model write tools from a read-only token', () => {
+      const tools = registerAll(makeDeps(), { ...OPERATOR, scopes: new Set(['mcp:read']) });
+      expect(tools.has('thinker_routing_virtual_list')).toBe(true);
+      for (const name of [
+        'thinker_routing_virtual_create',
+        'thinker_routing_virtual_update',
+        'thinker_routing_virtual_delete',
+      ]) {
+        expect(tools.has(name)).toBe(false);
+      }
     });
 
     it('reads and writes recording, and exposes no repair toggle', async () => {
@@ -898,6 +1198,40 @@ describe('MCP tools', () => {
         expect(
           (await call(tools, 'thinker_routing_test', { agent: 'demo', as: 'openclaw' })).error,
         ).toBe(true);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('reports the virtual model and the routing reason a test went through', async () => {
+      const originalFetch = global.fetch;
+      const fetchMock = jest.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ model: 'gpt-4o', choices: [{ message: { content: 'OK' } }] }),
+          {
+            status: 200,
+            headers: {
+              'X-Thinker-Reason': 'virtual-model',
+              'X-Thinker-Virtual-Model': 'DeepSeek/Flash',
+            },
+          },
+        ),
+      );
+      global.fetch = fetchMock;
+      try {
+        const res = await call(registerAll(makeDeps()), 'thinker_routing_test', {
+          agent: 'demo',
+          as: 'openclaw',
+          model: 'deepseek/flash',
+        });
+        expect(res.data).toMatchObject({
+          ok: true,
+          requested_model: 'deepseek/flash',
+          routing_reason: 'virtual-model',
+          virtual_model: 'DeepSeek/Flash',
+          served_model: 'gpt-4o',
+        });
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body as string).model).toBe('deepseek/flash');
       } finally {
         global.fetch = originalFetch;
       }

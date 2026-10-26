@@ -3,7 +3,14 @@ import { resolveAgentKey } from './agent';
 import { PLATFORM_CATALOG } from '../provider-catalog.gen';
 import { slugifyAgentName } from '../slug';
 import { CliError } from '../errors';
-import { parseArgs, parseBooleanFlag, requirePositional, requireString, requireYes } from '../args';
+import {
+  ParsedArgs,
+  parseArgs,
+  parseBooleanFlag,
+  requirePositional,
+  requireString,
+  requireYes,
+} from '../args';
 import { ApiClient } from '../client';
 import { assertModelsDiscovered } from './model-check';
 import { CLI_USER_AGENT } from '../version';
@@ -12,9 +19,10 @@ const URL_ONLY = { strings: ['url'] } as const;
 
 /**
  * The CLI exposes only the routing surfaces Thinker keeps long-term:
- * the DEFAULT route (one model + fallbacks) and CUSTOM header-triggered
- * tiers. The deprecated complexity tiers (simple/standard/complex/reasoning)
- * are deliberately absent.
+ * the DEFAULT route (one model + fallbacks), CUSTOM header-triggered tiers
+ * and VIRTUAL models (public names a harness sends as `model`). The
+ * deprecated complexity tiers (simple/standard/complex/reasoning) are
+ * deliberately absent.
  */
 
 function agentPath(agent: string, suffix: string): string {
@@ -38,6 +46,16 @@ interface TierAssignmentRow {
   fallback_routes?: unknown;
 }
 
+interface VirtualModelListRow {
+  name?: string;
+  enabled?: boolean;
+  override_route?: unknown;
+  fallback_routes?: unknown;
+  continue_on_default?: boolean;
+  response_mode?: string;
+  shadows?: unknown;
+}
+
 interface HeaderTierListRow {
   name?: string;
   header_key?: string;
@@ -49,8 +67,8 @@ interface HeaderTierListRow {
 
 /**
  * The composite readback for everything `agent configure` writes: default
- * route + fallbacks, custom tiers with their triggers and routes, and the
- * recording toggle. (The backend's /status endpoint only reports the
+ * route + fallbacks, custom tiers with their triggers and routes, virtual
+ * models with their chains, and the recording toggle. (The backend's /status endpoint only reports the
  * deprecated complexity-routing flag, so this composes the real config.)
  */
 export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
@@ -58,9 +76,10 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
 
-  const [tiers, customTiers, recording] = await Promise.all([
+  const [tiers, customTiers, virtualModels, recording] = await Promise.all([
     client.request('GET', agentPath(agent, '/tiers')),
     client.request('GET', agentPath(agent, '/header-tiers')),
+    client.request('GET', agentPath(agent, '/virtual-models')),
     client.request('GET', agentPath(agent, '/recording')),
   ]);
 
@@ -78,6 +97,18 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       fallbacks: t.fallback_routes ?? [],
     }));
 
+  const virtual = (Array.isArray(virtualModels) ? virtualModels : [])
+    .filter((v): v is VirtualModelListRow => typeof v === 'object' && v !== null)
+    .map((v) => ({
+      name: v.name,
+      enabled: v.enabled,
+      route: v.override_route ?? null,
+      fallbacks: v.fallback_routes ?? [],
+      continue_on_default: v.continue_on_default ?? false,
+      response_mode: v.response_mode,
+      shadows: Array.isArray(v.shadows) ? v.shadows : [],
+    }));
+
   printJson(io, {
     agent,
     default: {
@@ -85,6 +116,7 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       fallbacks: defaultTier?.fallback_routes ?? [],
     },
     custom_tiers: custom,
+    virtual_models: virtual,
     recording: (recording as { enabled?: boolean } | null)?.enabled ?? null,
   });
 }
@@ -242,6 +274,258 @@ export const routingCustom = {
     );
   },
 };
+
+interface VirtualModelRow {
+  id?: string;
+  name?: string;
+  override_route?: unknown;
+}
+
+const RESPONSE_MODES = ['buffered', 'stream'] as const;
+
+/** A virtual model by id or by name, ignoring case like the proxy does. */
+async function findVirtualModel(
+  client: ApiClient,
+  agent: string,
+  nameOrId: string,
+): Promise<{ id: string; name: string; hasPrimary: boolean }> {
+  const rows = (await client.request('GET', agentPath(agent, '/virtual-models'))) as unknown;
+  const list = (Array.isArray(rows) ? rows : []).filter(
+    (v): v is VirtualModelRow => typeof v === 'object' && v !== null,
+  );
+  const needle = nameOrId.toLowerCase();
+  const hit =
+    list.find((v) => v.id === nameOrId) ??
+    list.find((v) => typeof v.name === 'string' && v.name.toLowerCase() === needle);
+  if (!hit?.id) {
+    throw new CliError(
+      'not_found',
+      `No virtual model "${nameOrId}" on agent "${agent}"`,
+      'See thinker routing virtual list ' + agent,
+      404,
+    );
+  }
+  return {
+    id: hit.id,
+    name: typeof hit.name === 'string' ? hit.name : hit.id,
+    hasPrimary: hit.override_route !== null && hit.override_route !== undefined,
+  };
+}
+
+function virtualPath(agent: string, id: string, suffix = ''): string {
+  return agentPath(agent, `/virtual-models/${encodeURIComponent(id)}${suffix}`);
+}
+
+/** --model plus its optional pins, as the API's route input. */
+function primaryRouteFromFlags(args: ParsedArgs): Record<string, string> | null {
+  const model = args.strings['model'];
+  const pins = ['provider', 'auth-type', 'key-label'].filter((f) => args.strings[f] !== undefined);
+  if (model === undefined) {
+    if (pins.length > 0) {
+      throw new CliError(
+        'missing_flag',
+        `${pins.map((f) => `--${f}`).join(', ')} need --model`,
+        'They pin the primary route; pass --model with them',
+      );
+    }
+    return null;
+  }
+  return {
+    model,
+    ...(args.strings['provider'] ? { provider: args.strings['provider'] } : {}),
+    ...(args.strings['auth-type'] ? { authType: args.strings['auth-type'] } : {}),
+    ...(args.strings['key-label'] ? { keyLabel: args.strings['key-label'] } : {}),
+  };
+}
+
+function responseModeFlag(args: ParsedArgs): string | undefined {
+  const mode = args.strings['response-mode'];
+  if (mode !== undefined && !(RESPONSE_MODES as readonly string[]).includes(mode)) {
+    throw new CliError('invalid_flag', `--response-mode must be ${RESPONSE_MODES.join(' or ')}`);
+  }
+  return mode;
+}
+
+const ROUTE_FLAGS = ['model', 'provider', 'auth-type', 'key-label', 'response-mode'] as const;
+
+/**
+ * Virtual models: public names a harness sends as `model` (and sees in
+ * GET /v1/models), each with its own chain and an optional "continue on
+ * Default". The server validates every route against the agent's providers
+ * and answers 400 when one does not resolve, so no client-side model check
+ * runs here.
+ */
+export const routingVirtual = {
+  list: async (io: CliIo, argv: string[]): Promise<void> => {
+    const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
+    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const { client } = clientFromFlags(io, args);
+    printJson(io, await client.request('GET', agentPath(agent, '/virtual-models')));
+  },
+
+  create: async (io: CliIo, argv: string[]): Promise<void> => {
+    const args = parseArgs(argv, {
+      strings: ['url', 'name', ...ROUTE_FLAGS],
+      repeatables: ['fallback'],
+      booleans: ['continue-on-default'],
+      maxPositionals: 1,
+    });
+    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const name = requireString(args, 'name');
+    const primary = primaryRouteFromFlags(args);
+    const fallbacks = args.lists['fallback'] ?? [];
+    if (fallbacks.length > 0 && !primary) {
+      throw new CliError('missing_flag', '--fallback needs --model (the primary route)');
+    }
+    const responseMode = responseModeFlag(args);
+    const { client } = clientFromFlags(io, args);
+    printJson(
+      io,
+      await client.request('POST', agentPath(agent, '/virtual-models'), {
+        body: {
+          name,
+          ...(primary ? { override_route: primary } : {}),
+          ...(fallbacks.length > 0
+            ? { fallback_routes: fallbacks.map((model) => ({ model })) }
+            : {}),
+          ...(args.booleans['continue-on-default'] ? { continue_on_default: true } : {}),
+          ...(responseMode ? { response_mode: responseMode } : {}),
+        },
+      }),
+    );
+  },
+
+  /**
+   * Change only what is passed. --model replaces the primary and keeps the
+   * fallbacks; --fallback (repeatable) replaces the fallback list and
+   * --clear-fallbacks empties it; --clear-model removes the primary and its
+   * fallbacks. Route writes go first, so a rejected route changes nothing.
+   */
+  update: async (io: CliIo, argv: string[]): Promise<void> => {
+    const args = parseArgs(argv, {
+      strings: ['url', 'name', ...ROUTE_FLAGS],
+      repeatables: ['fallback'],
+      booleans: ['continue-on-default', 'no-continue-on-default', 'clear-fallbacks', 'clear-model'],
+      maxPositionals: 2,
+    });
+    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const nameOrId = requirePositional(args, 1, '<virtual-name-or-id>');
+    const primary = primaryRouteFromFlags(args);
+    const fallbacks = args.lists['fallback'] ?? [];
+    const clearFallbacks = Boolean(args.booleans['clear-fallbacks']);
+    const clearModel = Boolean(args.booleans['clear-model']);
+    const responseMode = responseModeFlag(args);
+    if (args.booleans['continue-on-default'] && args.booleans['no-continue-on-default']) {
+      throw new CliError(
+        'invalid_flag',
+        'Pass --continue-on-default or --no-continue-on-default, not both',
+      );
+    }
+    if (fallbacks.length > 0 && clearFallbacks) {
+      throw new CliError('invalid_flag', 'Pass --fallback or --clear-fallbacks, not both');
+    }
+    if (clearModel && (primary || fallbacks.length > 0)) {
+      throw new CliError(
+        'invalid_flag',
+        '--clear-model cannot be combined with --model or --fallback',
+      );
+    }
+    const continueOnDefault = args.booleans['continue-on-default']
+      ? true
+      : args.booleans['no-continue-on-default']
+        ? false
+        : undefined;
+    const newName = args.strings['name'];
+    if (
+      !primary &&
+      fallbacks.length === 0 &&
+      !clearFallbacks &&
+      !clearModel &&
+      !responseMode &&
+      continueOnDefault === undefined &&
+      newName === undefined
+    ) {
+      throw new CliError(
+        'missing_flag',
+        'Nothing to change',
+        'Pass --name, --model, --fallback, --clear-fallbacks, --clear-model, --response-mode or --[no-]continue-on-default',
+      );
+    }
+
+    const { client } = clientFromFlags(io, args);
+    const vm = await findVirtualModel(client, agent, nameOrId);
+    if (fallbacks.length > 0 && !primary && !vm.hasPrimary) {
+      throw new CliError('missing_flag', '--fallback needs --model (the primary route)');
+    }
+
+    let view: unknown;
+    if (clearModel) {
+      await client.request('DELETE', virtualPath(agent, vm.id, '/override'));
+    } else if (primary) {
+      // The override endpoint takes the flat shape: its nested `route` needs
+      // provider and auth type, which --model alone does not carry.
+      const { keyLabel, ...flat } = primary;
+      view = await client.request('PUT', virtualPath(agent, vm.id, '/override'), {
+        body: { ...flat, ...(keyLabel ? { providerKeyLabel: keyLabel } : {}) },
+      });
+    }
+    if (fallbacks.length > 0) {
+      await client.request('PUT', virtualPath(agent, vm.id, '/fallbacks'), {
+        body: { models: fallbacks },
+      });
+    } else if (clearFallbacks && !clearModel) {
+      await client.request('DELETE', virtualPath(agent, vm.id, '/fallbacks'));
+    }
+    if (responseMode) {
+      view = await client.request('PATCH', virtualPath(agent, vm.id, '/response-mode'), {
+        body: { response_mode: responseMode },
+      });
+    }
+    if (newName !== undefined || continueOnDefault !== undefined) {
+      view = await client.request('PUT', virtualPath(agent, vm.id), {
+        body: {
+          ...(newName !== undefined ? { name: newName } : {}),
+          ...(continueOnDefault !== undefined ? { continue_on_default: continueOnDefault } : {}),
+        },
+      });
+    }
+    // Fallback and clear writes return no view; read the row back so the
+    // output is always the virtual model as it now stands.
+    if (view === undefined || fallbacks.length > 0 || clearFallbacks || clearModel) {
+      const rows = (await client.request('GET', agentPath(agent, '/virtual-models'))) as unknown;
+      view = (Array.isArray(rows) ? rows : []).find(
+        (v) => typeof v === 'object' && v !== null && (v as VirtualModelRow).id === vm.id,
+      );
+    }
+    printJson(io, view ?? null);
+  },
+
+  delete: async (io: CliIo, argv: string[]): Promise<void> => {
+    const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 2 });
+    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const nameOrId = requirePositional(args, 1, '<virtual-name-or-id>');
+    const { client } = clientFromFlags(io, args);
+    const vm = await findVirtualModel(client, agent, nameOrId);
+    requireYes(args, `delete virtual model "${vm.name}" of "${agent}"`);
+    await client.request('DELETE', virtualPath(agent, vm.id));
+    printJson(io, { ok: true, deleted: { id: vm.id, name: vm.name } });
+  },
+
+  enable: (io: CliIo, argv: string[]): Promise<void> => toggleVirtual(io, argv, true),
+  disable: (io: CliIo, argv: string[]): Promise<void> => toggleVirtual(io, argv, false),
+};
+
+async function toggleVirtual(io: CliIo, argv: string[], enabled: boolean): Promise<void> {
+  const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 2 });
+  const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+  const nameOrId = requirePositional(args, 1, '<virtual-name-or-id>');
+  const { client } = clientFromFlags(io, args);
+  const vm = await findVirtualModel(client, agent, nameOrId);
+  printJson(
+    io,
+    await client.request('PATCH', virtualPath(agent, vm.id, '/toggle'), { body: { enabled } }),
+  );
+}
 
 const TEST_TIMEOUT_MS = 120_000;
 
@@ -454,6 +738,10 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
   if (/^\[🦚 [^\]\s]+ M\d+\]/.test(result.reply)) {
     throw new CliError('route_test_failed', result.reply, 'See thinker routing status ' + agent);
   }
+  // How the proxy routed it: `virtual-model` plus the stored name when
+  // --model matched an enabled virtual model.
+  const routingReason = response.headers.get('x-thinker-reason');
+  const virtualModel = response.headers.get('x-thinker-virtual-model');
 
   printJson(io, {
     agent,
@@ -462,6 +750,8 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     ...(platform ? { platform } : {}),
     requested_model: (requestBody as { model: string }).model,
     ...(args.strings['tier'] ? { tier: args.strings['tier'] } : {}),
+    ...(routingReason ? { routing_reason: routingReason } : {}),
+    ...(virtualModel ? { virtual_model: virtualModel } : {}),
     served_model: result.servedModel,
     duration_ms: durationMs,
     ...(result.tokens !== undefined ? { tokens: result.tokens } : {}),
@@ -492,8 +782,34 @@ function toggleCommand(feature: 'recording') {
 
 export const routingRecording = toggleCommand('recording');
 
-function tierParamsPath(agent: string, tier: string | undefined): string {
-  return agentPath(agent, `/tiers/${encodeURIComponent(tier ?? 'default')}/model-params`);
+/**
+ * Where the params of the selected route live: `--tier` (a tier name, the
+ * default tier when omitted) or `--virtual` (a virtual model name). The two
+ * are exclusive: a custom tier and a virtual model may share a name.
+ */
+function paramsRequest(
+  agent: string,
+  args: ParsedArgs,
+): { path: string; query: Record<string, string | undefined> } {
+  const tier = args.strings['tier'];
+  const virtual = args.strings['virtual'];
+  if (tier !== undefined && virtual !== undefined) {
+    throw new CliError(
+      'invalid_flag',
+      'Pass --tier or --virtual, not both',
+      '--tier names a tier (default or a custom tier), --virtual a virtual model',
+    );
+  }
+  if (virtual !== undefined) {
+    return {
+      path: agentPath(agent, '/virtual-model-params'),
+      query: { virtual, model: args.strings['model'] },
+    };
+  }
+  return {
+    path: agentPath(agent, `/tiers/${encodeURIComponent(tier ?? 'default')}/model-params`),
+    query: { model: args.strings['model'] },
+  };
 }
 
 /** `path=value`: the value is JSON when it parses (numbers, booleans, objects), else a string. */
@@ -518,30 +834,31 @@ function parseParamAssignment(raw: string): [string, unknown] {
 
 /**
  * Model params of one routed model, addressed as tier + model: `--tier` is
- * `default` (the default) or a custom tier's name, `--model` defaults to the
- * tier's primary and may name one of its fallbacks. Saved params override the
- * values the calling app sends, on requests Thinker routes (`model: "auto"`
- * or a matching custom-tier header); a request naming a model skips them.
+ * `default` (the default) or a custom tier's name, or `--virtual` names a
+ * virtual model instead; `--model` defaults to the primary and may name one
+ * of its fallbacks. Saved params override the values the calling app sends,
+ * on requests Thinker routes (`model: "auto"`, a virtual model name, or a
+ * matching custom-tier header); a request naming a model skips them.
  */
 export const routingParams = {
   get: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { strings: ['url', 'tier', 'model'], maxPositionals: 1 });
+    const args = parseArgs(argv, {
+      strings: ['url', 'tier', 'virtual', 'model'],
+      maxPositionals: 1,
+    });
     const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const target = paramsRequest(agent, args);
     const { client } = clientFromFlags(io, args);
-    printJson(
-      io,
-      await client.request('GET', tierParamsPath(agent, args.strings['tier']), {
-        query: { model: args.strings['model'] },
-      }),
-    );
+    printJson(io, await client.request('GET', target.path, { query: target.query }));
   },
   set: async (io: CliIo, argv: string[]): Promise<void> => {
     const args = parseArgs(argv, {
-      strings: ['url', 'tier', 'model'],
+      strings: ['url', 'tier', 'virtual', 'model'],
       repeatables: ['set', 'unset'],
       maxPositionals: 1,
     });
     const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
+    const target = paramsRequest(agent, args);
     const assignments = (args.lists['set'] ?? []).map(parseParamAssignment);
     const unset = args.lists['unset'] ?? [];
     if (assignments.length === 0 && unset.length === 0) {
@@ -554,8 +871,8 @@ export const routingParams = {
     const { client } = clientFromFlags(io, args);
     printJson(
       io,
-      await client.request('PATCH', tierParamsPath(agent, args.strings['tier']), {
-        query: { model: args.strings['model'] },
+      await client.request('PATCH', target.path, {
+        query: target.query,
         body: {
           ...(assignments.length > 0 ? { set: Object.fromEntries(assignments) } : {}),
           ...(unset.length > 0 ? { unset } : {}),

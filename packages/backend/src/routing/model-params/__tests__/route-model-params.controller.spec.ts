@@ -32,4 +32,30 @@ describe('RouteModelParamsController', () => {
       unset: ['temperature'],
     });
   });
+
+  it('addresses a virtual model by name through its own selector', async () => {
+    await expect(
+      controller.getVirtual(ctx, { agentName: 'demo' }, { virtual: 'deepseek/flash' }),
+    ).resolves.toBe(view);
+    expect(routeParams.get).toHaveBeenCalledWith(
+      'agent-1',
+      { virtual: 'deepseek/flash' },
+      undefined,
+    );
+
+    await expect(
+      controller.updateVirtual(
+        ctx,
+        { agentName: 'demo' },
+        { virtual: 'deepseek/flash', model: 'gpt-5' },
+        { set: { temperature: 0.2 } },
+      ),
+    ).resolves.toBe(view);
+    expect(routeParams.update).toHaveBeenCalledWith(
+      'agent-1',
+      { virtual: 'deepseek/flash' },
+      'gpt-5',
+      { set: { temperature: 0.2 }, unset: undefined },
+    );
+  });
 });

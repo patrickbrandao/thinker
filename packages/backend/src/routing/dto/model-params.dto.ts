@@ -117,6 +117,20 @@ export class TierModelParamsQueryDto {
   model?: string;
 }
 
+// Virtual-model-addressed params: names may contain `/`, so the name travels
+// in the query string, like the model id.
+export class VirtualModelParamsQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  virtual!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  model?: string;
+}
+
 const MAX_PARAM_CHANGES = 50;
 
 export class UpdateTierModelParamsBodyDto {

@@ -45,6 +45,7 @@ function setup(
   overrides: {
     tiers?: unknown[];
     headerTiers?: unknown[];
+    virtualModels?: unknown[];
     saved?: Record<string, unknown> | null;
   } = {},
 ) {
@@ -69,6 +70,20 @@ function setup(
         ],
       ),
   };
+  const virtualModels = {
+    list: jest.fn().mockResolvedValue(
+      overrides.virtualModels ?? [
+        {
+          id: 'vm1',
+          name: 'DeepSeek/Flash',
+          enabled: true,
+          override_route: PRIMARY,
+          fallback_routes: [FALLBACK],
+        },
+        { id: 'vm2', name: 'empty', enabled: false, override_route: null, fallback_routes: null },
+      ],
+    ),
+  };
   const modelParams = {
     get: jest.fn().mockResolvedValue(overrides.saved === undefined ? null : overrides.saved),
     set: jest.fn().mockResolvedValue({}),
@@ -84,10 +99,11 @@ function setup(
   const service = new RouteModelParamsService(
     tiers as never,
     headerTiers as never,
+    virtualModels as never,
     modelParams as never,
     specs as never,
   );
-  return { service, tiers, headerTiers, modelParams, specs };
+  return { service, tiers, headerTiers, virtualModels, modelParams, specs };
 }
 
 describe('RouteModelParamsService.get', () => {
@@ -363,5 +379,94 @@ describe('RouteModelParamsService.update', () => {
       service.update(AGENT, 'default', undefined, { set: { max_tokens: 100 } }),
     ).rejects.toThrow(/Param "max_tokens" does not apply with the current settings/);
     expect(modelParams.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('RouteModelParamsService with a virtual model target', () => {
+  it('resolves the virtual model by name ignoring case and reads the virtual:<id> scope', async () => {
+    const { service, modelParams } = setup({ saved: { temperature: 0.3 } });
+
+    const view = await service.get(AGENT, { virtual: 'deepseek/flash' });
+
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'openai',
+      'api_key',
+      'gpt-5',
+    );
+    expect(view.virtual).toBe('DeepSeek/Flash');
+    expect(view).not.toHaveProperty('tier');
+    expect(view.route).toEqual(PRIMARY);
+    expect(view.models).toEqual(['gpt-5', 'claude-sonnet']);
+    expect(view.params.find((p) => p.path === 'temperature')?.current).toBe(0.3);
+  });
+
+  it('addresses a fallback of the virtual chain by model', async () => {
+    const { service, modelParams } = setup();
+    await service.get(AGENT, { virtual: 'DeepSeek/Flash' }, 'claude-sonnet');
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'anthropic',
+      'subscription',
+      'claude-sonnet',
+    );
+  });
+
+  it('writes under the virtual:<id> scope, never the tier of the same name', async () => {
+    const { service, modelParams, headerTiers } = setup({
+      headerTiers: [
+        { id: 'h1', name: 'DeepSeek/Flash', override_route: PRIMARY, fallback_routes: null },
+      ],
+    });
+    const view = await service.update(AGENT, { virtual: 'deepseek/flash' }, undefined, {
+      set: { 'reasoning.effort': 'low' },
+    });
+    expect(modelParams.set).toHaveBeenCalledWith(
+      AGENT,
+      'virtual:vm1',
+      'openai',
+      'api_key',
+      'gpt-5',
+      { reasoning: { effort: 'low' } },
+    );
+    expect(headerTiers.list).not.toHaveBeenCalled();
+    expect(view.virtual).toBe('DeepSeek/Flash');
+  });
+
+  it('404s an unknown virtual model, listing the existing ones', async () => {
+    const { service } = setup();
+    await expect(service.get(AGENT, { virtual: 'nope' })).rejects.toThrow(NotFoundException);
+    await expect(service.get(AGENT, { virtual: 'nope' })).rejects.toThrow(
+      /Available virtual models: DeepSeek\/Flash, empty/,
+    );
+    const none = setup({ virtualModels: [] });
+    await expect(none.service.get(AGENT, { virtual: 'x' })).rejects.toThrow(
+      /has no virtual models/,
+    );
+  });
+
+  it('rejects a virtual model with no primary, and a model outside its chain', async () => {
+    const { service } = setup();
+    await expect(service.get(AGENT, { virtual: 'EMPTY' })).rejects.toThrow(
+      /Virtual model "empty" has no model yet; routes it borrows from the Default tier/,
+    );
+    await expect(service.get(AGENT, { virtual: 'deepseek/flash' }, 'gpt-4o')).rejects.toThrow(
+      /Model "gpt-4o" is not routed by virtual model "DeepSeek\/Flash"/,
+    );
+  });
+
+  it('still accepts an explicit tier target object', async () => {
+    const { service, modelParams } = setup();
+    const view = await service.get(AGENT, { tier: 'deep' });
+    expect(view.tier).toBe('Deep');
+    expect(modelParams.get).toHaveBeenCalledWith(
+      AGENT,
+      'header:h1',
+      'anthropic',
+      'subscription',
+      'claude-sonnet',
+    );
   });
 });
