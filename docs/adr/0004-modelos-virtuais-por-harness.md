@@ -19,7 +19,7 @@ Estado verificado no código (`main` em `ee0770b`):
 - `ResolveService.resolveHeaderTier` (`routing/resolve/resolve.service.ts`) ignora o tier quando ele não tem principal. Quando o principal está indisponível, promove o primeiro fallback disponível. Quando nada está disponível, devolve `null` e o pedido segue para o roteamento normal.
 - `ResolveService.resolveLazy` aplica header tier e depois, se `agents.complexity_routing_enabled` estiver desligado, o slot `default`. Se estiver ligado, aplica especificidade e depois complexidade. A complexidade cai no slot `default` quando o tier pontuado não tem atribuição, ou quando não tem rota **e** não tem override. Um override configurado e inutilizável **não** cai no `default`: vira M302 ou M101.
 - Heartbeats (`detectHeartbeatBody`, só no caminho `auto`) não passam por `resolveLazy`: vão direto para `resolveForTier(..., 'simple')` e nunca consultam header tiers.
-- A cadeia de um slot de tier vem de `buildResolvedRouteChain`. Ela usa `override_route` ou, sem ele, o `auto_assigned_route` legado (`route-helpers.ts`). O override passa por `isRouteAvailable`; o `auto_assigned_route` e os fallbacks passam por `hasRouteCredentials`. Só o principal escolhido é enriquecido com `enrichRouteKeyLabel`.
+- A cadeia de um slot de tier vem de `buildResolvedRouteChain`. Ela usa `override_route` ou, sem ele, o `auto_assigned_route` legado (`route-helpers.ts`). O override passa por `isRouteAvailable`; o `auto_assigned_route` e os fallbacks passam por `hasRouteCredentials` só até um deles virar o principal, e os fallbacks restantes seguem sem filtro. Só o principal escolhido é enriquecido com `enrichRouteKeyLabel`.
 - Na escrita, um header tier guarda a rota como veio quando `resolveModelRoute` falha (`header-tier.service.ts`), e `resolveModelRoute` não preenche nem confere o `keyLabel`.
 - `header_tiers` (`entities/header-tier.entity.ts`) guarda `override_route` e `fallback_routes` como `jsonb` de `ModelRoute` (`provider`, `authType`, `model`, `keyLabel`), além de `response_mode` e `output_modality`. O índice único `(agent_id, LOWER(name))` é declarado na migração `1776710000000-AddHeaderTiers`. Os DTOs limitam os fallbacks a 5 (`@ArrayMaxSize(5)` em `routing/dto/routing.dto.ts`).
 - `ProxyController.models()` (`routing/proxy/proxy.controller.ts`) publica `auto` (sem metadados) e depois os IDs públicos de `openAiModelId` (`routing/routing-core/public-model-id.ts`): `provedor/modelo`, `provedor/modelo-subscription`, `<alias>/<modelo>` para custom providers com alias e `custom:<uuid>/<modelo>` para custom providers sem alias (nesse caso o ID interno é também o público). Nenhuma entrada tem `context_length` hoje. O catálogo descoberto (`DiscoveredModel.contextWindow`) tem o dado.
@@ -72,7 +72,7 @@ A mesma migração acrescenta a `agent_messages` as colunas `virtual_model_id va
 
 Nenhum dado existente migra: a tabela nasce vazia, e as colunas novas de `agent_messages` ficam `NULL` nas linhas antigas. O `down` remove as colunas e a tabela.
 
-**Validação estrita na escrita, diferente dos header tiers.** Cada rota (principal e fallbacks) passa por `resolveModelRoute` / `resolveFallbackRoutes`. Uma rota que não resolve para um provedor habilitado no agente devolve **400**, com o modelo na mensagem; ela não é guardada como veio, ao contrário do que `header-tier.service.ts` faz. O `keyLabel` é enriquecido na escrita com `enrichRouteKeyLabel`, a mesma lógica que o resolvedor usa para fixar a conexão, e um `keyLabel` enviado que não existe para o provedor também devolve 400.
+**Validação estrita na escrita, diferente dos header tiers.** Cada rota (principal e fallbacks) passa por `resolveModelRoute` / `resolveFallbackRoutes`. Uma rota que não resolve para um provedor habilitado no agente devolve **400**, com o modelo na mensagem; ela não é guardada como veio, ao contrário do que `header-tier.service.ts` faz. O `keyLabel` **não** é enriquecido na escrita: um `keyLabel` enviado é validado (se não existir para o provedor, 400) e guardado; sem ele, a rota guarda `null` e segue a chave padrão do provedor, resolvida na hora do pedido (seção 4, passo 3), como nos tiers. Gravar a chave padrão na escrita congelaria o virtual nela quando o operador trocasse a padrão.
 
 ### 3. Validação do nome
 
@@ -88,9 +88,9 @@ O nome não pode ter espaço, aspas nem caracteres de controle, então ele cabe 
 Quando um virtual ativo casa com o pedido, o resolvedor monta a cadeia nesta ordem:
 
 1. **Cadeia do virtual:** `override_route` seguido de `fallback_routes`. Saem as rotas cujo provedor, modelo ou credencial não está disponível (`isRouteAvailable`, a mesma checagem do header tier).
-2. **Se `continue_on_default` estiver ligado, a cadeia do Default** é acrescentada ao fim. "Cadeia do Default" é exatamente a cadeia que `resolveForTier(agentId, tenantId, 'default')` produz hoje, reaproveitando `buildResolvedRouteChain`:
+2. **Se `continue_on_default` estiver ligado, a cadeia do Default** é acrescentada ao fim. "Cadeia do Default" é a cadeia que `buildResolvedRouteChain` produz para o slot `default`, a mesma que `resolveForTier(agentId, tenantId, 'default')` usa hoje, **antes** do filtro de transporte (`effectiveRoutesForResponseMode`) que `resolveForTier` aplica:
    - `override_route` do slot `default` ou, sem ele, o `auto_assigned_route` legado, para que instalações atualizadas cujo Default só tem rota auto-atribuída continuem roteáveis;
-   - os fallbacks do slot, com o filtro de credenciais (`hasRouteCredentials`) que esse resolvedor já aplica.
+   - os fallbacks do slot, com o filtro de credenciais (`hasRouteCredentials`) que esse resolvedor já aplica até escolher o principal. Os fallbacks restantes passam pelo filtro de disponibilidade do passo 1 antes de entrar na cadeia do virtual.
 
    O `response_mode` do próprio Default não é aplicado aqui; vale o do virtual (passo 4).
 3. **Normalização e deduplicação:** as rotas das duas partes são normalizadas com `enrichRouteKeyLabel` **na hora do pedido**, inclusive os fallbacks do Default, que hoje o resolvedor não enriquece. Depois disso, uma rota que já está na cadeia não se repete. A chave é `(provider, authType, model, keyLabel)`: duas chaves diferentes do mesmo modelo são rotas diferentes, mas `(openai, api_key, gpt-x, sem rótulo)` e `(openai, api_key, gpt-x, "Main")`, quando o rótulo vazio resolve para `"Main"`, viram a mesma rota. A primeira rota que sobra vira o principal efetivo, e pode vir do Default.
@@ -124,7 +124,7 @@ Consequências da regra:
 - O virtual vence o header tier. Quem manda um cabeçalho de tier e `model: "deepseek"` recebe o virtual. Nenhuma instalação tem virtuais hoje, então nada que funciona agora muda de comportamento.
 - Um virtual desativado não entra no passo 1, e o pedido segue para os passos 2 e 3: o ID real volta a resolver, ou o pedido recebe M302.
 - O passo 1 não roda quando `model` está ausente ou é `auto`, porque `auto` é reservado.
-- A implementação extrai o passo 1 para antes do desvio entre `auto` e explícito em `resolveRouting`. A busca do header tier sai de `resolveExplicitModel` **e também de `resolveLazy`**, para não rodar duas vezes, e vira um passo comum aos dois caminhos, o que mantém a ordem 2 → 3 que existe hoje. `ResolveService.resolve()`, usado por `resolve.controller.ts`, passa a chamar `resolveHeaderTier` antes de `resolveLazy`, para que aquele endpoint não mude.
+- A implementação extrai o passo 1 para antes do desvio entre `auto` e explícito em `resolveRouting`. A busca do header tier sai de `resolveExplicitModel` **e também de `resolveLazy`**, para não rodar duas vezes, e vira um passo comum aos dois caminhos, o que mantém a ordem 2 → 3 que existe hoje. `ResolveService.resolve()`, usado só por `resolve.controller.ts`, hoje não recebe cabeçalhos e portanto não aplica header tiers; retirar a chamada de `resolveLazy` preserva esse comportamento, e o endpoint `POST /api/v1/routing/resolve` continua sem aplicar header tiers.
 - **Heartbeats continuam como hoje.** Um pedido `auto` detectado como heartbeat vai direto para `resolveForTier(..., 'simple')` e **pula o passo 2**, mesmo com o cabeçalho de um tier. Um `model` virtual explícito nunca é heartbeat, porque a detecção só roda no caminho `auto`.
 
 ### 6. Interação com a resolução de modelos explícitos (sombreamento)
@@ -159,7 +159,7 @@ Entrada de um virtual:
 - `owned_by: "thinker"`, como em `auto`.
 - Virtuais e `auto` **não** trazem `capabilities` nem `cost`, mesmo com `?capabilities=true` / `?cost=true`, porque o modelo concreto muda conforme a disponibilidade e as falhas. Com `?route_metadata=true` eles também não trazem `provider_model_id` nem `auth_type`.
 - **`context_length`** é a menor `contextWindow` entre as rotas **disponíveis** da cadeia efetiva (seção 4, passos 1 a 4, sem tentativa em tempo de execução). O campo é omitido se a janela de alguma rota for desconhecida (ausente ou ≤ 0 no catálogo descoberto) ou se a cadeia estiver vazia.
-- O cálculo usa **um único snapshot** de `getModelsForAgent` por requisição de `/v1/models`, o mesmo que a listagem já carrega, para a janela e para a disponibilidade de cada rota. Ele não chama `isRouteAvailable` rota a rota, porque essa chamada recarrega a descoberta, e com virtuais sem limite, de até 12 rotas cada, o custo cresceria com a configuração.
+- O cálculo usa **um único snapshot** de `getModelsForAgent` por requisição de `/v1/models`, o mesmo que a listagem já carrega, para a janela e para a disponibilidade de cada rota. Ele não chama `isRouteAvailable` rota a rota: com virtuais sem limite, de até 12 rotas cada, o custo cresceria com a configuração, e com cache frio cada chamada pode cair no fallback de descoberta. Uma rota cuja conexão não tem modelos no snapshot conta como janela desconhecida, e o `context_length` é omitido, para não sair superestimado.
   - **Virtual:** a cadeia do virtual mais a do Default, quando `continue_on_default` estiver ligado.
   - **`auto`, roteamento por complexidade desligado:** a cadeia do Default, no mesmo sentido da seção 4, passo 2 (inclui o `auto_assigned_route` legado).
   - **`auto`, roteamento por complexidade ligado:** o mínimo entre as cadeias de todos os destinos que `auto` pode alcançar sem cabeçalho: os slots `simple`, `standard`, `complex`, `reasoning` e `default` (cada um montado como em `buildResolvedRouteChain`), mais as atribuições de especificidade ativas. Header tiers ficam de fora porque exigem cabeçalho.
@@ -273,7 +273,7 @@ Erros: 400 para nome inválido ou reservado, 409 para nome duplicado, 404 para `
   - M301;
   - virtual desativado volta ao ID real ou M302;
   - heartbeat `auto` com o cabeçalho de um header tier continua indo para o slot `simple`, sem casar o tier;
-  - `POST /api/v1/routing/resolve` (via `ResolveService.resolve()`) continua aplicando header tiers;
+  - `POST /api/v1/routing/resolve` (via `ResolveService.resolve()`) continua sem aplicar header tiers;
   - linhas de `agent_messages` com as colunas novas.
 - **`qa-docker`, contra a imagem local:**
   - criar o virtual `deepseek/flash` sem cabeçalho e vê-lo em `/v1/models` com a chave do harness, mas não com a chave de outro harness;
@@ -314,7 +314,7 @@ PRs em sequência, cada um com o seu changeset. O mesmo plano vai para a #176.
 1. **`feat(backend)`: entidade, migração e API de modelos virtuais.** Agente: `backend-dev`.
    - Escopo:
      - tabela `virtual_models` e colunas `agent_messages.virtual_model_*`, com `up` e `down`;
-     - entidade, `VirtualModelService` (validação do nome, validação estrita das rotas com 400 e `keyLabel` enriquecido na escrita, cache no `RoutingCacheService`, invalidação), controller CRUD/toggle/reorder/override/fallbacks/response-mode;
+     - entidade, `VirtualModelService` (validação do nome, validação estrita das rotas com 400, `keyLabel` validado quando enviado e `null` quando ausente, cache no `RoutingCacheService`, invalidação), controller CRUD/toggle/reorder/override/fallbacks/response-mode;
      - `shadows` e `context_length` na listagem (snapshot único de `getModelsForAgent`);
      - tipos em `thinker-shared`;
      - limpeza de `agent_model_params` ao apagar;
@@ -323,8 +323,8 @@ PRs em sequência, cada um com o seu changeset. O mesmo plano vai para a #176.
    - Dependências: este ADR aceito.
 2. **`feat(backend)`: resolução de modelos virtuais no proxy.** Agente: `backend-dev`.
    - Escopo:
-     - passo 1 da precedência em `resolveRouting`, com o header tier extraído como passo comum (fora de `resolveExplicitModel` e de `resolveLazy`; `resolve()` mantém a chamada; heartbeats continuam pulando o passo);
-     - montagem da cadeia com `continue_on_default`, usando a cadeia de `resolveForTier('default')` e `enrichRouteKeyLabel` antes da deduplicação;
+     - passo 1 da precedência em `resolveRouting`, com o header tier extraído como passo comum (fora de `resolveExplicitModel` e de `resolveLazy`; `resolve()` continua sem header tiers; heartbeats continuam pulando o passo);
+     - montagem da cadeia com `continue_on_default`, usando a cadeia de `buildResolvedRouteChain` do slot `default` e `enrichRouteKeyLabel` antes da deduplicação;
      - M301 (catálogo, `routing_reason`, classificação em `thinker-shared`, `docs/erros.md`);
      - `X-Thinker-Reason: virtual-model` e `X-Thinker-Virtual-Model`;
      - gravação de `virtual_model_*` em todas as linhas;
