@@ -2,6 +2,7 @@ import { type Component, Show, createResource, createSignal } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
 import ModelSelectDropdown from './ModelSelectDropdown.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
+import { createActiveVirtualModelNames } from './VirtualModelsHint.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
@@ -24,6 +25,9 @@ const RoutingInstructionModal: Component<Props> = (props) => {
   const [apiKeyData] = createResource(
     () => (props.open && isEnable() ? props.agentName : null),
     (n) => getAgentKey(n),
+  );
+  const virtualModels = createActiveVirtualModelNames(() =>
+    props.open && isEnable() ? props.agentName : null,
   );
 
   const baseUrl = () => {
@@ -159,6 +163,7 @@ const RoutingInstructionModal: Component<Props> = (props) => {
               keyPrefix={apiKeyData()?.keyPrefix ?? null}
               baseUrl={baseUrl()}
               platform={agentPlatform()}
+              virtualModels={virtualModels()}
             />
           </Show>
 

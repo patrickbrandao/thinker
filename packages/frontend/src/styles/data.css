@@ -248,6 +248,18 @@ a.status-badge:hover {
   background: hsl(270 60% 50% / 0.12);
   color: hsl(270 60% 45%);
 }
+/* Virtual model (ADR 0004) the request named in `model`. */
+.tier-badge--virtual {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-mono);
+  background: hsl(var(--chart-3) / 0.15);
+  color: hsl(var(--chart-3));
+}
 .tier-badge--fallback {
   background: hsl(var(--muted-foreground) / 0.1);
   color: hsl(var(--muted-foreground));

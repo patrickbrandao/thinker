@@ -84,12 +84,40 @@ export async function parseErrorMessage(res: Response): Promise<string> {
   return `Request failed (${res.status})`;
 }
 
-export async function fetchMutate<T = void>(path: string, options: RequestInit): Promise<T> {
+/**
+ * Error thrown by {@link fetchMutate}. Carries the HTTP status so a caller can
+ * tell a validation error (400) from a conflict (409) and place the message
+ * next to the field it concerns.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/** Options for {@link fetchMutate}. */
+export interface FetchMutateOptions {
+  /**
+   * Skip the global error toast. For a caller that shows the backend message
+   * inline (for example next to a form field), so it is not shown twice.
+   */
+  silent?: boolean;
+}
+
+export async function fetchMutate<T = void>(
+  path: string,
+  options: RequestInit,
+  mutateOptions?: FetchMutateOptions,
+): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include', ...options });
   if (!res.ok) {
     const message = await parseErrorMessage(res);
-    toast.error(message);
-    throw new Error(message);
+    if (!mutateOptions?.silent) toast.error(message);
+    throw new ApiError(message, res.status);
   }
   // A mutation (POST/PUT/PATCH/DELETE) can change data behind any number of GET
   // keys (e.g. renaming an agent touches the agent list, every per-agent view,
