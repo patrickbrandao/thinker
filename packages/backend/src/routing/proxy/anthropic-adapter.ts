@@ -718,6 +718,12 @@ function mapStopReason(reason: string | undefined): string {
     max_tokens: 'length',
     tool_use: 'tool_calls',
     stop_sequence: 'stop',
+    // The reply hit the model's context window rather than max_tokens; it is
+    // still cut short, so chat clients should see it as truncated.
+    model_context_window_exceeded: 'length',
+    // Claude's safety classifiers ended the reply; chat completions reports a
+    // policy stop as content_filter, not as a finished turn.
+    refusal: 'content_filter',
   };
   return map[reason] ?? 'stop';
 }
@@ -737,11 +743,17 @@ export function fromAnthropicResponse(
 ): Record<string, unknown> & { _extractedThinkingBlocks?: ExtractedThinkingBlocks } {
   const content = (resp.content as Array<Record<string, unknown>>) || [];
   let textContent = '';
+  let reasoningContent = '';
   const toolCalls: Record<string, unknown>[] = [];
   const thinkingBlocks: ThinkingBlock[] = [];
 
   for (const block of content) {
     if (block.type === 'text' && typeof block.text === 'string') textContent += block.text;
+    // Surface readable thinking as reasoning_content for chat completions
+    // clients. redacted_thinking carries only encrypted data, so it is skipped.
+    if (block.type === 'thinking' && typeof block.thinking === 'string') {
+      reasoningContent += block.thinking;
+    }
     if (block.type === 'thinking' || block.type === 'redacted_thinking') {
       // Pass blocks through unmodified — Anthropic signs them and the
       // signature becomes invalid if any field is altered or dropped.
@@ -757,6 +769,7 @@ export function fromAnthropicResponse(
   }
 
   const message: Record<string, unknown> = { role: 'assistant', content: textContent || null };
+  if (reasoningContent) message.reasoning_content = reasoningContent;
   if (toolCalls.length > 0) message.tool_calls = toolCalls;
 
   const usage = resp.usage as Record<string, number> | undefined;
@@ -945,7 +958,9 @@ function handleContentBlockDelta(state: StreamState, data: Record<string, unknow
     if (existing) {
       existing.thinking = ((existing.thinking as string) || '') + delta.thinking;
     }
-    return null;
+    return delta.thinking
+      ? makeChunkSse(state.model, { reasoning_content: delta.thinking }, null)
+      : null;
   }
   if (delta.type === 'signature_delta' && typeof delta.signature === 'string') {
     const existing = state.thinkingBlocksByIndex.get(blockIndex);
