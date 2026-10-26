@@ -37,43 +37,86 @@ export type DefaultTierChainSource = Pick<
 >;
 
 /**
- * Routes of a tier assignment in the order ResolveService.buildResolvedRouteChain
- * walks them: the override, its fallbacks, then the legacy auto-assigned
- * route; with no override, the auto-assigned route leads.
+ * Candidate routes of a tier assignment, in the order
+ * ResolveService.buildResolvedRouteChain uses them:
+ * - override available: the override and its fallbacks only. The legacy
+ *   auto-assigned route is never reached, even when it is still stored;
+ * - override unavailable: its fallbacks, then the auto-assigned route;
+ * - no override: the auto-assigned route, then the fallbacks.
+ *
+ * `overrideAvailable` is ignored when the tier has no override.
  */
-export function tierChainRoutes(tier: DefaultTierChainSource): ModelRoute[] {
+export function tierChainRoutes(
+  tier: DefaultTierChainSource,
+  overrideAvailable: boolean,
+): ModelRoute[] {
   const override = readOverrideRoute(tier);
   const autoAssigned = readAutoAssignedRoute(tier);
   const fallbacks = readFallbackRoutes(tier) ?? [];
-  const ordered = override ? [override, ...fallbacks, autoAssigned] : [autoAssigned, ...fallbacks];
+  let ordered: Array<ModelRoute | null>;
+  if (override && overrideAvailable) ordered = [override, ...fallbacks];
+  else if (override) ordered = [...fallbacks, autoAssigned];
+  else ordered = [autoAssigned, ...fallbacks];
   return ordered.filter((r): r is ModelRoute => r !== null);
 }
 
+type MaybePromise<T> = T | Promise<T>;
+
+export interface BuildVirtualModelChainOptions {
+  /**
+   * Whether the Default tier's override is available, which decides whether
+   * its legacy auto-assigned route can be reached (see tierChainRoutes). The
+   * proxy passes ProviderKeyService.isRouteAvailable; the admin listing
+   * judges it from its catalog snapshot. Defaults to available.
+   */
+  isDefaultOverrideAvailable?: (route: ModelRoute) => MaybePromise<boolean>;
+  /**
+   * Normalizes each route before deduplication, e.g. with the request-time
+   * key label (ResolveService.enrichRouteKeyLabel), so `(…, keyLabel: null)`
+   * and `(…, keyLabel: "Main")` collapse when "Main" is the default key.
+   * Defaults to the route as stored.
+   */
+  normalize?: (
+    route: ModelRoute,
+    entry: Omit<VirtualModelChainEntry, 'route'>,
+  ) => MaybePromise<ModelRoute>;
+}
+
 /**
- * The configured chain of a virtual model, before any availability check:
- * its primary and fallbacks, then, with `continue_on_default`, the Default
- * tier's chain. A route already in the chain is not repeated; identity is
- * (provider, authType, model, keyLabel), so the same model on two keys stays
- * two routes.
+ * The configured chain of a virtual model, before the availability and
+ * transport filters: its primary and fallbacks, then, with
+ * `continue_on_default`, the Default tier's chain. Each route goes through
+ * `normalize` first; a route already in the chain is then not repeated.
+ * Identity is (provider, authType, model, keyLabel), so the same model on two
+ * keys stays two routes.
  */
-export function buildVirtualModelChain(
+export async function buildVirtualModelChain(
   virtualModel: VirtualModelChainSource,
   defaultTier: DefaultTierChainSource | null | undefined,
-): VirtualModelChainEntry[] {
+  options: BuildVirtualModelChainOptions = {},
+): Promise<VirtualModelChainEntry[]> {
+  const normalize = options.normalize ?? ((route: ModelRoute) => route);
   const chain: VirtualModelChainEntry[] = [];
-  const push = (route: ModelRoute | null, paramsScope: string, fromDefault: boolean) => {
-    if (!route) return;
-    if (chain.some((entry) => routeMatches(entry.route, route))) return;
-    chain.push({ route, paramsScope, fromDefault });
+  const push = async (route: ModelRoute, paramsScope: string, fromDefault: boolean) => {
+    const normalized = await normalize(route, { paramsScope, fromDefault });
+    if (chain.some((entry) => routeMatches(entry.route, normalized))) return;
+    chain.push({ route: normalized, paramsScope, fromDefault });
   };
 
   const ownScope = modelParamsScopeForVirtualModel(virtualModel.id);
-  push(readOverrideRoute(virtualModel), ownScope, false);
-  for (const route of readFallbackRoutes(virtualModel) ?? []) push(route, ownScope, false);
+  const primary = readOverrideRoute(virtualModel);
+  if (primary) await push(primary, ownScope, false);
+  for (const route of readFallbackRoutes(virtualModel) ?? []) await push(route, ownScope, false);
 
   if (virtualModel.continue_on_default && defaultTier) {
     const defaultScope = modelParamsScopeForTier(DEFAULT_TIER_SLOT);
-    for (const route of tierChainRoutes(defaultTier)) push(route, defaultScope, true);
+    const override = readOverrideRoute(defaultTier);
+    const overrideAvailable = override
+      ? await (options.isDefaultOverrideAvailable?.(override) ?? true)
+      : false;
+    for (const route of tierChainRoutes(defaultTier, overrideAvailable)) {
+      await push(route, defaultScope, true);
+    }
   }
   return chain;
 }

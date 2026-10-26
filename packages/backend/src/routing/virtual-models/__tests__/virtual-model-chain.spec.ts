@@ -45,8 +45,15 @@ const vm = (overrides: Partial<Parameters<typeof buildVirtualModelChain>[0]> = {
 });
 
 describe('buildVirtualModelChain', () => {
-  it('lists the primary then the fallbacks under the virtual scope', () => {
-    expect(buildVirtualModelChain(vm(), null)).toEqual([
+  const defaultTier = (overrides: Partial<Parameters<typeof tierChainRoutes>[0]> = {}) => ({
+    override_route: route('deepseek', 'deepseek-chat'),
+    auto_assigned_route: null,
+    fallback_routes: null,
+    ...overrides,
+  });
+
+  it('lists the primary then the fallbacks under the virtual scope', async () => {
+    expect(await buildVirtualModelChain(vm(), null)).toEqual([
       { route: route('openai', 'gpt-4o'), paramsScope: 'virtual:vm-1', fromDefault: false },
       {
         route: route('anthropic', 'claude-opus-4-6'),
@@ -56,21 +63,17 @@ describe('buildVirtualModelChain', () => {
     ]);
   });
 
-  it('ignores the Default tier when continue_on_default is off', () => {
-    const chain = buildVirtualModelChain(vm(), {
-      override_route: route('deepseek', 'deepseek-chat'),
-      auto_assigned_route: null,
-      fallback_routes: null,
-    });
-    expect(chain).toHaveLength(2);
+  it('ignores the Default tier when continue_on_default is off', async () => {
+    expect(await buildVirtualModelChain(vm(), defaultTier())).toHaveLength(2);
   });
 
-  it('appends the Default chain under tier:default and drops repeated routes', () => {
-    const chain = buildVirtualModelChain(vm({ continue_on_default: true }), {
-      override_route: route('deepseek', 'deepseek-chat'),
-      auto_assigned_route: null,
-      fallback_routes: [route('openai', 'gpt-4o'), route('openai', 'gpt-4o', 'api_key', 'Work')],
-    });
+  it('appends the Default chain under tier:default and drops repeated routes', async () => {
+    const chain = await buildVirtualModelChain(
+      vm({ continue_on_default: true }),
+      defaultTier({
+        fallback_routes: [route('openai', 'gpt-4o'), route('openai', 'gpt-4o', 'api_key', 'Work')],
+      }),
+    );
     expect(chain.map((e) => [e.route.model, e.route.keyLabel ?? null, e.paramsScope])).toEqual([
       ['gpt-4o', null, 'virtual:vm-1'],
       ['claude-opus-4-6', null, 'virtual:vm-1'],
@@ -81,9 +84,55 @@ describe('buildVirtualModelChain', () => {
     expect(chain.filter((e) => e.fromDefault)).toHaveLength(2);
   });
 
-  it('tolerates an empty virtual chain and a missing Default tier', () => {
+  it('keeps the legacy auto-assigned route out while the Default override is available', async () => {
+    const chain = await buildVirtualModelChain(
+      vm({ continue_on_default: true }),
+      defaultTier({ auto_assigned_route: route('legacy', 'old-model') }),
+    );
+    expect(chain.map((e) => e.route.model)).toEqual(['gpt-4o', 'claude-opus-4-6', 'deepseek-chat']);
+  });
+
+  it('reaches the auto-assigned route when the Default override is unavailable', async () => {
+    const isDefaultOverrideAvailable = jest.fn().mockResolvedValue(false);
+    const chain = await buildVirtualModelChain(
+      vm({ continue_on_default: true }),
+      defaultTier({
+        auto_assigned_route: route('legacy', 'old-model'),
+        fallback_routes: [route('openai', 'gpt-4o-mini')],
+      }),
+      { isDefaultOverrideAvailable },
+    );
+    expect(isDefaultOverrideAvailable).toHaveBeenCalledWith(route('deepseek', 'deepseek-chat'));
+    expect(chain.filter((e) => e.fromDefault).map((e) => e.route.model)).toEqual([
+      'gpt-4o-mini',
+      'old-model',
+    ]);
+  });
+
+  it('normalizes each route before deduplicating', async () => {
+    // Request-time key label: the default key of openai is "Main".
+    const normalize = jest.fn((r: ModelRoute) =>
+      r.provider === 'openai' && !r.keyLabel ? { ...r, keyLabel: 'Main' } : r,
+    );
+    const chain = await buildVirtualModelChain(
+      vm({ continue_on_default: true }),
+      defaultTier({ fallback_routes: [route('openai', 'gpt-4o', 'api_key', 'Main')] }),
+      { normalize },
+    );
+    expect(chain.map((e) => [e.route.model, e.route.keyLabel ?? null])).toEqual([
+      ['gpt-4o', 'Main'],
+      ['claude-opus-4-6', null],
+      ['deepseek-chat', null],
+    ]);
+    expect(normalize).toHaveBeenCalledWith(route('openai', 'gpt-4o'), {
+      paramsScope: 'virtual:vm-1',
+      fromDefault: false,
+    });
+  });
+
+  it('tolerates an empty virtual chain and a missing Default tier', async () => {
     expect(
-      buildVirtualModelChain(
+      await buildVirtualModelChain(
         vm({ override_route: null, fallback_routes: null, continue_on_default: true }),
         null,
       ),
@@ -92,24 +141,25 @@ describe('buildVirtualModelChain', () => {
 });
 
 describe('tierChainRoutes', () => {
-  it('walks override, fallbacks, then the legacy auto-assigned route', () => {
-    expect(
-      tierChainRoutes({
-        override_route: route('a', 'm1'),
-        auto_assigned_route: route('a', 'auto'),
-        fallback_routes: [route('a', 'm2')],
-      }).map((r) => r.model),
-    ).toEqual(['m1', 'm2', 'auto']);
+  const tier = {
+    override_route: route('a', 'm1'),
+    auto_assigned_route: route('a', 'auto'),
+    fallback_routes: [route('a', 'm2')],
+  };
+
+  it('uses only the override and its fallbacks while the override is available', () => {
+    expect(tierChainRoutes(tier, true).map((r) => r.model)).toEqual(['m1', 'm2']);
+  });
+
+  it('walks the fallbacks, then the auto-assigned route, when the override is unavailable', () => {
+    expect(tierChainRoutes(tier, false).map((r) => r.model)).toEqual(['m2', 'auto']);
   });
 
   it('leads with the auto-assigned route when there is no override', () => {
-    expect(
-      tierChainRoutes({
-        override_route: null,
-        auto_assigned_route: route('a', 'auto'),
-        fallback_routes: [route('a', 'm2')],
-      }).map((r) => r.model),
-    ).toEqual(['auto', 'm2']);
+    expect(tierChainRoutes({ ...tier, override_route: null }, true).map((r) => r.model)).toEqual([
+      'auto',
+      'm2',
+    ]);
   });
 });
 

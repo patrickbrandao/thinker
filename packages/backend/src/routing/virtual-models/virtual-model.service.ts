@@ -39,6 +39,7 @@ import {
   buildVirtualModelChain,
   chainContextLength,
   computeShadows,
+  snapshotRouteState,
   type DefaultTierChainSource,
 } from './virtual-model-chain';
 
@@ -396,7 +397,15 @@ export class VirtualModelService {
     const defaultTier = rows.some((r) => r.continue_on_default)
       ? await this.defaultTier(agentId)
       : null;
-    return rows.map((row) => ({
+    // An override whose availability the snapshot cannot judge counts as
+    // reachable: the legacy auto-assigned route stays out, and the unknown
+    // route makes context_length null (the conservative answer).
+    const isDefaultOverrideAvailable = (route: ModelRoute) =>
+      snapshotRouteState(route, catalog).state !== 'unavailable';
+    const chains = await Promise.all(
+      rows.map((row) => buildVirtualModelChain(row, defaultTier, { isDefaultOverrideAvailable })),
+    );
+    return rows.map((row, i) => ({
       id: row.id,
       agent_id: row.agent_id,
       name: row.name,
@@ -411,7 +420,7 @@ export class VirtualModelService {
       updated_at: row.updated_at,
       shadows: computeShadows(row.name, catalog),
       context_length: chainContextLength(
-        buildVirtualModelChain(row, defaultTier).map((entry) => entry.route),
+        chains[i].map((entry) => entry.route),
         row.response_mode,
         catalog,
       ),
@@ -525,7 +534,17 @@ export class VirtualModelService {
       base.authType,
       agentId,
     );
-    const match = keys.find((k) => k.label.toLowerCase() === wanted.toLowerCase());
+    // Exact label first. A case-insensitive match is accepted only when it is
+    // the single one, so "Work" and "work" on one connection never resolve
+    // to an arbitrary key.
+    const exact = keys.find((k) => k.label === wanted);
+    const folded = keys.filter((k) => k.label.toLowerCase() === wanted.toLowerCase());
+    const match = exact ?? (folded.length === 1 ? folded[0] : undefined);
+    if (!match && folded.length > 1) {
+      throw new BadRequestException(
+        `Provider key "${wanted}" matches several keys for ${base.provider} (${base.authType}); use the exact label`,
+      );
+    }
     if (!match) {
       throw new BadRequestException(
         `Provider key "${wanted}" is not connected for ${base.provider} (${base.authType}) on this agent`,

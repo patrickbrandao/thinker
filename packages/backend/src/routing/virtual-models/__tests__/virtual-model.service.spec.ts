@@ -174,6 +174,43 @@ describe('VirtualModelService', () => {
       const [view] = await svc.listViews('agent-1', 'tenant-1');
       expect(view.context_length).toBe(64000);
     });
+
+    it('ignores a stored legacy auto-assigned route while the Default override is available', async () => {
+      repo.find.mockResolvedValue([
+        row({ override_route: route('openai', 'gpt-4o'), continue_on_default: true }),
+      ]);
+      // The legacy route has an unknown window: reaching it would null the result.
+      tiers.getTiers.mockResolvedValue([
+        {
+          tier: 'default',
+          override_route: route('deepseek', 'deepseek-chat'),
+          auto_assigned_route: route('mistral', 'legacy'),
+          fallback_routes: null,
+        },
+      ]);
+      const [view] = await svc.listViews('agent-1', 'tenant-1');
+      expect(view.context_length).toBe(64000);
+    });
+
+    it('reaches the auto-assigned route when the Default override is unavailable', async () => {
+      repo.find.mockResolvedValue([
+        row({ override_route: route('openai', 'gpt-4o'), continue_on_default: true }),
+      ]);
+      discovery.getModelsForAgent.mockResolvedValue([
+        ...CATALOG,
+        discovered('small', 'anthropic', 32000),
+      ]);
+      tiers.getTiers.mockResolvedValue([
+        {
+          tier: 'default',
+          override_route: route('deepseek', 'gone-model'),
+          auto_assigned_route: route('anthropic', 'small'),
+          fallback_routes: null,
+        },
+      ]);
+      const [view] = await svc.listViews('agent-1', 'tenant-1');
+      expect(view.context_length).toBe(32000);
+    });
   });
 
   describe('create', () => {
@@ -317,6 +354,28 @@ describe('VirtualModelService', () => {
         .catch((e) => e);
       expect(err).toBeInstanceOf(BadRequestException);
       expect(err.message).toContain('Provider key "Personal" is not connected');
+    });
+
+    it('prefers the exact key label and refuses an ambiguous case-insensitive one', async () => {
+      providerKeys.getProviderKeys.mockResolvedValue([
+        { id: 'k1', label: 'Work', priority: 0, apiKey: 'x', region: null },
+        { id: 'k2', label: 'work', priority: 1, apiKey: 'y', region: null },
+      ]);
+      await svc.create('agent-1', 'tenant-1', {
+        name: 'exact',
+        override_route: { model: 'gpt-4o', keyLabel: 'work' },
+      });
+      const inserted = repo.insert.mock.calls[0][0] as VirtualModel;
+      expect(inserted.override_route?.keyLabel).toBe('work');
+
+      const err = await svc
+        .create('agent-1', 'tenant-1', {
+          name: 'ambiguous',
+          override_route: { model: 'gpt-4o', keyLabel: 'WORK' },
+        })
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect(err.message).toContain('matches several keys');
     });
 
     it('keeps a fallback key label sent without provider or auth type', async () => {
