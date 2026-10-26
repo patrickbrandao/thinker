@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_USER_ID } from './helpers';
 // The SHIPPED predicate, imported rather than re-typed. The cross-tenant test
@@ -37,13 +37,13 @@ import { sqlExcludePlayground } from '../src/analytics/services/query-helpers';
 
 let app: INestApplication;
 
-const PLAYGROUND_AGENT_ID = uuid();
-const NORMAL_AGENT_ID = uuid();
-const NAME_ONLY_AGENT_ID = uuid();
+const PLAYGROUND_AGENT_ID = randomUUID();
+const NORMAL_AGENT_ID = randomUUID();
+const NAME_ONLY_AGENT_ID = randomUUID();
 
-const OTHER_TENANT_ID = uuid();
-const OTHER_TENANT_AGENT_ID = uuid();
-const ORPHAN_REQUEST_ID = uuid();
+const OTHER_TENANT_ID = randomUUID();
+const OTHER_TENANT_AGENT_ID = randomUUID();
+const ORPHAN_REQUEST_ID = randomUUID();
 
 /** Timestamps inside every default dashboard range. */
 const TS = new Date(Date.now() - 60 * 60 * 1000)
@@ -68,7 +68,7 @@ async function seedTraffic(
   ds: DataSource,
   opts: { tenantId: string; agentId: string | null; agentName: string },
 ): Promise<void> {
-  const requestId = uuid();
+  const requestId = randomUUID();
   await ds.query(
     `INSERT INTO requests (id, tenant_id, agent_id, user_id, agent_name, timestamp, status)
      VALUES ($1,$2,$3,$4,$5,$6,'success')`,
@@ -77,7 +77,7 @@ async function seedTraffic(
   await ds.query(
     `INSERT INTO agent_messages (id, request_id, tenant_id, agent_id, agent_name, timestamp, status, model, provider, auth_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd, user_id)
      VALUES ($1,$2,$3,$4,$5,$6,'ok','gpt-4o','openai','api_key',100,50,0,0,0.01,$7)`,
-    [uuid(), requestId, opts.tenantId, opts.agentId, opts.agentName, TS, TEST_USER_ID],
+    [randomUUID(), requestId, opts.tenantId, opts.agentId, opts.agentName, TS, TEST_USER_ID],
   );
 }
 

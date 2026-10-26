@@ -2,7 +2,7 @@ import { stripGatewayMarker } from './proxy-transport';
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import {
   classifyMessageError,
   FAILED_STATUS,
@@ -229,7 +229,7 @@ function buildMessageRow(
   overrides: Partial<AgentMessage>,
 ): Partial<AgentMessage> {
   const row: Partial<AgentMessage> = {
-    id: uuid(),
+    id: randomUUID(),
     tenant_id: ctx.tenantId,
     agent_id: ctx.agentId,
     agent_name: ctx.agentName,
@@ -710,7 +710,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     opts?: ProviderErrorOpts,
   ): Promise<void> {
     const {
-      requestId = uuid(),
+      requestId = randomUUID(),
       attemptNumber,
       attempt,
       skipAttempt = false,
@@ -801,7 +801,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     opts: ThinkerBlockedRequestOpts,
   ): Promise<void> {
     const {
-      requestId = uuid(),
+      requestId = randomUUID(),
       httpStatus,
       errorMessage,
       errorCode,
@@ -884,7 +884,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
   ): Promise<void> {
     const {
       traceId,
-      requestId = uuid(),
+      requestId = randomUUID(),
       firstAttemptNumber,
       baseTimeMs,
       markHandled = false,
@@ -1029,7 +1029,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       opts?.provider,
       model,
     );
-    const requestId = opts?.requestId ?? uuid();
+    const requestId = opts?.requestId ?? randomUUID();
     const errorMessage = scrubSecrets(
       normalizeProviderErrorForStorage(opts?.httpStatus, errorBody),
     ).slice(0, 2000);
@@ -1087,7 +1087,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     opts?: FallbackSuccessOpts,
   ): Promise<void> {
     const {
-      requestId = uuid(),
+      requestId = randomUUID(),
       attemptNumber,
       attempt,
       requestDurationMs,
@@ -1206,7 +1206,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       virtualModelName,
       apiMode,
     } = opts ?? {};
-    const requestId = providedRequestId ?? uuid();
+    const requestId = providedRequestId ?? randomUUID();
 
     // `model` is a required string, so the overload on
     // `canonicalizeAgentMessageKeys` keeps `canonical.model` non-null.

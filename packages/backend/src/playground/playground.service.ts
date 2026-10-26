@@ -1,7 +1,7 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import type { Response as ExpressResponse } from 'express';
 import type { AuthType, PlaygroundStreamEvent } from 'thinker-shared';
 import { AgentMessage } from '../entities/agent-message.entity';
@@ -485,11 +485,11 @@ export class PlaygroundService {
       // No tenant_provider_id: Playground runs use the reserved is_playground agent,
       // which excludePlaygroundAgents() filters out of every per-connection view,
       // so stamping the connection here would have no analytic effect.
-      const requestId = uuid();
+      const requestId = randomUUID();
       const timestamp = new Date().toISOString();
       await this.insertPlaygroundRequest(
         {
-          id: uuid(),
+          id: randomUUID(),
           request_id: requestId,
           attempt_number: 1,
           tenant_id: agent.tenant_id,
@@ -561,12 +561,12 @@ export class PlaygroundService {
     try {
       // No tenant_provider_id — see recordSuccess: Playground is a system agent,
       // excluded from per-connection analytics.
-      const requestId = uuid();
+      const requestId = randomUUID();
       const timestamp = new Date().toISOString();
       const errorMessage = scrubSecrets(errorBody).slice(0, 2000);
       await this.insertPlaygroundRequest(
         {
-          id: uuid(),
+          id: randomUUID(),
           request_id: requestId,
           attempt_number: 1,
           tenant_id: agent.tenant_id,
@@ -638,7 +638,7 @@ export class PlaygroundService {
       if (!getRepository) return;
       const errorMessage = scrubSecrets(errorBody).slice(0, 2000);
       await getRepository(ThinkerRequest).insert({
-        id: uuid(),
+        id: randomUUID(),
         tenant_id: agent.tenant_id,
         agent_id: agent.id,
         user_id: createdByUserId,

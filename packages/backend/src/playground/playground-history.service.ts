@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import type {
   AuthType,
   PlaygroundHistoryColumn,
@@ -49,8 +49,8 @@ export class PlaygroundHistoryService {
   ) {}
 
   async saveColumn(input: SaveColumnInput): Promise<string | null> {
-    const runId = input.runId ?? uuid();
-    const columnId = uuid();
+    const runId = input.runId ?? randomUUID();
+    const columnId = randomUUID();
 
     const insertedRun = await this.ensureRun(runId, input);
 

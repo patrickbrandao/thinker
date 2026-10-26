@@ -7,12 +7,12 @@ import { Agent } from '../../entities/agent.entity';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import { AgentKeyAuthGuard } from '../guards/agent-key-auth.guard';
 
-jest.mock('uuid', () => ({ v4: jest.fn() }));
 jest.mock('crypto', () => {
   const actual = jest.requireActual('crypto');
   return {
     ...actual,
     randomBytes: jest.fn(),
+    randomUUID: jest.fn(),
   };
 });
 
@@ -26,10 +26,9 @@ jest.mock('../../common/utils/crypto.util', () => {
   };
 });
 
-import { v4 as uuidv4 } from 'uuid';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 
-const mockedUuidv4 = uuidv4 as jest.Mock;
+const mockedRandomUUID = randomUUID as jest.Mock;
 const mockedRandomBytes = randomBytes as jest.Mock;
 
 describe('ApiKeyGeneratorService — edge cases', () => {
@@ -100,10 +99,10 @@ describe('ApiKeyGeneratorService — edge cases', () => {
 
     service = module.get<ApiKeyGeneratorService>(ApiKeyGeneratorService);
 
-    mockedUuidv4.mockReset();
+    mockedRandomUUID.mockReset();
     mockedRandomBytes.mockReset();
     mockedRandomBytes.mockReturnValue(Buffer.from('a'.repeat(32), 'utf8'));
-    mockedUuidv4
+    mockedRandomUUID
       .mockReturnValueOnce('uuid-tenant-1')
       .mockReturnValueOnce('uuid-agent-1')
       .mockReturnValueOnce('uuid-key-1');

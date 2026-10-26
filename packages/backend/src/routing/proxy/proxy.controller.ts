@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response as ExpressResponse } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { Public } from '../../common/decorators/public.decorator';
 import { AgentKeyAuthGuard } from '../../otlp/guards/agent-key-auth.guard';
 import { IngestionContext } from '../../otlp/interfaces/ingestion-context.interface';
@@ -282,7 +282,7 @@ export class ProxyController {
     const sessionScope = buildProxySessionScope(tenantId, agentId, req.headers['x-session-key']);
     const { sessionKey } = sessionScope;
     const traceId = this.extractTraceId(req);
-    const requestId = uuid();
+    const requestId = randomUUID();
     const callerAttribution = classifyCaller(req.headers);
     const requestHeaders = sanitizeRequestHeaders(req.headers);
     const isStream = body.stream === true;
@@ -331,7 +331,7 @@ export class ProxyController {
     const startProviderAttempt: StartProviderAttempt = (start) => {
       const startedAtMs = Date.now();
       const attempt: ProviderAttemptRef = {
-        id: uuid(),
+        id: randomUUID(),
         attemptNumber: ++attemptSequence,
         startedAtMs,
         startedAt: new Date(startedAtMs).toISOString(),

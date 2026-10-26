@@ -1,8 +1,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { randomBytes } from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
+import { randomBytes, randomUUID } from 'crypto';
 import { Agent } from '../../entities/agent.entity';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
@@ -114,7 +113,7 @@ export class AgentDuplicationService {
 
     const rawKey = this.generateOtlpKey();
     const secret = getEncryptionSecret();
-    const newAgentId = uuidv4();
+    const newAgentId = randomUUID();
     const now = sqlNow();
 
     const copied = await this.dataSource.transaction(async (manager) => {
@@ -131,7 +130,7 @@ export class AgentDuplicationService {
       });
 
       await manager.getRepository(AgentApiKey).insert({
-        id: uuidv4(),
+        id: randomUUID(),
         key: encrypt(rawKey, secret),
         key_hash: hashKey(rawKey),
         key_prefix: keyPrefix(rawKey),
@@ -166,7 +165,7 @@ export class AgentDuplicationService {
       if (tiers.length > 0) {
         await manager.getRepository(TierAssignment).insert(
           tiers.map((t) => ({
-            id: uuidv4(),
+            id: randomUUID(),
             agent_id: newAgentId,
             tier: t.tier,
             override_route: t.override_route,
@@ -185,7 +184,7 @@ export class AgentDuplicationService {
       if (specificity.length > 0) {
         await manager.getRepository(SpecificityAssignment).insert(
           specificity.map((s) => ({
-            id: uuidv4(),
+            id: randomUUID(),
             agent_id: newAgentId,
             category: s.category,
             is_active: s.is_active,
@@ -217,7 +216,7 @@ export class AgentDuplicationService {
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `,
             [
-              uuidv4(),
+              randomUUID(),
               newAgentId,
               p.scope_key,
               // Custom providers are tenant-global and shared by the duplicate, so

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { toSqlTimestamp } from '../../common/utils/postgres-sql';
 
 export function formatNotificationTimestamp(): string {
@@ -34,7 +34,7 @@ export class NotificationLogService {
          (id, rule_id, period_start, period_end, actual_value, threshold_value, metric_type, agent_name, sent_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
-        uuid(),
+        randomUUID(),
         params.ruleId,
         params.periodStart,
         params.periodEnd,

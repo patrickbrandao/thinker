@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { render } from '@react-email/render';
 import {
   encrypt,
@@ -141,7 +141,7 @@ export class EmailProviderConfigService {
       await this.ds.query(
         `INSERT INTO email_provider_configs (id, tenant_id, created_by_user_id, provider, api_key_encrypted, key_prefix, domain, is_active, created_at, updated_at, notification_email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
-          uuid(),
+          randomUUID(),
           tenantId,
           ctx.userId,
           provider,
