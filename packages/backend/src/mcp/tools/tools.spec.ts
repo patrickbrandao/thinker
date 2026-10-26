@@ -531,18 +531,24 @@ describe('MCP tools', () => {
 
   describe('routing tools', () => {
     it('reports status in each branch', async () => {
-      const deps = makeDeps();
+      // These are the auto-route verdicts; virtual models are covered below.
+      const depsWithoutVirtualModels = () => {
+        const d = makeDeps();
+        (d.virtualModels.list as jest.Mock).mockResolvedValue([]);
+        return d;
+      };
+      const deps = depsWithoutVirtualModels();
       expect(
         (await call(registerAll(deps), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ enabled: true });
 
-      const noProviders = makeDeps();
+      const noProviders = depsWithoutVirtualModels();
       (noProviders.providers.getProviders as jest.Mock).mockResolvedValue([]);
       expect(
         (await call(registerAll(noProviders), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ reason: 'no_provider' });
 
-      const inactiveOnly = makeDeps();
+      const inactiveOnly = depsWithoutVirtualModels();
       (inactiveOnly.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, is_active: false },
       ]);
@@ -552,14 +558,14 @@ describe('MCP tools', () => {
 
       // #75: an empty pricing cache (right after boot, or a failed fetch) does
       // not block an agent that can route, same as the REST endpoint.
-      const noPricing = makeDeps();
+      const noPricing = depsWithoutVirtualModels();
       (noPricing.pricingSync.getAll as jest.Mock).mockReturnValue(new Map());
       expect(
         (await call(registerAll(noPricing), 'thinker_routing_status', { agent: 'demo' })).data,
       ).toMatchObject({ enabled: true, reason: null });
 
       // It only explains an agent that cannot route.
-      const noPricingNotRoutable = makeDeps();
+      const noPricingNotRoutable = depsWithoutVirtualModels();
       (noPricingNotRoutable.pricingSync.getAll as jest.Mock).mockReturnValue(new Map());
       (noPricingNotRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
       expect(
@@ -587,7 +593,7 @@ describe('MCP tools', () => {
         else process.env['THINKER_CATALOG_SYNC'] = previous;
       }
 
-      const notRoutable = makeDeps();
+      const notRoutable = depsWithoutVirtualModels();
       (notRoutable.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
       expect(
         (await call(registerAll(notRoutable), 'thinker_routing_status', { agent: 'demo' })).data,
@@ -688,8 +694,11 @@ describe('MCP tools', () => {
         agent: 'demo',
       });
       expect(data).toEqual({
+        status_for: 'auto',
         enabled: true,
         reason: null,
+        routes_by_virtual_model: true,
+        active_virtual_models: ['DeepSeek/Flash'],
         virtual_models: [
           {
             id: 'vm-1',
@@ -702,6 +711,62 @@ describe('MCP tools', () => {
           },
         ],
       });
+    });
+
+    it('says when only virtual models route, without blaming the auto route reason', async () => {
+      // auto cannot route, but an enabled virtual model with a primary can.
+      const deps = makeDeps();
+      (deps.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(false);
+      const onlyVirtual = await call(registerAll(deps), 'thinker_routing_status', {
+        agent: 'demo',
+      });
+      expect(onlyVirtual.data).toMatchObject({
+        status_for: 'auto',
+        enabled: false,
+        reason: 'auto_not_routable',
+        auto_reason: 'no_routable_models',
+        routes_by_virtual_model: true,
+        active_virtual_models: ['DeepSeek/Flash'],
+      });
+
+      // Disabled, empty, or continuing on a Default chain that cannot route:
+      // none of them routes, so the auto reason stands.
+      (deps.virtualModels.list as jest.Mock).mockResolvedValue([
+        { ...VIRTUAL_ROW, enabled: false },
+        {
+          ...VIRTUAL_ROW,
+          id: 'vm-2',
+          name: 'empty',
+          override_route: null,
+          continue_on_default: false,
+        },
+        { ...VIRTUAL_ROW, id: 'vm-3', name: 'onDefault', override_route: null },
+      ]);
+      const none = await call(registerAll(deps), 'thinker_routing_status', { agent: 'demo' });
+      expect(none.data).toMatchObject({
+        enabled: false,
+        reason: 'no_routable_models',
+        routes_by_virtual_model: false,
+        active_virtual_models: [],
+      });
+
+      // A virtual model with only fallbacks, or on a Default that routes, counts.
+      (deps.tiers.hasRoutableTier as jest.Mock).mockResolvedValue(true);
+      const withDefault = await call(registerAll(deps), 'thinker_routing_status', {
+        agent: 'demo',
+      });
+      expect(withDefault.data).toMatchObject({
+        enabled: true,
+        reason: null,
+        active_virtual_models: ['onDefault'],
+      });
+
+      // With no active provider nothing routes, virtual models included.
+      const noProvider = makeDeps();
+      (noProvider.providers.getProviders as jest.Mock).mockResolvedValue([]);
+      expect(
+        (await call(registerAll(noProvider), 'thinker_routing_status', { agent: 'demo' })).data,
+      ).toMatchObject({ reason: 'no_provider', routes_by_virtual_model: false });
     });
 
     it('lists virtual models with their computed fields', async () => {
@@ -821,6 +886,54 @@ describe('MCP tools', () => {
         continue_on_default: false,
       });
       expect(deps.virtualModels.setEnabled).toHaveBeenCalledWith('agent-1', TENANT, 'vm-1', false);
+    });
+
+    it('refuses a taken or invalid name before writing, and reports a partial update', async () => {
+      const deps = makeDeps();
+      (deps.virtualModels.list as jest.Mock).mockResolvedValue([
+        VIRTUAL_ROW,
+        { ...VIRTUAL_ROW, id: 'vm-2', name: 'Other' },
+      ]);
+      const tools = registerAll(deps);
+      const taken = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        model: 'gpt-4o-mini',
+        name: 'other',
+      });
+      expect(taken.text).toBe('A virtual model named "other" already exists on this agent');
+      const invalid = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        model: 'gpt-4o-mini',
+        name: 'auto',
+      });
+      expect(invalid.error).toBe(true);
+      expect(deps.virtualModels.setOverride).not.toHaveBeenCalled();
+
+      (deps.virtualModels.setFallbacks as jest.Mock).mockRejectedValueOnce(
+        new Error('Fallback "nope" is not available'),
+      );
+      const partial = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        model: 'gpt-4o-mini',
+        fallbacks: ['nope'],
+        enabled: false,
+      });
+      expect(partial.text).toBe(
+        'Fallback "nope" is not available (already applied to "DeepSeek/Flash": model)',
+      );
+      expect(deps.virtualModels.setEnabled).not.toHaveBeenCalled();
+
+      // A failure on the first write needs no suffix.
+      (deps.virtualModels.setOverride as jest.Mock).mockRejectedValueOnce(new Error('bad model'));
+      const first = await call(tools, 'thinker_routing_virtual_update', {
+        agent: 'demo',
+        virtual: 'vm-1',
+        model: 'x',
+      });
+      expect(first.text).toBe('bad model');
     });
 
     it('clears fallbacks with [], the primary with clear_model, and finds by id', async () => {

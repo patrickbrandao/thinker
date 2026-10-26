@@ -12,7 +12,11 @@ import {
   resolveModelRoute,
 } from '../../routing/routing-core/resolve-model-route';
 import type { RouteParamsTarget } from '../../routing/model-params/route-model-params.service';
-import { registerVirtualModelTools, summarizeVirtualModel } from './virtual-models.tools';
+import {
+  registerVirtualModelTools,
+  routableVirtualModelNames,
+  summarizeVirtualModel,
+} from './virtual-models.tools';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 const ROUTE_TEST_TIMEOUT_MS = 120_000;
@@ -118,8 +122,12 @@ export function registerRoutingTools(
     {
       title: 'Routing status',
       description:
-        'Report whether a harness can route yet, and why not, and list its virtual models ' +
-        '(names it can send as `model`) with their chains.',
+        'Report whether a harness can route, and why not. enabled and reason refer to requests ' +
+        'with model "auto" (status_for: "auto"); routes_by_virtual_model and ' +
+        'active_virtual_models say whether requests naming a virtual model can route, and ' +
+        'reason is "auto_not_routable" when only those can (auto_reason then keeps why auto ' +
+        'cannot). Also lists the virtual models ' +
+        '(names the harness can send as `model`) with their chains.',
       inputSchema: z.object({ agent: z.string().min(1) }),
       annotations: { readOnlyHint: true },
     },
@@ -135,7 +143,24 @@ export function registerRoutingTools(
             }),
             deps.virtualModels.list(agent.id),
           ]);
-          return { ...status, virtual_models: virtualModels.map(summarizeVirtualModel) };
+          // The shared RoutingStatus (also served to the dashboard) answers
+          // for "auto" only. With no active provider nothing routes, virtual
+          // models included.
+          const active =
+            status.reason === 'no_provider'
+              ? []
+              : routableVirtualModelNames(virtualModels, status.enabled);
+          const onlyVirtual = !status.enabled && active.length > 0;
+          return {
+            status_for: 'auto' as const,
+            enabled: status.enabled,
+            reason: onlyVirtual ? 'auto_not_routable' : status.reason,
+            // Why auto cannot route, kept when the reason above is replaced.
+            ...(onlyVirtual ? { auto_reason: status.reason } : {}),
+            routes_by_virtual_model: active.length > 0,
+            active_virtual_models: active,
+            virtual_models: virtualModels.map(summarizeVirtualModel),
+          };
         })(),
       ),
   );

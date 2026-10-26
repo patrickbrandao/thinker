@@ -2234,6 +2234,8 @@ describe('routing commands', () => {
           shadows: [],
         },
       ],
+      routes_by_virtual_model: false,
+      active_virtual_models: [],
       recording: false,
     });
   });
@@ -2250,6 +2252,8 @@ describe('routing commands', () => {
       default: { route: null, fallbacks: [] },
       custom_tiers: [],
       virtual_models: [],
+      routes_by_virtual_model: false,
+      active_virtual_models: [],
     });
   });
 

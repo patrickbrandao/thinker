@@ -173,6 +173,58 @@ describe('routing virtual', () => {
     expect(io.lastJson()).toMatchObject({ id: 'vm-1', name: 'flash' });
   });
 
+  it('update refuses a taken name before writing, and reports a partial update', async () => {
+    const two = { status: 200, body: [VIEW, { ...VIEW, id: 'vm-2', name: 'Other' }] };
+    const { io, calls } = authedIo([two]);
+    expect(
+      await run(io, [
+        'routing',
+        'virtual',
+        'update',
+        'john',
+        'vm-1',
+        '--model',
+        'gpt-4o',
+        '--name',
+        'OTHER',
+      ]),
+    ).toBe(1);
+    expect(io.lastJson()).toMatchObject({ error: 'conflict', status: 409 });
+    expect(calls).toHaveLength(1);
+
+    const { io: io2, calls: calls2 } = authedIo([
+      LIST,
+      { status: 200, body: VIEW },
+      { status: 400, body: { message: 'Fallback "nope" is not available' } },
+    ]);
+    expect(
+      await run(io2, [
+        'routing',
+        'virtual',
+        'update',
+        'john',
+        'vm-1',
+        '--model',
+        'gpt-4o',
+        '--fallback',
+        'nope',
+        '--name',
+        'x',
+      ]),
+    ).toBe(1);
+    expect(io2.lastJson()).toMatchObject({
+      message: 'Fallback "nope" is not available (already applied to "DeepSeek/Flash": --model)',
+      status: 400,
+    });
+    expect(calls2).toHaveLength(3);
+
+    const { io: io3 } = authedIo([LIST, { status: 400, body: { message: 'bad model' } }]);
+    expect(
+      await run(io3, ['routing', 'virtual', 'update', 'john', 'vm-1', '--model', 'nope']),
+    ).toBe(1);
+    expect(io3.lastJson()).toMatchObject({ message: 'bad model' });
+  });
+
   it('update prints the view the last write returned when no read-back is needed', async () => {
     const { io, calls } = authedIo([LIST, { status: 200, body: { ...VIEW, enabled: true } }]);
     expect(
@@ -263,6 +315,49 @@ describe('routing virtual', () => {
     const { io: io2, calls: calls2 } = authedIo([LIST, { status: 200, body: VIEW }]);
     expect(await run(io2, ['routing', 'virtual', 'enable', 'john', 'vm-1'])).toBe(0);
     expect(JSON.parse(calls2[1].body!)).toEqual({ enabled: true });
+  });
+});
+
+describe('routing status with virtual models', () => {
+  const status = (defaultRoute: unknown, virtualModels: unknown[]) =>
+    authedIo([
+      { status: 200, body: [{ tier: 'default', override_route: defaultRoute }] },
+      { status: 200, body: [] },
+      { status: 200, body: virtualModels },
+      { status: 200, body: { enabled: true } },
+    ]);
+
+  it('reports routing by virtual model when the default route is empty', async () => {
+    const { io } = status(null, [
+      VIEW,
+      { ...VIEW, id: 'vm-2', name: 'off', enabled: false },
+      { ...VIEW, id: 'vm-3', name: 'onDefault', override_route: null, continue_on_default: true },
+    ]);
+    expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
+    expect(io.lastJson()).toMatchObject({
+      default: { route: null },
+      routes_by_virtual_model: true,
+      active_virtual_models: ['DeepSeek/Flash'],
+    });
+  });
+
+  it('counts a continue-on-Default virtual model only when the default route exists', async () => {
+    const onDefault = {
+      ...VIEW,
+      name: 'onDefault',
+      override_route: null,
+      continue_on_default: true,
+    };
+    const { io } = status(null, [onDefault]);
+    expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
+    expect(io.lastJson()).toMatchObject({
+      routes_by_virtual_model: false,
+      active_virtual_models: [],
+    });
+
+    const { io: io2 } = status({ model: 'gpt-4o' }, [onDefault]);
+    expect(await run(io2, ['routing', 'status', 'john'])).toBe(0);
+    expect(io2.lastJson()).toMatchObject({ active_virtual_models: ['onDefault'] });
   });
 });
 

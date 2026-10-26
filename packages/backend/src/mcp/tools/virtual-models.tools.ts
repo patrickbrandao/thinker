@@ -4,6 +4,7 @@ import {
   AUTH_TYPES,
   MAX_VIRTUAL_MODEL_FALLBACKS,
   RESPONSE_MODES,
+  validateVirtualModelName,
   type VirtualModelRouteInput,
 } from 'thinker-shared';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
@@ -46,6 +47,27 @@ export function summarizeVirtualModel(row: VirtualModel) {
     continue_on_default: row.continue_on_default,
     response_mode: row.response_mode,
   };
+}
+
+/**
+ * Names of the virtual models that can take traffic: enabled, with a route of
+ * their own, or continuing on a Default chain that routes. This is the
+ * configuration, not a live availability check (the proxy re-checks each
+ * route per request and answers M301 when none is available).
+ */
+export function routableVirtualModelNames(
+  rows: readonly VirtualModel[],
+  autoRoutable: boolean,
+): string[] {
+  return rows
+    .filter(
+      (row) =>
+        row.enabled &&
+        (row.override_route != null ||
+          (row.fallback_routes?.length ?? 0) > 0 ||
+          (row.continue_on_default && autoRoutable)),
+    )
+    .map((row) => row.name);
 }
 
 const routeFields = {
@@ -164,7 +186,9 @@ export function registerVirtualModelTools(
         'Change a virtual model, found by name (ignoring case) or id. Only the fields you pass ' +
         'change. model replaces the primary and keeps the fallbacks; fallbacks replaces the ' +
         'fallback list ([] clears it); clear_model removes the primary and its fallbacks. ' +
-        'enabled:false hides the name from /v1/models and stops it from shadowing a real model.',
+        'enabled:false hides the name from /v1/models and stops it from shadowing a real model. ' +
+        'The changes are applied one after another, routes first; if a later one fails, the ' +
+        'error lists the ones already applied.',
       inputSchema: z.object({
         agent: z.string().min(1),
         virtual: z.string().min(1).describe('Name or id of the virtual model to change.'),
@@ -212,43 +236,85 @@ export function registerVirtualModelTools(
             throw new Error('fallbacks require a model (the primary route)');
           }
 
-          // Route writes first: they carry the strict catalog validation and
-          // are the likeliest to fail, so a rejected route leaves the rest
-          // untouched. The response mode follows them because its stream
-          // guard checks the chain as it ends up.
+          // The cheap checks run before any write: the new name's format and
+          // its uniqueness among this agent's virtual models.
+          if (name !== undefined) {
+            const checked = validateVirtualModelName(name);
+            if (!checked.ok) throw new Error(checked.error);
+            const siblings = await deps.virtualModels.list(agent.id);
+            const lower = checked.name.toLowerCase();
+            if (siblings.some((r) => r.id !== row.id && r.name.toLowerCase() === lower)) {
+              throw new Error(
+                `A virtual model named "${checked.name}" already exists on this agent`,
+              );
+            }
+          }
+
+          // The writes are separate service calls, not one transaction. Route
+          // writes go first: they carry the strict catalog validation and are
+          // the likeliest to fail, so a rejected route leaves the name and
+          // flags untouched. The response mode follows them because its stream
+          // guard checks the chain as it ends up. A failure after an earlier
+          // step succeeded says which steps were already applied.
+          const applied: string[] = [];
+          const step = async (label: string, write: () => Promise<unknown>): Promise<void> => {
+            try {
+              await write();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              throw new Error(
+                applied.length > 0
+                  ? `${message} (already applied to "${row.name}": ${applied.join(', ')})`
+                  : message,
+              );
+            }
+            applied.push(label);
+          };
           if (clear_model) {
-            await deps.virtualModels.clearOverride(agent.id, row.id);
+            await step('clear_model', () => deps.virtualModels.clearOverride(agent.id, row.id));
           } else if (route.model) {
-            await deps.virtualModels.setOverride(
-              agent.id,
-              agent.tenant_id,
-              row.id,
-              primaryRoute(route),
+            await step('model', () =>
+              deps.virtualModels.setOverride(
+                agent.id,
+                agent.tenant_id,
+                row.id,
+                primaryRoute(route),
+              ),
             );
           }
           if (fallbacks !== undefined) {
             if (fallbacks.length > 0) {
-              await deps.virtualModels.setFallbacks(agent.id, agent.tenant_id, row.id, fallbacks);
+              await step('fallbacks', () =>
+                deps.virtualModels.setFallbacks(agent.id, agent.tenant_id, row.id, fallbacks),
+              );
             } else if (!clear_model) {
-              await deps.virtualModels.clearFallbacks(agent.id, row.id);
+              await step('fallbacks', () => deps.virtualModels.clearFallbacks(agent.id, row.id));
             }
           }
           if (response_mode !== undefined) {
-            await deps.virtualModels.setResponseMode(
-              agent.id,
-              agent.tenant_id,
-              row.id,
-              response_mode,
+            await step('response_mode', () =>
+              deps.virtualModels.setResponseMode(agent.id, agent.tenant_id, row.id, response_mode),
             );
           }
           if (name !== undefined || continue_on_default !== undefined) {
-            await deps.virtualModels.update(agent.id, agent.tenant_id, row.id, {
-              ...(name !== undefined ? { name } : {}),
-              ...(continue_on_default !== undefined ? { continue_on_default } : {}),
-            });
+            await step(
+              [
+                name !== undefined ? 'name' : '',
+                continue_on_default !== undefined ? 'continue_on_default' : '',
+              ]
+                .filter(Boolean)
+                .join(', '),
+              () =>
+                deps.virtualModels.update(agent.id, agent.tenant_id, row.id, {
+                  ...(name !== undefined ? { name } : {}),
+                  ...(continue_on_default !== undefined ? { continue_on_default } : {}),
+                }),
+            );
           }
           if (enabled !== undefined) {
-            await deps.virtualModels.setEnabled(agent.id, agent.tenant_id, row.id, enabled);
+            await step('enabled', () =>
+              deps.virtualModels.setEnabled(agent.id, agent.tenant_id, row.id, enabled),
+            );
           }
           const views = await deps.virtualModels.listViews(agent.id, agent.tenant_id);
           return { virtual_model: views.find((v) => v.id === row.id) ?? null };

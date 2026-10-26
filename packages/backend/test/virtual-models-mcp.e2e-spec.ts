@@ -218,6 +218,46 @@ describe('MCP virtual model tools', () => {
         },
       ],
     });
+    // No provider is connected in the e2e app: nothing routes.
+    expect(status.data).toMatchObject({
+      status_for: 'auto',
+      enabled: false,
+      reason: 'no_provider',
+      routes_by_virtual_model: false,
+      active_virtual_models: [],
+    });
+  });
+
+  it('tells a harness that routes only through virtual models from one that cannot route', async () => {
+    jest
+      .spyOn(app.get(ProviderService), 'getProviders')
+      .mockResolvedValue([{ is_active: true }] as never);
+    const routable = jest.spyOn(app.get(TierService), 'hasRoutableTier');
+    try {
+      routable.mockResolvedValue(false);
+      const onlyVirtual = await call('thinker_routing_status', { agent: 'test-agent' });
+      expect(onlyVirtual.data).toMatchObject({
+        status_for: 'auto',
+        enabled: false,
+        reason: 'auto_not_routable',
+        auto_reason: 'no_routable_models',
+        routes_by_virtual_model: true,
+        active_virtual_models: ['Deep'],
+      });
+
+      routable.mockResolvedValue(true);
+      const both = await call('thinker_routing_status', { agent: 'test-agent' });
+      expect(both.data).toMatchObject({
+        enabled: true,
+        reason: null,
+        routes_by_virtual_model: true,
+        active_virtual_models: ['Deep'],
+      });
+      expect(both.data).not.toHaveProperty('auto_reason');
+    } finally {
+      jest.mocked(app.get(ProviderService).getProviders).mockRestore();
+      routable.mockRestore();
+    }
   });
 
   it('sets params under virtual:<id>, apart from the custom tier of the same name', async () => {

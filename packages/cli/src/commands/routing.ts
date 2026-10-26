@@ -43,6 +43,7 @@ function parseModelsList(raw: string): string[] {
 interface TierAssignmentRow {
   tier?: string;
   override_route?: unknown;
+  auto_assigned_route?: unknown;
   fallback_routes?: unknown;
 }
 
@@ -109,6 +110,20 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       shadows: Array.isArray(v.shadows) ? v.shadows : [],
     }));
 
+  // Virtual models that can take traffic as configured: enabled, with a
+  // route of their own, or continuing on a Default chain that has a route.
+  // The proxy still checks each route's availability per request (M301).
+  const defaultRoutes = Boolean(defaultTier?.override_route ?? defaultTier?.auto_assigned_route);
+  const activeVirtual = virtual
+    .filter(
+      (v) =>
+        v.enabled === true &&
+        (v.route !== null ||
+          (Array.isArray(v.fallbacks) && v.fallbacks.length > 0) ||
+          (v.continue_on_default && defaultRoutes)),
+    )
+    .map((v) => v.name);
+
   printJson(io, {
     agent,
     default: {
@@ -117,6 +132,10 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
     },
     custom_tiers: custom,
     virtual_models: virtual,
+    // `default` is what model "auto" routes to; these say whether requests
+    // naming a virtual model route even when it is empty.
+    routes_by_virtual_model: activeVirtual.length > 0,
+    active_virtual_models: activeVirtual,
     recording: (recording as { enabled?: boolean } | null)?.enabled ?? null,
   });
 }
@@ -288,7 +307,7 @@ async function findVirtualModel(
   client: ApiClient,
   agent: string,
   nameOrId: string,
-): Promise<{ id: string; name: string; hasPrimary: boolean }> {
+): Promise<{ id: string; name: string; hasPrimary: boolean; otherNames: string[] }> {
   const rows = (await client.request('GET', agentPath(agent, '/virtual-models'))) as unknown;
   const list = (Array.isArray(rows) ? rows : []).filter(
     (v): v is VirtualModelRow => typeof v === 'object' && v !== null,
@@ -309,6 +328,9 @@ async function findVirtualModel(
     id: hit.id,
     name: typeof hit.name === 'string' ? hit.name : hit.id,
     hasPrimary: hit.override_route !== null && hit.override_route !== undefined,
+    otherNames: list
+      .filter((v) => v !== hit && typeof v.name === 'string')
+      .map((v) => v.name as string),
   };
 }
 
@@ -399,7 +421,10 @@ export const routingVirtual = {
    * Change only what is passed. --model replaces the primary and keeps the
    * fallbacks; --fallback (repeatable) replaces the fallback list and
    * --clear-fallbacks empties it; --clear-model removes the primary and its
-   * fallbacks. Route writes go first, so a rejected route changes nothing.
+   * fallbacks. The writes are separate requests, not one transaction: route
+   * writes go first, so a rejected route leaves the name and flags untouched,
+   * and a failure after an earlier write lists the writes already applied.
+   * A rename to a name already taken is refused before any write.
    */
   update: async (io: CliIo, argv: string[]): Promise<void> => {
     const args = parseArgs(argv, {
@@ -457,37 +482,79 @@ export const routingVirtual = {
     if (fallbacks.length > 0 && !primary && !vm.hasPrimary) {
       throw new CliError('missing_flag', '--fallback needs --model (the primary route)');
     }
+    if (
+      newName !== undefined &&
+      vm.otherNames.some((n) => n.toLowerCase() === newName.toLowerCase())
+    ) {
+      throw new CliError(
+        'conflict',
+        `A virtual model named "${newName}" already exists on agent "${agent}"`,
+        undefined,
+        409,
+      );
+    }
+
+    const applied: string[] = [];
+    const step = async (label: string, write: () => Promise<unknown>): Promise<unknown> => {
+      try {
+        const out = await write();
+        applied.push(label);
+        return out;
+      } catch (error) {
+        if (applied.length === 0) throw error;
+        const suffix = ` (already applied to "${vm.name}": ${applied.join(', ')})`;
+        if (error instanceof CliError) {
+          throw new CliError(error.code, error.message + suffix, error.hint, error.status);
+        }
+        throw new CliError(
+          'partial_update',
+          (error instanceof Error ? error.message : String(error)) + suffix,
+        );
+      }
+    };
 
     let view: unknown;
     if (clearModel) {
-      await client.request('DELETE', virtualPath(agent, vm.id, '/override'));
+      await step('--clear-model', () =>
+        client.request('DELETE', virtualPath(agent, vm.id, '/override')),
+      );
     } else if (primary) {
       // The override endpoint takes the flat shape: its nested `route` needs
       // provider and auth type, which --model alone does not carry.
       const { keyLabel, ...flat } = primary;
-      view = await client.request('PUT', virtualPath(agent, vm.id, '/override'), {
-        body: { ...flat, ...(keyLabel ? { providerKeyLabel: keyLabel } : {}) },
-      });
+      view = await step('--model', () =>
+        client.request('PUT', virtualPath(agent, vm.id, '/override'), {
+          body: { ...flat, ...(keyLabel ? { providerKeyLabel: keyLabel } : {}) },
+        }),
+      );
     }
     if (fallbacks.length > 0) {
-      await client.request('PUT', virtualPath(agent, vm.id, '/fallbacks'), {
-        body: { models: fallbacks },
-      });
+      await step('--fallback', () =>
+        client.request('PUT', virtualPath(agent, vm.id, '/fallbacks'), {
+          body: { models: fallbacks },
+        }),
+      );
     } else if (clearFallbacks && !clearModel) {
-      await client.request('DELETE', virtualPath(agent, vm.id, '/fallbacks'));
+      await step('--clear-fallbacks', () =>
+        client.request('DELETE', virtualPath(agent, vm.id, '/fallbacks')),
+      );
     }
     if (responseMode) {
-      view = await client.request('PATCH', virtualPath(agent, vm.id, '/response-mode'), {
-        body: { response_mode: responseMode },
-      });
+      view = await step('--response-mode', () =>
+        client.request('PATCH', virtualPath(agent, vm.id, '/response-mode'), {
+          body: { response_mode: responseMode },
+        }),
+      );
     }
     if (newName !== undefined || continueOnDefault !== undefined) {
-      view = await client.request('PUT', virtualPath(agent, vm.id), {
-        body: {
-          ...(newName !== undefined ? { name: newName } : {}),
-          ...(continueOnDefault !== undefined ? { continue_on_default: continueOnDefault } : {}),
-        },
-      });
+      view = await step(newName !== undefined ? '--name' : '--continue-on-default', () =>
+        client.request('PUT', virtualPath(agent, vm.id), {
+          body: {
+            ...(newName !== undefined ? { name: newName } : {}),
+            ...(continueOnDefault !== undefined ? { continue_on_default: continueOnDefault } : {}),
+          },
+        }),
+      );
     }
     // Fallback and clear writes return no view; read the row back so the
     // output is always the virtual model as it now stands.
