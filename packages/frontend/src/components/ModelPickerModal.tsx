@@ -741,12 +741,23 @@ const ModelPickerModal: Component<Props> = (props) => {
                   const model = item.model;
                   const disabledReason = () => missingRequiredCapability(model.pricing);
                   const disabled = () => disabledReason() !== null;
+                  // The label cell truncates with an ellipsis, so the hover
+                  // tooltip carries the full name (and the model id when it
+                  // differs) ahead of any disabled reason.
+                  const tooltip = () =>
+                    [
+                      model.label,
+                      model.value !== model.label ? model.value : null,
+                      disabledReason(),
+                    ]
+                      .filter(Boolean)
+                      .join('\n');
                   return (
                     <button
                       class="routing-modal__model"
                       classList={{ 'routing-modal__model--disabled': disabled() }}
                       disabled={disabled()}
-                      title={disabledReason() ?? undefined}
+                      title={tooltip()}
                       onClick={() =>
                         props.onSelect(props.tierId, model.value, item.provId, activeTab())
                       }
