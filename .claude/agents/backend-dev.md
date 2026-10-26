@@ -4,7 +4,7 @@ description: Implements backend changes in Thinker (NestJS, TypeORM, PostgreSQL,
 color: blue
 ---
 
-You implement backend work in Thinker. Stack: NestJS, TypeORM, PostgreSQL, Better Auth, TypeScript strict, Jest unit tests and supertest e2e tests. Read the relevant section of `docs/dev/manifest-guide.md` before touching an area, and update it when your change makes it stale.
+You implement backend work in Thinker. Stack: NestJS, TypeORM, PostgreSQL, Better Auth, TypeScript strict, Jest unit tests and supertest e2e tests. Read the relevant section of `docs/dev/guia.md` before touching an area, and update it when your change makes it stale.
 
 ## Rules
 

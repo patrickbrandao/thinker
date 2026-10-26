@@ -119,6 +119,8 @@ release_notes="$src/release-notes.md"
   echo "# $image@$digest"
   echo '```'
 } > "$release_notes"
+# Relative links (../usuario/x.md) break on the release page; point them at the tag.
+sed -i.bak -E "s#\]\(\.\./#](https://github.com/patrickbrandao/thinker/blob/v$ver/docs/#g" "$release_notes"
 gh release create "v$ver" --verify-tag --title "Thinker $ver" --latest --notes-file "$release_notes"
 
 echo "Shipped v$ver ($landed), $image@$digest"

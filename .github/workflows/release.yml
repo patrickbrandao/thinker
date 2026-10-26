@@ -50,28 +50,31 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      publish: ${{ steps.secrets.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Check Docker Hub secrets
+        id: secrets
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          missing=0
-          for name in DOCKERHUB_USERNAME DOCKERHUB_TOKEN; do
-            if [ -z "${!name}" ]; then
-              if [ "$DRY_RUN" = "true" ]; then
-                echo "::warning::Repository secret $name is not set (ignored in dry run)."
-                continue
-              fi
-              echo "::error::Repository secret $name is not set. Add it under Settings > Secrets and variables > Actions, then re-run this workflow." >&2
-              missing=1
+          # Without the secrets, scripts/ship.sh publishes from the local
+          # Docker instead, so a tag push only records a notice here.
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::Docker Hub secrets are not set (ignored in dry run)."
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::notice::Docker Hub secrets are not set; skipping CI publishing (scripts/ship.sh publishes from the local Docker)."
+              echo "publish=false" >> "$GITHUB_OUTPUT"
             fi
-          done
-          exit "$missing"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check tag, package version and release notes
         id: version
@@ -106,6 +109,7 @@ jobs:
   build:
     name: Build and push (${{ matrix.platform }})
     needs: preflight
+    if: needs.preflight.outputs.publish == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -167,6 +171,7 @@ jobs:
   manifest:
     name: Multi-arch manifest
     needs: [preflight, build]
+    if: needs.preflight.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -253,7 +258,7 @@ jobs:
   github-release:
     name: GitHub release
     needs: [preflight, manifest]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && needs.preflight.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -179,7 +179,7 @@ Toda resposta roteada pelo Thinker informa o que foi decidido. Os cabeçalhos va
 | `X-Thinker-Specificity` | Categoria detectada, quando a regra de especificidade decidiu. |
 | `X-Thinker-Fallback-From` | Sempre o modelo **principal** (que falhou), quando a resposta veio de um fallback. |
 | `X-Thinker-Fallback-Index` | Posição do fallback que respondeu (a partir de 0), junto com `Fallback-From`. |
-| `X-Thinker-Fallback-Exhausted` | `true` quando todas as tentativas falharam. O status HTTP e o erro são os do provedor **principal**, e o corpo traz `primary_model`, `primary_provider` e a lista `attempted_fallbacks`, com uma entrada por tentativa. |
+| `X-Thinker-Fallback-Exhausted` | `true` quando todas as tentativas falharam. O status HTTP e o erro são os do provedor **principal**, e o objeto `error` do corpo traz `primary_model`, `primary_provider` e a lista `attempted_fallbacks`, com uma entrada por tentativa. |
 
 Valores de `X-Thinker-Reason`:
 
