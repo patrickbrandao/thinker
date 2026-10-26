@@ -3,9 +3,12 @@ import type { DiscoveredModel } from '../../../model-discovery/model-fetcher';
 import {
   buildVirtualModelChain,
   chainContextLength,
+  chainContextWindow,
   computeShadows,
+  snapshotOverrideAvailable,
   snapshotRouteState,
   tierChainRoutes,
+  virtualModelContextLength,
 } from '../virtual-model-chain';
 
 const route = (
@@ -313,5 +316,104 @@ describe('chainContextLength', () => {
         catalog,
       ),
     ).toBe(128000);
+  });
+});
+
+describe('chainContextWindow', () => {
+  const catalog = [
+    discovered('gpt-4o', 'openai', 128000),
+    discovered('claude-opus-4-6', 'anthropic', 200000),
+    discovered('mystery', 'deepseek', 0),
+  ];
+
+  it('keeps "no route left" apart from "window unknown"', () => {
+    expect(chainContextWindow([], 'buffered', catalog)).toEqual({ kind: 'empty' });
+    expect(chainContextWindow([route('openai', 'gone')], 'buffered', catalog)).toEqual({
+      kind: 'empty',
+    });
+    expect(chainContextWindow([route('deepseek', 'mystery')], 'buffered', catalog)).toEqual({
+      kind: 'unknown',
+    });
+    expect(chainContextWindow([route('mistral', 'm')], 'buffered', catalog)).toEqual({
+      kind: 'unknown',
+    });
+    expect(
+      chainContextWindow(
+        [route('anthropic', 'claude-opus-4-6'), route('openai', 'gpt-4o')],
+        'buffered',
+        catalog,
+      ),
+    ).toEqual({ kind: 'known', value: 128000 });
+  });
+});
+
+describe('snapshotOverrideAvailable', () => {
+  const catalog = [discovered('gpt-4o', 'openai', 128000)];
+
+  it('is false only when the connection lists models but not this one', () => {
+    expect(snapshotOverrideAvailable(route('openai', 'gpt-4o'), catalog)).toBe(true);
+    expect(snapshotOverrideAvailable(route('openai', 'gone'), catalog)).toBe(false);
+    // Cold discovery: the snapshot cannot judge it, so it counts as reachable.
+    expect(snapshotOverrideAvailable(route('mistral', 'm'), catalog)).toBe(true);
+  });
+});
+
+describe('virtualModelContextLength', () => {
+  const catalog = [
+    discovered('gpt-4o', 'openai', 128000),
+    discovered('claude-opus-4-6', 'anthropic', 200000),
+    discovered('deepseek-chat', 'deepseek', 64000),
+    discovered('mystery', 'mistral', 0),
+  ];
+  const virtual = (overrides: Partial<Parameters<typeof virtualModelContextLength>[0]> = {}) => ({
+    ...vm(),
+    response_mode: 'buffered' as const,
+    ...overrides,
+  });
+  const defaultTier = {
+    override_route: route('deepseek', 'deepseek-chat'),
+    auto_assigned_route: null,
+    fallback_routes: null,
+  };
+
+  it('uses only the virtual chain without continue_on_default', async () => {
+    expect(await virtualModelContextLength(virtual(), defaultTier, catalog)).toBe(128000);
+  });
+
+  it('adds the Default chain with continue_on_default', async () => {
+    expect(
+      await virtualModelContextLength(virtual({ continue_on_default: true }), defaultTier, catalog),
+    ).toBe(64000);
+  });
+
+  it('reaches a Default that only has the legacy auto-assigned route', async () => {
+    expect(
+      await virtualModelContextLength(
+        virtual({ override_route: null, fallback_routes: null, continue_on_default: true }),
+        {
+          override_route: null,
+          auto_assigned_route: route('deepseek', 'deepseek-chat'),
+          fallback_routes: null,
+        },
+        catalog,
+      ),
+    ).toBe(64000);
+  });
+
+  it('is null when the chain is empty or a window is unknown', async () => {
+    expect(
+      await virtualModelContextLength(
+        virtual({ override_route: null, fallback_routes: null }),
+        null,
+        catalog,
+      ),
+    ).toBeNull();
+    expect(
+      await virtualModelContextLength(
+        virtual({ fallback_routes: [route('mistral', 'mystery')] }),
+        null,
+        catalog,
+      ),
+    ).toBeNull();
   });
 });
