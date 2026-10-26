@@ -18,7 +18,8 @@ const apiMocks = vi.hoisted(() => ({
   refreshConnectionModels: vi.fn(),
   fetchMutate: vi.fn(),
   getOverview: vi.fn(),
-  getOverviewDetails: vi.fn(),
+  getRecentRequests: vi.fn(),
+  getModelUsage: vi.fn(),
   getOverviewAgentUsage: vi.fn(),
   getOverviewProviderUsage: vi.fn(),
   getConnectionDetail: vi.fn(),
@@ -62,6 +63,7 @@ vi.mock('../../src/services/api.js', async () => {
     getCustomProviders: (...args: unknown[]) => apiMocks.getCustomProviders(...args),
     getGlobalProviders: (...args: unknown[]) => apiMocks.getGlobalProviders(...args),
     getGlobalProviderUsage: (...args: unknown[]) => apiMocks.getGlobalProviderUsage(...args),
+    getRecentRequests: (...args: unknown[]) => apiMocks.getRecentRequests(...args),
     // Real merge so the page's config+usage join stays under test.
     mergeUsage: providers.mergeUsage,
   };
@@ -93,7 +95,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   attemptSuccessRate: (row: { attempts: number; succeeded?: number }) =>
     !row.attempts || row.succeeded == null ? null : row.succeeded / row.attempts,
   getOverview: (...args: unknown[]) => apiMocks.getOverview(...args),
-  getOverviewDetails: (...args: unknown[]) => apiMocks.getOverviewDetails(...args),
+  getModelUsage: (...args: unknown[]) => apiMocks.getModelUsage(...args),
   getOverviewAgentUsage: (...args: unknown[]) => apiMocks.getOverviewAgentUsage(...args),
   getOverviewProviderUsage: (...args: unknown[]) => apiMocks.getOverviewProviderUsage(...args),
   getConnectionDetail: (...args: unknown[]) => apiMocks.getConnectionDetail(...args),
@@ -724,7 +726,8 @@ beforeEach(() => {
   apiMocks.refreshConnectionModels.mockResolvedValue({ ok: true });
   apiMocks.fetchMutate.mockResolvedValue({});
   apiMocks.getOverview.mockResolvedValue(overviewResponse);
-  apiMocks.getOverviewDetails.mockResolvedValue({});
+  apiMocks.getRecentRequests.mockResolvedValue({ items: overviewResponse.recent_activity });
+  apiMocks.getModelUsage.mockResolvedValue({ cost_by_model: overviewResponse.cost_by_model });
   apiMocks.getOverviewAgentUsage.mockResolvedValue(agentUsageTimeseries);
   apiMocks.getOverviewProviderUsage.mockResolvedValue(providerUsageTimeseries);
   apiMocks.getConnectionDetail.mockResolvedValue(connectionDetail);
@@ -853,8 +856,7 @@ describe('GlobalOverview (analytics)', () => {
     });
     // A custom model with no display_name must render its stripped name, not
     // the raw custom:<uuid>/ slug.
-    apiMocks.getOverview.mockResolvedValue({
-      ...overviewResponse,
+    apiMocks.getModelUsage.mockResolvedValue({
       cost_by_model: [
         {
           model: 'custom:cp-1/qwen-2.5',
