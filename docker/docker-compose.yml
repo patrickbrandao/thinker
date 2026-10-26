@@ -212,13 +212,16 @@ services:
       - frontend
 
   postgres:
-    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     environment:
       - POSTGRES_USER=thinker
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-thinker}
       - POSTGRES_DB=thinker
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PostgreSQL 18+ images keep PGDATA in /var/lib/postgresql/18/docker and
+      # declare the volume at /var/lib/postgresql, so mount the parent. A PG 16
+      # volume (old /var/lib/postgresql/data layout) is not migrated.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: pg_isready -U thinker
       interval: 5s

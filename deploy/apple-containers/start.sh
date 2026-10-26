@@ -2,7 +2,7 @@
 # Run the Thinker docker-compose stack with Apple Containers (`container` CLI).
 #
 # Mirrors docker/docker-compose.yml as closely as Apple Containers allows:
-#   - postgres:16-alpine with a persistent data directory
+#   - postgres:18-alpine with a persistent data directory
 #   - thinker app wired to postgres, with health-wait before starting
 #   - host LLM access (Ollama / LM Studio) via the container gateway IP
 #     (Apple Containers has no host.docker.internal)
@@ -88,7 +88,7 @@ RECORDINGS_VOLUME="${THINKER_RECORDINGS_VOLUME:-thinker-request-recordings}"
 # copy of this script run outside the repository.
 POSTGRES_IMAGE="$(grep -m1 -oE 'postgres:[^[:space:]"]+@sha256:[0-9a-f]{64}' \
   "$SCRIPT_DIR/../../docker/docker-compose.yml" 2>/dev/null || true)"
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5}"
 
 if [[ "$POSTGRES_PASSWORD" != "thinker" && -z "${DATABASE_URL:-}" ]]; then
   echo "error: DATABASE_URL must be set when POSTGRES_PASSWORD is customized." >&2
@@ -232,8 +232,7 @@ cmd_up() {
       --env POSTGRES_USER=thinker \
       --env POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
       --env POSTGRES_DB=thinker \
-      --env PGDATA=/var/lib/postgresql/data/pgdata \
-      --volume "$PG_VOLUME:/var/lib/postgresql/data" \
+      --volume "$PG_VOLUME:/var/lib/postgresql" \
       "$POSTGRES_IMAGE"
   fi
 

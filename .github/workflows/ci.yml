@@ -138,7 +138,7 @@ jobs:
           TZ: America/Sao_Paulo
 
   backend-e2e:
-    name: Backend e2e (PostgreSQL 16, TZ=${{ matrix.tz }})
+    name: Backend e2e (PostgreSQL, TZ=${{ matrix.tz }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -150,8 +150,8 @@ jobs:
         tz: [UTC, America/Sao_Paulo]
     services:
       postgres:
-        # Same major as docker/docker-compose.yml. PostgreSQL 18 lands in v0.2.
-        image: postgres:16
+        # Same image and digest as docker/docker-compose.yml.
+        image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
         env:
           POSTGRES_USER: myuser
           POSTGRES_PASSWORD: mypassword

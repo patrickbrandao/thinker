@@ -1,6 +1,6 @@
 # Instalação com Docker
 
-A instalação oficial do Thinker é Docker/Compose: a imagem `tmsoftbrasil/thinker` (`linux/amd64` e `linux/arm64`) e um PostgreSQL 16. Não há instalação via npm.
+A instalação oficial do Thinker é Docker/Compose: a imagem `tmsoftbrasil/thinker` (`linux/amd64` e `linux/arm64`) e um PostgreSQL 18. Não há instalação via npm.
 
 ## Requisitos
 
@@ -139,6 +139,12 @@ docker compose up -d
 ```
 
 `docker compose down` mantém os dados; `docker compose down -v` **apaga tudo**.
+
+## PostgreSQL 18
+
+A stack usa o PostgreSQL 18 (`postgres:18-alpine`, fixado por digest). A partir do 18, a imagem oficial guarda os dados em `/var/lib/postgresql/18/docker` e o volume `thinker_pgdata` é montado em `/var/lib/postgresql` (antes era `/var/lib/postgresql/data`). Os volumes novos já nascem com checksums de dados ligados.
+
+**Não há migração de dados de um volume PostgreSQL 16**: o Thinker não tem instalações anteriores com o 16. Se um volume antigo for montado, o contêiner do PostgreSQL 18 recusa subir (mensagem `there appears to be PostgreSQL data in: /var/lib/postgresql`) em vez de apagar ou ignorar os dados. Para quem testou uma versão anterior: faça o dump com a stack antiga, apague o volume (`docker compose down -v`), suba a stack nova e restaure o dump (veja [Backup](#backup)).
 
 ## Quem vem do Manifest
 

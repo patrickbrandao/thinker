@@ -5,7 +5,7 @@
  *   npm run test:e2e:docker --workspace=packages/backend [-- <jest args>]
  *
  * 1. Picks a free TCP port on 127.0.0.1 (never a fixed one like 5432).
- * 2. Starts a uniquely named postgres:16-alpine container, data on tmpfs,
+ * 2. Starts a uniquely named postgres:18-alpine container, data on tmpfs,
  *    database `thinker_e2e_test`, published only on 127.0.0.1:<port>.
  * 3. Waits until it accepts connections, runs the migrations, then runs the
  *    e2e suite in band with DATABASE_URL and THINKER_E2E_ALLOW_DROP=1 set.
@@ -20,7 +20,10 @@ import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const IMAGE = process.env.THINKER_E2E_PG_IMAGE || 'postgres:16-alpine';
+// Same digest-pinned image as docker/docker-compose.yml and the CI e2e job.
+const IMAGE =
+  process.env.THINKER_E2E_PG_IMAGE ||
+  'postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5';
 const DB_NAME = 'thinker_e2e_test';
 const DB_USER = 'thinker_e2e';
 const DB_PASSWORD = randomBytes(12).toString('hex');
@@ -142,7 +145,8 @@ async function startContainer() {
         '--label',
         RUN_LABEL,
         '--tmpfs',
-        '/var/lib/postgresql/data:rw',
+        // PostgreSQL 18+ keeps PGDATA under /var/lib/postgresql/<major>/docker.
+        '/var/lib/postgresql:rw',
         '--publish',
         `127.0.0.1:${port}:5432`,
         '--env',
