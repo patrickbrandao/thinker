@@ -163,6 +163,54 @@ describe('createSsePayloadParser', () => {
     expect(parser.flush()).toEqual(['partial']);
   });
 
+  it('throws the overflow error when a valid field outgrows the buffer across chunks', () => {
+    const parser = createSsePayloadParser({ maxBufferSize: 16 });
+
+    expect(parser.feed('data: 0123')).toEqual([]);
+    expect(() => parser.feed('456789abcdef')).toThrow(
+      'SSE buffer overflow: provider sent data without event boundaries',
+    );
+  });
+
+  it('discards a long line without a field prefix instead of buffering it', () => {
+    const parser = createSsePayloadParser({ maxBufferSize: 16 });
+
+    for (let i = 0; i < 10; i++) {
+      expect(parser.feed('x'.repeat(10))).toEqual([]);
+    }
+    expect(parser.feed('\ndata: ok\n\n')).toEqual(['ok']);
+  });
+
+  it('discards a partial comment when there is no onComment callback', () => {
+    const parser = createSsePayloadParser({ maxBufferSize: 16 });
+
+    expect(parser.feed(`: ${'k'.repeat(64)}`)).toEqual([]);
+    expect(parser.feed('\n\ndata: ok\n\n')).toEqual(['ok']);
+  });
+
+  it('delivers a comment split across chunks to onComment', () => {
+    const comments: string[] = [];
+    const parser = createSsePayloadParser({ onComment: (c) => comments.push(c) });
+
+    parser.feed(': OPENROUTER ');
+    parser.feed('PROCESSING\n\ndata: {"a":1}\n\n');
+    expect(comments).toEqual(['OPENROUTER PROCESSING']);
+  });
+
+  it('strips a leading BOM split across chunks', () => {
+    const parser = createSsePayloadParser();
+
+    expect(parser.feed('\uFEFF')).toEqual([]);
+    expect(parser.feed('data: first\n\n')).toEqual(['first']);
+  });
+
+  it('treats a CRLF split across chunks as a single line terminator', () => {
+    const parser = createSsePayloadParser();
+
+    expect(parser.feed('data: a\r')).toEqual([]);
+    expect(parser.feed('\n\r\ndata: b\r\n\r\n')).toEqual(['a', 'b']);
+  });
+
   it('should ignore unknown SSE fields', () => {
     const parser = createSsePayloadParser();
     const input = 'raw content\n\n';
@@ -649,8 +697,9 @@ describe('pipeStream', () => {
 
   it('should throw when SSE buffer exceeds MAX_SSE_BUFFER_SIZE', async () => {
     const { res } = mockResponse();
-    // Create a stream that sends a massive chunk with no event boundary (\n\n)
-    const hugeChunk = 'x'.repeat(1_048_577); // 1 byte over the 1MB limit
+    // A valid `data:` field that never reaches an event boundary (\n\n). Lines that
+    // cannot become an SSE field are discarded unbuffered (eventsource-parser 4).
+    const hugeChunk = `data: ${'x'.repeat(1_048_577)}`; // over the 1MB limit
     const stream = createReadableStream([hugeChunk]);
 
     const transform = (chunk: string) => `out:${chunk}\n\n`;
@@ -663,8 +712,9 @@ describe('pipeStream', () => {
 
   it('should throw when passthrough buffer exceeds MAX_SSE_BUFFER_SIZE', async () => {
     const { res } = mockResponse();
-    // Create a stream that sends a massive chunk with no event boundary (\n\n)
-    const hugeChunk = 'x'.repeat(1_048_577); // 1 byte over the 1MB limit
+    // A valid `data:` field that never reaches an event boundary (\n\n). Lines that
+    // cannot become an SSE field are discarded unbuffered (eventsource-parser 4).
+    const hugeChunk = `data: ${'x'.repeat(1_048_577)}`; // over the 1MB limit
     const stream = createReadableStream([hugeChunk]);
 
     // No transform → passthrough path
@@ -1107,7 +1157,7 @@ describe('pipePassthrough', () => {
 
   it('throws when the SSE buffer exceeds the safety limit', async () => {
     const { res } = mockResponse();
-    const huge = 'x'.repeat(1_048_577); // 1 MiB + 1 byte
+    const huge = `data: ${'x'.repeat(1_048_577)}`; // valid field, over 1 MiB
     const stream = createReadableStream([huge]);
     await expect(pipePassthrough(stream, res as never, () => null)).rejects.toThrow(
       'SSE buffer overflow',
