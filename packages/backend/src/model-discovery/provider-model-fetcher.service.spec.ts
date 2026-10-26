@@ -3285,10 +3285,48 @@ describe('ProviderModelFetcherService', () => {
   });
 
   describe('cline-pass provider', () => {
-    it('returns known subscription models with configured context windows', async () => {
+    it('fetches the recommended-models list from the ClinePass API host without the key', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          clinePass: [
+            { id: 'cline-pass/glm-5.3' },
+            { id: 'cline-pass/kimi-k3' },
+            { id: 'cline-pass/kimi-k3' },
+            { id: 'anthropic/claude-sonnet-5' },
+            { name: 'no-id' },
+          ],
+          other: [{ id: 'cline-pass/ignored' }],
+        }),
+      });
+
       const result = await service.fetch('cline-pass', 'cp-token', 'subscription');
 
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toBe('https://api.cline.bot/api/v1/ai/cline/recommended-models');
+      expect(JSON.stringify(init ?? {})).not.toContain('cp-token');
+      expect(result.map((m) => m.id)).toEqual(['cline-pass/glm-5.3', 'cline-pass/kimi-k3']);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ provider: 'cline-pass', contextWindow: 200000 }),
+      );
+    });
+
+    it.each([
+      ['a non-OK status', { ok: false, status: 503, json: async () => ({}) }],
+      ['an empty clinePass list', { ok: true, json: async () => ({ clinePass: [] }) }],
+    ])('falls back to known models on %s', async (_label, response) => {
+      fetchSpy.mockResolvedValue(response);
+
+      const result = await service.fetch('cline-pass', 'cp-token', 'subscription');
+
+      expect(result.map((m) => m.id)).toContain('cline-pass/deepseek-v4-flash');
+    });
+
+    it('returns known subscription models with configured context windows when the fetch fails', async () => {
+      fetchSpy.mockRejectedValue(new Error('network down'));
+      const result = await service.fetch('cline-pass', 'cp-token', 'subscription');
+
       expect(result).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
