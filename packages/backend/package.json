@@ -59,7 +59,7 @@
     "rxjs": "^7.8.0",
     "thinker-shared": "*",
     "typeorm": "^1.1.2",
-    "undici": "6.29.1",
+    "undici": "8.12.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
