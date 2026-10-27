@@ -468,6 +468,8 @@ export interface CustomProviderData {
   base_url: string;
   api_kind: CustomProviderApiKind;
   has_api_key: boolean;
+  /** Key pool in the order the proxy tries it (managed through the provider key endpoints). */
+  keys?: Array<{ label: string; key_prefix: string | null; priority: number }>;
   models: CustomProviderModel[];
   created_at: string;
 }

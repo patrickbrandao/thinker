@@ -9,6 +9,7 @@ const mockGetProviders = vi.fn().mockResolvedValue([]);
 const mockConnectProvider = vi.fn().mockResolvedValue({});
 const mockDisconnectProvider = vi.fn().mockResolvedValue({ ok: true, notifications: [] });
 const mockRenameProviderKey = vi.fn().mockResolvedValue({});
+const mockReorderProviderKeys = vi.fn().mockResolvedValue([]);
 
 vi.mock("../../src/services/api.js", () => ({
   createCustomProvider: (...args: unknown[]) => mockCreateCustomProvider(...args),
@@ -19,6 +20,7 @@ vi.mock("../../src/services/api.js", () => ({
   connectProvider: (...args: unknown[]) => mockConnectProvider(...args),
   disconnectProvider: (...args: unknown[]) => mockDisconnectProvider(...args),
   renameProviderKey: (...args: unknown[]) => mockRenameProviderKey(...args),
+  reorderProviderKeys: (...args: unknown[]) => mockReorderProviderKeys(...args),
   revokeOpenaiOAuth: vi.fn(),
 }));
 
@@ -1797,7 +1799,8 @@ describe("CustomProviderForm — edit mode: key connections", () => {
         initialData={initialData}
       />
     ));
-  const KEYS_HINT = "Each key is a separate connection. Changes apply immediately.";
+  const KEYS_HINT =
+    "Keys are tried in order; a refused or rate-limited key falls over to the next. Changes apply immediately.";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1868,6 +1871,29 @@ describe("CustomProviderForm — edit mode: key connections", () => {
         "Account B",
       );
     });
+  });
+
+  it("reorders the key pool so a later key is tried first", async () => {
+    mockGetProviders.mockResolvedValue([
+      connection({ label: "Account A" }),
+      connection({ id: "tp-2", label: "Account B", priority: 1 }),
+    ]);
+    renderForm();
+
+    const upFirst = await screen.findByLabelText("Move key Account A up");
+    expect(upFirst.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("Move key Account B down").hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText("Move key Account B up"));
+
+    await waitFor(() => {
+      expect(mockReorderProviderKeys).toHaveBeenCalledWith(
+        "test-agent",
+        "custom:cp-1",
+        ["Account B", "Account A"],
+        "api_key",
+      );
+    });
+    await waitFor(() => expect(mockGetProviders).toHaveBeenCalledTimes(2));
   });
 
   it("stores the first key of a keyless provider on its existing connection", async () => {

@@ -11,6 +11,20 @@ import {
 import { AgentNameParamDto } from '../dto/routing.dto';
 import { MinRole } from '../../common/decorators/roles.decorator';
 import { canUsePrivateDestinations } from '../../common/utils/private-url-policy';
+import type { TenantProvider } from '../../entities/tenant-provider.entity';
+
+/**
+ * The provider's key pool in the order the proxy tries it. Keys are managed
+ * through the shared provider endpoints (`POST providers`, `PATCH
+ * providers/:provider/keys/:label`, `PUT providers/:provider/keys/order`,
+ * `DELETE providers/:provider?label=`) with `provider = custom:<id>`.
+ */
+function keyPool(rows: readonly TenantProvider[], providerKey: string) {
+  return rows
+    .filter((r) => r.provider === providerKey && r.is_active && !!r.api_key_encrypted)
+    .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
+    .map((r) => ({ label: r.label, key_prefix: r.key_prefix ?? null, priority: r.priority }));
+}
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -37,7 +51,8 @@ export class CustomProviderController {
     if (providers.length === 0) return [];
 
     return providers.map((cp) => {
-      const up = primaryCustomConnection(tenantProviders, CustomProviderService.providerKey(cp.id));
+      const provKey = CustomProviderService.providerKey(cp.id);
+      const up = primaryCustomConnection(tenantProviders, provKey);
       return {
         id: cp.id,
         name: cp.name,
@@ -45,6 +60,7 @@ export class CustomProviderController {
         base_url: cp.base_url,
         api_kind: cp.api_kind,
         has_api_key: !!up?.api_key_encrypted,
+        keys: keyPool(tenantProviders, provKey),
         models: cp.models,
         created_at: cp.created_at,
       };
@@ -100,9 +116,8 @@ export class CustomProviderController {
       allowPrivate: canUsePrivateDestinations(ctx),
     });
     const provKey = CustomProviderService.providerKey(cp.id);
-    const up = (await this.providerService.getProviders(agent.tenant_id)).find(
-      (u) => u.provider === provKey,
-    );
+    const tenantProviders = await this.providerService.getProviders(agent.tenant_id);
+    const up = primaryCustomConnection(tenantProviders, provKey);
 
     return {
       id: cp.id,
@@ -111,6 +126,7 @@ export class CustomProviderController {
       base_url: cp.base_url,
       api_kind: cp.api_kind,
       has_api_key: !!up?.api_key_encrypted,
+      keys: keyPool(tenantProviders, provKey),
       models: cp.models,
       created_at: cp.created_at,
     };
@@ -128,9 +144,8 @@ export class CustomProviderController {
       allowPrivate: canUsePrivateDestinations(ctx),
     });
     const provKey = CustomProviderService.providerKey(cp.id);
-    const up = (await this.providerService.getProviders(agent.tenant_id)).find(
-      (u) => u.provider === provKey,
-    );
+    const tenantProviders = await this.providerService.getProviders(agent.tenant_id);
+    const up = primaryCustomConnection(tenantProviders, provKey);
 
     return {
       id: cp.id,
@@ -139,6 +154,7 @@ export class CustomProviderController {
       base_url: cp.base_url,
       api_kind: cp.api_kind,
       has_api_key: !!up?.api_key_encrypted,
+      keys: keyPool(tenantProviders, provKey),
       models: cp.models,
       created_at: cp.created_at,
     };

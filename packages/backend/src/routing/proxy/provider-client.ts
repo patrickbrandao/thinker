@@ -82,6 +82,12 @@ export interface ForwardResult {
   /** Internal: original Responses text.format metadata for synthesized Responses bodies. */
   responsesTextFormat?: Record<string, unknown>;
   responsesToolNames?: ResponsesToolNames;
+  /**
+   * Set when a custom provider's key pool rotated: the `tenant_providers` row
+   * that actually served this call, which callers stamp instead of the key
+   * they selected up front.
+   */
+  servedByKey?: { tenantProviderId: string; keyLabel: string };
 }
 
 function wireFormat(endpoint: ProviderEndpoint): ProviderWireFormat | undefined {

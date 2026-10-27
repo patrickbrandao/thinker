@@ -72,6 +72,7 @@ describe('ProxyFallbackService', () => {
       findProviderForModel: jest.fn().mockResolvedValue(undefined),
       getProviderRegion: jest.fn().mockResolvedValue(null),
       hasActiveProvider: jest.fn().mockResolvedValue(true),
+      getProviderKeys: jest.fn().mockResolvedValue([]),
       // Single key selection per attempt. By default the unified row composes
       // its fields from the other (legacy) mocks so existing test setups that
       // only drive getProviderApiKey/getProviderRegion/getProviderKeyId keep
@@ -1391,6 +1392,165 @@ describe('ProxyFallbackService', () => {
       });
 
       expect(customProviderRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    describe('custom provider key pool', () => {
+      const poolKeys = [
+        { id: 'tp-a', label: 'A', priority: 0, apiKey: 'key-a', region: null },
+        { id: 'tp-b', label: 'B', priority: 1, apiKey: 'key-b', region: null },
+        { id: 'tp-c', label: 'C', priority: 2, apiKey: 'key-c', region: null },
+      ];
+      const reply = (status: number) => ({
+        response: new Response(status === 200 ? '{}' : 'nope', { status }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+      const forwardPool = (selected = poolKeys[0]) =>
+        service.tryForwardToProvider({
+          provider: 'custom:cp-1',
+          apiKey: selected.apiKey,
+          rawApiKey: selected.apiKey,
+          providerKeyLabel: selected.label,
+          tenantProviderId: selected.id,
+          model: 'custom:cp-1/llama',
+          body,
+          stream: false,
+          sessionKey: 'sess-1',
+          tenantId: 'tenant-1',
+          agentId: 'agent-1',
+          authType: 'api_key',
+        });
+      const forwardedKeys = () =>
+        providerClient.forward.mock.calls.map((c) => (c[0] as { apiKey: string }).apiKey);
+
+      beforeEach(() => {
+        customProviderRepo.findOne.mockResolvedValue({
+          id: 'cp-1',
+          base_url: 'https://api.example.com/v1',
+        } as never);
+        providerKeyService.getProviderKeys = jest.fn().mockResolvedValue(poolKeys);
+      });
+
+      it('falls over to the next key in priority order on 429, 401 and 403', async () => {
+        providerClient.forward
+          .mockResolvedValueOnce(reply(429))
+          .mockResolvedValueOnce(reply(403))
+          .mockResolvedValueOnce(reply(200));
+
+        const result = await forwardPool();
+
+        expect(result.response.status).toBe(200);
+        expect(forwardedKeys()).toEqual(['key-a', 'key-b', 'key-c']);
+        expect(result.servedByKey).toEqual({ tenantProviderId: 'tp-c', keyLabel: 'C' });
+        expect(providerKeyService.getProviderKeys).toHaveBeenCalledWith(
+          'tenant-1',
+          'custom:cp-1',
+          'api_key',
+          'agent-1',
+        );
+
+        // A is cooling down after its 429, so B is the first key called.
+        providerClient.forward.mockReset();
+        providerClient.forward.mockResolvedValueOnce(reply(401)).mockResolvedValueOnce(reply(200));
+        await forwardPool();
+        expect(forwardedKeys()).toEqual(['key-b', 'key-c']);
+
+        // B is now remembered as rejected too, so C is called directly.
+        providerClient.forward.mockReset();
+        providerClient.forward.mockResolvedValueOnce(reply(200));
+        const next = await forwardPool();
+        expect(forwardedKeys()).toEqual(['key-c']);
+        expect(next.servedByKey).toEqual({ tenantProviderId: 'tp-c', keyLabel: 'C' });
+      });
+
+      it('starts from the pinned key, then tries the others in priority order', async () => {
+        providerClient.forward.mockResolvedValueOnce(reply(429)).mockResolvedValueOnce(reply(200));
+
+        const result = await forwardPool(poolKeys[1]);
+
+        expect(forwardedKeys()).toEqual(['key-b', 'key-a']);
+        expect(result.servedByKey).toEqual({ tenantProviderId: 'tp-a', keyLabel: 'A' });
+      });
+
+      it('supersedes the attempt of a key the pool moved past', async () => {
+        const completeFailure = jest.fn().mockResolvedValue(undefined);
+        const startProviderAttempt = jest.fn(() => ({ completeFailure }) as never);
+        providerClient.forward.mockResolvedValueOnce(reply(429)).mockResolvedValueOnce(reply(200));
+
+        const result = await service.tryForwardToProvider({
+          provider: 'custom:cp-1',
+          apiKey: 'key-a',
+          providerKeyLabel: 'A',
+          tenantProviderId: 'tp-a',
+          model: 'custom:cp-1/llama',
+          body,
+          stream: false,
+          sessionKey: 'sess-1',
+          tenantId: 'tenant-1',
+          agentId: 'agent-1',
+          authType: 'api_key',
+          startProviderAttempt,
+        });
+
+        expect(result.response.status).toBe(200);
+        // Each key gets its own attempt, stamped with its own connection.
+        expect(startProviderAttempt).toHaveBeenCalledTimes(2);
+        expect(startProviderAttempt).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ tenantProviderId: 'tp-b', keyLabel: 'B' }),
+        );
+        expect(completeFailure).toHaveBeenCalledTimes(1);
+        expect(completeFailure).toHaveBeenCalledWith({
+          status: 429,
+          errorBody: 'nope',
+          superseded: true,
+        });
+      });
+
+      it('does not rotate on other errors and keeps the selected key', async () => {
+        providerClient.forward.mockResolvedValueOnce(reply(500));
+
+        const result = await forwardPool();
+
+        expect(result.response.status).toBe(500);
+        expect(forwardedKeys()).toEqual(['key-a']);
+        expect(result.servedByKey).toBeUndefined();
+      });
+
+      it('returns the last key response when every key fails', async () => {
+        providerClient.forward
+          .mockResolvedValueOnce(reply(429))
+          .mockResolvedValueOnce(reply(429))
+          .mockResolvedValueOnce(reply(401));
+
+        const result = await forwardPool();
+
+        expect(result.response.status).toBe(401);
+        expect(forwardedKeys()).toEqual(['key-a', 'key-b', 'key-c']);
+        expect(result.servedByKey).toEqual({ tenantProviderId: 'tp-c', keyLabel: 'C' });
+      });
+
+      it('never pools keys of a non-custom provider', async () => {
+        providerClient.forward.mockResolvedValueOnce(reply(429));
+
+        const result = await service.tryForwardToProvider({
+          provider: 'openai',
+          apiKey: 'sk-a',
+          tenantProviderId: 'tp-openai',
+          providerKeyLabel: 'A',
+          model: 'gpt-4o',
+          body,
+          stream: false,
+          sessionKey: 'sess-1',
+          tenantId: 'tenant-1',
+          agentId: 'agent-1',
+          authType: 'api_key',
+        });
+
+        expect(result.response.status).toBe(429);
+        expect(providerKeyService.getProviderKeys).not.toHaveBeenCalled();
+      });
     });
 
     it('routes Anthropic-kind custom providers to /v1/messages with anthropic format', async () => {
