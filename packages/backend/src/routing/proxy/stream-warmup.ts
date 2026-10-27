@@ -7,19 +7,40 @@
  * @see https://github.com/mnfst/llm-gateway/issues/1656
  */
 
-export const DEFAULT_STREAM_WARMUP_MS = 15_000;
+import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
 
-export function parseStreamWarmupMs(rawValue = process.env.STREAM_WARMUP_MS): number {
+export const DEFAULT_STREAM_WARMUP_MS = 15_000;
+/** Cold local models (Ollama, LM Studio, llama.cpp) can take 30-60s to load (#128). */
+export const DEFAULT_LOCAL_STREAM_WARMUP_MS = 60_000;
+
+export function parseStreamWarmupMs(
+  rawValue = process.env.STREAM_WARMUP_MS,
+  fallback = DEFAULT_STREAM_WARMUP_MS,
+): number {
   const value = rawValue ?? '';
   if (!/^\d+$/.test(value)) {
-    return DEFAULT_STREAM_WARMUP_MS;
+    return fallback;
   }
 
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_STREAM_WARMUP_MS;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export const STREAM_WARMUP_MS = parseStreamWarmupMs();
+
+/**
+ * Warm-up for local providers: THINKER_LOCAL_STREAM_WARMUP_MS, else 60s, and
+ * never shorter than the global STREAM_WARMUP_MS.
+ */
+export const LOCAL_STREAM_WARMUP_MS = Math.max(
+  STREAM_WARMUP_MS,
+  parseStreamWarmupMs(process.env.THINKER_LOCAL_STREAM_WARMUP_MS, DEFAULT_LOCAL_STREAM_WARMUP_MS),
+);
+
+/** The first-chunk wait for a provider: longer for local runners (#128). */
+export function streamWarmupMsFor(provider: string): number {
+  return isLocalOnlyProvider(provider) ? LOCAL_STREAM_WARMUP_MS : STREAM_WARMUP_MS;
+}
 
 export interface WarmupSuccess {
   ok: true;

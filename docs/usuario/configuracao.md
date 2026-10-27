@@ -73,6 +73,7 @@ Fora do Docker o padrão de host é `localhost` (e `host.containers.internal` no
 | --- | --- | --- |
 | `PROVIDER_TIMEOUT_MS` | `180000` | Tempo máximo, por tentativa, de uma chamada ao provedor. Deixe abaixo do timeout do cliente para o fallback ter tempo de rodar. |
 | `STREAM_WARMUP_MS` | `15000` | Espera pelo primeiro trecho de uma resposta em streaming antes de tentar o fallback. |
+| `THINKER_LOCAL_STREAM_WARMUP_MS` | `60000` | A mesma espera para provedores locais (Ollama, LM Studio, llama.cpp), que demoram para carregar um modelo frio. Nunca fica abaixo de `STREAM_WARMUP_MS`. |
 | `STREAM_IDLE_TIMEOUT_MS` | `180000` | Silêncio máximo entre eventos de streaming antes de falhar a tentativa (HTTP 504). |
 | `CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS` | `60000` | Espera por texto ou saída de ferramenta úteis do ChatGPT Codex. |
 | `THINKER_CONCURRENCY_MAX` | `10` | Requisições simultâneas por tenant, por processo (erro M203). |

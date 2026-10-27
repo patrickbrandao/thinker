@@ -80,7 +80,7 @@ import { CopilotTokenService } from './copilot-token.service';
 import { ReasoningContentCache } from './reasoning-content-cache';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
-import { peekStream, STREAM_WARMUP_MS } from './stream-warmup';
+import { peekStream, streamWarmupMsFor } from './stream-warmup';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { normalizeProviderModel } from '../../common/utils/anthropic-model-id';
 import {
@@ -427,7 +427,7 @@ export class ProxyFallbackService {
   ): Promise<ForwardResult> {
     const { response, attempt } = forward;
     if (!opts.stream || !response.ok || !response.body) return forward;
-    const warmup = await peekStream(response.body, STREAM_WARMUP_MS);
+    const warmup = await peekStream(response.body, streamWarmupMsFor(opts.provider));
     if (warmup.ok) {
       return {
         ...forward,

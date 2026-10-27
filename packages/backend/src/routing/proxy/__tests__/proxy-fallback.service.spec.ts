@@ -24,6 +24,7 @@ import { getProviderParamSpecs, type ProviderParamSpecCatalog } from 'thinker-sh
 jest.mock('../stream-warmup', () => ({
   ...jest.requireActual('../stream-warmup'),
   STREAM_WARMUP_MS: 50,
+  streamWarmupMsFor: () => 50,
 }));
 
 const specCatalog: ProviderParamSpecCatalog = [
