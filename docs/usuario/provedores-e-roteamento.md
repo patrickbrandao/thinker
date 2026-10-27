@@ -62,7 +62,7 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 
 ## Fallback
 
-Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
+Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
 
 - Cada tentativa fica registrada separadamente (provedor, modelo, status, custo). A requisição conta como "recuperada por fallback" quando termina com sucesso depois de uma tentativa falha.
 - Se **todas** as tentativas falham, o cliente recebe o erro do provedor da última tentativa. Isso é um erro do provedor, não um código `M###`.
