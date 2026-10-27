@@ -90,6 +90,17 @@ export default {
     enabledToast: 'Logs enabled',
     disabledToast: 'Logs disabled',
   },
+  modelListing: {
+    title: 'Model listing',
+    label: 'Models in /v1/models',
+    closed: 'Closed',
+    restricted: 'Restricted',
+    open: 'Open',
+    closedDesc: 'Lists only auto and the virtual models.',
+    restrictedDesc: 'Lists auto, the virtual models and the models they route and fall back to.',
+    openDesc: 'Lists every available model (default).',
+    savedToast: 'Model listing updated',
+  },
   help: {
     title: 'Help & Support',
     metaDescription: 'Get help with Thinker: documentation and issue tracker.',

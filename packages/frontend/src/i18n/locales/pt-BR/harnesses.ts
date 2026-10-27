@@ -96,6 +96,18 @@ const ptBR: Catalog<typeof en> = {
     enabledToast: 'Logs ativados',
     disabledToast: 'Logs desativados',
   },
+  modelListing: {
+    title: 'Listagem de modelos',
+    label: 'Modelos em /v1/models',
+    closed: 'Fechada',
+    restricted: 'Restrita',
+    open: 'Aberta',
+    closedDesc: 'Lista só o auto e os modelos virtuais.',
+    restrictedDesc:
+      'Lista o auto, os modelos virtuais e os modelos ligados a eles por roteamento e fallback.',
+    openDesc: 'Lista todos os modelos disponíveis (padrão).',
+    savedToast: 'Listagem de modelos atualizada',
+  },
   help: {
     title: 'Ajuda e suporte',
     metaDescription: 'Ajuda com o Thinker: documentação e rastreador de issues.',

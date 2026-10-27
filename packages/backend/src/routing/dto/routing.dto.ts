@@ -18,6 +18,7 @@ import {
   Max,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { MODEL_LISTING_MODES, type ModelListingMode } from '../../entities/agent.entity';
 
 import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
@@ -276,4 +277,9 @@ export class UpdateRecordingDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+}
+
+export class UpdateModelListingDto {
+  @IsIn(MODEL_LISTING_MODES)
+  mode!: ModelListingMode;
 }

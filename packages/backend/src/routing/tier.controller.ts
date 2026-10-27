@@ -22,6 +22,7 @@ import {
   SetResponseModeDto,
   responseModeFromDto,
   UpdateRecordingDto,
+  UpdateModelListingDto,
 } from './dto/routing.dto';
 import { Agent } from '../entities/agent.entity';
 import { AgentRecordingConfigService } from '../common/services/agent-recording-config.service';
@@ -178,6 +179,27 @@ export class TierController {
     await this.agentRepo.update(agent.id, { record_messages: body.enabled });
     this.resolveAgentService.invalidate(agent.tenant_id, agentName);
     return { enabled: body.enabled };
+  }
+
+  @Get(':agentName/model-listing')
+  async getModelListing(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
+    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    const row = await this.agentRepo.findOne({
+      where: { id: agent.id },
+      select: { id: true, model_listing: true },
+    });
+    return { mode: row?.model_listing ?? 'open' };
+  }
+
+  @Patch(':agentName/model-listing')
+  async updateModelListing(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Body() body: UpdateModelListingDto,
+  ) {
+    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    await this.agentRepo.update(agent.id, { model_listing: body.mode });
+    return { mode: body.mode };
   }
 
   private validateTier(tier: string): void {
