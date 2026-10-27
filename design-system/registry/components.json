@@ -403,39 +403,11 @@
         "agents.css"
       ]
     },
-    "agent-chart-tooltip": {
-      "classes": [
-        "agent-chart-tooltip",
-        "agent-chart-tooltip__columns",
-        "agent-chart-tooltip__date",
-        "agent-chart-tooltip__list",
-        "agent-chart-tooltip__name",
-        "agent-chart-tooltip__row",
-        "agent-chart-tooltip__swatch",
-        "agent-chart-tooltip__total",
-        "agent-chart-tooltip__total-value",
-        "agent-chart-tooltip__value"
-      ],
-      "files": [
-        "agent-chart-tooltip.css"
-      ]
-    },
     "agent-filter-select": {
       "classes": [
-        "agent-filter-select",
-        "agent-filter-select__action-btn",
-        "agent-filter-select__actions",
-        "agent-filter-select__dropdown",
-        "agent-filter-select__item",
-        "agent-filter-select__name",
-        "agent-filter-select__swatch",
-        "agent-filter-select__toggle",
-        "agent-filter-select__toggle--on",
-        "agent-filter-select__toggle-thumb",
         "agent-filter-select__trigger"
       ],
       "files": [
-        "filter-select.css",
         "theme.css"
       ]
     },
@@ -4758,9 +4730,6 @@
     }
   ],
   "componentSheets": {
-    "agent-chart-tooltip.css": [
-      "components/ChartHoverTooltip.tsx"
-    ],
     "analytics-overview.css": [
       "components/ReliabilityKpiCards.tsx",
       "pages/GlobalOverview.tsx",
@@ -4770,17 +4739,11 @@
     "connection-detail.css": [
       "pages/providers/ConnectionDetail.tsx"
     ],
-    "filter-select.css": [
-      "components/FilterSelect.tsx"
-    ],
     "model-filter.css": [
       "components/ModelPricesFilterBar.tsx",
       "pages/MessageLog.tsx"
     ],
     "organization.css": [
-      "components/MeGate.tsx",
-      "components/OrgSwitcher.tsx",
-      "components/ReadOnlyRegion.tsx",
       "components/TemporaryPasswordBox.tsx",
       "pages/AdminUsers.tsx",
       "pages/Organization.tsx"
@@ -4839,14 +4802,20 @@
       "pages/Welcome.tsx"
     ]
   },
-  "orphanStylesheets": [],
+  "orphanStylesheets": [
+    "agent-chart-tooltip.css",
+    "filter-select.css"
+  ],
   "tokensOutsideSource": [],
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 293,
-    "classes": 1585,
+    "blocks": 292,
+    "classes": 1565,
     "canonicalRules": 47,
     "ghostRules": 47
-  }
+  },
+  "missingImports": [
+    "/Users/patrickbrandao/Projects/thinker/.claude/worktrees/agent-a3813cd0d61b2a1d2/packages/frontend/src/styles/canvas.css"
+  ]
 }

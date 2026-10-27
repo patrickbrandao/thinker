@@ -1,10 +1,10 @@
-import { Show, type ParentComponent } from 'solid-js';
-import '../styles/organization.css';
+import type { ReactNode } from 'react';
 
 interface ReadOnlyRegionProps {
   readOnly: boolean;
   /** Notice shown above the region when read-only. Omit to show none. */
   notice?: string;
+  children?: ReactNode;
 }
 
 /**
@@ -12,17 +12,17 @@ interface ReadOnlyRegionProps {
  * change it: every button, input and select inside is disabled while links and
  * the data stay visible. The backend enforces the same rule.
  */
-const ReadOnlyRegion: ParentComponent<ReadOnlyRegionProps> = (props) => (
-  <>
-    <Show when={props.readOnly && props.notice}>
-      <div class="readonly-notice" role="note">
-        {props.notice}
-      </div>
-    </Show>
-    <fieldset class="readonly-region" disabled={props.readOnly}>
-      {props.children}
-    </fieldset>
-  </>
-);
-
-export default ReadOnlyRegion;
+export default function ReadOnlyRegion({ readOnly, notice, children }: ReadOnlyRegionProps) {
+  return (
+    <>
+      {readOnly && notice ? (
+        <div className="readonly-notice notice is-info mb-3" role="note">
+          {notice}
+        </div>
+      ) : null}
+      <fieldset className="readonly-region m-0 min-w-0 border-0 p-0" disabled={readOnly}>
+        {children}
+      </fieldset>
+    </>
+  );
+}

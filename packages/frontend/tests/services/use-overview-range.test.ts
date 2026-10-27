@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createRoot } from 'solid-js';
+import { act, renderHook } from '@testing-library/react';
 import {
   RANGE_STORAGE_KEY,
   VALID_RANGES,
@@ -44,110 +44,56 @@ describe('use-overview-range', () => {
 
   describe('useOverviewRange', () => {
     it('defaults to 30d when localStorage is empty', () => {
-      let rangeValue: string | undefined;
-      const dispose = createRoot((d) => {
-        const { range } = useOverviewRange();
-        rangeValue = range();
-        return d;
-      });
-      expect(rangeValue).toBe('30d');
-      dispose();
+      const { result } = renderHook(() => useOverviewRange());
+      expect(result.current.range).toBe('30d');
     });
 
     it('reads saved range from localStorage when valid', () => {
       localStorage.setItem(RANGE_STORAGE_KEY, '365d');
-      let rangeValue: string | undefined;
-      const dispose = createRoot((d) => {
-        const { range } = useOverviewRange();
-        rangeValue = range();
-        return d;
-      });
-      expect(rangeValue).toBe('365d');
-      dispose();
+      const { result } = renderHook(() => useOverviewRange());
+      expect(result.current.range).toBe('365d');
     });
 
     it('falls back to 30d when localStorage contains an invalid value', () => {
       localStorage.setItem(RANGE_STORAGE_KEY, 'invalid-range');
-      let rangeValue: string | undefined;
-      const dispose = createRoot((d) => {
-        const { range } = useOverviewRange();
-        rangeValue = range();
-        return d;
-      });
-      expect(rangeValue).toBe('30d');
-      dispose();
+      const { result } = renderHook(() => useOverviewRange());
+      expect(result.current.range).toBe('30d');
     });
 
-    it('handleRangeChange updates the signal and persists to localStorage', () => {
-      let rangeValue: (() => string) | undefined;
-      let handleChange: ((v: string) => void) | undefined;
-      const dispose = createRoot((d) => {
-        const { range, handleRangeChange } = useOverviewRange();
-        rangeValue = range;
-        handleChange = handleRangeChange;
-        return d;
-      });
+    it('handleRangeChange updates the state and persists to localStorage', () => {
+      const { result } = renderHook(() => useOverviewRange());
 
-      handleChange!('24h');
+      act(() => result.current.handleRangeChange('24h'));
 
-      expect(rangeValue!()).toBe('24h');
+      expect(result.current.range).toBe('24h');
       expect(localStorage.getItem(RANGE_STORAGE_KEY)).toBe('24h');
-      dispose();
     });
 
     it('handleRangeChange calls markUserSelected when provided', () => {
       const markUserSelected = vi.fn();
-      let handleChange: ((v: string) => void) | undefined;
-      const dispose = createRoot((d) => {
-        const { handleRangeChange } = useOverviewRange({ markUserSelected });
-        handleChange = handleRangeChange;
-        return d;
-      });
+      const { result } = renderHook(() => useOverviewRange({ markUserSelected }));
 
-      handleChange!('7d');
+      act(() => result.current.handleRangeChange('7d'));
 
       expect(markUserSelected).toHaveBeenCalledTimes(1);
-      dispose();
     });
 
     it('handleRangeChange does not throw when markUserSelected is not provided', () => {
-      let handleChange: ((v: string) => void) | undefined;
-      const dispose = createRoot((d) => {
-        const { handleRangeChange } = useOverviewRange();
-        handleChange = handleRangeChange;
-        return d;
-      });
-
-      expect(() => handleChange!('24h')).not.toThrow();
-      dispose();
+      const { result } = renderHook(() => useOverviewRange());
+      expect(() => act(() => result.current.handleRangeChange('24h'))).not.toThrow();
     });
 
-    it('exposes setRange for direct signal mutation', () => {
-      let rangeValue: (() => string) | undefined;
-      let setRangeFunc: ((v: string) => void) | undefined;
-      const dispose = createRoot((d) => {
-        const { range, setRange } = useOverviewRange();
-        rangeValue = range;
-        setRangeFunc = setRange;
-        return d;
-      });
-
-      setRangeFunc!('7d');
-      expect(rangeValue!()).toBe('7d');
-      dispose();
+    it('exposes setRange for direct state mutation', () => {
+      const { result } = renderHook(() => useOverviewRange());
+      act(() => result.current.setRange('7d'));
+      expect(result.current.range).toBe('7d');
     });
   });
 
   describe('useOverviewColumns', () => {
     it('returns COMPACT_COLUMNS (the same set everywhere now that feedback is gone)', () => {
-      let cols: (() => string[]) | undefined;
-      const dispose = createRoot((d) => {
-        const { columns } = useOverviewColumns();
-        cols = columns;
-        return d;
-      });
-      expect(cols!()).toEqual(['status', 'trigger', 'date', 'model']);
-      dispose();
+      const { result } = renderHook(() => useOverviewColumns());
+      expect(result.current.columns).toEqual(['status', 'trigger', 'date', 'model']);
     });
   });
 });

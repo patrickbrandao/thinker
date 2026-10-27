@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js';
+import type { CSSProperties, ReactNode } from 'react';
 import { SHARED_PROVIDER_BY_ID_OR_ALIAS, normalizeProviderName } from 'thinker-shared';
 import { THINKER_MARK_URL } from '../services/thinker-links.js';
 
@@ -6,8 +6,8 @@ import { THINKER_MARK_URL } from '../services/thinker-links.js';
  * Returns a branded icon for a given provider ID, or null if no icon exists.
  * Inline SVGs use a 0 0 24 24 viewBox.
  */
-export function providerIcon(id: string, size: number = 20): JSX.Element | null {
-  const s = { width: `${size}px`, height: `${size}px` };
+export function providerIcon(id: string, size: number = 20): ReactNode {
+  const s: CSSProperties = { width: size, height: size };
 
   switch (id) {
     /* ── Thinker (the gateway's own marker) ──────── */
@@ -22,7 +22,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain' }}
+          style={{ ...s, display: 'block', objectFit: 'contain' }}
           aria-hidden="true"
         />
       );
@@ -48,7 +48,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
           viewBox="0 0 24 24"
           fill="currentColor"
-          fill-rule="evenodd"
+          fillRule="evenodd"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
@@ -103,10 +103,10 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           aria-hidden="true"
         >
           <path
-            clip-rule="evenodd"
+            clipRule="evenodd"
             d="M14.121 2.701a9.299 9.299 0 000 18.598V22.7c-5.91 0-10.7-4.791-10.7-10.701S8.21 1.299 14.12 1.299V2.7zm4.752 3.677A7.353 7.353 0 109.42 17.643l-.901 1.074a8.754 8.754 0 01-1.08-12.334 8.755 8.755 0 0112.335-1.08l-.901 1.075zm-2.255.844a5.407 5.407 0 00-5.048 9.563l-.656 1.24a6.81 6.81 0 016.358-12.043l-.654 1.24zM14.12 8.539a3.46 3.46 0 100 6.922v1.402a4.863 4.863 0 010-9.726v1.402z"
             fill="#F15A29"
-            fill-rule="evenodd"
+            fillRule="evenodd"
           />
           <path d="M15.407 10.836a2.24 2.24 0 00-.51-.409 1.084 1.084 0 00-.544-.152c-.255 0-.483.047-.684.14a1.58 1.58 0 00-.84.912c-.074.203-.11.416-.11.631 0 .218.036.43.11.631a1.594 1.594 0 00.84.913c.2.093.43.14.684.14.216 0 .417-.046.602-.135.188-.09.35-.225.475-.392l.928 1.006c-.14.14-.3.261-.482.363a3.367 3.367 0 01-1.083.38c-.17.026-.317.04-.44.04a3.315 3.315 0 01-1.182-.21 2.825 2.825 0 01-.961-.597 2.816 2.816 0 01-.644-.929 2.987 2.987 0 01-.238-1.21c0-.444.08-.847.238-1.21.15-.35.368-.666.643-.929.278-.261.605-.464.962-.596a3.315 3.315 0 011.182-.21c.355 0 .712.068 1.072.204.361.138.685.36.944.649l-.962.97z" />
         </svg>
@@ -139,7 +139,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          <g clip-path="url(#clip0_6832_216)">
+          <g clipPath="url(#clip0_6832_216)">
             <path
               d="M10.3081 5.418C9.47749 5.0644 8.72223 4.55507 8.08311 3.9175C7.19305 3.02566 6.55806 1.91175 6.24411 0.6915C6.23033 0.637304 6.19889 0.589244 6.15475 0.554917C6.1106 0.52059 6.05628 0.501953 6.00036 0.501953C5.94444 0.501953 5.89011 0.52059 5.84597 0.554917C5.80183 0.589244 5.77038 0.637304 5.75661 0.6915C5.44199 1.91159 4.8069 3.02538 3.91711 3.9175C3.27793 4.55499 2.52268 5.06431 1.69211 5.418C1.36711 5.558 1.03311 5.6705 0.691109 5.757C0.63658 5.7704 0.588119 5.80169 0.553473 5.84588C0.518828 5.89007 0.5 5.9446 0.5 6.00075C0.5 6.0569 0.518828 6.11143 0.553473 6.15562C0.588119 6.19981 0.63658 6.2311 0.691109 6.2445C1.03311 6.3305 1.36611 6.443 1.69211 6.583C2.52273 6.9366 3.27799 7.44593 3.91711 8.0835C4.80741 8.97543 5.44258 10.0895 5.75661 11.31C5.77001 11.3645 5.8013 11.413 5.84549 11.4476C5.88968 11.4823 5.94421 11.5011 6.00036 11.5011C6.05651 11.5011 6.11104 11.4823 6.15523 11.4476C6.19942 11.413 6.23071 11.3645 6.24411 11.31C6.33011 10.9675 6.44261 10.6345 6.58261 10.3085C6.93619 9.47787 7.44552 8.72261 8.08311 8.0835C8.97511 7.19341 10.0892 6.55841 11.3096 6.2445C11.3638 6.23073 11.4119 6.19928 11.4462 6.15514C11.4805 6.11099 11.4992 6.05667 11.4992 6.00075C11.4992 5.94483 11.4805 5.89051 11.4462 5.84636C11.4119 5.80222 11.3638 5.77077 11.3096 5.757C10.9673 5.67087 10.6324 5.55751 10.3081 5.418Z"
               fill="#3186FF"
@@ -166,8 +166,8 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
               y2="6.0005"
               gradientUnits="userSpaceOnUse"
             >
-              <stop stop-color="#08B962" />
-              <stop offset="1" stop-color="#08B962" stop-opacity="0" />
+              <stop stopColor="#08B962" />
+              <stop offset="1" stopColor="#08B962" stopOpacity="0" />
             </linearGradient>
             <linearGradient
               id="paint1_linear_6832_216"
@@ -177,8 +177,8 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
               y2="5.5005"
               gradientUnits="userSpaceOnUse"
             >
-              <stop stop-color="#F94543" />
-              <stop offset="1" stop-color="#F94543" stop-opacity="0" />
+              <stop stopColor="#F94543" />
+              <stop offset="1" stopColor="#F94543" stopOpacity="0" />
             </linearGradient>
             <linearGradient
               id="paint2_linear_6832_216"
@@ -188,8 +188,8 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
               y2="6.0005"
               gradientUnits="userSpaceOnUse"
             >
-              <stop stop-color="#FABC12" />
-              <stop offset="0.46" stop-color="#FABC12" stop-opacity="0" />
+              <stop stopColor="#FABC12" />
+              <stop offset="0.46" stopColor="#FABC12" stopOpacity="0" />
             </linearGradient>
             <clipPath id="clip0_6832_216">
               <rect width="12" height="12" fill="white" />
@@ -287,7 +287,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain' }}
+          style={{ ...s, display: 'block', objectFit: 'contain' }}
           aria-hidden="true"
         />
       );
@@ -300,7 +300,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain', 'border-radius': '4px' }}
+          style={{ ...s, display: 'block', objectFit: 'contain', borderRadius: '4px' }}
           aria-hidden="true"
         />
       );
@@ -338,7 +338,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
           viewBox="0 0 24 24"
           fill="currentColor"
-          fill-rule="evenodd"
+          fillRule="evenodd"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
@@ -358,8 +358,8 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           aria-hidden="true"
         >
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M226.665 18.1979H218.375C166.389 18.1979 129.23 18.2366 100.991 22.0332C73.2761 25.7594 56.8935 32.8027 44.8481 44.8481C32.8027 56.8935 25.7594 73.2761 22.0332 100.991C18.2365 129.23 18.1979 166.389 18.1979 218.375V226.665C18.1979 278.651 18.2365 315.809 22.0332 344.048C25.7594 371.764 32.8027 388.146 44.8481 400.192C56.8935 412.237 73.276 419.28 100.991 423.007C129.23 426.803 166.389 426.842 218.375 426.842H226.665C278.651 426.842 315.809 426.803 344.048 423.007C371.764 419.28 388.146 412.237 400.191 400.192C412.237 388.146 419.28 371.764 423.006 344.048C426.803 315.809 426.842 278.651 426.842 226.665V218.375C426.842 166.389 426.803 129.23 423.006 100.991C419.28 73.2761 412.237 56.8935 400.191 44.8481C388.146 32.8027 371.764 25.7594 344.048 22.0332C315.809 18.2366 278.651 18.1979 226.665 18.1979ZM31.9803 31.9803C0 63.9605 0 115.432 0 218.375V226.665C0 329.608 0 381.079 31.9803 413.059C63.9605 445.04 115.432 445.04 218.375 445.04H226.665C329.608 445.04 381.079 445.04 413.059 413.059C445.04 381.079 445.04 329.608 445.04 226.665V218.375C445.04 115.432 445.04 63.9605 413.059 31.9803C381.079 0 329.608 0 226.665 0H218.375C115.432 0 63.9605 0 31.9803 31.9803Z"
           />
           <path d="M306.202 85.5845C276.837 85.5845 252.95 109.472 252.95 138.837V161.66H192.09V138.837C192.09 109.472 168.202 85.5845 138.837 85.5845C109.472 85.5845 85.5845 109.472 85.5845 138.837C85.5845 168.202 109.472 192.09 138.837 192.09H161.66V252.95H138.837C109.472 252.95 85.5845 276.837 85.5845 306.202C85.5845 335.568 109.472 359.455 138.837 359.455C168.202 359.455 192.09 335.568 192.09 306.202V283.38H252.95V306.202C252.95 335.568 276.837 359.455 306.202 359.455C335.567 359.455 359.455 335.568 359.455 306.202C359.455 276.837 335.567 252.95 306.202 252.95H283.38V192.09H306.202C335.567 192.09 359.455 168.202 359.455 138.837C359.455 109.472 335.567 85.5845 306.202 85.5845ZM283.38 161.66V138.837C283.38 126.209 293.574 116.015 306.202 116.015C318.831 116.015 329.025 126.209 329.025 138.837C329.025 151.466 318.831 161.66 306.202 161.66H283.38ZM138.837 161.66C126.209 161.66 116.015 151.466 116.015 138.837C116.015 126.209 126.209 116.015 138.837 116.015C151.466 116.015 161.66 126.209 161.66 138.837V161.66H138.837ZM192.09 252.95V192.09H252.95V252.95H192.09ZM306.202 329.025C293.574 329.025 283.38 318.831 283.38 306.202V283.38H306.202C318.831 283.38 329.025 293.574 329.025 306.202C329.025 318.831 318.831 329.025 306.202 329.025ZM138.837 329.025C126.209 329.025 116.015 318.831 116.015 306.202C116.015 293.574 126.209 283.38 138.837 283.38H161.66V306.202C161.66 318.831 151.466 329.025 138.837 329.025Z" />
@@ -388,7 +388,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain', 'border-radius': '4px' }}
+          style={{ ...s, display: 'block', objectFit: 'contain', borderRadius: '4px' }}
           aria-hidden="true"
         />
       );
@@ -401,7 +401,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain', 'border-radius': '4px' }}
+          style={{ ...s, display: 'block', objectFit: 'contain', borderRadius: '4px' }}
           aria-hidden="true"
         />
       );
@@ -438,7 +438,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           alt=""
           width={size}
           height={size}
-          style={{ ...s, display: 'block', 'object-fit': 'contain' }}
+          style={{ ...s, display: 'block', objectFit: 'contain' }}
           aria-hidden="true"
         />
       );
@@ -450,7 +450,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
           viewBox="0 0 24 24"
           fill="currentColor"
-          fill-rule="evenodd"
+          fillRule="evenodd"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
@@ -483,7 +483,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
           viewBox="0 0 24 24"
           fill="currentColor"
-          fill-rule="evenodd"
+          fillRule="evenodd"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
@@ -559,7 +559,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
           viewBox="0 0 24 24"
           fill="currentColor"
-          fill-rule="evenodd"
+          fillRule="evenodd"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
@@ -614,17 +614,17 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           style={s}
         >
           <rect width="16" height="16" fill="url(#lms-icon-grad)" rx="3" />
-          <g clip-path="url(#lms-icon-clip)">
+          <g clipPath="url(#lms-icon-clip)">
             <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
+              fillRule="evenodd"
+              clipRule="evenodd"
               d="M3.42 3a.637.637 0 1 0 0 1.274h7.053a.637.637 0 0 0 0-1.274H3.42Zm2.547 1.665a.637.637 0 0 0 0 1.274h7.053a.637.637 0 0 0 0-1.274H5.967ZM3.812 6.968c0-.352.285-.638.637-.638h7.053a.637.637 0 0 1 0 1.274H4.449a.637.637 0 0 1-.637-.637ZM2.636 8.094a.637.637 0 0 0 0 1.274h7.054a.637.637 0 0 0 0-1.274H2.636Zm1.176 2.302c0-.352.285-.637.637-.637h7.053a.637.637 0 0 1 0 1.274H4.449a.637.637 0 0 1-.637-.637Zm4.702 1.028a.637.637 0 0 0 0 1.274h4.849a.637.637 0 0 0 0-1.274H8.514Z"
               fill="#fff"
-              fill-opacity="0.3"
+              fillOpacity="0.3"
             />
             <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
+              fillRule="evenodd"
+              clipRule="evenodd"
               d="M3.42 3a.637.637 0 1 0 0 1.274h5.143a.637.637 0 0 0 0-1.274H3.42Zm2.547 1.665a.637.637 0 0 0 0 1.274h5.143a.637.637 0 0 0 0-1.274H5.967ZM3.812 6.968c0-.352.285-.638.637-.638h5.143a.637.637 0 0 1 0 1.274H4.449a.637.637 0 0 1-.637-.637ZM2.636 8.094a.637.637 0 0 0 0 1.274h5.144a.637.637 0 0 0 0-1.274H2.636Zm1.176 2.302c0-.352.285-.637.637-.637h5.143a.637.637 0 0 1 0 1.274H4.449a.637.637 0 0 1-.637-.637Zm4.702 1.028a.637.637 0 0 0 0 1.274h2.89a.637.637 0 0 0 0-1.274h-2.89Z"
               fill="#fff"
             />
@@ -638,8 +638,8 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
               y2="16"
               gradientUnits="userSpaceOnUse"
             >
-              <stop stop-color="#6C79EF" />
-              <stop offset="1" stop-color="#4F14BE" />
+              <stop stopColor="#6C79EF" />
+              <stop offset="1" stopColor="#4F14BE" />
             </linearGradient>
             <clipPath id="lms-icon-clip">
               <rect width="12" height="12" fill="white" transform="translate(2 2)" />
@@ -654,7 +654,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
         <>
           {/* Light mode logo (dark frame) */}
           <svg
-            class="provider-icon--opencode-zen provider-icon--opencode-zen-light"
+            className="provider-icon--opencode-zen provider-icon--opencode-zen-light block dark:hidden"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -666,7 +666,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           </svg>
           {/* Dark mode logo (light frame) */}
           <svg
-            class="provider-icon--opencode-zen provider-icon--opencode-zen-dark"
+            className="provider-icon--opencode-zen provider-icon--opencode-zen-dark hidden dark:block"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -685,7 +685,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
         <>
           {/* Light mode logo (dark frame) */}
           <svg
-            class="provider-icon--opencode-go provider-icon--opencode-go-light"
+            className="provider-icon--opencode-go provider-icon--opencode-go-light block dark:hidden"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -697,7 +697,7 @@ export function providerIcon(id: string, size: number = 20): JSX.Element | null 
           </svg>
           {/* Dark mode logo (light frame) */}
           <svg
-            class="provider-icon--opencode-go provider-icon--opencode-go-dark"
+            className="provider-icon--opencode-go provider-icon--opencode-go-dark hidden dark:block"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -830,7 +830,7 @@ export function customProviderLogo(
   size: number = 16,
   baseUrl?: string,
   modelName?: string,
-): JSX.Element | null {
+): ReactNode {
   const normalized = normalizeProviderName(name);
   const shared =
     SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
@@ -849,7 +849,7 @@ export function customProviderLogo(
       alt={name}
       width={size}
       height={size}
-      style={{ display: 'block', 'object-fit': 'contain' }}
+      style={{ display: 'block', objectFit: 'contain' }}
     />
   );
 }

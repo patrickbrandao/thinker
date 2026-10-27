@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js';
+import type { ReactNode } from 'react';
 import { t } from '../i18n/index.js';
 
 const USER_ICON = (s: number) => (
@@ -8,9 +8,9 @@ const USER_ICON = (s: number) => (
     viewBox="2 1 20 22"
     fill="none"
     stroke="currentColor"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    strokeWidth="3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
   >
     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
@@ -25,9 +25,9 @@ const KEY_ICON = (s: number) => (
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    strokeWidth="3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
   >
     <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
@@ -46,16 +46,17 @@ export function authLabel(authType: string | null | undefined): string {
   return t('ui.auth.apiKey');
 }
 
-export function authBadgeFor(
-  authType: string | null | undefined,
-  size: number,
-): JSX.Element | null {
+export function authBadgeFor(authType: string | null | undefined, size: number): ReactNode {
+  // `provider-auth-badge*` classes are stable hooks for tests; the look comes
+  // from the utilities. The badge sits on the corner of a relative parent.
+  const base =
+    'provider-auth-badge absolute -right-1 -top-1 flex items-center justify-center rounded-full border border-elev leading-none text-bg';
   const overlay = size <= 10 ? ' provider-auth-badge--overlay' : '';
   if (authType === 'subscription')
     return (
       <span
-        class={`provider-auth-badge provider-auth-badge--sub${overlay}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={`${base} provider-auth-badge--sub bg-info${overlay}`}
+        style={{ width: size, height: size }}
         role="img"
         aria-label={t('ui.auth.subscriptionProvider')}
       >
@@ -65,8 +66,8 @@ export function authBadgeFor(
   if (authType === 'api_key')
     return (
       <span
-        class={`provider-auth-badge provider-auth-badge--key${overlay}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={`${base} provider-auth-badge--key bg-warn${overlay}`}
+        style={{ width: size, height: size }}
         role="img"
         aria-label={t('ui.auth.apiKeyProvider')}
       >
@@ -76,8 +77,8 @@ export function authBadgeFor(
   if (authType === 'local')
     return (
       <span
-        class={`provider-auth-badge provider-auth-badge--local${overlay}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={`${base} provider-auth-badge--local bg-accent${overlay}`}
+        style={{ width: size, height: size }}
         role="img"
         aria-label={t('ui.auth.localProvider')}
       >

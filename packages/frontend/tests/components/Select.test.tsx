@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Select from '../../src/components/Select';
 
 describe('Select', () => {
@@ -10,17 +10,17 @@ describe('Select', () => {
   ];
 
   it('renders with selected value label', () => {
-    render(() => <Select options={options} value="b" onChange={() => {}} />);
+    render(<Select options={options} value="b" onChange={() => {}} />);
     expect(screen.getByText('Option B')).toBeDefined();
   });
 
   it('shows placeholder when no match', () => {
-    render(() => <Select options={options} value="" onChange={() => {}} placeholder="Pick one" />);
+    render(<Select options={options} value="" onChange={() => {}} placeholder="Pick one" />);
     expect(screen.getByText('Pick one')).toBeDefined();
   });
 
   it('opens dropdown on click', async () => {
-    render(() => <Select options={options} value="a" onChange={() => {}} />);
+    render(<Select options={options} value="a" onChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toBeDefined();
@@ -28,7 +28,7 @@ describe('Select', () => {
 
   it('calls onChange when option selected', async () => {
     const onChange = vi.fn();
-    render(() => <Select options={options} value="a" onChange={onChange} />);
+    render(<Select options={options} value="a" onChange={onChange} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     const optB = screen.getByText('Option B');
@@ -37,7 +37,7 @@ describe('Select', () => {
   });
 
   it('closes on Escape key', async () => {
-    render(() => <Select options={options} value="a" onChange={() => {}} />);
+    render(<Select options={options} value="a" onChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toBeDefined();
@@ -50,7 +50,7 @@ describe('Select', () => {
   });
 
   it('does not close on non-Escape keys', async () => {
-    render(() => <Select options={options} value="a" onChange={() => {}} />);
+    render(<Select options={options} value="a" onChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toBeDefined();
@@ -62,7 +62,7 @@ describe('Select', () => {
   });
 
   it('closes dropdown when clicking outside', async () => {
-    render(() => <Select options={options} value="a" onChange={() => {}} />);
+    render(<Select options={options} value="a" onChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toBeDefined();
@@ -78,7 +78,7 @@ describe('Select', () => {
   });
 
   it('does not close when clicking inside the dropdown options', async () => {
-    render(() => <Select options={options} value="a" onChange={() => {}} />);
+    render(<Select options={options} value="a" onChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: /Option A/i });
     await fireEvent.click(trigger);
     const listbox = screen.getByRole('listbox');
@@ -94,10 +94,10 @@ describe('Select', () => {
     const innerHeight = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(180);
     const innerWidth = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(320);
 
-    render(() => (
-      <Select options={options} value="a" onChange={() => {}} portal maxDropdownHeight={120} />
-    ));
-    const root = document.querySelector('.custom-select') as HTMLDivElement;
+    render(
+      <Select options={options} value="a" onChange={() => {}} portal maxDropdownHeight={120} />,
+    );
+    const root = document.querySelector('.select') as HTMLDivElement;
     vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
       x: 12,
       y: 40,
@@ -115,7 +115,7 @@ describe('Select', () => {
 
     const listbox = screen.getByRole('listbox');
     expect(root.contains(listbox)).toBe(false);
-    expect(listbox.classList.contains('custom-select__dropdown--portal')).toBe(true);
+    expect(listbox.classList.contains('is-portal')).toBe(true);
     expect((listbox as HTMLElement).style.top).toBe('76px');
     expect((listbox as HTMLElement).style.width).toBe('240px');
     expect((listbox as HTMLElement).style.maxHeight).toBe('96px');
@@ -125,9 +125,9 @@ describe('Select', () => {
   });
 
   it('has correct aria attributes', () => {
-    render(() => (
-      <Select options={options} value="a" onChange={() => {}} ariaDescribedBy="select-help" />
-    ));
+    render(
+      <Select options={options} value="a" onChange={() => {}} ariaDescribedBy="select-help" />,
+    );
     const trigger = screen.getByRole('button');
     expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');

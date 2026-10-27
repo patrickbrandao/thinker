@@ -1,22 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// --- Capture SolidJS lifecycle callbacks ---
-let mountCb: (() => void) | null = null;
-let cleanupCb: (() => void) | null = null;
-let effectCb: (() => void) | null = null;
-
-vi.mock('solid-js', () => ({
-  onMount: (cb: () => void) => {
-    mountCb = cb;
-  },
-  onCleanup: (cb: () => void) => {
-    cleanupCb = cb;
-  },
-  createEffect: (cb: () => void) => {
-    effectCb = cb;
-  },
-  on: (_dep: unknown, cb: () => void) => cb,
-}));
+import { act, renderHook } from '@testing-library/react';
 
 vi.mock('../../src/services/theme.js', () => ({
   getHslA: (cssVar: string, alpha: number) => `hsla(var(${cssVar}), ${alpha})`,
@@ -56,9 +39,6 @@ function localMonDayHHMM(epochSec: number): string {
 }
 
 beforeEach(() => {
-  mountCb = null;
-  cleanupCb = null;
-  effectCb = null;
   vi.useFakeTimers();
 });
 
@@ -615,6 +595,8 @@ describe('createBaseAxes', () => {
 });
 
 // ---------- useChartLifecycle ----------
+// React port: "mount" is the first render, a data change is a rerender with
+// a new data array, and cleanup is unmount.
 
 describe('useChartLifecycle', () => {
   let mockEl: HTMLDivElement;
@@ -641,43 +623,63 @@ describe('useChartLifecycle', () => {
     );
   });
 
-  function setupLifecycle(dataValues: unknown[] | undefined, buildChart: () => any) {
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => dataValues,
-      buildChart,
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  interface Props {
+    data: unknown[] | undefined;
+    structureKey?: unknown;
   }
 
-  it('registers onMount, onCleanup, and createEffect callbacks', () => {
-    setupLifecycle([1, 2, 3], () => null);
-    expect(mountCb).toBeTruthy();
-    expect(cleanupCb).toBeTruthy();
-    expect(effectCb).toBeTruthy();
+  function mount(
+    data: unknown[] | undefined,
+    buildChart: () => any,
+    extra: { buildData?: () => any; structureKey?: unknown } = {},
+  ) {
+    const el = { current: mockEl };
+    const hook = renderHook(
+      (props: Props) =>
+        useChartLifecycle({
+          el,
+          data: props.data,
+          buildChart,
+          buildData: extra.buildData,
+          structureKey: props.structureKey,
+        }),
+      { initialProps: { data, structureKey: extra.structureKey } },
+    );
+    return {
+      changeData: (next: unknown[] | undefined, structureKey = extra.structureKey) =>
+        act(() => hook.rerender({ data: next, structureKey })),
+      unmount: () => hook.unmount(),
+    };
+  }
+
+  it('does not build the chart synchronously on mount', () => {
+    const buildChart = vi.fn().mockReturnValue(null);
+    mount([1, 2, 3], buildChart);
+    expect(buildChart).not.toHaveBeenCalled();
   });
 
-  it('onMount does nothing when data is empty', () => {
-    setupLifecycle([], () => null);
-    mountCb!();
+  it('mount does nothing when data is empty', () => {
+    mount([], () => null);
     expect(mockObserve).not.toHaveBeenCalled();
   });
 
-  it('onMount does nothing when data is undefined', () => {
-    setupLifecycle(undefined, () => null);
-    mountCb!();
+  it('mount does nothing when data is undefined', () => {
+    mount(undefined, () => null);
     expect(mockObserve).not.toHaveBeenCalled();
   });
 
-  it('onMount creates ResizeObserver and observes element when data has items', () => {
-    setupLifecycle([1, 2], () => null);
-    mountCb!();
+  it('mount creates ResizeObserver and observes element when data has items', () => {
+    mount([1, 2], () => null);
     expect(mockObserve).toHaveBeenCalledWith(mockEl);
   });
 
-  it('onMount schedules tryCreate via setTimeout(50)', () => {
+  it('mount schedules tryCreate via setTimeout(50)', () => {
     const buildChart = vi.fn().mockReturnValue({ destroy: vi.fn(), setCursor: vi.fn() });
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
     expect(buildChart).not.toHaveBeenCalled();
     vi.advanceTimersByTime(50);
     expect(buildChart).toHaveBeenCalledTimes(1);
@@ -686,8 +688,7 @@ describe('useChartLifecycle', () => {
   it('tryCreate does not call buildChart if chart already exists', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
 
     // First call via setTimeout creates the chart
     vi.advanceTimersByTime(50);
@@ -704,8 +705,7 @@ describe('useChartLifecycle', () => {
 
   it('ResizeObserver callback calls tryCreate when chart is null', () => {
     const buildChart = vi.fn().mockReturnValue(null);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
 
     // Trigger resize before setTimeout fires; chart is null
     resizeCallback!([]);
@@ -715,8 +715,7 @@ describe('useChartLifecycle', () => {
   it('ResizeObserver callback resizes existing chart', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
     vi.advanceTimersByTime(50);
 
     (mockEl as any).clientWidth = 1200;
@@ -729,8 +728,7 @@ describe('useChartLifecycle', () => {
 
   it('tryCreate does not assign chart when buildChart returns null', () => {
     const buildChart = vi.fn().mockReturnValue(null);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
     vi.advanceTimersByTime(50);
 
     // Chart is still null, so resize should try to create again
@@ -741,21 +739,13 @@ describe('useChartLifecycle', () => {
   it('effect destroys existing chart and schedules tryCreate when data changes with items', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    let currentData: unknown[] | undefined = [1, 2];
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
-    });
+    const h = mount([1, 2], buildChart);
 
-    // Mount and create the chart
-    mountCb!();
     vi.advanceTimersByTime(50);
     expect(buildChart).toHaveBeenCalledTimes(1);
 
-    // Simulate data change via effect
-    currentData = [3, 4, 5];
-    effectCb!();
+    // Simulate data change
+    h.changeData([3, 4, 5]);
     expect(mockChart.destroy).toHaveBeenCalledTimes(1);
 
     // New chart should be scheduled via setTimeout(0)
@@ -766,18 +756,11 @@ describe('useChartLifecycle', () => {
   it('effect does not schedule tryCreate when data becomes empty', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    let currentData: unknown[] | undefined = [1, 2];
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
-    });
+    const h = mount([1, 2], buildChart);
 
-    mountCb!();
     vi.advanceTimersByTime(50);
 
-    currentData = [];
-    effectCb!();
+    h.changeData([]);
     expect(mockChart.destroy).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(100);
@@ -787,19 +770,12 @@ describe('useChartLifecycle', () => {
 
   it('effect handles case when chart is already null', () => {
     const buildChart = vi.fn().mockReturnValue(null);
-    let currentData: unknown[] | undefined = [1, 2];
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
-    });
+    const h = mount([1, 2], buildChart);
 
-    mountCb!();
     vi.advanceTimersByTime(50);
     // buildChart returned null, so chart is null
 
-    currentData = [3, 4];
-    effectCb!();
+    h.changeData([3, 4]);
     // Should not throw; just schedules tryCreate
     vi.advanceTimersByTime(0);
     expect(buildChart).toHaveBeenCalledTimes(2);
@@ -807,57 +783,68 @@ describe('useChartLifecycle', () => {
 
   it('effect does not schedule tryCreate when data becomes undefined', () => {
     const buildChart = vi.fn().mockReturnValue(null);
-    let currentData: unknown[] | undefined = [1];
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
-    });
+    const h = mount([1], buildChart);
 
-    mountCb!();
     vi.advanceTimersByTime(50);
 
-    currentData = undefined;
-    effectCb!();
+    h.changeData(undefined);
     vi.advanceTimersByTime(100);
     expect(buildChart).toHaveBeenCalledTimes(1);
   });
 
-  it('onCleanup disconnects ResizeObserver and destroys chart', () => {
+  it('a rerender with the same data array does not rebuild', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    const data = [1, 2];
+    const h = mount(data, buildChart);
     vi.advanceTimersByTime(50);
 
-    cleanupCb!();
+    h.changeData(data);
+    vi.advanceTimersByTime(100);
+    expect(mockChart.destroy).not.toHaveBeenCalled();
+    expect(buildChart).toHaveBeenCalledTimes(1);
+  });
+
+  it('unmount disconnects ResizeObserver and destroys chart', () => {
+    const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
+    const buildChart = vi.fn().mockReturnValue(mockChart);
+    const h = mount([1, 2], buildChart);
+    vi.advanceTimersByTime(50);
+
+    h.unmount();
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
     expect(mockChart.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('onCleanup works safely when no chart or observer exists', () => {
-    setupLifecycle([], () => null);
-    // No mount was called effectively (data empty), so ro is null
-    expect(() => cleanupCb!()).not.toThrow();
+  it('unmount works safely when no chart or observer exists', () => {
+    const h = mount([], () => null);
+    // Data empty on mount, so no observer was created
+    expect(() => h.unmount()).not.toThrow();
   });
 
-  it('onCleanup works when chart was never built', () => {
+  it('unmount works when chart was never built', () => {
     const buildChart = vi.fn().mockReturnValue(null);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    const h = mount([1, 2], buildChart);
     vi.advanceTimersByTime(50);
     // chart is null (buildChart returned null)
 
-    cleanupCb!();
+    h.unmount();
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
     // No error thrown
+  });
+
+  it('unmount cancels a pending build', () => {
+    const buildChart = vi.fn().mockReturnValue(null);
+    const h = mount([1, 2], buildChart);
+    h.unmount();
+    vi.advanceTimersByTime(100);
+    expect(buildChart).not.toHaveBeenCalled();
   });
 
   it('tryCreate calls setCursor after building chart', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    setupLifecycle([1, 2], buildChart);
-    mountCb!();
+    mount([1, 2], buildChart);
     vi.advanceTimersByTime(50);
     expect(mockChart.setCursor).toHaveBeenCalledWith({ left: -1, top: -1 });
   });
@@ -865,26 +852,20 @@ describe('useChartLifecycle', () => {
   it('effect updates data in place via setData when structureKey is unchanged', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn(), setData: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    let currentData: unknown[] | undefined = [1, 2];
     const alignedData = [
       [0, 1],
       [10, 20],
     ];
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
+    const h = mount([1, 2], buildChart, {
       buildData: () => alignedData as any,
-      structureKey: () => '7d',
+      structureKey: '7d',
     });
 
-    mountCb!();
     vi.advanceTimersByTime(50);
     expect(buildChart).toHaveBeenCalledTimes(1);
 
     // Same structure → reuse instance, no destroy / rebuild
-    currentData = [3, 4, 5];
-    effectCb!();
+    h.changeData([3, 4, 5]);
     expect(mockChart.setData).toHaveBeenCalledWith(alignedData);
     expect(mockChart.destroy).not.toHaveBeenCalled();
     expect(buildChart).toHaveBeenCalledTimes(1);
@@ -893,24 +874,16 @@ describe('useChartLifecycle', () => {
   it('effect rebuilds the chart when structureKey changes', () => {
     const mockChart = { destroy: vi.fn(), setSize: vi.fn(), setCursor: vi.fn(), setData: vi.fn() };
     const buildChart = vi.fn().mockReturnValue(mockChart);
-    let currentData: unknown[] | undefined = [1, 2];
-    let key = '7d';
-    useChartLifecycle({
-      el: () => mockEl,
-      data: () => currentData,
-      buildChart,
+    const h = mount([1, 2], buildChart, {
       buildData: () => [[0], [1]] as any,
-      structureKey: () => key,
+      structureKey: '7d',
     });
 
-    mountCb!();
     vi.advanceTimersByTime(50);
     expect(buildChart).toHaveBeenCalledTimes(1);
 
     // Range changed → must rebuild so axes/scales pick up the new structure
-    key = '24h';
-    currentData = [3, 4];
-    effectCb!();
+    h.changeData([3, 4], '24h');
     expect(mockChart.setData).not.toHaveBeenCalled();
     expect(mockChart.destroy).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(0);

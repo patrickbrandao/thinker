@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
 import Sparkline from '../../src/components/Sparkline';
 
 describe('Sparkline', () => {
   it('renders an SVG with aria-hidden', () => {
-    const { container } = render(() => <Sparkline data={[1, 2, 3]} />);
+    const { container } = render(<Sparkline data={[1, 2, 3]} />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(svg!.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('renders path data for non-empty data', () => {
-    const { container } = render(() => <Sparkline data={[10, 20, 30]} />);
+    const { container } = render(<Sparkline data={[10, 20, 30]} />);
     const paths = container.querySelectorAll('path');
     expect(paths.length).toBe(2);
     // Verify area path (first path with fill gradient)
@@ -23,7 +23,7 @@ describe('Sparkline', () => {
   });
 
   it('renders empty SVG for no data', () => {
-    const { container } = render(() => <Sparkline data={[]} />);
+    const { container } = render(<Sparkline data={[]} />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(container.querySelectorAll('path').length).toBe(0);
@@ -32,7 +32,7 @@ describe('Sparkline', () => {
   });
 
   it('applies custom dimensions', () => {
-    const { container } = render(() => <Sparkline data={[1, 2]} width={100} height={25} />);
+    const { container } = render(<Sparkline data={[1, 2]} width={100} height={25} />);
     const svg = container.querySelector('svg');
     expect(svg!.getAttribute('width')).toBe('100');
     expect(svg!.getAttribute('height')).toBe('25');
@@ -41,7 +41,7 @@ describe('Sparkline', () => {
   it('handles single data point', () => {
     // Single point hits stepX = w() / Math.max(0, 1) = w() / 1 fallback.
     // Should not throw or produce NaN coordinates.
-    const { container } = render(() => <Sparkline data={[5]} />);
+    const { container } = render(<Sparkline data={[5]} />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     const paths = container.querySelectorAll('path');
@@ -53,7 +53,7 @@ describe('Sparkline', () => {
 
   it('handles all-zero data', () => {
     // All zeros hits Math.max(...points, 1) = 1 fallback to avoid divide-by-zero.
-    const { container } = render(() => <Sparkline data={[0, 0, 0]} />);
+    const { container } = render(<Sparkline data={[0, 0, 0]} />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     const paths = container.querySelectorAll('path');
@@ -66,9 +66,7 @@ describe('Sparkline', () => {
   });
 
   it('applies custom color to stroke and gradient stops', () => {
-    const { container } = render(() => (
-      <Sparkline data={[1, 2, 3]} color="rgb(255, 0, 0)" />
-    ));
+    const { container } = render(<Sparkline data={[1, 2, 3]} color="rgb(255, 0, 0)" />);
     const linePath = container.querySelectorAll('path')[1];
     expect(linePath!.getAttribute('stroke')).toBe('rgb(255, 0, 0)');
     const stops = container.querySelectorAll('stop');
@@ -81,13 +79,13 @@ describe('Sparkline', () => {
     // Guards against gradient-id collisions when multiple sparklines are
     // mounted in the same container. If the id scheme regresses (e.g. a
     // constant id), the gradient fills bleed across instances.
-    const { container } = render(() => (
+    const { container } = render(
       <>
         <Sparkline data={[1, 2, 3]} />
         <Sparkline data={[4, 5, 6]} />
         <Sparkline data={[7, 8, 9]} />
-      </>
-    ));
+      </>,
+    );
     const gradients = container.querySelectorAll('linearGradient');
     expect(gradients.length).toBe(3);
     const ids = Array.from(gradients).map((g) => g.getAttribute('id'));
@@ -112,7 +110,7 @@ describe('Sparkline', () => {
   });
 
   it('uses default width and height when not provided', () => {
-    const { container } = render(() => <Sparkline data={[1, 2, 3]} />);
+    const { container } = render(<Sparkline data={[1, 2, 3]} />);
     const svg = container.querySelector('svg');
     expect(svg!.getAttribute('width')).toBe('200');
     expect(svg!.getAttribute('height')).toBe('50');

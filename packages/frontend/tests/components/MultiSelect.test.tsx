@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
-import { createSignal, Show } from 'solid-js';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import MultiSelect from '../../src/components/MultiSelect';
 
@@ -14,34 +14,39 @@ const OPTIONS = [
 ];
 
 function renderMultiSelect(initialValues: string[] = [], label?: string) {
-  const [values, setValues] = createSignal(initialValues);
-  const onChange = vi.fn((next: string[]) => setValues(next));
-  const result = render(() => (
-    <MultiSelect
-      options={OPTIONS}
-      values={values()}
-      onChange={onChange}
-      placeholder="All providers"
-      label={label}
-    />
-  ));
-
+  const onChange = vi.fn();
+  function Host() {
+    const [values, setValues] = useState(initialValues);
+    return (
+      <MultiSelect
+        options={OPTIONS}
+        values={values}
+        onChange={(next) => {
+          onChange(next);
+          setValues(next);
+        }}
+        placeholder="All providers"
+        label={label}
+      />
+    );
+  }
+  const result = render(<Host />);
   return { ...result, onChange };
 }
 
-async function openDropdown(name: string | RegExp = 'All providers') {
-  await fireEvent.click(screen.getByRole('button', { name }));
+function openDropdown(name: string | RegExp = 'All providers') {
+  fireEvent.click(screen.getByRole('button', { name }));
 }
 
 describe('MultiSelect', () => {
-  it('opens with the empty selection, option metadata, and optional accessible label', async () => {
+  it('opens with the empty selection, option metadata, and optional accessible label', () => {
     renderMultiSelect([], 'Provider filter');
 
     const trigger = screen.getByRole('button', { name: 'Provider filter' });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(screen.getByText('All providers')).toBeDefined();
 
-    await openDropdown('Provider filter');
+    openDropdown('Provider filter');
 
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('listbox').getAttribute('aria-multiselectable')).toBe('true');
@@ -52,29 +57,29 @@ describe('MultiSelect', () => {
     ).toBe('true');
   });
 
-  it('adds and removes values while keeping the dropdown open', async () => {
+  it('adds and removes values while keeping the dropdown open', () => {
     const { onChange } = renderMultiSelect();
-    await openDropdown();
+    openDropdown();
 
-    await fireEvent.click(screen.getByRole('option', { name: /Anthropic/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Anthropic/ }));
     expect(onChange).toHaveBeenLastCalledWith(['anthropic']);
     expect(screen.getByRole('button', { name: 'Anthropic' })).toBeDefined();
     expect(screen.getByRole('listbox')).toBeDefined();
 
-    await fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }));
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }));
     expect(onChange).toHaveBeenLastCalledWith(['anthropic', 'openai']);
     expect(screen.getByText('2 selected')).toBeDefined();
 
-    await fireEvent.click(screen.getByRole('option', { name: /Anthropic/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Anthropic/ }));
     expect(onChange).toHaveBeenLastCalledWith(['openai']);
     expect(screen.getByRole('button', { name: 'OpenAI' })).toBeDefined();
   });
 
   it('clears the selection from the all option', async () => {
     const { onChange } = renderMultiSelect(['anthropic']);
-    await openDropdown('Anthropic');
+    openDropdown('Anthropic');
 
-    await fireEvent.click(screen.getByRole('option', { name: 'All providers' }));
+    fireEvent.click(screen.getByRole('option', { name: 'All providers' }));
 
     expect(onChange).toHaveBeenLastCalledWith([]);
     await waitFor(() =>
@@ -89,17 +94,17 @@ describe('MultiSelect', () => {
     expect(screen.getByText('All providers')).toBeDefined();
   });
 
-  it('closes on outside click and Escape, but not on an option click', async () => {
+  it('closes on outside click and Escape, but not on an option click', () => {
     renderMultiSelect();
-    await openDropdown();
-    await fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }));
+    openDropdown();
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }));
     expect(screen.getByRole('listbox')).toBeDefined();
 
-    await fireEvent.click(document.body);
+    fireEvent.click(document.body);
     expect(screen.queryByRole('listbox')).toBeNull();
 
-    await openDropdown('OpenAI');
-    await fireEvent.keyDown(document, { key: 'Escape' });
+    openDropdown('OpenAI');
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
@@ -118,33 +123,32 @@ describe('MultiSelect', () => {
 describe('MultiSelect with options derived from the selection', () => {
   // The Requests log builds its model options from the selection itself (so a
   // picked model stays listed even when it drops out of the range window).
-  // Toggling then rebuilds the option nodes, and the clicked node is already
-  // detached when the document-level outside-click handler runs — contains()
+  // Toggling then rebuilds the option nodes, and the clicked node may already
+  // be detached when the document-level outside-click handler runs — contains()
   // says false and the menu used to close after a single pick.
-  function renderSelfDerivedMultiSelect() {
-    const [values, setValues] = createSignal<string[]>([]);
-    const options = () =>
-      [...new Set(['gpt-4o', 'claude-sonnet-4', ...values()])].sort().map((value) => ({
-        label: value,
-        value,
-      }));
-    return render(() => (
+  function SelfDerived() {
+    const [values, setValues] = useState<string[]>([]);
+    const options = [...new Set(['gpt-4o', 'claude-sonnet-4', ...values])].sort().map((value) => ({
+      label: value,
+      value,
+    }));
+    return (
       <MultiSelect
-        options={options()}
-        values={values()}
+        options={options}
+        values={values}
         onChange={setValues}
         placeholder="All models"
         label="Model filter"
       />
-    ));
+    );
   }
 
   it('stays open after picking an option when the options rebuild', async () => {
-    renderSelfDerivedMultiSelect();
-    await fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
+    render(<SelfDerived />);
+    fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
     expect(screen.getByRole('listbox')).toBeDefined();
 
-    await fireEvent.click(screen.getByRole('option', { name: /gpt-4o/ }));
+    fireEvent.click(screen.getByRole('option', { name: /gpt-4o/ }));
 
     await waitFor(() => {
       expect(screen.getByRole('option', { name: /gpt-4o/ }).getAttribute('aria-selected')).toBe(
@@ -157,19 +161,20 @@ describe('MultiSelect with options derived from the selection', () => {
   it('closes when an outside element removes itself on click', async () => {
     // The detached-node guard must not swallow this: the click came from
     // outside, it merely left no node behind to ask `contains` about.
-    const [present, setPresent] = createSignal(true);
-    render(() => (
-      <Show when={present()}>
+    function SelfRemoving() {
+      const [present, setPresent] = useState(true);
+      return present ? (
         <button data-testid="self-removing" onClick={() => setPresent(false)}>
           dismiss
         </button>
-      </Show>
-    ));
-    renderSelfDerivedMultiSelect();
-    await fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
+      ) : null;
+    }
+    render(<SelfRemoving />);
+    render(<SelfDerived />);
+    fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
     expect(screen.getByRole('listbox')).toBeDefined();
 
-    await fireEvent.click(screen.getByTestId('self-removing'));
+    fireEvent.click(screen.getByTestId('self-removing'));
 
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).toBeNull();
@@ -177,11 +182,11 @@ describe('MultiSelect with options derived from the selection', () => {
   });
 
   it('still closes on a click outside the dropdown', async () => {
-    renderSelfDerivedMultiSelect();
-    await fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
+    render(<SelfDerived />);
+    fireEvent.click(screen.getByRole('button', { name: 'Model filter' }));
     expect(screen.getByRole('listbox')).toBeDefined();
 
-    await fireEvent.click(document.body);
+    fireEvent.click(document.body);
 
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).toBeNull();

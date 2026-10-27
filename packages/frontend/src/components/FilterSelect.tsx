@@ -1,6 +1,7 @@
-import { createSignal, For, Show, onCleanup, type Component } from 'solid-js';
-import '../styles/filter-select.css';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Filter } from 'lucide-react';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 interface FilterSelectProps {
   /** Plural noun for the trigger label, e.g. "providers" or "harnesses". */
@@ -21,111 +22,96 @@ interface FilterSelectProps {
 /**
  * Multi-select dropdown used to filter chart series (providers on the agent
  * Overview / ConnectionDetail, harnesses on the global Overview). Owns its
- * open state, outside-click/Escape dismissal, and stylesheet.
+ * open state and outside-click/Escape dismissal. Each row shows the series
+ * swatch and a switch reflecting whether the series is on.
  */
-const FilterSelect: Component<FilterSelectProps> = (props) => {
-  const [open, setOpen] = createSignal(false);
-  let rootRef: HTMLDivElement | undefined;
+export default function FilterSelect(props: FilterSelectProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  if (typeof document !== 'undefined') {
+  useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
-      if (rootRef && !rootRef.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
     document.addEventListener('click', onClickOutside);
     document.addEventListener('keydown', onKeyDown);
-    onCleanup(() => {
+    return () => {
       document.removeEventListener('click', onClickOutside);
       document.removeEventListener('keydown', onKeyDown);
-    });
-  }
+    };
+  }, []);
 
-  const selectedCount = () => props.items.filter((item) => props.selected.has(item)).length;
-  const label = () =>
-    selectedCount() === props.items.length
+  const selectedCount = props.items.filter((item) => props.selected.has(item)).length;
+  const label =
+    selectedCount === props.items.length
       ? t('ui.filter.all', { noun: props.noun, count: props.items.length })
       : t('ui.filter.some', {
-          selected: selectedCount(),
+          selected: selectedCount,
           total: props.items.length,
           noun: props.noun,
         });
 
   return (
-    <div class="agent-filter-select" ref={rootRef}>
-      <button class="agent-filter-select__trigger" onClick={() => setOpen(!open())} type="button">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+    <div className="filter-select relative" ref={rootRef}>
+      <button
+        type="button"
+        className="filter-select-trigger btn btn-ghost btn-sm"
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Filter aria-hidden="true" />
+        {label}
+        <ChevronDown
           aria-hidden="true"
-        >
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-        </svg>
-        {label()}
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+          className={cx('transition-transform', open && 'rotate-180')}
+        />
       </button>
-      <Show when={open()}>
-        <div class="agent-filter-select__dropdown">
-          <div class="agent-filter-select__actions">
+      {open ? (
+        <div className="filter-select-menu menu right-0 top-full mt-1 max-h-80 w-64 overflow-y-auto">
+          <div className="flex justify-end px-1 pb-1">
             <button
-              class="agent-filter-select__action-btn"
               type="button"
-              disabled={selectedCount() === props.items.length}
+              className="link-action text-xs disabled:cursor-default disabled:text-faint disabled:no-underline"
+              disabled={selectedCount === props.items.length}
               onClick={() => props.onSelectAll()}
             >
               {t('ui.filter.selectAll')}
             </button>
           </div>
-          <For each={props.items}>
-            {(item) => {
-              const isOn = () => props.selected.has(item);
-              return (
-                <button
-                  class="agent-filter-select__item"
-                  onClick={() => props.onToggle(item)}
-                  type="button"
-                  disabled={props.items.length <= 1}
-                >
-                  <span
-                    class="agent-filter-select__swatch"
-                    style={{ background: props.colorMap[item] }}
-                  />
-                  <span class="agent-filter-select__name">
-                    {props.displayName ? props.displayName(item) : item}
-                  </span>
-                  <span
-                    class="agent-filter-select__toggle"
-                    classList={{ 'agent-filter-select__toggle--on': isOn() }}
-                  >
-                    <span class="agent-filter-select__toggle-thumb" />
-                  </span>
-                </button>
-              );
-            }}
-          </For>
+          {props.items.map((item) => {
+            const isOn = props.selected.has(item);
+            return (
+              <button
+                key={item}
+                type="button"
+                className="menu-item disabled:cursor-default"
+                role="menuitemcheckbox"
+                aria-checked={isOn}
+                onClick={() => props.onToggle(item)}
+                disabled={props.items.length <= 1}
+              >
+                <span
+                  className="filter-select-swatch size-2.5 shrink-0 rounded-sm"
+                  style={{ background: props.colorMap[item] }}
+                />
+                <span className="min-w-0 flex-1 truncate">
+                  {props.displayName ? props.displayName(item) : item}
+                </span>
+                {/* Visual switch; the row itself carries the checked state. */}
+                <span
+                  className="filter-select-toggle switch pointer-events-none shrink-0"
+                  aria-hidden="true"
+                  aria-checked={isOn}
+                />
+              </button>
+            );
+          })}
         </div>
-      </Show>
+      ) : null}
     </div>
   );
-};
-
-export default FilterSelect;
+}

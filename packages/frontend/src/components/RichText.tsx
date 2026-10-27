@@ -1,17 +1,23 @@
-import type { Component, JSX } from 'solid-js';
+import { Fragment, type ReactNode } from 'react';
 
 /**
  * Renders a translated sentence whose `{{ key }}` placeholders are JSX nodes
  * (inline code, bold names, buttons), so translators keep the whole sentence
  * and its word order in one catalog entry.
  */
-const RichText: Component<{ text: string; parts: Record<string, JSX.Element> }> = (props) => (
-  <>
-    {props.text.split(/(\{\{\s*\w+\s*\}\})/).map((segment) => {
-      const key = /^\{\{\s*(\w+)\s*\}\}$/.exec(segment)?.[1];
-      return key && key in props.parts ? props.parts[key] : segment;
-    })}
-  </>
-);
-
-export default RichText;
+export default function RichText({
+  text,
+  parts,
+}: {
+  text: string;
+  parts: Record<string, ReactNode>;
+}) {
+  return (
+    <>
+      {text.split(/(\{\{\s*\w+\s*\}\})/).map((segment, i) => {
+        const key = /^\{\{\s*(\w+)\s*\}\}$/.exec(segment)?.[1];
+        return <Fragment key={i}>{key && key in parts ? parts[key] : segment}</Fragment>;
+      })}
+    </>
+  );
+}

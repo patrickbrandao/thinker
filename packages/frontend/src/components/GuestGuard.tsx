@@ -34,6 +34,12 @@ export default function GuestGuard({ children }: { children: ReactNode }) {
     navigate(destination, { replace: true });
   }, [session.isPending, session.data, searchParams, location.search, navigate]);
 
-  if (!setupChecked || session.isPending || session.data) return null;
+  // Once shown, keep the form mounted: Better Auth refetches the session (e.g.
+  // on window focus) and a brief isPending must not wipe what the user typed.
+  const [ready, setReady] = useState(false);
+  const canShow = setupChecked && !session.isPending && !session.data;
+  if (canShow && !ready) setReady(true);
+
+  if (!ready && !canShow) return null;
   return <>{children}</>;
 }

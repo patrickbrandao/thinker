@@ -1,23 +1,24 @@
-import { createSignal, onCleanup, type Component } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
-interface Props {
-  text: string;
+interface Pos {
+  top: number;
+  left: number;
+  placement: 'above' | 'below';
 }
 
-const InfoTooltip: Component<Props> = (props) => {
-  const [expanded, setExpanded] = createSignal(false);
-  const [pos, setPos] = createSignal<{
-    top: number;
-    left: number;
-    placement: 'above' | 'below';
-  } | null>(null);
-  let iconRef: HTMLSpanElement | undefined;
+/** A small "i" icon that shows `text` in a floating bubble on hover, focus or click. */
+export default function InfoTooltip({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [pos, setPos] = useState<Pos | null>(null);
+  const iconRef = useRef<HTMLSpanElement>(null);
 
   const updatePos = () => {
-    if (!iconRef) return;
-    const rect = iconRef.getBoundingClientRect();
+    const icon = iconRef.current;
+    if (!icon) return;
+    const rect = icon.getBoundingClientRect();
     const placement = rect.top < 72 ? 'below' : 'above';
     const left = Math.min(Math.max(rect.left + rect.width / 2, 16), window.innerWidth - 16);
     setPos({
@@ -34,69 +35,72 @@ const InfoTooltip: Component<Props> = (props) => {
 
   const hide = () => setExpanded(false);
 
+  // Hide while the page scrolls: the bubble is fixed and would drift away.
+  useEffect(() => {
+    if (!expanded) return;
+    window.addEventListener('scroll', hide, true);
+    return () => window.removeEventListener('scroll', hide, true);
+  }, [expanded]);
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (expanded()) hide();
+      if (expanded) hide();
       else show();
     } else if (e.key === 'Escape') {
       hide();
     }
   };
 
-  // Clean up on unmount
-  onCleanup(hide);
-
   return (
     <span
       ref={iconRef}
-      class="info-tooltip"
-      classList={{ 'info-tooltip--active': expanded() }}
-      tabindex="0"
+      className={cx(
+        'info-tooltip inline-flex cursor-help items-center align-middle text-faint hover:text-dim focus-visible:text-dim',
+        expanded && 'is-active text-dim',
+      )}
+      tabIndex={0}
       role="button"
-      aria-label={t('ui.infoAria', { text: props.text })}
-      aria-expanded={expanded()}
+      aria-label={t('ui.infoAria', { text })}
+      aria-expanded={expanded}
       onKeyDown={handleKeyDown}
-      onClick={() => (expanded() ? hide() : show())}
+      onClick={() => (expanded ? hide() : show())}
       onMouseEnter={show}
       onMouseLeave={hide}
-      onFocusOut={hide}
+      onBlur={hide}
     >
       <svg
-        class="info-tooltip__icon"
         width="13"
         height="13"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden="true"
       >
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="16" x2="12" y2="12" />
         <line x1="12" y1="8" x2="12.01" y2="8" />
       </svg>
-      {expanded() && pos() && (
-        <Portal>
-          <span
-            class="info-tooltip__bubble"
-            role="tooltip"
-            style={{
-              position: 'fixed',
-              top: `${pos()!.top}px`,
-              left: `${pos()!.left}px`,
-              transform:
-                pos()!.placement === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-            }}
-          >
-            {props.text}
-          </span>
-        </Portal>
-      )}
+      {expanded && pos
+        ? createPortal(
+            <span
+              role="tooltip"
+              className="pointer-events-none fixed z-[80] max-w-xs rounded-control border border-line bg-elev px-2.5 py-1.5 text-xs font-normal leading-snug text-dim shadow-[var(--shadow-float)]"
+              style={{
+                top: pos.top,
+                left: pos.left,
+                transform:
+                  pos.placement === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+              }}
+            >
+              {text}
+            </span>,
+            document.body,
+          )
+        : null}
     </span>
   );
-};
-
-export default InfoTooltip;
+}

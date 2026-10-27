@@ -1,16 +1,18 @@
-import { createSignal, For, Show, onCleanup, type Component, type JSX } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown } from 'lucide-react';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 export interface SelectOption {
   label: string;
   value: string;
   /** Optional icon rendered before the label (e.g. provider logo, platform icon). */
-  icon?: JSX.Element;
+  icon?: ReactNode;
   disabled?: boolean;
   description?: string;
   /** Optional badge rendered after the label (e.g. "PRO" tag). */
-  badge?: JSX.Element;
+  badge?: ReactNode;
 }
 
 interface SelectProps {
@@ -21,25 +23,45 @@ interface SelectProps {
   label?: string;
   displayValue?: string;
   disabled?: boolean;
+  /** Render the dropdown in document.body (inside modals and scroll boxes). */
   portal?: boolean;
   maxDropdownHeight?: number;
   ariaDescribedBy?: string;
 }
 
-const Select: Component<SelectProps> = (props) => {
-  const [open, setOpen] = createSignal(false);
-  const [dropdownStyle, setDropdownStyle] = createSignal('');
-  let ref: HTMLDivElement | undefined;
-  let dropdownRef: HTMLDivElement | undefined;
+/** Shared trigger look for Select and MultiSelect: a `.field` with a chevron. */
+export const selectTriggerClass =
+  'field flex cursor-pointer items-center justify-between gap-2 text-left';
+
+/** Shared option look for Select and MultiSelect rows inside a `.menu`. */
+export function selectOptionClass(selected: boolean, disabled?: boolean): string {
+  return cx(
+    'menu-item h-auto min-h-8 whitespace-normal py-1.5',
+    selected && 'is-active',
+    disabled && 'cursor-not-allowed opacity-50',
+  );
+}
+
+export default function Select(props: SelectProps) {
+  const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>(undefined);
+  const ref = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const latest = useRef(props);
+  latest.current = props;
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const updateDropdownPosition = () => {
-    if (!props.portal || !ref || typeof window === 'undefined') return;
+    const root = ref.current;
+    const { portal, maxDropdownHeight } = latest.current;
+    if (!portal || !root || typeof window === 'undefined') return;
 
     const gap = 4;
     const viewportMargin = 8;
     const minHeight = 96;
-    const maxHeight = props.maxDropdownHeight ?? 320;
-    const rect = ref.getBoundingClientRect();
+    const maxHeight = maxDropdownHeight ?? 320;
+    const rect = root.getBoundingClientRect();
     const availableBelow = window.innerHeight - rect.bottom - gap - viewportMargin;
     const availableAbove = rect.top - gap - viewportMargin;
     const opensAbove = availableBelow < minHeight && availableAbove > availableBelow;
@@ -49,15 +71,14 @@ const Select: Component<SelectProps> = (props) => {
       Math.max(viewportMargin, window.innerWidth - rect.width - viewportMargin),
     );
 
-    setDropdownStyle(
-      [
-        `left: ${constrainedLeft}px`,
-        `top: ${opensAbove ? rect.top - gap : rect.bottom + gap}px`,
-        `width: ${rect.width}px`,
-        `max-height: ${Math.max(minHeight, Math.min(maxHeight, availableHeight))}px`,
-        `transform: ${opensAbove ? 'translateY(-100%)' : 'none'}`,
-      ].join('; '),
-    );
+    setDropdownStyle({
+      position: 'fixed',
+      left: constrainedLeft,
+      top: opensAbove ? rect.top - gap : rect.bottom + gap,
+      width: rect.width,
+      maxHeight: Math.max(minHeight, Math.min(maxHeight, availableHeight)),
+      transform: opensAbove ? 'translateY(-100%)' : 'none',
+    });
   };
 
   const openDropdown = () => {
@@ -68,121 +89,97 @@ const Select: Component<SelectProps> = (props) => {
     }
   };
 
-  const selected = () => props.options.find((o) => o.value === props.value);
-  const selectedLabel = () => selected()?.label ?? props.placeholder ?? t('ui.selectPlaceholder');
-
-  const handleClickOutside = (e: MouseEvent) => {
-    const target = e.target as Node;
-    if (ref && !ref.contains(target) && !dropdownRef?.contains(target)) {
-      setOpen(false);
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') setOpen(false);
-  };
-
-  const handleViewportChange = () => {
-    if (open()) updateDropdownPosition();
-  };
-
-  if (typeof document !== 'undefined') {
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current && !ref.current.contains(target) && !dropdownRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const handleViewportChange = () => {
+      if (openRef.current) updateDropdownPosition();
+    };
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
-    onCleanup(() => {
+    return () => {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
-    });
-  }
+    };
+    // Listeners read the latest props through refs, so they register once.
+  }, []);
 
-  const dropdown = () => (
+  const selected = props.options.find((o) => o.value === props.value);
+  const selectedLabel = selected?.label ?? props.placeholder ?? t('ui.selectPlaceholder');
+
+  const dropdown = (
     <div
-      class="custom-select__dropdown"
-      classList={{ 'custom-select__dropdown--portal': props.portal }}
       ref={dropdownRef}
       role="listbox"
-      style={props.portal ? dropdownStyle() : undefined}
+      className={cx(
+        'menu select-menu overflow-y-auto',
+        props.portal ? 'is-portal z-[95]' : 'left-0 right-0 top-full mt-1 max-h-80',
+      )}
+      style={props.portal ? dropdownStyle : undefined}
     >
-      <For each={props.options}>
-        {(opt) => (
-          <button
-            class="custom-select__option"
-            classList={{
-              'custom-select__option--selected': props.value === opt.value,
-              'custom-select__option--disabled': opt.disabled,
-            }}
-            onClick={() => {
-              if (opt.disabled) return;
-              props.onChange(opt.value);
-              setOpen(false);
-            }}
-            disabled={opt.disabled}
-            type="button"
-            role="option"
-            aria-selected={props.value === opt.value}
-            aria-disabled={opt.disabled}
-            style="display: flex; align-items: center; gap: 6px;"
-          >
-            <Show when={opt.icon}>{opt.icon}</Show>
-            <span class="custom-select__option-text">
-              <span>{opt.label}</span>
-              <Show when={opt.description}>
-                <span class="custom-select__option-desc">{opt.description}</span>
-              </Show>
-            </span>
-            <Show when={opt.badge}>{opt.badge}</Show>
-          </button>
-        )}
-      </For>
+      {props.options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          role="option"
+          className={selectOptionClass(props.value === opt.value, opt.disabled)}
+          onClick={() => {
+            if (opt.disabled) return;
+            props.onChange(opt.value);
+            setOpen(false);
+          }}
+          disabled={opt.disabled}
+          aria-selected={props.value === opt.value}
+          aria-disabled={opt.disabled}
+        >
+          {opt.icon}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate">{opt.label}</span>
+            {opt.description ? <span className="text-xs text-faint">{opt.description}</span> : null}
+          </span>
+          {opt.badge}
+        </button>
+      ))}
     </div>
   );
 
   return (
-    <div class="custom-select" ref={ref}>
+    <div className="select relative min-w-0" ref={ref}>
       <button
-        class="custom-select__trigger"
-        classList={{ 'custom-select__trigger--open': open() }}
+        type="button"
+        className={selectTriggerClass}
         onClick={() => {
           if (props.disabled) return;
-          if (open()) setOpen(false);
+          if (open) setOpen(false);
           else openDropdown();
         }}
         disabled={props.disabled}
-        type="button"
         aria-haspopup="listbox"
-        aria-expanded={open()}
-        aria-label={props.label ?? selectedLabel()}
+        aria-expanded={open}
+        aria-label={props.label ?? selectedLabel}
         aria-describedby={props.ariaDescribedBy}
       >
-        <span
-          class="custom-select__value"
-          style="display: inline-flex; align-items: center; gap: 6px;"
-        >
-          <Show when={!props.displayValue && selected()?.icon}>{selected()!.icon}</Show>
-          {props.displayValue ?? selectedLabel()}
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+          {!props.displayValue && selected?.icon ? selected.icon : null}
+          {props.displayValue ?? selectedLabel}
         </span>
-        <svg
-          class="custom-select__chevron"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <ChevronDown
           aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+          className={cx('size-3.5 shrink-0 text-muted transition-transform', open && 'rotate-180')}
+        />
       </button>
-      <Show when={open()}>{props.portal ? <Portal>{dropdown()}</Portal> : dropdown()}</Show>
+      {open ? (props.portal ? createPortal(dropdown, document.body) : dropdown) : null}
     </div>
   );
-};
-
-export default Select;
+}

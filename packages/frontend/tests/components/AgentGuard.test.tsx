@@ -1,152 +1,149 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@solidjs/testing-library";
-import { createSignal } from "solid-js";
-
-// Reactive agent param so tests can simulate navigating between agents while
-// AgentGuard stays mounted (the resource is keyed on this).
-const [agentNameParam, setAgentNameParam] = createSignal("test-agent");
-vi.mock("@solidjs/router", () => ({
-  useParams: () => ({
-    get agentName() {
-      return agentNameParam();
-    },
-  }),
-  A: (props: any) => <a href={props.href}>{props.children}</a>,
-}));
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 
 const mockGetAgents = vi.fn();
-vi.mock("../../src/services/api.js", () => ({
+vi.mock('../../src/services/api.js', () => ({
   getAgents: () => mockGetAgents(),
 }));
 
 const mockSetAgentDisplayName = vi.fn();
-vi.mock("../../src/services/agent-display-name.js", () => ({
+vi.mock('../../src/services/agent-display-name.js', () => ({
   setAgentDisplayName: (...args: unknown[]) => mockSetAgentDisplayName(...args),
 }));
 
-const mockIsRecentlyCreated = vi.fn(() => false);
+const mockIsRecentlyCreated = vi.fn((_name: string) => false);
 const mockClearRecentAgent = vi.fn();
-vi.mock("../../src/services/recent-agents.js", () => ({
-  isRecentlyCreated: (...args: unknown[]) => mockIsRecentlyCreated(...args),
+vi.mock('../../src/services/recent-agents.js', () => ({
+  isRecentlyCreated: (name: string) => mockIsRecentlyCreated(name),
   clearRecentAgent: (...args: unknown[]) => mockClearRecentAgent(...args),
 }));
 
-vi.mock("../../src/components/ErrorState.jsx", () => ({
+vi.mock('../../src/components/ErrorState.jsx', () => ({
   default: (props: any) => (
-    <div data-testid="error-state" data-error={String(props.error ?? "")}>
-      {props.title || "Error"}
-      <button data-testid="retry" onClick={() => props.onRetry?.()}>Retry</button>
+    <div data-testid="error-state" data-error={String(props.error ?? '')}>
+      {props.title || 'Error'}
+      <button data-testid="retry" onClick={() => props.onRetry?.()}>
+        Retry
+      </button>
     </div>
   ),
 }));
 
-vi.mock("@solidjs/meta", () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-}));
+import AgentGuard from '../../src/components/AgentGuard';
 
-import AgentGuard from "../../src/components/AgentGuard";
+/**
+ * AgentGuard is a route layout: it renders the nested route through <Outlet />.
+ * The memory router lets a test move to another harness while the guard stays
+ * mounted (the agent list is keyed on the :agentName param).
+ */
+function renderGuard(child = <div data-testid="child">Child content</div>) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/harnesses/:agentName',
+        element: <AgentGuard />,
+        children: [{ index: true, element: child }],
+      },
+    ],
+    { initialEntries: ['/harnesses/test-agent'] },
+  );
+  const result = render(<RouterProvider router={router} />);
+  return { ...result, router };
+}
 
-describe("AgentGuard", () => {
+describe('AgentGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetAgentDisplayName.mockClear();
     mockIsRecentlyCreated.mockReturnValue(false);
-    mockClearRecentAgent.mockClear();
-    setAgentNameParam("test-agent");
   });
 
-  it("renders children when agent exists", async () => {
-    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: "test-agent" }] });
-    render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child content</div>
-      </AgentGuard>
-    ));
+  it('renders children when agent exists', async () => {
+    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'test-agent' }] });
+    renderGuard();
     await vi.waitFor(() => {
-      expect(screen.getByTestId("child")).toBeDefined();
+      expect(screen.getByTestId('child')).toBeDefined();
     });
   });
 
-  it("renders NotFound inline when agent does not exist", async () => {
-    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: "other-agent" }] });
-    const { container } = render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child</div>
-      </AgentGuard>
-    ));
+  it('renders NotFound inline when agent does not exist', async () => {
+    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'other-agent' }] });
+    const { container } = renderGuard();
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("Page not found");
+      expect(container.textContent).toContain('Page not found');
     });
     expect(container.querySelector('[data-testid="child"]')).toBeNull();
   });
 
-  it("calls getAgents (covers the fetcher path)", async () => {
+  it('calls getAgents (covers the fetcher path)', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
-    render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child</div>
-      </AgentGuard>
-    ));
+    renderGuard();
     await vi.waitFor(() => {
       expect(mockGetAgents).toHaveBeenCalled();
     });
   });
 
-  it("renders children when isRecentlyCreated returns true even if agent not in list", async () => {
+  it('renders children when isRecentlyCreated returns true even if agent not in list', async () => {
     mockIsRecentlyCreated.mockReturnValue(true);
-    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: "other-agent" }] });
-    render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child content</div>
-      </AgentGuard>
-    ));
+    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'other-agent' }] });
+    renderGuard();
     await vi.waitFor(() => {
-      expect(screen.getByTestId("child")).toBeDefined();
+      expect(screen.getByTestId('child')).toBeDefined();
     });
-    expect(mockIsRecentlyCreated).toHaveBeenCalledWith("test-agent");
+    expect(mockIsRecentlyCreated).toHaveBeenCalledWith('test-agent');
   });
 
-  it("calls clearRecentAgent when agent is found in the fetched list", async () => {
-    mockGetAgents.mockResolvedValue({ agents: [{ agent_name: "test-agent", display_name: "Test Agent" }] });
-    render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child</div>
-      </AgentGuard>
-    ));
+  it('calls clearRecentAgent when agent is found in the fetched list', async () => {
+    mockGetAgents.mockResolvedValue({
+      agents: [{ agent_name: 'test-agent', display_name: 'Test Agent' }],
+    });
+    renderGuard();
     await vi.waitFor(() => {
-      expect(mockClearRecentAgent).toHaveBeenCalledWith("test-agent");
+      expect(mockClearRecentAgent).toHaveBeenCalledWith('test-agent');
+    });
+    expect(mockSetAgentDisplayName).toHaveBeenCalledWith('Test Agent');
+  });
+
+  it('shows the error state with a retry when the list fails to load', async () => {
+    mockGetAgents.mockRejectedValueOnce(new Error('boom'));
+    renderGuard();
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('error-state')).toBeDefined();
+    });
+    mockGetAgents.mockResolvedValueOnce({ agents: [{ agent_name: 'test-agent' }] });
+    act(() => screen.getByTestId('retry').click());
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('child')).toBeDefined();
     });
   });
 
-  it("refetches the agent list when the viewed agent changes", async () => {
+  it('refetches the agent list when the viewed agent changes', async () => {
     // First load only knows about test-agent; a second agent is created later
     // (e.g. from the sidebar while this guard stays mounted) and must trigger a
     // fresh fetch rather than reusing the stale first-mount list.
     mockGetAgents
-      .mockResolvedValueOnce({ agents: [{ agent_name: "test-agent" }] })
+      .mockResolvedValueOnce({ agents: [{ agent_name: 'test-agent' }] })
       .mockResolvedValueOnce({
-        agents: [{ agent_name: "test-agent" }, { agent_name: "new-agent" }],
+        agents: [{ agent_name: 'test-agent' }, { agent_name: 'new-agent' }],
       });
-    mockIsRecentlyCreated.mockImplementation((name: string) => name === "new-agent");
+    mockIsRecentlyCreated.mockImplementation((name: string) => name === 'new-agent');
 
-    render(() => (
-      <AgentGuard>
-        <div data-testid="child">Child content</div>
-      </AgentGuard>
-    ));
+    const { router } = renderGuard();
     await vi.waitFor(() => {
       expect(mockGetAgents).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("child")).toBeDefined();
+      expect(screen.getByTestId('child')).toBeDefined();
     });
 
-    setAgentNameParam("new-agent");
+    await act(() => router.navigate('/harnesses/new-agent'));
 
     await vi.waitFor(() => {
       expect(mockGetAgents).toHaveBeenCalledTimes(2);
     });
     // Children stay mounted through the in-flight refetch (no blank flash) and
     // the freshly fetched list resolves the new agent.
-    expect(screen.getByTestId("child")).toBeDefined();
-    expect(mockClearRecentAgent).toHaveBeenCalledWith("new-agent");
+    expect(screen.getByTestId('child')).toBeDefined();
+    await vi.waitFor(() => {
+      expect(mockClearRecentAgent).toHaveBeenCalledWith('new-agent');
+    });
   });
 });

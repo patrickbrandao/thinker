@@ -1,24 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { act, render, screen } from '@testing-library/react';
 
 const mockNavigate = vi.fn();
 const mockCheckNeedsSetup = vi.fn();
 const mockLocationAssign = vi.fn();
 let mockSessionData: any = { data: null, isPending: false };
-let mockSearchParams: Record<string, string | string[]> = {};
-let mockLocation = { search: '' };
-let setMockSession: ((v: any) => void) | undefined;
+let mockSearchParams = new URLSearchParams();
+let mockLocation = { pathname: '/login', search: '' };
 
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => mockNavigate,
   useLocation: () => mockLocation,
-  useSearchParams: () => [mockSearchParams],
+  useSearchParams: () => [mockSearchParams, vi.fn()],
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => mockSessionData,
+    useSession: () => mockSessionData,
   },
 }));
 
@@ -28,22 +27,31 @@ vi.mock('../../src/services/setup-status.js', () => ({
 
 import GuestGuard from '../../src/components/GuestGuard';
 
+/** Builds search params (repeated keys allowed) the way the router would. */
+function params(entries: Record<string, string | string[]>): URLSearchParams {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(entries)) {
+    for (const v of Array.isArray(value) ? value : [value]) sp.append(key, v);
+  }
+  return sp;
+}
+
 describe('GuestGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     mockSessionData = { data: null, isPending: false };
-    mockSearchParams = {};
-    mockLocation = { search: '' };
+    mockSearchParams = new URLSearchParams();
+    mockLocation = { pathname: '/login', search: '' };
     mockCheckNeedsSetup.mockResolvedValue(false);
   });
 
   it('renders children when no session and setup is complete', async () => {
-    render(() => (
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(screen.getByText('Guest content')).not.toBeNull();
     });
@@ -55,11 +63,11 @@ describe('GuestGuard', () => {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    render(() => (
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
@@ -73,11 +81,11 @@ describe('GuestGuard', () => {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    render(() => (
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
@@ -88,12 +96,12 @@ describe('GuestGuard', () => {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    mockSearchParams = { redirect: '/messages?range=30d' };
-    render(() => (
+    mockSearchParams = params({ redirect: '/messages?range=30d' });
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/messages?range=30d', {
         replace: true,
@@ -107,21 +115,22 @@ describe('GuestGuard', () => {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    mockSearchParams = {
+    mockSearchParams = params({
       client_id: 'client',
       redirect_uri: 'http://127.0.0.1/callback',
       ba_param: ['client_id', 'redirect_uri'],
       sig: 'abc',
-    };
+    });
     mockLocation = {
+      pathname: '/login',
       search:
         '?client_id=client&redirect_uri=http%3A%2F%2F127.0.0.1%2Fcallback&ba_param=client_id&ba_param=redirect_uri&sig=abc',
     };
-    render(() => (
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(mockLocationAssign).toHaveBeenCalledWith(
         '/api/auth/oauth2/authorize?client_id=client&redirect_uri=http%3A%2F%2F127.0.0.1%2Fcallback&ba_param=client_id&ba_param=redirect_uri&sig=abc',
@@ -136,12 +145,12 @@ describe('GuestGuard', () => {
       data: { user: { id: 'u1', name: 'Test' } },
       isPending: false,
     };
-    mockSearchParams = { step: ['plan'] };
-    render(() => (
+    mockSearchParams = params({ step: ['plan'] });
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
 
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
@@ -151,11 +160,11 @@ describe('GuestGuard', () => {
 
   it('redirects to /setup when setup is incomplete', async () => {
     mockCheckNeedsSetup.mockResolvedValue(true);
-    render(() => (
+    render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/setup', { replace: true });
     });
@@ -164,31 +173,21 @@ describe('GuestGuard', () => {
   it('does not render children while setup check is pending', () => {
     // checkNeedsSetup hangs — we should see no content rendered yet
     mockCheckNeedsSetup.mockReturnValue(new Promise(() => undefined));
-    const { container } = render(() => (
+    const { container } = render(
       <GuestGuard>
         <span>Guest content</span>
-      </GuestGuard>
-    ));
+      </GuestGuard>,
+    );
     expect(container.textContent).not.toContain('Guest content');
   });
 
   it('keeps children mounted when session briefly goes pending after initial render', async () => {
-    // Use a reactive signal so we can change session state mid-test
-    const [sessionSig, setSession] = createSignal<any>({
-      data: null,
-      isPending: false,
-    });
-    setMockSession = setSession;
-
-    // Override the mock to use reactive signal for this test
-    const origMock = vi.mocked(await import('../../src/services/auth-client.js'));
-    origMock.authClient.useSession = () => sessionSig;
-
-    render(() => (
+    const tree = (
       <GuestGuard>
         <span>Guest content</span>
       </GuestGuard>
-    ));
+    );
+    const { rerender } = render(tree);
 
     // Wait for children to appear (setup check resolves, session not pending)
     await vi.waitFor(() => {
@@ -196,12 +195,14 @@ describe('GuestGuard', () => {
     });
 
     // Simulate Better Auth triggering a session refetch (isPending goes true)
-    setSession({ data: null, isPending: true });
+    mockSessionData = { data: null, isPending: true };
+    act(() => rerender(tree));
     // Children should still be mounted
     expect(screen.getByText('Guest content')).not.toBeNull();
 
     // Session refetch completes with no data
-    setSession({ data: null, isPending: false });
+    mockSessionData = { data: null, isPending: false };
+    act(() => rerender(tree));
     // Children should still be mounted
     expect(screen.getByText('Guest content')).not.toBeNull();
   });

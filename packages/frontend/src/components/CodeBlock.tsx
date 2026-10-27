@@ -1,5 +1,5 @@
-import { createMemo, type Component } from 'solid-js';
-import CopyButton from './CopyButton.jsx';
+import { useMemo } from 'react';
+import CopyButton from './CopyButton.js';
 import { highlight } from '../services/syntax-highlight.js';
 
 interface Props {
@@ -8,17 +8,17 @@ interface Props {
   copyText?: string;
 }
 
-const CodeBlock: Component<Props> = (props) => {
-  const html = createMemo(() => highlight(props.code, props.language));
+/** Highlighted, wrapped code with a copy button in the corner. */
+export default function CodeBlock({ code, language, copyText }: Props) {
+  // highlight() escapes the source before wrapping tokens in spans.
+  const html = useMemo(() => highlight(code, language), [code, language]);
 
   return (
-    <div class="setup-method__code">
-      <CopyButton text={props.copyText ?? props.code} />
-      <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">
-        <code class={`hljs language-${props.language}`} innerHTML={html()} />
+    <div className="code-block relative">
+      <CopyButton text={copyText ?? code} className="absolute right-1 top-1" />
+      <pre className="code whitespace-pre-wrap break-all pr-10">
+        <code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: html }} />
       </pre>
     </div>
   );
-};
-
-export default CodeBlock;
+}

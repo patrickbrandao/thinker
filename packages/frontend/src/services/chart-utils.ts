@@ -1,12 +1,23 @@
-import { onMount, onCleanup, createEffect, on } from 'solid-js';
-import type { Accessor } from 'solid-js';
+/**
+ * Chart helpers shared by the uPlot charts.
+ *
+ * React port: `useChartLifecycle` is now a real React hook. Its options take
+ * plain values instead of Solid accessors: `el` is a ref to the chart
+ * container, `data` is the current data array and `structureKey` the current
+ * structural key (e.g. the range). The hook reads `buildChart`/`buildData`
+ * from the latest render, so callers can pass inline closures. Every other
+ * export is a pure function and kept its name and signature.
+ */
+import { useEffect, useRef, type RefObject } from 'react';
 import uPlot from 'uplot';
 import { intlLocale, locale } from '../i18n/index.js';
 import { dayMonth } from './overview-format.js';
 
-interface UseChartLifecycleOptions<T> {
-  el: () => HTMLDivElement;
-  data: Accessor<T[] | undefined>;
+export interface UseChartLifecycleOptions<T> {
+  /** Ref to the element uPlot renders into (its width drives resizes). */
+  el: RefObject<HTMLDivElement | null>;
+  /** The chart's current data. A new array reference counts as a change. */
+  data: T[] | undefined;
   buildChart: () => uPlot | null;
   /**
    * Optional builder for the chart's aligned data. When provided, a data change
@@ -21,67 +32,85 @@ interface UseChartLifecycleOptions<T> {
    * is rebuilt; when it stays the same `setData` is used. Defaults to a constant
    * so charts without structural variation always reuse the instance.
    */
-  structureKey?: () => unknown;
+  structureKey?: unknown;
 }
 
-export function useChartLifecycle<T>(opts: UseChartLifecycleOptions<T>): void {
-  let chart: uPlot | null = null;
-  let ro: ResizeObserver | null = null;
-  let lastStructureKey: unknown = opts.structureKey?.();
+const CHART_HEIGHT = 260;
 
-  const CHART_HEIGHT = 260;
+export function useChartLifecycle<T>(opts: UseChartLifecycleOptions<T>): void {
+  const latest = useRef(opts);
+  latest.current = opts;
+  const chart = useRef<uPlot | null>(null);
+  const lastStructureKey = useRef<unknown>(opts.structureKey);
+  const lastData = useRef(opts.data);
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+
+  function schedule(delay: number) {
+    const id = setTimeout(() => {
+      timers.current.delete(id);
+      tryCreate();
+    }, delay);
+    timers.current.add(id);
+  }
 
   function tryCreate() {
-    if (chart) return;
-    const built = opts.buildChart();
+    if (chart.current) return;
+    const built = latest.current.buildChart();
     if (built) {
-      chart = built;
-      chart.setCursor({ left: -1, top: -1 });
+      chart.current = built;
+      built.setCursor({ left: -1, top: -1 });
     }
   }
 
-  onMount(() => {
-    if (!opts.data()?.length) return;
-
-    ro = new ResizeObserver(() => {
-      if (!chart) {
-        tryCreate();
-      } else {
-        chart.setSize({ width: opts.el().clientWidth, height: CHART_HEIGHT });
-      }
-    });
-    ro.observe(opts.el());
-
-    setTimeout(tryCreate, 50);
-  });
-
-  createEffect(
-    on(
-      opts.data,
-      () => {
-        const key = opts.structureKey?.();
-        const sameStructure = key === lastStructureKey;
-        lastStructureKey = key;
-
-        if (chart && opts.buildData && sameStructure) {
-          chart.setData(opts.buildData());
-          return;
+  // Mount: observe the container and build once it has a size.
+  useEffect(() => {
+    const pending = timers.current;
+    let ro: ResizeObserver | null = null;
+    const el = latest.current.el.current;
+    if (latest.current.data?.length && el) {
+      ro = new ResizeObserver(() => {
+        if (!chart.current) {
+          tryCreate();
+        } else {
+          const width = latest.current.el.current?.clientWidth ?? el.clientWidth;
+          chart.current.setSize({ width, height: CHART_HEIGHT });
         }
-        if (chart) {
-          chart.destroy();
-          chart = null;
-        }
-        if (opts.data()?.length) setTimeout(tryCreate, 0);
-      },
-      { defer: true },
-    ),
-  );
+      });
+      ro.observe(el);
+      schedule(50);
+    }
+    return () => {
+      for (const id of pending) clearTimeout(id);
+      pending.clear();
+      ro?.disconnect();
+      chart.current?.destroy();
+      chart.current = null;
+    };
+    // Runs once per mount; the latest options are read through `latest`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  onCleanup(() => {
-    ro?.disconnect();
-    chart?.destroy();
-    chart = null;
-  });
+  // Data change (skips the initial value, like Solid's `on(..., { defer })`).
+  useEffect(() => {
+    if (opts.data === lastData.current) return;
+    lastData.current = opts.data;
+
+    const key = latest.current.structureKey;
+    const sameStructure = key === lastStructureKey.current;
+    lastStructureKey.current = key;
+
+    const buildData = latest.current.buildData;
+    if (chart.current && buildData && sameStructure) {
+      chart.current.setData(buildData());
+      return;
+    }
+    if (chart.current) {
+      chart.current.destroy();
+      chart.current = null;
+    }
+    if (opts.data?.length) schedule(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opts.data]);
 }
 
 export function createFormatLegendTimestamp(

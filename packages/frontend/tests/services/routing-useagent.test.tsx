@@ -1,19 +1,29 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from 'vitest';
+import type { ReactNode } from 'react';
+import { renderHook } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { useAgentName } from '../../src/services/routing';
 
-vi.mock("@solidjs/router", () => ({
-  useLocation: () => ({ pathname: "/harnesses/test-agent/overview" }),
-}));
+function at(path: string) {
+  return ({ children }: { children: ReactNode }) => (
+    <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+  );
+}
 
-import { useAgentName } from "../../src/services/routing";
-
-describe("useAgentName", () => {
-  it("extracts agent name from pathname", () => {
-    const getAgentName = useAgentName();
-    expect(getAgentName()).toBe("test-agent");
+describe('useAgentName', () => {
+  it('extracts agent name from pathname', () => {
+    const { result } = renderHook(() => useAgentName(), {
+      wrapper: at('/harnesses/test-agent/overview'),
+    });
+    expect(result.current).toBe('test-agent');
   });
 
-  it("returns a function", () => {
-    const getAgentName = useAgentName();
-    expect(typeof getAgentName).toBe("function");
+  it('returns a string (null outside a harness route)', () => {
+    const inside = renderHook(() => useAgentName(), {
+      wrapper: at('/harnesses/test-agent/overview'),
+    });
+    expect(typeof inside.result.current).toBe('string');
+    const outside = renderHook(() => useAgentName(), { wrapper: at('/settings') });
+    expect(outside.result.current).toBeNull();
   });
 });
