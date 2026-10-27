@@ -254,7 +254,12 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
             aria-controls="palette-list"
             aria-activedescendant={visible[active] ? `palette-${active}` : undefined}
           />
-          {searching ? <span className="spinner" aria-hidden="true" /> : <Kbd>Esc</Kbd>}
+          {searching ? (
+            <span className="spinner" aria-hidden="true" />
+          ) : (
+            // i18n-ignore: key name
+            <Kbd>Esc</Kbd>
+          )}
         </div>
         <div className="palette-list" id="palette-list" role="listbox" ref={listRef}>
           {visible.length === 0 ? (
