@@ -149,23 +149,83 @@ export function filterByLiveAgentName<T extends ObjectLiteral>(
 }
 
 /**
+ * A harness name resolved to its live agent id inside one tenant. A null
+ * `agentId` means no live harness owns the name, so the selection is empty.
+ * The tenant travels with the id so a scope resolved for one tenant can never
+ * filter (or key a cache for) another tenant that reuses the same name.
+ */
+export interface AgentScope {
+  readonly tenantId: string;
+  readonly agentName: string;
+  readonly agentId: string | null;
+}
+
+/**
+ * Resolve a harness name to its live agent id once per request, so every
+ * query of that request filters on the actual value. Written as
+ * `agent_id = (SELECT id FROM agents ...)`, the lookup is an InitPlan whose
+ * result the planner cannot see: it guesses a handful of rows even for a
+ * harness that owns most of its tenant's traffic and picks a far worse plan.
+ *
+ * Returns undefined for a tenant-wide selection (no name) and for a caller
+ * without a tenant, whose queries are already empty through addTenantFilter.
+ * Deliberately not cached across requests: a deleted and recreated harness
+ * gets a new id under the same name.
+ */
+export async function resolveAgentScope(
+  runner: { query: (sql: string, parameters?: unknown[]) => Promise<unknown> },
+  tenantId: string | null,
+  agentName?: string,
+): Promise<AgentScope | undefined> {
+  if (!agentName || !tenantId) return undefined;
+  // The unique live-name index on `agents` makes this a single-row lookup.
+  const rows = (await runner.query(
+    'SELECT id FROM agents WHERE tenant_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1',
+    [tenantId, agentName],
+  )) as Array<{ id: string }> | undefined;
+  return { tenantId, agentName, agentId: rows?.[0]?.id ?? null };
+}
+
+/**
+ * Cache-key fragment for a harness selection. Keys on the resolved id rather
+ * than the name, so a recreated harness never reads its dead namesake's cached
+ * result, and keeps a missing harness distinct from the tenant-wide entry.
+ * The tenant is part of the fragment as well: callers already prefix their key
+ * with it, but the fragment alone must never collide across tenants.
+ */
+export function agentScopeCacheKey(agent?: string | AgentScope): string {
+  if (!agent) return '';
+  if (typeof agent === 'string') return `name:${agent}`;
+  return `${agent.tenantId}:${agent.agentId ? `id:${agent.agentId}` : `missing:${agent.agentName}`}`;
+}
+
+/**
  * Scope a message aggregate to the tenant. Pass `null` when the requesting
  * user has no tenant yet (fresh account) — the filter then matches nothing,
  * which is the correct "no data" answer. Tenancy is the ONLY scope; the
  * informational `at.user_id` column is never consulted.
+ *
+ * `agent` is either a harness name (resolved inline through a subquery) or an
+ * AgentScope already resolved by resolveAgentScope, which filters on the id.
  */
 export function addTenantFilter<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   tenantId: string | null,
-  agentName?: string,
+  agent?: string | AgentScope,
 ): SelectQueryBuilder<T> {
   if (tenantId === null) {
     // No tenant → no rows. Keeps callers branch-free.
     return qb.andWhere('1 = 0');
   }
+  if (agent && typeof agent !== 'string' && (agent.tenantId !== tenantId || !agent.agentId)) {
+    // A scope resolved for another tenant, or a name with no live harness.
+    return qb.andWhere('1 = 0');
+  }
   qb.andWhere('at.tenant_id = :tenantId', { tenantId });
-  if (agentName) {
-    filterByLiveAgentName(qb, agentName, tenantId);
+  if (typeof agent === 'string') {
+    filterByLiveAgentName(qb, agent, tenantId);
+  } else if (agent) {
+    qb.andWhere('at.agent_id = :liveAgentId', { liveAgentId: agent.agentId });
   }
   return qb;
 }

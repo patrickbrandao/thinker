@@ -193,7 +193,7 @@ describe('MessagesQueryService', () => {
   });
 
   it('offers only the selected harness custom tiers when one is picked', async () => {
-    skipScan(['gpt-4o'], ['openai']);
+    mockQuery.mockResolvedValueOnce([{ id: 'agent-alpha-id' }]);
     mockHeaderTierRows.mockResolvedValueOnce([{ id: 'ht-a', name: 'Premium' }]);
 
     const result = await service.getMessageFilterOptions({
@@ -203,10 +203,44 @@ describe('MessagesQueryService', () => {
     });
 
     expect(result.header_tiers).toEqual([{ name: 'Premium', ids: ['ht-a'] }]);
-    const agentScope = mockHeaderTierQb.andWhere.mock.calls[0];
-    expect(String(agentScope[0])).toContain('ht.agent_id = (');
-    expect(String(agentScope[0])).toContain('WHERE tenant_id = :headerTierTenant');
-    expect(agentScope[1]).toEqual({ headerTierAgent: 'agent-alpha' });
+    expect(mockHeaderTierQb.andWhere).toHaveBeenCalledWith('ht.agent_id = :headerTierAgentId', {
+      headerTierAgentId: 'agent-alpha-id',
+    });
+  });
+
+  it('offers no custom tiers for a harness name with no live agent', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+
+    await service.getMessageFilterOptions({
+      range: '24h',
+      tenantId: 'tenant-1',
+      agent_name: 'gone',
+    });
+
+    expect(mockHeaderTierQb.andWhere).toHaveBeenCalledWith('1 = 0');
+  });
+
+  it('keeps cached filter options apart when a harness name is recreated', async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'old-agent-id' }])
+      .mockResolvedValueOnce([{ id: 'new-agent-id' }]);
+    mockGetRawMany
+      .mockResolvedValueOnce([{ model: 'old-model' }])
+      .mockResolvedValueOnce([{ model: 'new-model' }]);
+
+    const first = await service.getMessageFilterOptions({
+      tenantId: 'tenant-1',
+      agent_name: 'bot',
+    });
+    const second = await service.getMessageFilterOptions({
+      tenantId: 'tenant-1',
+      agent_name: 'bot',
+    });
+
+    // Keyed by the resolved id, so the recreated harness never reads its dead
+    // namesake's cached models.
+    expect(first.models).toEqual(['old-model']);
+    expect(second.models).toEqual(['new-model']);
   });
 
   it('offers no custom tiers to a caller without a tenant', async () => {

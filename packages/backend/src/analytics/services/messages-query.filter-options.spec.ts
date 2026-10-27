@@ -95,8 +95,8 @@ describe('MessagesQueryService filter options', () => {
 
   it('scopes the blocked-model lookup to one harness when the caller names it', async () => {
     const requestQb = makeRequestQb([{ model: 'gpt-4o' }]);
-    const { service, requestRepo } = makeService({ attemptModels: [], requestQb });
-    requestRepo!.query.mockResolvedValue([{ id: 'agent-1' }]);
+    const { service, turnRepo } = makeService({ attemptModels: [], requestQb });
+    turnRepo.query.mockResolvedValue([{ id: 'agent-1' }]);
 
     await service.getMessageFilterOptions({
       tenantId: 'tenant-1',
@@ -106,7 +106,9 @@ describe('MessagesQueryService filter options', () => {
 
     const clauses = requestQb.andWhere.mock.calls.map((call) => String(call[0]));
     // The harness id is resolved first, so the planner sees the actual value.
-    expect(requestRepo!.query).toHaveBeenCalledWith(expect.stringContaining('FROM agents'), [
+    // Resolved once and shared by the distinct-model scan and this lookup.
+    expect(turnRepo.query).toHaveBeenCalledTimes(1);
+    expect(turnRepo.query).toHaveBeenCalledWith(expect.stringContaining('FROM agents'), [
       'tenant-1',
       'bot-1',
     ]);
@@ -125,8 +127,8 @@ describe('MessagesQueryService filter options', () => {
 
   it('finds no blocked models for a harness name with no live agent', async () => {
     const requestQb = makeRequestQb([]);
-    const { service, requestRepo } = makeService({ attemptModels: [], requestQb });
-    requestRepo!.query.mockResolvedValue([]);
+    const { service, turnRepo } = makeService({ attemptModels: [], requestQb });
+    turnRepo.query.mockResolvedValue([]);
 
     await service.getMessageFilterOptions({
       tenantId: 'tenant-1',
