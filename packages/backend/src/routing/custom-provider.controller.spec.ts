@@ -118,6 +118,7 @@ describe('CustomProviderController', () => {
           { label: 'Default', key_prefix: 'sk-abc12', priority: 0 },
           { label: 'Backup', key_prefix: 'sk-bak12', priority: 1 },
         ],
+        stream_warmup_ms: null,
         models: [{ model_name: 'llama' }],
         created_at: '2026-03-04',
       });

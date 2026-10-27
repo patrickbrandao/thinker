@@ -142,6 +142,17 @@ export function renameConnection(
   );
 }
 
+export function setConnectionStreamWarmup(connectionId: string, streamWarmupMs: number | null) {
+  return fetchMutate<{ id: string; stream_warmup_ms: number | null }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/stream-warmup`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stream_warmup_ms: streamWarmupMs }),
+    },
+  );
+}
+
 export function refreshConnectionModels() {
   return fetchMutate<{ ok: boolean }>('/providers/refresh-models', { method: 'POST' });
 }
@@ -470,6 +481,8 @@ export interface CustomProviderData {
   has_api_key: boolean;
   /** Key pool in the order the proxy tries it (managed through the provider key endpoints). */
   keys?: Array<{ label: string; key_prefix: string | null; priority: number }>;
+  /** Primary connection's stream warm-up override in ms; null inherits. */
+  stream_warmup_ms?: number | null;
   models: CustomProviderModel[];
   created_at: string;
 }

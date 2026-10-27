@@ -549,7 +549,13 @@ export class ProxyService {
     // actually starts delivering data before committing to the client.
     // If the stream stalls or dies, we can still try fallback providers.
     if (forward.response.ok && stream && forward.response.body) {
-      const warmup = await peekStream(forward.response.body, streamWarmupMsFor(route.provider));
+      const warmup = await peekStream(
+        forward.response.body,
+        streamWarmupMsFor(route.provider, {
+          headerTierMs: resolved.header_tier_stream_warmup_ms,
+          connectionMs: credentials.streamWarmupMs,
+        }),
+      );
       if (warmup.ok) {
         const peeked: ForwardResult = {
           response: new Response(warmup.stream, {
@@ -1051,6 +1057,7 @@ export class ProxyService {
       providerCacheKey,
       sessionCacheKey,
       args.clientAnthropicBeta,
+      resolved.header_tier_stream_warmup_ms,
     );
 
     this.recordTierIfScoring(sessionMomentumKey, resolved.tier);

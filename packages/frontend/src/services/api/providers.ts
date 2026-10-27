@@ -10,6 +10,7 @@ export interface TenantProviderConnection {
   models_fetched_at: string | null;
   cached_model_count: number;
   is_active: boolean;
+  stream_warmup_ms?: number | null;
 }
 
 /**

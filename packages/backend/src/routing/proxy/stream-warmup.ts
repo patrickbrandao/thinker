@@ -37,9 +37,38 @@ export const LOCAL_STREAM_WARMUP_MS = Math.max(
   parseStreamWarmupMs(process.env.THINKER_LOCAL_STREAM_WARMUP_MS, DEFAULT_LOCAL_STREAM_WARMUP_MS),
 );
 
-/** The first-chunk wait for a provider: longer for local runners (#128). */
-export function streamWarmupMsFor(provider: string): number {
-  return isLocalOnlyProvider(provider) ? LOCAL_STREAM_WARMUP_MS : STREAM_WARMUP_MS;
+/** Bounds for the per-header-tier and per-connection overrides (#244). */
+export const MIN_STREAM_WARMUP_OVERRIDE_MS = 1_000;
+export const MAX_STREAM_WARMUP_OVERRIDE_MS = 600_000;
+
+/** Stored overrides; null or undefined means "inherit the next level". */
+export interface StreamWarmupOverrides {
+  /** `header_tiers.stream_warmup_ms` of the matched header tier. */
+  headerTierMs?: number | null;
+  /** `tenant_providers.stream_warmup_ms` of the connection serving the hop. */
+  connectionMs?: number | null;
+}
+
+function validOverride(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= MIN_STREAM_WARMUP_OVERRIDE_MS &&
+    value <= MAX_STREAM_WARMUP_OVERRIDE_MS
+    ? value
+    : undefined;
+}
+
+/**
+ * The first-chunk wait for a provider hop. Precedence (#244): header tier
+ * override > provider connection override > local-runner default (#128) >
+ * global STREAM_WARMUP_MS. An out-of-range stored value is ignored.
+ */
+export function streamWarmupMsFor(provider: string, overrides?: StreamWarmupOverrides): number {
+  return (
+    validOverride(overrides?.headerTierMs) ??
+    validOverride(overrides?.connectionMs) ??
+    (isLocalOnlyProvider(provider) ? LOCAL_STREAM_WARMUP_MS : STREAM_WARMUP_MS)
+  );
 }
 
 export interface WarmupSuccess {

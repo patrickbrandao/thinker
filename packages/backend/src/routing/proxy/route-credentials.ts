@@ -56,6 +56,8 @@ export type ResolvedRouteCredentials =
        * label has to name the connection that really served the call.
        */
       keyLabel: string;
+      /** The selected row's stream warm-up override (#244). */
+      streamWarmupMs: number | null;
     }
   | {
       ok: false;
@@ -289,5 +291,6 @@ export async function resolveRouteCredentials(
     // The selected row's own label, not `args.providerKeyLabel`: selection may
     // have fallen back to the default key when the pin matched nothing.
     keyLabel: key.label,
+    streamWarmupMs: key.streamWarmupMs ?? null,
   };
 }

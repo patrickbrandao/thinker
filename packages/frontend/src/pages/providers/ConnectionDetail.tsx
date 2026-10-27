@@ -41,6 +41,7 @@ import {
   renameConnection,
   disconnectConnection,
   refreshConnectionModels,
+  setConnectionStreamWarmup,
 } from '../../services/api/routing.js';
 import UnifiedChartCard, { type ChartTab } from '../../components/UnifiedChartCard.jsx';
 import InfoTooltip from '../../components/InfoTooltip.jsx';
@@ -48,6 +49,13 @@ import { AGENT_COLORS } from '../../components/MultiAgentTokenChart.jsx';
 import Select from '../../components/Select.jsx';
 import { setConnectionBreadcrumb } from '../../services/connection-breadcrumb-store.js';
 import { toast } from '../../services/toast-store.js';
+import {
+  MAX_STREAM_WARMUP_SECONDS,
+  MIN_STREAM_WARMUP_SECONDS,
+  STREAM_WARMUP_ERROR,
+  parseWarmupSeconds,
+  warmupMsToSecondsInput,
+} from '../../services/stream-warmup.js';
 import { roleCan } from '../../services/session-store.js';
 import '../../styles/charts.css';
 import '../../styles/analytics-overview.css';
@@ -97,6 +105,7 @@ interface ConnectionInfo {
   key_prefix: string | null;
   connected_at: string;
   is_active: boolean;
+  stream_warmup_ms?: number | null;
   last_used_at: string | null;
 }
 
@@ -502,6 +511,9 @@ const ConnectionDetail: Component = () => {
   const [renaming, setRenaming] = createSignal(false);
   const [renameError, setRenameError] = createSignal('');
   const [refreshingModels, setRefreshingModels] = createSignal(false);
+  const [warmupValue, setWarmupValue] = createSignal('');
+  const [savingWarmup, setSavingWarmup] = createSignal(false);
+  const [warmupError, setWarmupError] = createSignal('');
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [deleteConfirmName, setDeleteConfirmName] = createSignal('');
   const [deletingConnection, setDeletingConnection] = createSignal(false);
@@ -521,6 +533,8 @@ const ConnectionDetail: Component = () => {
     const c = conn();
     if (c) setRenameValue(c.label);
     setRenameError('');
+    setWarmupValue(warmupMsToSecondsInput(c?.stream_warmup_ms));
+    setWarmupError('');
     setShowDeleteConfirm(false);
     setDeleteConfirmName('');
     setShowManageModal(true);
@@ -570,6 +584,30 @@ const ConnectionDetail: Component = () => {
       setRenameError(e?.message ?? 'Failed to rename');
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const warmupUnchanged = () =>
+    parseWarmupSeconds(warmupValue()) === (conn()?.stream_warmup_ms ?? null);
+
+  const handleSaveWarmup = async () => {
+    const c = conn();
+    if (!c) return;
+    const ms = parseWarmupSeconds(warmupValue());
+    if (ms === undefined) {
+      setWarmupError(STREAM_WARMUP_ERROR);
+      return;
+    }
+    setSavingWarmup(true);
+    setWarmupError('');
+    try {
+      await setConnectionStreamWarmup(c.id, ms);
+      toast.success('Stream warm-up saved');
+      refetchDetail();
+    } catch (e: any) {
+      setWarmupError(e?.message ?? 'Failed to save');
+    } finally {
+      setSavingWarmup(false);
     }
   };
 
@@ -1254,6 +1292,52 @@ const ConnectionDetail: Component = () => {
                           <Show when={renameError()}>
                             <div style="color: hsl(var(--destructive)); font-size: var(--font-size-sm); margin-top: 4px;">
                               {renameError()}
+                            </div>
+                          </Show>
+                        </div>
+
+                        {/* Stream warm-up override (#244) */}
+                        <div style="margin-bottom: 16px;">
+                          <label
+                            for="connection-stream-warmup"
+                            style="display: block; font-size: var(--font-size-sm); font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 6px;"
+                          >
+                            Stream warm-up (seconds)
+                          </label>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <input
+                              id="connection-stream-warmup"
+                              type="number"
+                              min={MIN_STREAM_WARMUP_SECONDS}
+                              max={MAX_STREAM_WARMUP_SECONDS}
+                              step="1"
+                              placeholder="Inherit"
+                              class={`provider-detail__input${warmupError() ? ' provider-detail__input--error' : ''}`}
+                              value={warmupValue()}
+                              onInput={(e) => {
+                                setWarmupValue(e.currentTarget.value);
+                                setWarmupError('');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveWarmup();
+                              }}
+                              style="flex: 1;"
+                            />
+                            <button
+                              class="btn btn--primary btn--sm"
+                              disabled={savingWarmup() || warmupUnchanged()}
+                              onClick={handleSaveWarmup}
+                            >
+                              {savingWarmup() ? 'Applying...' : 'Apply'}
+                            </button>
+                          </div>
+                          <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;">
+                            Optional. How long a streaming request waits for the first token before
+                            failing over. Leave empty to use the default.
+                          </div>
+                          <Show when={warmupError()}>
+                            <div style="color: hsl(var(--destructive)); font-size: var(--font-size-sm); margin-top: 4px;">
+                              {warmupError()}
                             </div>
                           </Show>
                         </div>

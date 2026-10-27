@@ -379,6 +379,7 @@ export class ResolveService {
       header_tier_id: match.id,
       header_tier_name: match.name,
       header_tier_color: match.badge_color,
+      header_tier_stream_warmup_ms: match.stream_warmup_ms ?? null,
     };
   }
 

@@ -21,6 +21,8 @@ export interface CachedProviderKey {
   priority: number;
   apiKey: string | null;
   region: string | null;
+  /** `tenant_providers.stream_warmup_ms` (#244); absent for the synthetic Ollama key. */
+  streamWarmupMs?: number | null;
 }
 
 function getOrExpire<T>(map: Map<string, CachedEntry<T>>, key: string): T | undefined {

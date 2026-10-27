@@ -578,6 +578,26 @@ export class ProviderService {
     return target;
   }
 
+  /**
+   * Set or clear (null) a connection's stream warm-up override in ms (#244).
+   * Scoped to the tenant: an id from another tenant is a 404. Callers
+   * invalidate the routing caches so the proxy reads the new value.
+   */
+  async setStreamWarmup(
+    tenantId: string,
+    connectionId: string,
+    streamWarmupMs: number | null,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    row.stream_warmup_ms = streamWarmupMs;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    return row;
+  }
+
   async reorderKeys(
     agentId: string,
     tenantId: string,
