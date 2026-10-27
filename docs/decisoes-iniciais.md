@@ -36,7 +36,7 @@ Mudanças de rumo posteriores entram como ADRs em [`docs/adr/`](adr/).
 |---|---|
 | Superfícies | Dashboard, proxy OpenAI/Anthropic-compatível, CLI `thinker`, servidor MCP remoto, Playground, Notificações/alertas |
 | Deploys | Docker/Compose é o **único caminho oficial e testado**; os templates Railway/Render/AWS/GCP/DO/Heroku/Koyeb/Fly/Coolify/Easypanel/Apple ficam rebrandeados e marcados como *community/não testados* |
-| Integrações | Nó n8n permanece (rebrandeado) |
+| Integrações | Nó n8n removido na v0.3.6; o n8n usa o node nativo OpenAI Chat Model |
 | Provedores | Todos: BYOK, assinaturas (mantidas como no upstream, sem aviso adicional), modelos locais, endpoints customizados |
 | Harnesses (matriz de QA) | Claude Code, OpenClaw/Hermes, Codex/OpenCode, SDKs (OpenAI/Anthropic/Vercel/LangChain) |
 

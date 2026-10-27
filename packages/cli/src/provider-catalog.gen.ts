@@ -279,5 +279,5 @@ export const SETUP_TEMPLATES: Readonly<Record<string, string>> = {
     '{\n  "agents": {\n    "defaults": {\n      "provider": "custom",\n      "model": "auto"\n    }\n  },\n  "providers": {\n    "custom": {\n      "apiKey": "{{API_KEY}}",\n      "apiBase": "{{ORIGIN}}/v1"\n    }\n  }\n}',
   codex:
     '# Add to ~/.codex/config.toml\nmodel = "auto"\nmodel_provider = "thinker"\n\n[model_providers.thinker]\nname = "Thinker"\nbase_url = "{{ORIGIN}}/v1"\nenv_key = "THINKER_API_KEY"\nwire_api = "responses"\n\n# Then, in the terminal that launches Codex:\nexport THINKER_API_KEY="{{API_KEY}}"',
-  n8n: '# In n8n, install the n8n-nodes-thinker community node, then add the Thinker\n# Chat Model node to your AI Agent / Basic LLM Chain (or the Thinker node for\n# direct calls). Create Thinker credentials with:\n#   Base URL: {{ORIGIN}}\n#   API Key:  {{API_KEY}}\n#   Model:    auto',
+  n8n: '# In n8n, add the built-in OpenAI Chat Model node to your AI Agent / Basic\n# LLM Chain. Create an OpenAI credential with:\n#   Base URL: {{ORIGIN}}/v1\n#   API Key:  {{API_KEY}}\n#   Model:    auto',
 };

@@ -100,10 +100,9 @@ ${getCodexKeyExportSnippet(apiKey)}`;
  * fields; the CLI emits the same values as a pasteable comment block.
  */
 function getN8nSnippet(baseUrl: string, apiKey: string): string {
-  return `# In n8n, install the n8n-nodes-thinker community node, then add the Thinker
-# Chat Model node to your AI Agent / Basic LLM Chain (or the Thinker node for
-# direct calls). Create Thinker credentials with:
-#   Base URL: ${stripV1Suffix(baseUrl)}
+  return `# In n8n, add the built-in OpenAI Chat Model node to your AI Agent / Basic
+# LLM Chain. Create an OpenAI credential with:
+#   Base URL: ${baseUrl}
 #   API Key:  ${apiKey}
 #   Model:    auto`;
 }

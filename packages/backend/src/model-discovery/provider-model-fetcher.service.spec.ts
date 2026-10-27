@@ -139,7 +139,7 @@ describe('ProviderModelFetcherService', () => {
       const result = await service.fetch('huggingface', 'hf_test_token');
 
       expect(result[0]).toMatchObject({
-        contextWindow: 128000,
+        contextWindow: 1000000,
         inputPricePerToken: null,
         outputPricePerToken: null,
         capabilityCode: false,
@@ -449,7 +449,7 @@ describe('ProviderModelFetcherService', () => {
     expect(result.map((m) => m.id)).toEqual(['gpt-oss-120b', 'zai-glm-4.7']);
     expect(result[0]).toMatchObject({
       provider: 'cerebras',
-      contextWindow: 128000,
+      contextWindow: 1000000,
       inputPricePerToken: null,
       outputPricePerToken: null,
     });
@@ -511,7 +511,7 @@ describe('ProviderModelFetcherService', () => {
     expect(result[0]).toMatchObject({
       provider: 'pioneer',
       displayName: 'Pioneer Auto',
-      contextWindow: 128000,
+      contextWindow: 1000000,
       inputPricePerToken: null,
       outputPricePerToken: null,
     });
@@ -632,7 +632,7 @@ describe('ProviderModelFetcherService', () => {
     expect(result.map((m) => m.id)).toEqual(['bare-model', 'invalid-prices', 'label-fallback']);
     expect(result[0]).toMatchObject({
       displayName: 'bare-model',
-      contextWindow: 128000,
+      contextWindow: 1000000,
     });
     expect(result[1]).toMatchObject({
       displayName: 'Invalid Prices',
@@ -735,7 +735,7 @@ describe('ProviderModelFetcherService', () => {
           id: 'gpt-4o',
           displayName: 'gpt-4o',
           provider: 'openai',
-          contextWindow: 128000,
+          contextWindow: 1000000,
           inputPricePerToken: null,
           outputPricePerToken: null,
           qualityScore: 3,
@@ -1070,7 +1070,7 @@ describe('ProviderModelFetcherService', () => {
       expect(result[1]).toEqual(
         expect.objectContaining({
           displayName: 'Kimi K2',
-          contextWindow: 128000,
+          contextWindow: 1000000,
           provider: 'fireworks',
           capabilityCode: false,
         }),
@@ -2464,7 +2464,7 @@ describe('ProviderModelFetcherService', () => {
       expect(result[0].displayName).toBe('model/test');
     });
 
-    it('should default contextWindow to 128000', async () => {
+    it('should default contextWindow to 1000000', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -2473,7 +2473,7 @@ describe('ProviderModelFetcherService', () => {
       });
 
       const result = await service.fetch('openrouter', '');
-      expect(result[0].contextWindow).toBe(128000);
+      expect(result[0].contextWindow).toBe(1000000);
     });
 
     it('should filter out entries without string id', async () => {
@@ -2520,7 +2520,7 @@ describe('ProviderModelFetcherService', () => {
           id: 'llama3',
           displayName: 'llama3',
           provider: 'ollama',
-          contextWindow: 128000,
+          contextWindow: 1000000,
           inputPricePerToken: 0,
           outputPricePerToken: 0,
           qualityScore: 2,
@@ -2848,7 +2848,7 @@ describe('ProviderModelFetcherService', () => {
           id: 'copilot/claude-opus-4.6',
           displayName: 'claude-opus-4.6',
           provider: 'copilot',
-          contextWindow: 128000,
+          contextWindow: 1000000,
           inputPricePerToken: 0,
           outputPricePerToken: 0,
           qualityScore: 3,

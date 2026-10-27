@@ -353,20 +353,18 @@ describe("SetupStepAddProvider", () => {
         <SetupStepAddProvider {...defaultProps} platform="n8n" keyPrefix="thk_abc" />
       ));
       expect(screen.getByText("Connect n8n to Thinker")).toBeDefined();
-      expect(container.textContent).toContain("n8n-nodes-thinker");
-      expect(container.textContent).toContain("Thinker Chat Model node");
-      expect(container.textContent).toContain("Create or select Thinker credentials");
+      expect(container.textContent).toContain("OpenAI Chat Model node");
+      expect(container.textContent).toContain("Create an OpenAI credential");
       expect(container.textContent).toContain("set the node model to auto");
-      expect(container.textContent).toContain("http://localhost:3001");
-      expect(container.textContent).not.toContain("http://localhost:3001/v1");
+      expect(container.textContent).toContain("http://localhost:3001/v1");
       expect(container.textContent).toContain("thk_abc...");
       expect(container.textContent).toContain("auto");
       expect(container.textContent).not.toContain("not bundled");
       const docsLink = container.querySelector(
-        'a[href="https://docs.n8n.io/integrations/community-nodes/installation-and-management/"]',
+        'a[href="https://docs.n8n.io/integrations/builtin/credentials/openai/"]',
       );
       expect(docsLink).not.toBeNull();
-      expect(docsLink!.textContent).toContain("n8n community node installation docs");
+      expect(docsLink!.textContent).toContain("n8n OpenAI credential docs");
       expect(container.querySelector('a[href*="npmjs.com"]')).toBeNull();
       expect(container.querySelector('[aria-label="Setup method"]')).toBeNull();
     });

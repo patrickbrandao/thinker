@@ -1155,7 +1155,7 @@ describe('ModelDiscoveryService', () => {
       expect(result[0].outputPricePerToken).toBeCloseTo(3.0 / 1_000_000);
     });
 
-    it('should default custom model context window to 128000', async () => {
+    it('should default custom model context window to 1000000', async () => {
       providerRepo.find.mockResolvedValue([]);
       customProviderRepo.find.mockResolvedValue([
         makeCustomProvider({
@@ -1164,7 +1164,7 @@ describe('ModelDiscoveryService', () => {
       ]);
 
       const result = await service.getModelsForAgent('agent-1');
-      expect(result[0].contextWindow).toBe(128000);
+      expect(result[0].contextWindow).toBe(1000000);
     });
 
     it('should filter out non-chat models from cached results', async () => {
