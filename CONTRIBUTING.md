@@ -199,7 +199,7 @@ npm run build
 
 ### Cutting a Docker release
 
-Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Every release goes out through `scripts/ship.sh "<conventional commit message>" [patch|minor|major]` ([ADR 0005](docs/adr/0005-modo-autonomo.md)): it bumps `packages/thinker/package.json`, writes `docs/releases/X.Y.Z.md` from the commit subjects, lands the change on `main`, and pushes the `vX.Y.Z` tag. The tag runs `.github/workflows/release.yml`, which builds both architectures, pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>`, and creates the GitHub release. Images are published from the local Docker, using the Docker Hub account it is logged into (`tmsoftbrasil`): when the repository has no Docker Hub secrets (the normal case), `ship.sh` builds and publishes the same image and release locally.
+Thinker ships as the multi-arch (`linux/amd64`, `linux/arm64`) Docker image [`tmsoftbrasil/thinker`](https://hub.docker.com/r/tmsoftbrasil/thinker). Every release goes out through `scripts/ship.sh "<conventional commit message>" [patch|minor|major]` ([ADR 0005](docs/adr/0005-modo-autonomo.md)): it bumps `packages/thinker/package.json`, writes `docs/releases/X.Y.Z.md` from the commit subjects, lands the change on `main`, and pushes the `vX.Y.Z` tag. Then it builds both architectures from the local Docker, using the Docker Hub account it is logged into (`tmsoftbrasil`), pushes `X.Y.Z`, `X.Y`, `latest` and `sha-<short>`, and creates the GitHub release. There is no CI publishing workflow.
 
 The full flow is in the [developer guide](docs/dev/guia.md).
 
