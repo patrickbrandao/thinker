@@ -55,7 +55,7 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
-| `THINKER_CATALOG_SYNC` | `true` | `false` desliga a busca em `openrouter.ai`, `models.dev` e (com provedor OpenCode Go) `raw.githubusercontent.com`. Os custos passam a vir só dos dados embutidos na imagem: a maioria dos modelos aparece com preço `$0`. Veja [Privacidade](privacidade.md). |
+| `THINKER_CATALOG_SYNC` | `true` | `false` desliga a busca em `openrouter.ai`, `models.dev` e (com provedor OpenCode Go) `raw.githubusercontent.com`. Os custos passam a vir do snapshot de preços embutido na imagem, com os preços do OpenRouter e do models.dev do dia do build (a data aparece como última sincronização). O mesmo snapshot cobre uma falha da primeira busca. Veja [Privacidade](privacidade.md). |
 
 ## Provedores locais
 

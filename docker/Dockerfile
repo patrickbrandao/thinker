@@ -23,6 +23,14 @@ COPY packages/frontend packages/frontend
 COPY packages/backend packages/backend
 COPY packages/thinker packages/thinker
 RUN npx turbo build --filter=thinker-backend --filter=thinker-frontend --filter=thinker-shared
+# Build-day OpenRouter/models.dev prices for THINKER_CATALOG_SYNC=false (#73,
+# ADR 0003 catalogs, fetched only here). Never fails the build;
+# --build-arg THINKER_PRICING_SNAPSHOT=false skips it.
+ARG THINKER_PRICING_SNAPSHOT=true
+COPY docker/pricing-snapshot.mjs /tmp/pricing-snapshot.mjs
+RUN if [ "$THINKER_PRICING_SNAPSHOT" != "false" ]; then \
+      node /tmp/pricing-snapshot.mjs packages/backend/dist/pricing-snapshot.json; \
+    fi
 
 # Stage 3: Production dependencies only. npm ci runs with --ignore-scripts
 # so nothing is compiled — all runtime deps are pure JS, making the glibc

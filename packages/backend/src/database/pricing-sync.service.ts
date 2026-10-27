@@ -5,6 +5,7 @@ import {
   describeCatalogSyncSetting,
   isCatalogSyncEnabled,
 } from '../common/utils/catalog-sync';
+import { loadPricingSnapshot } from '../model-prices/pricing-snapshot';
 
 interface OpenRouterModel {
   id: string;
@@ -50,6 +51,7 @@ export class PricingSyncService implements OnModuleInit {
       this.logger.log(
         `${describeCatalogSyncSetting()}: OpenRouter pricing sync disabled, using bundled data only`,
       );
+      this.loadSnapshot();
       return;
     }
     // Kick off the startup fetch WITHOUT blocking boot. A slow or unreachable
@@ -76,8 +78,30 @@ export class PricingSyncService implements OnModuleInit {
     if (!isCatalogSyncEnabled()) return 0;
     this.logger.log('Refreshing OpenRouter pricing cache...');
     const data = await this.fetchOpenRouterModels();
-    if (!data) return 0;
+    if (!data) {
+      if (this.cache.size === 0) this.loadSnapshot();
+      return 0;
+    }
+    const count = this.applyModels(data, new Date());
+    this.logger.log(`OpenRouter pricing cache loaded: ${count} models`);
+    return count;
+  }
 
+  /**
+   * Fills the cache from the build-time snapshot (#73), if the image has one.
+   * `lastFetchedAt` becomes the snapshot date, so the dashboard shows how old
+   * the prices are.
+   */
+  private loadSnapshot(): void {
+    const snapshot = loadPricingSnapshot();
+    if (!snapshot) return;
+    const count = this.applyModels(snapshot.openrouter as OpenRouterModel[], snapshot.generatedAt);
+    this.logger.log(
+      `OpenRouter pricing loaded from the build snapshot of ${snapshot.generatedAt.toISOString()}: ${count} models`,
+    );
+  }
+
+  private applyModels(data: OpenRouterModel[], fetchedAt: Date): number {
     const newCache = new Map<string, OpenRouterPricingEntry>();
     let count = 0;
 
@@ -105,9 +129,7 @@ export class PricingSyncService implements OnModuleInit {
     }
 
     this.cache = newCache;
-    this.lastFetchedAt = new Date();
-    this.logger.log(`OpenRouter pricing cache loaded: ${count} models`);
-
+    this.lastFetchedAt = fetchedAt;
     return count;
   }
 
