@@ -32,6 +32,7 @@ import type { DiscoveredModel } from '../../../model-discovery/model-fetcher';
 jest.mock('../stream-warmup', () => ({
   peekStream: jest.fn(),
   STREAM_WARMUP_MS: 15_000,
+  streamWarmupMsFor: () => 15_000,
 }));
 
 import { peekStream } from '../stream-warmup';

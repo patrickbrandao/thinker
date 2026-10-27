@@ -60,7 +60,7 @@ import {
   type ResolvedRouteCredentials,
   type RouteCredentialDeps,
 } from './route-credentials';
-import { peekStream, STREAM_WARMUP_MS } from './stream-warmup';
+import { peekStream, streamWarmupMsFor } from './stream-warmup';
 import { toChatCompletionsRequest } from './responses-adapter';
 import { messagesToChatCompletionsRequest } from './anthropic-messages-adapter';
 import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
@@ -544,7 +544,7 @@ export class ProxyService {
     // actually starts delivering data before committing to the client.
     // If the stream stalls or dies, we can still try fallback providers.
     if (forward.response.ok && stream && forward.response.body) {
-      const warmup = await peekStream(forward.response.body, STREAM_WARMUP_MS);
+      const warmup = await peekStream(forward.response.body, streamWarmupMsFor(route.provider));
       if (warmup.ok) {
         const peeked: ForwardResult = {
           response: new Response(warmup.stream, {

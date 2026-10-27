@@ -1,4 +1,11 @@
-import { DEFAULT_STREAM_WARMUP_MS, parseStreamWarmupMs, peekStream } from '../stream-warmup';
+import {
+  DEFAULT_STREAM_WARMUP_MS,
+  LOCAL_STREAM_WARMUP_MS,
+  parseStreamWarmupMs,
+  peekStream,
+  STREAM_WARMUP_MS,
+  streamWarmupMsFor,
+} from '../stream-warmup';
 
 function makeStream(chunks: Uint8Array[], delayMs = 0): ReadableStream<Uint8Array> {
   let i = 0;
@@ -207,5 +214,21 @@ describe('peekStream', () => {
 
     expect(second.ok).toBe(true);
     if (second.ok) expect(await collectStream(second.stream)).toBe('ab');
+  });
+});
+
+describe('streamWarmupMsFor (#128)', () => {
+  it('gives local runners the longer warm-up', () => {
+    expect(LOCAL_STREAM_WARMUP_MS).toBeGreaterThanOrEqual(STREAM_WARMUP_MS);
+    expect(streamWarmupMsFor('ollama')).toBe(LOCAL_STREAM_WARMUP_MS);
+    expect(streamWarmupMsFor('lmstudio')).toBe(LOCAL_STREAM_WARMUP_MS);
+  });
+
+  it('keeps the global warm-up for cloud providers', () => {
+    expect(streamWarmupMsFor('openai')).toBe(STREAM_WARMUP_MS);
+  });
+
+  it('uses the given fallback for an unset value', () => {
+    expect(parseStreamWarmupMs(undefined, 60_000)).toBe(60_000);
   });
 });
