@@ -81,6 +81,11 @@ import { ReasoningContentCache } from './reasoning-content-cache';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
 import { peekStream, streamWarmupMsFor } from './stream-warmup';
+import {
+  buildEmptyResponseError,
+  isEmptyResponseFallbackEnabled,
+  isEmptySuccessPayload,
+} from './empty-response';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { normalizeProviderModel } from '../../common/utils/anthropic-model-id';
 import {
@@ -531,6 +536,13 @@ export class ProxyFallbackService {
       const body = await response.arrayBuffer();
       // The attempt ends when its body does, not when headers arrived.
       if (attempt) attempt.completedAtMs = Date.now();
+      // A 200 with no content and zero tokens is a failed hop (#129).
+      if (isEmptyResponseFallbackEnabled() && isEmptySuccessPayload(body)) {
+        this.logger.warn(
+          `Provider empty response: provider=${opts.provider} model=${opts.model} (no content, zero tokens)`,
+        );
+        return { ...forward, response: buildEmptyResponseError(), providerCallStarted: true };
+      }
       return {
         ...forward,
         response: new Response(body, {
