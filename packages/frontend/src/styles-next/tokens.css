@@ -1,0 +1,164 @@
+/*
+ * Design tokens by role (light is :root, dark is .dark on <html>, set before
+ * paint by public/theme-init.js). Components use these through the Tailwind
+ * utilities mapped in index.css or as var(--x); never hex in a component and
+ * never the `dark:` variant for colors. One accent (blue); fixed surfaces have
+ * no shadow, only floating layers do.
+ */
+@font-face {
+  font-family: 'DM Sans';
+  src: url('/fonts/dm-sans-latin.woff2') format('woff2');
+  font-weight: 100 1000;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Backgrounds, from the chrome to the most elevated surface */
+  --bg-chrome: #f3f4f6;
+  --bg: #f7f8fa;
+  --bg-sunken: #eef0f3;
+  --bg-elev: #ffffff;
+  --surface-2: #f4f5f7;
+  --surface-3: #eceef2;
+  --surface-4: #e3e6eb;
+
+  /* Lines */
+  --border: #e3e6eb;
+  --border-strong: #cdd2da;
+
+  /* Text, four levels */
+  --text: #111827;
+  --text-dim: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+
+  /* Accent: action and selection */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #1d4ed8;
+  --accent-deep: #1e40af;
+  --accent-tint: rgb(37 99 235 / 0.1);
+  --on-accent: #ffffff;
+
+  /* State */
+  --ok: #15803d;
+  --ok-tint: rgb(21 128 61 / 0.1);
+  --warn: #b45309;
+  --warn-tint: rgb(180 83 9 / 0.12);
+  --danger: #dc2626;
+  --danger-tint: rgb(220 38 38 / 0.1);
+  --info: #0e7490;
+  --info-tint: rgb(14 116 144 / 0.1);
+
+  /* Category / port, 1 follows the accent */
+  --port-1: #2563eb;
+  --port-2: #7c3aed;
+  --port-3: #0d9488;
+  --port-4: #d97706;
+  --port-5: #db2777;
+  --port-6: #65a30d;
+  --port-7: #0891b2;
+  --port-8: #9333ea;
+  --port-9: #ea580c;
+  --port-10: #4f46e5;
+  --port-11: #059669;
+  --port-12: #64748b;
+
+  /* Chart series */
+  --chart-1: #2563eb;
+  --chart-2: #0d9488;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #db2777;
+  --chart-6: #65a30d;
+  --chart-other: #9ca3af;
+
+  /* Rings and floating layers */
+  --ring: rgb(17 24 39 / 0.18);
+  --ring-accent: rgb(37 99 235 / 0.35);
+  --shadow-float: 0 12px 32px -8px rgb(15 23 42 / 0.18), 0 2px 6px rgb(15 23 42 / 0.06);
+  --overlay: rgb(15 23 42 / 0.4);
+
+  /* Radii */
+  --radius-control: 6px;
+  --radius-surface: 8px;
+  --radius-node: 12px;
+
+  /* Shell */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 60px;
+  --topbar-height: 52px;
+
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --bg-chrome: #0b0d11;
+  --bg: #0f1115;
+  --bg-sunken: #0b0d10;
+  --bg-elev: #161920;
+  --surface-2: #1b1f27;
+  --surface-3: #222730;
+  --surface-4: #2a303b;
+
+  --border: #242934;
+  --border-strong: #343b48;
+
+  --text: #f3f4f6;
+  --text-dim: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-faint: #6b7280;
+
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: #7cb0fb;
+  --accent-deep: #1e3a8a;
+  --accent-tint: rgb(59 130 246 / 0.14);
+  --on-accent: #ffffff;
+
+  --ok: #4ade80;
+  --ok-tint: rgb(74 222 128 / 0.12);
+  --warn: #fbbf24;
+  --warn-tint: rgb(251 191 36 / 0.12);
+  --danger: #f87171;
+  --danger-tint: rgb(248 113 113 / 0.12);
+  --info: #22d3ee;
+  --info-tint: rgb(34 211 238 / 0.12);
+
+  --port-1: #3b82f6;
+  --port-2: #a78bfa;
+  --port-3: #2dd4bf;
+  --port-4: #fbbf24;
+  --port-5: #f472b6;
+  --port-6: #a3e635;
+  --port-7: #22d3ee;
+  --port-8: #c084fc;
+  --port-9: #fb923c;
+  --port-10: #818cf8;
+  --port-11: #34d399;
+  --port-12: #94a3b8;
+
+  --chart-1: #3b82f6;
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f472b6;
+  --chart-6: #a3e635;
+  --chart-other: #6b7280;
+
+  --ring: rgb(243 244 246 / 0.2);
+  --ring-accent: rgb(59 130 246 / 0.45);
+  --shadow-float: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  --overlay: rgb(0 0 0 / 0.6);
+}

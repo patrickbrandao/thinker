@@ -1,28 +1,28 @@
-import { createSignal } from 'solid-js';
+import { signal } from '../lib/signal.js';
 import { invalidateCustomProvidersCache } from './api/routing.js';
 import { DEFAULT_TTL_MS, invalidateGroup } from './api/cache.js';
 
 // pingCount counts ANY event from the bus (legacy back-compat for callers that
 // don't care which kind fired). New code should depend on the targeted
 // signals so a routing-only change doesn't refetch the message log etc.
-const [pingCount, setPingCount] = createSignal(0);
-const [messagePing, setMessagePing] = createSignal(0);
-const [analyticsPing, setAnalyticsPing] = createSignal(0);
-const [agentPing, setAgentPing] = createSignal(0);
-const [routingPing, setRoutingPing] = createSignal(0);
-
-export { pingCount, messagePing, analyticsPing, agentPing, routingPing };
+// Each ping is a counter; a component that reads one with useSignal re-renders
+// (and refetches) when it changes.
+export const pingCount = signal(0);
+export const messagePing = signal(0);
+export const analyticsPing = signal(0);
+export const agentPing = signal(0);
+export const routingPing = signal(0);
 
 /** Refresh views derived from the harness list after a local mutation. */
 export function refreshAgents(): void {
   invalidateGroup('agent');
-  setAgentPing((n) => n + 1);
+  agentPing.set((n) => n + 1);
 }
 
 export function connectSse(): () => void {
   const es = new EventSource('/api/v1/events');
 
-  const bumpPing = () => setPingCount((n) => n + 1);
+  const bumpPing = () => pingCount.set((n) => n + 1);
 
   // Coalesce message-class bumps. A chatty agent emits one SSE `message` event
   // per ingested record. The recent-message feed refreshes every 500ms while
@@ -37,7 +37,7 @@ export function connectSse(): () => void {
       analyticsBumpTimer = setTimeout(() => {
         analyticsBumpTimer = null;
         invalidateGroup('analytics');
-        setAnalyticsPing((n) => n + 1);
+        analyticsPing.set((n) => n + 1);
       }, DEFAULT_TTL_MS);
     }
     if (messageBumpTimer) return;
@@ -48,7 +48,7 @@ export function connectSse(): () => void {
       // cached, that refetch would read them and the dashboard wouldn't update
       // live. Dropping them first guarantees the refetch hits the network.
       invalidateGroup('message');
-      setMessagePing((n) => n + 1);
+      messagePing.set((n) => n + 1);
     }, 500);
   };
 
@@ -78,7 +78,7 @@ export function connectSse(): () => void {
     // bumping routingPing so the refetch reads fresh routing/provider data.
     invalidateGroup('routing');
     invalidateCustomProvidersCache();
-    setRoutingPing((n) => n + 1);
+    routingPing.set((n) => n + 1);
     bumpPing();
   });
 

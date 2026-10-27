@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, type ProxyOptions } from 'vite';
-import solidPlugin from 'vite-plugin-solid';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 // Dial the backend on 127.0.0.1, not `localhost`. The dev backend binds
 // 127.0.0.1 (IPv4), but on dual-stack machines `localhost` can resolve to
@@ -50,7 +51,7 @@ export default defineConfig({
     // anyone else) for it.
     __THINKER_VERSION__: JSON.stringify(thinkerVersion),
   },
-  plugins: [solidPlugin()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 3000,
     // Disable Vite's built-in CORS handler. Otherwise it short-circuits
@@ -74,7 +75,10 @@ export default defineConfig({
         // dependencies (Rolldown's `includeDependenciesRecursively` default).
         codeSplitting: {
           groups: [
-            { name: 'vendor', test: /node_modules[\\/](solid-js|@solidjs)[\\/]/ },
+            { name: 'vendor', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ },
+            // React Flow only loads with the topology page.
+            { name: 'flow', test: /node_modules[\\/](@xyflow|d3-[a-z]+|zustand|classcat)[\\/]/ },
+            { name: 'icons', test: /node_modules[\\/]lucide-react[\\/]/ },
             { name: 'charts', test: /node_modules[\\/]uplot[\\/]/ },
             { name: 'auth', test: /node_modules[\\/]better-auth[\\/]/ },
             // Syntax highlighting (highlight.js) is only pulled in by the
@@ -94,10 +98,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    transformMode: { web: [/\.[jt]sx?$/] },
-    deps: {
-      optimizer: { web: { include: ['solid-js'] } },
-    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

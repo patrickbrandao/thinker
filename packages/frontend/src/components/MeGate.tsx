@@ -1,11 +1,12 @@
-import { useNavigate } from '@solidjs/router';
-import { Match, Switch, createEffect, createSignal, onMount, type ParentComponent } from 'solid-js';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import { authClient } from '../services/auth-client.js';
 import { createOrganization, setActiveOrganization } from '../services/api/organizations.js';
 import { passwordChangeRequired, setActiveOrganizationId } from '../services/org-context.js';
 import { loadMe, me } from '../services/session-store.js';
-import '../styles/organization.css';
+import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
+import { Button, Field } from './ui.jsx';
 
 type GateState = 'loading' | 'ready' | 'no-org' | 'error';
 
@@ -31,14 +32,16 @@ function syncSavedOrganization(orgId: string): void {
  * change when required (on load or when any API call is refused with
  * `password_change_required`), and handles a user with no organization.
  */
-const MeGate: ParentComponent = (props) => {
+export default function MeGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const [state, setState] = createSignal<GateState>('loading');
-  const [error, setError] = createSignal('');
-  const [orgName, setOrgName] = createSignal('');
-  const [creating, setCreating] = createSignal(false);
+  const mustChange = useSignal(passwordChangeRequired);
+  const profile = useSignal(me);
+  const [state, setState] = useState<GateState>('loading');
+  const [error, setError] = useState('');
+  const [orgName, setOrgName] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setState('loading');
     try {
       const m = await loadMe();
@@ -54,17 +57,19 @@ const MeGate: ParentComponent = (props) => {
       setError(err instanceof Error ? err.message : t('org.gate.loadFailed'));
       setState('error');
     }
-  };
+  }, []);
 
-  onMount(() => void load());
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  createEffect(() => {
-    if (passwordChangeRequired()) navigate('/change-password', { replace: true });
-  });
+  useEffect(() => {
+    if (mustChange) navigate('/change-password', { replace: true });
+  }, [mustChange, navigate]);
 
-  const handleCreate = async (e: Event) => {
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    const name = orgName().trim();
+    const name = orgName.trim();
     if (!name) return;
     setCreating(true);
     try {
@@ -84,59 +89,52 @@ const MeGate: ParentComponent = (props) => {
     window.location.replace('/login');
   };
 
+  if (state === 'ready') return <>{children}</>;
+  if (state === 'loading')
+    return (
+      <div className="gate" aria-busy="true">
+        <span className="spinner" />
+        <p className="text-sm text-muted">{t('common.loading')}</p>
+      </div>
+    );
+  if (state === 'error')
+    return (
+      <div className="gate" role="alert">
+        <h2>{t('org.gate.couldNotLoad')}</h2>
+        <p className="text-sm text-muted">{error}</p>
+        <Button variant="ghost" size="sm" onClick={() => void load()}>
+          {t('common.tryAgain')}
+        </Button>
+      </div>
+    );
   return (
-    <Switch>
-      <Match when={state() === 'ready'}>{props.children}</Match>
-      <Match when={state() === 'loading'}>
-        <div class="org-gate" aria-busy="true">
-          <p class="org-gate__text">{t('common.loading')}</p>
-        </div>
-      </Match>
-      <Match when={state() === 'error'}>
-        <div class="org-gate" role="alert">
-          <span class="org-gate__title">{t('org.gate.couldNotLoad')}</span>
-          <p class="org-gate__text">{error()}</p>
-          <div>
-            <button type="button" class="btn btn--outline btn--sm" onClick={() => void load()}>
-              {t('common.tryAgain')}
-            </button>
-          </div>
-        </div>
-      </Match>
-      <Match when={state() === 'no-org'}>
-        <div class="org-gate">
-          <span class="org-gate__title">{t('org.gate.noOrg')}</span>
-          {me()?.isInstanceAdmin ? (
-            <>
-              <p class="org-gate__text">{t('org.gate.noOrgAdmin')}</p>
-              <form class="org-form" style="padding: 0;" onSubmit={handleCreate}>
-                <label class="org-form__field">
-                  {t('org.gate.orgName')}
-                  <input
-                    class="auth-form__input"
-                    type="text"
-                    value={orgName()}
-                    onInput={(e) => setOrgName(e.currentTarget.value)}
-                    required
-                  />
-                </label>
-                <button class="btn btn--primary btn--sm" type="submit" disabled={creating()}>
-                  {t('org.gate.createOrg')}
-                </button>
-              </form>
-            </>
-          ) : (
-            <p class="org-gate__text">{t('org.gate.notMember')}</p>
-          )}
-          <div>
-            <button type="button" class="btn btn--ghost btn--sm" onClick={() => void signOut()}>
-              {t('nav.logOut')}
-            </button>
-          </div>
-        </div>
-      </Match>
-    </Switch>
+    <div className="gate">
+      <h2>{t('org.gate.noOrg')}</h2>
+      {profile?.isInstanceAdmin ? (
+        <>
+          <p className="max-w-sm text-sm text-muted">{t('org.gate.noOrgAdmin')}</p>
+          <form className="flex w-full max-w-xs flex-col gap-3 text-left" onSubmit={handleCreate}>
+            <Field label={t('org.gate.orgName')} htmlFor="gate-org-name">
+              <input
+                id="gate-org-name"
+                className="field"
+                type="text"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                required
+              />
+            </Field>
+            <Button type="submit" busy={creating}>
+              {t('org.gate.createOrg')}
+            </Button>
+          </form>
+        </>
+      ) : (
+        <p className="max-w-sm text-sm text-muted">{t('org.gate.notMember')}</p>
+      )}
+      <Button variant="quiet" size="sm" onClick={() => void signOut()}>
+        {t('nav.logOut')}
+      </Button>
+    </div>
   );
-};
-
-export default MeGate;
+}

@@ -1,47 +1,29 @@
-import { useLocation, useNavigate } from '@solidjs/router';
-import { Show, createEffect, type ParentComponent } from 'solid-js';
+import { useEffect, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { authClient } from '../services/auth-client.js';
 import { buildLoginRedirect } from '../services/auth-redirects.js';
-import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 import { t } from '../i18n/index.js';
+import AuthLayout from '../layouts/AuthLayout.jsx';
 
-const AuthGuard: ParentComponent = (props) => {
+/** Renders children only with a session; otherwise sends the visitor to /login. */
+export default function AuthGuard({ children }: { children: ReactNode }) {
   const session = authClient.useSession();
   const navigate = useNavigate();
   const location = useLocation();
 
-  createEffect(() => {
-    const s = session();
-    if (s.isPending) return;
-    if (!s.data) {
+  useEffect(() => {
+    if (session.isPending) return;
+    if (!session.data) {
       navigate(buildLoginRedirect(location.pathname, location.search), { replace: true });
     }
-  });
+  }, [session.isPending, session.data, navigate, location.pathname, location.search]);
 
-  return (
-    <Show
-      when={!session().isPending && session().data}
-      fallback={
-        <div class="auth-layout">
-          <div class="auth-card" style="text-align: center;">
-            <div class="auth-logo">
-              <img
-                src={THINKER_LOGO_URL}
-                alt="Thinker"
-                class="auth-logo__img auth-logo__img--light"
-              />
-              <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
-            </div>
-            <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm);">
-              {t('common.loading')}
-            </p>
-          </div>
-        </div>
-      }
-    >
-      {props.children}
-    </Show>
-  );
-};
-
-export default AuthGuard;
+  if (session.isPending || !session.data) {
+    return (
+      <AuthLayout>
+        <p className="text-center text-sm text-muted">{t('common.loading')}</p>
+      </AuthLayout>
+    );
+  }
+  return <>{children}</>;
+}

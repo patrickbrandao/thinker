@@ -1,46 +1,39 @@
-import { useLocation, useNavigate, useSearchParams } from '@solidjs/router';
-import { Show, createEffect, createSignal, onMount, type ParentComponent } from 'solid-js';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { authClient } from '../services/auth-client.js';
 import { getAuthDestination, signedOAuthDestination } from '../services/auth-redirects.js';
 import { checkNeedsSetup } from '../services/setup-status.js';
 
-const GuestGuard: ParentComponent = (props) => {
+/** Sign-in screens: send signed-in visitors on, and a fresh install to /setup. */
+export default function GuestGuard({ children }: { children: ReactNode }) {
   const session = authClient.useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [setupChecked, setSetupChecked] = createSignal(false);
-  const [ready, setReady] = createSignal(false);
+  const [setupChecked, setSetupChecked] = useState(false);
 
-  onMount(async () => {
-    const needsSetup = await checkNeedsSetup();
-    if (needsSetup) {
-      navigate('/setup', { replace: true });
+  useEffect(() => {
+    let cancelled = false;
+    void checkNeedsSetup().then((needsSetup) => {
+      if (cancelled) return;
+      if (needsSetup) navigate('/setup', { replace: true });
+      else setSetupChecked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (session.isPending || !session.data) return;
+    const destination = getAuthDestination(Object.fromEntries(searchParams), location.search);
+    if (signedOAuthDestination(location.search) === destination) {
+      globalThis.location.assign(destination);
       return;
     }
-    setSetupChecked(true);
-  });
+    navigate(destination, { replace: true });
+  }, [session.isPending, session.data, searchParams, location.search, navigate]);
 
-  createEffect(() => {
-    const s = session();
-    if (!s.isPending && s.data) {
-      const destination = getAuthDestination(searchParams, location.search);
-      if (signedOAuthDestination(location.search) === destination) {
-        globalThis.location.assign(destination);
-        return;
-      }
-      navigate(destination, { replace: true });
-    }
-    if (setupChecked() && !s.isPending && !s.data) {
-      setReady(true);
-    }
-  });
-
-  return (
-    <Show when={ready()} fallback={null}>
-      {props.children}
-    </Show>
-  );
-};
-
-export default GuestGuard;
+  if (!setupChecked || session.isPending || session.data) return null;
+  return <>{children}</>;
+}

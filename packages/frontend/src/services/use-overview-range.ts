@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { useState } from 'react';
 import { COMPACT_COLUMNS } from '../components/message-table-types.js';
 import { t } from '../i18n/index.js';
 
@@ -13,20 +13,30 @@ export function rangeOptions(): Array<{ label: string; value: string }> {
 }
 
 /**
- * Shared range signal + localStorage persistence for Overview pages.
+ * Shared range state + localStorage persistence for Overview pages.
  * Returns `range`, `setRange`, and `handleRangeChange`.
  * `handleRangeChange` persists the new value and, when `markUserSelected` is
  * provided, calls it so the smart-range cascade in the per-agent Overview knows
  * the user made an explicit choice.
  */
 export function useOverviewRange(options?: { markUserSelected?: () => void }) {
-  const saved = localStorage.getItem(RANGE_STORAGE_KEY);
-  const [range, setRange] = createSignal(saved && VALID_RANGES.has(saved) ? saved : '30d');
+  const [range, setRange] = useState(() => {
+    try {
+      const saved = localStorage.getItem(RANGE_STORAGE_KEY);
+      return saved && VALID_RANGES.has(saved) ? saved : '30d';
+    } catch {
+      return '30d';
+    }
+  });
 
   const handleRangeChange = (value: string) => {
     setRange(value);
     options?.markUserSelected?.();
-    localStorage.setItem(RANGE_STORAGE_KEY, value);
+    try {
+      localStorage.setItem(RANGE_STORAGE_KEY, value);
+    } catch {
+      // Storage blocked: the range lasts for this page only.
+    }
   };
 
   return { range, setRange, handleRangeChange };
@@ -37,6 +47,5 @@ export function useOverviewRange(options?: { markUserSelected?: () => void }) {
  * stay stable, though the column set is now the same everywhere.
  */
 export function useOverviewColumns() {
-  const columns = () => COMPACT_COLUMNS;
-  return { columns };
+  return { columns: COMPACT_COLUMNS };
 }

@@ -1,6 +1,5 @@
-import { Navigate } from '@solidjs/router';
-import type { Component } from 'solid-js';
+import { Navigate } from 'react-router';
 
-const RootRedirect: Component = () => <Navigate href="/overview" />;
-
-export default RootRedirect;
+export default function RootRedirect() {
+  return <Navigate to="/overview" replace />;
+}

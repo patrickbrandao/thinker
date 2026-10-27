@@ -1,6 +1,12 @@
-import { beforeEach } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import { invalidateAll } from '../src/services/api/cache';
 import { resetLocaleForTests } from '../src/i18n';
+
+// Unmount whatever a test rendered, so DOM queries never see a previous test.
+afterEach(() => {
+  cleanup();
+});
 
 // Tests run in English (the reference locale) unless a test switches to
 // pt-BR on purpose with `resetLocaleForTests('pt-BR')`.

@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { signal } from '../lib/signal.js';
 
 /**
  * Active-organization plumbing shared by every dashboard API call (ADR 0006).
@@ -51,11 +51,10 @@ export function withOrganizationHeader(headers?: HeadersInit): HeadersInit | und
 
 // Raised by the API layer when the backend answers 403 password_change_required.
 // The app shell watches it and routes to /change-password.
-const [passwordChangeRequired, setPasswordChangeRequired] = createSignal(false);
-export { passwordChangeRequired };
+export const passwordChangeRequired = signal(false);
 
 export function markPasswordChangeRequired(value = true): void {
-  setPasswordChangeRequired(value);
+  passwordChangeRequired.set(value);
 }
 
 /** True when a parsed error body is the backend's forced-password-change refusal. */

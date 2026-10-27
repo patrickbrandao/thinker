@@ -17,6 +17,7 @@ export default {
   mcpServer: 'MCP server',
   sectionTools: 'TOOLS',
   playground: 'Playground',
+  topology: 'Topology',
   sectionOrganization: 'ORGANIZATION',
   membersSettings: 'Members & settings',
   users: 'Users',

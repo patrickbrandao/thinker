@@ -1,22 +1,27 @@
-import { createSignal } from 'solid-js';
 import { platformIcon } from 'thinker-shared';
+import { signal } from '../lib/signal.js';
 
-const [platform, setPlatformSignal] = createSignal<string | null>(null);
-const [category, setCategorySignal] = createSignal<string | null>(null);
+export const agentPlatformSignal = signal<{ platform: string | null; category: string | null }>({
+  platform: null,
+  category: null,
+});
 
 export function agentPlatform(): string | null {
-  return platform();
+  return agentPlatformSignal().platform;
 }
 
 export function setAgentPlatform(value: string | null, cat?: string | null): void {
-  setPlatformSignal(value);
-  if (cat !== undefined) setCategorySignal(cat);
+  agentPlatformSignal.set((prev) => ({
+    platform: value,
+    category: cat !== undefined ? cat : prev.category,
+  }));
 }
 
 export function agentCategory(): string | null {
-  return category();
+  return agentPlatformSignal().category;
 }
 
 export function agentPlatformIcon(): string | undefined {
-  return platformIcon(platform(), category());
+  const { platform, category } = agentPlatformSignal();
+  return platformIcon(platform, category);
 }

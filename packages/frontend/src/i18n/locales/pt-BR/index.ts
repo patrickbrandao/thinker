@@ -15,6 +15,7 @@ import harnesses from './harnesses.js';
 import welcome from './welcome.js';
 import limits from './limits.js';
 import playground from './playground.js';
+import shell from './shell.js';
 
 export default {
   common,
@@ -34,4 +35,5 @@ export default {
   welcome,
   limits,
   playground,
+  shell,
 };

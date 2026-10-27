@@ -1,4 +1,4 @@
-import { lazy, type Component } from 'solid-js';
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 
 const RELOAD_KEY = 'thinker:chunk-reload';
 
@@ -8,9 +8,10 @@ const RELOAD_KEY = 'thinker:chunk-reload';
  * infinite reload loops — if the reload itself fails, the error
  * propagates normally.
  */
-export function lazyReload<T extends Component>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function lazyReload<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
-): ReturnType<typeof lazy<T>> {
+): LazyExoticComponent<T> {
   return lazy(() =>
     factory().catch((err: unknown) => {
       // With storage blocked there is no loop guard, so skip the reload
