@@ -96,7 +96,7 @@
 --z-toast: 8000
 --z-tooltip: 9999
 
-## Blocks (282 BEM blocks, 1554 classes)
+## Blocks (293 BEM blocks, 1585 classes)
 account-back-btn (agents.css): account-back-btn
 account-modal (agents.css): account-modal account-modal--standalone account-modal__inner
 account-security-error (agents.css): account-security-error
@@ -131,7 +131,7 @@ auth-social-btn (auth.css): auth-social-btn auth-social-btn--discord auth-social
 auth-social-group (auth.css): auth-social-group
 auth-terms (auth.css): auth-terms auth-terms__link
 breadcrumb (layout.css, theme.css): breadcrumb
-btn (controls.css, layout.css, limits.css, modals.css, routing-providers.css, routing.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
+btn (controls.css, layout.css, limits.css, modals.css, organization.css, routing-providers.css, routing.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
 cards-grid (layout.css, theme.css, wizard.css): cards-grid
 chart-card (cards.css, theme.css): chart-card chart-card__body chart-card__controls chart-card__filter-btn chart-card__filter-btn--active chart-card__filters chart-card__header chart-card__label chart-card__stat chart-card__stat--active chart-card__stat--clickable chart-card__subtitle chart-card__subtitle-title chart-card__value chart-card__value-row
 chart-tooltip (charts.css, theme.css): chart-tooltip
@@ -249,6 +249,13 @@ notif-table (notifications.css): notif-table notif-table--flush notif-table__act
 notification-modal (notifications.css): notification-modal__select
 notification-rule (notifications.css): notification-rule__delete notification-rule__edit
 notification-toggle (notifications.css): notification-toggle notification-toggle__slider
+org-error (organization.css): org-error
+org-form (organization.css): org-form org-form__actions org-form__field org-form__field--inline
+org-gate (organization.css): org-gate org-gate__text org-gate__title
+org-select (organization.css): org-select
+org-switcher (organization.css): org-switcher org-switcher__label org-switcher__name org-switcher__role org-switcher__row org-switcher__select
+org-table (organization.css): org-table org-table__actions org-table__muted org-table__orgs
+org-table-wrap (organization.css): org-table-wrap
 output-controls (routing.css): output-controls output-controls--compact output-controls__field output-controls__label output-controls__segment output-controls__segment--active output-controls__segments
 overview (agents.css): overview__platform-icon
 overview-split (analytics-overview.css): overview-split
@@ -277,6 +284,8 @@ provider-setup (notifications.css): provider-setup__subtitle provider-setup__tit
 provider-setup-card (notifications.css): provider-setup-card provider-setup-card__desc provider-setup-card__logo provider-setup-card__name
 provider-setup-grid (notifications.css): provider-setup-grid
 provider-toggle (routing-providers.css, routing.css, welcome.css): provider-toggle provider-toggle--action provider-toggle__actions provider-toggle__add-btn provider-toggle__add-tooltip provider-toggle__badge provider-toggle__badge--connected provider-toggle__disconnect-btn provider-toggle__expand provider-toggle__icon provider-toggle__info provider-toggle__key-input provider-toggle__key-row provider-toggle__local-only provider-toggle__name provider-toggle__name--action provider-toggle__subtitle provider-toggle__switch provider-toggle__switch--on provider-toggle__switch-thumb provider-toggle__tag
+readonly-notice (organization.css): readonly-notice
+readonly-region (organization.css): readonly-region
 recovery-card (data.css): recovery-card recovery-card--fallback recovery-card__branding recovery-card__phrase recovery-card__title
 recovery-card-row (data.css): recovery-card-row
 recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none
@@ -288,6 +297,7 @@ request-tool (request-drawer.css): request-tool request-tool--available request-
 request-tools-section (request-drawer.css): request-tools-section request-tools-section__count request-tools-section__title
 response-mode-btn (routing.css): response-mode-btn response-mode-btn__icon
 response-mode-modal (routing.css): response-mode-modal response-mode-modal__blocker response-mode-modal__blocker-list response-mode-modal__blocker-meta response-mode-modal__blocker-model response-mode-modal__blocker-row response-mode-modal__blocker-text response-mode-modal__body response-mode-modal__desc response-mode-modal__field-header response-mode-modal__field-title
+role-badge (organization.css): role-badge role-badge--accent role-badge--warning
 routing-action (routing.css): routing-action routing-action--danger
 routing-card (routing-header-tiers.css, routing-specificity.css, routing-virtual-models.css, routing.css): routing-card routing-card--cta routing-card--disabled routing-card--header-tier routing-card--virtual-model routing-card--virtual-model-inactive routing-card__actions routing-card__auto-tag routing-card__body routing-card__change-btn routing-card__change-icon routing-card__change-label routing-card__chip-action routing-card__chip-action--active routing-card__chip-action--configured routing-card__chip-action--dialog-open routing-card__chip-footer routing-card__chip-main routing-card__chip-meta routing-card__chip-price routing-card__chip-reset routing-card__desc routing-card__disabled-desc routing-card__disabled-text routing-card__empty routing-card__empty-link routing-card__empty-text routing-card__fallbacks routing-card__fallbacks-label routing-card__header routing-card__header-action routing-card__header-action--danger routing-card__header-add routing-card__main routing-card__model-chip routing-card__model-chip--dragging routing-card__model-chip--drop-target routing-card__model-chip--skipped routing-card__model-row routing-card__override routing-card__override-icon routing-card__reset-btn routing-card__right routing-card__skipped-badge routing-card__sub routing-card__sub--subscription routing-card__tier
 routing-cards (routing.css, welcome.css): routing-cards routing-cards--centered routing-cards--unified-compact routing-cards--wide
@@ -349,6 +359,7 @@ status-badge (data.css, theme.css): status-badge status-badge--error status-badg
 status-badge-tooltip (data.css): status-badge-tooltip status-badge-tooltip__bubble
 subscription-detail (routing-providers.css): subscription-detail__alt subscription-detail__alt-divider subscription-detail__alt-hint subscription-detail__btn subscription-detail__primary
 summary-card (cards.css, theme.css): summary-card summary-card__label summary-card__subtitle summary-card__value
+temp-password (organization.css): temp-password temp-password__actions temp-password__row temp-password__title temp-password__value temp-password__warning
 theme-picker (agents.css): theme-picker theme-picker__option theme-picker__option--active
 theme-toggle (layout.css, theme.css): theme-toggle theme-toggle__icon
 tier-badge (data.css, overview.css): tier-badge tier-badge--complex tier-badge--custom tier-badge--default tier-badge--direct tier-badge--fallback tier-badge--playground tier-badge--reasoning tier-badge--simple tier-badge--specificity tier-badge--standard tier-badge--virtual
@@ -487,12 +498,13 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .welcome__route-test-heading { gap: 14px }  at welcome.css:870 loses to welcome.css:897
 .welcome__text-link { padding: 0 }  at welcome.css:1079 loses to welcome.css:1090
 
-## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (19)
+## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (20)
 agent-chart-tooltip.css ← components/ChartHoverTooltip.tsx
 analytics-overview.css ← components/ReliabilityKpiCards.tsx, pages/GlobalOverview.tsx, pages/providers/ConnectionDetail.tsx, pages/providers/ProviderConnectionsPage.tsx
 connection-detail.css ← pages/providers/ConnectionDetail.tsx
 filter-select.css ← components/FilterSelect.tsx
 model-filter.css ← components/ModelPricesFilterBar.tsx, pages/MessageLog.tsx
+organization.css ← components/MeGate.tsx, components/OrgSwitcher.tsx, components/ReadOnlyRegion.tsx, components/TemporaryPasswordBox.tsx, pages/AdminUsers.tsx, pages/Organization.tsx
 overview.css ← pages/GlobalOverview.tsx, pages/MessageLog.tsx, pages/Overview.tsx
 playground.css ← pages/Playground.tsx
 reliability-card.css ← components/ReliabilityChart.tsx

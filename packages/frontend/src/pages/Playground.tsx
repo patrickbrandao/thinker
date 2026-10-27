@@ -26,6 +26,7 @@ import {
   type PlaygroundColumn as ColumnData,
 } from '../services/playground-store.js';
 import { toast } from '../services/toast-store.js';
+import { roleCan } from '../services/session-store.js';
 import PlaygroundColumn from '../components/playground/PlaygroundColumn.jsx';
 import PlaygroundPrompt from '../components/playground/PlaygroundPrompt.jsx';
 import PlaygroundSummaryTable from '../components/playground/PlaygroundSummaryTable.jsx';
@@ -529,11 +530,15 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
         />
 
         <Show
-          when={hasConnectedProviders()}
+          when={hasConnectedProviders() && roleCan.editHarnesses()}
           fallback={
             <div class="playground-prompt-wrapper">
               <div class="playground-prompt playground-prompt--info">
-                <span class="playground-prompt__info-text">Connect a provider to get started</span>
+                <span class="playground-prompt__info-text">
+                  {roleCan.editHarnesses()
+                    ? 'Connect a provider to get started'
+                    : 'You have read-only access. Viewers can browse past runs but not send prompts.'}
+                </span>
               </div>
             </div>
           }

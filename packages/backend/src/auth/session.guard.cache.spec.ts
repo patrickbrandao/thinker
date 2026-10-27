@@ -47,6 +47,12 @@ describe('SessionGuard — cache edge cases', () => {
     reflector = new Reflector();
     const tenantCache = {
       resolve: jest.fn().mockResolvedValue('tenant-1'),
+      resolveAccess: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-1',
+        role: 'owner',
+        isInstanceAdmin: false,
+        mustChangePassword: false,
+      }),
       ensureForUser: jest.fn(),
       invalidate: jest.fn(),
     };

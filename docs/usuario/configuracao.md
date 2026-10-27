@@ -25,7 +25,7 @@ O passo a passo, inclusive para quem dependia do antigo fallback para `BETTER_AU
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
 | `THINKER_SETUP_TOKEN` | vazio | Token do primeiro setup escolhido pelo operador (mínimo de 16 caracteres; gere com `openssl rand -hex 24`). Com ele, dá para subir o serviço e enviar o token a quem vai criar o administrador, sem consultar o log. Ele nunca é impresso e deixa de valer quando o primeiro administrador existe. Vazio: o Thinker gera um token aleatório e o imprime no log. Valor com menos de 16 caracteres impede o boot. |
-| `THINKER_ALLOW_SIGNUP` | `false` | Válvula provisória (removida na v0.3, quando o administrador criar as contas). Com `true`, reabre o cadastro por e-mail e login social, mas só depois que o primeiro administrador existe. O primeiro administrador sempre vem do assistente `/setup`, com o token de uso único do log. |
+| `THINKER_ALLOW_SIGNUP` | `false` | Desde a v0.3 o admin cria as contas ([Organizações](organizacoes.md)), então raramente é preciso. Com `true`, reabre o cadastro por e-mail e login social, mas só depois que o primeiro administrador existe. O primeiro administrador sempre vem do assistente `/setup`, com o token de uso único do log. |
 | `BETTER_AUTH_URL` | `http://localhost:<PORT>` | URL pública. Deve ser igual à do navegador e alcançável de dentro do container (o MCP busca o JWKS nela). |
 | `BETTER_AUTH_ALLOWED_HOSTS` | vazio | Hosts extras que podem servir o dashboard e a API, separados por vírgula (aceita `*.exemplo.com`). |
 | `PORT` | `2099` | Porta do servidor; no compose, também a porta publicada. |
@@ -61,6 +61,7 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
+| `THINKER_PROVIDER_PRIVATE_URLS` | `admin-only` | Quem pode cadastrar provedor custom com URL privada/LAN e conectar Ollama, LM Studio e llama.cpp: `allow` (quem conecta provedores), `admin-only` (admin da instância e owner da organização) ou `deny` (ninguém). Metadados de nuvem ficam bloqueados em qualquer modo. Veja [Organizações](organizacoes.md). |
 | `OLLAMA_HOST` | `http://host.docker.internal:11434` (compose) | Endpoint do Ollama. |
 | `THINKER_LMSTUDIO_BASE_URL` | `http://host.docker.internal:1234` | Servidor do provedor embutido LM Studio, com ou sem `/v1`. Valor que não seja uma URL `http(s)` absoluta é ignorado, com aviso no boot. |
 | `THINKER_LLAMACPP_BASE_URL` | `http://host.docker.internal:8080` | Servidor do provedor embutido llama.cpp, com as mesmas regras. |

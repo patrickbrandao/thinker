@@ -110,6 +110,7 @@ Detalhes de configuração: [Provedores e roteamento](docs/usuario/provedores-e-
 - [Primeiros passos](docs/usuario/primeiros-passos.md)
 - [Conectar harnesses](docs/usuario/conectar-harnesses.md)
 - [Provedores e roteamento](docs/usuario/provedores-e-roteamento.md)
+- [Organizações, papéis e contas](docs/usuario/organizacoes.md)
 - [CLI `thinker`](docs/usuario/cli.md)
 - [Solução de problemas](docs/usuario/solucao-de-problemas.md) e [códigos de erro](docs/erros.md)
 - [Privacidade e saída de rede](docs/usuario/privacidade.md)

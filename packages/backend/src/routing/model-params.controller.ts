@@ -11,7 +11,9 @@ import {
   SetModelParamsBodyDto,
 } from './dto/model-params.dto';
 import { sanitizeModelParams } from './model-params/sanitize-model-params';
+import { MinRole } from '../common/decorators/roles.decorator';
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class ModelParamsController {
   constructor(

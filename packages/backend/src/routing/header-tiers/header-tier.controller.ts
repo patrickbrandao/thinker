@@ -30,6 +30,7 @@ import {
 } from '../dto/routing.dto';
 import { HeaderTierService } from './header-tier.service';
 import { AUTH_TYPES, type TierColor } from 'thinker-shared';
+import { MinRole } from '../../common/decorators/roles.decorator';
 
 interface CreateHeaderTierBody {
   name: string;
@@ -91,6 +92,7 @@ export class FallbacksBody {
   routes?: ModelRouteDto[];
 }
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class HeaderTierController {
   constructor(

@@ -2,6 +2,8 @@ import { Meta, Title } from '@solidjs/meta';
 import { useLocation, useNavigate, useParams } from '@solidjs/router';
 import { createResource, createSignal, ErrorBoundary, Show, type Component } from 'solid-js';
 import CopyButton from '../components/CopyButton.jsx';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
+import { roleCan } from '../services/session-store.js';
 import ErrorState from '../components/ErrorState.jsx';
 import AgentTypeGrid from '../components/AgentTypeGrid.jsx';
 import SetupStepAddProvider from '../components/SetupStepAddProvider.jsx';
@@ -153,209 +155,214 @@ const Settings: Component = () => {
         Rename your agent, manage API keys, and view setup instructions
       </p>
 
-      {/* -- Harness Name ------------------------------ */}
-      <div class="settings-card">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">Harness name</span>
-            <span class="settings-card__label-desc">
-              The display name for this harness across the dashboard.
-            </span>
-          </div>
-          <div class="settings-card__control">
-            <input
-              class="settings-card__input"
-              type="text"
-              aria-label="Harness name"
-              value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
-            />
-          </div>
-        </div>
-        <div class="settings-card__footer">
-          <button
-            class="btn btn--primary btn--sm"
-            onClick={handleSaveName}
-            disabled={saving() || !nameChanged()}
-          >
-            {saving() ? (
-              <>
-                <span class="spinner" />
-                <span class="sr-only">Saving...</span>
-              </>
-            ) : (
-              'Save'
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* -- Harness Type (read-only + change modal) --- */}
-      <h2 class="settings-section__title">Harness type</h2>
-      <div class="settings-card">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span
-              class="settings-card__label-title"
-              style="display: flex; align-items: center; gap: 6px;"
-            >
-              <Show when={platformIcon(currentPlatform(), currentCategory())}>
-                <img
-                  src={platformIcon(currentPlatform(), currentCategory())}
-                  alt=""
-                  width="18"
-                  height="18"
-                  class="platform-icon settings-type__icon"
-                />
-              </Show>
-              {currentPlatform()
-                ? (PLATFORM_LABELS[currentPlatform()! as keyof typeof PLATFORM_LABELS] ??
-                  currentPlatform())
-                : 'Not set'}
-            </span>
-            <span class="settings-card__label-desc">
-              {currentCategory()
-                ? CATEGORY_LABELS[currentCategory()! as keyof typeof CATEGORY_LABELS]
-                : ''}
-            </span>
-          </div>
-          <div class="settings-card__control settings-card__control--end">
-            <button class="btn btn--outline btn--sm" onClick={openTypeModal}>
-              Change
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* -- Message recording ------------------------- */}
-      <SettingsRecordingSection agentName={agentName} />
-
-      {/* -- API Key ----------------------------------- */}
-      <ErrorBoundary
-        fallback={(err, reset) => (
-          <ErrorState
-            error={err}
-            title="Something went wrong"
-            message="An error occurred."
-            onRetry={reset}
-          />
-        )}
+      <ReadOnlyRegion
+        readOnly={!roleCan.editHarnesses()}
+        notice="You have read-only access. Viewers can't change harness settings."
       >
-        <h2 class="settings-section__title">API Key</h2>
+        {/* -- Harness Name ------------------------------ */}
         <div class="settings-card">
-          <div class="settings-card__body">
-            <span class="settings-card__label-title">Harness API key</span>
-            <span class="settings-card__label-desc" style="font-size: 14px;">
-              This key authenticates your harness's requests to Thinker. Rotating it generates a new
-              key and immediately invalidates the current one.
-            </span>
-            <div class="settings-card__key-row">
-              <code class="settings-card__key-value">{displayedKey()}</code>
-              <div class="settings-card__key-actions">
-                <Show when={fullKey()}>
-                  <button
-                    class="btn btn--ghost btn--sm"
-                    onClick={() => setKeyRevealed(!keyRevealed())}
-                    aria-label={keyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                    title={keyRevealed() ? 'Hide' : 'Reveal'}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <Show
-                        when={keyRevealed()}
-                        fallback={
-                          <>
-                            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-                            <circle cx="12" cy="12" r="3" />
-                          </>
-                        }
-                      >
-                        <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
-                        <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
-                        <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
-                        <path d="m2 2 20 20" />
-                      </Show>
-                    </svg>
-                  </button>
-                </Show>
-                <Show when={fullKey()}>
-                  <CopyButton text={fullKey()!} />
-                </Show>
-              </div>
+          <div class="settings-card__row">
+            <div class="settings-card__label">
+              <span class="settings-card__label-title">Harness name</span>
+              <span class="settings-card__label-desc">
+                The display name for this harness across the dashboard.
+              </span>
+            </div>
+            <div class="settings-card__control">
+              <input
+                class="settings-card__input"
+                type="text"
+                aria-label="Harness name"
+                value={name()}
+                onInput={(e) => setName(e.currentTarget.value)}
+              />
             </div>
           </div>
           <div class="settings-card__footer">
-            <button class="btn btn--outline btn--sm" onClick={handleRotate} disabled={rotating()}>
-              {rotating() ? (
+            <button
+              class="btn btn--primary btn--sm"
+              onClick={handleSaveName}
+              disabled={saving() || !nameChanged()}
+            >
+              {saving() ? (
                 <>
                   <span class="spinner" />
-                  <span class="sr-only">Rotating...</span>
+                  <span class="sr-only">Saving...</span>
                 </>
               ) : (
-                'Rotate key'
+                'Save'
               )}
             </button>
           </div>
         </div>
 
-        {/* -- Setup Instructions ---------------------- */}
-        <h2 class="settings-section__title">Setup</h2>
-        <Show
-          when={!apiKeyData.loading}
-          fallback={<div class="skeleton skeleton--rect" style="width: 100%; height: 200px;" />}
-        >
-          <Show when={apiKeyData.error}>
-            <div style="background: hsl(var(--chart-5) / 0.1); border: 1px solid hsl(var(--chart-5) / 0.3); border-radius: var(--radius); padding: 10px 14px; margin-bottom: var(--gap-md); font-size: var(--font-size-sm);">
-              Could not load your API key. Use <strong>Rotate key</strong> above to generate a new
-              one.
+        {/* -- Harness Type (read-only + change modal) --- */}
+        <h2 class="settings-section__title">Harness type</h2>
+        <div class="settings-card">
+          <div class="settings-card__row">
+            <div class="settings-card__label">
+              <span
+                class="settings-card__label-title"
+                style="display: flex; align-items: center; gap: 6px;"
+              >
+                <Show when={platformIcon(currentPlatform(), currentCategory())}>
+                  <img
+                    src={platformIcon(currentPlatform(), currentCategory())}
+                    alt=""
+                    width="18"
+                    height="18"
+                    class="platform-icon settings-type__icon"
+                  />
+                </Show>
+                {currentPlatform()
+                  ? (PLATFORM_LABELS[currentPlatform()! as keyof typeof PLATFORM_LABELS] ??
+                    currentPlatform())
+                  : 'Not set'}
+              </span>
+              <span class="settings-card__label-desc">
+                {currentCategory()
+                  ? CATEGORY_LABELS[currentCategory()! as keyof typeof CATEGORY_LABELS]
+                  : ''}
+              </span>
             </div>
-          </Show>
-          <div class="settings-card" style="padding: var(--gap-lg);">
-            <SetupStepAddProvider
-              apiKey={rotatedKey() ?? keyData()?.apiKey ?? null}
-              keyPrefix={keyData()?.keyPrefix ?? null}
-              baseUrl={baseUrl()}
-              hideFullKey
-              platform={currentPlatform()}
-              virtualModels={virtualModels()}
-            />
-          </div>
-        </Show>
-      </ErrorBoundary>
-
-      {/* -- Danger Zone -------------------------------- */}
-      <h2 class="settings-section__title settings-section__title--danger">Danger zone</h2>
-      <div class="settings-card settings-card--danger">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">Delete this harness</span>
-            <span class="settings-card__label-desc">
-              Permanently delete this harness, its API key, and all messages and analytics. This
-              action cannot be undone.
-            </span>
-          </div>
-          <div class="settings-card__control">
-            <button
-              class="btn btn--danger btn--sm"
-              onClick={() => {
-                setShowDeleteModal(true);
-                setDeleteConfirmName('');
-              }}
-            >
-              Delete harness
-            </button>
+            <div class="settings-card__control settings-card__control--end">
+              <button class="btn btn--outline btn--sm" onClick={openTypeModal}>
+                Change
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* -- Message recording ------------------------- */}
+        <SettingsRecordingSection agentName={agentName} />
+
+        {/* -- API Key ----------------------------------- */}
+        <ErrorBoundary
+          fallback={(err, reset) => (
+            <ErrorState
+              error={err}
+              title="Something went wrong"
+              message="An error occurred."
+              onRetry={reset}
+            />
+          )}
+        >
+          <h2 class="settings-section__title">API Key</h2>
+          <div class="settings-card">
+            <div class="settings-card__body">
+              <span class="settings-card__label-title">Harness API key</span>
+              <span class="settings-card__label-desc" style="font-size: 14px;">
+                This key authenticates your harness's requests to Thinker. Rotating it generates a
+                new key and immediately invalidates the current one.
+              </span>
+              <div class="settings-card__key-row">
+                <code class="settings-card__key-value">{displayedKey()}</code>
+                <div class="settings-card__key-actions">
+                  <Show when={fullKey()}>
+                    <button
+                      class="btn btn--ghost btn--sm"
+                      onClick={() => setKeyRevealed(!keyRevealed())}
+                      aria-label={keyRevealed() ? 'Hide API key' : 'Reveal API key'}
+                      title={keyRevealed() ? 'Hide' : 'Reveal'}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <Show
+                          when={keyRevealed()}
+                          fallback={
+                            <>
+                              <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+                              <circle cx="12" cy="12" r="3" />
+                            </>
+                          }
+                        >
+                          <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+                          <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+                          <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+                          <path d="m2 2 20 20" />
+                        </Show>
+                      </svg>
+                    </button>
+                  </Show>
+                  <Show when={fullKey()}>
+                    <CopyButton text={fullKey()!} />
+                  </Show>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card__footer">
+              <button class="btn btn--outline btn--sm" onClick={handleRotate} disabled={rotating()}>
+                {rotating() ? (
+                  <>
+                    <span class="spinner" />
+                    <span class="sr-only">Rotating...</span>
+                  </>
+                ) : (
+                  'Rotate key'
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* -- Setup Instructions ---------------------- */}
+          <h2 class="settings-section__title">Setup</h2>
+          <Show
+            when={!apiKeyData.loading}
+            fallback={<div class="skeleton skeleton--rect" style="width: 100%; height: 200px;" />}
+          >
+            <Show when={apiKeyData.error}>
+              <div style="background: hsl(var(--chart-5) / 0.1); border: 1px solid hsl(var(--chart-5) / 0.3); border-radius: var(--radius); padding: 10px 14px; margin-bottom: var(--gap-md); font-size: var(--font-size-sm);">
+                Could not load your API key. Use <strong>Rotate key</strong> above to generate a new
+                one.
+              </div>
+            </Show>
+            <div class="settings-card" style="padding: var(--gap-lg);">
+              <SetupStepAddProvider
+                apiKey={rotatedKey() ?? keyData()?.apiKey ?? null}
+                keyPrefix={keyData()?.keyPrefix ?? null}
+                baseUrl={baseUrl()}
+                hideFullKey
+                platform={currentPlatform()}
+                virtualModels={virtualModels()}
+              />
+            </div>
+          </Show>
+        </ErrorBoundary>
+
+        {/* -- Danger Zone -------------------------------- */}
+        <h2 class="settings-section__title settings-section__title--danger">Danger zone</h2>
+        <div class="settings-card settings-card--danger">
+          <div class="settings-card__row">
+            <div class="settings-card__label">
+              <span class="settings-card__label-title">Delete this harness</span>
+              <span class="settings-card__label-desc">
+                Permanently delete this harness, its API key, and all messages and analytics. This
+                action cannot be undone.
+              </span>
+            </div>
+            <div class="settings-card__control">
+              <button
+                class="btn btn--danger btn--sm"
+                onClick={() => {
+                  setShowDeleteModal(true);
+                  setDeleteConfirmName('');
+                }}
+              >
+                Delete harness
+              </button>
+            </div>
+          </div>
+        </div>
+      </ReadOnlyRegion>
 
       {/* -- Delete Modal ------------------------------ */}
       <Show when={showDeleteModal()}>

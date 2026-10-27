@@ -2,6 +2,7 @@ import { A, useLocation, useNavigate } from '@solidjs/router';
 import { Show, createSignal, createEffect, onCleanup, type Component } from 'solid-js';
 import { useAgentName } from '../services/routing.js';
 import { authClient } from '../services/auth-client.js';
+import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { agentPlatformIcon } from '../services/agent-platform-store.js';
 import {
@@ -139,26 +140,28 @@ const Header: Component<HeaderProps> = (props) => {
                     </svg>
                     Settings
                   </A>
-                  <button
-                    class="header__dropdown-item"
-                    role="menuitem"
-                    onClick={() => {
-                      setGearOpen(false);
-                      setDuplicateOpen(true);
-                    }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
+                  <Show when={roleCan.editHarnesses()}>
+                    <button
+                      class="header__dropdown-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setGearOpen(false);
+                        setDuplicateOpen(true);
+                      }}
                     >
-                      <path d="M20 2H10c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 12H10V4h10z" />
-                      <path d="M4 22h10c1.1 0 2-.9 2-2v-2h-2v2H4V10h2V8H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2m10-10h2v-2h2V8h-2V6h-2v2h-2v2h2z" />
-                    </svg>
-                    Duplicate harness
-                  </button>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M20 2H10c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 12H10V4h10z" />
+                        <path d="M4 22h10c1.1 0 2-.9 2-2v-2h-2v2H4V10h2V8H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2m10-10h2v-2h2V8h-2V6h-2v2h-2v2h2z" />
+                      </svg>
+                      Duplicate harness
+                    </button>
+                  </Show>
                 </div>
               </Show>
             </div>

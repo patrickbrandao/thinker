@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/server';
-import { McpOperator, MCP_WRITE_SCOPE } from './mcp-auth';
+import { canWrite as operatorCanWrite, McpOperator } from './mcp-auth';
 import { McpToolDeps } from './tool-deps';
 import { registerAgentTools } from './tools/agents.tools';
 import { registerEnvironmentTools, registerGuideTool } from './tools/environment.tools';
@@ -17,7 +17,7 @@ import { registerRoutingTools } from './tools/routing.tools';
  * makes tenant scoping automatic and un-forgeable by the caller.
  */
 export function buildMcpServer(deps: McpToolDeps, operator: McpOperator): McpServer {
-  const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
+  const canWrite = operatorCanWrite(operator);
   const server = new McpServer(
     { name: 'thinker', version: '1.0.0' },
     {

@@ -9,6 +9,8 @@ import LimitRuleTable from '../components/LimitRuleTable.js';
 import LimitHistoryTable from '../components/LimitHistoryTable.js';
 import { KebabMenu, DeleteRuleModal, RemoveProviderModal } from '../components/LimitModals.js';
 import { toast } from '../services/toast-store.js';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
+import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { checkEmailConfigured } from '../services/setup-status.js';
 import {
@@ -173,29 +175,31 @@ const Limits: Component = () => {
         <span class="breadcrumb">
           Get notified or block requests when token or cost thresholds are exceeded
         </span>
-        <button
-          class="btn btn--primary btn--sm"
-          onClick={() => {
-            setEditRule(null);
-            setShowModal(true);
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+        <Show when={roleCan.manageProviders()}>
+          <button
+            class="btn btn--primary btn--sm"
+            onClick={() => {
+              setEditRule(null);
+              setShowModal(true);
+            }}
           >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Create rule
-        </button>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Create rule
+          </button>
+        </Show>
       </div>
 
       <Show when={blockRulesExceeded()}>
@@ -249,20 +253,25 @@ const Limits: Component = () => {
         </div>
       </Show>
 
-      <EmailProviderSection
-        emailProvider={savedProvider()}
-        loading={emailProvider.loading || emailProvider.state === 'unresolved'}
-        onConfigured={refetchProvider}
-        onEdit={() => setShowEditProvider(true)}
-        onRemove={() => setShowRemoveProvider(true)}
-      />
+      <ReadOnlyRegion
+        readOnly={!roleCan.manageProviders()}
+        notice="You have read-only access to limits and notifications. Only admins and owners can change them."
+      >
+        <EmailProviderSection
+          emailProvider={savedProvider()}
+          loading={emailProvider.loading || emailProvider.state === 'unresolved'}
+          onConfigured={refetchProvider}
+          onEdit={() => setShowEditProvider(true)}
+          onRemove={() => setShowRemoveProvider(true)}
+        />
 
-      <LimitRuleTable
-        rules={rules()}
-        loading={rules.loading}
-        hasProvider={hasProvider()}
-        onToggleMenu={toggleMenu}
-      />
+        <LimitRuleTable
+          rules={rules()}
+          loading={rules.loading}
+          hasProvider={hasProvider()}
+          onToggleMenu={toggleMenu}
+        />
+      </ReadOnlyRegion>
 
       <Show when={!logs.loading && (logs() ?? []).length > 0}>
         <div style="margin-top: var(--gap-lg);">

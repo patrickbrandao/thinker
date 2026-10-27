@@ -4,6 +4,7 @@ import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { Public } from '../common/decorators/public.decorator';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { CliAuthService } from './cli-auth.service';
+import { MinRole } from '../common/decorators/roles.decorator';
 
 const STATE_MESSAGE =
   'state must be 16-128 URL-safe characters (letters, numbers, dashes, underscores)';
@@ -42,6 +43,7 @@ class ExchangeDto {
   code_verifier!: string;
 }
 
+@MinRole('viewer')
 @Controller('api/v1/cli')
 export class CliAuthController {
   constructor(private readonly cliAuth: CliAuthService) {}

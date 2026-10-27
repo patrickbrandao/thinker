@@ -1,5 +1,10 @@
 import { toast } from '../toast-store.js';
 import { cachedFetch, isCacheable, invalidateAll } from './cache.js';
+import {
+  isPasswordChangeRequiredBody,
+  markPasswordChangeRequired,
+  withOrganizationHeader,
+} from '../org-context.js';
 
 export const BASE_URL = '/api/v1';
 
@@ -49,7 +54,12 @@ async function doFetchJson<T>(url: string, loginRedirect = true): Promise<T> {
   // 'default' lets the browser revalidate via ETag / Cache-Control. Backend
   // analytics endpoints set short max-age=10 which keeps stale UI bounded;
   // SSE-driven refetches still bypass cache because they pass a unique signal.
-  const res = await fetch(url, { credentials: 'include', cache: 'default' });
+  const headers = withOrganizationHeader();
+  const res = await fetch(url, {
+    credentials: 'include',
+    cache: 'default',
+    ...(headers ? { headers } : {}),
+  });
   if (res.status === 401) {
     // Only redirect to /login when the 401 looks like a real session
     // expiry. Per-endpoint 401s (e.g. an endpoint that requires a
@@ -68,9 +78,20 @@ async function doFetchJson<T>(url: string, loginRedirect = true): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    if (res.status === 403 && isPasswordChangeRequiredBody(safeParse(body))) {
+      markPasswordChangeRequired();
+    }
     throw new Error(body || `API error: ${res.status} ${res.statusText}`);
   }
   return res.json() as Promise<T>;
+}
+
+function safeParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 export async function parseErrorMessage(res: Response): Promise<string> {
@@ -93,6 +114,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -113,8 +135,23 @@ export async function fetchMutate<T = void>(
   options: RequestInit,
   mutateOptions?: FetchMutateOptions,
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include', ...options });
+  const headers = withOrganizationHeader(options.headers);
+  const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: 'include',
+    ...options,
+    ...(headers ? { headers } : {}),
+  });
   if (!res.ok) {
+    if (res.status === 403 && typeof res.clone === 'function') {
+      const body = await res
+        .clone()
+        .json()
+        .catch(() => null);
+      if (isPasswordChangeRequiredBody(body)) {
+        markPasswordChangeRequired();
+        throw new ApiError('Password change required', 403, 'password_change_required');
+      }
+    }
     const message = await parseErrorMessage(res);
     if (!mutateOptions?.silent) toast.error(message);
     throw new ApiError(message, res.status);

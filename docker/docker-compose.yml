@@ -66,7 +66,7 @@ services:
       # Rotation only: the previous encryption key. Stored credentials are
       # rewritten onto the current key after boot; remove it afterwards.
       - THINKER_ENCRYPTION_KEY_PREVIOUS=${THINKER_ENCRYPTION_KEY_PREVIOUS:-}
-      # Public sign-up is closed; set to true to reopen it temporarily.
+      # Public sign-up is closed; accounts are created by the admin (v0.3).
       - THINKER_ALLOW_SIGNUP=${THINKER_ALLOW_SIGNUP:-}
       # Fixed first-setup token (16+ chars). Empty prints a random one-time
       # token to the log instead.
@@ -90,8 +90,15 @@ services:
       # Built-in LM Studio / llama.cpp servers. Empty uses the host default.
       - THINKER_LMSTUDIO_BASE_URL=${THINKER_LMSTUDIO_BASE_URL:-}
       - THINKER_LLAMACPP_BASE_URL=${THINKER_LLAMACPP_BASE_URL:-}
+      # Who may use private/LAN provider URLs and local runners:
+      # allow | admin-only (default) | deny.
+      - THINKER_PROVIDER_PRIVATE_URLS=${THINKER_PROVIDER_PRIVATE_URLS:-}
       - PROVIDER_TIMEOUT_MS=${PROVIDER_TIMEOUT_MS:-180000}
       - STREAM_WARMUP_MS=${STREAM_WARMUP_MS:-15000}
+      # First-chunk wait for local runners (cold models load slowly).
+      - THINKER_LOCAL_STREAM_WARMUP_MS=${THINKER_LOCAL_STREAM_WARMUP_MS:-}
+      # false disables falling back on a 200 with no content and zero tokens.
+      - THINKER_EMPTY_RESPONSE_FALLBACK=${THINKER_EMPTY_RESPONSE_FALLBACK:-}
       - CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS=${CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS:-60000}
       # Per-tenant concurrent in-flight request limit for this backend process.
       - THINKER_CONCURRENCY_MAX=${THINKER_CONCURRENCY_MAX:-10}

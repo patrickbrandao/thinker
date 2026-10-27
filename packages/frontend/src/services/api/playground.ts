@@ -1,3 +1,4 @@
+import { withOrganizationHeader } from '../org-context.js';
 import type {
   AuthType,
   PlaygroundHistoryRunDetail,
@@ -55,7 +56,7 @@ export async function streamPlayground(
   const res = await fetch(`${BASE_URL}/playground/run`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(req),
     signal: init.signal,
   });
@@ -123,7 +124,7 @@ export async function setPlaygroundRunBest(
   const res = await fetch(`/api/v1/playground/runs/${encodeURIComponent(runId)}/best`, {
     method: 'PATCH',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ columnId }),
   });
   if (!res.ok) throw new Error('Failed to set best answer');
@@ -147,6 +148,7 @@ export async function togglePlaygroundRunStar(runId: string): Promise<boolean> {
   const res = await fetch(`/api/v1/playground/runs/${encodeURIComponent(runId)}/star`, {
     method: 'PATCH',
     credentials: 'include',
+    headers: withOrganizationHeader(),
   });
   if (!res.ok) throw new Error('Failed to toggle star');
   const data = (await res.json()) as { starred: boolean };

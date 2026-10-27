@@ -52,7 +52,12 @@ describe('ApiKeyGuard', () => {
       find: mockFind,
       createQueryBuilder: jest.fn().mockReturnValue(mockUpdateQb),
     } as never;
-    guard = new ApiKeyGuard(reflector, configService, mockRepo);
+    const tenantCache = {
+      resolveAccess: jest
+        .fn()
+        .mockResolvedValue({ role: 'owner', isInstanceAdmin: false, mustChangePassword: false }),
+    } as never;
+    guard = new ApiKeyGuard(reflector, configService, mockRepo, tenantCache);
   });
 
   it('throws UnauthorizedException when X-API-Key header is missing', async () => {
@@ -115,7 +120,7 @@ describe('ApiKeyGuard', () => {
 
     await guard.canActivate(ctx);
     // The tenant comes straight off the key row — no key→user→tenant indirection.
-    expect(request.tenantContext).toEqual({ tenantId: 'tenant-456', userId: 'user-456' });
+    expect(request.tenantContext).toMatchObject({ tenantId: 'tenant-456', userId: 'user-456' });
     // Creating user is kept as attribution so @CurrentUser controllers see a user.
     expect(request.user).toEqual({ id: 'user-456' });
     expect(request.authMethod).toBe('api_key');
@@ -150,7 +155,7 @@ describe('ApiKeyGuard', () => {
     } as unknown as ExecutionContext;
 
     await guard.canActivate(ctx);
-    expect(request.tenantContext).toEqual({ tenantId: 'tenant-789', userId: null });
+    expect(request.tenantContext).toMatchObject({ tenantId: 'tenant-789', userId: null });
     // No owning user → no synthesized request.user (env-key-style attribution).
     expect(request.user).toBeUndefined();
     expect(request.authMethod).toBe('api_key');

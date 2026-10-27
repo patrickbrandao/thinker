@@ -6,6 +6,7 @@ import { Tenant } from '../../entities/tenant.entity';
 import { Agent } from '../../entities/agent.entity';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
 import { AgentKeyAuthGuard } from '../guards/agent-key-auth.guard';
+import { TenantCacheService } from '../../common/services/tenant-cache.service';
 import { keyPrefix, verifyKey } from '../../common/utils/hash.util';
 import { decrypt } from '../../common/utils/crypto.util';
 import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
@@ -109,6 +110,19 @@ describe('ApiKeyGeneratorService', () => {
         {
           provide: AgentKeyAuthGuard,
           useValue: { clearCache: mockClearCache },
+        },
+        {
+          // Mirrors TenantCacheService.ensureForUser against the tenant mocks.
+          provide: TenantCacheService,
+          useValue: {
+            ensureForUser: async (userId: string) => {
+              const existing = await mockTenantFindOne({ where: { owner_user_id: userId } });
+              if (existing) return existing.id;
+              const id = randomUUID();
+              await mockTenantInsert({ id, name: userId, owner_user_id: userId, is_active: true });
+              return id;
+            },
+          },
         },
       ],
     }).compile();
@@ -257,36 +271,6 @@ describe('ApiKeyGeneratorService', () => {
       expect(result.tenantId).toBe('uuid-tenant-1');
       expect(result.agentId).toBe('uuid-agent-1');
       expect(result.apiKey).toMatch(/^thk_/);
-    });
-
-    it('should pass optional organization and email when creating tenant', async () => {
-      mockTenantFindOne.mockResolvedValue(null);
-
-      await service.onboardAgent({
-        ...defaultParams,
-        organizationName: 'Acme Corp',
-        email: 'admin@acme.com',
-      });
-
-      expect(mockTenantInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organization_name: 'Acme Corp',
-          email: 'admin@acme.com',
-        }),
-      );
-    });
-
-    it('should default organization_name and email to null', async () => {
-      mockTenantFindOne.mockResolvedValue(null);
-
-      await service.onboardAgent(defaultParams);
-
-      expect(mockTenantInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organization_name: null,
-          email: null,
-        }),
-      );
     });
 
     it('should default agent description to null when omitted', async () => {

@@ -1,126 +1,136 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { ForbiddenException } from '@nestjs/common';
 import { TenantCacheService } from './tenant-cache.service';
-import { Tenant } from '../../entities/tenant.entity';
 
-describe('TenantCacheService', () => {
-  let service: TenantCacheService;
-  let mockFindOne: jest.Mock;
-  let mockInsert: jest.Mock;
+type Member = { tenant_id: string; user_id: string; role: string; created_at: string };
 
-  beforeEach(async () => {
-    mockFindOne = jest.fn();
-    mockInsert = jest.fn().mockResolvedValue({});
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        TenantCacheService,
-        {
-          provide: getRepositoryToken(Tenant),
-          useValue: { findOne: mockFindOne, insert: mockInsert },
-        },
-      ],
-    }).compile();
-    service = module.get<TenantCacheService>(TenantCacheService);
-  });
+function setup(opts: {
+  members?: Member[];
+  profile?: Record<string, unknown> | null;
+  activeTenants?: string[];
+}) {
+  const members = [...(opts.members ?? [])];
+  const active = new Set(opts.activeTenants ?? members.map((m) => m.tenant_id));
+  const tenantRepo = {
+    find: jest.fn(async ({ where }: { where: { id: { _value: string[] } } }) =>
+      where.id._value.filter((id) => active.has(id)).map((id) => ({ id })),
+    ),
+    exists: jest.fn(async ({ where }: { where: { id: string } }) => active.has(where.id)),
+    insert: jest.fn(async ({ id }: { id: string }) => {
+      active.add(id);
+    }),
+    findOne: jest.fn(),
+  };
+  const memberRepo = {
+    find: jest.fn(async ({ where }: { where: { user_id: string } }) =>
+      members.filter((m) => m.user_id === where.user_id),
+    ),
+    upsert: jest.fn(async (row: Member) => {
+      members.push({ ...row, created_at: '2026-10-27' });
+    }),
+  };
+  const profileRepo = { findOne: jest.fn(async () => opts.profile ?? null) };
+  const service = new TenantCacheService(
+    tenantRepo as never,
+    memberRepo as never,
+    profileRepo as never,
+  );
+  return { service, tenantRepo, memberRepo, profileRepo };
+}
 
-  it('returns tenantId when the tenant exists', async () => {
-    mockFindOne.mockResolvedValueOnce({ id: 'tenant-abc', owner_user_id: 'user-1' });
-    expect(await service.resolve('user-1')).toBe('tenant-abc');
-    expect(mockFindOne).toHaveBeenCalledWith({ where: { owner_user_id: 'user-1' } });
-  });
+const m = (tenant_id: string, role: string): Member => ({
+  tenant_id,
+  user_id: 'u1',
+  role,
+  created_at: '2026-10-01',
+});
 
-  it('returns null when the tenant is missing', async () => {
-    mockFindOne.mockResolvedValueOnce(null);
-    expect(await service.resolve('unknown')).toBeNull();
-  });
-
-  it('caches subsequent lookups for the same user', async () => {
-    mockFindOne.mockResolvedValueOnce({ id: 'tenant-abc' });
-    await service.resolve('user-1');
-    await service.resolve('user-1');
-    expect(mockFindOne).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT cache a missing tenant — re-queries until one exists (first-run 404 regression)', async () => {
-    // First resolve: the user has no tenant yet (e.g. the create-agent guard
-    // runs before its handler creates the tenant).
-    mockFindOne.mockResolvedValueOnce(null);
-    expect(await service.resolve('user-1')).toBeNull();
-
-    // The tenant is created between the two calls.
-    mockFindOne.mockResolvedValueOnce({ id: 'tenant-created' });
-    expect(await service.resolve('user-1')).toBe('tenant-created');
-
-    // The null was never cached, so the second call had to re-hit the DB —
-    // otherwise the freshly created tenant would stay invisible for the TTL and
-    // provider/routing endpoints would 404 "Tenant not found".
-    expect(mockFindOne).toHaveBeenCalledTimes(2);
-  });
-
-  it('invalidate() forces the next resolve() to re-hit the DB', async () => {
-    // First resolve populates the cache.
-    mockFindOne.mockResolvedValueOnce({ id: 'tenant-abc' });
-    await service.resolve('user-1');
-    expect(mockFindOne).toHaveBeenCalledTimes(1);
-
-    // Invalidate clears the cached entry.
-    service.invalidate('user-1');
-
-    // Next resolve must re-query.
-    mockFindOne.mockResolvedValueOnce({ id: 'tenant-abc-refreshed' });
-    const result = await service.resolve('user-1');
-    expect(mockFindOne).toHaveBeenCalledTimes(2);
-    expect(result).toBe('tenant-abc-refreshed');
-  });
-
-  it('invalidate() on an unknown user is a no-op (does not throw)', () => {
-    expect(() => service.invalidate('no-such-user')).not.toThrow();
-  });
-
-  describe('ensureForUser', () => {
-    it('returns the existing tenant id without inserting when one exists', async () => {
-      mockFindOne.mockResolvedValueOnce({ id: 'tenant-existing' });
-      const result = await service.ensureForUser('user-1');
-      expect(result).toBe('tenant-existing');
-      expect(mockInsert).not.toHaveBeenCalled();
+describe('TenantCacheService (ADR 0006)', () => {
+  it('returns no organization for a user without memberships', async () => {
+    const { service } = setup({});
+    await expect(service.resolveAccess('u1')).resolves.toMatchObject({
+      tenantId: null,
+      role: null,
     });
+  });
 
-    it('inserts a new tenant keyed by owner_user_id when none exists', async () => {
-      mockFindOne.mockResolvedValueOnce(null);
-      const result = await service.ensureForUser('user-2');
-      expect(mockInsert).toHaveBeenCalledTimes(1);
-      const inserted = mockInsert.mock.calls[0][0];
-      expect(inserted).toEqual(
-        expect.objectContaining({
-          id: result,
-          name: 'user-2',
-          owner_user_id: 'user-2',
-          is_active: true,
-        }),
-      );
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
+  it('picks the first membership, or the saved active one', async () => {
+    const first = setup({ members: [m('t1', 'owner'), m('t2', 'viewer')] });
+    await expect(first.service.resolveAccess('u1')).resolves.toMatchObject({
+      tenantId: 't1',
+      role: 'owner',
     });
-
-    it('re-finds by owner_user_id when the insert races and loses', async () => {
-      // resolve() finds nothing → attempt insert → insert throws (unique
-      // index on owner_user_id) → re-find returns the surviving row.
-      mockFindOne.mockResolvedValueOnce(null);
-      mockInsert.mockRejectedValueOnce(new Error('duplicate key value'));
-      mockFindOne.mockResolvedValueOnce({ id: 'tenant-raced' });
-
-      const result = await service.ensureForUser('user-3');
-      expect(result).toBe('tenant-raced');
-      // Second findOne is the post-race re-find, scoped by owner_user_id.
-      expect(mockFindOne).toHaveBeenLastCalledWith({ where: { owner_user_id: 'user-3' } });
+    const saved = setup({
+      members: [m('t1', 'owner'), m('t2', 'viewer')],
+      profile: { active_tenant_id: 't2' },
     });
-
-    it('rethrows the original insert error when the re-find finds nothing (not a race)', async () => {
-      mockFindOne.mockResolvedValueOnce(null);
-      mockInsert.mockRejectedValueOnce(new Error('connection terminated'));
-      mockFindOne.mockResolvedValueOnce(null);
-
-      await expect(service.ensureForUser('user-4')).rejects.toThrow('connection terminated');
+    await expect(saved.service.resolveAccess('u1')).resolves.toMatchObject({
+      tenantId: 't2',
+      role: 'viewer',
     });
+  });
+
+  it('honours a requested organization the user belongs to', async () => {
+    const { service } = setup({ members: [m('t1', 'owner'), m('t2', 'member')] });
+    await expect(service.resolveAccess('u1', 't2')).resolves.toMatchObject({
+      tenantId: 't2',
+      role: 'member',
+    });
+  });
+
+  it('refuses a requested organization the user does not belong to', async () => {
+    const { service } = setup({ members: [m('t1', 'owner')], activeTenants: ['t1', 't9'] });
+    await expect(service.resolveAccess('u1', 't9')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets the instance admin act as owner in any active organization', async () => {
+    const { service } = setup({
+      members: [],
+      profile: { is_instance_admin: true },
+      activeTenants: ['t9'],
+    });
+    await expect(service.resolveAccess('u1', 't9')).resolves.toMatchObject({
+      tenantId: 't9',
+      role: 'owner',
+      isInstanceAdmin: true,
+    });
+  });
+
+  it('drops deactivated organizations', async () => {
+    const { service } = setup({ members: [m('t1', 'owner')], activeTenants: [] });
+    await expect(service.resolve('u1')).resolves.toBeNull();
+  });
+
+  it('reports the forced password change flag', async () => {
+    const { service } = setup({ profile: { must_change_password: true } });
+    await expect(service.resolveAccess('u1')).resolves.toMatchObject({ mustChangePassword: true });
+  });
+
+  it('caches access until invalidated', async () => {
+    const { service, memberRepo } = setup({ members: [m('t1', 'owner')] });
+    await service.resolve('u1');
+    await service.resolve('u1');
+    expect(memberRepo.find).toHaveBeenCalledTimes(1);
+    service.invalidate('u1');
+    await service.resolve('u1');
+    expect(memberRepo.find).toHaveBeenCalledTimes(2);
+  });
+
+  it('ensureForUser creates a personal organization owned by the user', async () => {
+    const { service, tenantRepo, memberRepo } = setup({});
+    const id = await service.ensureForUser('u1');
+    expect(tenantRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ id, owner_user_id: 'u1' }),
+    );
+    expect(memberRepo.upsert).toHaveBeenCalledWith(
+      { tenant_id: id, user_id: 'u1', role: 'owner' },
+      ['tenant_id', 'user_id'],
+    );
+    await expect(service.resolve('u1')).resolves.toBe(id);
+  });
+
+  it('ensureForUser returns an existing membership without creating', async () => {
+    const { service, tenantRepo } = setup({ members: [m('t1', 'member')] });
+    await expect(service.ensureForUser('u1')).resolves.toBe('t1');
+    expect(tenantRepo.insert).not.toHaveBeenCalled();
   });
 });

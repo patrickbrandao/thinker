@@ -25,7 +25,9 @@ import {
   makeAgentProviderRouteMatcher,
   type AffectedVirtualModel,
 } from './routing-core/agent-provider-impact';
+import { MinRole } from '../common/decorators/roles.decorator';
 
+@MinRole('admin')
 @Controller('api/v1/agents/:agentName/enabled-providers')
 export class AgentEnabledProvidersController {
   constructor(

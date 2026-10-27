@@ -24,6 +24,7 @@ import {
   AgentProviderParamDto,
   RemoveProviderQueryDto,
 } from './dto/routing.dto';
+import { MinRole } from '../common/decorators/roles.decorator';
 
 function formatModelSlug(slug: string): string {
   return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -54,6 +55,7 @@ function displayNameForModel(
   return trimmedDisplay || null;
 }
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class ModelController {
   constructor(

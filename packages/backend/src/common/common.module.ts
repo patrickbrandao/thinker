@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
+import { OrganizationMember } from '../entities/organization-member.entity';
+import { UserProfile } from '../entities/user-profile.entity';
 import { IngestEventBusService } from './services/ingest-event-bus.service';
 import { ThinkerRuntimeService } from './services/thinker-runtime.service';
 import { TenantCacheService } from './services/tenant-cache.service';
@@ -14,7 +16,7 @@ import { AgentListCacheService } from './services/agent-list-cache.service';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant, Agent])],
+  imports: [TypeOrmModule.forFeature([Tenant, Agent, OrganizationMember, UserProfile])],
   providers: [
     IngestEventBusService,
     ThinkerRuntimeService,

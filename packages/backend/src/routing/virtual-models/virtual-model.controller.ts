@@ -20,6 +20,7 @@ import {
   ToggleVirtualModelDto,
   UpdateVirtualModelDto,
 } from './virtual-model.dto';
+import { MinRole } from '../../common/decorators/roles.decorator';
 
 /**
  * Admin API for virtual models (ADR 0004), in parity with
@@ -27,6 +28,7 @@ import {
  * the service scopes every row to that agent, so another agent's or tenant's
  * id is a 404.
  */
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class VirtualModelController {
   constructor(

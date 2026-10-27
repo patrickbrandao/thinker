@@ -100,12 +100,13 @@ describe('NotificationLogService', () => {
       expect(mockQuery).not.toHaveBeenCalled();
     });
 
-    it('resolves the owner email via tenants LEFT JOIN user on owner_user_id', async () => {
+    it('resolves the oldest organization owner, then the legacy owner and tenant email', async () => {
       mockQuery.mockResolvedValue([{ email: 'owner@test.com' }]);
       expect(await service.resolveRecipientEmail('tenant-1')).toBe('owner@test.com');
       expect(mockQuery).toHaveBeenCalledTimes(1);
       const [sql, params] = mockQuery.mock.calls[0];
-      expect(sql).toContain('COALESCE(u.email, t.email)');
+      expect(sql).toContain("om.role = 'owner'");
+      expect(sql).toContain('u.email, t.email)');
       expect(sql).toContain('FROM tenants t');
       expect(sql).toContain('LEFT JOIN "user" u ON u.id = t.owner_user_id');
       expect(sql).toContain('WHERE t.id = $1');

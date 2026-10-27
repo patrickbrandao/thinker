@@ -197,6 +197,7 @@ const OPERATOR: McpOperator = {
   userId: 'user-1',
   tenantId: TENANT,
   scopes: new Set(['mcp:read', 'mcp:write']),
+  role: 'owner',
 };
 
 function parse(res: unknown): { data?: unknown; error?: boolean; text: string } {

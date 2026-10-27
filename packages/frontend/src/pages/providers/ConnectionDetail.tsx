@@ -48,6 +48,7 @@ import { AGENT_COLORS } from '../../components/MultiAgentTokenChart.jsx';
 import Select from '../../components/Select.jsx';
 import { setConnectionBreadcrumb } from '../../services/connection-breadcrumb-store.js';
 import { toast } from '../../services/toast-store.js';
+import { roleCan } from '../../services/session-store.js';
 import '../../styles/charts.css';
 import '../../styles/analytics-overview.css';
 import '../../styles/connection-detail.css';
@@ -781,9 +782,11 @@ const ConnectionDetail: Component = () => {
                     onChange={setChartRange}
                     options={CD_RANGE_OPTIONS}
                   />
-                  <button class="btn btn--outline btn--sm" onClick={openManageModal}>
-                    Manage
-                  </button>
+                  <Show when={roleCan.manageProviders()}>
+                    <button class="btn btn--outline btn--sm" onClick={openManageModal}>
+                      Manage
+                    </button>
+                  </Show>
                 </div>
               </div>
 

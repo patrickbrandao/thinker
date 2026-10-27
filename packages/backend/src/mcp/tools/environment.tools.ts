@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { PLATFORM_SETUP_SNIPPETS } from 'thinker-shared';
 import { authOrigin } from '../../auth/auth.instance';
-import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
+import { canWrite as operatorCanWrite, McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
 
@@ -44,7 +44,7 @@ export function registerEnvironmentTools(
   deps: McpToolDeps,
   operator: McpOperator,
 ): void {
-  const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
+  const canWrite = operatorCanWrite(operator, 'admin');
 
   server.registerTool(
     'thinker_agent_setup',

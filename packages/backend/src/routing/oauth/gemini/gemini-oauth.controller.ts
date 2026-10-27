@@ -21,7 +21,9 @@ import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 import { ProviderKeyService } from '../../routing-core/provider-key.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/gemini')
 export class GeminiOauthController {
   private readonly logger = new Logger(GeminiOauthController.name);

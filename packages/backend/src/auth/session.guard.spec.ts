@@ -44,18 +44,34 @@ function createMockContext(overrides: { ip?: string; headers?: Record<string, st
 describe('SessionGuard', () => {
   let guard: SessionGuard;
   let reflector: Reflector;
-  let tenantCache: { resolve: jest.Mock; ensureForUser: jest.Mock; invalidate: jest.Mock };
+  let tenantCache: {
+    resolve: jest.Mock;
+    resolveAccess: jest.Mock;
+    ensureForUser: jest.Mock;
+    invalidate: jest.Mock;
+  };
 
   beforeEach(() => {
     reflector = new Reflector();
     tenantCache = {
       resolve: jest.fn().mockResolvedValue('tenant-1'),
+      resolveAccess: jest.fn(),
       ensureForUser: jest.fn(),
       invalidate: jest.fn(),
     };
     guard = new SessionGuard(reflector, tenantCache as never);
     jest.clearAllMocks();
     tenantCache.resolve.mockResolvedValue('tenant-1');
+    // resolveAccess delegates to the resolve mock so each test drives one stub.
+    tenantCache.resolveAccess.mockImplementation(async (userId: string) => {
+      const tenantId = await tenantCache.resolve(userId);
+      return {
+        tenantId,
+        role: tenantId ? 'owner' : null,
+        isInstanceAdmin: false,
+        mustChangePassword: false,
+      };
+    });
   });
 
   afterEach(() => {
@@ -113,7 +129,7 @@ describe('SessionGuard', () => {
     await guard.canActivate(context);
 
     expect(tenantCache.resolve).toHaveBeenCalledWith('user-1');
-    expect(request['tenantContext']).toEqual({ tenantId: 'tenant-42', userId: 'user-1' });
+    expect(request['tenantContext']).toMatchObject({ tenantId: 'tenant-42', userId: 'user-1' });
   });
 
   it('attaches tenantContext with a null tenantId for a fresh user without a tenant', async () => {
@@ -127,7 +143,7 @@ describe('SessionGuard', () => {
 
     await guard.canActivate(context);
 
-    expect(request['tenantContext']).toEqual({ tenantId: null, userId: 'fresh-user' });
+    expect(request['tenantContext']).toMatchObject({ tenantId: null, userId: 'fresh-user' });
   });
 
   it('fails soft with a null tenantId when tenant resolution throws (no request crash)', async () => {
@@ -142,7 +158,7 @@ describe('SessionGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(request['tenantContext']).toEqual({ tenantId: null, userId: 'user-1' });
+    expect(request['tenantContext']).toMatchObject({ tenantId: null, userId: 'user-1' });
   });
 
   it('returns true even when no session found (anonymous passthrough)', async () => {

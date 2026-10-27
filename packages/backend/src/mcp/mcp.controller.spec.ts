@@ -32,7 +32,15 @@ const { createMcpHandler } = jest.requireMock('@modelcontextprotocol/server') as
 
 function makeController(tenantId: string | null): McpController {
   const args: unknown[] = new Array(24).fill(undefined);
-  args[1] = { resolve: jest.fn().mockResolvedValue(tenantId) };
+  args[1] = {
+    resolve: jest.fn().mockResolvedValue(tenantId),
+    resolveAccess: jest.fn().mockResolvedValue({
+      tenantId,
+      role: tenantId ? 'owner' : null,
+      isInstanceAdmin: false,
+      mustChangePassword: false,
+    }),
+  };
   return new (McpController as unknown as new (...a: unknown[]) => McpController)(...args);
 }
 

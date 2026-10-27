@@ -5,7 +5,9 @@ import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { CopilotDeviceAuthService } from './copilot-device-auth.service';
 import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { AgentNameParamDto, CopilotPollDto } from '../../dto/routing.dto';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/routing')
 export class CopilotController {
   constructor(

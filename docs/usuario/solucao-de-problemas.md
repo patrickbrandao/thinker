@@ -32,7 +32,7 @@ Quando todos os modelos do tier falham, o cliente recebe o erro do provedor da �
 
 **Não acho o token de setup.** `docker compose logs thinker | grep 'setup token'`. Se o container reiniciou, procure a linha mais recente: cada boot sem usuários imprime um token novo. Com várias réplicas, use o log da réplica que vai receber o setup. Se `THINKER_SETUP_TOKEN` estiver definido, o token é o valor dessa variável e não aparece no log. Copiando de um visualizador que mostra as cores cruas (Portainer, por exemplo), não leve o `[39m` do fim da linha.
 
-**Quero criar mais contas e o cadastro está fechado (`SIGNUP_DISABLED`, HTTP 403).** O cadastro público é fechado de propósito. Use `THINKER_ALLOW_SIGNUP=true` temporariamente.
+**Quero criar mais contas e o cadastro está fechado (`SIGNUP_DISABLED`, HTTP 403).** O cadastro público é fechado de propósito. O admin da instância cria as contas em **Users**, e owners/admins de uma organização em **Members & settings**, com senha temporária. Veja [Organizações](organizacoes.md).
 
 **Chamadas MCP respondem `401 no token payload`.** `BETTER_AUTH_URL` não é alcançável de dentro do container. Veja [Instalação](instalacao-docker.md#porta-e-acesso-pela-rede).
 

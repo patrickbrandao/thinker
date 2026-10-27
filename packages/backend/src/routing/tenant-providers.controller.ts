@@ -27,6 +27,7 @@ import {
   RemoveProviderQueryDto,
   RenameProviderKeyDto,
 } from './dto/routing.dto';
+import { MinRole } from '../common/decorators/roles.decorator';
 
 /**
  * Tenant-level provider management endpoints.
@@ -44,6 +45,7 @@ import {
  * twins of the `/routing/:agentName/providers/*` routes. Connections belong to
  * the tenant, so managing one must not require a harness to exist.
  */
+@MinRole('admin')
 @Controller('api/v1/providers')
 export class TenantProvidersController {
   constructor(

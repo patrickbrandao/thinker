@@ -1,4 +1,12 @@
-import { CanActivate, ExecutionContext, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -7,6 +15,16 @@ import { auth } from './auth.instance';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
 import { RequestWithTenantContext } from '../common/decorators/tenant-context.decorator';
+
+/** Dashboard header that picks the active organization (ADR 0006). */
+export const ORGANIZATION_HEADER = 'x-thinker-organization';
+
+/**
+ * While an account still has its temporary password, only these session
+ * routes answer; everything else is a 403 the dashboard turns into the
+ * change-password screen.
+ */
+const PASSWORD_CHANGE_ALLOWED = [/^\/api\/v1\/me\/?$/, /^\/api\/v1\/me\/password\/?$/];
 
 interface CachedSession {
   user: unknown;
@@ -100,17 +118,36 @@ export class SessionGuard implements CanActivate, OnModuleDestroy {
   private async attachTenantContext(request: Request, user: unknown): Promise<void> {
     const userId = (user as { id?: unknown } | null)?.id;
     if (typeof userId !== 'string' || userId.length === 0) return;
+    const header = request.headers[ORGANIZATION_HEADER];
+    const requested = typeof header === 'string' && header.trim() ? header.trim() : null;
     try {
-      const tenantId = await this.tenantCache.resolve(userId);
-      (request as RequestWithTenantContext).tenantContext = { tenantId, userId };
+      const access = await this.tenantCache.resolveAccess(userId, requested);
+      (request as RequestWithTenantContext).tenantContext = { userId, ...access };
+      if (access.mustChangePassword && !this.isPasswordChangeRoute(request)) {
+        throw new ForbiddenException({
+          message: 'Change your temporary password before continuing.',
+          code: 'password_change_required',
+        });
+      }
     } catch (err) {
+      if (err instanceof HttpException) throw err;
       // Fail soft: a transient resolution failure (e.g. DB hiccup) must not
       // crash every authenticated request — especially the cached-session
       // fast path, which never touched the DB before tenant scoping. A null
       // tenant means read endpoints return empty and mutations 404.
       this.logger.warn(`Tenant resolution failed for session user: ${(err as Error).message}`);
-      (request as RequestWithTenantContext).tenantContext = { tenantId: null, userId };
+      // Least privilege until resolution works again.
+      (request as RequestWithTenantContext).tenantContext = {
+        tenantId: null,
+        userId,
+        role: 'viewer',
+      };
     }
+  }
+
+  private isPasswordChangeRoute(request: Request): boolean {
+    const path = (request.originalUrl ?? request.url ?? '').split('?')[0] ?? '';
+    return PASSWORD_CHANGE_ALLOWED.some((re) => re.test(path));
   }
 
   invalidateCache(cookieHeader?: string): void {

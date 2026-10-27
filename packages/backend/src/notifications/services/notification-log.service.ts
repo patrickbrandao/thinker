@@ -73,7 +73,13 @@ export class NotificationLogService {
     if (notificationEmail) return notificationEmail;
 
     const rows = await this.ds.query(
-      `SELECT COALESCE(u.email, t.email) AS email
+      // The organization's oldest owner (ADR 0006), then the legacy owner.
+      `SELECT COALESCE(
+                (SELECT ou.email FROM organization_members om
+                   JOIN "user" ou ON ou.id = om.user_id
+                  WHERE om.tenant_id = t.id AND om.role = 'owner'
+                  ORDER BY om.created_at ASC LIMIT 1),
+                u.email, t.email) AS email
          FROM tenants t
          LEFT JOIN "user" u ON u.id = t.owner_user_id
          WHERE t.id = $1`,

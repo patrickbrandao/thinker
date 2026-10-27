@@ -166,7 +166,9 @@ describe('CustomProviderController', () => {
         body as never,
       );
 
-      expect(mockCustomProviderService.create).toHaveBeenCalledWith('tenant-1', body, 'user-1');
+      expect(mockCustomProviderService.create).toHaveBeenCalledWith('tenant-1', body, 'user-1', {
+        allowPrivate: true,
+      });
       expect(result.id).toBe('cp-1');
       expect(result.name).toBe('Groq');
       expect(result.has_api_key).toBe(true);
@@ -224,6 +226,7 @@ describe('CustomProviderController', () => {
         'tenant-1',
         body,
         'user-1',
+        { allowPrivate: true },
       );
       expect(result.id).toBe('cp-1');
       expect(result.name).toBe('Updated Groq');
@@ -283,6 +286,7 @@ describe('CustomProviderController', () => {
         'sk-x',
         undefined,
         undefined,
+        { allowPrivate: true },
       );
       expect(result).toEqual({ models: [{ model_name: 'm1' }, { model_name: 'm2' }] });
     });
@@ -300,6 +304,7 @@ describe('CustomProviderController', () => {
         'sk-typed',
         undefined,
         undefined,
+        { allowPrivate: true },
       );
     });
 
@@ -314,6 +319,7 @@ describe('CustomProviderController', () => {
         'sk-ant-x',
         'anthropic',
         undefined,
+        { allowPrivate: true },
       );
     });
 
@@ -328,6 +334,7 @@ describe('CustomProviderController', () => {
         'kilo-x',
         undefined,
         'Kilo Gateway',
+        { allowPrivate: true },
       );
     });
 
@@ -353,6 +360,7 @@ describe('CustomProviderController', () => {
         'sk-stored',
         'anthropic',
         undefined,
+        { allowPrivate: true },
       );
     });
 
@@ -369,6 +377,7 @@ describe('CustomProviderController', () => {
         undefined,
         undefined,
         undefined,
+        { allowPrivate: true },
       );
     });
 
@@ -384,6 +393,7 @@ describe('CustomProviderController', () => {
         undefined,
         undefined,
         undefined,
+        { allowPrivate: true },
       );
     });
 

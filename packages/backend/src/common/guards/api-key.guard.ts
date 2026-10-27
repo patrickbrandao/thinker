@@ -16,6 +16,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RequestWithTenantContext } from '../decorators/tenant-context.decorator';
 import { verifyKey, keyPrefix as computePrefix } from '../utils/hash.util';
 import { toLocalSqlTimestamp } from '../utils/postgres-sql';
+import { TenantCacheService } from '../services/tenant-cache.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -26,6 +27,7 @@ export class ApiKeyGuard implements CanActivate {
     private readonly configService: ConfigService,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepo: Repository<ApiKey>,
+    private readonly tenantCache: TenantCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -71,9 +73,17 @@ export class ApiKeyGuard implements CanActivate {
       // row — no key → user → tenant indirection. The creating user is kept
       // as attribution so @CurrentUser-scoped controllers (and audit writes)
       // still see a user when one exists.
+      // The key carries its creator's CURRENT role in that organization
+      // (ADR 0006); a creator who left the organization loses the key (403).
+      // Legacy keys with no creator act as the organization's owner.
+      const access = found.created_by_user_id
+        ? await this.tenantCache.resolveAccess(found.created_by_user_id, found.tenant_id)
+        : { role: 'owner' as const, isInstanceAdmin: false, mustChangePassword: false };
       (request as RequestWithTenantContext).tenantContext = {
         tenantId: found.tenant_id,
         userId: found.created_by_user_id,
+        role: access.role,
+        isInstanceAdmin: access.isInstanceAdmin,
       };
       if (found.created_by_user_id) {
         (request as Request & { user: { id: string } }).user = {

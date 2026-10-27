@@ -99,6 +99,7 @@ function routingStatus(): Promise<Record<string, unknown>> {
     userId: 'mcp-user',
     tenantId: TEST_TENANT_ID,
     scopes: new Set(['mcp:read']),
+    role: 'owner',
   };
   registerRoutingTools(server, deps, op);
   return registered.get('thinker_routing_status')!({ agent: 'test-agent' }).then((res) =>

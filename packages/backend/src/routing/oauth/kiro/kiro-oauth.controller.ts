@@ -13,7 +13,9 @@ import { KiroAuthorizationOptionsError, type KiroAuthorizationOptions } from './
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/kiro')
 export class KiroOauthController {
   constructor(

@@ -174,11 +174,12 @@ Regras:
 
 ## Autenticação
 
-Três guards globais, nesta ordem:
+Quatro guards globais, nesta ordem:
 
 1. **SessionGuard** (`auth/session.guard.ts`): respeita `@Public()`; valida o cookie de sessão do Better Auth.
 2. **ApiKeyGuard** (`common/guards/api-key.guard.ts`): sem sessão, lê `X-API-Key` e procura na tabela `api_keys` (hash scrypt, escopo de tenant). Só se não achar compara, em tempo constante, com a variável `API_KEY`. Os tokens da CLI (`thinker login`) são linhas de `api_keys` chamadas `cli`, com TTL deslizante (`CLI_TOKEN_TTL_DAYS`, 30) e teto absoluto (`CLI_TOKEN_ABSOLUTE_TTL_DAYS`, 90).
-3. **ThrottlerGuard**: limite de requisições (`THROTTLE_*`); o proxy `/v1/*` e o SSE ficam fora (`@SkipThrottle()`), pois têm limites próprios (`THINKER_RATE_MAX_REQUESTS`, `THINKER_IP_RATE_MAX_REQUESTS`, `THINKER_CONCURRENCY_MAX`).
+3. **RolesGuard** (`common/guards/roles.guard.ts`): papel na organização ativa (ADR 0006). Leituras pedem `viewer`; os demais métodos, `member`. `@MinRole('admin')` sobe a exigência das mutações (provedores, credenciais, roteamento, notificações); com `{ includeReads: true }` vale também para GET (início de OAuth). `@InstanceAdminOnly()` restringe ao admin da instância.
+4. **ThrottlerGuard**: limite de requisições (`THROTTLE_*`); o proxy `/v1/*` e o SSE ficam fora (`@SkipThrottle()`), pois têm limites próprios (`THINKER_RATE_MAX_REQUESTS`, `THINKER_IP_RATE_MAX_REQUESTS`, `THINKER_CONCURRENCY_MAX`).
 
 As rotas `/v1/*` usam a chave do harness (`AgentKeyAuthGuard`, em `otlp/guards/`), em `Authorization: Bearer thk_...` ou `x-api-key`. Chaves diferentes nos dois cabeçalhos dão `M006`. A verificação consulta o banco a cada requisição para que rotação e exclusão valham em todas as réplicas; o contexto verificado fica em cache de 5 minutos.
 
@@ -195,16 +196,19 @@ Nomes herdados: `common/utils/legacy-env.ts` registra no boot um aviso com o nom
 ## Multi-tenancy
 
 ```text
-Usuário (Better Auth) ──→ Tenant ──→ Agent ──→ AgentApiKey (thk_*)
-                                       └──→ requests ──→ agent_messages
+Usuário (Better Auth) ──→ organization_members ──→ Tenant (organização) ──→ Agent ──→ AgentApiKey (thk_*)
+                                                                             └──→ requests ──→ agent_messages
 ```
 
-- **Tenant** (`tenants`): criado na primeira criação de agente; `owner_user_id` é o único vínculo usuário→tenant (resolvido por `TenantCacheService`).
+- **Organização = tenant** (`tenants`, [ADR 0006](../adr/0006-organizacoes-e-papeis.md)). O nome visível é `organization_name`. `owner_user_id` é legado e não é mais lido na resolução.
+- **Membros** (`organization_members`): `(tenant_id, user_id, role)`, papéis `viewer < member < admin < owner`. Um usuário pode estar em várias organizações.
+- **Perfil** (`user_profiles`): `is_instance_admin`, `must_change_password` e `active_tenant_id`.
+- **Resolução** (`TenantCacheService.resolveAccess`, cache de 5 min invalidado em toda mudança de membro ou perfil): cabeçalho `X-Thinker-Organization`, senão `active_tenant_id`, senão a primeira associação. Organização pedida sem associação dá 403, exceto para o admin da instância, que entra como `owner`. Sem organização nenhuma, a primeira mutação cria uma pessoal (`ensureForUser`).
+- Os guards anexam um `TenantContext` (`@TenantCtx()`) com `tenantId`, `userId`, `role`, `isInstanceAdmin` e `mustChangePassword`. Toda consulta filtra por tenant (`addTenantFilter`). **Nunca** escope, cacheie ou autorize por id de usuário.
+- Chaves de CLI (`api_keys`) carregam o papel atual de quem as criou naquela organização. O MCP limita as ferramentas de escrita pelo papel (`canWrite` em `mcp/mcp-auth.ts`: agentes pedem `member`; provedores e roteamento, `admin`).
+- **Contas** (`organizations/`): o admin da instância e owner/admin de uma organização criam contas com senha temporária (`AccountsService`, via `runAsServerUserCreation`). Enquanto `must_change_password` estiver ligado, o `SessionGuard` só deixa passar `GET /api/v1/me` e `POST /api/v1/me/password` (403 `password_change_required`). A redefinição pelo admin apaga as linhas de `session`, mas o cookie cache do Better Auth (5 min) mantém o cookie antigo válido nesse intervalo; como a flag volta a ligar e a troca exige a senha atual, esse cookie não faz nada além de ler `/me`.
 - **Agent** (`agents`): pertence a um tenant; único por `[tenant_id, name]`.
 - **AgentApiKey** (`agent_api_keys`): a chave `thk_*` do agente. **ApiKey** (`api_keys`): credencial de gestão do tenant, distinta da anterior.
-- Os guards resolvem o tenant uma vez por requisição e anexam um `TenantContext` (`@TenantCtx()`). Toda consulta de análise filtra por tenant (`addTenantFilter`). **Nunca** escope, cacheie ou autorize por id de usuário.
-
-Organizações e papéis chegam na v0.3.
 
 ## Roteamento e proxy
 

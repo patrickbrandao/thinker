@@ -36,6 +36,7 @@ import {
 import InfoTooltip from '../../components/InfoTooltip.jsx';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import { toast } from '../../services/toast-store.js';
+import { roleCan } from '../../services/session-store.js';
 import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import Sparkline from '../../components/Sparkline.jsx';
@@ -541,7 +542,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
           <h1 class="page-header__title">{copy().heading}</h1>
           <p class="page-header__subtitle">{copy().subtitle}</p>
         </div>
-        <Show when={copy().customAddLabel}>
+        <Show when={copy().customAddLabel && roleCan.manageProviders()}>
           <button
             class="btn btn--outline btn--sm"
             onClick={() => openCustomProvider()}
@@ -685,25 +686,27 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                                 class="connection-label-cell"
                               >
                                 {row.connection.label}
-                                <button
-                                  type="button"
-                                  class="connection-label-cell__edit"
-                                  onClick={(e) =>
-                                    startRename(row.connection.id, row.connection.label, e)
-                                  }
-                                  aria-label={`Rename ${row.connection.label}`}
-                                  style="background: none; border: none; cursor: pointer; padding: 2px; color: hsl(var(--muted-foreground)); opacity: 0; transition: opacity 0.15s; display: inline-flex; align-items: center; line-height: 1;"
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
+                                <Show when={roleCan.manageProviders()}>
+                                  <button
+                                    type="button"
+                                    class="connection-label-cell__edit"
+                                    onClick={(e) =>
+                                      startRename(row.connection.id, row.connection.label, e)
+                                    }
+                                    aria-label={`Rename ${row.connection.label}`}
+                                    style="background: none; border: none; cursor: pointer; padding: 2px; color: hsl(var(--muted-foreground)); opacity: 0; transition: opacity 0.15s; display: inline-flex; align-items: center; line-height: 1;"
                                   >
-                                    <path d="M5 21h14c1.1 0 2-.9 2-2v-7h-2v7H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2" />
-                                    <path d="M7 13v3c0 .55.45 1 1 1h3c.27 0 .52-.11.71-.29l9-9a.996.996 0 0 0 0-1.41l-3-3a.996.996 0 0 0-1.41 0l-9.01 8.99A1 1 0 0 0 7 13m10-7.59L18.59 7 17.5 8.09 15.91 6.5zm-8 8 5.5-5.5 1.59 1.59-5.5 5.5H9z" />
-                                  </svg>
-                                </button>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <path d="M5 21h14c1.1 0 2-.9 2-2v-7h-2v7H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2" />
+                                      <path d="M7 13v3c0 .55.45 1 1 1h3c.27 0 .52-.11.71-.29l9-9a.996.996 0 0 0 0-1.41l-3-3a.996.996 0 0 0-1.41 0l-9.01 8.99A1 1 0 0 0 7 13m10-7.59L18.59 7 17.5 8.09 15.91 6.5zm-8 8 5.5-5.5 1.59 1.59-5.5 5.5H9z" />
+                                    </svg>
+                                  </button>
+                                </Show>
                               </span>
                             }
                           >
@@ -944,14 +947,16 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                               {activeLabel(activeCount())}
                             </span>
                           </Show>
-                          <button
-                            class="btn btn--outline btn--sm"
-                            disabled={!firstAgentName()}
-                            style="white-space: nowrap;"
-                            onClick={() => openModal(provider.id)}
-                          >
-                            {copy().addLabel}
-                          </button>
+                          <Show when={roleCan.manageProviders()}>
+                            <button
+                              class="btn btn--outline btn--sm"
+                              disabled={!firstAgentName()}
+                              style="white-space: nowrap;"
+                              onClick={() => openModal(provider.id)}
+                            >
+                              {copy().addLabel}
+                            </button>
+                          </Show>
                         </span>
                       </td>
                     </tr>
@@ -996,14 +1001,16 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                         {activeLabel(activeCount())}
                       </span>
                     </Show>
-                    <button
-                      class="btn btn--outline btn--sm"
-                      disabled={!firstAgentName()}
-                      style="font-size: var(--font-size-xs); white-space: nowrap;"
-                      onClick={() => openModal(provider.id)}
-                    >
-                      {copy().addLabel}
-                    </button>
+                    <Show when={roleCan.manageProviders()}>
+                      <button
+                        class="btn btn--outline btn--sm"
+                        disabled={!firstAgentName()}
+                        style="font-size: var(--font-size-xs); white-space: nowrap;"
+                        onClick={() => openModal(provider.id)}
+                      >
+                        {copy().addLabel}
+                      </button>
+                    </Show>
                   </div>
                 </div>
               );

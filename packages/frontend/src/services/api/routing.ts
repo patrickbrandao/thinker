@@ -1,3 +1,4 @@
+import { withOrganizationHeader } from '../org-context.js';
 import type {
   AuthType,
   ModelCapability,
@@ -183,7 +184,7 @@ export async function copilotPollToken(agentName: string, deviceCode: string) {
   const res = await fetch(`/api/v1${routingPath(agentName, 'copilot/poll-token')}`, {
     credentials: 'include',
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ deviceCode }),
   });
   if (!res.ok) throw new Error(`Poll failed: ${res.status}`);
@@ -560,7 +561,7 @@ export async function probeCustomProvider(
   const res = await fetch(`${BASE_URL}${routingPath(agentName, 'custom-providers/probe')}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ base_url, apiKey, api_kind, provider_name, provider_id }),
   });
   if (!res.ok) {

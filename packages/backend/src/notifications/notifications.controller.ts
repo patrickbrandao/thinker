@@ -11,7 +11,9 @@ import {
   TestSavedEmailProviderDto,
 } from './dto/set-email-provider.dto';
 import { SetNotificationEmailDto } from './dto/set-notification-email.dto';
+import { MinRole } from '../common/decorators/roles.decorator';
 
+@MinRole('admin')
 @Controller('api/v1/notifications')
 export class NotificationsController {
   private readonly logger = new Logger(NotificationsController.name);

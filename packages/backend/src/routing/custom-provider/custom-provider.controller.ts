@@ -9,7 +9,10 @@ import {
   UpdateCustomProviderDto,
 } from '../dto/custom-provider.dto';
 import { AgentNameParamDto } from '../dto/routing.dto';
+import { MinRole } from '../../common/decorators/roles.decorator';
+import { canUsePrivateDestinations } from '../../common/utils/private-url-policy';
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class CustomProviderController {
   constructor(
@@ -77,6 +80,7 @@ export class CustomProviderController {
       apiKey,
       body.api_kind,
       body.provider_name,
+      { allowPrivate: canUsePrivateDestinations(ctx) },
     );
     return { models };
   }
@@ -92,7 +96,9 @@ export class CustomProviderController {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName, {
       allowPlayground: true,
     });
-    const cp = await this.customProviderService.create(agent.tenant_id, body, ctx.userId);
+    const cp = await this.customProviderService.create(agent.tenant_id, body, ctx.userId, {
+      allowPrivate: canUsePrivateDestinations(ctx),
+    });
     const provKey = CustomProviderService.providerKey(cp.id);
     const up = (await this.providerService.getProviders(agent.tenant_id)).find(
       (u) => u.provider === provKey,
@@ -118,7 +124,9 @@ export class CustomProviderController {
     @Body() body: UpdateCustomProviderDto,
   ) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    const cp = await this.customProviderService.update(id, agent.tenant_id, body, ctx.userId);
+    const cp = await this.customProviderService.update(id, agent.tenant_id, body, ctx.userId, {
+      allowPrivate: canUsePrivateDestinations(ctx),
+    });
     const provKey = CustomProviderService.providerKey(cp.id);
     const up = (await this.providerService.getProviders(agent.tenant_id)).find(
       (u) => u.provider === provKey,
