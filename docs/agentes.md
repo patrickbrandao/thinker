@@ -9,7 +9,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | QA Docker | `qa-docker.md` | Sonnet | Build da imagem e testes no Docker local | Não |
 | Revisor | `reviewer.md` | herda | Revisão sob demanda: bugs, segurança, isolamento | Não |
 | Backend | `backend-dev.md` | herda | NestJS, TypeORM, proxy, CLI, MCP | Sim |
-| Frontend | `frontend-dev.md` | herda | Dashboard SolidJS | Sim |
+| Frontend | `frontend-dev.md` | herda | Dashboard React | Sim |
 | Provedores | `providers.md` | herda | Adaptadores, catálogos, preços, assinaturas | Sim |
 | Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` e issues (também planeja milestones e abre as issues) |
 | DevOps | `devops.md` | herda | CI, imagem multi-arch, Docker Hub, releases | Sim (infra) |

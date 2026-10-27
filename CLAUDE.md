@@ -25,7 +25,7 @@ Do the work yourself by default; it is usually faster than delegating. Use a sub
 | Upstream changes / should we port X? | `manifest-tracker` |
 | Large cross-cutting design | `architect` |
 | NestJS / TypeORM / auth / proxy code | `backend-dev` |
-| SolidJS dashboard | `frontend-dev` |
+| React dashboard | `frontend-dev` |
 | Provider adapters, catalogs, pricing, subscription OAuth | `providers` |
 | Full Docker smoke/e2e run | `qa-docker` |
 | Review, only when the user asks | `reviewer` |
