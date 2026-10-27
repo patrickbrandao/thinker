@@ -24,6 +24,7 @@ import {
 import { analyticsPing, routingPing } from '../../services/sse.js';
 import { toggleScrollFade } from '../../services/scroll-fade.js';
 import { renameProviderKey } from '../../services/api/routing.js';
+import { getPlaygroundAgent } from '../../services/api/playground.js';
 import type { AuthType, CustomProviderData, RoutingProvider } from '../../services/api.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../../services/routing-params.js';
 import { PROVIDERS, subscriptionCatalog, type ProviderDef } from '../../services/providers.js';
@@ -352,7 +353,20 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
     }
   });
 
-  const firstAgentName = () => agents()?.[0]?.agent_name ?? '';
+  // Connections belong to the organization; the agent name only addresses the
+  // routing endpoints. With no harness yet, the reserved Playground agent
+  // stands in, so providers can be connected before the first harness.
+  const [playgroundAgent] = createResource(
+    () => (agents() !== undefined && agents()!.length === 0 ? true : undefined),
+    async () => {
+      try {
+        return (await getPlaygroundAgent()).name;
+      } catch {
+        return '';
+      }
+    },
+  );
+  const firstAgentName = () => agents()?.[0]?.agent_name ?? playgroundAgent() ?? '';
 
   const [modalProviders, { refetch: refetchModalProviders }] = createResource(
     () => firstAgentName(),

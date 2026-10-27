@@ -967,7 +967,9 @@ describe('ProviderController', () => {
       mockResolveAgent.resolve.mockRejectedValue(new NotFoundException('Tenant not found'));
 
       await expect(controller.getStatus(mockCtx, mockAgentName)).rejects.toThrow(NotFoundException);
-      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'test-agent');
+      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'test-agent', {
+        allowPlayground: true,
+      });
     });
 
     it('should throw NotFoundException when agent is not found', async () => {
@@ -996,7 +998,9 @@ describe('ProviderController', () => {
 
       await controller.getStatus(mockCtx, { agentName: 'my-agent' } as never);
 
-      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent');
+      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent', {
+        allowPlayground: true,
+      });
       expect(mockProviderService.getProviders).toHaveBeenCalledWith('tenant-1');
     });
 

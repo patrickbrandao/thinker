@@ -21,6 +21,7 @@ import { ProviderService } from '../../routing-core/provider.service';
 import { ProviderKeyService } from '../../routing-core/provider-key.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
+import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/openai')
@@ -49,7 +50,11 @@ export class OpenaiOauthController {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     // Prefer the operator-configured BETTER_AUTH_URL so a forged Host header
     // can't redirect the OAuth flow. Fall back to the request's host:port for
     // the dev case where BETTER_AUTH_URL isn't set.
@@ -82,7 +87,11 @@ export class OpenaiOauthController {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
     const keyLabel = optionalTrimmedStringQuery(label, 'label');
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const keys = await this.providerKeyService.getProviderKeys(
       agent.tenant_id,
       'openai',

@@ -20,6 +20,13 @@ export interface ResolveOptions {
   allowPlayground?: boolean;
 }
 
+/**
+ * Provider connections belong to the organization, not to one agent, so the
+ * connect, key and OAuth endpoints also accept the Playground agent. The
+ * dashboard uses it when the organization has no harness yet.
+ */
+export const PROVIDER_CONNECTION_SCOPE: ResolveOptions = { allowPlayground: true };
+
 @Injectable()
 export class ResolveAgentService {
   private readonly cache = new Map<string, CachedAgent>();

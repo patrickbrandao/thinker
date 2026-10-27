@@ -6,6 +6,7 @@ import { CopilotDeviceAuthService } from './copilot-device-auth.service';
 import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { AgentNameParamDto, CopilotPollDto } from '../../dto/routing.dto';
 import { MinRole } from '../../../common/decorators/roles.decorator';
+import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
 @Controller('api/v1/routing')
@@ -19,7 +20,11 @@ export class CopilotController {
 
   @Post(':agentName/copilot/device-code')
   async copilotDeviceCode(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
-    await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     return this.copilotAuth.requestDeviceCode();
   }
 
@@ -29,7 +34,11 @@ export class CopilotController {
     @Param() params: AgentNameParamDto,
     @Body() body: CopilotPollDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const result = await this.copilotAuth.pollForToken(body.deviceCode);
     if (result.status === 'complete' && result.token) {
       const label = await this.providerService.nextOAuthLabel(agent.tenant_id, 'copilot');

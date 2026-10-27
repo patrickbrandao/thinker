@@ -302,7 +302,9 @@ describe('CustomProviderController', () => {
         apiKey: 'sk-x',
       } as never);
 
-      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'test-agent');
+      expect(mockResolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'test-agent', {
+        allowPlayground: true,
+      });
       expect(mockCustomProviderService.probeModels).toHaveBeenCalledWith(
         'http://host.docker.internal:8000/v1',
         'sk-x',

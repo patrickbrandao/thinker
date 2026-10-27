@@ -63,7 +63,9 @@ describe('CopilotController', () => {
 
       const result = await controller.copilotDeviceCode(mockCtx, mockAgentName);
 
-      expect(mockResolveAgent.resolve).toHaveBeenCalledWith(TEST_TENANT_ID, 'test-agent');
+      expect(mockResolveAgent.resolve).toHaveBeenCalledWith(TEST_TENANT_ID, 'test-agent', {
+        allowPlayground: true,
+      });
       expect(result).toEqual(deviceCodeResponse);
     });
   });

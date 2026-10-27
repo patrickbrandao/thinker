@@ -14,6 +14,7 @@ import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
+import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/kiro')
@@ -43,7 +44,11 @@ export class KiroOauthController {
     if (trimmedRegion !== undefined) {
       options.region = trimmedRegion;
     }
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     try {
       return await this.oauthService.startAuthorization(
         agent.id,
@@ -86,7 +91,11 @@ export class KiroOauthController {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
     const keyLabel = optionalTrimmedStringQuery(label, 'label');
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const { notifications } = await this.providerService.removeProvider(
       agent.id,
       agent.tenant_id,

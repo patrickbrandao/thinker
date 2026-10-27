@@ -12,6 +12,7 @@ import { AgentNameParamDto } from '../dto/routing.dto';
 import { MinRole } from '../../common/decorators/roles.decorator';
 import { canUsePrivateDestinations } from '../../common/utils/private-url-policy';
 import type { TenantProvider } from '../../entities/tenant-provider.entity';
+import { PROVIDER_CONNECTION_SCOPE } from '../routing-core/resolve-agent.service';
 
 /**
  * The provider's key pool in the order the proxy tries it. Keys are managed
@@ -76,7 +77,11 @@ export class CustomProviderController {
   ) {
     // Resolve for authz — the tenant must own the agent before the server
     // probes anything on its behalf.
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     // Edit-mode fallback: the form has no plaintext key when re-opened
     // (list() only exposes has_api_key:bool), so it forwards provider_id
     // and we reuse the stored key. The service only releases it for the
@@ -141,7 +146,11 @@ export class CustomProviderController {
     @Param('id') id: string,
     @Body() body: UpdateCustomProviderDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const cp = await this.customProviderService.update(id, agent.tenant_id, body, ctx.userId, {
       allowPrivate: canUsePrivateDestinations(ctx),
     });
@@ -169,7 +178,11 @@ export class CustomProviderController {
     @Param('agentName') agentName: string,
     @Param('id') id: string,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     await this.customProviderService.remove(agent.tenant_id, id, ctx.userId);
     return { ok: true };
   }

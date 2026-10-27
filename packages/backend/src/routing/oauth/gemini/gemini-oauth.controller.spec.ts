@@ -64,7 +64,9 @@ describe('GeminiOauthController', () => {
         req,
       );
 
-      expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent');
+      expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent', {
+        allowPlayground: true,
+      });
       expect(oauthService.generateAuthorizationUrl).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
