@@ -85,7 +85,24 @@ describe('CustomProviderController', () => {
         },
       ]);
       mockProviderService.getProviders.mockResolvedValue([
-        { provider: 'custom:cp-1', api_key_encrypted: 'enc-value' },
+        {
+          id: 'tp-2',
+          provider: 'custom:cp-1',
+          api_key_encrypted: 'enc-backup',
+          key_prefix: 'sk-bak12',
+          label: 'Backup',
+          priority: 1,
+          is_active: true,
+        },
+        {
+          id: 'tp-1',
+          provider: 'custom:cp-1',
+          api_key_encrypted: 'enc-value',
+          key_prefix: 'sk-abc12',
+          label: 'Default',
+          priority: 0,
+          is_active: true,
+        },
       ]);
 
       const result = await controller.list(mockCtx, { agentName: 'test-agent' } as never);
@@ -97,6 +114,10 @@ describe('CustomProviderController', () => {
         alias: 'groq',
         base_url: 'https://api.groq.com/v1',
         has_api_key: true,
+        keys: [
+          { label: 'Default', key_prefix: 'sk-abc12', priority: 0 },
+          { label: 'Backup', key_prefix: 'sk-bak12', priority: 1 },
+        ],
         models: [{ model_name: 'llama' }],
         created_at: '2026-03-04',
       });

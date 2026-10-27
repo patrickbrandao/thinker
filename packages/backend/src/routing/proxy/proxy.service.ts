@@ -507,6 +507,11 @@ export class ProxyService {
       tenantProviderId: credentials.tenantProviderId,
       startProviderAttempt,
     });
+    // A custom provider's key pool may have rotated to another key; stamp the
+    // connection that actually served the call.
+    const servedTenantProviderId =
+      forward.servedByKey?.tenantProviderId ?? credentials.tenantProviderId;
+    const servedKeyLabel = forward.servedByKey?.keyLabel ?? credentials.keyLabel;
     if (
       !explicitModelOverride &&
       !forward.response.ok &&
@@ -531,8 +536,8 @@ export class ProxyService {
         thinkingLookup,
         apiMode,
         paramMergeContext,
-        primaryTenantProviderId: credentials.tenantProviderId,
-        primaryKeyLabel: credentials.keyLabel,
+        primaryTenantProviderId: servedTenantProviderId,
+        primaryKeyLabel: servedKeyLabel,
         startProviderAttempt,
         credentialDashboardUrl: dashboardUrl,
         clientAnthropicBeta: headers?.['anthropic-beta'],
@@ -569,10 +574,10 @@ export class ProxyService {
           forward: peeked,
           meta: this.buildBaseMeta(resolved, primaryModel, {
             request_params: primaryRequestParams,
-            tenantProviderId: credentials.tenantProviderId,
+            tenantProviderId: servedTenantProviderId,
             // Label of the row actually selected — a stale pin resolves to the
             // default key, and the recorded label must follow the key used.
-            provider_key_label: credentials.keyLabel,
+            provider_key_label: servedKeyLabel,
             attempt: forward.attempt,
             providerCallStarted: forward.providerCallStarted,
           }),
@@ -603,8 +608,8 @@ export class ProxyService {
           thinkingLookup,
           apiMode,
           paramMergeContext,
-          primaryTenantProviderId: credentials.tenantProviderId,
-          primaryKeyLabel: credentials.keyLabel,
+          primaryTenantProviderId: servedTenantProviderId,
+          primaryKeyLabel: servedKeyLabel,
           startProviderAttempt,
           credentialDashboardUrl: dashboardUrl,
           clientAnthropicBeta: headers?.['anthropic-beta'],
@@ -620,8 +625,8 @@ export class ProxyService {
         forward: syntheticForward,
         meta: this.buildBaseMeta(resolved, primaryModel, {
           request_params: primaryRequestParams,
-          tenantProviderId: credentials.tenantProviderId,
-          provider_key_label: credentials.keyLabel,
+          tenantProviderId: servedTenantProviderId,
+          provider_key_label: servedKeyLabel,
           attempt: forward.attempt,
           providerCallStarted: forward.providerCallStarted,
         }),
@@ -634,8 +639,8 @@ export class ProxyService {
       forward,
       meta: this.buildBaseMeta(resolved, primaryModel, {
         request_params: primaryRequestParams,
-        tenantProviderId: credentials.tenantProviderId,
-        provider_key_label: credentials.keyLabel,
+        tenantProviderId: servedTenantProviderId,
+        provider_key_label: servedKeyLabel,
         attempt: forward.attempt,
         providerCallStarted: forward.providerCallStarted,
       }),

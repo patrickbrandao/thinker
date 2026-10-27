@@ -26,6 +26,14 @@ Provedores customizados aceitam URLs `http://`, de LAN e de loopback; só precis
 
 Cada provedor customizado tem um **alias**, o prefixo que seus modelos mostram em `GET /v1/models` (por exemplo `meu-vllm/qwen-3-14b`). O campo `model` aceita o alias.
 
+### Várias chaves em um provedor customizado (key pool)
+
+Um provedor customizado com chave de API aceita até 5 chaves, cada uma com um rótulo, todas cifradas com `THINKER_ENCRYPTION_KEY` e restritas à organização. No dashboard, abra o provedor (**Edit custom provider**) e use **Add another key**, as setas para reordenar e a lixeira para remover.
+
+As chaves formam um pool, tentado em ordem: começa pela chave fixada na rota (ou pela primeira da lista) e, se o provedor recusar a chave (401 ou 403) ou limitar a taxa (429), a mesma requisição passa para a próxima chave, antes de ir para o fallback do tier. Uma chave que recebeu 429 fica em espera pelo `Retry-After` (15 s sem o cabeçalho) e uma que recebeu 401 fica de fora por 5 minutos; nesse tempo o Thinker pula essas chaves sem chamar o provedor, a não ser que não sobre outra. Cada chave tentada aparece como uma tentativa no log, com o rótulo da chave.
+
+Pela API (papel `admin` ou acima), as chaves usam os mesmos endpoints dos provedores nativos, com `provider` igual a `custom:<id>`: `POST /api/v1/routing/:agent/providers` (com `apiKey` e `label`) adiciona, `PUT .../providers/custom:<id>/keys/order` (com `labels`) reordena, `PATCH .../providers/custom:<id>/keys/:label` renomeia e `DELETE .../providers/custom:<id>?label=<rótulo>` remove. `GET .../custom-providers` lista o pool de cada provedor em `keys`, na ordem em que é tentado.
+
 ## Tiers e o modelo `auto`
 
 O roteamento de cada harness é configurado na página de roteamento do harness, por **tiers**. Cada tier tem um modelo principal e até **5 modelos de fallback**.

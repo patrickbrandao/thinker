@@ -122,6 +122,8 @@ import {
 const RATE_LIMIT_COOLDOWN_DEFAULT_MS = 15_000;
 const RATE_LIMIT_COOLDOWN_MAX_MS = 5 * 60_000;
 const MAX_RATE_LIMIT_COOLDOWNS = 2_000;
+// Statuses that move a custom provider's request on to the next key of its pool.
+const KEY_POOL_ROTATE_STATUSES = new Set([401, 403, 429]);
 const PROVIDER_ATTEMPT_REF = Symbol('providerAttemptRef');
 
 type AttemptTaggedError = Error & { [PROVIDER_ATTEMPT_REF]?: ProviderAttemptRef };
@@ -336,7 +338,7 @@ export class ProxyFallbackService {
       // resolveRouteCredentials always reports the row it selected, which may
       // differ from the pin when the pin matched nothing.
       providerKeyLabel = credentials.keyLabel;
-      const tenantProviderId = credentials.tenantProviderId;
+      let tenantProviderId = credentials.tenantProviderId;
 
       this.logger.log(
         `Fallback ${i}: trying model=${model} provider=${provider} auth_type=${authType} (primary=${primaryModel})`,
@@ -375,6 +377,11 @@ export class ProxyFallbackService {
         }),
         { stream, provider, model },
       );
+      // A custom provider's key pool may have rotated to another key.
+      if (forward.servedByKey) {
+        tenantProviderId = forward.servedByKey.tenantProviderId;
+        providerKeyLabel = forward.servedByKey.keyLabel;
+      }
 
       if (forward.response.ok) {
         return {
@@ -470,7 +477,99 @@ export class ProxyFallbackService {
     };
   }
 
+  /**
+   * Forward one route hop. A custom provider with several API keys is a key
+   * pool: when the selected key is refused (401/403) or rate limited (429),
+   * the same request moves on to the provider's next key in priority order.
+   * Keys still in a 429 cooldown or remembered as rejected are skipped without
+   * a provider call, unless no other key is left to try.
+   */
   async tryForwardToProvider(opts: ForwardProviderOptions): Promise<ForwardResult> {
+    const pool = await this.keyPoolCandidates(opts);
+    for (let i = 0; i < pool.length; i++) {
+      const candidate = pool[i];
+      const isLast = i === pool.length - 1;
+      if (!isLast && this.isCredentialSkipped(candidate)) continue;
+      const forward = await this.forwardWithKey(candidate);
+      const rotated = candidate !== opts;
+      const result: ForwardResult = rotated
+        ? {
+            ...forward,
+            servedByKey: {
+              tenantProviderId: candidate.tenantProviderId!,
+              keyLabel: candidate.providerKeyLabel!,
+            },
+          }
+        : forward;
+      if (isLast || forward.response.ok || !KEY_POOL_ROTATE_STATUSES.has(forward.response.status)) {
+        return result;
+      }
+      await this.supersedeFailedAttempt(forward);
+      this.logger.warn(
+        `Key pool: provider=${opts.provider} model=${opts.model} key=${JSON.stringify(
+          candidate.providerKeyLabel ?? 'default',
+        )} returned ${forward.response.status}; trying the next key`,
+      );
+    }
+    // Unreachable: the pool always holds at least the selected key.
+    return this.forwardWithKey(opts);
+  }
+
+  /**
+   * The keys one hop may try: the selected one (the route's pin, else the
+   * first by priority) and then the provider's other active keys in priority
+   * order. Only custom providers form a pool; every other provider gets just
+   * the key the caller resolved, since its keys are pinned per route.
+   */
+  private async keyPoolCandidates(opts: ForwardProviderOptions): Promise<ForwardProviderOptions[]> {
+    if (
+      !opts.tenantId ||
+      !opts.tenantProviderId ||
+      !CustomProviderService.isCustom(opts.provider)
+    ) {
+      return [opts];
+    }
+    const keys = await this.providerKeyService.getProviderKeys(
+      opts.tenantId,
+      opts.provider,
+      opts.authType as AuthType | undefined,
+      opts.agentId,
+    );
+    if (!Array.isArray(keys)) return [opts];
+    const others = keys.filter((k) => k.id !== opts.tenantProviderId && !!k.apiKey);
+    return [
+      opts,
+      ...others.map((k) => ({
+        ...opts,
+        apiKey: k.apiKey!,
+        rawApiKey: k.apiKey!,
+        providerKeyLabel: k.label,
+        tenantProviderId: k.id,
+        providerRegion: k.region,
+      })),
+    ];
+  }
+
+  /** True when a key would be skipped locally (429 cooldown or remembered 401). */
+  private isCredentialSkipped(opts: ForwardProviderOptions): boolean {
+    return (
+      this.getActiveRateLimitCooldown(opts) !== null ||
+      this.credentialRejections.rejectedUntil(this.credentialRef(opts, opts.apiKey)) !== null
+    );
+  }
+
+  /** Close a provider attempt that a later key of the pool replaces. */
+  private async supersedeFailedAttempt(forward: ForwardResult): Promise<void> {
+    const errorBody = await forward.response.text().catch(() => '');
+    await forward.attempt?.finishRecording?.(recordingResponseFromText(errorBody));
+    await forward.attempt?.completeFailure?.({
+      status: forward.response.status,
+      errorBody,
+      superseded: true,
+    });
+  }
+
+  private async forwardWithKey(opts: ForwardProviderOptions): Promise<ForwardResult> {
     const cooldown = this.getActiveRateLimitCooldown(opts);
     if (cooldown) {
       return this.buildRateLimitCooldownForward(opts, cooldown);

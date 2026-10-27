@@ -625,7 +625,8 @@ const CustomProviderForm: Component<Props> = (props) => {
         >
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
             <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-              Each key is a separate connection. Changes apply immediately.
+              Keys are tried in order; a refused or rate-limited key falls over to the next. Changes
+              apply immediately.
             </span>
             <Show when={showAddKeyButton()}>
               <button

@@ -17,6 +17,7 @@ import {
   connectProvider,
   disconnectProvider,
   renameProviderKey,
+  reorderProviderKeys,
   revokeOpenaiOAuth,
   type AuthType,
   type RoutingProvider,
@@ -842,6 +843,24 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
     }
   };
 
+  // Order is the default key first, then the order a custom provider's key
+  // pool falls over in. Swaps one key with its neighbour.
+  const moveKey = async (index: number, delta: -1 | 1) => {
+    const labels = props.activeKeys().map((k) => k.label);
+    const target = index + delta;
+    if (target < 0 || target >= labels.length) return;
+    labels.splice(target, 0, ...labels.splice(index, 1));
+    props.setBusy(true);
+    try {
+      await reorderProviderKeys(props.agentName, props.provId, labels, props.authType());
+      props.onUpdate();
+    } catch {
+      // toast handled upstream
+    } finally {
+      props.setBusy(false);
+    }
+  };
+
   return (
     <div class="provider-detail__field">
       <label class="provider-detail__label">API Keys</label>
@@ -851,7 +870,7 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
         style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
       >
         <For each={props.activeKeys()}>
-          {(k) => (
+          {(k, i) => (
             <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / 0.3);">
               <Show
                 when={renamingId() === k.id}
@@ -870,6 +889,26 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
                           .join(' · ')}
                       </div>
                     </div>
+                    <button
+                      class="btn btn--outline btn--sm"
+                      style="flex-shrink: 0;"
+                      disabled={props.busy() || i() === 0}
+                      onClick={() => moveKey(i(), -1)}
+                      aria-label={`Move key ${k.label} up`}
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      class="btn btn--outline btn--sm"
+                      style="flex-shrink: 0;"
+                      disabled={props.busy() || i() === props.activeKeys().length - 1}
+                      onClick={() => moveKey(i(), 1)}
+                      aria-label={`Move key ${k.label} down`}
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
                     <button
                       class="btn btn--outline btn--sm"
                       style="flex-shrink: 0;"
