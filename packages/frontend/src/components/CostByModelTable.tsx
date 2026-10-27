@@ -11,12 +11,9 @@ import {
 } from '../services/routing-utils.js';
 import { PROVIDERS } from '../services/providers.js';
 import InfoTooltip from './InfoTooltip.jsx';
-import {
-  attemptSuccessRate,
-  TOTAL_ATTEMPTS_TOOLTIP,
-  MODEL_SUCCESS_RATE_TOOLTIP,
-  type ModelReliabilityRow,
-} from '../services/api/analytics.js';
+import { attemptSuccessRate, type ModelReliabilityRow } from '../services/api/analytics.js';
+import { formatRate } from '../services/overview-format.js';
+import { intlLocale, t } from '../i18n/index.js';
 
 interface CostByModelRow {
   model: string;
@@ -62,26 +59,26 @@ const CostByModelTable: Component<CostByModelTableProps> = (props) => {
 
   return (
     <div class="panel" style="margin-top: var(--gap-lg);">
-      <div class="panel__title">Model usage</div>
+      <div class="panel__title">{t('overview.modelUsage.title')}</div>
       <p style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin: -8px 0 12px;">
-        The models used and what they cost you
+        {t('overview.modelUsage.subtitle')}
       </p>
       <table class="data-table">
         <thead>
           <tr>
-            <th>Model</th>
-            <th>Tokens</th>
-            <th>% of total</th>
-            <th>Cost</th>
+            <th>{t('overview.modelUsage.model')}</th>
+            <th>{t('overview.modelUsage.tokens')}</th>
+            <th>{t('overview.modelUsage.pctOfTotal')}</th>
+            <th>{t('overview.modelUsage.cost')}</th>
             {props.reliability && (
               <>
                 <th class="rel-col">
-                  Total attempts
-                  <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+                  {t('overview.totalAttempts')}
+                  <InfoTooltip text={t('overview.tips.totalAttempts')} />
                 </th>
                 <th class="rel-col">
-                  Success rate
-                  <InfoTooltip text={MODEL_SUCCESS_RATE_TOOLTIP} />
+                  {t('overview.successRate')}
+                  <InfoTooltip text={t('overview.tips.modelSuccessRate')} />
                 </th>
               </>
             )}
@@ -163,7 +160,11 @@ const CostByModelTable: Component<CostByModelTableProps> = (props) => {
                 <td
                   title={
                     row.estimated_cost > 0 && row.estimated_cost < 0.01
-                      ? `$${row.estimated_cost.toFixed(6)}`
+                      ? new Intl.NumberFormat(intlLocale(), {
+                          style: 'currency',
+                          currency: 'USD',
+                          minimumFractionDigits: 6,
+                        }).format(row.estimated_cost)
                       : undefined
                   }
                 >
@@ -181,7 +182,7 @@ const CostByModelTable: Component<CostByModelTableProps> = (props) => {
                       {(() => {
                         const rel = relFor(row.model);
                         const rate = rel ? attemptSuccessRate(rel) : null;
-                        return rate == null ? '\u2014' : `${(rate * 100).toFixed(1)}%`;
+                        return rate == null ? '\u2014' : formatRate(rate);
                       })()}
                     </td>
                   </>

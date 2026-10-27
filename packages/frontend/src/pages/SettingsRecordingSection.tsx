@@ -1,6 +1,7 @@
 import { createResource, createSignal, type Component } from 'solid-js';
 import { getRecording, updateRecording } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 
 const SettingsRecordingSection: Component<{ agentName: () => string }> = (props) => {
   const [config, { mutate }] = createResource(() => props.agentName(), getRecording);
@@ -17,7 +18,11 @@ const SettingsRecordingSection: Component<{ agentName: () => string }> = (props)
       const next = await updateRecording(agentName, { enabled: !enabled() });
       if (props.agentName() === agentName) {
         mutate(next);
-        toast.success(`Logs ${next.enabled ? 'enabled' : 'disabled'}`);
+        toast.success(
+          next.enabled
+            ? t('harnesses.recording.enabledToast')
+            : t('harnesses.recording.disabledToast'),
+        );
       }
     } catch {
       // fetchMutate already shows the backend error.
@@ -28,23 +33,19 @@ const SettingsRecordingSection: Component<{ agentName: () => string }> = (props)
 
   return (
     <>
-      <h2 class="settings-section__title">Logs</h2>
+      <h2 class="settings-section__title">{t('harnesses.recording.title')}</h2>
       <div class="settings-card">
         <div class="settings-card__row">
           <div class="settings-card__label">
-            <span class="settings-card__label-title">Enable logs</span>
-            <span class="settings-card__label-desc">
-              Log the full content of every request and every attempt, so you can see what your
-              agent sends. You will find these logs on the Requests page, inside each request. Logs
-              stay in your own database.
-            </span>
+            <span class="settings-card__label-title">{t('harnesses.recording.enable')}</span>
+            <span class="settings-card__label-desc">{t('harnesses.recording.desc')}</span>
           </div>
           <div class="settings-card__control settings-card__control--end">
             <button
               type="button"
               role="switch"
               aria-checked={enabled()}
-              aria-label="Enable logs"
+              aria-label={t('harnesses.recording.enable')}
               class="settings-switch"
               classList={{ 'settings-switch--on': enabled() }}
               disabled={busy()}

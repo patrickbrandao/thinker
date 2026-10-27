@@ -5,6 +5,7 @@ import {
   SHARED_PROVIDER_BY_ID,
   type SharedProviderEntry,
 } from 'thinker-shared';
+import { t, tMaybe } from '../i18n/index.js';
 
 export interface SubscriptionEndpointRegion {
   value: string;
@@ -119,53 +120,73 @@ interface ProviderUIOverlay {
   defaultLocalPort?: number;
 }
 
+/**
+ * Region option whose label follows the dashboard language. The getter is
+ * read at render time, so switching language updates open selectors.
+ */
+function region(
+  value: string,
+  label: () => string,
+  baseUrlPlaceholder?: string,
+): SubscriptionEndpointRegion {
+  return {
+    value,
+    get label() {
+      return label();
+    },
+    ...(baseUrlPlaceholder && { baseUrlPlaceholder }),
+  };
+}
+
+const regionLabel = (key: string) => () => tMaybe(`providerSetup.catalog.regions.${key}`) ?? key;
+
 const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   qwen: {
     initial: 'Al',
     subtitle: 'Qwen 3.7, DeepSeek, Kimi, GLM via Alibaba Cloud',
     apiKeyEndpointRegions: [
-      { value: 'auto', label: 'Auto-detect' },
-      { value: 'beijing', label: 'China (Beijing)' },
-      { value: 'singapore', label: 'Singapore' },
-      { value: 'us', label: 'United States' },
-      {
-        value: 'workspace-cn-hongkong',
-        label: 'China (Hong Kong)',
-        baseUrlPlaceholder:
-          'https://<workspace-id>.cn-hongkong.maas.aliyuncs.com/compatible-mode/v1',
-      },
-      {
-        value: 'workspace-eu-central-1',
-        label: 'Germany (Frankfurt)',
-        baseUrlPlaceholder:
-          'https://<workspace-id>.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
-      },
-      {
-        value: 'workspace-ap-northeast-1',
-        label: 'Japan (Tokyo)',
-        baseUrlPlaceholder:
-          'https://<workspace-id>.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1',
-      },
-      {
-        value: 'custom',
-        label: 'Custom endpoint',
-        baseUrlPlaceholder:
-          'https://<workspace-id>.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
-      },
+      region('auto', regionLabel('autoDetect')),
+      region('beijing', regionLabel('chinaBeijing')),
+      region('singapore', regionLabel('singapore')),
+      region('us', regionLabel('unitedStates')),
+      region(
+        'workspace-cn-hongkong',
+        regionLabel('chinaHongKong'),
+        'https://<workspace-id>.cn-hongkong.maas.aliyuncs.com/compatible-mode/v1',
+      ),
+      region(
+        'workspace-eu-central-1',
+        regionLabel('germanyFrankfurt'),
+        'https://<workspace-id>.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
+      ),
+      region(
+        'workspace-ap-northeast-1',
+        regionLabel('japanTokyo'),
+        'https://<workspace-id>.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1',
+      ),
+      region(
+        'custom',
+        regionLabel('customEndpoint'),
+        'https://<workspace-id>.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
+      ),
     ],
     supportsSubscription: true,
     subscriptionLabel: 'Qwen Token Plan',
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
     subscriptionCredentialName: 'Qwen Token Plan',
-    subscriptionKeyPlaceholder: 'Paste your Qwen Token Plan API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Qwen Token Plan' });
+    },
     models: [],
   },
   anthropic: {
     initial: 'A',
     subtitle: 'Claude Opus 5, Sonnet 5, Fable 5, Haiku 4.5',
     supportsSubscription: true,
-    subscriptionLabel: 'Claude Max / Pro subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.claudeSubscription');
+    },
     subscriptionAuthMode: 'popup_paste',
     models: [],
   },
@@ -178,19 +199,19 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     initial: 'AWS',
     subtitle: 'Claude, GPT, Kimi, MiniMax, Nova via Amazon Bedrock',
     apiKeyEndpointRegions: [
-      { value: 'us-east-1', label: 'US East (N. Virginia)' },
-      { value: 'us-east-2', label: 'US East (Ohio)' },
-      { value: 'us-west-2', label: 'US West (Oregon)' },
-      { value: 'eu-west-1', label: 'Europe (Ireland)' },
-      { value: 'eu-west-2', label: 'Europe (London)' },
-      { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
-      { value: 'eu-south-1', label: 'Europe (Milan)' },
-      { value: 'eu-north-1', label: 'Europe (Stockholm)' },
-      { value: 'ap-south-1', label: 'Asia Pacific (Mumbai)' },
-      { value: 'ap-southeast-2', label: 'Asia Pacific (Sydney)' },
-      { value: 'ap-southeast-3', label: 'Asia Pacific (Jakarta)' },
-      { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
-      { value: 'sa-east-1', label: 'South America (Sao Paulo)' },
+      region('us-east-1', regionLabel('usEast1')),
+      region('us-east-2', regionLabel('usEast2')),
+      region('us-west-2', regionLabel('usWest2')),
+      region('eu-west-1', regionLabel('euWest1')),
+      region('eu-west-2', regionLabel('euWest2')),
+      region('eu-central-1', regionLabel('euCentral1')),
+      region('eu-south-1', regionLabel('euSouth1')),
+      region('eu-north-1', regionLabel('euNorth1')),
+      region('ap-south-1', regionLabel('apSouth1')),
+      region('ap-southeast-2', regionLabel('apSoutheast2')),
+      region('ap-southeast-3', regionLabel('apSoutheast3')),
+      region('ap-northeast-1', regionLabel('apNortheast1')),
+      region('sa-east-1', regionLabel('saEast1')),
     ],
     models: [],
   },
@@ -203,30 +224,42 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
     subscriptionCredentialName: 'ModelArk Coding Plan',
-    subscriptionKeyPlaceholder: 'Paste your ModelArk Coding Plan API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'ModelArk Coding Plan' });
+    },
     models: [],
   },
   cerebras: {
     initial: 'Cb',
-    subtitle: 'GPT-OSS, GLM, Gemma on Cerebras inference',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.cerebras');
+    },
     models: [],
   },
   'cline-pass': {
     initial: 'CP',
     subtitle: 'GLM, Kimi, DeepSeek, MiMo, MiniMax, Qwen via ClinePass',
     supportsSubscription: true,
-    subscriptionLabel: 'ClinePass subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'ClinePass' });
+    },
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
-    subscriptionKeyPlaceholder: 'Paste your ClinePass API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'ClinePass' });
+    },
     subscriptionSignInUrl: 'https://app.cline.bot',
-    subscriptionSignInLabel: 'Sign in to ClinePass',
+    get subscriptionSignInLabel() {
+      return t('providerSetup.catalog.signInTo', { name: 'ClinePass' });
+    },
     subscriptionOnly: true,
     models: [],
   },
   pioneer: {
     initial: 'P',
-    subtitle: 'OpenAI-compatible inference and fine-tuned Pioneer models',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.pioneer');
+    },
     models: [],
   },
   deepseek: {
@@ -243,7 +276,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     initial: 'GH',
     subtitle: 'Claude, GPT, Gemini, Grok via Copilot',
     supportsSubscription: true,
-    subscriptionLabel: 'GitHub Copilot subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'GitHub Copilot' });
+    },
     subscriptionAuthMode: 'device_code',
     deviceLogin: true,
     subscriptionOnly: true,
@@ -266,30 +301,41 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subtitle: 'Claude, DeepSeek, Qwen, Gemini, Kimi',
     supportsSubscription: true,
     subscriptionOnly: true,
-    subscriptionLabel: 'Command Code subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'Command Code' });
+    },
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
-    subscriptionKeyPlaceholder: 'Paste your Command Code API key',
-    subscriptionRequirementNote: 'Requires Command Code Pro or higher.',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Command Code' });
+    },
+    get subscriptionRequirementNote() {
+      return t('providerSetup.catalog.commandCodeRequirement');
+    },
     models: [],
   },
   gemini: {
     initial: 'G',
     subtitle: 'Gemini 3.5 Flash, 3.1 Flash-Lite, Gemini 2.5',
     supportsSubscription: true,
-    subscriptionLabel: 'Sign in with Google',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.signInWithGoogle');
+    },
     subscriptionAuthMode: 'popup_oauth',
     // Google refuses gemini-cli's OAuth client for Gemini Code Assist for
     // individuals (google-gemini/gemini-cli#29279), so new sign-ins fail.
-    subscriptionClosedNote:
-      'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',
+    get subscriptionClosedNote() {
+      return t('providerSetup.catalog.geminiClosed');
+    },
     models: [],
   },
   kiro: {
     initial: 'K',
     subtitle: 'Claude, DeepSeek, MiniMax, GLM, Qwen via Kiro',
     supportsSubscription: true,
-    subscriptionLabel: 'Kiro subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'Kiro' });
+    },
     subscriptionAuthMode: 'device_code',
     subscriptionOnly: true,
     beta: true,
@@ -297,29 +343,39 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   },
   groq: {
     initial: 'Gq',
-    subtitle: 'Llama 4, Qwen, GPT-OSS. Fast inference',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.groq');
+    },
     models: [],
   },
   huggingface: {
     initial: 'HF',
-    subtitle: 'Open models through Hugging Face Inference Providers',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.huggingface');
+    },
     models: [],
   },
   kilo: {
     initial: 'K',
-    subtitle: 'Kilo Gateway unified model access',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.kilo');
+    },
     models: [],
   },
   llamacpp: {
     initial: 'Lc',
-    subtitle: 'OpenAI-compatible server for GGUF models on CPU / Metal / CUDA',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.llamacpp');
+    },
     noKeyRequired: true,
     models: [],
     defaultLocalPort: 8080,
   },
   lmstudio: {
     initial: 'LM',
-    subtitle: 'Run GGUF models with a local server',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.lmstudio');
+    },
     noKeyRequired: true,
     models: [],
     defaultLocalPort: 1234,
@@ -328,8 +384,8 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     initial: 'Mm',
     subtitle: 'MiniMax M3, M2.7, M2.5',
     apiKeyEndpointRegions: [
-      { value: 'global', label: 'Global' },
-      { value: 'cn', label: 'China' },
+      region('global', regionLabel('global')),
+      region('cn', regionLabel('china')),
     ],
     supportsSubscription: true,
     subscriptionLabel: 'MiniMax Coding Plan',
@@ -337,13 +393,17 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionTokenAlternative: {
       prefix: 'sk-cp-',
       placeholder: 'sk-cp-...',
-      dividerLabel: 'Or paste your Coding Plan token',
+      get dividerLabel() {
+        return t('providerSetup.catalog.minimaxDivider');
+      },
     },
     models: [],
   },
   meta: {
     initial: 'Me',
-    subtitle: 'Muse Spark 1.2, Contributor, and 1.1',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.meta');
+    },
     models: META_MODEL_API_MODELS.map((model) => ({
       label: model.displayName,
       value: model.id,
@@ -357,11 +417,13 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
     subscriptionCredentialName: 'MiMo Token Plan',
-    subscriptionKeyPlaceholder: 'Paste your MiMo Token Plan API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'MiMo Token Plan' });
+    },
     subscriptionEndpointRegions: [
-      { value: 'cn', label: 'China (token-plan-cn)' },
-      { value: 'sgp', label: 'Singapore (token-plan-sgp)' },
-      { value: 'ams', label: 'Europe (token-plan-ams)' },
+      region('cn', regionLabel('mimoCn')),
+      region('sgp', regionLabel('mimoSgp')),
+      region('ams', regionLabel('mimoAms')),
     ],
     models: [],
   },
@@ -369,11 +431,15 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     initial: 'M',
     subtitle: 'Mistral Large, Medium 3.5, Devstral, Codestral',
     supportsSubscription: true,
-    subscriptionLabel: 'Mistral Vibe subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'Mistral Vibe' });
+    },
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
     subscriptionCredentialName: 'Mistral Vibe',
-    subscriptionKeyPlaceholder: 'Paste your Mistral Vibe API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Mistral Vibe' });
+    },
     models: [],
   },
   moonshot: {
@@ -384,18 +450,26 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
     subscriptionCredentialName: 'Kimi Code',
-    subscriptionKeyPlaceholder: 'Paste your Kimi Code API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Kimi Code' });
+    },
     models: [],
   },
   nous: {
     initial: 'N',
-    subtitle: 'OpenRouter-backed models via NousResearch Portal',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.nous');
+    },
     supportsSubscription: true,
     subscriptionOnly: true,
-    subscriptionLabel: 'NousResearch subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'NousResearch' });
+    },
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
-    subscriptionKeyPlaceholder: 'Paste your NousResearch API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'NousResearch' });
+    },
     models: [],
   },
   nvidia: {
@@ -405,19 +479,27 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   },
   ollama: {
     initial: 'Ol',
-    subtitle: 'Llama, Qwen, Gemma, and more',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.ollama');
+    },
     noKeyRequired: true,
     models: [],
   },
   'ollama-cloud': {
     initial: 'Oc',
-    subtitle: 'DeepSeek V4, GLM, Kimi, MiniMax in the cloud',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.ollamaCloud');
+    },
     supportsSubscription: true,
     subscriptionOnly: true,
-    subscriptionLabel: 'Ollama Cloud subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'Ollama Cloud' });
+    },
     subscriptionAuthMode: 'token',
     subscriptionCredentialKind: 'api-key',
-    subscriptionKeyPlaceholder: 'Paste your Ollama Cloud API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Ollama Cloud' });
+    },
     models: [],
   },
   openai: {
@@ -450,29 +532,41 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     supportsSubscription: true,
     subscriptionLabel: 'OpenCode Go (beta)',
     subscriptionAuthMode: 'token',
-    subscriptionKeyPlaceholder: 'Paste your OpenCode API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
+    },
     subscriptionSignInUrl: 'https://opencode.ai/auth',
-    subscriptionSignInLabel: 'Sign in to OpenCode Go',
-    subscriptionSignInHint: 'Sign in to OpenCode Go to get your API key.',
+    get subscriptionSignInLabel() {
+      return t('providerSetup.catalog.signInTo', { name: 'OpenCode Go' });
+    },
+    get subscriptionSignInHint() {
+      return t('providerSetup.catalog.opencodeSignInHint');
+    },
     subscriptionOnly: true,
     beta: true,
     models: [],
   },
   'opencode-zen': {
     initial: 'OZ',
-    subtitle: 'Curated Claude, GPT, DeepSeek, MiMo, Nemotron',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.opencodeZen');
+    },
     models: [],
   },
   openrouter: {
     initial: 'OR',
-    subtitle: 'Auto-route to 300+ models',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.openrouter');
+    },
     models: [],
   },
   xai: {
     initial: 'X',
     subtitle: 'Grok 4.5, Grok 4.3, Grok Build',
     supportsSubscription: true,
-    subscriptionLabel: 'Grok subscription',
+    get subscriptionLabel() {
+      return t('providerSetup.catalog.subscriptionOf', { name: 'Grok' });
+    },
     subscriptionAuthMode: 'popup_oauth',
     models: [],
   },
@@ -482,11 +576,13 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     supportsSubscription: true,
     subscriptionLabel: 'GLM Coding Plan',
     subscriptionAuthMode: 'token',
-    subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+    get subscriptionKeyPlaceholder() {
+      return t('providerSetup.catalog.pasteYourKey', { name: 'Z.ai' });
+    },
     subscriptionCredentialKind: 'api-key',
     subscriptionEndpointRegions: [
-      { value: 'global', label: 'Outside China (api.z.ai)' },
-      { value: 'cn', label: 'China Mainland (open.bigmodel.cn)' },
+      region('global', regionLabel('zaiGlobal')),
+      region('cn', regionLabel('zaiCn')),
     ],
     models: [],
   },
@@ -498,7 +594,7 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
   if (!overlay) {
     throw new Error(`Missing UI overlay for shared provider "${shared.id}"`);
   }
-  return {
+  const def = {
     id: shared.id,
     name: shared.displayName,
     color: shared.color,
@@ -506,8 +602,10 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
     minKeyLength: shared.minKeyLength,
     keyPlaceholder: shared.keyPlaceholder,
     localOnly: shared.localOnly || undefined,
-    ...overlay,
-  };
+  } as ProviderDef;
+  // Copy property descriptors (not values) so translated getters on the
+  // overlay keep following the active language.
+  return Object.defineProperties(def, Object.getOwnPropertyDescriptors(overlay));
 }
 
 // Preserve previous ordering (alphabetical-ish by display name) so UI tests
@@ -584,34 +682,54 @@ export interface StageDef {
 export const DEFAULT_STAGE: StageDef = {
   id: 'default',
   step: 0,
-  label: 'Default',
-  desc: 'Handles every request.',
+  get label() {
+    return t('providerSetup.stages.default.label');
+  },
+  get desc() {
+    return t('providerSetup.stages.default.desc');
+  },
 };
 
 export const STAGES: StageDef[] = [
   {
     id: 'simple',
     step: 1,
-    label: 'Simple',
-    desc: 'Heartbeats, greetings, and low-cost tasks that any model can handle.',
+    get label() {
+      return t('providerSetup.stages.simple.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.simple.desc');
+    },
   },
   {
     id: 'standard',
     step: 2,
-    label: 'Standard',
-    desc: 'General-purpose requests that need a good balance of quality and cost.',
+    get label() {
+      return t('providerSetup.stages.standard.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.standard.desc');
+    },
   },
   {
     id: 'complex',
     step: 3,
-    label: 'Complex',
-    desc: 'Tasks requiring high quality, nuance, or multi-step reasoning.',
+    get label() {
+      return t('providerSetup.stages.complex.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.complex.desc');
+    },
   },
   {
     id: 'reasoning',
     step: 4,
-    label: 'Reasoning',
-    desc: 'Advanced reasoning, planning, and critical decision-making.',
+    get label() {
+      return t('providerSetup.stages.reasoning.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.reasoning.desc');
+    },
   },
 ];
 
@@ -619,56 +737,92 @@ export const SPECIFICITY_STAGES: StageDef[] = [
   {
     id: 'coding',
     step: 1,
-    label: 'Coding',
-    desc: 'Write, debug, and refactor code.',
+    get label() {
+      return t('providerSetup.stages.coding.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.coding.desc');
+    },
   },
   {
     id: 'web_browsing',
     step: 2,
-    label: 'Web Browsing',
-    desc: 'Navigate pages, search, and extract content.',
+    get label() {
+      return t('providerSetup.stages.web_browsing.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.web_browsing.desc');
+    },
   },
   {
     id: 'data_analysis',
     step: 3,
-    label: 'Data Analysis',
-    desc: 'Crunch numbers, run stats, build charts.',
+    get label() {
+      return t('providerSetup.stages.data_analysis.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.data_analysis.desc');
+    },
   },
   {
     id: 'image_generation',
     step: 4,
-    label: 'Image Generation',
-    desc: 'Create and edit images, logos, visuals.',
+    get label() {
+      return t('providerSetup.stages.image_generation.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.image_generation.desc');
+    },
   },
   {
     id: 'video_generation',
     step: 5,
-    label: 'Video Generation',
-    desc: 'Produce clips, animations, and edits.',
+    get label() {
+      return t('providerSetup.stages.video_generation.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.video_generation.desc');
+    },
   },
   {
     id: 'social_media',
     step: 6,
-    label: 'Social Media',
-    desc: 'Draft posts, plan content, track engagement.',
+    get label() {
+      return t('providerSetup.stages.social_media.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.social_media.desc');
+    },
   },
   {
     id: 'email_management',
     step: 7,
-    label: 'Email',
-    desc: 'Compose, reply, and manage your inbox.',
+    get label() {
+      return t('providerSetup.stages.email_management.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.email_management.desc');
+    },
   },
   {
     id: 'calendar_management',
     step: 8,
-    label: 'Calendar',
-    desc: 'Book meetings, check availability, reschedule.',
+    get label() {
+      return t('providerSetup.stages.calendar_management.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.calendar_management.desc');
+    },
   },
   {
     id: 'trading',
     step: 9,
-    label: 'Trading',
-    desc: 'Analyze markets, place trades, track positions.',
+    get label() {
+      return t('providerSetup.stages.trading.label');
+    },
+    get desc() {
+      return t('providerSetup.stages.trading.desc');
+    },
   },
 ];
 

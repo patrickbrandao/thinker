@@ -1,5 +1,6 @@
 import { createSignal, For, Show, onCleanup, type Component } from 'solid-js';
 import '../styles/filter-select.css';
+import { t } from '../i18n/index.js';
 
 interface FilterSelectProps {
   /** Plural noun for the trigger label, e.g. "providers" or "harnesses". */
@@ -44,8 +45,12 @@ const FilterSelect: Component<FilterSelectProps> = (props) => {
   const selectedCount = () => props.items.filter((item) => props.selected.has(item)).length;
   const label = () =>
     selectedCount() === props.items.length
-      ? `All ${props.noun} (${props.items.length})`
-      : `${selectedCount()} of ${props.items.length} ${props.noun}`;
+      ? t('ui.filter.all', { noun: props.noun, count: props.items.length })
+      : t('ui.filter.some', {
+          selected: selectedCount(),
+          total: props.items.length,
+          noun: props.noun,
+        });
 
   return (
     <div class="agent-filter-select" ref={rootRef}>
@@ -87,7 +92,7 @@ const FilterSelect: Component<FilterSelectProps> = (props) => {
               disabled={selectedCount() === props.items.length}
               onClick={() => props.onSelectAll()}
             >
-              Select all
+              {t('ui.filter.selectAll')}
             </button>
           </div>
           <For each={props.items}>

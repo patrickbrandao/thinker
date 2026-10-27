@@ -3,11 +3,10 @@ import {
   type AgentCategory,
   type AgentPlatform,
   AGENT_CATEGORIES,
-  CATEGORY_LABELS,
-  PLATFORM_LABELS,
   PLATFORMS_BY_CATEGORY,
   PLATFORM_ICONS,
 } from 'thinker-shared';
+import { categoryLabel, platformLabel } from '../services/agent-type-labels.js';
 
 interface Props {
   category: AgentCategory | null;
@@ -40,7 +39,7 @@ const AgentTypeGrid: Component<Props> = (props) => {
           {(cat) => (
             <div class="agent-type-select__column">
               <div class="agent-type-select__group-label" role="presentation">
-                {CATEGORY_LABELS[cat]}
+                {categoryLabel(cat)}
               </div>
               <For each={[...PLATFORMS_BY_CATEGORY[cat]]}>
                 {(plat) => {
@@ -65,7 +64,7 @@ const AgentTypeGrid: Component<Props> = (props) => {
                           class="agent-type-select__option-icon"
                         />
                       </Show>
-                      <span>{PLATFORM_LABELS[plat]}</span>
+                      <span>{platformLabel(plat)}</span>
                     </button>
                   );
                 }}

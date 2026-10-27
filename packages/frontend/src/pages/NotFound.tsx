@@ -1,15 +1,16 @@
 import { A } from '@solidjs/router';
 import { Title } from '@solidjs/meta';
 import type { Component } from 'solid-js';
+import { t } from '../i18n/index.js';
 
 const NotFound: Component = () => {
   return (
     <>
-      <Title>Page Not Found - Thinker</Title>
+      <Title>{t('common.pageTitle', { page: t('auth.notFound.pageTitle') })}</Title>
       <div class="not-found">
         <span class="not-found__code">404</span>
-        <h1 class="not-found__title">Page not found</h1>
-        <p class="not-found__text">The page you're looking for doesn't exist or has been moved.</p>
+        <h1 class="not-found__title">{t('auth.notFound.title')}</h1>
+        <p class="not-found__text">{t('auth.notFound.text')}</p>
         <A href="/" class="not-found__link">
           <svg
             width="16"
@@ -24,7 +25,7 @@ const NotFound: Component = () => {
           >
             <path d="m15 18-6-6 6-6" />
           </svg>
-          Back to dashboard
+          {t('auth.notFound.back')}
         </A>
       </div>
     </>

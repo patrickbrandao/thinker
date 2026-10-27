@@ -57,7 +57,7 @@ const MultiAgentTokenChart: Component<MultiAgentTokenChartProps> = (props) => {
   let el!: HTMLDivElement;
   let rawData: number[][] = [];
   const isCost = () => props.label === 'Cost';
-  const fmtVal = (v: number) => (isCost() ? (formatCost(v) ?? '$0.00') : formatNumber(v));
+  const fmtVal = (v: number) => (isCost() ? (formatCost(v) ?? formatCost(0)!) : formatNumber(v));
 
   const [tooltip, setTooltip] = createSignal<HoverTooltipState>(HIDDEN_TOOLTIP);
 
@@ -206,7 +206,7 @@ const MultiAgentTokenChart: Component<MultiAgentTokenChartProps> = (props) => {
                 vals.map((v) =>
                   // formatCost surfaces sub-cent values as "< $0.01" instead of
                   // rounding them to "$0.00".
-                  isCost() ? (formatCost(v) ?? '$0.00') : formatLegendTokens(u, v),
+                  isCost() ? (formatCost(v) ?? formatCost(0)!) : formatLegendTokens(u, v),
                 ),
             };
             return a;

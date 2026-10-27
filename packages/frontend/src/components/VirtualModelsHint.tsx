@@ -1,5 +1,17 @@
 import { createResource, For, Show, type Accessor, type Component, type JSX } from 'solid-js';
 import { listVirtualModels } from '../services/api/virtual-models.js';
+import { t } from '../i18n/index.js';
+
+/**
+ * Fill a translated template whose `{{ name }}` placeholders stand for JSX
+ * (code chips, links), keeping the surrounding text translatable.
+ */
+export function richText(template: string, parts: Record<string, JSX.Element>): JSX.Element {
+  return template.split(/(\{\{\s*\w+\s*\}\})/).map((segment) => {
+    const match = /^\{\{\s*(\w+)\s*\}\}$/.exec(segment);
+    return match ? parts[match[1]!] : segment;
+  }) as unknown as JSX.Element;
+}
 
 /**
  * Names of a harness's active virtual models (ADR 0004), in their configured
@@ -23,55 +35,74 @@ function howToUse(platform: string | null | undefined, example: string): JSX.Ele
     case 'claude-code':
       return (
         <>
-          Switch with {code(`/model ${example}`)}, or set {code(`"model": "${example}"`)} in{' '}
-          {code('settings.json')}.
+          {richText(t('models.hint.claudeCode'), {
+            a: code(`/model ${example}`),
+            b: code(`"model": "${example}"`),
+            c: code('settings.json'),
+          })}
         </>
       );
     case 'codex':
       return (
         <>
-          Set {code(`model = "${example}"`)} in {code('config.toml')}, or run{' '}
-          {code(`codex -m ${example}`)}.
+          {richText(t('models.hint.codex'), {
+            a: code(`model = "${example}"`),
+            b: code('config.toml'),
+            c: code(`codex -m ${example}`),
+          })}
         </>
       );
     case 'opencode':
       return (
         <>
-          Add each name under {code('provider.thinker.models')} and select{' '}
-          {code(`thinker/${example}`)}.
+          {richText(t('models.hint.opencode'), {
+            a: code('provider.thinker.models'),
+            b: code(`thinker/${example}`),
+          })}
         </>
       );
     case 'hermes':
       return (
         <>
-          {code('hermes model')} reads the model list from {code('/v1/models')}, so they appear
-          there next to {code('auto')}. You can also set {code(`default: ${example}`)}.
+          {richText(t('models.hint.hermes'), {
+            a: code('hermes model'),
+            b: code('/v1/models'),
+            c: code('auto'),
+            d: code(`default: ${example}`),
+          })}
         </>
       );
     case 'openclaw':
       return (
         <>
-          Use one as the Model ID instead of {code('auto')}, so the model reads{' '}
-          {code(`thinker/${example}`)}.
+          {richText(t('models.hint.openclaw'), {
+            a: code('auto'),
+            b: code(`thinker/${example}`),
+          })}
         </>
       );
     case 'nanobot':
       return (
         <>
-          Set {code('agents.defaults.model')} to one of them instead of {code('auto')}.
+          {richText(t('models.hint.nanobot'), {
+            a: code('agents.defaults.model'),
+            b: code('auto'),
+          })}
         </>
       );
     case 'n8n':
       return (
         <>
-          The model list of n8n's OpenAI nodes reads {code('/v1/models')}, so they appear there next
-          to {code('auto')}.
+          {richText(t('models.hint.n8n'), {
+            a: code('/v1/models'),
+            b: code('auto'),
+          })}
         </>
       );
     case 'toolkits':
-      return <>Pick one above to put it in the snippet.</>;
+      return <>{t('models.hint.toolkits')}</>;
     default:
-      return <>Use one as the model name instead of {code('auto')}.</>;
+      return <>{richText(t('models.hint.default'), { a: code('auto') })}</>;
   }
 }
 
@@ -88,7 +119,7 @@ interface Props {
 const VirtualModelsHint: Component<Props> = (props) => (
   <Show when={props.names.length > 0}>
     <p class="setup-method__hint setup-virtual-models" data-testid="virtual-models-hint">
-      Virtual models on this harness can be used as the model too:{' '}
+      {t('models.hint.intro')}{' '}
       <span class="setup-virtual-models__names">
         <For each={props.names}>{(name) => code(name)}</For>
       </span>

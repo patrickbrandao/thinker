@@ -51,6 +51,8 @@ jobs:
       - run: npm ci
       # ESLint over every package's src/ plus packages/backend/test.
       - run: npm run lint
+      # Dashboard i18n (#42): en/pt-BR keys in sync, no hard-coded UI text.
+      - run: npm run check:i18n --workspace=thinker-frontend
       - name: Design-system registry is up to date
         run: npm run design:registry:check
 

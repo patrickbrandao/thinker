@@ -1,16 +1,18 @@
 import { For, Show, type Component } from 'solid-js';
 import type { NotificationLog } from '../services/api.js';
+import { intlLocale, t } from '../i18n/index.js';
+import { usd } from '../services/formatters.js';
 
 function formatValue(log: NotificationLog, field: 'actual_value' | 'threshold_value'): string {
   const val = Number(log[field]);
-  if (log.metric_type === 'cost') return `$${val.toFixed(2)}`;
-  return `${val.toLocaleString()} tokens`;
+  if (log.metric_type === 'cost') return usd(val, 2);
+  return t('limits.tokensValue', { value: val.toLocaleString(intlLocale()) });
 }
 
 function formatDate(dateStr: string): string {
   const normalized = dateStr.endsWith('Z') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
   const d = new Date(normalized);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(intlLocale(), {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -25,17 +27,17 @@ interface Props {
 
 const LimitHistoryTable: Component<Props> = (props) => (
   <div class="panel">
-    <div class="panel__title">History</div>
+    <div class="panel__title">{t('limits.history.title')}</div>
     <Show
       when={!props.loading}
       fallback={
         <table class="notif-table notif-table--flush">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Usage</th>
-              <th>Threshold</th>
-              <th>Resets at</th>
+              <th>{t('limits.history.date')}</th>
+              <th>{t('limits.history.usage')}</th>
+              <th>{t('limits.history.threshold')}</th>
+              <th>{t('limits.history.resetsAt')}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,17 +67,17 @@ const LimitHistoryTable: Component<Props> = (props) => (
         when={(props.logs ?? []).length > 0}
         fallback={
           <div class="empty-state">
-            <div class="empty-state__title">No alerts triggered yet</div>
+            <div class="empty-state__title">{t('limits.history.empty')}</div>
           </div>
         }
       >
         <table class="notif-table notif-table--flush">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Usage</th>
-              <th>Threshold</th>
-              <th>Resets at</th>
+              <th>{t('limits.history.date')}</th>
+              <th>{t('limits.history.usage')}</th>
+              <th>{t('limits.history.threshold')}</th>
+              <th>{t('limits.history.resetsAt')}</th>
             </tr>
           </thead>
           <tbody>

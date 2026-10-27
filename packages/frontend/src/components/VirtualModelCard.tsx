@@ -17,6 +17,7 @@ import {
 import RouteChainCard from './RouteChainCard.js';
 import VirtualModelShadowWarning from './VirtualModelShadowWarning.js';
 import { modelParamsScopeForVirtualModel } from 'thinker-shared';
+import { t } from '../i18n/index.js';
 
 interface SwitchProps {
   label: string;
@@ -120,7 +121,7 @@ const VirtualModelCard: Component<VirtualModelCardProps> = (props) => {
       titleLeading={props.dragHandle}
       titleExtra={
         <Show when={!vm().enabled}>
-          <span class="virtual-model-card__inactive">Inactive</span>
+          <span class="virtual-model-card__inactive">{t('models.vmCard.inactive')}</span>
         </Show>
       }
       details={
@@ -128,38 +129,33 @@ const VirtualModelCard: Component<VirtualModelCardProps> = (props) => {
           <button
             type="button"
             class="virtual-model-card__model"
-            title="Show a copyable example"
+            title={t('models.vmCard.showExample')}
             onClick={() => props.onShowExample()}
           >
+            {/* i18n-ignore */}
             model: "{vm().name}"
           </button>
           <div class="virtual-model-card__switches">
             <CardSwitch
-              label="Active"
+              label={t('models.vmCard.active')}
               on={vm().enabled}
               busy={props.busy === 'enabled'}
-              title={
-                vm().enabled
-                  ? 'Hide from /v1/models and stop matching requests'
-                  : 'List in /v1/models and match requests'
-              }
+              title={vm().enabled ? t('models.vmCard.hideTitle') : t('models.vmCard.listTitle')}
               onToggle={() => props.onToggle(!vm().enabled)}
             />
             <CardSwitch
-              label="Continue on Default"
+              label={t('models.vmCard.continueOnDefault')}
               on={vm().continue_on_default}
               busy={props.busy === 'continue_on_default'}
-              title="When the chain runs out, continue with the Default tier's chain"
+              title={t('models.vmCard.continueTitle')}
               onToggle={() => props.onContinueOnDefaultChange(!vm().continue_on_default)}
             />
             <CardSwitch
-              label="Stream"
+              label={t('models.vmCard.stream')}
               on={isStream()}
               busy={props.busy === 'response_mode'}
               title={
-                isStream()
-                  ? 'Responses are streamed token by token'
-                  : 'Responses are returned as a single payload'
+                isStream() ? t('models.vmCard.streamOnTitle') : t('models.vmCard.streamOffTitle')
               }
               onToggle={() => props.onResponseModeChange(isStream() ? 'buffered' : 'stream')}
             />
@@ -183,11 +179,15 @@ const VirtualModelCard: Component<VirtualModelCardProps> = (props) => {
         );
         return (
           <>
-            {item('Copy example', props.onShowExample)}
-            {item('Edit virtual model', props.onEdit)}
-            <Show when={props.onMoveUp}>{item('Move up', () => props.onMoveUp?.())}</Show>
-            <Show when={props.onMoveDown}>{item('Move down', () => props.onMoveDown?.())}</Show>
-            {item('Delete', props.onDelete, true)}
+            {item(t('models.vmCard.copyExample'), props.onShowExample)}
+            {item(t('models.vmCard.edit'), props.onEdit)}
+            <Show when={props.onMoveUp}>
+              {item(t('models.vmCard.moveUp'), () => props.onMoveUp?.())}
+            </Show>
+            <Show when={props.onMoveDown}>
+              {item(t('models.vmCard.moveDown'), () => props.onMoveDown?.())}
+            </Show>
+            {item(t('models.vmCard.delete'), props.onDelete, true)}
           </>
         );
       }}

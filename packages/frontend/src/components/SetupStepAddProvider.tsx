@@ -10,6 +10,8 @@ import OpenCodeSetup from './OpenCodeSetup.jsx';
 import CodexSetup from './CodexSetup.jsx';
 import VirtualModelsHint from './VirtualModelsHint.jsx';
 import type { ToolkitId } from '../services/framework-snippets.js';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 type SetupTab = 'toolkits' | 'agents';
 type AgentId = 'openclaw' | 'hermes' | 'nanobot' | 'craft' | 'claude-code' | 'opencode' | 'codex';
@@ -35,6 +37,29 @@ const PLATFORM_TO_TOOLKIT: Record<string, ToolkitId> = {
   curl: 'curl',
 };
 
+/** Harnesses named in "Connect your X harness to Thinker". */
+const NAMED_HARNESSES: Record<string, string> = {
+  hermes: 'Hermes',
+  openclaw: 'OpenClaw',
+  nanobot: 'Nanobot',
+  craft: 'Craft',
+};
+/** Tools named in "Connect X to Thinker". */
+const NAMED_TOOLS: Record<string, string> = {
+  n8n: 'n8n',
+  'claude-code': 'Claude Code',
+  opencode: 'OpenCode',
+  codex: 'Codex',
+};
+
+function headingFor(platform: string | null | undefined): string {
+  const harness = platform ? NAMED_HARNESSES[platform] : undefined;
+  if (harness) return t('harnesses.setupStep.connectNamed', { name: harness });
+  const tool = platform ? NAMED_TOOLS[platform] : undefined;
+  if (tool) return t('harnesses.setupStep.connectTool', { name: tool });
+  return t('harnesses.setupStep.connectDefault');
+}
+
 const SetupStepAddProvider: Component<Props> = (props) => {
   const [activeTab, setActiveTab] = createSignal<SetupTab>('agents');
   const [activeAgent, setActiveAgent] = createSignal<AgentId>('openclaw');
@@ -54,25 +79,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
 
   return (
     <div>
-      <h3 class="setup-step__heading">
-        {props.platform === 'hermes'
-          ? 'Connect your Hermes harness to Thinker'
-          : props.platform === 'openclaw'
-            ? 'Connect your OpenClaw harness to Thinker'
-            : props.platform === 'nanobot'
-              ? 'Connect your Nanobot harness to Thinker'
-              : props.platform === 'craft'
-                ? 'Connect your Craft harness to Thinker'
-                : props.platform === 'n8n'
-                  ? 'Connect n8n to Thinker'
-                  : props.platform === 'claude-code'
-                    ? 'Connect Claude Code to Thinker'
-                    : props.platform === 'opencode'
-                      ? 'Connect OpenCode to Thinker'
-                      : props.platform === 'codex'
-                        ? 'Connect Codex to Thinker'
-                        : 'Connect your harness to Thinker'}
-      </h3>
+      <h3 class="setup-step__heading">{headingFor(props.platform)}</h3>
 
       {/* Platform-filtered mode: show only relevant content */}
       <Show when={isFiltered()}>
@@ -124,11 +131,13 @@ const SetupStepAddProvider: Component<Props> = (props) => {
       {/* Default / "other": show full tabbed UI */}
       <Show when={!isFiltered()}>
         <p class="setup-step__desc">
-          Point your harness at the Thinker endpoint using the model{' '}
-          <code class="setup-model-hint__code">auto</code>
+          <RichText
+            text={t('harnesses.setupStep.pointAt')}
+            parts={{ model: <code class="setup-model-hint__code">auto</code> }}
+          />
         </p>
 
-        <div class="setup-segment" role="tablist" aria-label="Setup method">
+        <div class="setup-segment" role="tablist" aria-label={t('harnesses.setupStep.method')}>
           <button
             class="setup-segment__btn"
             classList={{ 'setup-segment__btn--active': activeTab() === 'agents' }}
@@ -136,7 +145,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
             role="tab"
             aria-selected={activeTab() === 'agents'}
           >
-            Agents
+            {t('harnesses.setupStep.agents')}
           </button>
           <button
             class="setup-segment__btn"
@@ -145,7 +154,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
             role="tab"
             aria-selected={activeTab() === 'toolkits'}
           >
-            Toolkits
+            {t('harnesses.setupStep.toolkits')}
           </button>
         </div>
 
@@ -160,7 +169,7 @@ const SetupStepAddProvider: Component<Props> = (props) => {
 
         <Show when={activeTab() === 'agents'}>
           <div class="setup-method-tabs">
-            <div class="panel__tabs" role="tablist" aria-label="Agent framework">
+            <div class="panel__tabs" role="tablist" aria-label={t('harnesses.setupStep.framework')}>
               <button
                 class="panel__tab"
                 classList={{ 'panel__tab--active': activeAgent() === 'openclaw' }}

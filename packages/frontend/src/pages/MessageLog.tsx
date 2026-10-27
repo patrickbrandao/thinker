@@ -39,6 +39,7 @@ import { providerIcon } from '../components/ProviderIcon.jsx';
 import { platformIcon } from 'thinker-shared';
 import { ALL_TIERS, TIER_LABELS_ALL } from 'thinker-shared';
 import { analyticsPing, messagePing } from '../services/sse.js';
+import { t, tMaybe } from '../i18n/index.js';
 import '../styles/overview.css';
 import '../styles/routing.css';
 // The filtered-empty state here reuses .model-filter__empty classes, so this
@@ -180,7 +181,7 @@ const MessageLog: Component = () => {
     return map;
   });
   const agentFilterOptions = createMemo(() => [
-    { label: 'All harnesses', value: '' },
+    { label: t('messages.log.filters.allHarnesses'), value: '' },
     ...(agentList() ?? []).map((a) => {
       const info = agentPlatformMap().get(a);
       const iconPath = info?.platform ? platformIcon(info.platform, info.category) : null;
@@ -548,8 +549,11 @@ const MessageLog: Component = () => {
   );
 
   const tierOptions = createMemo(() => [
-    { label: 'All tiers', value: '' },
-    ...ALL_TIERS.map((t) => ({ label: TIER_LABELS_ALL[t], value: t })),
+    { label: t('messages.log.filters.allTiers'), value: '' },
+    ...ALL_TIERS.map((tier) => ({
+      label: tMaybe(`routing.stages.${tier}.label`) ?? TIER_LABELS_ALL[tier],
+      value: tier,
+    })),
     ...SPECIFICITY_STAGES.filter((stage) => activeSpecificityCategories().has(stage.id)).map(
       (stage) => ({
         label: stage.label,
@@ -572,10 +576,11 @@ const MessageLog: Component = () => {
     return messageFilterOptions()?.provider_labels?.[id] ?? id;
   };
 
-  const AUTH_TYPE_LABELS: Record<string, string> = {
-    subscription: 'Subscription',
-    api_key: 'Usage-based',
-    local: 'Local',
+  const authTypeLabel = (authType: string): string => {
+    if (authType === 'subscription') return t('messages.log.authType.subscription');
+    if (authType === 'api_key') return t('messages.log.authType.api_key');
+    if (authType === 'local') return t('messages.log.authType.local');
+    return authType;
   };
   // Every connection the tenant has, active or not: the log keeps history for
   // connections that were since disabled.
@@ -587,34 +592,34 @@ const MessageLog: Component = () => {
         label: `${group.display_name ?? providerDisplayName(group.provider)} · ${conn.label}`,
         icon: providerIcon(group.provider, 14) ?? undefined,
         description:
-          (AUTH_TYPE_LABELS[group.auth_type] ?? group.auth_type) +
-          (conn.is_active ? '' : ' · inactive'),
+          authTypeLabel(group.auth_type) +
+          (conn.is_active ? '' : ` · ${t('messages.log.inactive')}`),
       })),
     );
   });
 
-  const rangeOptions = [
-    { label: 'All time', value: '' },
-    { label: 'Last 24 hours', value: '24h' },
-    { label: 'Last 7 days', value: '7d' },
-    { label: 'Last 30 days', value: '30d' },
-    { label: 'Last 90 days', value: '90d' },
-    { label: 'Last 365 days', value: '365d' },
+  const rangeOptions = () => [
+    { label: t('messages.log.range.all'), value: '' },
+    { label: t('messages.log.range.24h'), value: '24h' },
+    { label: t('messages.log.range.7d'), value: '7d' },
+    { label: t('messages.log.range.30d'), value: '30d' },
+    { label: t('messages.log.range.90d'), value: '90d' },
+    { label: t('messages.log.range.365d'), value: '365d' },
   ];
 
-  const attemptStatusOptions = [
-    { label: 'All attempt statuses', value: '' },
-    { label: 'With a failed attempt', value: 'has_failed' },
-    { label: 'With a succeeded attempt', value: 'has_succeeded' },
+  const attemptStatusOptions = () => [
+    { label: t('messages.log.attemptStatus.all'), value: '' },
+    { label: t('messages.log.attemptStatus.has_failed'), value: 'has_failed' },
+    { label: t('messages.log.attemptStatus.has_succeeded'), value: 'has_succeeded' },
   ];
 
-  const statusOptions = [
-    { label: 'All statuses', value: '' },
-    { label: 'Success', value: 'ok' },
-    { label: 'Failed', value: 'failed' },
+  const statusOptions = () => [
+    { label: t('messages.log.status.all'), value: '' },
+    { label: t('messages.log.status.ok'), value: 'ok' },
+    { label: t('messages.log.status.failed'), value: 'failed' },
     // The caller hung up — not a Thinker or provider failure, so it is no
     // longer folded into Failed and needs its own way in.
-    { label: 'Cancelled', value: 'cancelled' },
+    { label: t('messages.log.status.cancelled'), value: 'cancelled' },
   ];
 
   const noRecoveryIcon = () => (
@@ -634,10 +639,10 @@ const MessageLog: Component = () => {
       </svg>
     </span>
   );
-  const triggerOptions = [
-    { label: 'All attempts', value: '' },
+  const triggerOptions = () => [
+    { label: t('messages.log.trigger.all'), value: '' },
     {
-      label: 'With a fallback attempt',
+      label: t('messages.log.trigger.fallback'),
       value: 'fallback',
       icon: (
         <span class="recovery-opt-icon" aria-hidden="true">
@@ -645,18 +650,18 @@ const MessageLog: Component = () => {
         </span>
       ),
     },
-    { label: 'No recovery attempt', value: 'none', icon: noRecoveryIcon() },
+    { label: t('messages.log.trigger.none'), value: 'none', icon: noRecoveryIcon() },
   ];
 
   // Who failed. The gateway origin collapses every Thinker-authored origin (setup,
   // limits, bad requests, internal errors) into one choice, since from a user's
   // point of view they share a fix path that has nothing to do with a provider.
-  const originOptions = [
-    { label: 'All origins', value: '' },
+  const originOptions = () => [
+    { label: t('messages.log.origin.all'), value: '' },
     // The query value is still the backend's legacy origin name; only the label changed.
     { label: 'Thinker', value: 'thinker' },
-    { label: 'Provider', value: 'provider' },
-    { label: 'Transport', value: 'transport' },
+    { label: t('messages.log.origin.provider'), value: 'provider' },
+    { label: t('messages.log.origin.transport'), value: 'transport' },
   ];
 
   // Drawer state. `?request=<id>` deep-links a request into the side panel
@@ -684,23 +689,25 @@ const MessageLog: Component = () => {
     <div class="container--full" onClick={handlePageClick}>
       <Title>
         {params.agentName
-          ? `${agentDisplayName() ?? decodeURIComponent(params.agentName)} Requests - Thinker`
-          : 'Requests - Thinker'}
+          ? t('messages.log.pageTitleAgent', {
+              agent: agentDisplayName() ?? decodeURIComponent(params.agentName),
+            })
+          : t('messages.log.pageTitle')}
       </Title>
       <Meta
         name="description"
         content={
           params.agentName
-            ? `Browse all requests handled for ${agentDisplayName() ?? decodeURIComponent(params.agentName)}. Filter by provider, status, or cost.`
-            : 'Browse all requests across all harnesses. Filter by provider, status, or cost.'
+            ? t('messages.log.metaDescriptionAgent', {
+                agent: agentDisplayName() ?? decodeURIComponent(params.agentName),
+              })
+            : t('messages.log.metaDescription')
         }
       />
       <div class="page-header page-header--wrap">
         <div class="page-header__intro">
-          <h1>Requests</h1>
-          <span class="breadcrumb">
-            Full log of requests from your app. Provider calls appear as attempts.
-          </span>
+          <h1>{t('messages.log.title')}</h1>
+          <span class="breadcrumb">{t('messages.log.subtitle')}</span>
         </div>
         <div class="header-controls">
           <Show when={!showEmptyState()}>
@@ -715,51 +722,51 @@ const MessageLog: Component = () => {
               values={connectionsFilter()}
               onChange={setConnectionsFilter}
               options={connectionOptions()}
-              placeholder="All connections"
-              label="Connection filter"
+              placeholder={t('messages.log.filters.allConnections')}
+              label={t('messages.log.filters.connection')}
             />
             <Select
               value={triggerFilter()}
               onChange={setTriggerFilterValue}
-              options={triggerOptions}
-              label="Recovery filter"
+              options={triggerOptions()}
+              label={t('messages.log.filters.recovery')}
             />
             <Select
               value={attemptStatusFilter()}
               onChange={setAttemptStatusFilter}
-              options={attemptStatusOptions}
-              label="Attempt status filter"
+              options={attemptStatusOptions()}
+              label={t('messages.log.filters.attemptStatus')}
             />
             <MultiSelect
               values={modelsFilter()}
               onChange={setModelsFilter}
               options={modelOptions()}
-              placeholder="All models"
-              label="Model filter"
+              placeholder={t('messages.log.filters.allModels')}
+              label={t('messages.log.filters.model')}
             />
             <Select
               value={statusFilterValue()}
               onChange={setStatusFilter}
-              options={statusOptions}
-              label="Status filter"
+              options={statusOptions()}
+              label={t('messages.log.filters.status')}
             />
             <Select
               value={originFilter()}
               onChange={setOriginFilter}
-              options={originOptions}
-              label="Origin filter"
+              options={originOptions()}
+              label={t('messages.log.filters.origin')}
             />
             <Select value={tierFilter()} onChange={setTierFilter} options={tierOptions()} />
             <Select
               value={rangeFilter()}
               onChange={setRangeFilter}
-              options={rangeOptions}
-              label="Period filter"
+              options={rangeOptions()}
+              label={t('messages.log.filters.period')}
             />
           </Show>
           <Show when={showEmptyState() && !!params.agentName && !setupCompleted()}>
             <button class="btn btn--primary btn--sm" onClick={() => setSetupOpen(true)}>
-              Set up harness
+              {t('messages.log.setUpHarness')}
             </button>
           </Show>
         </div>
@@ -777,16 +784,16 @@ const MessageLog: Component = () => {
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Request</th>
-                    <th>Cost</th>
-                    <th>Total Tokens</th>
-                    <th>Input</th>
-                    <th>Output</th>
-                    <th>Model</th>
-                    <th>Cache</th>
-                    <th>Latency</th>
-                    <th>Status</th>
+                    <th>{t('messages.log.skeleton.date')}</th>
+                    <th>{t('messages.log.skeleton.request')}</th>
+                    <th>{t('messages.log.skeleton.cost')}</th>
+                    <th>{t('messages.log.skeleton.totalTokens')}</th>
+                    <th>{t('messages.log.skeleton.input')}</th>
+                    <th>{t('messages.log.skeleton.output')}</th>
+                    <th>{t('messages.log.skeleton.model')}</th>
+                    <th>{t('messages.log.skeleton.cache')}</th>
+                    <th>{t('messages.log.skeleton.latency')}</th>
+                    <th>{t('messages.log.skeleton.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -838,39 +845,35 @@ const MessageLog: Component = () => {
               when={params.agentName && setupCompleted()}
               fallback={
                 <div class="empty-state">
-                  <div class="empty-state__title">No requests yet</div>
+                  <div class="empty-state__title">{t('messages.log.noRequestsYet')}</div>
                   <Show
                     when={params.agentName}
                     fallback={
                       <>
-                        <p>
-                          Create a harness and send a request. Every caller request shows up here.
-                        </p>
+                        <p>{t('messages.log.emptyGlobal')}</p>
                         <A
                           href="/harnesses"
                           class="btn btn--primary btn--sm"
                           style="margin-top: var(--gap-md);"
                         >
-                          Go to Harnesses
+                          {t('messages.log.goToHarnesses')}
                         </A>
                       </>
                     }
                   >
-                    <p>
-                      Set up your harness and send a request. Every caller request shows up here.
-                    </p>
+                    <p>{t('messages.log.emptyAgent')}</p>
                     <button
                       class="btn btn--primary btn--sm"
                       style="margin-top: var(--gap-md);"
                       onClick={() => setSetupOpen(true)}
                     >
-                      Set up harness
+                      {t('messages.log.setUpHarness')}
                     </button>
                   </Show>
                   <div class="empty-state__img-wrapper">
                     <img
                       src="/example-messages.svg"
-                      alt="Example request log showing LLM request history"
+                      alt={t('messages.log.exampleAlt')}
                       class="empty-state__img"
                       loading="lazy"
                     />
@@ -879,8 +882,8 @@ const MessageLog: Component = () => {
               }
             >
               <div class="empty-state">
-                <div class="empty-state__title">No requests yet</div>
-                <p>Connect a provider to start routing LLM calls.</p>
+                <div class="empty-state__title">{t('messages.log.noRequestsYet')}</div>
+                <p>{t('messages.log.connectProviderHint')}</p>
                 <button
                   class="btn btn--primary btn--sm"
                   style="margin-top: var(--gap-md);"
@@ -890,12 +893,12 @@ const MessageLog: Component = () => {
                     })
                   }
                 >
-                  Connect provider
+                  {t('messages.log.connectProvider')}
                 </button>
                 <div class="empty-state__img-wrapper">
                   <img
                     src="/example-messages.svg"
-                    alt="Example request log showing LLM request history"
+                    alt={t('messages.log.exampleAlt')}
                     class="empty-state__img"
                     loading="lazy"
                   />
@@ -907,19 +910,17 @@ const MessageLog: Component = () => {
             <div class="panel">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gap-lg);">
                 <div class="panel__title" style="margin-bottom: 0;">
-                  Requests
+                  {t('messages.log.title')}
                 </div>
                 <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                  0 results
+                  {t('messages.log.zeroResults')}
                 </span>
               </div>
               <div class="model-filter__empty">
-                <p class="model-filter__empty-title">No requests match your filters</p>
-                <p class="model-filter__empty-hint">
-                  Try adjusting your provider, status, or cost filters to see more results.
-                </p>
+                <p class="model-filter__empty-title">{t('messages.log.noMatchTitle')}</p>
+                <p class="model-filter__empty-hint">{t('messages.log.noMatchHint')}</p>
                 <button class="btn btn--outline btn--sm" onClick={clearFilters} type="button">
-                  Clear filters
+                  {t('messages.log.clearFilters')}
                 </button>
               </div>
             </div>
@@ -928,16 +929,16 @@ const MessageLog: Component = () => {
             <Show when={hasNoData() && hasProviders()}>
               <div class="waiting-banner">
                 <i class="bxd bx-florist" />
-                <p>No requests yet. They appear seconds after your first LLM call.</p>
+                <p>{t('messages.log.waiting')}</p>
               </div>
             </Show>
             <div class="panel">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gap-lg);">
                 <div class="panel__title" style="margin-bottom: 0;">
-                  Requests
+                  {t('messages.log.title')}
                 </div>
                 <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                  {totalForPager()} total
+                  {t('messages.log.total', { count: totalForPager() })}
                 </span>
               </div>
               <div class="data-table-scroll">

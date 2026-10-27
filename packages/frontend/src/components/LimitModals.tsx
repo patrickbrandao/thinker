@@ -1,7 +1,8 @@
 import { Show, type Component } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import type { NotificationRule } from '../services/api.js';
-import { formatThreshold, PERIOD_LABELS } from './LimitRuleTable.js';
+import { formatThreshold, periodLabel } from './LimitRuleTable.js';
+import { t } from '../i18n/index.js';
 
 interface KebabMenuProps {
   openMenuId: string | null;
@@ -43,7 +44,7 @@ const KebabMenu: Component<KebabMenuProps> = (props) => (
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
-              Edit
+              {t('common.edit')}
             </button>
             <button
               class="rule-menu__item rule-menu__item--danger"
@@ -64,7 +65,7 @@ const KebabMenu: Component<KebabMenuProps> = (props) => (
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         );
@@ -95,16 +96,19 @@ const DeleteRuleModal: Component<DeleteRuleModalProps> = (props) => (
           onClick={(e) => e.stopPropagation()}
         >
           <h2 class="modal-card__title" id="delete-rule-modal-title">
-            Delete rule
+            {t('limits.deleteModal.title')}
           </h2>
           <p class="modal-card__desc">
-            This will permanently delete the{' '}
+            {t('limits.deleteModal.bodyBefore')}{' '}
             <span style="font-weight: 600;">
-              {props.target!.metric_type === 'tokens' ? 'token' : 'cost'}
+              {props.target!.metric_type === 'tokens'
+                ? t('limits.deleteModal.token')
+                : t('limits.deleteModal.cost')}
             </span>{' '}
-            rule ({formatThreshold(props.target!)}{' '}
-            {PERIOD_LABELS[props.target!.period]?.toLowerCase() ?? props.target!.period}). This
-            action cannot be undone.
+            {t('limits.deleteModal.bodyAfter', {
+              threshold: formatThreshold(props.target!),
+              period: periodLabel(props.target!.period)?.toLowerCase() ?? props.target!.period,
+            })}
           </p>
 
           <label class="confirm-modal__confirm-row">
@@ -113,19 +117,19 @@ const DeleteRuleModal: Component<DeleteRuleModalProps> = (props) => (
               checked={props.confirmed}
               onChange={(e) => props.onConfirmChange(e.currentTarget.checked)}
             />
-            I understand this action is irreversible
+            {t('limits.deleteModal.confirm')}
           </label>
 
           <div class="confirm-modal__footer">
             <button class="btn btn--ghost btn--sm" onClick={props.onCancel}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               class="btn btn--danger btn--sm"
               disabled={!props.confirmed || props.deleting}
               onClick={props.onDelete}
             >
-              {props.deleting ? <span class="spinner" /> : 'Delete rule'}
+              {props.deleting ? <span class="spinner" /> : t('limits.deleteModal.submit')}
             </button>
           </div>
         </div>
@@ -155,26 +159,23 @@ const RemoveProviderModal: Component<RemoveProviderModalProps> = (props) => (
           onClick={(e) => e.stopPropagation()}
         >
           <h2 class="modal-card__title" id="remove-provider-modal-title">
-            Remove provider
+            {t('limits.removeProvider.title')}
           </h2>
           <p class="modal-card__desc">
-            This will disconnect your email provider.
-            <Show when={props.hasEmailRules}>
-              {' '}
-              Email alerts won't be sent until you set up a new one.
-            </Show>
+            {t('limits.removeProvider.body')}
+            <Show when={props.hasEmailRules}> {t('limits.removeProvider.bodyRules')}</Show>
           </p>
 
           <div class="confirm-modal__footer">
             <button class="btn btn--ghost btn--sm" onClick={props.onCancel}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               class="btn btn--danger btn--sm"
               onClick={props.onRemove}
               disabled={props.removing}
             >
-              {props.removing ? <span class="spinner" /> : 'Remove'}
+              {props.removing ? <span class="spinner" /> : t('common.remove')}
             </button>
           </div>
         </div>

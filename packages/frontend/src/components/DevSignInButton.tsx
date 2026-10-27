@@ -1,5 +1,6 @@
 /* v8 ignore start -- dev-only shortcut, validated in the local dev server. */
 import type { Component } from 'solid-js';
+import { t } from '../i18n/index.js';
 
 // Dev-only seed credentials (see packages/backend/src/database/database-seeder.service.ts,
 // seeded only when SEED_DATA=true / non-production). Login.tsx loads this module through
@@ -20,7 +21,7 @@ const DevSignInButton: Component<{
     disabled={props.disabled}
     style="background:#f59e0b;color:#1f1400;font-weight:700;margin-bottom:0.75rem;"
   >
-    ⚡ Sign in as dev, {DEV_EMAIL}
+    {t('auth.devSignIn', { email: DEV_EMAIL })}
   </button>
 );
 

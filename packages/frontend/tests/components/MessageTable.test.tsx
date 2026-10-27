@@ -13,6 +13,7 @@ vi.mock('@solidjs/router', () => ({
 
 vi.mock('../../src/services/formatters.js', () => ({
   formatCost: (v: number) => (v < 0 ? null : `$${v.toFixed(2)}`),
+  usd: (v: number, digits: number) => `$${v.toFixed(digits)}`,
   formatNumber: (v: number) => String(v),
   formatStatus: (s: string) => s,
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,

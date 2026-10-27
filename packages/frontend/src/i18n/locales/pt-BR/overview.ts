@@ -1,0 +1,145 @@
+import type en from '../en/overview.js';
+import type { Catalog } from '../../types.js';
+
+const ptBR: Catalog<typeof en> = {
+  title: 'Visão geral',
+  pageTitle: 'Visão geral | Thinker',
+  subtitle: 'Todos os seus harnesses e provedores',
+  agentPageTitle: 'Visão geral de {{ name }} - Thinker',
+  agentMetaDescription: 'Acompanhe o desempenho, os custos, os tokens e a atividade de {{ name }}.',
+  range: {
+    '24h': 'Últimas 24 horas',
+    '7d': 'Últimos 7 dias',
+    '30d': 'Últimos 30 dias',
+    '90d': 'Últimos 90 dias',
+    '365d': 'Últimos 365 dias',
+  },
+  empty: {
+    noActivity: 'Nenhuma atividade ainda',
+    setupAndConnect:
+      'Configure o seu harness e conecte pelo menos um provedor. Quando o harness enviar requisições, os dados aparecem aqui.',
+    setupHarness: 'Configurar harness',
+    noProviders: 'Nenhum provedor conectado',
+    connectToRoute:
+      'Conecte um provedor de modelos para começar a rotear as chamadas de LLM dos seus harnesses.',
+    connectProvider: 'Conectar provedor',
+    agentSetup: 'Configure o seu harness e envie uma mensagem. Os dados de uso aparecem aqui.',
+    agentConnect: 'Conecte um provedor para começar a rotear as chamadas de LLM.',
+    exampleAlt: 'Exemplo de visão geral do painel com gráficos de custo e de tokens',
+    waiting:
+      'Nenhuma atividade ainda. O painel se atualiza segundos depois da primeira chamada de LLM.',
+  },
+  costInfo: 'Só os custos reais de chaves de API. O uso de assinaturas não entra na conta.',
+  groupBy: {
+    status: 'Por status da requisição',
+    harness: 'Por harness',
+    provider: 'Por provedor',
+  },
+  nounProviders: 'provedores',
+  nounHarnesses: 'harnesses',
+  recentRequests: 'Requisições recentes',
+  viewMore: 'Ver mais',
+  modelUsage: {
+    title: 'Uso por modelo',
+    subtitle: 'Os modelos usados e quanto custaram',
+    model: 'Modelo',
+    tokens: 'Tokens',
+    share: 'Participação',
+    estCost: 'Custo estimado',
+    pctOfTotal: '% do total',
+    cost: 'Custo',
+    empty: 'Ainda não há dados de modelos',
+  },
+  connections: {
+    title: 'Conexões de provedor',
+    provider: 'Provedor',
+    name: 'Nome da conexão',
+    type: 'Tipo',
+    status: 'Status',
+    failedAttempts: 'Tentativas com falha',
+    failedAttemptsTip:
+      'Tentativas em que esta conexão falhou no período filtrado. Clique em um número para ver as requisições que as contêm.',
+    failedLinkTitle: 'Ver as requisições com estas tentativas com falha',
+    defaultLabel: 'Padrão',
+    custom: 'personalizado',
+    active: 'Ativa',
+    inactive: 'Inativa',
+    empty: 'Nenhuma conexão ainda',
+  },
+  harnesses: {
+    title: 'Harnesses',
+    harness: 'Harness',
+    usage: 'Uso',
+    totalRequests: 'Total de requisições',
+    recoveredRequests: 'Requisições recuperadas',
+    tokens: '{{ n }} tokens',
+    requestsLinkTitle: 'Ver as requisições deste harness',
+    recoveredLinkTitle: 'Ver as requisições recuperadas deste harness',
+    empty: 'Nenhum harness ainda',
+  },
+  totalAttempts: 'Total de tentativas',
+  successRate: 'Taxa de sucesso',
+  tips: {
+    recoveredRequests: 'Requisições bem-sucedidas que foram recuperadas por fallback.',
+    totalAttempts:
+      'Toda chamada a um provedor conta aqui, inclusive as repetições de fallback. Uma requisição pode gerar várias tentativas.',
+    modelSuccessRate: 'Tentativas bem-sucedidas sobre todas as tentativas deste modelo.',
+    connectionSuccessRate:
+      'Tentativas bem-sucedidas sobre todas as tentativas desta conexão, no período filtrado.',
+    harnessSuccessRate: 'Requisições bem-sucedidas sobre todas as requisições deste harness.',
+    harnessTotalRequests:
+      'Requisições lógicas deste harness, uma por chamada, seja qual for o número de tentativas.',
+    requestSuccessRate:
+      'Requisições bem-sucedidas sobre todas as requisições. As recuperadas contam como bem-sucedidas.',
+  },
+  kpi: {
+    successRate: 'Taxa de sucesso',
+    recoveredRequests: 'Requisições recuperadas',
+    recoveredByFallback: 'Recuperadas por fallback',
+    failedRequests: 'Requisições com falha',
+    new: 'novo',
+    viewMore: 'Ver mais',
+    subjectRecovered: 'requisições recuperadas',
+    subjectRecoveredByFallback: 'requisições recuperadas por fallback',
+    subjectFailed: 'requisições com falha',
+    scopeHarness: 'Ver as {{ subject }} deste harness',
+    scopeAll: 'Ver as {{ subject }} de todos os harnesses',
+  },
+  chart: {
+    requests: 'Requisições',
+    recoveredRequests: 'Requisições recuperadas',
+    cost: 'Custo',
+    tokenUsage: 'Uso de tokens',
+    loading: 'Carregando gráfico…',
+    noRequestData: 'Nenhuma requisição neste período',
+    noRecovered: 'Nenhuma requisição recuperada neste período',
+    noCostData: 'Nenhum custo neste período',
+    noTokenData: 'Nenhum uso de tokens neste período',
+    total: 'Total',
+    attemptSuccess: 'Sucesso das tentativas nos provedores: {{ attempt }}.',
+    callerSuccess:
+      'Sucesso para quem chamou: {{ request }}. Sucesso das tentativas nos provedores: {{ attempt }}. A diferença é a recuperação por fallback.',
+    series: {
+      none: 'Sem erro',
+      success: 'Sucesso',
+      error: 'Erro',
+      fallback: 'Sucesso - recuperada por fallback',
+    },
+  },
+  errorClasses: {
+    title: 'Classes de erro por frequência',
+    empty: 'Nenhum erro neste período',
+  },
+  skeleton: {
+    date: 'Data',
+    request: 'Requisição',
+    cost: 'Custo',
+    model: 'Modelo',
+    tokens: 'Tokens',
+    status: 'Status',
+    costByModel: 'Custo por modelo',
+    costByModelDesc: 'Quanto cada modelo de IA está custando',
+  },
+};
+
+export default ptBR;

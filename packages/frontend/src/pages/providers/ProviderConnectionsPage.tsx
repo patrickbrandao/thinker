@@ -36,15 +36,12 @@ import {
 import InfoTooltip from '../../components/InfoTooltip.jsx';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import { toast } from '../../services/toast-store.js';
+import { t } from '../../i18n/index.js';
 import { roleCan } from '../../services/session-store.js';
 import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import Sparkline from '../../components/Sparkline.jsx';
-import {
-  attemptSuccessRate,
-  TOTAL_ATTEMPTS_TOOLTIP,
-  CONNECTION_SUCCESS_RATE_TOOLTIP_30D,
-} from '../../services/api/analytics.js';
+import { attemptSuccessRate } from '../../services/api/analytics.js';
 import '../../styles/routing.css';
 import '../../styles/analytics-overview.css';
 
@@ -59,63 +56,61 @@ interface AgentRow {
   agent_name: string;
 }
 
-const PAGE_COPY: Record<
-  ProviderPageKind,
-  {
-    title: string;
-    heading: string;
-    subtitle: string;
-    addLabel: string;
-    customAddLabel?: string;
-    connectedHeading: string;
-    supportedHeading: string;
-    authType: AuthType;
-    /** Cost metric (stat card + per-row column) — BYOK only. Subscriptions and
-     *  local providers have no real cost figure to show. */
-    metricLabel?: string;
-    metricTooltip?: string;
-    rowMetricHeading?: string;
-    activeSingular: string;
-    activePlural: string;
-  }
-> = {
-  subscriptions: {
-    title: 'Subscriptions | Thinker',
-    heading: 'Subscriptions',
-    subtitle: 'Use your current plans with any supported provider.',
-    addLabel: 'Connect',
-    connectedHeading: 'My subscription connections',
-    supportedHeading: 'Supported subscription providers',
-    authType: 'subscription',
-    activeSingular: 'connection',
-    activePlural: 'connections',
-  },
-  byok: {
-    title: 'Usage-based | Thinker',
-    heading: 'Usage-based',
-    subtitle: 'Connect providers you pay per token or per usage with your own API keys.',
-    addLabel: 'Connect',
-    customAddLabel: 'Add custom provider',
-    connectedHeading: 'My usage-based connections',
-    supportedHeading: 'Supported usage-based providers',
-    authType: 'api_key',
-    metricLabel: 'Total API cost (30d)',
-    metricTooltip: 'Sum of all API key usage costs across your connected providers.',
-    rowMetricHeading: 'Cost (30d)',
-    activeSingular: 'key',
-    activePlural: 'keys',
-  },
-  local: {
-    title: 'Local | Thinker',
-    heading: 'Local',
-    subtitle: 'Connect to LLM servers running on your machine.',
-    addLabel: 'Connect',
-    connectedHeading: 'My local connections',
-    supportedHeading: 'Supported local providers',
+interface PageCopy {
+  title: string;
+  heading: string;
+  subtitle: string;
+  addLabel: string;
+  customAddLabel?: string;
+  connectedHeading: string;
+  supportedHeading: string;
+  authType: AuthType;
+  /** Cost metric (stat card + per-row column) — BYOK only. Subscriptions and
+   *  local providers have no real cost figure to show. */
+  metricLabel?: string;
+  metricTooltip?: string;
+  rowMetricHeading?: string;
+  activeLabel: (count: number) => string;
+}
+
+/** Page copy, read at render time so it follows the active language. */
+const pageCopy = (kind: ProviderPageKind): PageCopy => {
+  if (kind === 'subscriptions')
+    return {
+      title: t('providers.page.subscriptions.title'),
+      heading: t('providers.kind.subscriptions'),
+      subtitle: t('providers.page.subscriptions.subtitle'),
+      addLabel: t('providers.connect'),
+      connectedHeading: t('providers.page.subscriptions.connectedHeading'),
+      supportedHeading: t('providers.page.subscriptions.supportedHeading'),
+      authType: 'subscription',
+      activeLabel: (n) => t('providers.page.activeConnections', n),
+    };
+  if (kind === 'byok')
+    return {
+      title: t('providers.page.byok.title'),
+      heading: t('providers.kind.byok'),
+      subtitle: t('providers.page.byok.subtitle'),
+      addLabel: t('providers.connect'),
+      customAddLabel: t('providers.page.addCustomProvider'),
+      connectedHeading: t('providers.page.byok.connectedHeading'),
+      supportedHeading: t('providers.page.byok.supportedHeading'),
+      authType: 'api_key',
+      metricLabel: t('providers.page.totalApiCost30d'),
+      metricTooltip: t('providers.page.totalApiCostTooltip'),
+      rowMetricHeading: t('providers.page.cost30d'),
+      activeLabel: (n) => t('providers.page.activeKeys', n),
+    };
+  return {
+    title: t('providers.page.local.title'),
+    heading: t('providers.kind.local'),
+    subtitle: t('providers.page.local.subtitle'),
+    addLabel: t('providers.connect'),
+    connectedHeading: t('providers.page.local.connectedHeading'),
+    supportedHeading: t('providers.page.local.supportedHeading'),
     authType: 'local',
-    activeSingular: 'connection',
-    activePlural: 'connections',
-  },
+    activeLabel: (n) => t('providers.page.activeConnections', n),
+  };
 };
 
 const CONNECTIONS_COLLAPSE_THRESHOLD = 6;
@@ -168,12 +163,12 @@ const StatusBadge: Component<{ active: boolean }> = (props) => (
     when={props.active}
     fallback={
       <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;">
-        Inactive
+        {t('providers.inactive')}
       </span>
     }
   >
     <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--success)); color: white; font-size: var(--font-size-xs); font-weight: 600;">
-      Active
+      {t('providers.active')}
     </span>
   </Show>
 );
@@ -222,7 +217,7 @@ const GridIcon: Component = () => (
 );
 
 const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props) => {
-  const copy = () => PAGE_COPY[props.kind];
+  const copy = () => pageCopy(props.kind);
   const navigate = useNavigate();
   const [showModal, setShowModal] = createSignal(false);
   const [showCustomModal, setShowCustomModal] = createSignal(false);
@@ -276,7 +271,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
     e?.stopPropagation();
     const newLabel = renameValue().trim();
     if (!newLabel) {
-      setRenameError('Name cannot be empty');
+      setRenameError(t('providers.nameEmpty'));
       return;
     }
     if (newLabel === currentLabel) {
@@ -294,11 +289,11 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
         newLabel,
         authType as AuthType,
       );
-      toast.success('Connection renamed');
+      toast.success(t('providers.connectionRenamed'));
       setRenamingId(null);
       refetchGlobalProviders();
     } catch (err: any) {
-      setRenameError(err?.message ?? 'Failed to rename');
+      setRenameError(err?.message ?? t('providers.renameFailed'));
     } finally {
       setRenameBusy(false);
     }
@@ -482,8 +477,8 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
     !!copy().metricLabel && (connectedRows().length > 0 || totalApiCost() > 0);
 
   const activeLabel = (count: number) => {
-    if (props.kind === 'local') return 'Connected';
-    return `${count} active ${count === 1 ? copy().activeSingular : copy().activePlural}`;
+    if (props.kind === 'local') return t('providers.connected');
+    return copy().activeLabel(count);
   };
 
   const openModal = (providerId?: string) => {
@@ -571,7 +566,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
         >
           <Show when={showMetricCard()}>
             <div class="overview-stat-card">
-              <span class="overview-stat-card__label">Total API cost (30d)</span>
+              <span class="overview-stat-card__label">{copy().metricLabel}</span>
               <div class="overview-stat-card__value-row">
                 <Show when={!usageLoading()} fallback={<UsageShimmer width={72} />}>
                   <span class="overview-stat-card__value">
@@ -583,8 +578,8 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
           </Show>
           <div class="overview-stat-card">
             <span class="overview-stat-card__label">
-              Total attempts (30d)
-              <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+              {t('providers.totalAttempts30d')}
+              <InfoTooltip text={t('ui.analytics.totalAttempts')} />
             </span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">{formatNumber(totalAttempts())}</span>
@@ -592,8 +587,8 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
           </div>
           <div class="overview-stat-card">
             <span class="overview-stat-card__label">
-              Success rate (30d)
-              <InfoTooltip text={CONNECTION_SUCCESS_RATE_TOOLTIP_30D} />
+              {t('providers.successRate30d')}
+              <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
             </span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">
@@ -629,22 +624,22 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
               <table class="data-table" style="width: 100%;">
                 <thead>
                   <tr>
-                    <th>Provider</th>
-                    <th>Connection</th>
-                    <th>Status</th>
-                    <th>Usage (30d)</th>
+                    <th>{t('providers.page.colProvider')}</th>
+                    <th>{t('providers.page.colConnection')}</th>
+                    <th>{t('providers.page.colStatus')}</th>
+                    <th>{t('providers.page.colUsage30d')}</th>
                     <Show when={copy().rowMetricHeading}>
                       <th>{copy().rowMetricHeading}</th>
                     </Show>
                     <th class="rel-col">
-                      Total attempts (30d)
-                      <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+                      {t('providers.totalAttempts30d')}
+                      <InfoTooltip text={t('ui.analytics.totalAttempts')} />
                     </th>
                     <th class="rel-col">
-                      Success rate (30d)
-                      <InfoTooltip text={CONNECTION_SUCCESS_RATE_TOOLTIP_30D} />
+                      {t('providers.successRate30d')}
+                      <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
                     </th>
-                    <th>Last used</th>
+                    <th>{t('providers.lastUsed')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -669,7 +664,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                             <span style="font-weight: 500;">{row.name}</span>
                             <Show when={row.summary.provider.startsWith('custom:')}>
                               <span style="display: inline-flex; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid hsl(var(--border)); font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                                Custom
+                                {t('providers.custom')}
                               </span>
                             </Show>
                           </span>
@@ -693,7 +688,9 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                                     onClick={(e) =>
                                       startRename(row.connection.id, row.connection.label, e)
                                     }
-                                    aria-label={`Rename ${row.connection.label}`}
+                                    aria-label={t('providers.page.renameAria', {
+                                      label: row.connection.label,
+                                    })}
                                     style="background: none; border: none; cursor: pointer; padding: 2px; color: hsl(var(--muted-foreground)); opacity: 0; transition: opacity 0.15s; display: inline-flex; align-items: center; line-height: 1;"
                                   >
                                     <svg
@@ -745,14 +742,14 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                                   )
                                 }
                               >
-                                Save
+                                {t('common.save')}
                               </button>
                               <button
                                 class="btn btn--outline btn--sm"
                                 style="font-size: var(--font-size-xs); padding: 4px 10px;"
                                 onClick={cancelRename}
                               >
-                                Cancel
+                                {t('common.cancel')}
                               </button>
                             </div>
                             <Show when={renameError()}>
@@ -782,7 +779,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                                       {formatNumber(
                                         perConnectionTokens(row.summary, row.connection),
                                       )}{' '}
-                                      tokens
+                                      {t('providers.page.tokensSuffix')}
                                     </span>
                                   </>
                                 );
@@ -837,7 +834,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
                               navigate(`/providers/connections/${row.connection.id}`);
                             }}
                           >
-                            View details
+                            {t('providers.page.viewDetails')}
                           </button>
                         </td>
                       </tr>
@@ -857,9 +854,9 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
             >
               <Show
                 when={connectionsExpanded()}
-                fallback={`Show all ${connectedRows().length} connections`}
+                fallback={t('providers.page.showAll', { count: connectedRows().length })}
               >
-                Show less
+                {t('common.showLess')}
               </Show>
               <svg
                 class="connections-panel__chevron"
@@ -891,7 +888,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
             class="panel__tab"
             classList={{ 'panel__tab--active': viewMode() === 'grid' }}
             onClick={() => setViewMode('grid')}
-            aria-label="Grid view"
+            aria-label={t('providers.page.gridView')}
             style="padding: 0 8px;"
           >
             <GridIcon />
@@ -902,7 +899,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
             class="panel__tab"
             classList={{ 'panel__tab--active': viewMode() === 'list' }}
             onClick={() => setViewMode('list')}
-            aria-label="List view"
+            aria-label={t('providers.page.listView')}
             style="padding: 0 8px;"
           >
             <ListIcon />
@@ -915,7 +912,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
           <table class="data-table" style="width: 100%;">
             <thead>
               <tr>
-                <th>Provider</th>
+                <th>{t('providers.page.colProvider')}</th>
                 <th />
               </tr>
             </thead>
@@ -1046,7 +1043,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
             class="modal-card routing-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Add custom provider"
+            aria-label={t('providers.page.addCustomProvider')}
             style="max-width: 600px; max-height: 85vh; overflow-y: auto;"
           >
             <CustomProviderForm

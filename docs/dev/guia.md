@@ -4,7 +4,7 @@ Guia técnico do repositório: arquitetura, comandos, autenticação, roteamento
 
 O Thinker começou como um snapshot sem histórico de [mnfst/llm-gateway](https://github.com/mnfst/llm-gateway) (`manifest@6.28.6`) e evolui de forma independente; não há obrigação de compatibilidade com o Manifest. Convenções de nome: variáveis `THINKER_*`, prefixo de chave `thk_`, CLI `thinker`, imagem `tmsoftbrasil/thinker`, porta `2099`. Nunca crie identificadores novos com `manifest`/`mnfst`.
 
-> Língua: código, identificadores, comentários, commits e PRs em inglês; documentação em `docs/` e notas de release em português. O texto da interface fica em inglês na v0.1.
+> Língua: código, identificadores, comentários, commits e PRs em inglês; documentação em `docs/` e notas de release em português. O dashboard tem inglês (referência) e português do Brasil desde a v0.3 (#42); veja [Traduções do dashboard](#traduções-do-dashboard-42).
 
 ## O que é
 
@@ -140,6 +140,22 @@ TZ=America/Sao_Paulo npm run test:e2e:docker --workspace=packages/backend
 Uma proteção (`packages/backend/test/e2e-db-guard.ts`) recusa rodar sem `DATABASE_URL`, sem `THINKER_E2E_ALLOW_DROP=1` ou se o nome do banco não tiver `test` como token separado. Um teste de varredura (`e2e-db-guard-scan.spec.ts`) falha se um spec novo apagar o banco sem passar pela proteção, usar `DATABASE_URL ?? ...` ou citar `localhost:5432`. Os testes e2e nunca falam com a internet. Para um PostgreSQL seu: `DATABASE_URL=postgresql://.../thinker_e2e_test THINKER_E2E_ALLOW_DROP=1 npm run test:e2e --workspace=packages/backend`, nunca contra um banco de desenvolvimento.
 
 Qualquer mudança de comportamento em tempo de execução também passa pelo agente `qa-docker`, contra a imagem construída localmente.
+
+### Traduções do dashboard (#42)
+
+O dashboard fala inglês (`en`, referência e fallback) e português do Brasil (`pt-BR`), com [`@solid-primitives/i18n`](https://github.com/solidjs-community/solid-primitives/tree/main/packages/i18n). Os catálogos vão no bundle: nada é baixado em tempo de execução.
+
+- **Onde ficam:** `packages/frontend/src/i18n/locales/{en,pt-BR}/<namespace>.ts`, um arquivo por área (`common`, `nav`, `auth`, `org`, `routing`, `providers`...). O `pt-BR` é tipado como `Catalog<typeof en>`, então o typecheck acusa chave faltando.
+- **No código:** `t('routing.title')`, com `{{ nome }}` preenchido pelo segundo argumento (`t('format.minutesAgo', { n: 5 })`). Plurais são funções no catálogo, com a mesma assinatura nos dois idiomas. Chaves montadas em tempo de execução usam `tMaybe`, que devolve `undefined` quando a chave não existe. Chame `t()` dentro do JSX ou de um memo para o texto acompanhar a troca de idioma; constantes de módulo guardam chaves, não textos.
+- **Datas, números e moeda:** sempre por `Intl` com `intlLocale()` ou pelos helpers de `services/formatters.ts` (`formatCost`, `usd`, `formatNumber`, `formatTime`). Em inglês a saída continua `en-US`.
+- **Idioma escolhido:** em Preferências da conta (`/account`). O padrão vem do navegador (`pt*` → `pt-BR`, senão `en`). A escolha fica no `localStorage` (`thinker.locale.<userId>`, mais `thinker.locale` para as telas de login) e volta depois de um novo login. Ainda não há preferência no backend, então ela vale por navegador.
+- **Fica em inglês:** nomes de marca, provedor e modelo, comandos e trechos de código, variáveis de ambiente, URLs e mensagens de erro vindas da API.
+
+Fluxo para mudar ou criar um texto:
+
+1. Adicione a chave no arquivo `en` da área e a tradução no `pt-BR` correspondente. Use o glossário do PT-BR já adotado: harness, provedor, requisição, tentativa, token, chave de API, fallback, roteamento, nível, modelo virtual, organização, papel.
+2. Rode `npm run check:i18n --workspace=thinker-frontend` (também roda no `npm run lint` do frontend e no CI). Ele falha quando uma chave existe em `en` e falta em `pt-BR` (ou o contrário, ou os `{{ }}` diferem) e quando um componente mostra texto fora do catálogo: texto JSX, `placeholder`/`title`/`aria-label`/`alt`/`label`, literais no JSX e toasts. Um literal que precisa ficar como está leva um comentário `i18n-ignore` na mesma linha ou na anterior.
+3. Os testes rodam em inglês por padrão (`tests/setup.ts`). Para conferir uma tela em português, chame `resetLocaleForTests('pt-BR')` (exemplos em `packages/frontend/tests/i18n/`).
 
 ### Relógio: tudo em UTC (#58)
 

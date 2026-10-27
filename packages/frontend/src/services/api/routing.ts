@@ -8,6 +8,7 @@ import type {
   OutputModality,
 } from 'thinker-shared';
 import { BASE_URL, fetchJson, fetchMutate, parseErrorMessage, routingPath } from './core.js';
+import { t } from '../../i18n/index.js';
 
 export type { AuthType, ModelCapability, ModelModality, ModelRoute, ResponseMode, OutputModality };
 
@@ -198,7 +199,7 @@ export async function copilotPollToken(agentName: string, deviceCode: string) {
     headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ deviceCode }),
   });
-  if (!res.ok) throw new Error(`Poll failed: ${res.status}`);
+  if (!res.ok) throw new Error(t('ui.errors.pollFailed', { status: res.status }));
   return res.json() as Promise<{ status: CopilotPollStatus }>;
 }
 

@@ -17,6 +17,7 @@ import {
 import RouteChainCard from './RouteChainCard.js';
 import HeaderTierSnippetModal from './HeaderTierSnippetModal.js';
 import { modelParamsScopeForHeaderTier } from 'thinker-shared';
+import { t } from '../i18n/index.js';
 
 interface Props {
   agentName: string;
@@ -97,7 +98,7 @@ const HeaderTierCard: Component<Props> = (props) => {
                 setSnippetOpen(true);
               }}
             >
-              Send this header
+              {t('routing.headerTierCard.sendHeader')}
             </button>
             <Show when={props.onEdit}>
               <button
@@ -108,7 +109,7 @@ const HeaderTierCard: Component<Props> = (props) => {
                   props.onEdit?.();
                 }}
               >
-                Edit tier
+                {t('routing.headerTierCard.editTier')}
               </button>
             </Show>
             <Show when={props.onDisable}>
@@ -120,7 +121,7 @@ const HeaderTierCard: Component<Props> = (props) => {
                   props.onDisable?.();
                 }}
               >
-                Disable
+                {t('common.disable')}
               </button>
             </Show>
           </>

@@ -32,6 +32,7 @@ import type {
   RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import '../styles/routing-header-tiers.css';
 
 export interface RoutingHeaderTiersSectionProps {
@@ -87,7 +88,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
     () => (props.externalTiers ? false : props.agentName()),
     (name) =>
       listHeaderTiers(name as string).catch((err) => {
-        toast.error(err instanceof Error ? err.message : 'Failed to load custom tiers');
+        toast.error(err instanceof Error ? err.message : t('routing.headerTiers.loadFailed'));
         return [] as HeaderTier[];
       }),
   );
@@ -141,7 +142,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
       await overrideHeaderTier(props.agentName(), id, model, provider, authType, providerKeyLabel);
       await refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update tier');
+      toast.error(err instanceof Error ? err.message : t('routing.updateTierFailed'));
     }
   };
 
@@ -150,7 +151,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
       await deleteHeaderTier(props.agentName(), id);
       await refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete tier');
+      toast.error(err instanceof Error ? err.message : t('routing.deleteTierFailed'));
     }
   };
 
@@ -160,7 +161,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
       await toggleHeaderTier(props.agentName(), id, enabled);
       await refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to toggle tier');
+      toast.error(err instanceof Error ? err.message : t('routing.toggleTierFailed'));
     } finally {
       setToggling(null);
     }
@@ -176,11 +177,11 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
       else internalMutate(update);
       toast.success(
         responseMode === 'stream'
-          ? 'Streaming response mode enabled'
-          : 'Buffered response mode enabled',
+          ? t('routing.streamModeEnabled')
+          : t('routing.bufferedModeEnabled'),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update response mode');
+      toast.error(err instanceof Error ? err.message : t('routing.responseModeFailed'));
     } finally {
       setChangingResponseMode(null);
     }
@@ -211,7 +212,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
         class="btn btn--primary btn--sm routing-section__cta"
         onClick={openCreateOrManage}
       >
-        Manage custom routing
+        {t('routing.manageCustomRouting')}
       </button>
     </Show>
   );
@@ -237,11 +238,9 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="manage-tiers-title" class="specificity-modal__title">
-              Manage custom routing
+              {t('routing.manageCustomRouting')}
             </h2>
-            <p class="specificity-modal__desc">
-              Toggle tiers on or off. Create new tiers or edit them directly on their card.
-            </p>
+            <p class="specificity-modal__desc">{t('routing.headerTiers.manageDesc')}</p>
             <div class="specificity-modal__list">
               <For each={tiers()}>
                 {(tier) => {
@@ -311,10 +310,10 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
                   <path d="m21,4h-1v-1c0-.55-.45-1-1-1s-1,.45-1,1v1h-1c-.55,0-1,.45-1,1s.45,1,1,1h1v1c0,.55.45,1,1,1s1-.45,1-1v-1h1c.55,0,1-.45,1-1s-.45-1-1-1Z" />
                   <path d="m3.24,16.5c0,.76.42,1.45,1.11,1.79l5.87,2.93c.56.28,1.18.42,1.79.42s1.23-.14,1.79-.42l5.87-2.93c.68-.34,1.11-1.03,1.11-1.79s-.42-1.45-1.11-1.79l-.42-.21.42-.21c.68-.34,1.11-1.03,1.11-1.79,0-.76-.42-1.45-1.11-1.79l-5.87-2.93c-1.12-.56-2.46-.56-3.58,0l-5.87,2.93c-.68.34-1.11,1.03-1.11,1.79,0,.76.42,1.45,1.11,1.79l.42.21-.42.21c-.68.34-1.11,1.03-1.11,1.79Zm2-4l5.87-2.93c.28-.14.59-.21.89-.21s.61.07.89.21l5.88,2.93-5.88,2.94c-.56.28-1.23.28-1.79,0l-4.11-2.05-1.76-.88Zm4.97,4.72c1.12.56,2.46.56,3.58,0l3.21-1.61,1.77.88-5.88,2.94c-.56.28-1.23.28-1.79,0l-5.87-2.93,1.76-.88,3.21,1.61Z" />
                 </svg>
-                Create new tier
+                {t('routing.headerTiers.createNew')}
               </button>
               <button class="btn btn--primary" onClick={() => setManageOpen(false)}>
-                Done
+                {t('common.done')}
               </button>
             </div>
           </div>
@@ -344,10 +343,10 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
       </Show>
 
       <Show when={snippetTier()} keyed>
-        {(t) => (
+        {(snippet) => (
           <HeaderTierSnippetModal
             agentName={props.agentName()}
-            tier={t}
+            tier={snippet}
             customProviders={props.customProviders()}
             onClose={() => setSnippetTier(null)}
           />
@@ -362,12 +361,12 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
         when={enabledTiers().length > 0}
         fallback={
           <div class="routing-section__empty">
-            <div class="routing-section__empty-title">No custom tiers activated</div>
-            <div class="routing-section__empty-desc">
-              Create or activate custom tiers to route matching requests to the models you choose.
-            </div>
+            <div class="routing-section__empty-title">{t('routing.headerTiers.emptyTitle')}</div>
+            <div class="routing-section__empty-desc">{t('routing.headerTiers.emptyDesc')}</div>
             <button type="button" class="btn btn--primary btn--sm" onClick={openCreateOrManage}>
-              {tiers().length > 0 ? 'Manage custom routing' : 'Create custom tier'}
+              {tiers().length > 0
+                ? t('routing.manageCustomRouting')
+                : t('routing.createCustomTier')}
             </button>
           </div>
         }
@@ -415,10 +414,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
           style="margin-bottom: 16px;"
         >
           <div>
-            <span class="routing-section__subtitle">
-              Assign requests to tiers based on their HTTP headers. Custom routing is evaluated
-              before any other routing method.
-            </span>
+            <span class="routing-section__subtitle">{t('routing.headerTiers.subtitle')}</span>
           </div>
           {manageButton()}
         </div>
@@ -431,11 +427,8 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
     <div class="routing-section routing-section--header-tiers">
       <div class="routing-section__header routing-section__header--header-tiers">
         <div>
-          <h2 class="routing-section__title">Custom routing</h2>
-          <p class="routing-section__subtitle">
-            Assign requests to tiers based on their HTTP headers. Custom routing is evaluated before
-            any other routing method.
-          </p>
+          <h2 class="routing-section__title">{t('routing.headerTiers.title')}</h2>
+          <p class="routing-section__subtitle">{t('routing.headerTiers.subtitle')}</p>
         </div>
         {manageButton()}
       </div>

@@ -1,6 +1,8 @@
 import { Show, Suspense, lazy, type Component } from 'solid-js';
 import InfoTooltip from './InfoTooltip.jsx';
 import { formatNumber, formatCost } from '../services/formatters.js';
+import { formatRate } from '../services/overview-format.js';
+import { t } from '../i18n/index.js';
 
 // uPlot is heavy; lazy-load the chart so it stays out of the initial bundle and
 // is only fetched when this card actually renders a chart body.
@@ -65,13 +67,13 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
             onClick={() => props.onViewChange('cost')}
           >
             <span class="chart-card__label">
-              Cost
+              {t('overview.chart.cost')}
               <Show when={props.costInfoTooltip}>
                 <InfoTooltip text={props.costInfoTooltip!} />
               </Show>
             </span>
             <div class="chart-card__value-row">
-              <span class="chart-card__value">{formatCost(props.costValue!) ?? '$0.00'}</span>
+              <span class="chart-card__value">{formatCost(props.costValue!) ?? formatCost(0)}</span>
               {trendBadge(props.costTrendPct ?? 0, props.costValue!)}
             </div>
           </button>
@@ -83,13 +85,18 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
           onClick={() => props.onViewChange('messages')}
         >
           <span class="chart-card__label">
-            Requests
+            {t('overview.chart.requests')}
             <Show when={props.attemptSuccessRate != null}>
               <InfoTooltip
                 text={
                   props.requestSuccessRate == null
-                    ? `Provider-attempt success: ${props.attemptSuccessRate!.toFixed(1)}%.`
-                    : `Caller success: ${props.requestSuccessRate.toFixed(1)}%. Provider-attempt success: ${props.attemptSuccessRate!.toFixed(1)}%. The gap is recovery from fallbacks.`
+                    ? t('overview.chart.attemptSuccess', {
+                        attempt: formatRate(props.attemptSuccessRate! / 100),
+                      })
+                    : t('overview.chart.callerSuccess', {
+                        request: formatRate(props.requestSuccessRate / 100),
+                        attempt: formatRate(props.attemptSuccessRate! / 100),
+                      })
                 }
               />
             </Show>
@@ -105,7 +112,7 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
           classList={{ 'chart-card__stat--active': props.activeView === 'tokens' }}
           onClick={() => props.onViewChange('tokens')}
         >
-          <span class="chart-card__label">Token usage</span>
+          <span class="chart-card__label">{t('overview.chart.tokenUsage')}</span>
           <div class="chart-card__value-row">
             <span class="chart-card__value">{formatNumber(props.tokensValue)}</span>
             {trendBadge(props.tokensTrendPct, props.tokensValue)}
@@ -113,17 +120,18 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
         </button>
       </div>
       <div class="chart-card__body">
-        <Suspense fallback={EMPTY('Loading chart…')}>
+        <Suspense fallback={EMPTY(t('overview.chart.loading'))}>
           <Show when={props.activeView === 'messages'}>
             <Show
               when={props.agentMessageTimeseries?.agents.length}
-              fallback={EMPTY('No request data for this time range')}
+              fallback={EMPTY(t('overview.chart.noRequestData'))}
             >
               <MultiAgentTokenChart
                 agents={props.agentMessageTimeseries!.agents}
                 timeseries={props.agentMessageTimeseries!.timeseries}
                 range={props.range}
                 colorMap={props.colorMap}
+                // i18n-ignore: chart mode flag, not shown
                 label="Requests"
               />
             </Show>
@@ -131,7 +139,7 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
           <Show when={props.activeView === 'tokens'}>
             <Show
               when={props.agentTimeseries?.agents.length}
-              fallback={EMPTY('No token data for this time range')}
+              fallback={EMPTY(t('overview.chart.noTokenData'))}
             >
               <MultiAgentTokenChart
                 agents={props.agentTimeseries!.agents}
@@ -144,13 +152,14 @@ const ProviderChartCard: Component<ProviderChartCardProps> = (props) => {
           <Show when={props.activeView === 'cost'}>
             <Show
               when={props.agentCostTimeseries?.agents.length}
-              fallback={EMPTY('No cost data for this time range')}
+              fallback={EMPTY(t('overview.chart.noCostData'))}
             >
               <MultiAgentTokenChart
                 agents={props.agentCostTimeseries!.agents}
                 timeseries={props.agentCostTimeseries!.timeseries}
                 range={props.range}
                 colorMap={props.colorMap}
+                // i18n-ignore: chart mode flag, not shown
                 label="Cost"
               />
             </Show>

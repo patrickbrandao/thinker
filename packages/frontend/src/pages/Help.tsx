@@ -1,28 +1,25 @@
 import type { Component } from 'solid-js';
 import { Title, Meta } from '@solidjs/meta';
 import { THINKER_DOCS_URL, THINKER_ISSUES_URL } from '../services/thinker-links.js';
+import { t } from '../i18n/index.js';
 
 const Help: Component = () => {
   return (
     <div class="container--sm">
-      <Title>Help & Support - Thinker</Title>
-      <Meta name="description" content="Get help with Thinker: documentation and issue tracker." />
+      <Title>{t('common.pageTitle', { page: t('harnesses.help.title') })}</Title>
+      <Meta name="description" content={t('harnesses.help.metaDescription')} />
       <div class="page-header">
         <div>
-          <h1>Help & Support</h1>
-          <span class="breadcrumb">
-            Questions, bugs or ideas? Thinker is open source and tracked on GitHub
-          </span>
+          <h1>{t('harnesses.help.title')}</h1>
+          <span class="breadcrumb">{t('harnesses.help.subtitle')}</span>
         </div>
       </div>
 
       <div class="settings-card">
         <div class="settings-card__row">
           <div class="settings-card__label">
-            <span class="settings-card__label-title">Documentation</span>
-            <span class="settings-card__label-desc">
-              Installation, configuration and provider guides.
-            </span>
+            <span class="settings-card__label-title">{t('harnesses.help.docsTitle')}</span>
+            <span class="settings-card__label-desc">{t('harnesses.help.docsDesc')}</span>
           </div>
           <div class="settings-card__control">
             <a
@@ -32,7 +29,7 @@ const Help: Component = () => {
               class="btn btn--outline btn--sm"
               style="text-decoration: none;"
             >
-              Open docs
+              {t('harnesses.help.openDocs')}
               <svg
                 width="12"
                 height="12"
@@ -54,10 +51,8 @@ const Help: Component = () => {
         </div>
         <div class="settings-card__row">
           <div class="settings-card__label">
-            <span class="settings-card__label-title">Issues</span>
-            <span class="settings-card__label-desc">
-              Report a bug or ask a question on GitHub. Leave out keys, tokens and request logs.
-            </span>
+            <span class="settings-card__label-title">{t('harnesses.help.issuesTitle')}</span>
+            <span class="settings-card__label-desc">{t('harnesses.help.issuesDesc')}</span>
           </div>
           <div class="settings-card__control">
             <a
@@ -67,7 +62,7 @@ const Help: Component = () => {
               class="btn btn--outline btn--sm"
               style="text-decoration: none;"
             >
-              Open issues
+              {t('harnesses.help.openIssues')}
               <svg
                 width="12"
                 height="12"

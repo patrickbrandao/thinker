@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show, type Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
 import { highlight } from '../services/syntax-highlight.js';
+import { t } from '../i18n/index.js';
 import {
   type ToolkitId,
   type OpenAILangId,
@@ -139,20 +140,20 @@ const FrameworkSnippets: Component<Props> = (props) => {
     <div class="framework-snippets">
       <div class="setup-method-tabs">
         <Show when={!props.defaultToolkit}>
-          <div class="panel__tabs" role="tablist" aria-label="SDK / toolkit">
+          <div class="panel__tabs" role="tablist" aria-label={t('harnesses.snippets.toolkitTabs')}>
             <For each={TOOLKIT_TABS}>
-              {(t) => (
+              {(tab) => (
                 <button
                   class="panel__tab"
-                  classList={{ 'panel__tab--active': activeTab() === t.id }}
-                  onClick={() => handleTabChange(t.id)}
+                  classList={{ 'panel__tab--active': activeTab() === tab.id }}
+                  onClick={() => handleTabChange(tab.id)}
                   role="tab"
-                  aria-selected={activeTab() === t.id}
+                  aria-selected={activeTab() === tab.id}
                 >
-                  <Show when={t.icon}>
-                    <img src={t.icon} alt="" class="panel__tab-icon" width="16" height="16" />
+                  <Show when={tab.icon}>
+                    <img src={tab.icon} alt="" class="panel__tab-icon" width="16" height="16" />
                   </Show>
-                  {t.label}
+                  {tab.label}
                 </button>
               )}
             </For>
@@ -167,7 +168,11 @@ const FrameworkSnippets: Component<Props> = (props) => {
           }
         >
           <div class="framework-snippets__toggle-row">
-            <div class="toolkit-lang-toggle" role="tablist" aria-label="Language">
+            <div
+              class="toolkit-lang-toggle"
+              role="tablist"
+              aria-label={t('harnesses.snippets.language')}
+            >
               <For each={SDK_LANG_TOGGLE}>
                 {(lang) => (
                   <button
@@ -185,7 +190,11 @@ const FrameworkSnippets: Component<Props> = (props) => {
             </div>
 
             <Show when={activeTab() === 'openai-sdk'}>
-              <div class="toolkit-api-toggle" role="tablist" aria-label="OpenAI API">
+              <div
+                class="toolkit-api-toggle"
+                role="tablist"
+                aria-label={t('harnesses.snippets.openaiApi')}
+              >
                 <For each={OPENAI_API_TOGGLE}>
                   {(api) => (
                     <button
@@ -206,7 +215,11 @@ const FrameworkSnippets: Component<Props> = (props) => {
 
         <Show when={modelChoices().length > 0}>
           <div class="framework-snippets__toggle-row">
-            <div class="toolkit-api-toggle" role="radiogroup" aria-label="Model">
+            <div
+              class="toolkit-api-toggle"
+              role="radiogroup"
+              aria-label={t('harnesses.snippets.model')}
+            >
               <For each={modelChoices()}>
                 {(name) => (
                   <button
@@ -232,8 +245,12 @@ const FrameworkSnippets: Component<Props> = (props) => {
                 <button
                   class="modal-terminal__copy"
                   onClick={() => setKeyRevealed(!keyRevealed())}
-                  aria-label={keyRevealed() ? 'Hide API key in code' : 'Reveal API key in code'}
-                  title={keyRevealed() ? 'Hide key' : 'Reveal key'}
+                  aria-label={
+                    keyRevealed()
+                      ? t('harnesses.key.hideInCodeAria')
+                      : t('harnesses.key.revealInCodeAria')
+                  }
+                  title={keyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
                 >
                   {keyRevealed() ? <EyeClosed /> : <EyeOpen />}
                 </button>
@@ -252,24 +269,30 @@ const FrameworkSnippets: Component<Props> = (props) => {
         </div>
       </div>
 
-      <div class="setup-onboard-fields" role="list" aria-label="Connection details">
+      <div
+        class="setup-onboard-fields"
+        role="list"
+        aria-label={t('harnesses.snippets.connectionDetails')}
+      >
         <div class="setup-onboard-fields__row" role="listitem">
-          <span class="setup-onboard-fields__label">Base URL</span>
+          <span class="setup-onboard-fields__label">{t('harnesses.snippets.baseUrl')}</span>
           <span class="setup-onboard-fields__value">
             <code>{props.baseUrl}</code>
             <CopyButton text={props.baseUrl} />
           </span>
         </div>
         <div class="setup-onboard-fields__row" role="listitem">
-          <span class="setup-onboard-fields__label">API Key</span>
+          <span class="setup-onboard-fields__label">{t('harnesses.snippets.apiKey')}</span>
           <span class="setup-onboard-fields__value">
             <code>{displayKey()}</code>
             <Show when={hasFullKey()}>
               <button
                 class="setup-onboard-fields__eye"
                 onClick={() => setKeyRevealed(!keyRevealed())}
-                aria-label={keyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                title={keyRevealed() ? 'Hide key' : 'Reveal key'}
+                aria-label={
+                  keyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                }
+                title={keyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
               >
                 {keyRevealed() ? <EyeClosed /> : <EyeOpen />}
               </button>
@@ -278,7 +301,7 @@ const FrameworkSnippets: Component<Props> = (props) => {
           </span>
         </div>
         <div class="setup-onboard-fields__row" role="listitem">
-          <span class="setup-onboard-fields__label">Model</span>
+          <span class="setup-onboard-fields__label">{t('harnesses.snippets.model')}</span>
           <span class="setup-onboard-fields__value">
             <code>{model()}</code>
             <CopyButton text={model()} />
@@ -288,7 +311,7 @@ const FrameworkSnippets: Component<Props> = (props) => {
           {([key, value]) => (
             <div class="setup-onboard-fields__row" role="listitem">
               <span class="setup-onboard-fields__label">
-                Header <code>{key}</code>
+                {t('harnesses.snippets.header')} <code>{key}</code>
               </span>
               <span class="setup-onboard-fields__value">
                 <code>{value}</code>

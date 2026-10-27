@@ -360,6 +360,7 @@ export interface ProviderReliabilityRow {
   succeeded: number;
 }
 
+/** English definitions (the UI reads `ui.analytics.*`); kept for scripts and tests. */
 /** One-line definition surfaced by the ⓘ tooltips next to "Recovered requests". */
 export const RECOVERED_REQUESTS_TOOLTIP = 'Successful requests that were recovered by fallback.';
 

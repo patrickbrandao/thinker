@@ -2,6 +2,7 @@ import { useSearchParams } from '@solidjs/router';
 import { Title } from '@solidjs/meta';
 import { Show, createEffect, createSignal, type Component } from 'solid-js';
 import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
+import { t, tMaybe } from '../i18n/index.js';
 
 interface ClientSummary {
   client_id: string;
@@ -9,10 +10,15 @@ interface ClientSummary {
   client_uri?: string;
 }
 
-const SCOPE_COPY: Record<string, string> = {
-  'mcp:read': 'Read your harnesses, providers, routing, models, and request ledger',
-  'mcp:write': 'Create, change, and delete harnesses, providers, and routing',
-  offline_access: 'Stay connected by refreshing access after the short-lived token expires',
+const SCOPE_KEYS: Record<string, string> = {
+  'mcp:read': 'read',
+  'mcp:write': 'write',
+  offline_access: 'offline',
+};
+
+const scopeCopy = (scope: string): string => {
+  const key = SCOPE_KEYS[scope];
+  return (key && tMaybe(`auth.consent.scopes.${key}`)) || scope;
 };
 
 /**
@@ -55,7 +61,7 @@ const Consent: Component = () => {
 
   createEffect(() => {
     if (!clientId()) {
-      setLoadError('This authorization request has no client identifier.');
+      setLoadError(t('auth.consent.noClientId'));
       return;
     }
     void fetch(`/api/auth/oauth2/public-client?client_id=${encodeURIComponent(clientId())}`, {
@@ -63,13 +69,13 @@ const Consent: Component = () => {
     })
       .then((r) => (r.ok ? (r.json() as Promise<ClientSummary>) : Promise.reject()))
       .then(setClient)
-      .catch(() => setLoadError('Could not load the requesting client.'));
+      .catch(() => setLoadError(t('auth.consent.loadFailed')));
   });
 
   const decide = async (accept: boolean): Promise<void> => {
     const oauthQuery = signedOAuthQuery();
     if (!oauthQuery) {
-      setSubmitError('This authorization request has an invalid signature.');
+      setSubmitError(t('auth.consent.badSignature'));
       return;
     }
     setBusy(accept ? 'approve' : 'deny');
@@ -88,13 +94,13 @@ const Consent: Component = () => {
       } | null;
       if (!response.ok) {
         throw new Error(
-          body?.message || body?.error_description || body?.error || 'Authorization request failed',
+          body?.message || body?.error_description || body?.error || t('auth.consent.failed'),
         );
       }
       if (typeof body?.url === 'string') {
         window.location.assign(body.url);
       } else {
-        setSubmitError('The authorization server returned no redirect.');
+        setSubmitError(t('auth.consent.noRedirect'));
         setBusy(null);
       }
     } catch (error) {
@@ -105,7 +111,7 @@ const Consent: Component = () => {
 
   return (
     <div class="auth-layout">
-      <Title>Authorize MCP client - Thinker</Title>
+      <Title>{t('common.pageTitle', { page: t('auth.consent.pageTitle') })}</Title>
       <div class="auth-card" style="text-align: center;">
         <div class="auth-logo">
           <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
@@ -115,16 +121,16 @@ const Consent: Component = () => {
           when={!loadError()}
           fallback={
             <div class="auth-header">
-              <h1 class="auth-header__title">Invalid authorization request</h1>
+              <h1 class="auth-header__title">{t('auth.consent.invalidTitle')}</h1>
               <p class="auth-header__subtitle">{loadError()}</p>
             </div>
           }
         >
           <div class="auth-header">
-            <h1 class="auth-header__title">Authorize this MCP client?</h1>
+            <h1 class="auth-header__title">{t('auth.consent.title')}</h1>
             <p class="auth-header__subtitle">
-              <strong>{client()?.client_name || clientId()}</strong> wants to connect to your
-              Thinker workspace.
+              <strong>{client()?.client_name || clientId()}</strong>{' '}
+              {t('auth.consent.wantsToConnect')}
             </p>
             <Show when={client()?.client_uri}>
               <p class="auth-header__subtitle">{client()?.client_uri}</p>
@@ -132,7 +138,7 @@ const Consent: Component = () => {
           </div>
           <ul style="text-align: left; margin: 0 auto 1rem; max-width: 320px;">
             {scopes().map((scope) => (
-              <li>{SCOPE_COPY[scope] ?? scope}</li>
+              <li>{scopeCopy(scope)}</li>
             ))}
           </ul>
           <Show when={submitError()}>
@@ -147,7 +153,7 @@ const Consent: Component = () => {
               disabled={busy() !== null}
               onClick={() => void decide(true)}
             >
-              {busy() === 'approve' ? 'Allowing…' : 'Allow access'}
+              {busy() === 'approve' ? t('auth.consent.allowing') : t('auth.consent.allow')}
             </button>
             <button
               class="auth-form__submit auth-form__submit--secondary"
@@ -155,7 +161,7 @@ const Consent: Component = () => {
               disabled={busy() !== null}
               onClick={() => void decide(false)}
             >
-              {busy() === 'deny' ? 'Denying…' : 'Deny'}
+              {busy() === 'deny' ? t('auth.consent.denying') : t('auth.consent.deny')}
             </button>
           </div>
         </Show>

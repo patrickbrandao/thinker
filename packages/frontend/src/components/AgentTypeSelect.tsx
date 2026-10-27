@@ -1,10 +1,7 @@
 import { createSignal, Show, onCleanup, type Component } from 'solid-js';
-import {
-  type AgentCategory,
-  type AgentPlatform,
-  PLATFORM_LABELS,
-  PLATFORM_ICONS,
-} from 'thinker-shared';
+import { type AgentCategory, type AgentPlatform, PLATFORM_ICONS } from 'thinker-shared';
+import { platformLabel } from '../services/agent-type-labels.js';
+import { t } from '../i18n/index.js';
 import AgentTypeGrid from './AgentTypeGrid.jsx';
 
 interface Props {
@@ -58,7 +55,9 @@ const AgentTypeSelect: Component<Props> = (props) => {
         disabled={props.disabled}
         aria-haspopup="listbox"
         aria-expanded={open()}
-        aria-label={`Harness type: ${props.platform ? PLATFORM_LABELS[props.platform] : 'Select'}`}
+        aria-label={t('harnesses.typeSelect.aria', {
+          type: props.platform ? platformLabel(props.platform) : t('harnesses.typeSelect.select'),
+        })}
       >
         <Show when={selectedIcon()}>
           <img
@@ -70,7 +69,7 @@ const AgentTypeSelect: Component<Props> = (props) => {
           />
         </Show>
         <span class="agent-type-select__trigger-label">
-          {props.platform ? PLATFORM_LABELS[props.platform] : 'Select'}
+          {props.platform ? platformLabel(props.platform) : t('harnesses.typeSelect.select')}
         </span>
         <svg
           class="agent-type-select__caret"

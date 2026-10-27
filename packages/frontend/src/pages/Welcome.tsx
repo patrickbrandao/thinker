@@ -68,21 +68,17 @@ import '../styles/routing-providers.css';
 import '../styles/routing-modal.css';
 import '../styles/welcome.css';
 import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
+import { t } from '../i18n/index.js';
 
 type StepId = 'harness' | 'providers' | 'playground' | 'route' | 'activate';
 const STEP_ORDER: StepId[] = ['harness', 'providers', 'playground', 'route', 'activate'];
 
 /** The theme lives in "Launch sequence"; the rest is plain wayfinding. */
 const eyebrow = (id: StepId) =>
-  `Launch sequence · Step ${STEP_ORDER.indexOf(id) + 1} of ${STEP_ORDER.length}`;
+  t('welcome.eyebrow', { step: STEP_ORDER.indexOf(id) + 1, total: STEP_ORDER.length });
 
-const STEP_META: Record<StepId, { label: string }> = {
-  harness: { label: 'Create harness' },
-  providers: { label: 'Connect providers' },
-  playground: { label: 'Test models' },
-  route: { label: 'Configure routing' },
-  activate: { label: 'Connect harness & go live' },
-};
+/** Sidebar label of a step, read at render time so it follows the language. */
+const stepLabel = (id: StepId): string => t(`welcome.steps.${id}`);
 
 /** Replicates ProviderMark from ProviderConnectionsPage (icon or colored initial). */
 const ProviderMark: Component<{ providerId: string; name: string; size?: number }> = (props) => {
@@ -303,7 +299,7 @@ const Welcome: Component = () => {
       markAgentCreated(slug);
       goTo('providers');
     } catch (e) {
-      setHarnessError(e instanceof Error ? e.message : 'Failed to create harness');
+      setHarnessError(e instanceof Error ? e.message : t('welcome.failedCreate'));
     } finally {
       setCreating(false);
     }
@@ -555,11 +551,8 @@ const Welcome: Component = () => {
 
   return (
     <div class="welcome">
-      <Title>Welcome - Thinker</Title>
-      <Meta
-        name="description"
-        content="Connect your AI harness and send its first reliable request through Thinker."
-      />
+      <Title>{t('welcome.pageTitle')}</Title>
+      <Meta name="description" content={t('welcome.metaDescription')} />
 
       {/* ── Sidebar: activation progress + steps ───── */}
       <aside class="welcome__sidebar">
@@ -577,10 +570,13 @@ const Welcome: Component = () => {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          aria-label={`${completedStepCount()} of ${STEP_ORDER.length} setup steps complete`}
+          aria-label={t('welcome.progressLabel', {
+            done: completedStepCount(),
+            total: STEP_ORDER.length,
+          })}
         >
           <div class="welcome__progress-header">
-            <p>Setup progress</p>
+            <p>{t('welcome.progressTitle')}</p>
             <span>
               {completedStepCount()}/{STEP_ORDER.length}
             </span>
@@ -621,7 +617,7 @@ const Welcome: Component = () => {
                         </svg>
                       </Show>
                     </span>
-                    <span class="welcome__nav-label">{STEP_META[id].label}</span>
+                    <span class="welcome__nav-label">{stepLabel(id)}</span>
                   </button>
                 </li>
               )}
@@ -631,7 +627,7 @@ const Welcome: Component = () => {
 
         <div class="welcome__sidebar-footer">
           <button type="button" class="btn btn--ghost btn--sm" onClick={leaveOnboarding}>
-            Skip setup for now
+            {t('welcome.skip')}
           </button>
         </div>
       </aside>
@@ -641,7 +637,7 @@ const Welcome: Component = () => {
         <Show when={!resumeChecked()}>
           <div class="welcome__panel welcome__pending" role="status">
             <span class="welcome__spinner" />
-            <span>Restoring your setup…</span>
+            <span>{t('welcome.restoring')}</span>
           </div>
         </Show>
 
@@ -651,11 +647,8 @@ const Welcome: Component = () => {
             <div class="welcome__panel">
               <div class="welcome__panel-header">
                 <p class="welcome__eyebrow">{eyebrow('harness')}</p>
-                <h1 class="welcome__panel-title">Create your first harness</h1>
-                <p class="welcome__panel-desc">
-                  A harness represents the agent or application whose requests Thinker will route,
-                  repair and observe.
-                </p>
+                <h1 class="welcome__panel-title">{t('welcome.harness.title')}</h1>
+                <p class="welcome__panel-desc">{t('welcome.harness.desc')}</p>
               </div>
 
               <Show
@@ -692,7 +685,7 @@ const Welcome: Component = () => {
                 >
                   <div class="agent-type-select-row">
                     <div>
-                      <label class="modal-card__field-label">Type</label>
+                      <label class="modal-card__field-label">{t('welcome.harness.type')}</label>
                       <AgentTypeSelect
                         category={category()}
                         platform={platform()}
@@ -703,14 +696,14 @@ const Welcome: Component = () => {
                     </div>
                     <div style="flex: 1;">
                       <label class="modal-card__field-label" for="welcome-harness-name">
-                        Harness name
+                        {t('welcome.harness.name')}
                       </label>
                       <input
                         ref={(el) => requestAnimationFrame(() => el.focus())}
                         id="welcome-harness-name"
                         class="modal-card__input modal-card__input--lg"
                         type="text"
-                        placeholder="e.g. My Cool Harness"
+                        placeholder={t('welcome.harness.namePlaceholder')}
                         value={harnessName()}
                         onInput={(e) => setHarnessName(e.currentTarget.value)}
                         disabled={creating()}
@@ -723,16 +716,17 @@ const Welcome: Component = () => {
                     <div class="model-params__group">
                       {/* Same label treatment as the Type / Harness name field
                           labels, not the larger Model-params group header. */}
-                      <div class="modal-card__field-label add-agent-toggles__header">Settings</div>
+                      <div class="modal-card__field-label add-agent-toggles__header">
+                        {t('welcome.harness.settings')}
+                      </div>
                       <div class="model-params__group-card">
                         <div class="model-params__row">
                           <div class="model-params__row-text">
                             <div class="model-params__label-title">
-                              <span>Enable logs</span>
+                              <span>{t('welcome.harness.enableLogs')}</span>
                             </div>
                             <div class="model-params__label-hint">
-                              See exactly what your agent sends on every attempt, and debug it
-                              faster. Logs stay in your own database.
+                              {t('welcome.harness.enableLogsHint')}
                             </div>
                           </div>
                           <div class="model-params__row-control">
@@ -740,7 +734,7 @@ const Welcome: Component = () => {
                               type="button"
                               role="switch"
                               aria-checked={logsEnabled()}
-                              aria-label="Enable logs"
+                              aria-label={t('welcome.harness.enableLogs')}
                               class="settings-switch"
                               classList={{ 'settings-switch--on': logsEnabled() }}
                               disabled={creating()}
@@ -771,7 +765,7 @@ const Welcome: Component = () => {
                       class="btn btn--primary btn--sm"
                       disabled={!harnessName().trim() || !platform() || creating()}
                     >
-                      {creating() ? <span class="spinner" /> : 'Create harness'}
+                      {creating() ? <span class="spinner" /> : t('welcome.harness.create')}
                     </button>
                   </div>
                 </form>
@@ -784,11 +778,11 @@ const Welcome: Component = () => {
             <div class="welcome__panel">
               <div class="welcome__panel-header">
                 <p class="welcome__eyebrow">{eyebrow('providers')}</p>
-                <h1 class="welcome__panel-title">Connect providers</h1>
+                <h1 class="welcome__panel-title">{t('welcome.providers.title')}</h1>
                 <p class="welcome__panel-desc">
-                  {harnessName().trim() || 'Your harness'} routes requests across the providers you
-                  connect. Start with one, then add two more independent providers for full fallback
-                  coverage.
+                  {t('welcome.providers.desc', {
+                    name: harnessName().trim() || t('welcome.providers.yourHarness'),
+                  })}
                 </p>
               </div>
 
@@ -819,7 +813,7 @@ const Welcome: Component = () => {
                   >
                     <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
                   </svg>
-                  Usage-based
+                  {t('welcome.providers.usageBased')}
                 </button>
                 <button
                   id="welcome-provider-tab-subscription"
@@ -848,7 +842,7 @@ const Welcome: Component = () => {
                     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
-                  Subscriptions
+                  {t('welcome.providers.subscriptions')}
                 </button>
                 <button
                   id="welcome-provider-tab-local"
@@ -872,7 +866,7 @@ const Welcome: Component = () => {
                   >
                     <path d="m13.18 6.75 2.66-4.22-1.69-1.07L12 4.87 9.85 1.46 8.16 2.53l2.66 4.22-8.67 13.72A1.006 1.006 0 0 0 3 22.01h18c.36 0 .7-.2.88-.52s.16-.71-.03-1.02zM10.24 20 12 16.98 13.76 20zm5.83 0-3.21-5.5c-.36-.62-1.37-.62-1.73 0L7.92 20H4.81L12 8.62 19.19 20h-3.11Z" />
                   </svg>
-                  Local
+                  {t('welcome.providers.local')}
                 </button>
               </div>
 
@@ -881,7 +875,7 @@ const Welcome: Component = () => {
                 fallback={
                   <div class="welcome__pending">
                     <span class="welcome__spinner" />
-                    <span>Loading providers…</span>
+                    <span>{t('welcome.providers.loading')}</span>
                   </div>
                 }
               >
@@ -908,9 +902,15 @@ const Welcome: Component = () => {
                           </span>
                           <Show
                             when={con()}
-                            fallback={<span class="btn btn--outline btn--sm">Connect</span>}
+                            fallback={
+                              <span class="btn btn--outline btn--sm">
+                                {t('welcome.providers.connect')}
+                              </span>
+                            }
                           >
-                            <span class="welcome__provider-connected">Connected</span>
+                            <span class="welcome__provider-connected">
+                              {t('welcome.providers.connected')}
+                            </span>
                           </Show>
                         </button>
                       );
@@ -920,7 +920,7 @@ const Welcome: Component = () => {
               </Show>
               <Show when={agent.error || providers.error}>
                 <p class="welcome__error" role="alert">
-                  We could not load your providers. Refresh the page and try again.
+                  {t('welcome.providers.loadError')}
                 </p>
               </Show>
 
@@ -928,20 +928,17 @@ const Welcome: Component = () => {
                 <Show
                   when={connectedCount() > 0}
                   fallback={
-                    <span class="welcome__actions-note">
-                      Connect at least one provider to continue.
-                    </span>
+                    <span class="welcome__actions-note">{t('welcome.providers.needOne')}</span>
                   }
                 >
                   <button type="button" class="welcome__text-link" onClick={() => goTo('route')}>
-                    Test models later
+                    {t('welcome.providers.testLater')}
                   </button>
                 </Show>
                 <div style="display:flex;align-items:center;gap:12px">
                   <Show when={connectedCount() > 0}>
                     <span class="welcome__actions-note">
-                      {connectedCount()} {connectedCount() === 1 ? 'provider' : 'providers'}{' '}
-                      connected.
+                      {t('welcome.providers.connectedCount', connectedCount())}
                     </span>
                   </Show>
                   <button
@@ -950,7 +947,7 @@ const Welcome: Component = () => {
                     disabled={connectedCount() === 0}
                     onClick={() => goTo('playground')}
                   >
-                    Test models
+                    {t('welcome.providers.testModels')}
                   </button>
                 </div>
               </div>
@@ -962,20 +959,17 @@ const Welcome: Component = () => {
             <div class="welcome__panel welcome__panel--playground">
               <div class="welcome__panel-header">
                 <p class="welcome__eyebrow">{eyebrow('playground')}</p>
-                <h1 class="welcome__panel-title">Test your models</h1>
-                <p class="welcome__panel-desc">
-                  Compare how your available models handle one representative prompt without leaving
-                  onboarding.
-                </p>
+                <h1 class="welcome__panel-title">{t('welcome.playground.title')}</h1>
+                <p class="welcome__panel-desc">{t('welcome.playground.desc')}</p>
               </div>
               <Playground embedded />
               <div class="welcome__actions welcome__actions--split welcome__actions--sticky">
                 <button type="button" class="btn btn--ghost" onClick={() => goTo('providers')}>
-                  Back to providers
+                  {t('welcome.playground.backToProviders')}
                 </button>
-                <span class="welcome__actions-note">This step is optional.</span>
+                <span class="welcome__actions-note">{t('welcome.playground.optional')}</span>
                 <button type="button" class="btn btn--primary" onClick={() => goTo('route')}>
-                  Continue to routing
+                  {t('welcome.playground.continueToRouting')}
                 </button>
               </div>
             </div>
@@ -986,7 +980,7 @@ const Welcome: Component = () => {
             <div class="welcome__panel welcome__panel--routing">
               <div class="welcome__panel-header">
                 <p class="welcome__eyebrow">{eyebrow('route')}</p>
-                <h1 class="welcome__panel-title">Configure default routing</h1>
+                <h1 class="welcome__panel-title">{t('welcome.route.title')}</h1>
               </div>
 
               <Show
@@ -994,7 +988,7 @@ const Welcome: Component = () => {
                 fallback={
                   <div class="welcome__pending">
                     <span class="welcome__spinner" />
-                    <span>Loading routing…</span>
+                    <span>{t('welcome.route.loading')}</span>
                   </div>
                 }
               >
@@ -1033,14 +1027,14 @@ const Welcome: Component = () => {
 
               <div class="welcome__actions welcome__actions--split">
                 <button class="btn btn--ghost" onClick={() => goTo('playground')}>
-                  Back to test models
+                  {t('welcome.route.backToTest')}
                 </button>
                 <button
                   class="btn btn--primary"
                   disabled={routedProviderCount() === 0}
                   onClick={() => goTo('activate')}
                 >
-                  Continue
+                  {t('welcome.route.continue')}
                 </button>
               </div>
             </div>
@@ -1051,18 +1045,18 @@ const Welcome: Component = () => {
             <div class="welcome__panel welcome__panel--setup">
               <div class="welcome__panel-header">
                 <p class="welcome__eyebrow">{eyebrow('activate')}</p>
-                <h1 class="welcome__panel-title">Connect your harness and go live</h1>
+                <h1 class="welcome__panel-title">{t('welcome.activate.title')}</h1>
                 <p class="welcome__panel-desc">
-                  Point {harnessName().trim() || 'your agent'} at Thinker with the instructions
-                  below, then send one message. We detect the first successful request
-                  automatically.
+                  {t('welcome.activate.desc', {
+                    name: harnessName().trim() || t('welcome.activate.yourAgent'),
+                  })}
                 </p>
               </div>
 
               <section
                 class="panel welcome__form-panel welcome__setup-snippets"
                 style="padding: 20px; margin-bottom: 0;"
-                aria-label="Harness setup instructions"
+                aria-label={t('welcome.activate.instructionsLabel')}
               >
                 <SetupStepAddProvider
                   apiKey={harnessKey()}
@@ -1072,10 +1066,7 @@ const Welcome: Component = () => {
                 />
               </section>
 
-              <p class="welcome__panel-desc">
-                Once configured, send a message from your agent. Thinker detects the first
-                successful request automatically.
-              </p>
+              <p class="welcome__panel-desc">{t('welcome.activate.onceConfigured')}</p>
 
               <section
                 class="welcome__agent-wait"
@@ -1090,12 +1081,9 @@ const Welcome: Component = () => {
                         <span class="welcome__spinner" aria-hidden="true" />
                         <div>
                           <h2 class="welcome__route-test-title">
-                            Waiting for your agent’s first request
+                            {t('welcome.activate.waitingTitle')}
                           </h2>
-                          <p class="welcome__section-desc">
-                            Keep this page open and send a message from your agent. We check every
-                            few seconds.
-                          </p>
+                          <p class="welcome__section-desc">{t('welcome.activate.waitingDesc')}</p>
                         </div>
                       </div>
                       <button
@@ -1104,18 +1092,18 @@ const Welcome: Component = () => {
                         disabled={checkingForRequest()}
                         onClick={() => void checkForFirstAgentRequest()}
                       >
-                        {checkingForRequest() ? 'Checking…' : 'Check again'}
+                        {checkingForRequest()
+                          ? t('welcome.activate.checking')
+                          : t('welcome.activate.checkAgain')}
                       </button>
                       <Show when={requestCheckError()}>
                         <p class="welcome__availability-note" role="status">
-                          We couldn’t verify a request just now. Confirm that your agent can reach
-                          Thinker, then try again.
+                          {t('welcome.activate.checkError')}
                         </p>
                       </Show>
                       <Show when={waitedLong() && !latestAgentRequest()}>
                         <p class="welcome__availability-note" role="status">
-                          Nothing yet? Most agents need a restart after configuration changes before
-                          they pick up the new endpoint.
+                          {t('welcome.activate.waitedLong')}
                         </p>
                       </Show>
                       <Show
@@ -1124,10 +1112,12 @@ const Welcome: Component = () => {
                         }
                       >
                         <div class="welcome__request-failure" role="alert">
-                          <strong>We received the request, but it failed.</strong>
+                          <strong>{t('welcome.activate.failedTitle')}</strong>
                           <p>
                             {latestAgentRequest()?.error_message ||
-                              `Thinker recorded status “${latestAgentRequest()?.status}”. Fix the issue and send another message.`}
+                              t('welcome.activate.failedStatus', {
+                                status: latestAgentRequest()?.status ?? '',
+                              })}
                           </p>
                           <Show when={errorDocCode()}>
                             <a
@@ -1136,7 +1126,7 @@ const Welcome: Component = () => {
                               target="_blank"
                               rel="noreferrer"
                             >
-                              What does {errorDocCode()} mean?
+                              {t('welcome.activate.whatDoesMean', { code: errorDocCode()! })}
                             </a>
                           </Show>
                         </div>
@@ -1149,16 +1139,20 @@ const Welcome: Component = () => {
                       ✓
                     </span>
                     <div>
-                      <strong>Your harness is live.</strong>
+                      <strong>{t('welcome.activate.liveTitle')}</strong>
                       <p class="welcome__section-desc">
-                        Thinker successfully routed the first real request
+                        {t('welcome.activate.liveDesc')}
                         <Show when={latestAgentRequest()?.model}>
                           {' '}
-                          to {latestAgentRequest()?.model}
+                          {t('welcome.activate.liveTo', {
+                            model: latestAgentRequest()?.model ?? '',
+                          })}
                         </Show>
                         <Show when={latestAgentRequest()?.duration_ms}>
                           {' '}
-                          in {latestAgentRequest()?.duration_ms} ms
+                          {t('welcome.activate.liveIn', {
+                            ms: latestAgentRequest()?.duration_ms ?? 0,
+                          })}
                         </Show>
                         .
                       </p>
@@ -1169,11 +1163,11 @@ const Welcome: Component = () => {
 
               <div class="welcome__actions welcome__actions--split">
                 <button class="btn btn--ghost" onClick={() => goTo('route')}>
-                  Back to routing
+                  {t('welcome.activate.backToRouting')}
                 </button>
                 <Show when={agentRequestSeen()}>
                   <button class="btn btn--primary" onClick={leaveOnboarding}>
-                    Go to dashboard
+                    {t('welcome.activate.goToDashboard')}
                     <svg
                       width="14"
                       height="14"

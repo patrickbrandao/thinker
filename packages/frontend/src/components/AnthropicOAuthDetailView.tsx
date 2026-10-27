@@ -19,6 +19,7 @@ import {
   type RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   provDef: ProviderDef;
@@ -83,7 +84,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
     // can block a window opened after the OAuth start request completes.
     const popup = window.open('about:blank', '_blank');
     if (!popup) {
-      toast.error('Popup was blocked by your browser. Allow popups for this site, then try again.');
+      toast.error(t('providerSetup.shared.popupBlocked'));
       if (props.connected()) setAddingAccount(false);
       return;
     }
@@ -110,16 +111,12 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
     if (!raw) return;
 
     if (!raw.includes('#')) {
-      setError(
-        "That doesn't look like an authorization code. Make sure you copied the full string from the redirect page.",
-      );
+      setError(t('providerSetup.anthropic.invalidCode'));
       return;
     }
     const pastedState = raw.slice(raw.indexOf('#') + 1);
     if (!pastedState) {
-      setError(
-        "That doesn't look like an authorization code. Make sure you copied the full string from the redirect page.",
-      );
+      setError(t('providerSetup.anthropic.invalidCode'));
       return;
     }
 
@@ -128,17 +125,13 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
     try {
       const authState = state() ?? pastedState;
       await submitAnthropicOAuth(props.agentName, raw, authState);
-      toast.success(`${props.provDef.name} subscription connected`);
+      toast.success(t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }));
       setAddingAccount(false);
       setInput('');
       setState(null);
       props.onUpdate();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to exchange code. The code may have expired. Sign in again to retry.',
-      );
+      setError(err instanceof Error ? err.message : t('providerSetup.anthropic.exchangeFailed'));
     } finally {
       props.setBusy(false);
     }
@@ -206,7 +199,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
         newLabel,
         props.selectedAuthType(),
       );
-      toast.success(`Renamed to "${newLabel}"`);
+      toast.success(t('providerSetup.shared.renamedTo', { label: newLabel }));
       setRenamingId(null);
       props.onUpdate();
     } catch {
@@ -220,36 +213,30 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
     <>
       <Show when={showConnectFlow()}>
         <div class="anthropic-detail__primary">
-          <p class="provider-detail__hint">
-            Sign in with your Claude Pro or Max account. Thinker will route through your
-            subscription with auto-refreshing tokens.
-          </p>
+          <p class="provider-detail__hint">{t('providerSetup.anthropic.intro')}</p>
           <button
             class="btn btn--primary anthropic-detail__btn"
             disabled={props.busy()}
             onClick={handleSignIn}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Sign in with Claude
+              {t('providerSetup.anthropic.signIn')}
             </Show>
           </button>
         </div>
 
         <div class="anthropic-detail__alt">
           <div class="anthropic-detail__alt-divider">
-            <span>Paste the authorization code</span>
+            <span>{t('providerSetup.anthropic.pasteDivider')}</span>
           </div>
-          <p class="anthropic-detail__alt-hint">
-            After signing in, Anthropic's redirect page shows a code. Copy the full string and paste
-            it below.
-          </p>
+          <p class="anthropic-detail__alt-hint">{t('providerSetup.anthropic.pasteHint')}</p>
           <input
             class="provider-detail__input provider-detail__input--masked"
             classList={{ 'provider-detail__input--error': !!error() }}
             type="text"
             autocomplete="off"
-            placeholder="Authorization code"
-            aria-label="Anthropic authorization code"
+            placeholder={t('providerSetup.anthropic.codePlaceholder')}
+            aria-label={t('providerSetup.anthropic.codeAria')}
             value={input()}
             onInput={(e) => {
               setInput(e.currentTarget.value);
@@ -268,7 +255,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
             onClick={handleSubmit}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Connect
+              {t('providerSetup.shared.connect')}
             </Show>
           </button>
         </div>
@@ -278,7 +265,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
             disabled={props.busy()}
             onClick={cancelAddAccount}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </Show>
       </Show>
@@ -286,10 +273,10 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
         {/* Multi-key list */}
         <Show when={isMultiKey()}>
           <div class="provider-detail__field">
-            <label class="provider-detail__label">Accounts</label>
+            <label class="provider-detail__label">{t('providerSetup.shared.accounts')}</label>
             <ul
               role="list"
-              aria-label={`OAuth accounts for ${props.provDef.name}`}
+              aria-label={t('providerSetup.shared.oauthAccountsFor', { name: props.provDef.name })}
               style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
             >
               <For each={props.activeKeys!()}>
@@ -304,7 +291,11 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
                               {k.label}
                             </div>
                             <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                              Connected via {props.provDef.subscriptionLabel ?? 'subscription'}
+                              {t('providerSetup.shared.connectedVia', {
+                                via:
+                                  props.provDef.subscriptionLabel ??
+                                  t('providerSetup.shared.subscriptionLower'),
+                              })}
                             </div>
                           </div>
                           <button
@@ -313,14 +304,16 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
                             disabled={props.busy()}
                             onClick={() => startRename(k)}
                           >
-                            Rename
+                            {t('providerSetup.shared.rename')}
                           </button>
                           <button
                             class="provider-detail__disconnect-icon"
                             disabled={props.busy()}
                             onClick={() => handleDeleteKey(k.label)}
-                            aria-label={`Delete account ${k.label}`}
-                            title="Delete account"
+                            aria-label={t('providerSetup.shared.deleteAccountNamed', {
+                              label: k.label,
+                            })}
+                            title={t('providerSetup.shared.deleteAccount')}
                           >
                             <svg
                               width="16"
@@ -345,7 +338,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
                         class="provider-detail__input"
                         type="text"
                         maxlength={MAX_LABEL_LENGTH}
-                        aria-label={`Rename ${k.label}`}
+                        aria-label={t('providerSetup.shared.renameNamed', { label: k.label })}
                         value={renameValue()}
                         onInput={(e) => setRenameValue(e.currentTarget.value)}
                         onKeyDown={(e) => {
@@ -358,14 +351,14 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
                         disabled={props.busy()}
                         onClick={() => commitRename(k)}
                       >
-                        Save
+                        {t('common.save')}
                       </button>
                       <button
                         class="btn btn--outline btn--sm"
                         disabled={props.busy()}
                         onClick={() => setRenamingId(null)}
                       >
-                        Cancel
+                        {t('common.cancel')}
                       </button>
                     </Show>
                   </li>
@@ -379,7 +372,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
             onClick={handleDisconnect}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Disconnect all
+              {t('providerSetup.shared.disconnectAll')}
             </Show>
           </button>
         </Show>
@@ -387,7 +380,9 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
         <Show when={!isMultiKey()}>
           <div class="provider-detail__field">
             <span class="provider-detail__no-key">
-              Connected via {props.provDef.subscriptionLabel ?? 'subscription'}
+              {t('providerSetup.shared.connectedVia', {
+                via: props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower'),
+              })}
             </span>
           </div>
           <button
@@ -396,7 +391,7 @@ const AnthropicOAuthDetailView: Component<Props> = (props) => {
             onClick={handleDisconnect}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Disconnect
+              {t('providerSetup.shared.disconnect')}
             </Show>
           </button>
         </Show>

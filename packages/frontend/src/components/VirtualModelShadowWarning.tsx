@@ -1,4 +1,5 @@
 import { For, Show, type Component } from 'solid-js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   /** Real model ids the virtual model's name matches, ignoring case. */
@@ -31,16 +32,19 @@ const VirtualModelShadowWarning: Component<Props> = (props) => (
       </svg>
       <div>
         <span class="virtual-model-shadow__title">
-          {props.preview ? 'This name matches' : 'Shadows'}{' '}
-          {props.shadows.length === 1 ? 'a real model' : `${props.shadows.length} real models`}
+          {props.preview
+            ? props.shadows.length === 1
+              ? t('models.shadow.matchesOne')
+              : t('models.shadow.matchesMany', { n: props.shadows.length })
+            : props.shadows.length === 1
+              ? t('models.shadow.shadowsOne')
+              : t('models.shadow.shadowsMany', { n: props.shadows.length })}
         </span>
         <span class="virtual-model-shadow__list">
           <For each={props.shadows}>{(id) => <code>{id}</code>}</For>
         </span>
         <span class="virtual-model-shadow__desc">
-          {props.enabled
-            ? 'While this virtual model is active, requests for these ids route through it instead, and they are hidden from /v1/models.'
-            : 'If you activate this virtual model, requests for these ids will route through it instead.'}
+          {props.enabled ? t('models.shadow.activeDesc') : t('models.shadow.inactiveDesc')}
         </span>
       </div>
     </div>

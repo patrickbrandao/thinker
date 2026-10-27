@@ -1,4 +1,5 @@
 import { Show } from 'solid-js';
+import { t } from '../i18n/index.js';
 
 /**
  * Bottom-corner `vX.Y.Z` badge. The version is a build-time constant injected
@@ -10,7 +11,7 @@ const VersionIndicator = () => {
 
   return (
     <Show when={version}>
-      <div class="version-indicator" aria-label={`Version ${version}`}>
+      <div class="version-indicator" aria-label={t('nav.version', { version })}>
         <span>v{version}</span>
       </div>
     </Show>

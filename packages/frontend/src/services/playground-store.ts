@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import { createRoot, createSignal } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import type { AuthType, AvailableModel, RoutingProvider } from './api.js';
@@ -256,7 +257,7 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
       // AbortError is the user's intent (cancel/replace/remove) — don't paint
       // an error state, just leave the column where the abort path put it.
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      const message = err instanceof Error ? err.message : 'Request failed';
+      const message = err instanceof Error ? err.message : t('playground.requestFailed');
       setColumns(
         (c) => c.id === colId,
         produce((c) => {

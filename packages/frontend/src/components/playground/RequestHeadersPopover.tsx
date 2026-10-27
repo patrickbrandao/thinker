@@ -16,6 +16,7 @@ import {
   type HeaderIssue,
 } from '../../services/playground-request-headers.js';
 import { PlusIcon, TrashIcon, XIcon } from './icons.jsx';
+import { t } from '../../i18n/index.js';
 
 interface Props {
   open: boolean;
@@ -31,20 +32,7 @@ export function headerWarningId(entryId: string): string {
 
 /** Warning shown under a row the server will drop. */
 export function headerIssueMessage(name: string, issue: HeaderIssue): string {
-  switch (issue) {
-    case 'blocked':
-      return `${name} is reserved by Thinker and will be dropped.`;
-    case 'invalid-name':
-      return `${name} is not a valid header name and will be dropped. Use only letters, digits and ! # $ % & ' * + - . ^ _ \` | ~ (no spaces).`;
-    case 'control-chars':
-      return `The value of ${name} contains control characters (such as line breaks), so the header will be dropped.`;
-    case 'unsupported-chars':
-      return `The value of ${name} contains characters a header can't carry (above U+00FF, such as emoji), so the header will be dropped.`;
-    case 'duplicate':
-      return `${name} is already set in an earlier row (names are case-insensitive), so this row will be dropped.`;
-    case 'over-limit':
-      return `Only ${MAX_HEADER_ENTRIES} headers are sent, so ${name} will be dropped.`;
-  }
+  return t(`playground.headers.issue.${issue}`, { name, max: MAX_HEADER_ENTRIES });
 }
 
 const RequestHeadersPopover: Component<Props> = (props) => {
@@ -119,29 +107,24 @@ const RequestHeadersPopover: Component<Props> = (props) => {
         class="playground-headers"
         role="dialog"
         aria-modal="true"
-        aria-label="Request headers"
+        aria-label={t('playground.headers.title')}
       >
         <header class="playground-headers__header">
-          <h3 class="playground-headers__title">Request headers</h3>
+          <h3 class="playground-headers__title">{t('playground.headers.title')}</h3>
           <button
             type="button"
             class="playground-headers__close"
-            aria-label="Close request headers"
+            aria-label={t('playground.headers.close')}
             onClick={props.onClose}
           >
             <XIcon size={16} />
           </button>
         </header>
 
-        <p class="playground-headers__hint">
-          Added to every provider call for this playground. Thinker-managed headers (Authorization,
-          Content-Type, x-thinker-*) are ignored, and so is any header the route's provider adapter
-          sets itself. Only header names are saved in this browser; values are kept until you leave
-          the page.
-        </p>
+        <p class="playground-headers__hint">{t('playground.headers.hint')}</p>
 
         <Show when={props.entries.length === 0}>
-          <p class="playground-headers__empty">No headers yet.</p>
+          <p class="playground-headers__empty">{t('playground.headers.empty')}</p>
         </Show>
 
         <div class="playground-headers__rows">
@@ -172,9 +155,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   <input
                     type="text"
                     class="playground-headers__input playground-headers__input--key"
-                    placeholder="Header"
+                    placeholder={t('playground.headers.namePlaceholder')}
                     value={entry().key}
-                    aria-label="Header name"
+                    aria-label={t('playground.headers.nameLabel')}
                     aria-invalid={nameIssue() ? 'true' : undefined}
                     aria-describedby={nameIssue() ? warningId() : undefined}
                     spellcheck={false}
@@ -184,9 +167,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   <input
                     type="text"
                     class="playground-headers__input playground-headers__input--value"
-                    placeholder="Value"
+                    placeholder={t('playground.headers.valuePlaceholder')}
                     value={entry().value}
-                    aria-label="Header value"
+                    aria-label={t('playground.headers.valueLabel')}
                     aria-invalid={valueIssue() ? 'true' : undefined}
                     aria-describedby={valueIssue() ? warningId() : undefined}
                     spellcheck={false}
@@ -196,7 +179,9 @@ const RequestHeadersPopover: Component<Props> = (props) => {
                   <button
                     type="button"
                     class="playground-headers__remove"
-                    aria-label={`Remove ${entry().key || 'header'}`}
+                    aria-label={t('playground.headers.remove', {
+                      name: entry().key || t('playground.headers.headerFallback'),
+                    })}
                     onClick={() => remove(entry().id)}
                   >
                     <TrashIcon size={14} />
@@ -220,11 +205,11 @@ const RequestHeadersPopover: Component<Props> = (props) => {
 
         <footer class="playground-headers__footer">
           <button type="button" class="playground-headers__add" onClick={add}>
-            <PlusIcon size={14} /> Add header
+            <PlusIcon size={14} /> {t('playground.headers.add')}
           </button>
           <Show when={props.entries.length > 0}>
             <button type="button" class="playground-headers__clear" onClick={clearAll}>
-              Clear all
+              {t('playground.headers.clearAll')}
             </button>
           </Show>
         </footer>

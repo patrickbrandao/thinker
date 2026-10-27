@@ -3,6 +3,7 @@ import { Title, Meta } from '@solidjs/meta';
 import { type Component, createSignal, onMount, Show } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
 import { checkNeedsSetup, createFirstAdmin, SetupError } from '../services/setup-status.js';
+import { t } from '../i18n/index.js';
 
 const Setup: Component = () => {
   const navigate = useNavigate();
@@ -29,11 +30,11 @@ const Setup: Component = () => {
     setError('');
 
     if (password() !== confirmPassword()) {
-      setError('Passwords do not match');
+      setError(t('auth.reset.mismatch'));
       return;
     }
     if (password().length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('auth.setup.tooShort'));
       return;
     }
 
@@ -61,11 +62,9 @@ const Setup: Component = () => {
       window.location.href = '/';
     } catch (err) {
       if (err instanceof SetupError && err.status === 403) {
-        setError(
-          'The setup token is invalid or missing. Copy the one-time setup token from the server log and try again.',
-        );
+        setError(t('auth.setup.invalidToken'));
       } else {
-        setError(err instanceof Error ? err.message : 'Setup failed');
+        setError(err instanceof Error ? err.message : t('auth.setup.failed'));
       }
     } finally {
       setLoading(false);
@@ -74,12 +73,15 @@ const Setup: Component = () => {
 
   return (
     <>
-      <Title>Set up Thinker</Title>
-      <Meta name="description" content="Create the admin account for your Thinker instance." />
-      <Show when={!checking()} fallback={<div class="auth-header__subtitle">Loading...</div>}>
+      <Title>{t('auth.setup.pageTitle')}</Title>
+      <Meta name="description" content={t('auth.setup.metaDescription')} />
+      <Show
+        when={!checking()}
+        fallback={<div class="auth-header__subtitle">{t('common.loading')}</div>}
+      >
         <div class="auth-header">
-          <h1 class="auth-header__title">Welcome to Thinker</h1>
-          <p class="auth-header__subtitle">Create the admin account for your instance</p>
+          <h1 class="auth-header__title">{t('auth.setup.title')}</h1>
+          <p class="auth-header__subtitle">{t('auth.setup.subtitle')}</p>
         </div>
         <form class="auth-form" onSubmit={handleSubmit}>
           {error() && (
@@ -88,11 +90,11 @@ const Setup: Component = () => {
             </div>
           )}
           <label class="auth-form__label">
-            Setup token
+            {t('auth.setup.token')}
             <input
               class="auth-form__input"
               type="text"
-              placeholder="Paste the one-time setup token"
+              placeholder={t('auth.setup.tokenPlaceholder')}
               value={setupToken()}
               onInput={(e) => setSetupToken(e.currentTarget.value)}
               required
@@ -101,16 +103,16 @@ const Setup: Component = () => {
               aria-describedby="setup-token-help"
             />
             <span id="setup-token-help" class="auth-form__hint">
-              Find it in the server log, on the line that says "one-time setup token" (for example{' '}
-              <code>docker compose logs thinker</code>).
+              {t('auth.setup.tokenHelpBefore')} <code>docker compose logs thinker</code>
+              {t('auth.setup.tokenHelpAfter')}
             </span>
           </label>
           <label class="auth-form__label">
-            Name
+            {t('common.name')}
             <input
               class="auth-form__input"
               type="text"
-              placeholder="Your name"
+              placeholder={t('auth.register.namePlaceholder')}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
               required
@@ -119,22 +121,22 @@ const Setup: Component = () => {
             />
           </label>
           <label class="auth-form__label">
-            Email
+            {t('common.email')}
             <input
               class="auth-form__input"
               type="email"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={email()}
               onInput={(e) => setEmail(e.currentTarget.value)}
               required
             />
           </label>
           <label class="auth-form__label">
-            Password
+            {t('common.password')}
             <input
               class="auth-form__input"
               type="password"
-              placeholder="At least 8 characters"
+              placeholder={t('auth.setup.passwordPlaceholder')}
               value={password()}
               onInput={(e) => setPassword(e.currentTarget.value)}
               required
@@ -143,11 +145,11 @@ const Setup: Component = () => {
             />
           </label>
           <label class="auth-form__label">
-            Confirm password
+            {t('auth.reset.confirmPassword')}
             <input
               class="auth-form__input"
               type="password"
-              placeholder="Re-enter password"
+              placeholder={t('auth.setup.confirmPlaceholder')}
               value={confirmPassword()}
               onInput={(e) => setConfirmPassword(e.currentTarget.value)}
               required
@@ -156,7 +158,7 @@ const Setup: Component = () => {
             />
           </label>
           <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : 'Create admin account'}
+            {loading() ? <span class="spinner" /> : t('auth.setup.submit')}
           </button>
         </form>
       </Show>

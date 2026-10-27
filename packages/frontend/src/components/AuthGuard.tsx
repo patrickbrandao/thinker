@@ -3,6 +3,7 @@ import { Show, createEffect, type ParentComponent } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
 import { buildLoginRedirect } from '../services/auth-redirects.js';
 import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
+import { t } from '../i18n/index.js';
 
 const AuthGuard: ParentComponent = (props) => {
   const session = authClient.useSession();
@@ -32,7 +33,7 @@ const AuthGuard: ParentComponent = (props) => {
               <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
             </div>
             <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm);">
-              Loading...
+              {t('common.loading')}
             </p>
           </div>
         </div>

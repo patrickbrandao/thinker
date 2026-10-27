@@ -26,6 +26,7 @@ import {
   type PlaygroundColumn as ColumnData,
 } from '../services/playground-store.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import { roleCan } from '../services/session-store.js';
 import PlaygroundColumn from '../components/playground/PlaygroundColumn.jsx';
 import PlaygroundPrompt from '../components/playground/PlaygroundPrompt.jsx';
@@ -183,7 +184,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       .markBest(col)
       .then(() => props.onBestModelChange?.(next))
       .catch((err) =>
-        toast.error(err instanceof Error ? err.message : 'Failed to set best answer'),
+        toast.error(err instanceof Error ? err.message : t('playground.failedSetBest')),
       );
   };
 
@@ -299,7 +300,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
     try {
       setHistoryRuns(await listPlaygroundRuns());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load history');
+      toast.error(err instanceof Error ? err.message : t('playground.failedLoadHistory'));
     } finally {
       setHistoryLoading(false);
     }
@@ -349,7 +350,12 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
   createEffect(() => {
     for (const col of store().columns) {
       if (col.status === 'success' && col.metrics) {
-        setAnnouncement(`${col.displayName} responded in ${col.metrics.durationMs} milliseconds.`);
+        setAnnouncement(
+          t('playground.responded', {
+            name: col.displayName ?? col.model,
+            ms: col.metrics.durationMs,
+          }),
+        );
       }
     }
   });
@@ -417,7 +423,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       setActiveRunId(runId);
       setSearchParams({ run: runId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load run');
+      toast.error(err instanceof Error ? err.message : t('playground.failedLoadRun'));
     }
   };
 
@@ -454,18 +460,13 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
       style={props.embedded ? undefined : { 'padding-bottom': `${promptHeight() + 48}px` }}
     >
       <Show when={!props.embedded}>
-        <Title>Playground · Thinker</Title>
-        <Meta
-          name="description"
-          content="Compare models side by side for cost, speed, and quality."
-        />
+        <Title>{t('playground.pageTitle')}</Title>
+        <Meta name="description" content={t('playground.metaDescription')} />
 
         <header class="page-header">
           <div>
-            <h1>Playground</h1>
-            <p class="page-header__sub">
-              Send one prompt to multiple models and compare cost, speed, and quality.
-            </p>
+            <h1>{t('playground.title')}</h1>
+            <p class="page-header__sub">{t('playground.subtitle')}</p>
           </div>
           {/* Provider connection now handled via sidebar provider pages */}
         </header>
@@ -483,7 +484,7 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
           </Show>
         }
       >
-        <div class="playground__columns" aria-label="Model comparison columns">
+        <div class="playground__columns" aria-label={t('playground.columnsLabel')}>
           <For each={viewingHistory() ?? store().columns}>
             {(col) => (
               <PlaygroundColumn
@@ -509,11 +510,11 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
               type="button"
               class="playground__add"
               onClick={() => setShowAddPicker(true)}
-              aria-label="Add model column"
+              aria-label={t('playground.addModelColumn')}
               disabled={store().isAnyRunning()}
             >
               <span class="playground__add-plus">+</span>
-              <span>Add model</span>
+              <span>{t('playground.addModel')}</span>
               <kbd class="playground__add-shortcut">
                 <span>{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}</span>
                 <span class="playground__add-shortcut-plus">+</span>
@@ -536,8 +537,8 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
               <div class="playground-prompt playground-prompt--info">
                 <span class="playground-prompt__info-text">
                   {roleCan.editHarnesses()
-                    ? 'Connect a provider to get started'
-                    : 'You have read-only access. Viewers can browse past runs but not send prompts.'}
+                    ? t('playground.connectProvider')
+                    : t('playground.readOnly')}
                 </span>
               </div>
             </div>
@@ -560,9 +561,9 @@ const Playground: Component<PlaygroundProps & Partial<RouteSectionProps>> = (pro
                 <button
                   type="button"
                   class="playground-prompt__headers"
-                  aria-label="Request headers"
+                  aria-label={t('playground.requestHeadersButton')}
                   aria-expanded={headersOpen()}
-                  title="Custom request headers"
+                  title={t('playground.customRequestHeaders')}
                   onClick={() => (headersOpen() ? setHeadersOpen(false) : openHeaders())}
                 >
                   <CodeIcon size={16} />

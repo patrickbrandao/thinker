@@ -5,6 +5,7 @@ import { createOrganization, setActiveOrganization } from '../services/api/organ
 import { passwordChangeRequired, setActiveOrganizationId } from '../services/org-context.js';
 import { loadMe, me } from '../services/session-store.js';
 import '../styles/organization.css';
+import { t } from '../i18n/index.js';
 
 type GateState = 'loading' | 'ready' | 'no-org' | 'error';
 
@@ -50,7 +51,7 @@ const MeGate: ParentComponent = (props) => {
       setState('ready');
     } catch (err) {
       if (passwordChangeRequired()) return;
-      setError(err instanceof Error ? err.message : 'Failed to load your account');
+      setError(err instanceof Error ? err.message : t('org.gate.loadFailed'));
       setState('error');
     }
   };
@@ -88,31 +89,29 @@ const MeGate: ParentComponent = (props) => {
       <Match when={state() === 'ready'}>{props.children}</Match>
       <Match when={state() === 'loading'}>
         <div class="org-gate" aria-busy="true">
-          <p class="org-gate__text">Loading...</p>
+          <p class="org-gate__text">{t('common.loading')}</p>
         </div>
       </Match>
       <Match when={state() === 'error'}>
         <div class="org-gate" role="alert">
-          <span class="org-gate__title">Could not load your account</span>
+          <span class="org-gate__title">{t('org.gate.couldNotLoad')}</span>
           <p class="org-gate__text">{error()}</p>
           <div>
             <button type="button" class="btn btn--outline btn--sm" onClick={() => void load()}>
-              Try again
+              {t('common.tryAgain')}
             </button>
           </div>
         </div>
       </Match>
       <Match when={state() === 'no-org'}>
         <div class="org-gate">
-          <span class="org-gate__title">No organization</span>
+          <span class="org-gate__title">{t('org.gate.noOrg')}</span>
           {me()?.isInstanceAdmin ? (
             <>
-              <p class="org-gate__text">
-                There is no organization yet. Create one to start adding harnesses and providers.
-              </p>
+              <p class="org-gate__text">{t('org.gate.noOrgAdmin')}</p>
               <form class="org-form" style="padding: 0;" onSubmit={handleCreate}>
                 <label class="org-form__field">
-                  Organization name
+                  {t('org.gate.orgName')}
                   <input
                     class="auth-form__input"
                     type="text"
@@ -122,18 +121,16 @@ const MeGate: ParentComponent = (props) => {
                   />
                 </label>
                 <button class="btn btn--primary btn--sm" type="submit" disabled={creating()}>
-                  Create organization
+                  {t('org.gate.createOrg')}
                 </button>
               </form>
             </>
           ) : (
-            <p class="org-gate__text">
-              Your account is not a member of any organization. Ask an administrator to add you.
-            </p>
+            <p class="org-gate__text">{t('org.gate.notMember')}</p>
           )}
           <div>
             <button type="button" class="btn btn--ghost btn--sm" onClick={() => void signOut()}>
-              Log out
+              {t('nav.logOut')}
             </button>
           </div>
         </div>

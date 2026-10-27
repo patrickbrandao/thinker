@@ -20,6 +20,7 @@ import {
   usedKeyLabelsForModelInTier,
 } from '../services/routing-utils.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import { authBadgeFor } from './AuthBadge.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
@@ -210,7 +211,11 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     props.onUpdate(updated, updatedRoutes);
     try {
       await persistSet(props.agentName, props.tier, updated, updatedRoutes ?? undefined);
-      toast.success(newLabel ? `Fallback pinned to "${newLabel}"` : 'Fallback key pin cleared');
+      toast.success(
+        newLabel
+          ? t('routing.fallbacks.pinned', { label: newLabel })
+          : t('routing.fallbacks.pinCleared'),
+      );
     } catch {
       props.onUpdate(original, originalRoutes);
     }
@@ -240,7 +245,10 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     if (!providerId) return '';
     const provDef = PROVIDERS.find((p) => p.id === providerId);
     const name = provDef?.name ?? providerId;
-    const method = authType === 'subscription' ? 'Subscription' : 'API Key';
+    const method =
+      authType === 'subscription'
+        ? t('routing.fallbacks.subscription')
+        : t('routing.fallbacks.apiKey');
     return `${name} (${method})`;
   };
 
@@ -271,7 +279,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
       } else {
         await persistSet(props.agentName, props.tier, updated, updatedRoutes ?? undefined);
       }
-      toast.success('Fallback removed');
+      toast.success(t('routing.fallbacks.removed'));
     } catch {
       props.onUpdate(original, originalRoutes);
     } finally {
@@ -379,7 +387,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     props.onReorderingChange?.(true);
     try {
       await persistSet(props.agentName, props.tier, reordered, reorderedRoutes ?? undefined);
-      toast.success('Fallback order updated');
+      toast.success(t('routing.fallbacks.orderUpdated'));
     } catch {
       props.onUpdate(original, originalRoutes);
     } finally {
@@ -435,9 +443,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                       'fallback-list__card--skipped': skippedInStream(model(), i()),
                     }}
                     title={
-                      skippedInStream(model(), i())
-                        ? 'Skipped while Stream mode is active'
-                        : undefined
+                      skippedInStream(model(), i()) ? t('routing.skippedWhileStream') : undefined
                     }
                     draggable={!dragLocked()}
                     onDragStart={(e) => handleDragStart(i(), e)}
@@ -484,7 +490,10 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                           );
                           if (logo) {
                             return (
-                              <span class="fallback-list__icon" title={cp?.name ?? 'Custom'}>
+                              <span
+                                class="fallback-list__icon"
+                                title={cp?.name ?? t('routing.fallbacks.custom')}
+                              >
                                 {logo}
                               </span>
                             );
@@ -493,7 +502,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                           return (
                             <span
                               class="provider-card__logo-letter fallback-list__icon"
-                              title={cp?.name ?? 'Custom'}
+                              title={cp?.name ?? t('routing.fallbacks.custom')}
                               style={{
                                 background: customProviderColor(cp?.name ?? ''),
                                 width: '14px',
@@ -509,7 +518,9 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                       </Show>
                       <span class="fallback-list__model">{modelLabel(model())}</span>
                       <Show when={skippedInStream(model(), i())}>
-                        <span class="routing-card__skipped-badge">Skipped in Stream</span>
+                        <span class="routing-card__skipped-badge">
+                          {t('routing.skippedInStream')}
+                        </span>
                       </Show>
                       <Show when={keys().length > 1}>
                         <RouteKeyChip
@@ -553,8 +564,10 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                       <button
                         class="fallback-list__remove"
                         onClick={() => handleRemove(i())}
-                        title="Remove fallback"
-                        aria-label={`Remove ${modelLabel(model())}`}
+                        title={t('routing.fallbacks.removeTitle')}
+                        aria-label={t('routing.fallbacks.removeModel', {
+                          model: modelLabel(model()),
+                        })}
                         disabled={removingIndex() !== null || dragLocked()}
                       >
                         {removingIndex() === i() ? (
@@ -595,10 +608,8 @@ const FallbackList: Component<FallbackListProps> = (props) => {
         fallback={
           <div class="fallback-list__empty">
             <FallbackUndoIcon size={20} class="fallback-list__empty-icon" />
-            <span class="fallback-list__empty-title">No fallbacks</span>
-            <span class="fallback-list__empty-desc">
-              Add fallback models to guarantee a response if the provider fails.
-            </span>
+            <span class="fallback-list__empty-title">{t('routing.fallbacks.emptyTitle')}</span>
+            <span class="fallback-list__empty-desc">{t('routing.fallbacks.emptyDesc')}</span>
             <button
               class="btn btn--outline btn--sm fallback-list__add"
               onClick={props.onAddFallback}
@@ -609,7 +620,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
               ) : (
                 <>
                   <FallbackUndoIcon size={16} />
-                  Add fallback
+                  {t('routing.fallbacks.add')}
                 </>
               )}
             </button>
@@ -627,7 +638,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
             ) : (
               <>
                 <FallbackUndoIcon size={16} />
-                Add fallback
+                {t('routing.fallbacks.add')}
               </>
             )}
           </button>

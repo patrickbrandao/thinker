@@ -2,6 +2,8 @@ import { createSignal, Show, type Component } from 'solid-js';
 import { getCodexConfigSnippet, getCodexKeyExportSnippet } from 'thinker-shared';
 import CopyButton from './CopyButton.jsx';
 import CodeBlock from './CodeBlock.jsx';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 interface Props {
   apiKey: string | null;
@@ -58,9 +60,10 @@ const CodexSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-method__hint">
-        Add this block to your global{' '}
-        <code class="setup-model-hint__code">~/.codex/config.toml</code>. Codex CLI and Desktop both
-        read this file. Restart Codex after you save it.
+        <RichText
+          text={t('harnesses.guides.codexConfig')}
+          parts={{ file: <code class="setup-model-hint__code">~/.codex/config.toml</code> }}
+        />
       </p>
 
       <div class="setup-cli-block">
@@ -70,11 +73,7 @@ const CodexSetup: Component<Props> = (props) => {
         <CodeBlock code={configShown()} language="toml" />
       </div>
 
-      <p class="setup-method__hint">
-        Export your Thinker key, then launch Codex CLI from the same terminal. For Desktop, make
-        this variable available in the environment that launches the app, then fully quit and reopen
-        Codex. An export in a separate terminal does not update a running app.
-      </p>
+      <p class="setup-method__hint">{t('harnesses.guides.codexExport')}</p>
 
       <div class="setup-cli-block">
         <div class="setup-cli-block__actions">
@@ -82,8 +81,10 @@ const CodexSetup: Component<Props> = (props) => {
             <button
               class="modal-terminal__copy"
               onClick={() => setKeyRevealed(!keyRevealed())}
-              aria-label={keyRevealed() ? 'Hide API key' : 'Reveal API key'}
-              title={keyRevealed() ? 'Hide key' : 'Reveal key'}
+              aria-label={
+                keyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+              }
+              title={keyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
             >
               <EyeIcon open={keyRevealed()} />
             </button>

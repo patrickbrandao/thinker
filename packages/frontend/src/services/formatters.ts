@@ -1,8 +1,17 @@
+import { intlLocale, locale, t, tMaybe } from '../i18n/index.js';
+
 /**
  * Format large numbers with suffix (1.2k, 304.3k, 1.2M).
  */
 export function formatNumber(n: number): string {
   n = Number(n);
+  if (locale() !== 'en') {
+    if (Math.abs(n) < 1_000) return new Intl.NumberFormat(intlLocale()).format(n);
+    return new Intl.NumberFormat(intlLocale(), {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(n);
+  }
   if (n >= 1_000_000) {
     const v = n / 1_000_000;
     return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}M`;
@@ -19,11 +28,21 @@ export function formatNumber(n: number): string {
  * Returns null for negative costs (invalid/unknown pricing).
  * Returns "< $0.01" for small sub-cent positive costs to avoid misleading "$0.00".
  */
+/** USD amount in the active locale ($6.18 in English, US$ 6,18 in pt-BR). */
+export function usd(n: number, digits: number): string {
+  return new Intl.NumberFormat(intlLocale(), {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(n);
+}
+
 export function formatCost(n: number): string | null {
   n = Number(n);
   if (!Number.isFinite(n) || n < 0) return null;
-  if (n > 0 && n < 0.01) return '< $0.01';
-  return `$${n.toFixed(2)}`;
+  if (n > 0 && n < 0.01) return `< ${usd(0.01, 2)}`;
+  return usd(n, 2);
 }
 
 /**
@@ -35,8 +54,8 @@ export function formatPerRequestCost(cost: number | null | undefined): string | 
   if (cost == null) return null;
   const n = Number(cost);
   if (!Number.isFinite(n) || n <= 0) return null;
-  if (n < 0.0001) return 'Included (< $0.0001 quota/req)';
-  return `Included ($${n.toFixed(4)} quota/req)`;
+  if (n < 0.0001) return t('format.perRequestTiny', { amount: usd(0.0001, 4) });
+  return t('format.perRequest', { amount: usd(n, 4) });
 }
 
 /**
@@ -54,11 +73,11 @@ export function formatTime(ts: string): string {
   const normalized = ts.replace(' ', 'T');
   const d = new Date(normalized.endsWith('Z') ? normalized : normalized + 'Z');
   if (Number.isNaN(d.getTime())) return '—';
-  const date = d.toLocaleDateString('en-US', {
+  const date = d.toLocaleDateString(intlLocale(), {
     month: 'short',
     day: 'numeric',
   });
-  const time = d.toLocaleTimeString('en-US', {
+  const time = d.toLocaleTimeString(intlLocale(), {
     hour12: false,
     hour: '2-digit',
     minute: '2-digit',
@@ -68,21 +87,12 @@ export function formatTime(ts: string): string {
 }
 
 /**
- * Map raw status codes to user-friendly labels.
+ * Map raw status codes to user-friendly labels. A rate limit is just a
+ * provider failure (the origin pill and the details drawer carry the nuance),
+ * so it reads "Failed" like any other failure.
  */
-const STATUS_LABELS: Record<string, string> = {
-  ok: 'Success',
-  retry: 'Retried',
-  error: 'Failed',
-  // A rate limit is just a provider failure — the origin pill ("Provider") and
-  // the details drawer ("Type: Rate limit") carry the nuance, so the status
-  // column stays the simple Success/Failed it was before.
-  rate_limited: 'Failed',
-  fallback_error: 'Handled',
-};
-
 export function formatStatus(status: string): string {
-  return STATUS_LABELS[status.toLowerCase()] ?? status;
+  return tMaybe(`format.status.${status.toLowerCase()}`) ?? status;
 }
 
 /**
@@ -90,58 +100,22 @@ export function formatStatus(status: string): string {
  * (config/policy/internal) are labelled as Thinker's own so they read
  * distinctly from a provider's failure.
  */
-const ERROR_ORIGIN_LABELS: Record<string, string> = {
-  provider: 'Provider',
-  transport: 'Transport',
-  config: 'Thinker · Setup',
-  // policy = a Thinker software limit (spend/token guardrail) was hit — labelled
-  // "Limit" so it reads distinctly from a provider rate limit.
-  policy: 'Thinker · Limit',
-  internal: 'Thinker · Internal',
-  // request = the caller's own payload was refused before routing. Not the
-  // operator's setup, not a Thinker bug, and never a provider failure.
-  request: 'Thinker · Bad request',
-};
-
 export function formatErrorOrigin(origin: string | null | undefined): string | null {
   if (!origin) return null;
-  return ERROR_ORIGIN_LABELS[origin] ?? origin;
+  return tMaybe(`format.errorOrigin.${origin}`) ?? origin;
 }
 
 /** Map an error_class to a user-facing label. */
-const ERROR_CLASS_LABELS: Record<string, string> = {
-  rate_limit: 'Rate limit',
-  auth: 'Authentication',
-  invalid_request: 'Invalid request',
-  not_found: 'Not found',
-  payload_too_large: 'Payload too large',
-  billing: 'Billing',
-  server_error: 'Server error',
-  client_error: 'Client error',
-  timeout: 'Timeout',
-  network: 'Network',
-  no_provider: 'No provider configured',
-  no_provider_key: 'Missing API key',
-  subscription_credentials_unusable: 'Subscription credentials',
-  limit_exceeded: 'Limit exceeded',
-  internal: 'Internal error',
-};
-
 export function formatErrorClass(errorClass: string | null | undefined): string | null {
   if (!errorClass) return null;
-  return ERROR_CLASS_LABELS[errorClass] ?? errorClass.replace(/_/g, ' ');
+  return tMaybe(`format.errorClass.${errorClass}`) ?? errorClass.replace(/_/g, ' ');
 }
 
 /**
  * Map raw metric_type values to user-friendly labels.
  */
-const METRIC_LABELS: Record<string, string> = {
-  tokens: 'Token usage',
-  cost: 'Cost',
-};
-
 export function formatMetricType(metricType: string): string {
-  return METRIC_LABELS[metricType] ?? metricType;
+  return tMaybe(`format.metric.${metricType}`) ?? metricType;
 }
 
 /**
@@ -208,8 +182,8 @@ export function formatRelativeTime(ts: string): string {
   const diffDays = Math.floor(diffMs / 86_400_000);
 
   if (diffDays === 0) return formatTime(ts);
-  if (diffDays === 1) return 'Yesterday';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (diffDays === 1) return t('format.yesterday');
+  return d.toLocaleDateString(intlLocale(), { month: 'short', day: 'numeric' });
 }
 
 export function formatTimeAgo(ts: string | null | undefined): string | null {
@@ -219,15 +193,15 @@ export function formatTimeAgo(ts: string | null | undefined): string | null {
   const diffMs = Date.now() - d.getTime();
   if (!Number.isFinite(diffMs) || diffMs < 0) return null;
   const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 45) return 'Just now';
+  if (diffSec < 45) return t('format.justNow');
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return t('format.minutesAgo', { n: diffMin });
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffHr < 24) return t('format.hoursAgo', { n: diffHr });
   const diffDays = Math.floor(diffHr / 24);
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (diffDays === 1) return t('format.yesterday');
+  if (diffDays < 7) return t('format.daysAgo', { n: diffDays });
+  return d.toLocaleDateString(intlLocale(), { month: 'short', day: 'numeric' });
 }
 
 export function sortedHeaderEntries(

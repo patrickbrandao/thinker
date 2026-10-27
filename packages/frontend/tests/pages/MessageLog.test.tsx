@@ -170,6 +170,7 @@ vi.mock('../../src/services/model-display.js', () => ({
 
 vi.mock('../../src/services/formatters.js', () => ({
   formatCost: (v: number) => `$${v.toFixed(2)}`,
+  usd: (v: number, digits: number) => `$${v.toFixed(digits)}`,
   formatNumber: (v: number) => String(v),
   formatStatus: (s: string) => s,
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,

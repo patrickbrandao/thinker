@@ -4,6 +4,7 @@ import { checkMcpEnabled } from '../services/setup-status.js';
 import { isInstanceAdmin, me, roleCan } from '../services/session-store.js';
 import AddAgentModal from './AddAgentModal.jsx';
 import OrgSwitcher from './OrgSwitcher.jsx';
+import { t } from '../i18n/index.js';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -41,7 +42,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
       id="agent-navigation"
       class="sidebar"
       classList={{ 'sidebar--mobile-open': props.mobileOpen === true }}
-      aria-label="Navigation"
+      aria-label={t('nav.navigation')}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('a.sidebar__link')) {
           handleNav();
@@ -57,7 +58,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
         classList={{ active: isGlobalActive('/overview') }}
         aria-current={isGlobalActive('/overview') ? 'page' : undefined}
       >
-        Overview
+        {t('nav.overview')}
       </A>
       <A
         href="/messages"
@@ -65,7 +66,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
         classList={{ active: isGlobalActive('/messages') }}
         aria-current={isGlobalActive('/messages') ? 'page' : undefined}
       >
-        Requests
+        {t('nav.requests')}
       </A>
       {/* Harnesses is a plain nav entry to the /harnesses page; the + keeps
           the one-click create from the nav. */}
@@ -76,14 +77,14 @@ const Sidebar: Component<SidebarProps> = (props) => {
           classList={{ active: isGlobalActive('/harnesses') }}
           aria-current={isGlobalActive('/harnesses') ? 'page' : undefined}
         >
-          Harnesses
+          {t('nav.harnesses')}
         </A>
         <Show when={roleCan.editHarnesses()}>
           <button
             type="button"
             class="sidebar__section-add"
-            title="Create new harness"
-            aria-label="Create new harness"
+            title={t('nav.createHarness')}
+            aria-label={t('nav.createHarness')}
             onClick={() => setAddModalOpen(true)}
           >
             <svg
@@ -99,14 +100,14 @@ const Sidebar: Component<SidebarProps> = (props) => {
           </button>
         </Show>
       </div>
-      <div class="sidebar__section-label">PROVIDERS</div>
+      <div class="sidebar__section-label">{t('nav.sectionProviders')}</div>
       <A
         href="/providers/local"
         class="sidebar__link"
         classList={{ active: isGlobalActive('/providers/local') }}
         aria-current={isGlobalActive('/providers/local') ? 'page' : undefined}
       >
-        Local
+        {t('nav.local')}
       </A>
       <A
         href="/providers/usage-based"
@@ -114,7 +115,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
         classList={{ active: isGlobalActive('/providers/usage-based') }}
         aria-current={isGlobalActive('/providers/usage-based') ? 'page' : undefined}
       >
-        Usage-based
+        {t('nav.usageBased')}
       </A>
       <A
         href="/providers/subscriptions"
@@ -122,13 +123,13 @@ const Sidebar: Component<SidebarProps> = (props) => {
         classList={{ active: isGlobalActive('/providers/subscriptions') }}
         aria-current={isGlobalActive('/providers/subscriptions') ? 'page' : undefined}
       >
-        Subscriptions
+        {t('nav.subscriptions')}
       </A>
 
       {/* Integrations: surfaces that drive Thinker from outside the dashboard.
           The "New" pills are a showcase device, not structure — delete the two
           spans once these stop being new. n8n joins here when it gets a page. */}
-      <div class="sidebar__section-label">INTEGRATIONS</div>
+      <div class="sidebar__section-label">{t('nav.sectionIntegrations')}</div>
       <Show when={mcpEnabled()}>
         <A
           href="/integrations/mcp"
@@ -136,8 +137,8 @@ const Sidebar: Component<SidebarProps> = (props) => {
           classList={{ active: isGlobalActive('/integrations/mcp') }}
           aria-current={isGlobalActive('/integrations/mcp') ? 'page' : undefined}
         >
-          MCP server
-          <span class="sidebar__badge">New</span>
+          {t('nav.mcpServer')}
+          <span class="sidebar__badge">{t('common.new')}</span>
         </A>
       </Show>
       <A
@@ -147,28 +148,28 @@ const Sidebar: Component<SidebarProps> = (props) => {
         aria-current={isGlobalActive('/integrations/cli') ? 'page' : undefined}
       >
         CLI
-        <span class="sidebar__badge">New</span>
+        <span class="sidebar__badge">{t('common.new')}</span>
       </A>
 
-      <div class="sidebar__section-label">TOOLS</div>
+      <div class="sidebar__section-label">{t('nav.sectionTools')}</div>
       <A
         href="/playground"
         class="sidebar__link"
         classList={{ active: isGlobalActive('/playground') }}
         aria-current={isGlobalActive('/playground') ? 'page' : undefined}
       >
-        Playground
+        {t('nav.playground')}
       </A>
 
       <Show when={me()}>
-        <div class="sidebar__section-label">ORGANIZATION</div>
+        <div class="sidebar__section-label">{t('nav.sectionOrganization')}</div>
         <A
           href="/organization"
           class="sidebar__link"
           classList={{ active: isGlobalActive('/organization') }}
           aria-current={isGlobalActive('/organization') ? 'page' : undefined}
         >
-          Members & settings
+          {t('nav.membersSettings')}
         </A>
         <Show when={isInstanceAdmin()}>
           <A
@@ -177,7 +178,7 @@ const Sidebar: Component<SidebarProps> = (props) => {
             classList={{ active: isGlobalActive('/admin/users') }}
             aria-current={isGlobalActive('/admin/users') ? 'page' : undefined}
           >
-            Users
+            {t('nav.users')}
           </A>
         </Show>
       </Show>

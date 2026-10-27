@@ -1,5 +1,6 @@
 import { For, Show, type Component } from 'solid-js';
 import type { ModelCapability, ModelModality } from '../services/api.js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   capabilities?: readonly ModelCapability[];
@@ -7,13 +8,26 @@ interface Props {
   iconOnly?: boolean;
 }
 
+/** Capability names in the active language (getters, so reads stay reactive). */
 export const CAPABILITY_LABELS: Record<ModelCapability, string> = {
-  text: 'Text',
-  image: 'Image',
-  audio: 'Audio',
-  video: 'Video',
-  stream: 'Stream',
-  tools: 'Tools',
+  get text() {
+    return t('models.capability.text');
+  },
+  get image() {
+    return t('models.capability.image');
+  },
+  get audio() {
+    return t('models.capability.audio');
+  },
+  get video() {
+    return t('models.capability.video');
+  },
+  get stream() {
+    return t('models.capability.stream');
+  },
+  get tools() {
+    return t('models.capability.tools');
+  },
 };
 
 export const CAPABILITY_ICONS: Record<ModelCapability, string> = {
@@ -49,11 +63,13 @@ const ModelCapabilityBadges: Component<Props> = (props) => {
     return DISPLAY_ORDER.filter((capability) => set.has(capability));
   };
   const summary = () => {
-    if (!hasMetadata()) return 'Capabilities unknown';
-    if (supported().length === 0) return 'Text only';
-    return `Capabilities: ${supported()
-      .map((capability) => CAPABILITY_LABELS[capability])
-      .join(', ')}`;
+    if (!hasMetadata()) return t('models.capability.unknown');
+    if (supported().length === 0) return t('models.capability.textOnly');
+    return t('models.capability.summary', {
+      list: supported()
+        .map((capability) => CAPABILITY_LABELS[capability])
+        .join(', '),
+    });
   };
 
   return (
@@ -68,7 +84,7 @@ const ModelCapabilityBadges: Component<Props> = (props) => {
           <Show when={!hasMetadata()}>
             <span
               class="model-capability-badge model-capability-badge--icon-only model-capability-badge--unknown"
-              data-tooltip="Capabilities unknown"
+              data-tooltip={t('models.capability.unknown')}
             >
               <span class="model-capability-badge__icon" innerHTML={unknownIcon} />
             </span>
@@ -80,7 +96,7 @@ const ModelCapabilityBadges: Component<Props> = (props) => {
         class="model-capability-badges"
         classList={{ 'model-capability-badges--compact': !!props.compact }}
         aria-label={summary()}
-        title="Model capability metadata. This is not a selected setting."
+        title={t('models.capability.metadataTitle')}
       >
         <For each={supported()}>
           {(capability) => (
@@ -110,12 +126,17 @@ export const ModelModalityBadges: Component<ModalityProps> = (props) => {
     const set = new Set(props.modalities ?? []);
     return MODALITY_ORDER.filter((modality) => set.has(modality));
   };
-  const directionLabel = () => (props.direction === 'input' ? 'Input' : 'Output');
+  const directionLabel = () =>
+    props.direction === 'input' ? t('models.capability.input') : t('models.capability.output');
   const summary = () => {
-    if (supported().length === 0) return `${directionLabel()} modalities unknown`;
-    return `${directionLabel()}: ${supported()
-      .map((modality) => CAPABILITY_LABELS[modality])
-      .join(', ')}`;
+    if (supported().length === 0)
+      return t('models.capability.modalitiesUnknown', { direction: directionLabel() });
+    return t('models.capability.modalitySummary', {
+      direction: directionLabel(),
+      list: supported()
+        .map((modality) => CAPABILITY_LABELS[modality])
+        .join(', '),
+    });
   };
   const tooltip = (modality: ModelModality) => CAPABILITY_LABELS[modality];
 
@@ -130,7 +151,7 @@ export const ModelModalityBadges: Component<ModalityProps> = (props) => {
         >
           <span
             class="model-capability-badge model-capability-badge--icon-only model-capability-badge--unknown"
-            data-tooltip={`${directionLabel()} modalities unknown`}
+            data-tooltip={t('models.capability.modalitiesUnknown', { direction: directionLabel() })}
           >
             <span class="model-capability-badge__icon" innerHTML={unknownIcon} />
           </span>

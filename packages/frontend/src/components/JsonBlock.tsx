@@ -1,5 +1,6 @@
 import { Show, type Component } from 'solid-js';
 import { highlight } from '../services/syntax-highlight.js';
+import { t } from '../i18n/index.js';
 
 const MAX_HIGHLIGHT_BYTES = 50_000;
 
@@ -25,9 +26,7 @@ const JsonBlock: Component<Props> = (props) => {
   return (
     <div class={`json-block-wrap${props.class ? ` ${props.class}` : ''}`}>
       <Show when={tooLarge()}>
-        <div class="json-block__size-notice">
-          Highlighting skipped — payload is {kb()} KB. Showing plain text.
-        </div>
+        <div class="json-block__size-notice">{t('messages.json.tooLarge', { kb: kb() })}</div>
       </Show>
       <pre class="json-block">
         {html() != null ? (

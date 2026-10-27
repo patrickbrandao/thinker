@@ -3,13 +3,14 @@ import { useLocation, useSearchParams } from '@solidjs/router';
 import { authClient } from '../services/auth-client.js';
 import { buildSocialAuthUrls } from '../services/auth-redirects.js';
 import { setLastAuthMethod } from '../services/last-auth-method.js';
+import { t } from '../i18n/index.js';
 
 type Provider = 'google' | 'github' | 'discord';
 
 const allProviders: { id: Provider; label: string }[] = [
-  { id: 'google', label: 'Continue with Google' },
-  { id: 'github', label: 'Continue with GitHub' },
-  { id: 'discord', label: 'Continue with Discord' },
+  { id: 'google', label: 'Google' },
+  { id: 'github', label: 'GitHub' },
+  { id: 'discord', label: 'Discord' },
 ];
 
 const handleSocialLogin = (
@@ -84,10 +85,12 @@ const SocialButtons: Component<SocialButtonsProps> = (props) => {
               onClick={() => handleSocialLogin(provider.id, authUrls())}
             >
               <span class="auth-social-btn__icon">{providerIcons[provider.id]()}</span>
-              <span class="auth-social-btn__label">{provider.label}</span>
+              <span class="auth-social-btn__label">
+                {t('auth.continueWith', { provider: provider.label })}
+              </span>
               <Show when={props.lastUsed === provider.id}>
-                <span class="auth-last-used" aria-label="Last used">
-                  Last used
+                <span class="auth-last-used" aria-label={t('auth.lastUsed')}>
+                  {t('auth.lastUsed')}
                 </span>
               </Show>
             </button>

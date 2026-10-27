@@ -15,6 +15,7 @@ export type {
   PlaygroundMetrics,
   PlaygroundRunResult,
 } from 'thinker-shared';
+import { t } from '../../i18n/index.js';
 
 /** Resolved value of a completed stream (the terminal `done` event). */
 export interface PlaygroundStreamResult {
@@ -113,7 +114,7 @@ export async function streamPlayground(
   if (buffer.trim()) handleEvent(buffer);
 
   if (streamError !== null) throw new Error(streamError);
-  if (result === null) throw new Error('Stream ended without a result');
+  if (result === null) throw new Error(t('ui.errors.streamNoResult'));
   return result;
 }
 
@@ -127,7 +128,7 @@ export async function setPlaygroundRunBest(
     headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ columnId }),
   });
-  if (!res.ok) throw new Error('Failed to set best answer');
+  if (!res.ok) throw new Error(t('ui.errors.bestAnswerFailed'));
   const data = (await res.json()) as { bestColumnId: string | null };
   return data.bestColumnId;
 }
@@ -150,7 +151,7 @@ export async function togglePlaygroundRunStar(runId: string): Promise<boolean> {
     credentials: 'include',
     headers: withOrganizationHeader(),
   });
-  if (!res.ok) throw new Error('Failed to toggle star');
+  if (!res.ok) throw new Error(t('ui.errors.starFailed'));
   const data = (await res.json()) as { starred: boolean };
   return data.starred;
 }

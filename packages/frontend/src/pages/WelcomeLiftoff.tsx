@@ -2,6 +2,7 @@
 import type { AnimationPlaybackControls, AnimationSequence } from 'motion';
 import { Show, onCleanup, onMount, type Component } from 'solid-js';
 import type { OnboardingMessageSummary } from './welcome-helpers.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Dev-only liftoff cinematic for the onboarding wizard (`/welcome?preview=liftoff`).
@@ -296,21 +297,21 @@ const WelcomeLiftoff: Component<{
 
       <div class="welcome__liftoff-copy">
         <p ref={(element) => (liftoffKicker = element)} class="welcome__liftoff-kicker">
-          Onboarding complete
+          {t('welcome.liftoff.kicker')}
         </p>
         <div class="welcome__liftoff-titles">
           <h1
             ref={(element) => (liftoffLaunchTitle = element)}
             class="welcome__liftoff-title welcome__liftoff-title--launch"
           >
-            Liftoff
+            {t('welcome.liftoff.launch')}
           </h1>
           <h1
             ref={(element) => (liftoffOrbitTitle = element)}
             id="welcome-liftoff-title"
             class="welcome__liftoff-title welcome__liftoff-title--orbit"
           >
-            Orbit achieved
+            {t('welcome.liftoff.orbit')}
           </h1>
         </div>
         <p
@@ -318,13 +319,13 @@ const WelcomeLiftoff: Component<{
           id="welcome-liftoff-description"
           class="welcome__liftoff-description"
         >
-          Your agent's first request just came through.
+          {t('welcome.liftoff.description')}
           <Show when={props.latestAgentRequest?.model}>
             {' '}
-            Routed to {props.latestAgentRequest?.model}
+            {t('welcome.liftoff.routedTo', { model: props.latestAgentRequest?.model ?? '' })}
             <Show when={props.latestAgentRequest?.duration_ms}>
               {' '}
-              in {props.latestAgentRequest?.duration_ms} ms
+              {t('welcome.liftoff.in', { ms: props.latestAgentRequest?.duration_ms ?? 0 })}
             </Show>
             .
           </Show>
@@ -339,14 +340,14 @@ const WelcomeLiftoff: Component<{
           class="welcome__liftoff-status"
           aria-hidden="true"
         >
-          {props.harnessSlug || 'agent'} · live
+          {t('welcome.liftoff.live', { name: props.harnessSlug || t('welcome.liftoff.agent') })}
         </span>
         <button
           ref={(element) => (liftoffAction = element)}
           class="welcome__liftoff-action btn btn--primary"
           onClick={() => props.onLeave()}
         >
-          Go to dashboard
+          {t('welcome.liftoff.goToDashboard')}
           <svg
             width="16"
             height="16"

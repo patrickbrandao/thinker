@@ -13,6 +13,7 @@ import {
 import type { AttemptRecording } from '../services/api/messages.js';
 import MarkdownContent from './playground/MarkdownContent.js';
 import JsonBlock from './JsonBlock.js';
+import { t } from '../i18n/index.js';
 
 type Recording = AttemptRecording;
 export type RecordingView = 'messages' | 'tools' | 'raw';
@@ -116,7 +117,7 @@ const ToolCalls: Component<{ calls: ToolCall[] }> = (props) => (
           <div class="request-messages__tool-call-head">
             <ToolIcon />
             <strong class="request-messages__tool-name">
-              {call.function?.name ?? 'Unknown tool'}
+              {call.function?.name ?? t('messages.recording.unknownTool')}
             </strong>
             <Show when={call.id}>
               <TruncatedId id={call.id!} />
@@ -170,6 +171,7 @@ const MessageTurn: Component<{
       >
         <span class="request-message__index">#{props.index + 1}</span>
         <span class={`request-message__role request-message__role--${role()}`}>
+          {/* i18n-ignore: chat protocol role names */}
           {role() === 'unknown' ? (props.message.role ?? 'unknown') : role()}
         </span>
         <Show when={props.message.name}>
@@ -221,7 +223,7 @@ const MessageTurn: Component<{
               class="request-message__uncap"
               onClick={() => setCapped((v) => !v)}
             >
-              {capped() ? 'Expand to full height' : 'Collapse back'}
+              {capped() ? t('messages.recording.expandFull') : t('messages.recording.collapseBack')}
             </button>
           </div>
         </Show>
@@ -318,7 +320,7 @@ const ConversationSplit: Component<{ messages: ChatMessage[] }> = (props) => {
           <input
             class="conv-rail__search"
             type="search"
-            placeholder="Filter…"
+            placeholder={t('messages.recording.filterPlaceholder')}
             value={searchQuery()}
             onInput={(e) => setSearchQuery(e.currentTarget.value)}
           />
@@ -331,7 +333,7 @@ const ConversationSplit: Component<{ messages: ChatMessage[] }> = (props) => {
                 class={`conv-rail__role-pill conv-rail__role-pill--${role}`}
                 classList={{ 'conv-rail__role-pill--off': !visibleRoles().has(role) }}
                 onClick={() => toggleRole(role)}
-                title={`Toggle ${role} messages`}
+                title={t('messages.recording.toggleRole', { role })}
               >
                 {role}
               </button>
@@ -357,7 +359,7 @@ const ConversationSplit: Component<{ messages: ChatMessage[] }> = (props) => {
             )}
           </For>
           <Show when={outlineRows().length === 0}>
-            <div class="conv-rail__empty">No matches</div>
+            <div class="conv-rail__empty">{t('messages.recording.noMatches')}</div>
           </Show>
         </div>
       </div>
@@ -409,10 +411,8 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
           <div class="request-messages__empty-icon" aria-hidden="true">
             ◌
           </div>
-          <strong>No logs for this attempt</strong>
-          <span>
-            Logs were off when this attempt ran. Enable logs in Settings to inspect future requests.
-          </span>
+          <strong>{t('messages.recording.noLogsTitle')}</strong>
+          <span>{t('messages.recording.noLogsBody')}</span>
         </div>
       }
     >
@@ -423,7 +423,7 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
               when={messages().length > 0}
               fallback={
                 <div class="request-messages__scroll-area">
-                  <div class="request-messages__empty">No conversation turns found.</div>
+                  <div class="request-messages__empty">{t('messages.recording.noTurns')}</div>
                 </div>
               }
             >
@@ -437,14 +437,14 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
                 {/* Called tools */}
                 <section class="request-tools-section">
                   <h4 class="request-tools-section__title">
-                    Called
+                    {t('messages.recording.called')}
                     <span class="request-tools-section__count">{toolCalls().length}</span>
                   </h4>
                   <Show
                     when={toolCalls().length > 0}
                     fallback={
                       <div class="request-messages__empty request-messages__empty--sm">
-                        No tools were called in this conversation.
+                        {t('messages.recording.noToolsCalled')}
                       </div>
                     }
                   >
@@ -455,8 +455,9 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
                             <div class="request-tool__head">
                               <ToolIcon />
                               <strong class="request-messages__tool-name">
-                                {call.function?.name ?? 'Unknown tool'}
+                                {call.function?.name ?? t('messages.recording.unknownTool')}
                               </strong>
+                              {/* i18n-ignore: tool type from the API */}
                               <span class="request-tool__type">{call.type ?? 'function'}</span>
                               <Show when={call.id}>
                                 <TruncatedId id={call.id!} />
@@ -475,14 +476,14 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
                 {/* Available tools */}
                 <section class="request-tools-section">
                   <h4 class="request-tools-section__title">
-                    Available
+                    {t('messages.recording.available')}
                     <span class="request-tools-section__count">{availableTools().length}</span>
                   </h4>
                   <Show
                     when={availableTools().length > 0}
                     fallback={
                       <div class="request-messages__empty request-messages__empty--sm">
-                        No tools were offered in this request.
+                        {t('messages.recording.noToolsOffered')}
                       </div>
                     }
                   >
@@ -492,8 +493,9 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
                           <article class="request-tool request-tool--available">
                             <div class="request-tool__head">
                               <strong class="request-messages__tool-name">
-                                {tool.function?.name ?? 'Unknown tool'}
+                                {tool.function?.name ?? t('messages.recording.unknownTool')}
                               </strong>
+                              {/* i18n-ignore: tool type from the API */}
                               <span class="request-tool__type">{tool.type ?? 'function'}</span>
                             </div>
                             <Show when={tool.function?.description}>
@@ -516,11 +518,11 @@ const RequestMessages: Component<{ recording: Recording | null; view?: Recording
             <div class="request-messages__scroll-area">
               <div class="request-messages__raw">
                 <section>
-                  <h4>Request</h4>
+                  <h4>{t('messages.recording.request')}</h4>
                   <JsonBlock value={recording().request_body} />
                 </section>
                 <section>
-                  <h4>Response</h4>
+                  <h4>{t('messages.recording.response')}</h4>
                   <JsonBlock value={recording().response_body} />
                 </section>
               </div>

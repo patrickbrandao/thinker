@@ -14,6 +14,7 @@ import { authClient } from '../services/auth-client.js';
 import { appendSearch, getAuthDestination } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
 import { checkSignupEnabled, checkSocialProviders } from '../services/setup-status.js';
+import { t } from '../i18n/index.js';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -43,16 +44,14 @@ const Login: Component = () => {
   onMount(async () => {
     if (searchParams.error === 'account_not_linked') {
       setNeedsVerification(true);
-      setError('This email already has an account. Enter it below to get a verification link.');
+      setError(t('auth.login.accountNotLinked'));
     } else if (
       searchParams.error === 'signup_disabled' ||
       searchParams.error === 'unable_to_create_user'
     ) {
-      setError(
-        'There is no account for this login yet, and this Thinker instance does not allow sign-up. Ask an admin to create your account.',
-      );
+      setError(t('auth.login.signupDisabled'));
     } else if (searchParams.error || searchParams.oauth === 'failed') {
-      setError('Login failed. Please try again or use a different method.');
+      setError(t('auth.login.oauthFailed'));
     }
     const [providers, signup] = await Promise.all([checkSocialProviders(), checkSignupEnabled()]);
     setSocialProviders(providers);
@@ -100,10 +99,10 @@ const Login: Component = () => {
         authError.code === 'EMAIL_NOT_VERIFIED'
       ) {
         setNeedsVerification(true);
-        setError('Please verify your email before signing in.');
+        setError(t('auth.login.verifyFirst'));
         return;
       }
-      setError(msg || 'Invalid email or password');
+      setError(msg || t('auth.login.invalid'));
       return;
     }
 
@@ -124,7 +123,7 @@ const Login: Component = () => {
     });
     setLoading(false);
     if (authError) {
-      setError(authError.message ?? 'Dev sign-in failed');
+      setError(authError.message ?? t('auth.login.devFailed'));
       return;
     }
     setLastAuthMethod('email');
@@ -134,7 +133,7 @@ const Login: Component = () => {
   const handleResendVerification = async () => {
     if (resendCooldown() > 0) return;
     if (!email().trim()) {
-      setError('Enter your email address to receive a verification link.');
+      setError(t('auth.login.enterEmailForLink'));
       return;
     }
 
@@ -144,28 +143,28 @@ const Login: Component = () => {
     });
 
     if (resendError) {
-      setError(resendError.message ?? 'Failed to resend verification email');
+      setError(resendError.message ?? t('auth.resendFailed'));
       return;
     }
 
     startCooldown();
-    setError('Verification email sent! Check your inbox.');
+    setError(t('auth.login.verificationSent'));
   };
 
   return (
     <>
-      <Title>Sign In - Thinker</Title>
-      <Meta name="description" content="Sign in to Thinker to monitor your AI harnesses." />
+      <Title>{t('common.pageTitle', { page: t('auth.login.pageTitle') })}</Title>
+      <Meta name="description" content={t('auth.login.metaDescription')} />
       <div class="auth-header">
-        <h1 class="auth-header__title">Welcome back</h1>
-        <p class="auth-header__subtitle">Take control of your AI harness costs</p>
+        <h1 class="auth-header__title">{t('auth.login.title')}</h1>
+        <p class="auth-header__subtitle">{t('auth.login.subtitle')}</p>
       </div>
 
       <SocialButtons enabledProviders={socialProviders()} lastUsed={lastAuthMethod()} />
 
       <Show when={socialProviders().length > 0}>
         <div class="auth-divider">
-          <span class="auth-divider__text">or</span>
+          <span class="auth-divider__text">{t('auth.or')}</span>
         </div>
       </Show>
 
@@ -179,14 +178,14 @@ const Login: Component = () => {
           </div>
         )}
         <label class="auth-form__label" for={emailId}>
-          Email
+          {t('common.email')}
           <input
             ref={(el) => requestAnimationFrame(() => el.focus())}
             id={emailId}
             class="auth-form__input"
             type="email"
             autocomplete="email"
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             value={email()}
             onInput={(e) => setEmail(e.currentTarget.value)}
             required
@@ -200,17 +199,19 @@ const Login: Component = () => {
             onClick={handleResendVerification}
             disabled={resendCooldown() > 0}
           >
-            {resendCooldown() > 0 ? `Resend in ${resendCooldown()}s` : 'Send verification email'}
+            {resendCooldown() > 0
+              ? t('auth.resendIn', { seconds: resendCooldown() })
+              : t('auth.sendVerification')}
           </button>
         </Show>
         <label class="auth-form__label" for={passwordId}>
-          Password
+          {t('common.password')}
           <input
             id={passwordId}
             class="auth-form__input"
             type="password"
             autocomplete="current-password"
-            placeholder="Enter your password"
+            placeholder={t('auth.login.passwordPlaceholder')}
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}
             required
@@ -219,18 +220,18 @@ const Login: Component = () => {
         </label>
         <div class="auth-form__actions">
           <A href="/reset-password" class="auth-form__forgot">
-            Forgot password?
+            {t('auth.login.forgot')}
           </A>
         </div>
         <button class="auth-form__submit" type="submit" disabled={loading()}>
-          {loading() ? <span class="spinner" /> : 'Sign in'}
+          {loading() ? <span class="spinner" /> : t('auth.login.submit')}
         </button>
       </form>
       <Show when={signupEnabled()}>
         <div class="auth-footer">
-          <span>Don't have an account? </span>
+          <span>{t('auth.login.noAccount')} </span>
           <A href={appendSearch('/register', location.search)} class="auth-footer__link">
-            Sign up
+            {t('auth.login.signUp')}
           </A>
         </div>
       </Show>

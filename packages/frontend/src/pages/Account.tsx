@@ -1,8 +1,9 @@
-import { createResource, createSignal, onMount, Show, type Component } from 'solid-js';
+import { createResource, createSignal, For, onMount, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
 import { authClient } from '../services/auth-client.js';
 import { toast } from '../services/toast-store.js';
+import { LOCALES, LOCALE_NAMES, locale, setLocale, t } from '../i18n/index.js';
 
 const Account: Component = () => {
   const navigate = useNavigate();
@@ -23,15 +24,15 @@ const Account: Component = () => {
     const next = newPassword();
 
     if (next !== confirmPassword()) {
-      setPwError('New passwords do not match');
+      setPwError(t('account.security.mismatch'));
       return;
     }
     if (next.length < 8) {
-      setPwError('New password must be at least 8 characters');
+      setPwError(t('account.security.tooShort'));
       return;
     }
     if (next === current) {
-      setPwError('New password must differ from the current password');
+      setPwError(t('account.security.sameAsCurrent'));
       return;
     }
 
@@ -44,16 +45,16 @@ const Account: Component = () => {
       });
 
       if (error) {
-        setPwError(error.message ?? 'Failed to change password');
+        setPwError(error.message ?? t('account.security.failed'));
         return;
       }
 
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      toast.success('Password changed. Other devices have been signed out.');
+      toast.success(t('account.security.changed'));
     } catch {
-      setPwError('Failed to change password');
+      setPwError(t('account.security.failed'));
     } finally {
       setPwBusy(false);
     }
@@ -95,8 +96,8 @@ const Account: Component = () => {
 
   return (
     <div class="account-modal">
-      <Title>Account Preferences - Thinker</Title>
-      <Meta name="description" content="Manage your profile, workspace, and theme preferences." />
+      <Title>{t('common.pageTitle', { page: t('account.title') })}</Title>
+      <Meta name="description" content={t('account.metaDescription')} />
       <div class="account-modal__inner">
         <button class="btn btn--ghost btn--sm account-back-btn" onClick={() => navigate(-1)}>
           <svg
@@ -109,29 +110,29 @@ const Account: Component = () => {
           >
             <path d="M14.71 7.29a.996.996 0 0 0-1.41 0l-4 4a.996.996 0 0 0 0 1.41l4 4c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41L11.43 12l3.29-3.29a.996.996 0 0 0 0-1.41Z" />
           </svg>
-          Back
+          {t('common.back')}
         </button>
         <div class="page-header">
           <div>
-            <h1>Account Preferences</h1>
-            <span class="breadcrumb">Your profile, workspace details, and display preferences</span>
+            <h1>{t('account.title')}</h1>
+            <span class="breadcrumb">{t('account.subtitle')}</span>
           </div>
         </div>
 
         {/* Profile Information */}
-        <h2 class="settings-section__title">Profile information</h2>
+        <h2 class="settings-section__title">{t('account.profile.title')}</h2>
 
         <div class="settings-card">
           <div class="settings-card__row">
             <div class="settings-card__label">
-              <span class="settings-card__label-title">Display name</span>
-              <span class="settings-card__label-desc">Name shown throughout the dashboard.</span>
+              <span class="settings-card__label-title">{t('account.profile.displayName')}</span>
+              <span class="settings-card__label-desc">{t('account.profile.displayNameDesc')}</span>
             </div>
             <div class="settings-card__control">
               <input
                 class="settings-card__input"
                 type="text"
-                aria-label="Display name"
+                aria-label={t('account.profile.displayName')}
                 value={userName()}
                 readonly
               />
@@ -139,14 +140,14 @@ const Account: Component = () => {
           </div>
           <div class="settings-card__row">
             <div class="settings-card__label">
-              <span class="settings-card__label-title">Email</span>
-              <span class="settings-card__label-desc">Used for account notifications.</span>
+              <span class="settings-card__label-title">{t('account.profile.email')}</span>
+              <span class="settings-card__label-desc">{t('account.profile.emailDesc')}</span>
             </div>
             <div class="settings-card__control">
               <input
                 class="settings-card__input"
                 type="email"
-                aria-label="Email"
+                aria-label={t('account.profile.email')}
                 value={userEmail()}
                 readonly
               />
@@ -154,27 +155,31 @@ const Account: Component = () => {
           </div>
           <div class="settings-card__footer">
             <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-              Profile information is managed through your authentication provider.
+              {t('account.profile.managedBy')}
             </span>
           </div>
         </div>
 
         {/* Security */}
         <Show when={hasCredentialAccount()}>
-          <h2 class="settings-section__title">Security</h2>
+          <h2 class="settings-section__title">{t('account.security.title')}</h2>
 
           <form class="settings-card" onSubmit={handleChangePassword}>
             <div class="settings-card__row">
               <div class="settings-card__label">
-                <span class="settings-card__label-title">Current password</span>
-                <span class="settings-card__label-desc">Confirm the password you use today.</span>
+                <span class="settings-card__label-title">
+                  {t('account.security.currentPassword')}
+                </span>
+                <span class="settings-card__label-desc">
+                  {t('account.security.currentPasswordDesc')}
+                </span>
               </div>
               <div class="settings-card__control">
                 <input
                   class="settings-card__input"
                   type="password"
                   autocomplete="current-password"
-                  aria-label="Current password"
+                  aria-label={t('account.security.currentPassword')}
                   value={currentPassword()}
                   onInput={(e) => setCurrentPassword(e.currentTarget.value)}
                   required
@@ -183,15 +188,17 @@ const Account: Component = () => {
             </div>
             <div class="settings-card__row">
               <div class="settings-card__label">
-                <span class="settings-card__label-title">New password</span>
-                <span class="settings-card__label-desc">At least 8 characters.</span>
+                <span class="settings-card__label-title">{t('account.security.newPassword')}</span>
+                <span class="settings-card__label-desc">
+                  {t('account.security.newPasswordDesc')}
+                </span>
               </div>
               <div class="settings-card__control">
                 <input
                   class="settings-card__input"
                   type="password"
                   autocomplete="new-password"
-                  aria-label="New password"
+                  aria-label={t('account.security.newPassword')}
                   value={newPassword()}
                   onInput={(e) => setNewPassword(e.currentTarget.value)}
                   required
@@ -201,15 +208,19 @@ const Account: Component = () => {
             </div>
             <div class="settings-card__row">
               <div class="settings-card__label">
-                <span class="settings-card__label-title">Confirm new password</span>
-                <span class="settings-card__label-desc">Re-enter the new password to confirm.</span>
+                <span class="settings-card__label-title">
+                  {t('account.security.confirmPassword')}
+                </span>
+                <span class="settings-card__label-desc">
+                  {t('account.security.confirmPasswordDesc')}
+                </span>
               </div>
               <div class="settings-card__control">
                 <input
                   class="settings-card__input"
                   type="password"
                   autocomplete="new-password"
-                  aria-label="Confirm new password"
+                  aria-label={t('account.security.confirmPassword')}
                   value={confirmPassword()}
                   onInput={(e) => setConfirmPassword(e.currentTarget.value)}
                   required
@@ -222,28 +233,25 @@ const Account: Component = () => {
                 {pwError()}
               </span>
               <button class="btn btn--primary btn--sm" type="submit" disabled={pwBusy()}>
-                {pwBusy() ? <span class="spinner" /> : 'Change password'}
+                {pwBusy() ? <span class="spinner" /> : t('account.security.submit')}
               </button>
             </div>
           </form>
         </Show>
 
         {/* Workspace ID */}
-        <h2 class="settings-section__title">Workspace</h2>
+        <h2 class="settings-section__title">{t('account.workspace.title')}</h2>
 
         <div class="settings-card">
           <div class="settings-card__body">
-            <p class="settings-card__desc">
-              Your unique workspace identifier. You may need this for support requests or advanced
-              integrations.
-            </p>
+            <p class="settings-card__desc">{t('account.workspace.desc')}</p>
             <div class="settings-card__id-row">
               <code class="settings-card__id-value">{userId()}</code>
               <button
                 class="settings-card__copy-btn"
                 onClick={copyId}
-                title="Copy"
-                aria-label={copied() ? 'Copied' : 'Copy workspace ID'}
+                title={t('common.copy')}
+                aria-label={copied() ? t('common.copied') : t('account.workspace.copyId')}
               >
                 {copied() ? (
                   <svg
@@ -281,11 +289,11 @@ const Account: Component = () => {
         </div>
 
         {/* Appearance */}
-        <h2 class="settings-section__title">Appearance</h2>
+        <h2 class="settings-section__title">{t('account.appearance.title')}</h2>
 
         <div class="settings-card">
           <div class="settings-card__body">
-            <p class="settings-card__desc">Choose how Thinker looks for you.</p>
+            <p class="settings-card__desc">{t('account.appearance.desc')}</p>
             <div class="theme-picker">
               <button
                 class="theme-picker__option"
@@ -313,7 +321,7 @@ const Account: Component = () => {
                   <path d="m6.34 17.66-1.41 1.41" />
                   <path d="m19.07 4.93-1.41 1.41" />
                 </svg>
-                Light
+                {t('account.appearance.light')}
               </button>
               <button
                 class="theme-picker__option"
@@ -333,7 +341,7 @@ const Account: Component = () => {
                 >
                   <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
                 </svg>
-                Dark
+                {t('account.appearance.dark')}
               </button>
               <button
                 class="theme-picker__option"
@@ -355,8 +363,32 @@ const Account: Component = () => {
                   <path d="M8 21h8" />
                   <path d="M12 17v4" />
                 </svg>
-                System
+                {t('account.appearance.system')}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Language */}
+        <h2 class="settings-section__title">{t('account.language.title')}</h2>
+
+        <div class="settings-card">
+          <div class="settings-card__body">
+            <p class="settings-card__desc">{t('account.language.desc')}</p>
+            <div class="theme-picker" role="group" aria-label={t('account.language.label')}>
+              <For each={LOCALES}>
+                {(l) => (
+                  <button
+                    class="theme-picker__option"
+                    classList={{ 'theme-picker__option--active': locale() === l }}
+                    aria-pressed={locale() === l}
+                    lang={l}
+                    onClick={() => setLocale(l)}
+                  >
+                    {LOCALE_NAMES[l]}
+                  </button>
+                )}
+              </For>
             </div>
           </div>
         </div>

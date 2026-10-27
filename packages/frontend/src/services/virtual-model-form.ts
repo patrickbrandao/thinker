@@ -1,6 +1,7 @@
 import { validateVirtualModelName } from 'thinker-shared';
 import type { AvailableModel, CustomProviderData, ModelRoute } from './api.js';
 import { ApiError } from './api/core.js';
+import { t } from '../i18n/index.js';
 import { customProviderAliases, publicModelId } from './public-model-id.js';
 
 /**
@@ -18,7 +19,7 @@ export function virtualModelNameError(
   if (!result.ok) return result.error;
   const lower = result.name.toLowerCase();
   if (otherNames.some((n) => n.toLowerCase() === lower)) {
-    return 'Another virtual model on this harness already uses this name';
+    return t('models.vm.nameTaken');
   }
   return undefined;
 }
@@ -54,7 +55,7 @@ export function previewShadows(
 
 /** The delete confirmation: the per-model parameters go with the virtual model. */
 export function deleteVirtualModelPrompt(name: string): string {
-  return `Delete virtual model "${name}"? Its per-model parameters are deleted too.`;
+  return t('models.vm.deletePrompt', { name });
 }
 
 /** Routes of a chain that cannot stream, by their catalog capabilities. */
@@ -90,8 +91,7 @@ export function mapVirtualModelError(
   err: unknown,
   chainModels: readonly string[],
 ): VirtualModelFormErrors {
-  const message =
-    err instanceof Error && err.message ? err.message : 'Something went wrong. Try again.';
+  const message = err instanceof Error && err.message ? err.message : t('models.vm.genericError');
   const status = err instanceof ApiError ? err.status : undefined;
   if (status === 409 || (status === 400 && NAME_MESSAGE.test(message))) {
     return { name: message, invalidModels: [] };

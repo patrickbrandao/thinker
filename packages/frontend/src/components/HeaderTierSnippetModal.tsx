@@ -5,6 +5,7 @@ import { installOrigin } from '../services/install-endpoints.js';
 import type { HeaderTier } from '../services/api/header-tiers.js';
 import type { CustomProviderData } from '../services/api.js';
 import { customProviderAliases, publicModelId } from '../services/public-model-id.js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   agentName: string;
@@ -37,7 +38,7 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
   // provider has an alias), not the internal `custom:<uuid>/<model>` key.
   const modelText = (): string => {
     const route = props.tier.override_route;
-    if (!route) return 'no model assigned (falls back to default routing)';
+    if (!route) return t('routing.snippet.noModel');
     if (!route.provider?.startsWith('custom:')) return route.model;
     return publicModelId(route, customProviderAliases(props.customProviders));
   };
@@ -64,9 +65,13 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
             id="header-tier-snippet-title"
             style="margin: 0; font-size: var(--font-size-lg); font-weight: 600;"
           >
-            Send the “{props.tier.name}” header
+            {t('routing.snippet.title', { name: props.tier.name })}
           </h2>
-          <button class="modal__close" onClick={() => props.onClose()} aria-label="Close">
+          <button
+            class="modal__close"
+            onClick={() => props.onClose()}
+            aria-label={t('common.close')}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -80,7 +85,8 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
           </button>
         </div>
         <p class="modal-card__desc" style="margin-top: 0;">
-          Add this header to any request and it'll route to <code>{modelText()}</code>.
+          {t('routing.snippet.descBefore')} <code>{modelText()}</code>
+          {t('routing.snippet.descAfter')}
         </p>
 
         <FrameworkSnippets
@@ -92,7 +98,7 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
 
         <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
           <button class="btn btn--primary" type="button" onClick={() => props.onClose()}>
-            Done
+            {t('common.done')}
           </button>
         </div>
       </div>

@@ -11,18 +11,13 @@ import {
 import { getProviders as getGlobalProviders } from '../services/api/providers.js';
 import { PROVIDERS } from '../services/providers.js';
 import { toast } from '../services/toast-store.js';
+import { t, tMaybe } from '../i18n/index.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
 import { roleCan } from '../services/session-store.js';
 import { customProviderColor } from '../services/formatters.js';
 import { providerIcon } from '../components/ProviderIcon.jsx';
 import NoConnectionsPrompt from '../components/NoConnectionsPrompt.jsx';
 import '../styles/routing.css';
-
-const AUTH_BADGES: Record<string, string> = {
-  api_key: 'API Key',
-  subscription: 'Subscription',
-  local: 'Local',
-};
 
 interface AgentProviderConnection {
   userProviderId: string;
@@ -121,7 +116,7 @@ const AgentProviders: Component = () => {
       impact = await getAgentProviderDisableImpact(agentName(), connection.userProviderId);
     } catch {
       setBusy(null);
-      toast.error("Couldn't check this provider's routing impact. Please try again.");
+      toast.error(t('providers.agentAccess.impactCheckFailed'));
       return;
     }
 
@@ -131,10 +126,13 @@ const AgentProviders: Component = () => {
       const virtualNames = [...new Set(affectedVirtuals.map((v) => `"${v.name}"`))];
       const usedBy =
         virtualNames.length > 0
-          ? ` Used by virtual model${virtualNames.length > 1 ? 's' : ''} ${virtualNames.join(', ')}.`
+          ? t('providers.agentAccess.usedByVirtual', virtualNames.join(', '), virtualNames.length)
           : '';
       toast.error(
-        `Can't disable ${providerName(connection.provider)}. Its models are assigned to this harness's routing.${usedBy} Update routing to stop using them first.`,
+        t('providers.agentAccess.cantDisable', {
+          provider: providerName(connection.provider),
+          usedBy,
+        }),
       );
       return;
     }
@@ -152,13 +150,12 @@ const AgentProviders: Component = () => {
   return (
     <div>
       <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); margin-bottom: 16px;">
-        Enable the global provider connections this harness may use. A provider can't be turned off
-        while its models are assigned to this harness's routing. Update routing first to remove it.
+        {t('providers.agentAccess.intro')}
       </p>
 
       <ReadOnlyRegion
         readOnly={!roleCan.manageProviders()}
-        notice="You have read-only access. Only admins and owners can change which providers this harness uses."
+        notice={t('providers.agentAccess.readOnly')}
       >
         <Show when={connections().length > 0} fallback={<NoConnectionsPrompt />}>
           <div class="panel" style="padding: 0; overflow-x: auto;">
@@ -172,10 +169,10 @@ const AgentProviders: Component = () => {
               </colgroup>
               <thead>
                 <tr>
-                  <th>Provider</th>
-                  <th>Type</th>
-                  <th>Connection</th>
-                  <th>Models</th>
+                  <th>{t('providers.agentAccess.colProvider')}</th>
+                  <th>{t('providers.agentAccess.colType')}</th>
+                  <th>{t('providers.agentAccess.colConnection')}</th>
+                  <th>{t('providers.agentAccess.colModels')}</th>
                   <th />
                 </tr>
               </thead>
@@ -218,7 +215,8 @@ const AgentProviders: Component = () => {
                         </td>
                         <td>
                           <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                            {AUTH_BADGES[connection.authType] ?? connection.authType}
+                            {tMaybe(`providers.authBadge.${connection.authType}`) ??
+                              connection.authType}
                           </span>
                         </td>
                         <td>
@@ -240,9 +238,15 @@ const AgentProviders: Component = () => {
                             class="routing-switch"
                             classList={{ 'routing-switch--on': enabled() }}
                             disabled={busy() === connection.userProviderId}
-                            aria-label={`${enabled() ? 'Disable' : 'Enable'} ${name()} ${
-                              connection.label
-                            }`}
+                            aria-label={t(
+                              enabled()
+                                ? 'providers.agentAccess.disableAria'
+                                : 'providers.agentAccess.enableAria',
+                              {
+                                name: name(),
+                                label: connection.label,
+                              },
+                            )}
                             onClick={() => void handleToggle(connection)}
                           >
                             <span class="routing-switch__track">

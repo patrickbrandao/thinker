@@ -1,6 +1,8 @@
 import { For, Show, type Component } from 'solid-js';
 import type uPlot from 'uplot';
 import '../styles/agent-chart-tooltip.css';
+import { t } from '../i18n/index.js';
+import { monthShort } from '../services/overview-format.js';
 
 /**
  * Shared column-hover tooltip for the stacked bar charts (Cost / Tokens /
@@ -47,12 +49,10 @@ export function snapToBucket(u: uPlot, left: number, top: number): [number, numb
   return [snappedLeft, top];
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export function formatTooltipDate(epochSec: number, multiDay: boolean): string {
   const d = new Date(epochSec * 1000);
   const day = d.getDate();
-  const mon = MONTHS[d.getMonth()]!;
+  const mon = monthShort(d);
   const year = d.getFullYear();
   if (multiDay) return `${day} ${mon} ${year}`;
   const hh = String(d.getHours()).padStart(2, '0');
@@ -112,7 +112,7 @@ const ChartHoverTooltip: Component<ChartHoverTooltipProps> = (props) => {
           </For>
         </div>
         <div class="agent-chart-tooltip__total">
-          <span>Total</span>
+          <span>{t('overview.chart.total')}</span>
           <span class="agent-chart-tooltip__total-value">{props.fmtVal(props.state.total)}</span>
         </div>
       </div>

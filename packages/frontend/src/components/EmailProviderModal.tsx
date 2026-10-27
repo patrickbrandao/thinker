@@ -4,6 +4,7 @@ import { setEmailProvider, testEmailProvider, testSavedEmailProvider } from '../
 import { authClient } from '../services/auth-client.js';
 import { getEmailProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
@@ -70,16 +71,16 @@ const EmailProviderModal: Component<Props> = (props) => {
     if (!editingKey() && hasExistingKey()) {
       setKeyError('');
     } else if (!key) {
-      setKeyError('API key is required');
+      setKeyError(t('harnesses.email.keyRequired'));
       valid = false;
     } else if (key.length < 8) {
-      setKeyError('API key must be at least 8 characters');
+      setKeyError(t('harnesses.email.keyTooShort'));
       valid = false;
     } else if (provider() === 'resend' && !key.startsWith('re_')) {
-      setKeyError('Resend API key must start with re_');
+      setKeyError(t('harnesses.email.resendPrefix'));
       valid = false;
     } else if (provider() === 'sendgrid' && !key.startsWith('SG.')) {
-      setKeyError('SendGrid API key must start with SG.');
+      setKeyError(t('harnesses.email.sendgridPrefix'));
       valid = false;
     } else {
       setKeyError('');
@@ -87,17 +88,17 @@ const EmailProviderModal: Component<Props> = (props) => {
 
     if (needsDomain()) {
       if (!dom) {
-        setDomainError('Domain is required');
+        setDomainError(t('harnesses.email.domainRequired'));
         valid = false;
       } else if (!DOMAIN_RE.test(dom)) {
-        setDomainError('Invalid domain format');
+        setDomainError(t('harnesses.email.domainInvalid'));
         valid = false;
       } else {
         setDomainError('');
       }
     } else {
       if (dom && !DOMAIN_RE.test(dom)) {
-        setDomainError('Invalid domain format');
+        setDomainError(t('harnesses.email.domainInvalid'));
         valid = false;
       } else {
         setDomainError('');
@@ -119,7 +120,7 @@ const EmailProviderModal: Component<Props> = (props) => {
     const recipient = getTestRecipient();
 
     if (!recipient) {
-      toast.error('Enter a notification email to send the test to');
+      toast.error(t('harnesses.email.needRecipient'));
       return false;
     }
 
@@ -134,7 +135,7 @@ const EmailProviderModal: Component<Props> = (props) => {
       const result = await testEmailProvider(testData);
 
       if (!result.success) {
-        toast.error(result.error ?? 'Email test failed. Check your credentials');
+        toast.error(result.error ?? t('harnesses.email.testFailed'));
         return false;
       }
       return true;
@@ -148,7 +149,7 @@ const EmailProviderModal: Component<Props> = (props) => {
   const runTestSaved = async (): Promise<boolean> => {
     const recipient = getTestRecipient();
     if (!recipient) {
-      toast.error('Enter a notification email to send the test to');
+      toast.error(t('harnesses.email.needRecipient'));
       return false;
     }
 
@@ -156,7 +157,7 @@ const EmailProviderModal: Component<Props> = (props) => {
     try {
       const result = await testSavedEmailProvider(recipient);
       if (!result.success) {
-        toast.error(result.error ?? 'Email test failed. Check your credentials');
+        toast.error(result.error ?? t('harnesses.email.testFailed'));
         return false;
       }
       return true;
@@ -172,7 +173,7 @@ const EmailProviderModal: Component<Props> = (props) => {
     if (busy()) return;
     const keepingExistingKey = !editingKey() && hasExistingKey();
     const ok = keepingExistingKey ? await runTestSaved() : await runTest();
-    if (ok) toast.success(`Test email sent to ${getTestRecipient()}`);
+    if (ok) toast.success(t('harnesses.email.testSent', { to: getTestRecipient() ?? '' }));
   };
 
   const handleSave = async () => {
@@ -202,7 +203,7 @@ const EmailProviderModal: Component<Props> = (props) => {
       if (trimmedEmail) saveData.notificationEmail = trimmedEmail;
       await setEmailProvider(saveData);
       const name = PROVIDER_NAMES[provider()] ?? provider();
-      toast.success(`${name} connected`);
+      toast.success(t('harnesses.email.connected', { provider: name }));
       props.onSaved();
       props.onClose();
     } catch {
@@ -231,9 +232,9 @@ const EmailProviderModal: Component<Props> = (props) => {
   };
 
   const buttonLabel = () => {
-    if (testing()) return 'Testing...';
-    if (saving()) return 'Saving...';
-    return props.editMode ? 'Test & Save' : 'Test & Connect';
+    if (testing()) return t('harnesses.email.testing');
+    if (saving()) return t('common.saving');
+    return props.editMode ? t('harnesses.email.testAndSave') : t('harnesses.email.testAndConnect');
   };
 
   const keyDocsUrl = () => getEmailProviderApiKeyUrl(provider());
@@ -268,13 +269,13 @@ const EmailProviderModal: Component<Props> = (props) => {
             }}
           >
             <h2 class="modal-card__title" id="provider-modal-title">
-              {props.editMode ? 'Edit email provider' : 'Configure email provider'}
+              {props.editMode
+                ? t('harnesses.email.editTitle')
+                : t('harnesses.email.configureTitle')}
             </h2>
-            <p class="modal-card__desc">
-              Enter your API credentials to enable email alert delivery.
-            </p>
+            <p class="modal-card__desc">{t('harnesses.email.modalDesc')}</p>
 
-            <label class="modal-card__field-label">Provider</label>
+            <label class="modal-card__field-label">{t('harnesses.email.provider')}</label>
             <div class="provider-modal-picker">
               <button
                 class="provider-modal-option"
@@ -315,7 +316,7 @@ const EmailProviderModal: Component<Props> = (props) => {
             </div>
 
             <label class="modal-card__field-label" for="email-provider-api-key">
-              API Key
+              {t('harnesses.email.apiKey')}
             </label>
             <Show
               when={editingKey() || !hasExistingKey()}
@@ -330,7 +331,7 @@ const EmailProviderModal: Component<Props> = (props) => {
                       setApiKey('');
                     }}
                   >
-                    Change
+                    {t('harnesses.email.change')}
                   </button>
                 </div>
               }
@@ -364,21 +365,23 @@ const EmailProviderModal: Component<Props> = (props) => {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Get {PROVIDER_NAMES[provider()] ?? provider()} API key
+                  {t('harnesses.email.getKey', {
+                    provider: PROVIDER_NAMES[provider()] ?? provider(),
+                  })}
                 </a>
               </p>
             </Show>
 
             <Show when={needsDomain()}>
               <label class="modal-card__field-label" for="email-provider-domain">
-                Sending domain
+                {t('harnesses.email.domain')}
               </label>
               <input
                 id="email-provider-domain"
                 class="modal-card__input"
                 classList={{ 'modal-card__input--error': !!domainError() }}
                 type="text"
-                placeholder="e.g. notifications.mycompany.com"
+                placeholder={t('harnesses.email.domainPlaceholder')}
                 value={domain()}
                 onInput={(e) => {
                   setDomain(e.currentTarget.value);
@@ -393,18 +396,20 @@ const EmailProviderModal: Component<Props> = (props) => {
             </Show>
 
             <label class="modal-card__field-label" for="email-provider-notification">
-              Notification email
+              {t('harnesses.email.notificationEmail')}
             </label>
             <input
               id="email-provider-notification"
               class="modal-card__input"
               type="email"
-              placeholder={session()?.data?.user?.email ?? 'you@example.com'}
+              placeholder={
+                session()?.data?.user?.email ?? t('harnesses.email.notificationPlaceholder')
+              }
               value={notificationEmail()}
               onInput={(e) => setNotificationEmail(e.currentTarget.value)}
               onKeyDown={handleKeyDown}
             />
-            <p class="modal-card__field-hint">Where threshold alerts will be sent.</p>
+            <p class="modal-card__field-hint">{t('harnesses.email.notificationHint')}</p>
 
             <div class="modal-card__footer modal-card__footer--split">
               <button
@@ -413,7 +418,7 @@ const EmailProviderModal: Component<Props> = (props) => {
                 disabled={busy() || isDisabled()}
                 type="button"
               >
-                {testing() ? <span class="spinner" /> : 'Send test email'}
+                {testing() ? <span class="spinner" /> : t('harnesses.email.sendTest')}
               </button>
               <button
                 class="btn btn--primary btn--sm"
