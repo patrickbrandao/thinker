@@ -7,11 +7,9 @@
 #   3. lands everything on main: a direct push, or, when branch protection
 #      rejects it, a PR that is squash-merged right away (auto-merge if checks
 #      are required);
-#   4. tags the landed commit vX.Y.Z and pushes the tag. The Release workflow
-#      then publishes tmsoftbrasil/thinker:latest and the GitHub release;
-#   5. when the repository has no DOCKERHUB_TOKEN secret (so release.yml fails
-#      at preflight), mirrors release.yml from the local Docker instead: a
-#      multi-arch buildx push with the same tags and labels, then the GitHub
+#   4. tags the landed commit vX.Y.Z and pushes the tag;
+#   5. publishes tmsoftbrasil/thinker from the local Docker (multi-arch buildx
+#      push tagged X.Y.Z, X.Y, latest and sha-<short>), then creates the GitHub
 #      release marked latest. This needs a local `docker login` to Docker Hub.
 #
 # Usage: scripts/ship.sh "<conventional commit message>" [patch|minor|major]
@@ -79,12 +77,7 @@ if [ "$branch" = main ]; then
   git reset -q --hard origin/main
 fi
 
-if gh secret list --json name -q '.[].name' | grep -qx DOCKERHUB_TOKEN; then
-  echo "Shipped v$ver ($landed). Release: https://github.com/patrickbrandao/thinker/actions/workflows/release.yml"
-  exit 0
-fi
-
-# No Docker Hub secret in CI: publish from the local Docker, as release.yml would.
+# Publish from the local Docker (there is no CI publishing path).
 image=tmsoftbrasil/thinker
 src=$(mktemp -d)/thinker-v$ver
 git worktree add -q --detach "$src" "v$ver"

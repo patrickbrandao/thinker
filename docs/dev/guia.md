@@ -269,7 +269,6 @@ Workflows em `.github/workflows/` (ações fixadas por SHA, token somente leitur
 | `docker-smoke.yml` | PRs que tocam imagem ou compose | Teste de fumaça do Compose (somente leitura) e `install.sh` ponta a ponta |
 | `codeql.yml` | PRs, pushes, semanal | Análise de código |
 | `dependency-review.yml` | PRs | Revisão de dependências |
-| `release.yml` | Tag `vX.Y.Z` ou `vX.Y.Z-rc.N` | Publica a imagem e cria a release (veja abaixo). Único workflow que usa os segredos do Docker Hub. |
 
 Só os checks de `ci.yml` podem ser obrigatórios na `main`, porque os demais são filtrados por caminho.
 
@@ -284,7 +283,7 @@ Toda entrega sai por `scripts/ship.sh "<mensagem no formato Conventional Commits
 3. integra na `main` (push direto ou, se a proteção recusar, PR com squash imediato);
 4. cria e envia a tag anotada `vX.Y.Z`.
 
-**Publicação:** a tag dispara `release.yml`, que confere a tag contra `packages/thinker/package.json` e `docs/releases/X.Y.Z.md`, constrói amd64 e arm64, publica o manifesto multi-arquitetura com as tags `X.Y.Z`, `X.Y`, `latest` e `sha-<curto>` (as `-rc.N` só recebem `X.Y.Z-rc.N` e `sha-<curto>`) e cria a release no GitHub com as notas. **Regra do projeto:** as imagens são publicadas pelo Docker local, com a conta do Docker Hub em que ele está logado (`tmsoftbrasil`) e o builder local `desktop-linux`. O `ship.sh` faz isso sempre que o repositório não tem os segredos do Docker Hub, o que é a situação normal hoje. Ninguém roda `docker login` nem manipula credenciais: o mantenedor mantém a sessão local logada. A CLI (`thinker-cli`) pode ser carimbada com `npm run set-version --workspace=packages/cli`.
+**Publicação:** depois de enviar a tag, o `ship.sh` constrói amd64 e arm64 pelo Docker local, com a conta do Docker Hub em que ele está logado (`tmsoftbrasil`) e o builder local `desktop-linux`, publica o manifesto multi-arquitetura com as tags `X.Y.Z`, `X.Y`, `latest` e `sha-<curto>` e cria a release no GitHub com as notas. Não existe workflow de publicação na CI. Ninguém roda `docker login` nem manipula credenciais: o mantenedor mantém a sessão local logada. A CLI (`thinker-cli`) pode ser carimbada com `npm run set-version --workspace=packages/cli`.
 
 O histórico até a 0.1.2 está em `packages/thinker/CHANGELOG.md` (gerado pelo Changesets, aposentado depois da 0.1.4). Daqui em diante, as notas ficam só em `docs/releases/`.
 

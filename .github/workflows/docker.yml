@@ -6,8 +6,8 @@ name: Docker
 #
 # Nothing is pushed and no secret is used: the token is read-only and the jobs
 # never log in to a registry. Publishing to Docker Hub (tmsoftbrasil/thinker,
-# multi-arch manifest, tags and signing) is the release workflow of #31, the
-# only one allowed to use DOCKERHUB_USERNAME / DOCKERHUB_TOKEN.
+# multi-arch manifest and tags) happens only from the local Docker, in
+# scripts/ship.sh.
 #
 # Path-filtered, so these checks must not be required on main.
 
