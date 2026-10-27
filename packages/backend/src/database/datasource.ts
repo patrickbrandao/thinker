@@ -1,6 +1,7 @@
 import './load-env-file';
 import { DataSource } from 'typeorm';
 import { entities, INVALID_WHERE_VALUES_BEHAVIOR, migrations } from './data-source-definitions';
+import { pinSessionTimeZoneToUtc } from '../common/utils/utc-clock';
 
 function createDataSource(): DataSource {
   // Prefer a direct (non-pooled) connection for migrations: the advisory lock in
@@ -31,6 +32,7 @@ function createDataSource(): DataSource {
     entities,
     migrations,
     invalidWhereValuesBehavior: INVALID_WHERE_VALUES_BEHAVIOR,
+    extra: { onConnect: pinSessionTimeZoneToUtc },
   });
 }
 

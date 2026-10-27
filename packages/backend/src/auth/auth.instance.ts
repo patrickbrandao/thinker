@@ -14,6 +14,7 @@ import { authOriginFromEnv, mcpAvailability } from './mcp-availability';
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
 import { DEFAULT_PORT } from '../common/constants/server.constants';
 import { decideUserCreation, isSignupValveOpen } from './signup-policy';
+import { pinSessionTimeZoneToUtc } from '../common/utils/utc-clock';
 
 const port = process.env['PORT'] ?? String(DEFAULT_PORT);
 const isDev = (process.env['NODE_ENV'] ?? '') !== 'production';
@@ -109,7 +110,13 @@ function createDatabaseConnection() {
   // traffic is light relative to ingest, hence a smaller default than the app
   // pool. Idle connections are reaped after 30s to free server-side slots.
   const max = optionalPositiveInteger(process.env['AUTH_DB_POOL_MAX']) ?? 5;
-  return new Pool({ connectionString: databaseUrl, max, idleTimeoutMillis: 30000 });
+  // Sessions in UTC, like the process and the TypeORM pool (#58).
+  return new Pool({
+    connectionString: databaseUrl,
+    max,
+    idleTimeoutMillis: 30000,
+    onConnect: pinSessionTimeZoneToUtc,
+  });
 }
 
 const database = createDatabaseConnection();
