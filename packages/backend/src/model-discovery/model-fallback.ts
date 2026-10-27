@@ -28,6 +28,11 @@ interface PricingLookup {
 }
 
 function normalizeProviderModelId(providerId: string, modelId: string): string {
+  // MiniMax ids arrive lowercased (and `:free`) from OpenRouter metadata (#195).
+  if (providerId.toLowerCase() === 'minimax') {
+    if (/^minimax-m3\.1-flash(?::free)?$/i.test(modelId)) return 'MiniMax-M3.1-Flash';
+    if (/^minimax-m3$/i.test(modelId)) return 'MiniMax-M3';
+  }
   return providerId.toLowerCase() === 'anthropic'
     ? normalizeAnthropicShortModelId(modelId)
     : modelId;

@@ -753,6 +753,12 @@ export class ProviderClient {
               thinkingLookup: ctx.thinkingLookup,
               thinkingRouteContext,
             });
+      // The MiniMax subscription speaks Messages; its effort knob is
+      // `output_config.effort` (#195). An explicit output_config wins.
+      if (endpointKey === 'minimax-subscription' && requestSource.reasoning_effort !== undefined) {
+        const outputConfig = (requestBody.output_config ?? {}) as Record<string, unknown>;
+        requestBody.output_config = { effort: requestSource.reasoning_effort, ...outputConfig };
+      }
       requestBody.model = bareModel;
       if (stream) requestBody.stream = true;
       if (shouldApplyAnthropicAutomaticCacheControl(endpointKey)) {
