@@ -465,11 +465,14 @@ export function sanitizeOpenAiBody(
       cleaned[key] = value;
       continue;
     }
-    // xAI and DeepSeek implement `reasoning_effort`; keep it there. Every other
+    // xAI, DeepSeek and MiniMax implement `reasoning_effort`; keep it there. Every other
     // non-passthrough provider gets the OpenAI-only field stripped below.
     if (
       key === 'reasoning_effort' &&
-      (endpointKey === 'xai' || endpointKey === 'deepseek' || options.forwardReasoningEffort)
+      (endpointKey === 'xai' ||
+        endpointKey === 'deepseek' ||
+        endpointKey === 'minimax' ||
+        options.forwardReasoningEffort)
     ) {
       cleaned[key] = value;
       continue;

@@ -363,6 +363,7 @@ describe('buildSubscriptionFallbackModels', () => {
 
   it('preserves curated model casing', () => {
     expect(buildSubscriptionFallbackModels('minimax').map((model) => model.id)).toEqual([
+      'MiniMax-M3.1-Flash',
       'MiniMax-M3',
       'MiniMax-M2.7',
       'MiniMax-M2.7-highspeed',
