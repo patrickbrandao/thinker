@@ -259,6 +259,41 @@ describe('virtual models in the list', () => {
     expect(ids(res.body)).not.toContain(`${CUSTOM_ID}/model-a`);
   });
 
+  it('follows the harness model listing mode', async () => {
+    const LISTING = '/api/v1/routing/test-agent/model-listing';
+    const [{ complexity_routing_enabled: complexity }] = await ds.query(
+      `SELECT complexity_routing_enabled FROM agents WHERE id = $1`,
+      [TEST_AGENT_ID],
+    );
+    await setComplexity(TEST_AGENT_ID, false);
+    try {
+      expect((await asA(api().get(LISTING)).expect(200)).body).toEqual({ mode: 'open' });
+      await asA(api().patch(LISTING)).send({ mode: 'bogus' }).expect(400);
+
+      await asA(api().patch(LISTING)).send({ mode: 'closed' }).expect(200);
+      expect(ids((await listAs(TEST_OTLP_KEY)).body)).toEqual([
+        'auto',
+        'deepseek/flash',
+        'OpenAI/GPT-4o',
+        `${CUSTOM_ID.toUpperCase()}/Model-A`,
+        'mystery-vm',
+        'default-only',
+      ]);
+
+      await asA(api().patch(LISTING)).send({ mode: 'restricted' }).expect(200);
+      const restricted = ids((await listAs(TEST_OTLP_KEY)).body);
+      // Default tier (deepseek-chat) and the virtual models' own routes.
+      expect(restricted).toContain('deepseek/deepseek-chat');
+      expect(restricted).toContain('anthropic/claude-sonnet-4-5');
+      expect(restricted).toContain('mistral/mystery');
+      // Not reached by auto nor by any enabled virtual model.
+      expect(restricted).not.toContain('openai/gpt-4o-mini');
+    } finally {
+      await asA(api().patch(LISTING)).send({ mode: 'open' }).expect(200);
+      await setComplexity(TEST_AGENT_ID, complexity);
+    }
+  });
+
   it('publishes virtual entries as thinker-owned with context_length', async () => {
     const res = await listAs(TEST_OTLP_KEY);
     expect(entry(res.body, 'deepseek/flash')).toEqual({

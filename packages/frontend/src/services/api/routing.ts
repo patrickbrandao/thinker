@@ -237,6 +237,26 @@ export function updateRecording(agentName: string, body: { enabled?: boolean }) 
   });
 }
 
+/* -- Routing: /v1/models listing -- */
+
+export type ModelListingMode = 'closed' | 'restricted' | 'open';
+
+export interface ModelListingConfig {
+  mode: ModelListingMode;
+}
+
+export function getModelListing(agentName: string) {
+  return fetchJson<ModelListingConfig>(routingPath(agentName, 'model-listing'));
+}
+
+export function updateModelListing(agentName: string, mode: ModelListingMode) {
+  return fetchMutate<ModelListingConfig>(routingPath(agentName, 'model-listing'), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+}
+
 /* -- Routing: Tier Assignments -- */
 
 /**

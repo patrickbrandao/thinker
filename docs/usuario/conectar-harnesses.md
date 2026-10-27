@@ -169,6 +169,18 @@ Nos harnesses que listam os modelos pelo seletor (por exemplo o seletor de model
 
 `auto` e os virtuais trazem `context_length`, a **menor** janela de contexto entre as rotas que podem atendê-los agora, para o cliente não estourar o contexto no modelo mais curto da cadeia. O campo é omitido quando a janela de alguma rota é desconhecida. Eles não trazem `capabilities`, `cost` nem metadados de rota, mesmo com `?capabilities=true` ou `?cost=true`, porque o modelo concreto muda conforme a disponibilidade. Os modelos reais não trazem `context_length`. Cada chave só vê os virtuais do próprio harness.
 
+### Listagem de modelos
+
+Em **Configurações** de cada harness, a opção **Listagem de modelos** decide o que `GET /v1/models` mostra:
+
+| Opção | O que aparece |
+|---|---|
+| **Fechada** | Só `auto` e os virtuais ativos. |
+| **Restrita** | `auto`, os virtuais ativos e os modelos reais ligados a eles por roteamento e fallback: os tiers que o `auto` alcança (só o Default com o roteamento por complexidade desligado; senão todos os slots e as atribuições de especificidade) e as rotas de cada virtual, incluindo a cadeia do Default quando ele continua no Default. |
+| **Aberta** (padrão) | Todos os modelos disponíveis. |
+
+A opção só muda a lista. Um harness ainda pode pedir pelo nome um modelo que não aparece nela.
+
 ## Roteamento por cabeçalho
 
 Um harness pode ter **tiers customizados** ativados por um cabeçalho de requisição (por exemplo `x-thinker-tier: premium`), cada um com seu modelo e fallbacks. Veja [Provedores e roteamento](provedores-e-roteamento.md#tiers-customizados-por-cabeçalho). Se o harness não deixa enviar cabeçalhos, use um modelo virtual. Um modelo virtual com o mesmo nome do `model` vence o tier por cabeçalho.

@@ -73,6 +73,7 @@ import {
   ModelListRoutingService,
   type ModelListRouting,
 } from '../virtual-models/model-list-routing.service';
+import { catalogModelMatchesRoute } from '../virtual-models/model-list-scope';
 
 const MAX_SEEN_TENANTS = 10_000;
 const SEEN_TENANT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -208,7 +209,20 @@ export class ProxyController {
     // its name, ignoring case (ADR 0004, sections 6 and 7).
     const shadowed = new Set(routing.virtuals.map((v) => v.name.toLowerCase()));
 
-    for (const model of models) {
+    // Listing mode (per agent): `closed` stops at auto and the virtual
+    // models, `restricted` keeps only the models their routes reach.
+    const listing = routing.listing ?? 'open';
+    const linkedRoutes = routing.linkedRoutes ?? [];
+    const listed =
+      listing === 'closed'
+        ? []
+        : listing === 'restricted'
+          ? models.filter((model) =>
+              linkedRoutes.some((route) => catalogModelMatchesRoute(model, route)),
+            )
+          : models;
+
+    for (const model of listed) {
       const id = openAiModelId(model);
       if (seen.has(id) || shadowed.has(id.toLowerCase())) continue;
       seen.add(id);

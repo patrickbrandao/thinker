@@ -3,6 +3,14 @@ import { Tenant } from './tenant.entity';
 import { AgentApiKey } from './agent-api-key.entity';
 import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
 
+/**
+ * What `GET /v1/models` lists for the agent: `closed` only `auto` and the
+ * virtual models, `restricted` also the real models their routes and
+ * fallbacks reach, `open` every model in the catalog.
+ */
+export const MODEL_LISTING_MODES = ['closed', 'restricted', 'open'] as const;
+export type ModelListingMode = (typeof MODEL_LISTING_MODES)[number];
+
 @Entity('agents')
 @Index(['tenant_id', 'name'], { unique: true, where: '"deleted_at" IS NULL' })
 export class Agent {
@@ -39,6 +47,9 @@ export class Agent {
   // from the agent list / switcher / counts and not user-creatable/renamable.
   @Column('boolean', { default: false })
   is_playground!: boolean;
+
+  @Column('varchar', { default: 'open' })
+  model_listing!: ModelListingMode;
 
   @ManyToOne(() => Tenant, (t) => t.agents, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'tenant_id' })

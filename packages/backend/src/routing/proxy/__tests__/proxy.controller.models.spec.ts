@@ -193,6 +193,36 @@ describe('ProxyController.models with virtual models', () => {
     });
   });
 
+  it('lists only auto and the virtual models when the listing is closed', async () => {
+    routing({
+      autoContextLength: null,
+      virtuals: [{ name: 'fast', context_length: null }],
+      listing: 'closed',
+    });
+    const result = await controller.models(request());
+    expect(result.data.map((m) => m.id)).toEqual(['auto', 'fast']);
+  });
+
+  it('lists only the models the routes reach when the listing is restricted', async () => {
+    routing({
+      autoContextLength: null,
+      virtuals: [{ name: 'fast', context_length: null }],
+      listing: 'restricted',
+      linkedRoutes: [
+        { provider: 'deepseek', authType: 'api_key', model: 'deepseek-chat' },
+        { provider: 'custom:cp-2', authType: 'api_key', model: 'custom:cp-2/qwen' },
+        { provider: 'anthropic', authType: 'api_key', model: 'gpt-4o' },
+      ],
+    });
+    const result = await controller.models(request());
+    expect(result.data.map((m) => m.id)).toEqual([
+      'auto',
+      'fast',
+      'deepseek/deepseek-chat',
+      'gw/qwen',
+    ]);
+  });
+
   it('falls back to the plain listing when the routing service is absent', async () => {
     controller = build(false);
 

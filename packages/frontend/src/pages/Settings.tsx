@@ -10,6 +10,7 @@ import SetupStepAddProvider from '../components/SetupStepAddProvider.jsx';
 import { createActiveVirtualModelNames } from '../components/VirtualModelsHint.jsx';
 import SetupModal from '../components/SetupModal.jsx';
 import SettingsRecordingSection from './SettingsRecordingSection.jsx';
+import SettingsModelListingSection from './SettingsModelListingSection.jsx';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import {
@@ -234,6 +235,9 @@ const Settings: Component = () => {
 
         {/* -- Message recording ------------------------- */}
         <SettingsRecordingSection agentName={agentName} />
+
+        {/* -- /v1/models listing ------------------------ */}
+        <SettingsModelListingSection agentName={agentName} />
 
         {/* -- API Key ----------------------------------- */}
         <ErrorBoundary

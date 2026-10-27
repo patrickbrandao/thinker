@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { DEFAULT_TIER_SLOT } from 'thinker-shared';
-import { Agent } from '../../entities/agent.entity';
+import { DEFAULT_TIER_SLOT, type ModelRoute } from 'thinker-shared';
+import { Agent, type ModelListingMode } from '../../entities/agent.entity';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { TierService } from '../routing-core/tier.service';
 import { SpecificityService } from '../routing-core/specificity.service';
@@ -10,6 +10,7 @@ import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { VirtualModelService } from './virtual-model.service';
 import { virtualModelContextLength, type RouteSnapshot } from './virtual-model-chain';
 import { autoContextLength } from './model-list-context';
+import { collectLinkedRoutes } from './model-list-scope';
 
 /** A virtual model as `/v1/models` publishes it. */
 export interface ModelListVirtualEntry {
@@ -23,6 +24,10 @@ export interface ModelListRouting {
   autoContextLength: number | null;
   /** The agent's enabled virtual models, in publish order. */
   virtuals: ModelListVirtualEntry[];
+  /** The agent's listing mode; absent means `open`. */
+  listing?: ModelListingMode;
+  /** Routes of `auto` and the virtual models; set only for `restricted`. */
+  linkedRoutes?: ModelRoute[];
 }
 
 /**
@@ -60,7 +65,7 @@ export class ModelListRoutingService {
       this.tierService.getTiers(agentId),
       this.agentRepo.findOne({
         where: { id: agentId, tenant_id: tenantId },
-        select: { id: true, complexity_routing_enabled: true },
+        select: { id: true, complexity_routing_enabled: true, model_listing: true },
       }),
       this.providerKeyService.getRouteProviderRecords(tenantId, agentId),
     ]);
@@ -78,7 +83,21 @@ export class ModelListRoutingService {
       enabled.map((row) => virtualModelContextLength(row, defaultTier, snapshot)),
     );
 
+    const listing: ModelListingMode = agent?.model_listing ?? 'open';
+    const linkedRoutes =
+      listing === 'restricted'
+        ? await collectLinkedRoutes({
+            complexityRoutingEnabled,
+            tiers,
+            specificity,
+            virtuals: enabled,
+            snapshot,
+          })
+        : undefined;
+
     return {
+      listing,
+      ...(linkedRoutes ? { linkedRoutes } : {}),
       autoContextLength: autoContextLength({
         complexityRoutingEnabled,
         tiers,
