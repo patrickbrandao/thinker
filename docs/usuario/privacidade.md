@@ -14,7 +14,7 @@ São GETs anônimos, sem nenhum dado da sua instância, que alimentam preços, j
 | `models.dev` (`/api.json`) | No boot e uma vez por dia. Ligado por padrão. | `THINKER_CATALOG_SYNC=false` |
 | `raw.githubusercontent.com` (documento do OpenCode Go) | Só quando existe um provedor OpenCode Go cadastrado; cache de 1 hora. | `THINKER_CATALOG_SYNC=false` |
 
-Com `THINKER_CATALOG_SYNC=false` as três buscas somem e os custos vêm só dos dados embutidos na imagem, que cobrem poucos modelos: a maioria das requisições é registrada sem preço conhecido (`$0`) e as requisições do OpenCode Go custam `$0`. Indicado para ambientes isolados da internet.
+Com `THINKER_CATALOG_SYNC=false` as três buscas somem e os custos vêm do snapshot de preços embutido na imagem (OpenRouter e models.dev do dia do build, baixados só durante o build, nunca em execução); as requisições do OpenCode Go custam `$0`. Indicado para ambientes isolados da internet.
 
 ## Destinos que você configura
 

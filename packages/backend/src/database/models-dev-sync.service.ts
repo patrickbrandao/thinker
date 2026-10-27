@@ -8,6 +8,7 @@ import {
   modelModalitiesFromModelsDev,
 } from '../model-discovery/model-capabilities';
 import { GOOGLE_VARIANT_RE } from '../model-prices/model-name-normalizer';
+import { loadPricingSnapshot } from '../model-prices/pricing-snapshot';
 
 /**
  * Providers whose models.dev catalog is authoritative for **pricing as well as
@@ -288,6 +289,7 @@ export class ModelsDevSyncService implements OnModuleInit {
       this.logger.log(
         `${describeCatalogSyncSetting()}: models.dev sync disabled, using bundled data only`,
       );
+      this.loadSnapshot();
       return;
     }
     // Fire-and-forget so a slow models.dev fetch can't delay app.listen() and
@@ -311,8 +313,29 @@ export class ModelsDevSyncService implements OnModuleInit {
     if (!isCatalogSyncEnabled()) return 0;
     this.logger.log('Refreshing models.dev cache...');
     const raw = await this.fetchModelsDevData();
-    if (!raw) return 0;
+    if (!raw) {
+      if (this.cache.size === 0) this.loadSnapshot();
+      return 0;
+    }
+    const totalModels = this.applyRaw(raw, new Date());
+    this.logger.log(`models.dev cache loaded: ${this.cache.size} providers, ${totalModels} models`);
+    return totalModels;
+  }
 
+  /** Fills the caches from the build-time snapshot (#73), if the image has one. */
+  private loadSnapshot(): void {
+    const snapshot = loadPricingSnapshot();
+    if (!snapshot) return;
+    const totalModels = this.applyRaw(
+      snapshot.modelsDev as RawModelsDevResponse,
+      snapshot.generatedAt,
+    );
+    this.logger.log(
+      `models.dev loaded from the build snapshot of ${snapshot.generatedAt.toISOString()}: ${totalModels} models`,
+    );
+  }
+
+  private applyRaw(raw: RawModelsDevResponse, fetchedAt: Date): number {
     const newCache = new Map<string, Map<string, ModelsDevModelEntry>>();
     const newCustomProviderCache = new Map<string, Map<string, ModelsDevModelEntry>>();
     const newCustomProviderIndex = new Map<string, string>();
@@ -379,9 +402,7 @@ export class ModelsDevSyncService implements OnModuleInit {
     this.capabilityCache = newCapabilityCache;
     this.customProviderCache = newCustomProviderCache;
     this.customProviderIndex = newCustomProviderIndex;
-    this.lastFetchedAt = new Date();
-    this.logger.log(`models.dev cache loaded: ${newCache.size} providers, ${totalModels} models`);
-
+    this.lastFetchedAt = fetchedAt;
     return totalModels;
   }
 
