@@ -42,6 +42,10 @@ export class TenantProvider {
   @Column('boolean', { default: true })
   is_active!: boolean;
 
+  /** Stream warm-up override in ms (#244). Null inherits the local/global default. */
+  @Column('integer', { nullable: true, default: null })
+  stream_warmup_ms!: number | null;
+
   @Column(timestampType(), { default: timestampDefault() })
   connected_at!: string;
 

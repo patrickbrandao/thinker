@@ -513,6 +513,16 @@ export class CustomProviderService {
       );
     }
 
+    // The stream warm-up override (#244) lives on the primary connection,
+    // the row the proxy selects. Undefined leaves it alone; null clears it.
+    if (dto.stream_warmup_ms !== undefined) {
+      const primary = await this.primaryConnection(tenantId, id);
+      if (primary) {
+        await this.providerService.setStreamWarmup(tenantId, primary.id, dto.stream_warmup_ms);
+        this.routingCache.invalidateTenant(tenantId);
+      }
+    }
+
     this.notifyChange(tenantId, actorUserId);
     return cp;
   }

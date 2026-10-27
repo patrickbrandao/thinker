@@ -302,3 +302,16 @@ describe('api_kind validation', () => {
     expect(errors.some((e) => e.property === 'api_kind')).toBe(true);
   });
 });
+
+describe('UpdateCustomProviderDto stream_warmup_ms (#244)', () => {
+  it('accepts an in-range value, null, or omission', async () => {
+    expect(await validate(toUpdateDto({ stream_warmup_ms: 60_000 }))).toHaveLength(0);
+    expect(await validate(toUpdateDto({ stream_warmup_ms: null }))).toHaveLength(0);
+    expect(await validate(toUpdateDto({}))).toHaveLength(0);
+  });
+
+  it('rejects values outside 1000..600000 ms', async () => {
+    expect(await validate(toUpdateDto({ stream_warmup_ms: 500 }))).not.toHaveLength(0);
+    expect(await validate(toUpdateDto({ stream_warmup_ms: 600_001 }))).not.toHaveLength(0);
+  });
+});

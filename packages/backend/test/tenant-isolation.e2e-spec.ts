@@ -325,6 +325,34 @@ describe('Routing — user B cannot reach tenant A routing config', () => {
     expect(row).toHaveLength(1);
   });
 
+  it('stream warm-up overrides (#244): owner sets and validates, B gets 404', async () => {
+    const tierPath = `/api/v1/routing/test-agent/header-tiers/${A_HEADER_TIER_ID}/stream-warmup`;
+    const tier = await asA(api().patch(tierPath)).send({ stream_warmup_ms: 30_000 }).expect(200);
+    expect(tier.body.stream_warmup_ms).toBe(30_000);
+    await asA(api().patch(tierPath)).send({ stream_warmup_ms: 999 }).expect(400);
+    await asA(api().patch(tierPath)).send({ stream_warmup_ms: 600_001 }).expect(400);
+    await asA(api().patch(tierPath)).send({ stream_warmup_ms: null }).expect(200);
+
+    const connPath = `/api/v1/providers/connections/${aProviderConnectionId}/stream-warmup`;
+    const conn = await asA(api().patch(connPath))
+      .send({ stream_warmup_ms: 120_000 })
+      .expect(200);
+    expect(conn.body).toEqual({ id: aProviderConnectionId, stream_warmup_ms: 120_000 });
+
+    await asB(
+      api().patch(
+        `/api/v1/routing/${B_AGENT_NAME}/header-tiers/${A_HEADER_TIER_ID}/stream-warmup`,
+      ),
+    )
+      .send({ stream_warmup_ms: 5_000 })
+      .expect(404);
+    await asB(api().patch(connPath)).send({ stream_warmup_ms: 5_000 }).expect(404);
+    const [row] = await ds.query(`SELECT stream_warmup_ms FROM tenant_providers WHERE id = $1`, [
+      aProviderConnectionId,
+    ]);
+    expect(row.stream_warmup_ms).toBe(120_000);
+  });
+
   it('enabled-providers: A agent unreadable, A connection unusable from B agent', async () => {
     const list = await asB(api().get('/api/v1/agents/test-agent/enabled-providers')).expect(200);
     expect(list.body).toEqual({ enabled: [] });

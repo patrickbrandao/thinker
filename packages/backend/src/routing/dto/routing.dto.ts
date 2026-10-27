@@ -12,11 +12,19 @@ import {
   ValidateNested,
   IsBoolean,
   ValidateBy,
+  ValidateIf,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
+import {
+  MAX_STREAM_WARMUP_OVERRIDE_MS,
+  MIN_STREAM_WARMUP_OVERRIDE_MS,
+} from '../proxy/stream-warmup';
 
 const KNOWN_PROVIDER_IDS: readonly string[] = Array.from(PROVIDER_BY_ID_OR_ALIAS.keys());
 
@@ -246,6 +254,18 @@ export class SetResponseModeDto {
   @IsOptional()
   @IsIn(RESPONSE_MODES)
   responseMode?: ResponseMode;
+}
+
+/**
+ * Body for setting a header tier's or a connection's stream warm-up override.
+ * The field is required: an integer in ms within the bounds, or null to clear.
+ */
+export class SetStreamWarmupDto {
+  @ValidateIf((_obj, value) => value !== null)
+  @IsInt()
+  @Min(MIN_STREAM_WARMUP_OVERRIDE_MS)
+  @Max(MAX_STREAM_WARMUP_OVERRIDE_MS)
+  stream_warmup_ms!: number | null;
 }
 
 export function responseModeFromDto(body: SetResponseModeDto): ResponseMode | undefined {

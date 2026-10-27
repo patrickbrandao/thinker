@@ -9,6 +9,7 @@ import {
   SetOverrideDto,
   SetResponseModeDto,
   SetFallbacksDto,
+  SetStreamWarmupDto,
   responseModeFromDto,
 } from './routing.dto';
 
@@ -279,5 +280,24 @@ describe('routing.dto decorator transforms', () => {
     });
     expect(dto.routes).toHaveLength(1);
     expect(await validate(dto)).toHaveLength(0);
+  });
+});
+
+describe('SetStreamWarmupDto (#244)', () => {
+  const check = (data: Record<string, unknown>) =>
+    validate(plainToInstance(SetStreamWarmupDto, data));
+
+  it('accepts the bounds and null', async () => {
+    expect(await check({ stream_warmup_ms: 1_000 })).toHaveLength(0);
+    expect(await check({ stream_warmup_ms: 600_000 })).toHaveLength(0);
+    expect(await check({ stream_warmup_ms: null })).toHaveLength(0);
+  });
+
+  it('rejects out-of-range, fractional, non-numeric and missing values', async () => {
+    expect(await check({ stream_warmup_ms: 999 })).not.toHaveLength(0);
+    expect(await check({ stream_warmup_ms: 600_001 })).not.toHaveLength(0);
+    expect(await check({ stream_warmup_ms: 1_500.5 })).not.toHaveLength(0);
+    expect(await check({ stream_warmup_ms: '30000' })).not.toHaveLength(0);
+    expect(await check({})).not.toHaveLength(0);
   });
 });

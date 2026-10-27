@@ -98,6 +98,7 @@ export class HeaderTierService {
       fallback_routes: null,
       output_modality: DEFAULT_OUTPUT_MODALITY,
       response_mode: DEFAULT_RESPONSE_MODE,
+      stream_warmup_ms: null,
       created_at: now,
       updated_at: now,
     });
@@ -154,6 +155,20 @@ export class HeaderTierService {
       row.fallback_routes,
     );
     row.response_mode = responseMode;
+    row.updated_at = new Date().toISOString();
+    await this.repo.save(row);
+    this.routingCache.invalidateAgent(agentId);
+    return row;
+  }
+
+  /** Set or clear (null) the tier's stream warm-up override in ms (#244). */
+  async setStreamWarmup(
+    agentId: string,
+    id: string,
+    streamWarmupMs: number | null,
+  ): Promise<HeaderTier> {
+    const row = await this.findOrThrow(agentId, id);
+    row.stream_warmup_ms = streamWarmupMs;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
     this.routingCache.invalidateAgent(agentId);

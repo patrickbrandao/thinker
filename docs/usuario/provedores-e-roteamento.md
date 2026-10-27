@@ -76,6 +76,8 @@ Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, respo
 - Se **todas** as tentativas falham, o cliente recebe o erro do provedor da última tentativa. Isso é um erro do provedor, não um código `M###`.
 - Deixe `PROVIDER_TIMEOUT_MS` abaixo do timeout do cliente para o fallback ter tempo de rodar.
 
+**Warm-up do streaming.** A espera pelo primeiro trecho de uma resposta em streaming pode ser ajustada por tier customizado (modal do tier) e por conexão de provedor (botão de gerenciar na página da conexão; para provedores customizados, no formulário de edição), no campo opcional "Stream warm-up (seconds)", de 1 a 600 segundos. Vale o mais específico: o valor do tier por cabeçalho, depois o da conexão que atende a tentativa, depois `THINKER_LOCAL_STREAM_WARMUP_MS` (padrão 60 s) para runners locais e, por fim, `STREAM_WARMUP_MS` (padrão 15 s). Campo vazio herda o próximo nível. Na API, o campo é `stream_warmup_ms` em milissegundos (1000 a 600000; `null` limpa): `PATCH /api/v1/routing/:agente/header-tiers/:id/stream-warmup`, `PATCH /api/v1/providers/connections/:id/stream-warmup` e `PUT /api/v1/routing/:agente/custom-providers/:id`. Só administradores da organização alteram esses valores.
+
 ## Tiers customizados por cabeçalho
 
 Além dos tiers padrão, você pode criar tiers que se ativam por um cabeçalho da requisição (por exemplo `x-thinker-tier: premium`), cada um com modelo principal e fallbacks. Quando uma regra casa, ela tem prioridade sobre o `model` do corpo e sobre a complexidade, mas perde para um [modelo virtual](#modelos-virtuais) com o mesmo nome do `model`. O dashboard e a CLI (`thinker routing`) criam e editam essas regras.

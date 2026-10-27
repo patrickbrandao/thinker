@@ -39,6 +39,8 @@ export interface ResolveResponse {
   header_tier_id?: string;
   header_tier_name?: string;
   header_tier_color?: string;
+  /** The matched header tier's stream warm-up override in ms (#244). */
+  header_tier_stream_warmup_ms?: number | null;
   /** Virtual model the request named (ADR 0004). Set with reason `virtual-model`. */
   virtual_model_id?: string;
   /** The virtual model's name as the operator spelled it. */

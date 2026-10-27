@@ -26,6 +26,7 @@ import {
   MAX_PROVIDER_KEY_LABEL_LENGTH,
   ModelRouteDto,
   SetResponseModeDto,
+  SetStreamWarmupDto,
   responseModeFromDto,
 } from '../dto/routing.dto';
 import { HeaderTierService } from './header-tier.service';
@@ -149,6 +150,17 @@ export class HeaderTierController {
     if (!responseMode) throw new BadRequestException('response_mode is required');
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
     return this.headerTierService.setResponseMode(agent.id, id, responseMode);
+  }
+
+  @Patch(':agentName/header-tiers/:id/stream-warmup')
+  async setStreamWarmup(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('id') id: string,
+    @Body() body: SetStreamWarmupDto,
+  ) {
+    const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
+    return this.headerTierService.setStreamWarmup(agent.id, id, body.stream_warmup_ms);
   }
 
   @Delete(':agentName/header-tiers/:id')

@@ -237,6 +237,8 @@ export class ProxyFallbackService {
     reasoningCacheKey?: string,
     /** The caller's raw `anthropic-beta` header; a fallback hop onto Anthropic needs it too. */
     clientAnthropicBeta?: string | string[],
+    /** The matched header tier's stream warm-up override; it wins on every hop (#244). */
+    headerTierStreamWarmupMs?: number | null,
   ): Promise<{
     success: {
       forward: ForwardResult;
@@ -375,7 +377,15 @@ export class ProxyFallbackService {
           tenantProviderId,
           startProviderAttempt,
         }),
-        { stream, provider, model },
+        {
+          stream,
+          provider,
+          model,
+          warmupMs: streamWarmupMsFor(provider, {
+            headerTierMs: headerTierStreamWarmupMs,
+            connectionMs: credentials.streamWarmupMs,
+          }),
+        },
       );
       // A custom provider's key pool may have rotated to another key.
       if (forward.servedByKey) {
@@ -435,11 +445,11 @@ export class ProxyFallbackService {
    */
   private async warmUpStreamBody(
     forward: ForwardResult,
-    opts: { stream: boolean; provider: string; model: string },
+    opts: { stream: boolean; provider: string; model: string; warmupMs: number },
   ): Promise<ForwardResult> {
     const { response, attempt } = forward;
     if (!opts.stream || !response.ok || !response.body) return forward;
-    const warmup = await peekStream(response.body, streamWarmupMsFor(opts.provider));
+    const warmup = await peekStream(response.body, opts.warmupMs);
     if (warmup.ok) {
       return {
         ...forward,

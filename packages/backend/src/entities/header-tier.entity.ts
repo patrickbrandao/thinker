@@ -48,6 +48,10 @@ export class HeaderTier {
   @Column('varchar', { default: 'buffered' })
   response_mode!: ResponseMode;
 
+  /** Stream warm-up override in ms (#244). Null inherits the connection/default. */
+  @Column('integer', { nullable: true, default: null })
+  stream_warmup_ms!: number | null;
+
   @Column(timestampType(), { default: timestampDefault() })
   created_at!: string;
 

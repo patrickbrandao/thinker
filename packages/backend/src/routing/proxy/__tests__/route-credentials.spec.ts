@@ -191,6 +191,7 @@ describe('route-credentials', () => {
         providerRegion: 'us',
         tenantProviderId: 'up-1',
         keyLabel: 'Work',
+        streamWarmupMs: null,
       });
     });
 

@@ -5,11 +5,19 @@ import {
   createHeaderTier,
   getSeenHeaders,
   setHeaderTierResponseMode,
+  setHeaderTierStreamWarmup,
   updateHeaderTier,
   type HeaderTier,
   type SeenHeader,
 } from '../services/api/header-tiers.js';
 import { toast } from '../services/toast-store.js';
+import {
+  MAX_STREAM_WARMUP_SECONDS,
+  MIN_STREAM_WARMUP_SECONDS,
+  STREAM_WARMUP_ERROR,
+  parseWarmupSeconds,
+  warmupMsToSecondsInput,
+} from '../services/stream-warmup.js';
 import type { AvailableModel, ModelCapability, ResponseMode } from '../services/api.js';
 
 const RESERVED_KEYS = new Set([
@@ -49,6 +57,9 @@ const HeaderTierModal: Component<Props> = (props) => {
   );
   const [streamMode, setStreamMode] = createSignal<boolean>(
     editingTier?.response_mode === 'stream',
+  );
+  const [warmupSeconds, setWarmupSeconds] = createSignal(
+    warmupMsToSecondsInput(editingTier?.stream_warmup_ms),
   );
   const [submitting, setSubmitting] = createSignal(false);
   const [triedSubmit, setTriedSubmit] = createSignal(false);
@@ -154,10 +165,16 @@ const HeaderTierModal: Component<Props> = (props) => {
   const valueError = (): string | undefined =>
     triedSubmit() ? validateValue(headerValue(), headerKey()) : undefined;
 
+  const warmupError = (): string | undefined =>
+    triedSubmit() && parseWarmupSeconds(warmupSeconds()) === undefined
+      ? STREAM_WARMUP_ERROR
+      : undefined;
+
   const isValid = (): boolean =>
     validateName(name()) === undefined &&
     validateKey(headerKey()) === undefined &&
-    validateValue(headerValue(), headerKey()) === undefined;
+    validateValue(headerValue(), headerKey()) === undefined &&
+    parseWarmupSeconds(warmupSeconds()) !== undefined;
 
   const submit = async (): Promise<void> => {
     setTriedSubmit(true);
@@ -177,6 +194,11 @@ const HeaderTierModal: Component<Props> = (props) => {
       const newMode: ResponseMode = streamMode() ? 'stream' : 'buffered';
       if (saved.response_mode !== newMode) {
         saved = await setHeaderTierResponseMode(props.agentName, saved.id, newMode);
+      }
+      // Persist the stream warm-up override if it changed (validated above).
+      const warmupMs = parseWarmupSeconds(warmupSeconds()) ?? null;
+      if (warmupMs !== (saved.stream_warmup_ms ?? null)) {
+        saved = await setHeaderTierStreamWarmup(props.agentName, saved.id, warmupMs);
       }
       props.onSaved(saved);
       props.onClose();
@@ -371,6 +393,33 @@ const HeaderTierModal: Component<Props> = (props) => {
             </div>
           </div>
         </Show>
+
+        <label
+          class="modal-card__field-label"
+          for="header-tier-stream-warmup"
+          style="margin-top: 16px;"
+        >
+          Stream warm-up (seconds)
+        </label>
+        <input
+          id="header-tier-stream-warmup"
+          class="modal-card__input"
+          classList={{ 'modal-card__input--error': warmupError() !== undefined }}
+          type="number"
+          min={MIN_STREAM_WARMUP_SECONDS}
+          max={MAX_STREAM_WARMUP_SECONDS}
+          step="1"
+          value={warmupSeconds()}
+          placeholder="Inherit"
+          onInput={(e) => setWarmupSeconds(e.currentTarget.value)}
+        />
+        <Show when={warmupError()}>
+          <div class="header-tier-modal__error">{warmupError()}</div>
+        </Show>
+        <p class="response-mode-modal__desc">
+          Optional. How long a streaming request waits for the first token before failing over.
+          Leave empty to use the connection setting or the default.
+        </p>
 
         <div class="header-tier-modal__footer">
           <Show when={editingTier && props.onDelete}>

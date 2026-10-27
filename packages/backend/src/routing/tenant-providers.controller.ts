@@ -26,6 +26,7 @@ import {
   ProviderParamDto,
   RemoveProviderQueryDto,
   RenameProviderKeyDto,
+  SetStreamWarmupDto,
 } from './dto/routing.dto';
 import { MinRole } from '../common/decorators/roles.decorator';
 
@@ -105,6 +106,19 @@ export class TenantProvidersController {
     };
   }
 
+  /** Set or clear a connection's stream warm-up override (#244). */
+  @Patch('connections/:id/stream-warmup')
+  async setStreamWarmup(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetStreamWarmupDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const updated = await this.providerService.setStreamWarmup(tenantId, id, body.stream_warmup_ms);
+    await this.invalidateTenantRouting(tenantId);
+    return { id: updated.id, stream_warmup_ms: updated.stream_warmup_ms };
+  }
+
   @Delete(':provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,
@@ -151,6 +165,7 @@ export class TenantProvidersController {
           models_fetched_at: string | null;
           cached_model_count: number;
           is_active: boolean;
+          stream_warmup_ms: number | null;
         }>;
         total_models: number;
       }
@@ -171,6 +186,7 @@ export class TenantProvidersController {
           models_fetched_at: p.models_fetched_at,
           cached_model_count: modelCount,
           is_active: p.is_active,
+          stream_warmup_ms: p.stream_warmup_ms ?? null,
         });
         existing.total_models = Math.max(existing.total_models, modelCount);
       } else {
@@ -187,6 +203,7 @@ export class TenantProvidersController {
               models_fetched_at: p.models_fetched_at,
               cached_model_count: modelCount,
               is_active: p.is_active,
+              stream_warmup_ms: p.stream_warmup_ms ?? null,
             },
           ],
           total_models: modelCount,

@@ -232,3 +232,33 @@ describe('streamWarmupMsFor (#128)', () => {
     expect(parseStreamWarmupMs(undefined, 60_000)).toBe(60_000);
   });
 });
+
+describe('streamWarmupMsFor overrides (#244)', () => {
+  it('prefers the header tier override over everything else', () => {
+    expect(streamWarmupMsFor('ollama', { headerTierMs: 5_000, connectionMs: 90_000 })).toBe(5_000);
+    expect(streamWarmupMsFor('openai', { headerTierMs: 120_000, connectionMs: 2_000 })).toBe(
+      120_000,
+    );
+  });
+
+  it('falls back to the connection override when the tier has none', () => {
+    expect(streamWarmupMsFor('ollama', { headerTierMs: null, connectionMs: 3_000 })).toBe(3_000);
+    expect(streamWarmupMsFor('openai', { connectionMs: 45_000 })).toBe(45_000);
+  });
+
+  it('falls back to the local and global defaults when no override is set', () => {
+    expect(streamWarmupMsFor('ollama', { headerTierMs: null, connectionMs: null })).toBe(
+      LOCAL_STREAM_WARMUP_MS,
+    );
+    expect(streamWarmupMsFor('openai', {})).toBe(STREAM_WARMUP_MS);
+  });
+
+  it('ignores out-of-range stored values', () => {
+    expect(streamWarmupMsFor('openai', { headerTierMs: 999, connectionMs: 700_000 })).toBe(
+      STREAM_WARMUP_MS,
+    );
+    expect(streamWarmupMsFor('openai', { headerTierMs: 600_001, connectionMs: 600_000 })).toBe(
+      600_000,
+    );
+  });
+});

@@ -329,6 +329,7 @@ export class ProviderKeyService {
             priority: record.priority,
             apiKey: '',
             region: record.region,
+            streamWarmupMs: record.stream_warmup_ms,
           },
         ];
       }
@@ -341,6 +342,7 @@ export class ProviderKeyService {
             priority: record.priority,
             apiKey: '',
             region: record.region,
+            streamWarmupMs: record.stream_warmup_ms,
           },
         ];
       }
@@ -354,6 +356,7 @@ export class ProviderKeyService {
           priority: record.priority,
           apiKey: decryptWithAny(record.api_key_encrypted, getDecryptionSecrets()).plaintext,
           region: record.region,
+          streamWarmupMs: record.stream_warmup_ms,
         },
       ];
     } catch {

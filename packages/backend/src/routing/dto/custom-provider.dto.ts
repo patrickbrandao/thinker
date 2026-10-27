@@ -14,6 +14,8 @@ import {
   IsIn,
   Min,
   IsBoolean,
+  IsInt,
+  Max,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -22,6 +24,10 @@ import {
   CUSTOM_PROVIDER_ALIAS_PATTERN,
   normalizeCustomProviderAlias,
 } from 'thinker-shared';
+import {
+  MAX_STREAM_WARMUP_OVERRIDE_MS,
+  MIN_STREAM_WARMUP_OVERRIDE_MS,
+} from '../proxy/stream-warmup';
 
 /**
  * Public prefix of the provider's model ids (`<alias>/<model_name>`).
@@ -176,4 +182,14 @@ export class UpdateCustomProviderDto {
   @ValidateNested({ each: true })
   @Type(() => CustomProviderModelDto)
   models?: CustomProviderModelDto[];
+
+  /**
+   * Stream warm-up override in ms for the provider's primary connection
+   * (#244). Omitted leaves it untouched; null clears it.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_STREAM_WARMUP_OVERRIDE_MS)
+  @Max(MAX_STREAM_WARMUP_OVERRIDE_MS)
+  stream_warmup_ms?: number | null;
 }

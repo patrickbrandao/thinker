@@ -12,6 +12,13 @@ import {
   type RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import {
+  MAX_STREAM_WARMUP_SECONDS,
+  MIN_STREAM_WARMUP_SECONDS,
+  STREAM_WARMUP_ERROR,
+  parseWarmupSeconds,
+  warmupMsToSecondsInput,
+} from '../services/stream-warmup.js';
 import { customProviderColor } from '../services/formatters.js';
 import type { ProviderDef } from '../services/providers.js';
 import type { CustomProviderPrefill } from '../services/routing-params.js';
@@ -90,6 +97,8 @@ const CustomProviderForm: Component<Props> = (props) => {
   );
   const [apiKey, setApiKey] = createSignal(props.prefill?.apiKey ?? '');
   const [editingKey, setEditingKey] = createSignal(false);
+  const initialWarmupMs = props.initialData?.stream_warmup_ms ?? null;
+  const [warmupSeconds, setWarmupSeconds] = createSignal(warmupMsToSecondsInput(initialWarmupMs));
   const [rows, setRows] = createSignal<ModelRow[]>(
     props.initialData ? toModelRows(props.initialData.models) : prefillRows(),
   );
@@ -262,6 +271,12 @@ const CustomProviderForm: Component<Props> = (props) => {
     if (editingKey()) {
       data.apiKey = apiKey().trim() || undefined;
     }
+    const warmupMs = parseWarmupSeconds(warmupSeconds());
+    if (warmupMs === undefined) {
+      setError(STREAM_WARMUP_ERROR);
+      return;
+    }
+    if (warmupMs !== initialWarmupMs) data.stream_warmup_ms = warmupMs;
 
     setBusy(true);
     try {
@@ -459,6 +474,36 @@ const CustomProviderForm: Component<Props> = (props) => {
             </div>
           </Show>
         </div>
+
+        <Show when={isEdit()}>
+          <div class="provider-detail__field">
+            <label class="provider-detail__label" for="cp-stream-warmup">
+              Stream warm-up (seconds){' '}
+              <span style="color: hsl(var(--muted-foreground)); font-weight: 400;">(optional)</span>
+            </label>
+            <input
+              id="cp-stream-warmup"
+              class="provider-detail__input"
+              type="number"
+              min={MIN_STREAM_WARMUP_SECONDS}
+              max={MAX_STREAM_WARMUP_SECONDS}
+              step="1"
+              placeholder="Inherit"
+              value={warmupSeconds()}
+              onInput={(e) => {
+                setWarmupSeconds(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+            <div
+              class="provider-detail__hint"
+              style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;"
+            >
+              How long a streaming request waits for the first token before failing over. Raise it
+              for local models with slow cold loads. Leave empty to use the default.
+            </div>
+          </div>
+        </Show>
 
         <Show when={showKeyField()}>
           <div class="provider-detail__field">

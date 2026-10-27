@@ -403,6 +403,7 @@ export class ProviderAnalyticsController {
         key_prefix: conn.key_prefix,
         connected_at: conn.connected_at,
         is_active: conn.is_active,
+        stream_warmup_ms: conn.stream_warmup_ms ?? null,
         last_used_at: lastUsedAt,
       },
       agents: (() => {
