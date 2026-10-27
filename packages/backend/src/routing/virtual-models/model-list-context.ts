@@ -83,6 +83,9 @@ export interface AutoContextInput {
  *   default slots, plus the active specificity assignments. Header tiers stay
  *   out, since they need a header.
  * Null (omitted) when a window is unknown or nothing can serve the request.
+ * Context-aware routing (#134) moves a too-large request past routes it
+ * overflows, but only when another route fits, so the floor stays the size
+ * every route can take. Both read windows through snapshotRouteState.
  */
 export function autoContextLength(input: AutoContextInput): number | null {
   const { snapshot } = input;

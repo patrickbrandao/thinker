@@ -1369,6 +1369,62 @@ describe('ProxyService — orchestration', () => {
   });
 
   describe('happy path forward', () => {
+    it('skips a primary whose context window cannot fit the request (#134)', async () => {
+      modelDiscovery.getModelsForAgent.mockResolvedValue([
+        discoveredModel({ id: 'small-model', contextWindow: 8_000 }),
+        discoveredModel({ id: 'big-model', contextWindow: 1_000_000 }),
+      ]);
+      resolveService.resolve.mockResolvedValue({
+        tier: 'standard',
+        route: route('openai', 'api_key', 'small-model'),
+        fallback_routes: [route('openai', 'api_key', 'big-model')],
+        confidence: 0.9,
+        score: 5,
+        reason: 'scored',
+      });
+      fallbackService.tryForwardToProvider.mockResolvedValue({
+        response: okResponse(200),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+
+      const body = { messages: [{ role: 'user', content: 'x'.repeat(40_000) }], stream: false };
+      const result = await svc.proxyRequest(baseOpts({ body }));
+
+      expect(fallbackService.tryForwardToProvider).toHaveBeenCalledTimes(1);
+      expect(fallbackService.tryForwardToProvider.mock.calls[0][0].model).toBe('big-model');
+      expect(result.meta.model).toBe('big-model');
+      expect(result.meta.context_skipped_models).toEqual(['small-model']);
+    });
+
+    it('keeps the primary when no route in the chain fits (#134)', async () => {
+      modelDiscovery.getModelsForAgent.mockResolvedValue([
+        discoveredModel({ id: 'small-model', contextWindow: 8_000 }),
+        discoveredModel({ id: 'mid-model', contextWindow: 9_000 }),
+      ]);
+      resolveService.resolve.mockResolvedValue({
+        tier: 'standard',
+        route: route('openai', 'api_key', 'small-model'),
+        fallback_routes: [route('openai', 'api_key', 'mid-model')],
+        confidence: 0.9,
+        score: 5,
+        reason: 'scored',
+      });
+      fallbackService.tryForwardToProvider.mockResolvedValue({
+        response: okResponse(200),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+
+      const body = { messages: [{ role: 'user', content: 'x'.repeat(40_000) }], stream: false };
+      const result = await svc.proxyRequest(baseOpts({ body }));
+
+      expect(fallbackService.tryForwardToProvider.mock.calls[0][0].model).toBe('small-model');
+      expect(result.meta.context_skipped_models).toBeUndefined();
+    });
+
     it('uses the redacted routing body for scoring while forwarding the original body', async () => {
       const body = {
         messages: [

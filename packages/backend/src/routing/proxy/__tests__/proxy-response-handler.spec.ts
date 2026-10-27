@@ -96,6 +96,12 @@ describe('proxy-response-handler', () => {
       expect(headers['X-Thinker-Fallback-Index']).toBe('0');
     });
 
+    it('lists the models skipped for context window', () => {
+      const headers = buildMetaHeaders(makeMeta({ context_skipped_models: ['small', 'mid'] }));
+      expect(headers['X-Thinker-Context-Skipped']).toBe('small,mid');
+      expect(buildMetaHeaders(makeMeta())).not.toHaveProperty('X-Thinker-Context-Skipped');
+    });
+
     it('should not include fallback headers when no fallback', () => {
       const meta = makeMeta();
       const headers = buildMetaHeaders(meta);
