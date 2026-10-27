@@ -7,6 +7,9 @@ import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { rangeToInterval } from '../../common/utils/range.util';
 import {
   addTenantFilter,
+  agentScopeCacheKey,
+  resolveAgentScope,
+  type AgentScope,
   formatTimestamp,
   selectMessageRowColumns,
   ERROR_MESSAGE_STATUSES,
@@ -14,7 +17,6 @@ import {
   THINKER_ORIGIN_PREDICATE,
   CUSTOM_PROVIDER_JOIN_CONDITION,
   excludePlaygroundAgents,
-  filterByLiveAgentName,
   sqlExcludePlayground,
   excludeDirectAttempts,
   sqlExcludeDirectRequests,
@@ -101,6 +103,11 @@ interface MessageFilterParams {
   range?: string;
   tenantId: string | null;
   agent_name?: string;
+  /**
+   * `agent_name` resolved once per request (see resolveAgentScope) and reused
+   * by every query of that request. Filled in by the public entry points.
+   */
+  agentScope?: AgentScope;
 }
 
 interface MessageQueryParams extends MessageFilterParams {
@@ -248,6 +255,7 @@ export class MessagesQueryService {
   ) {}
 
   async getMessages(params: MessageQueryParams) {
+    params = await this.withAgentScope(params);
     if (this.requestRepo) return this.getRequests(params);
     const baseQb = await this.buildBaseMessageQuery(params);
 
@@ -323,8 +331,8 @@ export class MessagesQueryService {
     // Still bound without a tenant: the agent and attempt-window subqueries
     // reference it, and `1 = 0` already empties the result.
     else qb.andWhere('1 = 0', { requestTenantId: null });
-    if (params.agent_name && params.tenantId) {
-      const agentId = await this.resolveLiveAgentId(params.tenantId, params.agent_name);
+    if (params.agentScope) {
+      const agentId = params.agentScope.agentId;
       if (agentId) qb.andWhere('r.agent_id = :requestAgentId', { requestAgentId: agentId });
       else qb.andWhere('1 = 0');
     }
@@ -716,25 +724,16 @@ export class MessagesQueryService {
   }
 
   /**
-   * The live harness id for a name, or null when none is live.
-   *
-   * Resolved before the Requests queries are built so Postgres plans them with
-   * the actual value. Written as `agent_id = (SELECT id FROM agents ...)`, the
-   * lookup is an InitPlan whose result the planner cannot see: it guesses a
-   * handful of rows even for a harness that owns most of its tenant's traffic,
-   * then probes attempts once per request (117k pages for a 23k-request week,
-   * against 950 with the value). Correlating it on `r.tenant_id` was worse
-   * still, a per-row SubPlan that kept `agent_id` out of the index condition.
-   *
-   * The unique live-name index on `agents` makes this the same single row the
-   * subquery returned.
+   * Resolve `agent_name` to its live harness id once, so the request-first and
+   * legacy-attempt branches, the filter options and the cache keys all reuse
+   * the same value. A scope already resolved for this tenant is kept as is.
    */
-  private async resolveLiveAgentId(tenantId: string, agentName: string): Promise<string | null> {
-    const rows = (await this.requestRepo!.query(
-      'SELECT id FROM agents WHERE tenant_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1',
-      [tenantId, agentName],
-    )) as Array<{ id: string }>;
-    return rows[0]?.id ?? null;
+  private async withAgentScope<T extends MessageFilterParams>(params: T): Promise<T> {
+    const scope = params.agentScope;
+    if (scope && scope.tenantId === params.tenantId && scope.agentName === params.agent_name)
+      return params;
+    const agentScope = await resolveAgentScope(this.turnRepo, params.tenantId, params.agent_name);
+    return { ...params, agentScope };
   }
 
   /** Resolve connection ids to their identity triple, tenant-scoped. */
@@ -794,9 +793,10 @@ export class MessagesQueryService {
     header_tiers: HeaderTierFilterOption[];
     models: string[];
   }> {
+    params = await this.withAgentScope(params);
     const [distinctRows, headerTiers] = await Promise.all([
-      this.getDistinctModels(params.tenantId, params.range, params.agent_name),
-      this.getHeaderTierOptions(params.tenantId, params.agent_name),
+      this.getDistinctModels(params.tenantId, params.range, params.agentScope),
+      this.getHeaderTierOptions(params.tenantId, params.agentScope),
     ]);
     const providers = this.deriveProviders(distinctRows.models, distinctRows.providers);
     const providerLabels = await this.resolveCustomProviderLabels(providers, params.tenantId);
@@ -828,7 +828,7 @@ export class MessagesQueryService {
    */
   private async getHeaderTierOptions(
     tenantId: string | null,
-    agentName?: string,
+    agentScope?: AgentScope,
   ): Promise<HeaderTierFilterOption[]> {
     if (!tenantId || !this.headerTierRepo) return [];
     const qb = this.headerTierRepo
@@ -837,15 +837,10 @@ export class MessagesQueryService {
       .addSelect('ht.name', 'name')
       .where('ht.tenant_id = :headerTierTenant', { headerTierTenant: tenantId })
       .orderBy('LOWER(ht.name)', 'ASC');
-    if (agentName) {
-      qb.andWhere(
-        `ht.agent_id = (
-          SELECT id FROM agents
-          WHERE tenant_id = :headerTierTenant AND name = :headerTierAgent AND deleted_at IS NULL
-          LIMIT 1
-        )`,
-        { headerTierAgent: agentName },
-      );
+    if (agentScope) {
+      if (agentScope.agentId && agentScope.tenantId === tenantId)
+        qb.andWhere('ht.agent_id = :headerTierAgentId', { headerTierAgentId: agentScope.agentId });
+      else qb.andWhere('1 = 0');
     }
     const rows = await qb.getRawMany<{ id: string; name: string }>();
     const byName = new Map<string, HeaderTierFilterOption>();
@@ -887,6 +882,7 @@ export class MessagesQueryService {
     cost_min?: number;
     cost_max?: number;
     agent_name?: string;
+    agentScope?: AgentScope;
     status?: MessageStatusFilter;
     triggers?: MessageTriggerFilter[];
     origin?: MessageOriginFilter;
@@ -899,7 +895,9 @@ export class MessagesQueryService {
     const qb = this.turnRepo.createQueryBuilder('at');
     if (cutoff) qb.where('at.timestamp >= :cutoff', { cutoff });
 
-    addTenantFilter(qb, params.tenantId);
+    // Reuse the scope resolved by the entry point so the planner sees the actual
+    // harness id (and can pick the partial unlinked index) instead of an InitPlan.
+    addTenantFilter(qb, params.tenantId, params.agentScope ?? params.agent_name);
 
     if (params.models?.length)
       qb.andWhere('at.model IN (:...legacyModels)', { legacyModels: params.models });
@@ -909,10 +907,6 @@ export class MessagesQueryService {
       qb.andWhere('at.cost_usd >= :costMin', { costMin: params.cost_min });
     if (params.cost_max !== undefined)
       qb.andWhere('at.cost_usd <= :costMax', { costMax: params.cost_max });
-    if (params.agent_name && params.tenantId) {
-      filterByLiveAgentName(qb, params.agent_name, params.tenantId);
-    }
-
     if (params.status === 'failed') {
       qb.andWhere('at.status IN (:...failedStatuses)', { failedStatuses: FAILED_STATUSES });
     } else if (params.status === 'errors') {
@@ -960,7 +954,7 @@ export class MessagesQueryService {
       await this.applyProviderFilter(qb, params.provider, {
         tenantId: params.tenantId,
         range: params.range,
-        agentName: params.agent_name,
+        agent: params.agentScope ?? params.agent_name,
       });
     }
 
@@ -994,12 +988,12 @@ export class MessagesQueryService {
   private async applyProviderFilter(
     qb: SelectQueryBuilder<AgentMessage>,
     provider: string,
-    ctx: { tenantId: string | null; range?: string; agentName?: string },
+    ctx: { tenantId: string | null; range?: string; agent?: string | AgentScope },
   ): Promise<void> {
     // Prefer the stored provider column (populated by the proxy from routing
     // resolution), and fall back to inference for legacy rows that pre-date
     // the column.
-    const distinct = await this.getDistinctModels(ctx.tenantId, ctx.range, ctx.agentName);
+    const distinct = await this.getDistinctModels(ctx.tenantId, ctx.range, ctx.agent);
     const matching = distinct.models.filter((m) => inferProviderFromModel(m) === provider);
     qb.andWhere(
       new Brackets((sub) => {
@@ -1074,7 +1068,8 @@ export class MessagesQueryService {
   private async getAttemptlessRequestedModels(params: MessageFilterParams): Promise<string[]> {
     // No tenant resolves to no rows, matching addTenantFilter's own contract.
     if (!this.requestRepo || params.tenantId === null) return [];
-    const cacheKey = `blocked:${params.tenantId ?? 'no-tenant'}:${params.agent_name ?? ''}:${params.range ?? 'all'}`;
+    const { agentScope } = await this.withAgentScope(params);
+    const cacheKey = `blocked:${params.tenantId}:${agentScopeCacheKey(agentScope)}:${params.range ?? 'all'}`;
     const cached = this.attemptlessModelsCache.get(cacheKey);
     if (cached) return cached;
 
@@ -1098,8 +1093,8 @@ export class MessagesQueryService {
       // Scoped on `r` by hand: addTenantFilter hardcodes the `at` alias of the
       // attempt-first queries and would emit SQL with no such FROM entry here.
       .andWhere('r.tenant_id = :blockedTenantId', { blockedTenantId: params.tenantId });
-    if (params.agent_name) {
-      const agentId = await this.resolveLiveAgentId(params.tenantId, params.agent_name);
+    if (agentScope) {
+      const agentId = agentScope.agentId;
       if (agentId) qb.andWhere('r.agent_id = :blockedAgentId', { blockedAgentId: agentId });
       else qb.andWhere('1 = 0');
     }
@@ -1112,9 +1107,9 @@ export class MessagesQueryService {
   private async getDistinctModels(
     tenantId: string | null,
     range?: string,
-    agentName?: string,
+    agent?: string | AgentScope,
   ): Promise<{ models: string[]; providers: string[] }> {
-    const cacheKey = `${tenantId ?? 'no-tenant'}:${agentName ?? ''}:${range ?? 'all'}`;
+    const cacheKey = `${tenantId ?? 'no-tenant'}:${agentScopeCacheKey(agent)}:${range ?? 'all'}`;
     const cached = this.modelsCache.get(cacheKey);
     if (cached) return cached;
 
@@ -1128,9 +1123,9 @@ export class MessagesQueryService {
     // The per-agent / no-tenant cases stay on the bounded scan below — they touch
     // far fewer rows (or lack a supporting index for the skip scan).
     const result =
-      tenantId && !agentName
+      tenantId && !agent
         ? await this.getDistinctModelsViaSkipScan(tenantId)
-        : await this.getDistinctModelsViaScan(tenantId, range, agentName);
+        : await this.getDistinctModelsViaScan(tenantId, range, agent);
 
     this.modelsCache.set(cacheKey, result);
     return result;
@@ -1152,7 +1147,7 @@ export class MessagesQueryService {
   private async getDistinctModelsViaScan(
     tenantId: string | null,
     range: string | undefined,
-    agentName: string | undefined,
+    agent: string | AgentScope | undefined,
   ): Promise<{ models: string[]; providers: string[] }> {
     // Bound the scan: when the caller doesn't constrain the range, default to
     // the last 90 days. The DISTINCT covers the entire agent_messages table
@@ -1168,7 +1163,7 @@ export class MessagesQueryService {
       .where('at.model IS NOT NULL')
       .andWhere("at.model != ''")
       .andWhere('at.timestamp >= :cutoff', { cutoff });
-    addTenantFilter(modelsQb, tenantId, agentName);
+    addTenantFilter(modelsQb, tenantId, agent);
     const modelsResult = await modelsQb.orderBy('at.model', 'ASC').getRawMany();
 
     const modelSet = new Set<string>();
@@ -1195,6 +1190,7 @@ export class MessagesQueryService {
     attemptStatus?: ('has_failed' | 'has_succeeded')[];
     service_type?: string;
     agent_name?: string;
+    agentScope?: AgentScope;
     cost_min?: number;
     cost_max?: number;
     status?: MessageStatusFilter;
@@ -1215,7 +1211,9 @@ export class MessagesQueryService {
       params.models?.join(',') ?? '',
       params.attemptStatus?.join(',') ?? '',
       params.service_type ?? '',
-      params.agent_name ?? '',
+      // The resolved id, not the name: a recreated harness must not reuse the
+      // cached total of its deleted namesake.
+      agentScopeCacheKey(params.agentScope ?? params.agent_name),
       params.cost_min ?? '',
       params.cost_max ?? '',
       params.status ?? '',

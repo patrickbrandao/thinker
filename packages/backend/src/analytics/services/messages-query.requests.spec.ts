@@ -614,18 +614,18 @@ describe('MessagesQueryService request-first queries', () => {
   });
 
   describe('attempt lookups for cold-cache performance', () => {
-    async function run(params: Record<string, unknown>, agentLookup = jest.fn()) {
+    async function run(
+      params: Record<string, unknown>,
+      agentLookup = jest.fn().mockResolvedValue([]),
+    ) {
       const requestQb = makeQb();
       requestQb.clone.mockReturnValue(makeQb());
       const legacyBase = makeQb();
       legacyBase.clone.mockReturnValueOnce(makeQb()).mockReturnValueOnce(makeQb());
       const service = new MessagesQueryService(
-        {
-          createQueryBuilder: jest.fn(() => legacyBase),
-          query: jest.fn().mockResolvedValue([]),
-        } as never,
+        { createQueryBuilder: jest.fn(() => legacyBase), query: agentLookup } as never,
         { find: jest.fn() } as never,
-        { createQueryBuilder: jest.fn(() => requestQb), query: agentLookup } as never,
+        { createQueryBuilder: jest.fn(() => requestQb), query: jest.fn() } as never,
       );
       await service.getMessages({
         limit: 10,
@@ -691,6 +691,8 @@ describe('MessagesQueryService request-first queries', () => {
         agentLookup,
       );
 
+      // Resolved once for the whole request, not once per branch.
+      expect(agentLookup).toHaveBeenCalledTimes(1);
       expect(agentLookup).toHaveBeenCalledWith(
         'SELECT id FROM agents WHERE tenant_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1',
         ['tenant-1', 'bot-1'],
@@ -701,16 +703,19 @@ describe('MessagesQueryService request-first queries', () => {
       const clauses = requestQb.andWhere.mock.calls.map((call) => String(call[0]));
       expect(clauses.some((clause) => clause.includes('FROM agents'))).toBe(false);
 
-      // The unlinked legacy branch keeps the tenant-bound lookup.
-      const legacyAgent = legacyBase.andWhere.mock.calls.find((call) =>
-        String(call[0]).includes('at.agent_id = ('),
-      );
-      expect(String(legacyAgent?.[0])).toContain('a.tenant_id = :liveTenantId');
-      expect(legacyAgent?.[1]).toEqual({ liveAgentName: 'bot-1', liveTenantId: 'tenant-1' });
+      // The unlinked legacy branch reuses the same resolved id.
+      expect(legacyBase.andWhere).toHaveBeenCalledWith('at.tenant_id = :tenantId', {
+        tenantId: 'tenant-1',
+      });
+      expect(legacyBase.andWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
+        liveAgentId: 'agent-9',
+      });
+      const legacyClauses = legacyBase.andWhere.mock.calls.map((call) => String(call[0]));
+      expect(legacyClauses.some((clause) => clause.includes('FROM agents'))).toBe(false);
     });
 
     it('matches nothing for a harness name with no live agent', async () => {
-      const { requestQb } = await run(
+      const { requestQb, legacyBase } = await run(
         { tenantId: 'tenant-1', range: '7d', agent_name: 'gone' },
         jest.fn().mockResolvedValue([]),
       );
@@ -718,6 +723,10 @@ describe('MessagesQueryService request-first queries', () => {
       expect(requestQb.andWhere).toHaveBeenCalledWith('1 = 0');
       expect(
         requestQb.andWhere.mock.calls.some((call) => String(call[0]).includes('r.agent_id')),
+      ).toBe(false);
+      expect(legacyBase.andWhere).toHaveBeenCalledWith('1 = 0');
+      expect(
+        legacyBase.andWhere.mock.calls.some((call) => String(call[0]).includes('at.agent_id')),
       ).toBe(false);
     });
 

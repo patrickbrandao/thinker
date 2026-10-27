@@ -15,6 +15,8 @@ import {
   filterByTenantProviderId,
   scopeToConnection,
   filterByLiveAgentName,
+  resolveAgentScope,
+  agentScopeCacheKey,
   MESSAGE_ROW_SELECT_ALIASES,
   sqlCountMessages,
   ERROR_MESSAGE_STATUSES,
@@ -183,6 +185,38 @@ describe('addTenantFilter', () => {
     addTenantFilter(qb, 'tenant-456');
 
     expect(mockAndWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters on a pre-resolved harness id without a subquery', () => {
+    const { qb, mockAndWhere } = makeMockQb();
+    addTenantFilter(qb, 'tenant-456', {
+      tenantId: 'tenant-456',
+      agentName: 'my-agent',
+      agentId: 'agent-1',
+    });
+
+    expect(mockAndWhere).toHaveBeenCalledTimes(2);
+    expect(mockAndWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
+      liveAgentId: 'agent-1',
+    });
+  });
+
+  it('matches nothing for a missing harness or a scope resolved in another tenant', () => {
+    const missing = makeMockQb();
+    addTenantFilter(missing.qb, 'tenant-456', {
+      tenantId: 'tenant-456',
+      agentName: 'gone',
+      agentId: null,
+    });
+    expect(missing.mockAndWhere.mock.calls).toEqual([['1 = 0']]);
+
+    const foreign = makeMockQb();
+    addTenantFilter(foreign.qb, 'tenant-456', {
+      tenantId: 'tenant-other',
+      agentName: 'my-agent',
+      agentId: 'agent-of-other-tenant',
+    });
+    expect(foreign.mockAndWhere.mock.calls).toEqual([['1 = 0']]);
   });
 
   it('filterByLiveAgentName scopes by the tenant id', () => {
@@ -574,5 +608,53 @@ describe('origin predicates', () => {
     expect(THINKER_ORIGIN_PREDICATE).toBe(
       "at.error_origin IN ('config', 'policy', 'internal', 'request')",
     );
+  });
+});
+
+describe('resolveAgentScope', () => {
+  it('resolves a harness name within its tenant', async () => {
+    const query = jest.fn().mockResolvedValue([{ id: 'agent-1' }]);
+    await expect(resolveAgentScope({ query }, 'tenant-1', 'bot')).resolves.toEqual({
+      tenantId: 'tenant-1',
+      agentName: 'bot',
+      agentId: 'agent-1',
+    });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('tenant_id = $1 AND name = $2'), [
+      'tenant-1',
+      'bot',
+    ]);
+  });
+
+  it('marks a name with no live harness as missing', async () => {
+    const query = jest.fn().mockResolvedValue([]);
+    const scope = await resolveAgentScope({ query }, 'tenant-1', 'gone');
+    expect(scope?.agentId).toBeNull();
+  });
+
+  it('skips the lookup for a tenant-wide selection or a caller without a tenant', async () => {
+    const query = jest.fn();
+    await expect(resolveAgentScope({ query }, 'tenant-1')).resolves.toBeUndefined();
+    await expect(resolveAgentScope({ query }, null, 'bot')).resolves.toBeUndefined();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('propagates a database failure instead of widening the selection', async () => {
+    const query = jest.fn().mockRejectedValue(new Error('database unavailable'));
+    await expect(resolveAgentScope({ query }, 'tenant-1', 'bot')).rejects.toThrow(
+      'database unavailable',
+    );
+  });
+});
+
+describe('agentScopeCacheKey', () => {
+  it('keys by tenant and resolved id, never by the harness name alone', () => {
+    const keys = [
+      agentScopeCacheKey(),
+      agentScopeCacheKey({ tenantId: 't1', agentName: 'bot', agentId: 'old-id' }),
+      agentScopeCacheKey({ tenantId: 't1', agentName: 'bot', agentId: 'new-id' }),
+      agentScopeCacheKey({ tenantId: 't1', agentName: 'bot', agentId: null }),
+      agentScopeCacheKey({ tenantId: 't2', agentName: 'bot', agentId: null }),
+    ];
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
