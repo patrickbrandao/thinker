@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { pinProcessTimeZoneToUtc } from '../common/utils/utc-clock';
 
 /**
  * Side-effect import for the standalone CLIs (migrations, backfills) that run
@@ -11,3 +12,5 @@ const envFile = '.env';
 if (existsSync(envFile)) {
   process.loadEnvFile(envFile);
 }
+// The CLIs store timestamps too: same UTC clock as the server (#58).
+pinProcessTimeZoneToUtc();

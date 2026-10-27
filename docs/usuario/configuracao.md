@@ -97,6 +97,8 @@ Sem provedor de e-mail, a verificação de cadastro é dispensada e a redefiniç
 
 ## Banco de dados e operação
 
+**Fuso horário:** o Thinker grava e compara todos os horários em UTC. O processo e cada sessão do PostgreSQL são fixados em UTC na inicialização, então um `TZ` definido no ambiente é ignorado (o log de boot avisa). Não é preciso configurar nada.
+
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD` | `thinker` | Senha do PostgreSQL embutido. Se mudar, mude também `DATABASE_URL` (caracteres especiais em percent-encoding). |

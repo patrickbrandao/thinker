@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { pinSessionTimeZoneToUtc } from '../common/utils/utc-clock';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { entities, INVALID_WHERE_VALUES_BEHAVIOR, migrations } from './data-source-definitions';
@@ -70,6 +71,9 @@ import { SecretReencryptionService } from './secret-reencryption.service';
           // of truth for the pool size.
           max: config.get<number>('app.dbPoolMax'),
           idleTimeoutMillis: 30000,
+          // Every session in UTC, like the process (#58): NOW() and
+          // CURRENT_TIMESTAMP then agree with the timestamps Node writes.
+          onConnect: pinSessionTimeZoneToUtc,
           // statement_timeout / idle_in_transaction_session_timeout were tried
           // here (#1745) and via the `options` connection string (#1749), but
           // Railway's PgBouncer rejects both forms — its

@@ -1,3 +1,5 @@
+// First: pin the process clock to UTC before any Date exists (#58).
+import { overriddenTimeZone } from './common/utils/pin-utc';
 import { NestFactory } from '@nestjs/core';
 import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -28,9 +30,12 @@ import { checkLocalServerBaseUrls } from './common/constants/local-servers';
 import { DEFAULT_PORT } from './common/constants/server.constants';
 import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
 import { assertEncryptionKeyConfig, StartupConfigError } from './common/utils/crypto.util';
+import { overriddenTimeZoneWarning } from './common/utils/utc-clock';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
+  const tzWarning = overriddenTimeZoneWarning(overriddenTimeZone);
+  if (tzWarning) logger.warn(tzWarning);
   assertLegacyEncryptionKeyMigrated(process.env);
   // Before anything touches the database: migrations and the re-encryption
   // pass both need the key, and it must never silently be the session secret.

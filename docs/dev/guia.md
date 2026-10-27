@@ -141,6 +141,15 @@ Uma proteção (`packages/backend/test/e2e-db-guard.ts`) recusa rodar sem `DATAB
 
 Qualquer mudança de comportamento em tempo de execução também passa pelo agente `qa-docker`, contra a imagem construída localmente.
 
+### Relógio: tudo em UTC (#58)
+
+As colunas de data são `timestamp without time zone` e recebem valores do Node (o driver `pg` serializa um `Date` no fuso do processo), do PostgreSQL (`NOW()`/`CURRENT_TIMESTAMP`, no fuso da sessão) e de `toSqlTimestamp` (UTC). Para que concordem, o Thinker fixa os dois relógios em UTC (`common/utils/utc-clock.ts`):
+
+- **processo:** `import './common/utils/pin-utc'` é o primeiro import de `main.ts`; os CLIs de migração e backfill fixam o fuso em `database/load-env-file.ts`. Um `TZ` do operador é ignorado, com aviso no boot;
+- **sessão:** `pinSessionTimeZoneToUtc` é o `onConnect` dos pools `pg` do TypeORM (`database.module.ts`), do CLI de migrações e do Better Auth. Todo `DataSource` ou `Pool` novo precisa do mesmo `onConnect`.
+
+Não há migração de dados: o container padrão já roda em UTC.
+
 ## Migrações
 
 O esquema é gerenciado só por migrações TypeORM em `packages/backend/src/database/migrations/` (`synchronize` é sempre `false`). Elas rodam no boot, controladas por `RUN_MIGRATIONS_ON_BOOT` (padrão `true`; `false` nas réplicas que não devem migrar).
