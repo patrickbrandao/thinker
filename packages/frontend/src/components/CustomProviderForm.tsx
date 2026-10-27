@@ -43,6 +43,7 @@ interface ModelRow {
   model_name: string;
   input_price: string;
   output_price: string;
+  context_window: string;
   price_estimated: boolean;
 }
 
@@ -52,6 +53,7 @@ const emptyRow = (): ModelRow => ({
   model_name: '',
   input_price: '',
   output_price: '',
+  context_window: '',
   price_estimated: false,
 });
 
@@ -62,6 +64,7 @@ const toModelRows = (models: CustomProviderModel[] | undefined): ModelRow[] =>
       m.input_price_per_million_tokens != null ? String(m.input_price_per_million_tokens) : '',
     output_price:
       m.output_price_per_million_tokens != null ? String(m.output_price_per_million_tokens) : '',
+    context_window: m.context_window != null ? String(m.context_window) : '',
     price_estimated: m.price_estimated === true,
   }));
 
@@ -74,6 +77,7 @@ const CustomProviderForm: Component<Props> = (props) => {
       model_name: m.model_name,
       input_price: m.input_price ?? '',
       output_price: m.output_price ?? '',
+      context_window: '',
       price_estimated: false,
     }));
   };
@@ -204,11 +208,20 @@ const CustomProviderForm: Component<Props> = (props) => {
 
   const updateRow = (
     index: number,
-    field: 'model_name' | 'input_price' | 'output_price',
+    field: 'model_name' | 'input_price' | 'output_price' | 'context_window',
     value: string,
   ) => {
+    // The context window is not a price, so editing it keeps the estimate flag.
     setRows((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, [field]: value, price_estimated: false } : r)),
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              [field]: value,
+              price_estimated: field === 'context_window' ? r.price_estimated : false,
+            }
+          : r,
+      ),
     );
   };
 
@@ -224,6 +237,11 @@ const CustomProviderForm: Component<Props> = (props) => {
   const canSubmit = () => name().trim() && baseUrl().trim() && validModels().length > 0 && !busy();
 
   const parsePrice = (v: string): number => Number(v.replace(',', '.'));
+  // Digits only (thousands separators dropped); blank or invalid means unknown.
+  const parseContextWindow = (v: string): number | null => {
+    const n = Number(v.replace(/[\s,._]/g, ''));
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  };
 
   const buildModels = (): CustomProviderModel[] =>
     validModels().map((r) => ({
@@ -233,6 +251,9 @@ const CustomProviderForm: Component<Props> = (props) => {
         : {}),
       ...(r.output_price !== ''
         ? { output_price_per_million_tokens: parsePrice(r.output_price) }
+        : {}),
+      ...(parseContextWindow(r.context_window) !== null
+        ? { context_window: parseContextWindow(r.context_window)! }
         : {}),
       ...(r.price_estimated && (r.input_price !== '' || r.output_price !== '')
         ? { price_estimated: true }
@@ -567,6 +588,9 @@ const CustomProviderForm: Component<Props> = (props) => {
               <span class="custom-provider-models__column custom-provider-models__column--price">
                 Output / 1M tokens
               </span>
+              <span class="custom-provider-models__column custom-provider-models__column--price">
+                Context window
+              </span>
               <span class="custom-provider-models__column-spacer" />
             </div>
             <Index each={rows()}>
@@ -597,6 +621,15 @@ const CustomProviderForm: Component<Props> = (props) => {
                     aria-label={`Model ${i + 1} output price per million tokens`}
                     value={row().output_price}
                     onInput={(e) => updateRow(i, 'output_price', e.currentTarget.value)}
+                  />
+                  <input
+                    class="provider-detail__input custom-provider-model-row__price"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="Tokens"
+                    aria-label={`Model ${i + 1} context window in tokens`}
+                    value={row().context_window}
+                    onInput={(e) => updateRow(i, 'context_window', e.currentTarget.value)}
                   />
                   <button
                     type="button"

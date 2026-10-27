@@ -138,6 +138,14 @@ export function buildMetaHeaders(meta: RoutingMeta): Record<string, string> {
     headers['X-Thinker-Fallback-From'] = meta.fallbackFromModel;
     headers['X-Thinker-Fallback-Index'] = String(meta.fallbackIndex ?? 0);
   }
+  // Routes dropped up front because the request overflows their context
+  // window (#134). Model ids are printable ASCII; anything else is dropped so
+  // the header stays valid.
+  if (meta.context_skipped_models?.length) {
+    headers['X-Thinker-Context-Skipped'] = meta.context_skipped_models
+      .map((model) => model.replace(/[^\x21-\x7e]/g, ''))
+      .join(',');
+  }
   return headers;
 }
 

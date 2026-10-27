@@ -72,11 +72,27 @@ import {
   SUBSCRIPTION_MODEL_SUFFIX,
 } from './openai-model-id';
 import { recordingResponseFromText } from './attempt-recording-capture';
+import {
+  estimateRequestTokens,
+  mayExceedContextWindows,
+  planContextFit,
+} from './context-window-fit';
+import { snapshotRouteState, type RouteSnapshot } from '../virtual-models/virtual-model-chain';
+import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 
 type ResolvedRouting = Awaited<ReturnType<ResolveService['resolve']>> & {
   explicit_model_override?: boolean;
   explicit_model_unavailable?: string;
+  /** Models dropped from the chain because the request overflows their context window. */
+  context_skipped_models?: string[];
 };
+
+/**
+ * One route snapshot per catalog array. getModelsForAgent returns the same
+ * cached array until it refreshes, so the per-provider index snapshotRouteState
+ * builds is reused across requests instead of rebuilt on each one.
+ */
+const contextSnapshots = new WeakMap<readonly DiscoveredModel[], RouteSnapshot>();
 
 /**
  * Roles excluded from scoring. AI agents (OpenClaw, Hermes, and
@@ -160,6 +176,8 @@ export interface RoutingMeta {
   output_modality?: OutputModality;
   /** Effective response transport configured on the resolved routing chain. */
   response_mode?: ResponseMode;
+  /** Models skipped before any attempt because the request overflows their context window. */
+  context_skipped_models?: string[];
   /** Internal persisted identity of the response-producing Attempt. */
   attempt?: ProviderAttemptRef;
   /** False when the response was produced without invoking provider transport. */
@@ -299,15 +317,20 @@ export class ProxyService {
       return buildFriendlyResponse(limitMessage, body.stream === true, 'limit_exceeded', 'M200');
     }
 
-    const resolved = await this.resolveRouting(
+    const resolved = await this.fitChainToContext(
       agentId,
       tenantId,
-      routingSource,
-      resolveRoutingChatBody,
-      sessionMomentumKey,
-      specificityOverride,
-      headers,
-      apiMode,
+      body,
+      await this.resolveRouting(
+        agentId,
+        tenantId,
+        routingSource,
+        resolveRoutingChatBody,
+        sessionMomentumKey,
+        specificityOverride,
+        headers,
+        apiMode,
+      ),
     );
     const responseMode = resolved.response_mode ?? DEFAULT_RESPONSE_MODE;
     const stream = body.stream === true || responseMode === 'stream';
@@ -725,6 +748,50 @@ export class ProxyService {
    * A heartbeat (`auto` only) skips step 2 and goes straight to the simple
    * tier, as it always has.
    */
+  /**
+   * Context-window aware routing (#134): drops the routes of the resolved
+   * chain (primary and fallbacks) whose known context window the request
+   * clearly overflows, so the first route that fits becomes the primary.
+   * Unknown windows are kept, and when no route fits the chain is left as is.
+   */
+  private async fitChainToContext(
+    agentId: string,
+    tenantId: string,
+    body: ProxyRequestOptions['body'],
+    resolved: ResolvedRouting,
+  ): Promise<ResolvedRouting> {
+    if (!resolved.route || !resolved.fallback_routes?.length) return resolved;
+    const chain = [resolved.route, ...resolved.fallback_routes];
+    const estimate = estimateRequestTokens(body as Record<string, unknown>);
+    if (!mayExceedContextWindows(estimate)) return resolved;
+    const catalog = await this.modelDiscovery.getModelsForAgent(tenantId, agentId);
+    if (!Array.isArray(catalog) || catalog.length === 0) return resolved;
+    let snapshot = contextSnapshots.get(catalog);
+    if (!snapshot) {
+      snapshot = { catalog, providers: [] };
+      contextSnapshots.set(catalog, snapshot);
+    }
+    const routeSnapshot = snapshot;
+    const plan = planContextFit(chain, estimate, (route) => {
+      const state = snapshotRouteState(route, routeSnapshot);
+      return state.state === 'available' ? state.contextWindow : null;
+    });
+    if (plan.skipped.length === 0) return resolved;
+
+    const skippedModels = plan.skipped.map((route) => route.model);
+    this.logger.log(
+      `Context fit: agent=${agentId} estimate=${estimate} skipped=${skippedModels.join(',')} ` +
+        `primary=${plan.routes[0].model}`,
+    );
+    const [primary, ...fallbacks] = plan.routes;
+    return {
+      ...resolved,
+      route: primary,
+      fallback_routes: fallbacks.length > 0 ? fallbacks : null,
+      context_skipped_models: skippedModels,
+    };
+  }
+
   private async resolveRouting(
     agentId: string,
     tenantId: string,
@@ -1223,6 +1290,9 @@ export class ProxyService {
       ...virtualModelFields(resolved),
       output_modality: resolved.output_modality,
       response_mode: resolved.response_mode ?? DEFAULT_RESPONSE_MODE,
+      ...(resolved.context_skipped_models
+        ? { context_skipped_models: resolved.context_skipped_models }
+        : {}),
       ...overrides,
     };
   }
