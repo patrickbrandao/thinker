@@ -42,6 +42,7 @@ import {
 import { MinRole } from '../common/decorators/roles.decorator';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
 import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
+import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -81,7 +82,11 @@ export class ProviderController {
 
   @Get(':agentName/status')
   async getStatus(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     return resolveRoutingStatus({
       providers: await this.providerService.getProviders(agent.tenant_id),
       hasRoutableTier: () => this.tierService.hasRoutableTier(agent.id),
@@ -222,7 +227,11 @@ export class ProviderController {
     @Param() params: AgentProviderKeyParamDto,
     @Body() body: RenameProviderKeyDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const updated = await this.providerService.renameKey(
       agent.id,
       agent.tenant_id,
@@ -246,7 +255,11 @@ export class ProviderController {
     @Param() params: AgentProviderParamDto,
     @Body() body: ReorderProviderKeysDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const updated = await this.providerService.reorderKeys(
       agent.id,
       agent.tenant_id,
@@ -268,7 +281,11 @@ export class ProviderController {
     @TenantCtx() ctx: TenantContext,
     @Param() params: AgentNameParamDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     await this.providerService.deactivateAllProviders(agent.id, agent.tenant_id);
     return { ok: true };
   }
@@ -279,7 +296,11 @@ export class ProviderController {
     @Param() params: AgentProviderParamDto,
     @Query() query: RemoveProviderQueryDto,
   ) {
-    const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
+    const agent = await this.resolveAgentService.resolve(
+      ctx.tenantId,
+      params.agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const { notifications } = await this.providerService.removeProvider(
       agent.id,
       agent.tenant_id,

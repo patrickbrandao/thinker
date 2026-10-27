@@ -22,6 +22,7 @@ import { oauthDoneHtml, type OAuthTokenBlob } from '../core';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { XaiOauthService } from './xai-oauth.service';
 import { MinRole } from '../../../common/decorators/roles.decorator';
+import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/xai')
@@ -45,7 +46,11 @@ export class XaiOauthController {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const trustedBackendUrl = this.configService.get<string>('BETTER_AUTH_URL');
     const backendUrl = trustedBackendUrl || `${req.protocol}://${req.get('host')}`;
     try {
@@ -92,7 +97,11 @@ export class XaiOauthController {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
     const keyLabel = optionalTrimmedStringQuery(label, 'label');
-    const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
     const keys = await this.providerKeyService.getProviderKeys(
       agent.tenant_id,
       'xai',

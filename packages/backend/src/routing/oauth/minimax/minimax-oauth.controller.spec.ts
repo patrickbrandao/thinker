@@ -42,7 +42,9 @@ describe('MinimaxOauthController', () => {
       userId: 'user-1',
     } as never);
 
-    expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent');
+    expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent', {
+      allowPlayground: true,
+    });
     expect(oauthService.startAuthorization).toHaveBeenCalledWith(
       'agent-id-1',
       'tenant-1',
@@ -119,7 +121,9 @@ describe('MinimaxOauthController', () => {
       userId: 'user-1',
     } as never);
 
-    expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent');
+    expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent', {
+      allowPlayground: true,
+    });
     expect(providerService.removeProvider).toHaveBeenCalledWith(
       'agent-id-1',
       'tenant-1',
