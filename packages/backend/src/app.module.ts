@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './common/guards/roles.guard';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -85,12 +87,14 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     PlaygroundModule,
     SseModule,
     SetupModule,
+    OrganizationsModule,
     BackfillModule,
     ...mcpImports,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: ApiKeyGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

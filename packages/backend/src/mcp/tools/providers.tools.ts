@@ -15,9 +15,13 @@ import {
   collectAffectedVirtualModels,
   makeAgentProviderRouteMatcher,
 } from '../../routing/routing-core/agent-provider-impact';
-import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
+import { canWrite as operatorCanWrite, McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
+import {
+  assertCanUseLocalRunners,
+  canUsePrivateDestinations,
+} from '../../common/utils/private-url-policy';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 
@@ -134,7 +138,7 @@ export function registerProviderTools(
 
   // Everything below connects, disconnects, or mutates provider access — a
   // read-only token must not see these tools.
-  if (!operator.scopes.has(MCP_WRITE_SCOPE)) return;
+  if (!operatorCanWrite(operator, 'admin')) return;
 
   server.registerTool(
     'thinker_provider_connect',
@@ -162,6 +166,8 @@ export function registerProviderTools(
             SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
             SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalizeProviderName(normalized));
           if (!known) throw new Error(`Unknown provider: ${provider}`);
+          // Local runners reach services on the host (#102, ADR 0006).
+          if (known.localOnly) assertCanUseLocalRunners({ role: operator.role });
           const upserted = await deps.providers.upsertProvider(
             resolved.id,
             resolved.tenant_id,
@@ -294,7 +300,9 @@ export function registerProviderTools(
             models && models.length > 0
               ? models.map((model_name) => ({ model_name }))
               : await deps.customProviders
-                  .probeModels(base_url, api_key, api_kind ?? 'openai', name)
+                  .probeModels(base_url, api_key, api_kind ?? 'openai', name, {
+                    allowPrivate: canUsePrivateDestinations({ role: operator.role }),
+                  })
                   .then((probed) => probed.map((m) => ({ model_name: m.model_name })));
           if (modelDtos.length === 0) {
             throw new Error('No models found at the endpoint; pass models explicitly');
@@ -303,6 +311,7 @@ export function registerProviderTools(
             operator.tenantId,
             { name, alias, base_url, api_kind, apiKey: api_key, models: modelDtos },
             operator.userId,
+            { allowPrivate: canUsePrivateDestinations({ role: operator.role }) },
           );
           return { id: created.id, name: created.name, alias: created.alias };
         })(),

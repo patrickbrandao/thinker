@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   INestApplication,
   Injectable,
   UnauthorizedException,
@@ -25,6 +26,10 @@ import { AgentMessage } from '../src/entities/agent-message.entity';
 import { ThinkerRequest } from '../src/entities/request.entity';
 import { ApiKey } from '../src/entities/api-key.entity';
 import { Tenant } from '../src/entities/tenant.entity';
+import { OrganizationMember, OrganizationRole } from '../src/entities/organization-member.entity';
+import { RolesGuard } from '../src/common/guards/roles.guard';
+import { OrganizationsModule } from '../src/organizations/organizations.module';
+import { UserProfile } from '../src/entities/user-profile.entity';
 import { Agent } from '../src/entities/agent.entity';
 import { AgentApiKey } from '../src/entities/agent-api-key.entity';
 import { NotificationRule } from '../src/entities/notification-rule.entity';
@@ -65,6 +70,8 @@ export const TEST_AGENT_ID = 'test-agent-001';
 export const TEST_OTLP_KEY = 'thk_test-otlp-key-001';
 
 const entities = [
+  OrganizationMember,
+  UserProfile,
   AgentMessage,
   ThinkerRequest,
   ApiKey,
@@ -211,16 +218,52 @@ class MockSessionGuard implements CanActivate {
         ? request.headers['x-test-auth-method']
         : 'session';
 
-    // Resolve the user's tenant via owner_user_id (no caching: tests create
-    // tenants on the fly and must see them on the next request).
-    const rows: Array<{ id: string }> = await this.dataSource.query(
-      `SELECT id FROM tenants WHERE owner_user_id = $1 LIMIT 1`,
+    // Same resolution as TenantCacheService.resolveAccess (ADR 0006), without
+    // its cache: tests create organizations on the fly. Fixtures that only set
+    // tenants.owner_user_id still resolve, as that tenant's owner.
+    const header = request.headers['x-thinker-organization'];
+    const requested = typeof header === 'string' && header ? header : null;
+    const memberships: Array<{ tenant_id: string; role: OrganizationRole }> =
+      await this.dataSource.query(
+        `SELECT m.tenant_id, m.role FROM organization_members m
+           JOIN tenants t ON t.id = m.tenant_id AND t.is_active
+          WHERE m.user_id = $1 ORDER BY m.created_at ASC`,
+        [userId],
+      );
+    const legacy: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id FROM tenants WHERE owner_user_id = $1 AND is_active LIMIT 1`,
       [userId],
     );
+    if (legacy[0] && !memberships.some((m) => m.tenant_id === legacy[0].id)) {
+      memberships.push({ tenant_id: legacy[0].id, role: 'owner' });
+    }
+    const [profile]: Array<{
+      is_instance_admin: boolean;
+      must_change_password: boolean;
+      active_tenant_id: string | null;
+    }> = await this.dataSource.query(`SELECT * FROM user_profiles WHERE user_id = $1`, [userId]);
+    const isInstanceAdmin = profile?.is_instance_admin ?? false;
+    const wanted = requested ?? profile?.active_tenant_id ?? null;
+    let chosen = memberships.find((m) => m.tenant_id === wanted);
+    if (!chosen && wanted && isInstanceAdmin) chosen = { tenant_id: wanted, role: 'owner' };
+    if (!chosen && requested) {
+      throw new ForbiddenException({ message: 'Not a member', code: 'not_a_member' });
+    }
+    chosen ??= memberships[0];
     (request as RequestWithTenantContext).tenantContext = {
-      tenantId: rows[0]?.id ?? null,
+      tenantId: chosen?.tenant_id ?? null,
       userId,
+      role: chosen?.role ?? null,
+      isInstanceAdmin,
+      mustChangePassword: profile?.must_change_password ?? false,
     };
+    const path = String(request.originalUrl ?? request.url ?? '').split('?')[0];
+    if (profile?.must_change_password && !/^\/api\/v1\/me(\/password)?\/?$/.test(path)) {
+      throw new ForbiddenException({
+        message: 'Change your temporary password before continuing.',
+        code: 'password_change_required',
+      });
+    }
     return true;
   }
 }
@@ -250,8 +293,12 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
         RoutingModule,
         PlaygroundModule,
         SetupModule,
+        OrganizationsModule,
       ],
-      providers: [{ provide: APP_GUARD, useClass: MockSessionGuard }],
+      providers: [
+        { provide: APP_GUARD, useClass: MockSessionGuard },
+        { provide: APP_GUARD, useClass: RolesGuard },
+      ],
     })
       // Provider-connect tests use fake credentials. Keep model discovery
       // deterministic instead of waiting on live provider APIs to reject them.

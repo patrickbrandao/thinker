@@ -1,0 +1,244 @@
+/* Organizations, members, accounts and the forced password change (ADR 0006). */
+
+/* ── Sidebar organization switcher ─────────────────── */
+.org-switcher {
+  padding: 0 var(--gap-lg) var(--gap-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
+}
+
+.org-switcher__label {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.org-switcher__row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-xs);
+}
+
+.org-switcher__select {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--gap-sm);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.org-switcher__select:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 1px;
+}
+
+.org-switcher__name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-switcher__role {
+  font-size: var(--font-size-xs);
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Role badge ────────────────────────────────────── */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--gap-sm);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+.role-badge--warning {
+  border-color: hsl(var(--warning) / 0.5);
+  color: hsl(var(--warning));
+}
+
+.role-badge--accent {
+  border-color: hsl(var(--primary) / 0.4);
+  color: hsl(var(--primary));
+}
+
+/* ── Read-only notice + region ─────────────────────── */
+.readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-lg);
+  padding: var(--gap-sm) var(--gap-md);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: var(--font-size-sm);
+}
+
+/* A disabled <fieldset> disables every form control inside it; display:
+   contents keeps it out of the layout. */
+.readonly-region {
+  display: contents;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+/* ── Temporary password box ────────────────────────── */
+.temp-password {
+  margin-top: var(--gap-md);
+  padding: var(--gap-md);
+  border: 1px solid hsl(var(--warning) / 0.5);
+  border-radius: var(--radius);
+  background: hsl(var(--warning) / 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.temp-password__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.temp-password__warning {
+  font-size: var(--font-size-xs);
+  color: hsl(var(--muted-foreground));
+}
+
+.temp-password__row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.temp-password__value {
+  flex: 1;
+  min-width: 0;
+  padding: var(--gap-sm) var(--gap-md);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--background));
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: hsl(var(--foreground));
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.temp-password__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Forms and tables on the org/users pages ───────── */
+.org-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--gap-md);
+  align-items: end;
+  padding: var(--gap-lg);
+}
+
+.org-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
+  font-size: var(--font-size-sm);
+  color: hsl(var(--foreground));
+}
+
+.org-form__field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.org-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.org-table-wrap {
+  overflow-x: auto;
+}
+
+.org-table td {
+  vertical-align: middle;
+}
+
+.org-table__muted {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--font-size-xs);
+}
+
+.org-table__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.org-table__actions .btn + .btn {
+  margin-left: var(--gap-xs);
+}
+
+.org-table__orgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-xs);
+}
+
+.org-select {
+  height: 30px;
+  padding: 0 var(--gap-sm);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.org-error {
+  color: hsl(var(--destructive));
+  font-size: var(--font-size-xs);
+}
+
+/* ── Full-page gate states (no organization, load error) ── */
+.org-gate {
+  max-width: 440px;
+  margin: var(--gap-2xl) auto;
+  padding: 0 var(--gap-lg);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+}
+
+.org-gate__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.org-gate__text {
+  font-size: var(--font-size-sm);
+  color: hsl(var(--muted-foreground));
+}

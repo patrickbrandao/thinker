@@ -10,6 +10,7 @@ import {
 import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
+import MeGate from './components/MeGate.jsx';
 import VersionIndicator from './components/VersionIndicator.jsx';
 import { connectSse } from './services/sse.js';
 import { RightSidebarProvider, useRightSidebar } from './services/right-sidebar.jsx';
@@ -81,11 +82,13 @@ const AppInner: ParentComponent = (props) => {
 const App: ParentComponent = (props) => {
   return (
     <AuthGuard>
-      <SseConnector>
-        <RightSidebarProvider>
-          <AppInner>{props.children}</AppInner>
-        </RightSidebarProvider>
-      </SseConnector>
+      <MeGate>
+        <SseConnector>
+          <RightSidebarProvider>
+            <AppInner>{props.children}</AppInner>
+          </RightSidebarProvider>
+        </SseConnector>
+      </MeGate>
     </AuthGuard>
   );
 };

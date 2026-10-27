@@ -1,5 +1,6 @@
 import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
+import type { OrganizationRole } from '../../entities/organization-member.entity';
 
 /**
  * The single request-scoped ownership concept. Every resource belongs to a
@@ -17,6 +18,16 @@ export interface TenantContext {
   tenantId: string | null;
   /** The authenticated user, when one exists. Attribution only — never scope by it. */
   userId: string | null;
+  /**
+   * The user's role in the active organization (ADR 0006). Null when the user
+   * belongs to none yet: their first mutation creates a personal organization
+   * they own. Undefined only for internal contexts that skip the auth guards.
+   */
+  role?: OrganizationRole | null;
+  /** Instance administrator: manages accounts and every organization. */
+  isInstanceAdmin?: boolean;
+  /** The account still has a temporary password (ADR 0006). */
+  mustChangePassword?: boolean;
 }
 
 export type RequestWithTenantContext = Request & { tenantContext?: TenantContext };

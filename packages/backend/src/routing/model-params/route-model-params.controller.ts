@@ -9,6 +9,7 @@ import {
 } from '../dto/model-params.dto';
 import { AgentNameParamDto } from '../dto/routing.dto';
 import { RouteModelParamsService, type RouteModelParamsView } from './route-model-params.service';
+import { MinRole } from '../../common/decorators/roles.decorator';
 
 /**
  * Model params addressed by tier + model, for the CLI (`thinker routing params`).
@@ -20,6 +21,7 @@ import { RouteModelParamsService, type RouteModelParamsView } from './route-mode
  * (ADR 0004, section 9): a separate selector, since a virtual model and a
  * custom tier may share a name. It reads and writes the `virtual:<id>` scope.
  */
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class RouteModelParamsController {
   constructor(

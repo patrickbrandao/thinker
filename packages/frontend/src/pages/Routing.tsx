@@ -14,6 +14,8 @@ import { buildPipelineHelp } from '../components/RoutingPipelineCard.js';
 import RoutingTabs from '../components/RoutingTabs.js';
 import ResponseModeModal from '../components/ResponseModeModal.js';
 import { toast } from '../services/toast-store.js';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
+import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import SetupModal from '../components/SetupModal.jsx';
 import { isRecentlyCreated, isSetupPending, clearSetupPending } from '../services/recent-agents.js';
@@ -516,62 +518,66 @@ const Routing: Component = () => {
         fallback={<RoutingLoadingSkeleton />}
       >
         <Show when={hasProviders()} fallback={<NoConnectionsPrompt />}>
-          {/* Provider icons + action buttons in a single row */}
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <Show when={isEnabled()}>
-              <ActiveProviderIcons
-                activeProviders={activeProviders}
-                customProviders={() => customProviders() ?? []}
-              />
-            </Show>
-            <div style="display: flex; gap: 8px; margin-left: auto;">
+          <ReadOnlyRegion
+            readOnly={!roleCan.manageProviders()}
+            notice="You have read-only access to routing. Only admins and owners can change it."
+          >
+            {/* Provider icons + action buttons in a single row */}
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
               <Show when={isEnabled()}>
-                <button
-                  class="btn btn--outline btn--sm"
-                  disabled={refreshingModels()}
-                  onClick={async () => {
-                    setRefreshingModels(true);
-                    try {
-                      await refreshModels(agentName());
-                      refetchModels();
-                      refetchTiers();
-                      toast.success('Models refreshed');
-                    } catch {
-                      toast.error('Failed to refresh models');
-                    } finally {
-                      setRefreshingModels(false);
-                    }
-                  }}
-                >
-                  {refreshingModels() ? 'Refreshing...' : 'Refresh models'}
-                </button>
+                <ActiveProviderIcons
+                  activeProviders={activeProviders}
+                  customProviders={() => customProviders() ?? []}
+                />
               </Show>
-              <button class="response-mode-btn" onClick={() => setResponseModeModalOpen(true)}>
-                <span class="response-mode-btn__icon">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
+              <div style="display: flex; gap: 8px; margin-left: auto;">
+                <Show when={isEnabled()}>
+                  <button
+                    class="btn btn--outline btn--sm"
+                    disabled={refreshingModels()}
+                    onClick={async () => {
+                      setRefreshingModels(true);
+                      try {
+                        await refreshModels(agentName());
+                        refetchModels();
+                        refetchTiers();
+                        toast.success('Models refreshed');
+                      } catch {
+                        toast.error('Failed to refresh models');
+                      } finally {
+                        setRefreshingModels(false);
+                      }
+                    }}
                   >
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </span>
-                Response mode: {defaultResponseMode() === 'stream' ? 'Stream' : 'Buffered'}
-              </button>
+                    {refreshingModels() ? 'Refreshing...' : 'Refresh models'}
+                  </button>
+                </Show>
+                <button class="response-mode-btn" onClick={() => setResponseModeModalOpen(true)}>
+                  <span class="response-mode-btn__icon">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </span>
+                  Response mode: {defaultResponseMode() === 'stream' ? 'Stream' : 'Buffered'}
+                </button>
+              </div>
             </div>
-          </div>
-
+          </ReadOnlyRegion>
           <Show
             when={!isCleanAgent()}
             fallback={
-              <>
+              <ReadOnlyRegion readOnly={!roleCan.manageProviders()}>
                 {/* ── Unified view for clean agents (no tabs) ──────── */}
                 <div
                   class="routing-section__header routing-section__header--header-tiers"
@@ -717,7 +723,7 @@ const Routing: Component = () => {
                   getModelParams={getModelParamsFor}
                   setModelParams={setModelParamsFor}
                 />
-              </>
+              </ReadOnlyRegion>
             }
           >
             <RoutingTabs
@@ -734,118 +740,126 @@ const Routing: Component = () => {
             >
               {{
                 default: (
-                  <RoutingDefaultTierSection
-                    agentName={agentName}
-                    tier={() => actions.getTier('default')}
-                    models={() => models() ?? []}
-                    customProviders={() => customProviders() ?? []}
-                    activeProviders={activeProviders}
-                    connectedProviders={enabledConnectedProviders}
-                    tiersLoading={tiers.loading}
-                    changingTier={actions.changingTier}
-                    resettingTier={actions.resettingTier}
-                    resettingAll={actions.resettingAll}
-                    addingFallback={actions.addingFallback}
-                    onDropdownOpen={(tierId) => setDropdownTier(tierId)}
-                    onOverride={handleOverride}
-                    onPinKey={actions.handlePinKey}
-                    onReset={actions.handleReset}
-                    onFallbackUpdate={actions.handleFallbackUpdate}
-                    onAddFallback={(tierId) => setFallbackPickerTier(tierId)}
-                    getFallbacksFor={actions.getFallbacksFor}
-                    getTier={actions.getTier}
-                    complexityEnabled={complexityEnabled}
-                    togglingComplexity={togglingComplexity}
-                    onToggleComplexity={handleToggleComplexity}
-                    showComplexityToggle={legacyComplexityVisible}
-                    responseMode={defaultResponseMode}
-                    changingResponseMode={changingDefaultResponseMode}
-                    onResponseModeChange={handleDefaultResponseModeChange}
-                    embedded
-                    getModelParams={getModelParamsFor}
-                    setModelParams={setModelParamsFor}
-                  />
+                  <ReadOnlyRegion readOnly={!roleCan.manageProviders()}>
+                    <RoutingDefaultTierSection
+                      agentName={agentName}
+                      tier={() => actions.getTier('default')}
+                      models={() => models() ?? []}
+                      customProviders={() => customProviders() ?? []}
+                      activeProviders={activeProviders}
+                      connectedProviders={enabledConnectedProviders}
+                      tiersLoading={tiers.loading}
+                      changingTier={actions.changingTier}
+                      resettingTier={actions.resettingTier}
+                      resettingAll={actions.resettingAll}
+                      addingFallback={actions.addingFallback}
+                      onDropdownOpen={(tierId) => setDropdownTier(tierId)}
+                      onOverride={handleOverride}
+                      onPinKey={actions.handlePinKey}
+                      onReset={actions.handleReset}
+                      onFallbackUpdate={actions.handleFallbackUpdate}
+                      onAddFallback={(tierId) => setFallbackPickerTier(tierId)}
+                      getFallbacksFor={actions.getFallbacksFor}
+                      getTier={actions.getTier}
+                      complexityEnabled={complexityEnabled}
+                      togglingComplexity={togglingComplexity}
+                      onToggleComplexity={handleToggleComplexity}
+                      showComplexityToggle={legacyComplexityVisible}
+                      responseMode={defaultResponseMode}
+                      changingResponseMode={changingDefaultResponseMode}
+                      onResponseModeChange={handleDefaultResponseModeChange}
+                      embedded
+                      getModelParams={getModelParamsFor}
+                      setModelParams={setModelParamsFor}
+                    />
+                  </ReadOnlyRegion>
                 ),
                 specificity: (
-                  <RoutingSpecificitySection
-                    agentName={agentName}
-                    assignments={specificityAssignments}
-                    models={() => models() ?? []}
-                    customProviders={() => customProviders() ?? []}
-                    activeProviders={activeProviders}
-                    connectedProviders={enabledConnectedProviders}
-                    changingTier={changingSpecificity}
-                    resettingTier={resettingSpecificity}
-                    resettingAll={() => false}
-                    addingFallback={() => null}
-                    onDropdownOpen={(category) => setSpecificityDropdown(category)}
-                    onOverride={handleSpecificityOverride}
-                    onPinKey={handleSpecificityPinKey}
-                    onReset={async (category) => {
-                      setResettingSpecificity(category);
-                      try {
-                        await resetSpecificity(agentName(), category);
-                        await refetchSpecificity();
-                      } catch {
-                        toast.error('Failed to reset');
-                      } finally {
-                        setResettingSpecificity(null);
-                      }
-                    }}
-                    onFallbackUpdate={(category, _updatedFallbacks, updatedRoutes) => {
-                      if (updatedRoutes === undefined) return;
-                      mutateSpecificity((prev) =>
-                        prev?.map((a) =>
-                          a.category === category ? { ...a, fallback_routes: updatedRoutes } : a,
-                        ),
-                      );
-                    }}
-                    onAddFallback={(category) => setFallbackPickerTier(category)}
-                    responseMode={specificityResponseMode}
-                    changingResponseMode={changingSpecificityResponseMode}
-                    onResponseModeChange={handleSpecificityResponseModeChange}
-                    refetchAll={refetchAll}
-                    refetchSpecificity={() => refetchSpecificity() as unknown as Promise<void>}
-                    embedded
-                    getModelParams={getModelParamsFor}
-                    setModelParams={setModelParamsFor}
-                  />
+                  <ReadOnlyRegion readOnly={!roleCan.manageProviders()}>
+                    <RoutingSpecificitySection
+                      agentName={agentName}
+                      assignments={specificityAssignments}
+                      models={() => models() ?? []}
+                      customProviders={() => customProviders() ?? []}
+                      activeProviders={activeProviders}
+                      connectedProviders={enabledConnectedProviders}
+                      changingTier={changingSpecificity}
+                      resettingTier={resettingSpecificity}
+                      resettingAll={() => false}
+                      addingFallback={() => null}
+                      onDropdownOpen={(category) => setSpecificityDropdown(category)}
+                      onOverride={handleSpecificityOverride}
+                      onPinKey={handleSpecificityPinKey}
+                      onReset={async (category) => {
+                        setResettingSpecificity(category);
+                        try {
+                          await resetSpecificity(agentName(), category);
+                          await refetchSpecificity();
+                        } catch {
+                          toast.error('Failed to reset');
+                        } finally {
+                          setResettingSpecificity(null);
+                        }
+                      }}
+                      onFallbackUpdate={(category, _updatedFallbacks, updatedRoutes) => {
+                        if (updatedRoutes === undefined) return;
+                        mutateSpecificity((prev) =>
+                          prev?.map((a) =>
+                            a.category === category ? { ...a, fallback_routes: updatedRoutes } : a,
+                          ),
+                        );
+                      }}
+                      onAddFallback={(category) => setFallbackPickerTier(category)}
+                      responseMode={specificityResponseMode}
+                      changingResponseMode={changingSpecificityResponseMode}
+                      onResponseModeChange={handleSpecificityResponseModeChange}
+                      refetchAll={refetchAll}
+                      refetchSpecificity={() => refetchSpecificity() as unknown as Promise<void>}
+                      embedded
+                      getModelParams={getModelParamsFor}
+                      setModelParams={setModelParamsFor}
+                    />
+                  </ReadOnlyRegion>
                 ),
                 custom: (
-                  <RoutingHeaderTiersSection
-                    agentName={agentName}
-                    models={() => models() ?? []}
-                    customProviders={() => customProviders() ?? []}
-                    connectedProviders={enabledConnectedProviders}
-                    externalTiers={() => headerTiers()}
-                    externalRefetch={() => void refetchHeaderTiers()}
-                    externalMutate={mutateHeaderTiers}
-                    embedded
-                    getModelParams={getModelParamsFor}
-                    setModelParams={setModelParamsFor}
-                  />
+                  <ReadOnlyRegion readOnly={!roleCan.manageProviders()}>
+                    <RoutingHeaderTiersSection
+                      agentName={agentName}
+                      models={() => models() ?? []}
+                      customProviders={() => customProviders() ?? []}
+                      connectedProviders={enabledConnectedProviders}
+                      externalTiers={() => headerTiers()}
+                      externalRefetch={() => void refetchHeaderTiers()}
+                      externalMutate={mutateHeaderTiers}
+                      embedded
+                      getModelParams={getModelParamsFor}
+                      setModelParams={setModelParamsFor}
+                    />
+                  </ReadOnlyRegion>
                 ),
               }}
             </RoutingTabs>
           </Show>
 
-          <RoutingVirtualModelsSection
-            agentName={agentName}
-            models={() => models() ?? []}
-            customProviders={() => customProviders() ?? []}
-            connectedProviders={enabledConnectedProviders}
-            getModelParams={getModelParamsFor}
-            setModelParams={setModelParamsFor}
-          />
+          <ReadOnlyRegion readOnly={!roleCan.manageProviders()}>
+            <RoutingVirtualModelsSection
+              agentName={agentName}
+              models={() => models() ?? []}
+              customProviders={() => customProviders() ?? []}
+              connectedProviders={enabledConnectedProviders}
+              getModelParams={getModelParamsFor}
+              setModelParams={setModelParamsFor}
+            />
 
-          <RoutingFooter
-            hasOverrides={hasOverrides}
-            resettingAll={actions.resettingAll}
-            resettingTier={actions.resettingTier}
-            onResetAll={actions.handleResetAll}
-            onShowInstructions={() => setInstructionModal('enable')}
-            onShowHowRoutingWorks={() => setHelpOpen(true)}
-          />
+            <RoutingFooter
+              hasOverrides={hasOverrides}
+              resettingAll={actions.resettingAll}
+              resettingTier={actions.resettingTier}
+              onResetAll={actions.handleResetAll}
+              onShowInstructions={() => setInstructionModal('enable')}
+              onShowHowRoutingWorks={() => setHelpOpen(true)}
+            />
+          </ReadOnlyRegion>
 
           <Show when={helpOpen()}>
             {(() => {

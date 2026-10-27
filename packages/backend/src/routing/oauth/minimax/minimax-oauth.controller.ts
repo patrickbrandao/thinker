@@ -12,7 +12,9 @@ import { isMinimaxRegion, MinimaxOauthService } from './minimax-oauth.service';
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/minimax')
 export class MinimaxOauthController {
   constructor(

@@ -9,6 +9,7 @@ import RootRedirect from './components/RootRedirect.jsx';
 import AgentGuard from './components/AgentGuard.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
 import GuestGuard from './components/GuestGuard.jsx';
+import MeGate from './components/MeGate.jsx';
 import NotFound from './pages/NotFound.jsx';
 import ToastContainer from './components/ToastContainer.jsx';
 import { lazyReload, clearReloadFlag } from './services/lazy-reload.js';
@@ -55,6 +56,9 @@ const LocalProviders = lazyReload(() => import('./pages/providers/Local.jsx'));
 const ConnectionDetail = lazyReload(() => import('./pages/providers/ConnectionDetail.jsx'));
 const McpServer = lazyReload(() => import('./pages/integrations/McpServer.jsx'));
 const Cli = lazyReload(() => import('./pages/integrations/Cli.jsx'));
+const Organization = lazyReload(() => import('./pages/Organization.jsx'));
+const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
+const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 
 const GuestLayout: ParentComponent = (props) => (
   <GuestGuard>
@@ -67,7 +71,17 @@ const GuestLayout: ParentComponent = (props) => (
 // normally supplies must be recreated here.
 const WelcomeLayout: ParentComponent = (props) => (
   <AuthGuard>
-    <RightSidebarProvider>{props.children}</RightSidebarProvider>
+    <MeGate>
+      <RightSidebarProvider>{props.children}</RightSidebarProvider>
+    </MeGate>
+  </AuthGuard>
+);
+
+// Forced password change: authenticated, outside the dashboard shell (which
+// stays blocked until the change succeeds).
+const ChangePasswordLayout: ParentComponent = (props) => (
+  <AuthGuard>
+    <AuthLayout>{props.children}</AuthLayout>
   </AuthGuard>
 );
 
@@ -143,6 +157,8 @@ render(
 
           <Route path="/connect-provider" component={ConnectProvider} />
           <Route path="/account" component={Account} />
+          <Route path="/organization" component={Organization} />
+          <Route path="/admin/users" component={AdminUsers} />
         </Route>
         <Route path="/cli/auth" component={AuthGuard}>
           <Route path="/" component={CliAuth} />
@@ -160,6 +176,9 @@ render(
         </Route>
         <Route path="/setup" component={AuthLayout}>
           <Route path="/" component={Setup} />
+        </Route>
+        <Route path="/change-password" component={ChangePasswordLayout}>
+          <Route path="/" component={ChangePassword} />
         </Route>
         <Route path="/welcome" component={WelcomeLayout}>
           <Route path="/" component={Welcome} />

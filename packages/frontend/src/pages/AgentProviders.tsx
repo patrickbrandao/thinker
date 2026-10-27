@@ -11,6 +11,8 @@ import {
 import { getProviders as getGlobalProviders } from '../services/api/providers.js';
 import { PROVIDERS } from '../services/providers.js';
 import { toast } from '../services/toast-store.js';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
+import { roleCan } from '../services/session-store.js';
 import { customProviderColor } from '../services/formatters.js';
 import { providerIcon } from '../components/ProviderIcon.jsx';
 import NoConnectionsPrompt from '../components/NoConnectionsPrompt.jsx';
@@ -154,104 +156,109 @@ const AgentProviders: Component = () => {
         while its models are assigned to this harness's routing. Update routing first to remove it.
       </p>
 
-      <Show when={connections().length > 0} fallback={<NoConnectionsPrompt />}>
-        <div class="panel" style="padding: 0; overflow-x: auto;">
-          <table class="data-table" style="min-width: 600px; table-layout: fixed;">
-            <colgroup>
-              <col style="width: 220px;" />
-              <col style="width: 120px;" />
-              <col />
-              <col style="width: 56px;" />
-              <col style="width: 64px;" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>Provider</th>
-                <th>Type</th>
-                <th>Connection</th>
-                <th>Models</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              <For each={connections()}>
-                {(connection) => {
-                  const enabled = () => isEnabled(connection.userProviderId);
-                  const name = () => providerName(connection.provider);
-                  return (
-                    <tr style={{ opacity: enabled() ? '1' : '0.55' }}>
-                      <td>
-                        <span style="display: flex; align-items: center; gap: 10px;">
-                          <Show
-                            when={providerIcon(connection.provider, 20)}
-                            fallback={
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  'align-items': 'center',
-                                  'justify-content': 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  'border-radius': '4px',
-                                  'font-size': '11px',
-                                  'font-weight': '600',
-                                  color: 'white',
-                                  background: customProviderColor(name()),
-                                }}
-                              >
-                                {name().charAt(0).toUpperCase()}
+      <ReadOnlyRegion
+        readOnly={!roleCan.manageProviders()}
+        notice="You have read-only access. Only admins and owners can change which providers this harness uses."
+      >
+        <Show when={connections().length > 0} fallback={<NoConnectionsPrompt />}>
+          <div class="panel" style="padding: 0; overflow-x: auto;">
+            <table class="data-table" style="min-width: 600px; table-layout: fixed;">
+              <colgroup>
+                <col style="width: 220px;" />
+                <col style="width: 120px;" />
+                <col />
+                <col style="width: 56px;" />
+                <col style="width: 64px;" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>Type</th>
+                  <th>Connection</th>
+                  <th>Models</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                <For each={connections()}>
+                  {(connection) => {
+                    const enabled = () => isEnabled(connection.userProviderId);
+                    const name = () => providerName(connection.provider);
+                    return (
+                      <tr style={{ opacity: enabled() ? '1' : '0.55' }}>
+                        <td>
+                          <span style="display: flex; align-items: center; gap: 10px;">
+                            <Show
+                              when={providerIcon(connection.provider, 20)}
+                              fallback={
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    'align-items': 'center',
+                                    'justify-content': 'center',
+                                    width: '20px',
+                                    height: '20px',
+                                    'border-radius': '4px',
+                                    'font-size': '11px',
+                                    'font-weight': '600',
+                                    color: 'white',
+                                    background: customProviderColor(name()),
+                                  }}
+                                >
+                                  {name().charAt(0).toUpperCase()}
+                                </span>
+                              }
+                            >
+                              <span style="display: flex; align-items: center; width: 20px; height: 20px;">
+                                {providerIcon(connection.provider, 20)}
                               </span>
-                            }
-                          >
-                            <span style="display: flex; align-items: center; width: 20px; height: 20px;">
-                              {providerIcon(connection.provider, 20)}
-                            </span>
-                          </Show>
-                          <span style="font-weight: 500;">{name()}</span>
-                        </span>
-                      </td>
-                      <td>
-                        <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                          {AUTH_BADGES[connection.authType] ?? connection.authType}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          title={connection.label}
-                          style={{
-                            display: 'block',
-                            overflow: 'hidden',
-                            'text-overflow': 'ellipsis',
-                            color: 'hsl(var(--muted-foreground))',
-                          }}
-                        >
-                          {connection.label}
-                        </span>
-                      </td>
-                      <td>{connection.models || '-'}</td>
-                      <td style="text-align: right;">
-                        <button
-                          class="routing-switch"
-                          classList={{ 'routing-switch--on': enabled() }}
-                          disabled={busy() === connection.userProviderId}
-                          aria-label={`${enabled() ? 'Disable' : 'Enable'} ${name()} ${
-                            connection.label
-                          }`}
-                          onClick={() => void handleToggle(connection)}
-                        >
-                          <span class="routing-switch__track">
-                            <span class="routing-switch__thumb" />
+                            </Show>
+                            <span style="font-weight: 500;">{name()}</span>
                           </span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                }}
-              </For>
-            </tbody>
-          </table>
-        </div>
-      </Show>
+                        </td>
+                        <td>
+                          <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
+                            {AUTH_BADGES[connection.authType] ?? connection.authType}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            title={connection.label}
+                            style={{
+                              display: 'block',
+                              overflow: 'hidden',
+                              'text-overflow': 'ellipsis',
+                              color: 'hsl(var(--muted-foreground))',
+                            }}
+                          >
+                            {connection.label}
+                          </span>
+                        </td>
+                        <td>{connection.models || '-'}</td>
+                        <td style="text-align: right;">
+                          <button
+                            class="routing-switch"
+                            classList={{ 'routing-switch--on': enabled() }}
+                            disabled={busy() === connection.userProviderId}
+                            aria-label={`${enabled() ? 'Disable' : 'Enable'} ${name()} ${
+                              connection.label
+                            }`}
+                            onClick={() => void handleToggle(connection)}
+                          >
+                            <span class="routing-switch__track">
+                              <span class="routing-switch__thumb" />
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </Show>
+      </ReadOnlyRegion>
     </div>
   );
 };

@@ -39,7 +39,11 @@ import {
   MINIMAX_API_KEY_REGION_VALIDATION_MESSAGE,
   isMinimaxRegion,
 } from './oauth/minimax/minimax-oauth-helpers';
+import { MinRole } from '../common/decorators/roles.decorator';
+import { isLocalOnlyProvider } from '../common/utils/provider-availability';
+import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class ProviderController {
   constructor(
@@ -122,6 +126,8 @@ export class ProviderController {
       allowPlayground: true,
     });
     const lowerProvider = body.provider.toLowerCase();
+    // Local runners reach services on the host (#102, ADR 0006).
+    if (isLocalOnlyProvider(lowerProvider)) assertCanUseLocalRunners(ctx);
     const isCustomProvider = lowerProvider.startsWith('custom:');
     const label = isCustomProvider
       ? await this.customConnectionLabel(agent.tenant_id, lowerProvider, body)

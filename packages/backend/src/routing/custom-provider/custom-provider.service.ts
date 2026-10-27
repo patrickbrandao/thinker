@@ -39,12 +39,19 @@ import { classifyProbeError } from './probe-error';
 const PROBE_TIMEOUT_MS = 5000;
 
 // Private and LAN destinations are a feature: operators point custom providers
-// at Ollama, LM Studio or vLLM on their own network. Cloud metadata endpoints
-// stay blocked inside validatePublicUrl regardless of this flag, and every
-// request to the URL goes through ssrfSafeFetch, which re-checks the address
-// it actually connects to (DNS rebinding). The URL comes from an authenticated
-// tenant member, not an anonymous client.
-const CUSTOM_PROVIDER_URL_POLICY = { allowPrivate: true } as const;
+// at Ollama, LM Studio or vLLM on their own network. Who may register one is
+// THINKER_PROVIDER_PRIVATE_URLS (#78, common/utils/private-url-policy.ts); the
+// controllers pass the caller's answer as `allowPrivate`. Cloud metadata
+// endpoints stay blocked inside validatePublicUrl regardless, and every request
+// to the URL goes through ssrfSafeFetch, which re-checks the address it
+// actually connects to (DNS rebinding).
+export interface CustomProviderUrlOptions {
+  allowPrivate?: boolean;
+}
+
+function urlPolicy(opts: CustomProviderUrlOptions): { allowPrivate: boolean } {
+  return { allowPrivate: opts.allowPrivate ?? true };
+}
 
 /**
  * OpenAI-compatible `/v1/models` endpoints return every model the server
@@ -303,6 +310,7 @@ export class CustomProviderService {
     tenantId: string,
     dto: CreateCustomProviderDto,
     createdByUserId?: string | null,
+    urlOpts: CustomProviderUrlOptions = {},
   ): Promise<CustomProvider> {
     // Use case-insensitive comparison to match the DB unique index on
     // (tenant_id, LOWER(name)) — an exact findOne would miss "My Provider"
@@ -324,7 +332,7 @@ export class CustomProviderService {
     if (alias && dto.alias !== undefined) this.assertAliasAvailable(alias, allForTenant);
 
     try {
-      await validatePublicUrl(dto.base_url, CUSTOM_PROVIDER_URL_POLICY);
+      await validatePublicUrl(dto.base_url, urlPolicy(urlOpts));
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }
@@ -395,6 +403,7 @@ export class CustomProviderService {
     tenantId: string,
     dto: UpdateCustomProviderDto,
     actorUserId?: string | null,
+    urlOpts: CustomProviderUrlOptions = {},
   ): Promise<CustomProvider> {
     const cp = await this.repo.findOne({ where: { id, tenant_id: tenantId } });
     if (!cp) {
@@ -430,7 +439,7 @@ export class CustomProviderService {
 
     if (dto.base_url !== undefined) {
       try {
-        await validatePublicUrl(dto.base_url, CUSTOM_PROVIDER_URL_POLICY);
+        await validatePublicUrl(dto.base_url, urlPolicy(urlOpts));
       } catch (err) {
         throw new BadRequestException((err as Error).message);
       }
@@ -574,9 +583,10 @@ export class CustomProviderService {
     apiKey?: string,
     apiKind: CustomProviderApiKind = 'openai',
     providerName?: string,
+    urlOpts: CustomProviderUrlOptions = {},
   ): Promise<CustomProviderModel[]> {
     try {
-      await validatePublicUrl(baseUrl, CUSTOM_PROVIDER_URL_POLICY);
+      await validatePublicUrl(baseUrl, urlPolicy(urlOpts));
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }

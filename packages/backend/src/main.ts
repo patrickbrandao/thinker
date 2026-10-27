@@ -7,6 +7,7 @@ import compression from 'compression';
 import * as express from 'express';
 import { AppModule } from './app.module';
 import { auth, mcpDisabledReason, mcpEnabled } from './auth/auth.instance';
+import { ORGANIZATION_HEADER } from './auth/session.guard';
 import { mcpOAuthResponse } from './auth/mcp-oauth-response';
 import { mountMcpDiscovery, mountMcpUnavailable } from './mcp/mcp-discovery';
 import { SpaFallbackFilter } from './common/filters/spa-fallback.filter';
@@ -85,6 +86,13 @@ export async function bootstrap() {
   // tokens and wrecks streaming time-to-first-token. All other responses use
   // the package's default content-type filter.
   app.use(compression({ filter: shouldCompress }));
+
+  // Dashboard responses depend on the active organization (ADR 0006): keep
+  // the browser's HTTP cache from serving one organization's data to another.
+  app.use('/api/', (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.vary(ORGANIZATION_HEADER);
+    next();
+  });
 
   // CORS: the dashboard is same-origin, so production allows no cross-origin
   // browser caller unless the operator lists it in `THINKER_CORS_ORIGINS`. Dev

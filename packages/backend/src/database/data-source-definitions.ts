@@ -26,6 +26,8 @@ import { ReasoningContentCacheEntry } from '../entities/reasoning-content-cache-
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { CliAuthCode } from '../entities/cli-auth-code.entity';
 import { AgentUsageDaily } from '../entities/agent-usage-daily.entity';
+import { OrganizationMember } from '../entities/organization-member.entity';
+import { UserProfile } from '../entities/user-profile.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -62,6 +64,7 @@ import { RenameThinkerRoutingReasons1803600000000 } from './migrations/180360000
 import { RenameReservedCustomProviderAliases1803610000000 } from './migrations/1803610000000-RenameReservedCustomProviderAliases';
 import { RemapAutofixedStatus1803620000000 } from './migrations/1803620000000-RemapAutofixedStatus';
 import { AddVirtualModels1803700000000 } from './migrations/1803700000000-AddVirtualModels';
+import { AddOrganizations1803800000000 } from './migrations/1803800000000-AddOrganizations';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -213,6 +216,8 @@ export const entities = [
   BackfillState,
   CliAuthCode,
   AgentUsageDaily,
+  OrganizationMember,
+  UserProfile,
 ];
 
 export const migrations = [
@@ -370,4 +375,5 @@ export const migrations = [
   RenameReservedCustomProviderAliases1803610000000,
   RemapAutofixedStatus1803620000000,
   AddVirtualModels1803700000000,
+  AddOrganizations1803800000000,
 ];

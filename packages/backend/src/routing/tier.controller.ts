@@ -25,7 +25,9 @@ import {
 } from './dto/routing.dto';
 import { Agent } from '../entities/agent.entity';
 import { AgentRecordingConfigService } from '../common/services/agent-recording-config.service';
+import { MinRole } from '../common/decorators/roles.decorator';
 
+@MinRole('admin')
 @Controller('api/v1/routing')
 export class TierController {
   constructor(

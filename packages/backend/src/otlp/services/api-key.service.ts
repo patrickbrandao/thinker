@@ -13,6 +13,7 @@ import {
   getDecryptionSecrets,
 } from '../../common/utils/crypto.util';
 import { API_KEY_PREFIX } from '../../common/constants/api-key.constants';
+import { TenantCacheService } from '../../common/services/tenant-cache.service';
 import { AgentKeyAuthGuard } from '../guards/agent-key-auth.guard';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class ApiKeyGeneratorService {
     @InjectRepository(AgentApiKey)
     private readonly keyRepo: Repository<AgentApiKey>,
     private readonly otlpAuthGuard: AgentKeyAuthGuard,
+    private readonly tenantCache: TenantCacheService,
   ) {}
 
   private generateKey(): string {
@@ -50,24 +52,8 @@ export class ApiKeyGeneratorService {
     if (params.tenantId) {
       tenantId = params.tenantId;
     } else if (params.ownerUserId) {
-      const existing = await this.tenantRepo.findOne({
-        where: { owner_user_id: params.ownerUserId },
-      });
-      if (existing) {
-        tenantId = existing.id;
-      } else {
-        tenantId = randomUUID();
-        await this.tenantRepo.insert({
-          id: tenantId,
-          // `name` keeps mirroring the owner id until it's repurposed as a
-          // display slug; resolution only ever reads owner_user_id.
-          name: params.ownerUserId,
-          owner_user_id: params.ownerUserId,
-          organization_name: params.organizationName ?? null,
-          email: params.email ?? null,
-          is_active: true,
-        });
-      }
+      // The user's active organization, or a personal one they own (ADR 0006).
+      tenantId = await this.tenantCache.ensureForUser(params.ownerUserId);
     } else {
       throw new NotFoundException('No tenant available for agent onboarding');
     }

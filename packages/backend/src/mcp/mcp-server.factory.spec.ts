@@ -35,6 +35,7 @@ describe('buildMcpServer', () => {
       userId: 'u',
       tenantId: 't',
       scopes: new Set(['mcp:read', 'mcp:write']),
+      role: 'owner',
     }) as unknown as FakeServer;
     expect(server.tools).toContain('thinker_agent_create');
     expect(server.tools).toContain('thinker_provider_connect');
@@ -51,6 +52,7 @@ describe('buildMcpServer', () => {
       userId: 'u',
       tenantId: 't',
       scopes: new Set(['mcp:read']),
+      role: 'owner',
     }) as unknown as FakeServer;
     expect(server.opts).toMatchObject({ capabilities: { tools: { listChanged: false } } });
   });
@@ -60,6 +62,7 @@ describe('buildMcpServer', () => {
       userId: 'u',
       tenantId: 't',
       scopes: new Set(['mcp:read']),
+      role: 'owner',
     } satisfies McpOperator) as unknown as FakeServer;
     expect(server.tools).toContain('thinker_agent_list');
     expect(server.tools).not.toContain('thinker_agent_create');

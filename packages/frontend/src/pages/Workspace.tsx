@@ -7,6 +7,7 @@ import AddAgentModal from '../components/AddAgentModal.jsx';
 import DuplicateAgentModal from '../components/DuplicateAgentModal.jsx';
 import { getAgents, deleteAgent } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { roleCan } from '../services/session-store.js';
 import { formatCost, formatNumber, formatTime } from '../services/formatters.js';
 import Sparkline from '../components/Sparkline.jsx';
 import { agentPing, analyticsPing } from '../services/sse.js';
@@ -198,23 +199,25 @@ const Workspace: Component = () => {
               </svg>
             </button>
           </div>
-          <button class="btn btn--primary btn--sm" onClick={() => setModalOpen(true)}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Connect Harness
-          </button>
+          <Show when={roleCan.editHarnesses()}>
+            <button class="btn btn--primary btn--sm" onClick={() => setModalOpen(true)}>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Connect Harness
+            </button>
+          </Show>
         </div>
       </div>
 
@@ -298,13 +301,15 @@ const Workspace: Component = () => {
                 <p>
                   Connect a harness or an AI app to take control of your routing and your costs.
                 </p>
-                <button
-                  class="btn btn--primary btn--sm"
-                  style="margin-top: var(--gap-md);"
-                  onClick={() => setModalOpen(true)}
-                >
-                  Connect your first harness
-                </button>
+                <Show when={roleCan.editHarnesses()}>
+                  <button
+                    class="btn btn--primary btn--sm"
+                    style="margin-top: var(--gap-md);"
+                    onClick={() => setModalOpen(true)}
+                  >
+                    Connect your first harness
+                  </button>
+                </Show>
               </div>
             }
           >
@@ -351,10 +356,12 @@ const Workspace: Component = () => {
                             <td>{formatCost(agent.total_cost) ?? '—'}</td>
                             <td>{agent.last_active ? formatTime(agent.last_active) : '—'}</td>
                             <td class="workspace-table__actions">
-                              <ActionMenu
-                                ariaLabel={`Actions for ${agent.agent_name}`}
-                                items={harnessActionItems(agent.agent_name)}
-                              />
+                              <Show when={roleCan.editHarnesses()}>
+                                <ActionMenu
+                                  ariaLabel={`Actions for ${agent.agent_name}`}
+                                  items={harnessActionItems(agent.agent_name)}
+                                />
+                              </Show>
                             </td>
                           </tr>
                         )}
@@ -404,11 +411,13 @@ const Workspace: Component = () => {
                           <Sparkline data={agent.sparkline} width={280} height={50} />
                         </div>
                       </A>
-                      <ActionMenu
-                        class="agent-card__menu"
-                        ariaLabel={`Actions for ${agent.agent_name}`}
-                        items={harnessActionItems(agent.agent_name)}
-                      />
+                      <Show when={roleCan.editHarnesses()}>
+                        <ActionMenu
+                          class="agent-card__menu"
+                          ariaLabel={`Actions for ${agent.agent_name}`}
+                          items={harnessActionItems(agent.agent_name)}
+                        />
+                      </Show>
                     </div>
                   )}
                 </For>

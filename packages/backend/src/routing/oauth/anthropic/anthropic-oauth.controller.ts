@@ -13,7 +13,9 @@ import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 import { AnthropicOauthExchangeError, AnthropicOauthService } from './anthropic-oauth.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/anthropic')
 export class AnthropicOauthController {
   private readonly logger = new Logger(AnthropicOauthController.name);

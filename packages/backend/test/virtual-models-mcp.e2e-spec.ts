@@ -68,7 +68,12 @@ const CATALOG: DiscoveredModel[] = [
 ];
 
 function operator(tenantId = TEST_TENANT_ID): McpOperator {
-  return { userId: 'mcp-user', tenantId, scopes: new Set(['mcp:read', 'mcp:write']) };
+  return {
+    userId: 'mcp-user',
+    tenantId,
+    scopes: new Set(['mcp:read', 'mcp:write']),
+    role: 'owner',
+  };
 }
 
 function tools(op = operator()): Map<string, Handler> {

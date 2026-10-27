@@ -309,7 +309,11 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
         'k.tenant_id',
         'k.agent_id',
         'k.expires_at',
+        'a.id',
         'a.name',
+        // t.id keeps the tenant hydrated when owner_user_id is NULL, as it is
+        // for organizations created by the instance admin (ADR 0006).
+        't.id',
         't.owner_user_id',
       ])
       .leftJoin('k.agent', 'a')

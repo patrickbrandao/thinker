@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { PLATFORM_API_SURFACES, type JsonValue } from 'thinker-shared';
 import { authOrigin } from '../../auth/auth.instance';
-import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
+import { canWrite as operatorCanWrite, McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { result } from '../tool-result';
 import { resolveRoutingStatus } from '../../routing/routing-status';
@@ -112,7 +112,7 @@ export function registerRoutingTools(
   deps: McpToolDeps,
   operator: McpOperator,
 ): void {
-  const canWrite = operator.scopes.has(MCP_WRITE_SCOPE);
+  const canWrite = operatorCanWrite(operator, 'admin');
   server.registerTool(
     'thinker_routing_status',
     {

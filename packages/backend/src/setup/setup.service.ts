@@ -170,6 +170,13 @@ export class SetupService {
         await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
           dto.email,
         ]);
+        // The first account is the instance administrator (ADR 0006).
+        await queryRunner.query(
+          `INSERT INTO user_profiles (user_id, is_instance_admin)
+           SELECT id, true FROM "user" WHERE email = $1
+           ON CONFLICT (user_id) DO UPDATE SET is_instance_admin = true`,
+          [dto.email],
+        );
 
         this.logger.log(`First-run setup complete — admin user created: ${dto.email}`);
       } finally {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'thinker-shared';
 import { PLAYGROUND_AGENT_SLUG } from '../../common/constants/playground.constants';
 import { slugify } from '../../common/utils/slugify';
-import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
+import { canWrite as operatorCanWrite, McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
 
@@ -86,7 +86,7 @@ export function registerAgentTools(
 
   // Everything below mutates state or returns a live secret — a read-only token
   // must not even see these tools, so the client cannot offer them.
-  if (!operator.scopes.has(MCP_WRITE_SCOPE)) return;
+  if (!operatorCanWrite(operator)) return;
 
   server.registerTool(
     'thinker_agent_create',

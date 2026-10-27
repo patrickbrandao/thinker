@@ -1,7 +1,9 @@
 import { A, useLocation } from '@solidjs/router';
 import { Show, createSignal, createResource, type Component } from 'solid-js';
 import { checkMcpEnabled } from '../services/setup-status.js';
+import { isInstanceAdmin, me, roleCan } from '../services/session-store.js';
 import AddAgentModal from './AddAgentModal.jsx';
+import OrgSwitcher from './OrgSwitcher.jsx';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -46,6 +48,9 @@ const Sidebar: Component<SidebarProps> = (props) => {
         }
       }}
     >
+      <Show when={me()}>
+        <OrgSwitcher />
+      </Show>
       <A
         href="/overview"
         class="sidebar__link"
@@ -73,24 +78,26 @@ const Sidebar: Component<SidebarProps> = (props) => {
         >
           Harnesses
         </A>
-        <button
-          type="button"
-          class="sidebar__section-add"
-          title="Create new harness"
-          aria-label="Create new harness"
-          onClick={() => setAddModalOpen(true)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+        <Show when={roleCan.editHarnesses()}>
+          <button
+            type="button"
+            class="sidebar__section-add"
+            title="Create new harness"
+            aria-label="Create new harness"
+            onClick={() => setAddModalOpen(true)}
           >
-            <path d="M19 12.998h-6v6h-2v-6H5v-2h6v-6h2v6h6z" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M19 12.998h-6v6h-2v-6H5v-2h6v-6h2v6h6z" />
+            </svg>
+          </button>
+        </Show>
       </div>
       <div class="sidebar__section-label">PROVIDERS</div>
       <A
@@ -152,6 +159,28 @@ const Sidebar: Component<SidebarProps> = (props) => {
       >
         Playground
       </A>
+
+      <Show when={me()}>
+        <div class="sidebar__section-label">ORGANIZATION</div>
+        <A
+          href="/organization"
+          class="sidebar__link"
+          classList={{ active: isGlobalActive('/organization') }}
+          aria-current={isGlobalActive('/organization') ? 'page' : undefined}
+        >
+          Members & settings
+        </A>
+        <Show when={isInstanceAdmin()}>
+          <A
+            href="/admin/users"
+            class="sidebar__link"
+            classList={{ active: isGlobalActive('/admin/users') }}
+            aria-current={isGlobalActive('/admin/users') ? 'page' : undefined}
+          >
+            Users
+          </A>
+        </Show>
+      </Show>
 
       {/* Create-harness modal, opened by the + button next to the Harnesses nav link */}
       <AddAgentModal open={addModalOpen()} onClose={() => setAddModalOpen(false)} />

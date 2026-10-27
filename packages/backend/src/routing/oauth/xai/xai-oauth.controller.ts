@@ -21,7 +21,9 @@ import { ProviderService } from '../../routing-core/provider.service';
 import { oauthDoneHtml, type OAuthTokenBlob } from '../core';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { XaiOauthService } from './xai-oauth.service';
+import { MinRole } from '../../../common/decorators/roles.decorator';
 
+@MinRole('admin', { includeReads: true })
 @Controller('api/v1/oauth/xai')
 export class XaiOauthController {
   private readonly logger = new Logger(XaiOauthController.name);
