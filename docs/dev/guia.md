@@ -23,7 +23,6 @@ packages/
 ├── frontend/   thinker-frontend  SolidJS + Vite, dashboard
 ├── cli/        thinker-cli       CLI `thinker` (privada, não publicada)
 └── thinker/    thinker           pacote sem código que guarda a versão canônica
-integrations/n8n-nodes-thinker/   nó da comunidade para n8n (fora dos workspaces)
 contracts/gateway/                testes de contrato HTTP do gateway
 design-system/                    registro do design system (gerado)
 deploy/                           templates de deploy da comunidade

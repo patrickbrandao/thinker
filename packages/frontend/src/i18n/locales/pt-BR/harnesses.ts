@@ -217,9 +217,9 @@ const ptBR: Catalog<typeof en> = {
     wizard:
       'Rode o assistente de configuração e escolha {{ option }} quando for perguntado. Depois informe os valores a seguir:',
     n8nIntro:
-      'No n8n, instale o community node {{ node }} (gerado a partir do repositório do Thinker) e adicione o node Thinker Chat Model ao seu AI Agent ou Basic LLM Chain, ou o node Thinker para chamadas diretas. Crie ou escolha credenciais do Thinker, cole os valores abaixo e defina o modelo do node como {{ auto }}.',
+      'No n8n, adicione o node nativo OpenAI Chat Model ao seu AI Agent ou Basic LLM Chain. Crie uma credencial OpenAI, cole os valores abaixo (a Base URL aponta para o Thinker) e defina o modelo do node como {{ auto }}.',
     n8nReference: 'Referência:',
-    n8nDocs: 'documentação de instalação de community nodes do n8n',
+    n8nDocs: 'documentação da credencial OpenAI do n8n',
     n8nValues: 'Valores da credencial do n8n',
     openClawIntro:
       'Registre o Thinker na configuração do OpenClaw para rotear cada requisição ao melhor provedor usando o modelo {{ model }}',

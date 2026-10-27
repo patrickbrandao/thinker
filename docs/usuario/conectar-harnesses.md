@@ -127,7 +127,7 @@ msg = client.messages.create(
 
 Para o SDK da Anthropic, defina só `api_key` (vira `x-api-key`) **ou** `auth_token` (vira Bearer), nunca os dois com valores diferentes (`M006`).
 
-**Vercel AI SDK, LangChain, n8n e cURL** usam a superfície Chat Completions: URL base `http://localhost:2099/v1` e a chave `thk_`. Há também um nó da comunidade para n8n em [`integrations/n8n-nodes-thinker`](../../integrations/n8n-nodes-thinker).
+**Vercel AI SDK, LangChain, n8n e cURL** usam a superfície Chat Completions: URL base `http://localhost:2099/v1` e a chave `thk_`. No n8n, use o node OpenAI Chat Model com uma credencial OpenAI cuja Base URL aponta para o Thinker.
 
 ## Escolher um modelo virtual
 

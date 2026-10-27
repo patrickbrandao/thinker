@@ -133,7 +133,7 @@ describe('buildFallbackModels', () => {
 
     const result = buildFallbackModels(makePricingSync(cache), 'openai');
 
-    expect(result[0].contextWindow).toBe(128000);
+    expect(result[0].contextWindow).toBe(1000000);
   });
 
   it('should use provided context window', () => {
@@ -597,7 +597,7 @@ describe('buildModelsDevFallback', () => {
 
     const result = buildModelsDevFallback(mockSync, 'openai');
 
-    expect(result[0].contextWindow).toBe(128000);
+    expect(result[0].contextWindow).toBe(1000000);
   });
 
   it('should use model id as displayName when name is empty', () => {

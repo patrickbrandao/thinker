@@ -48,8 +48,8 @@ describe('setup snippets', () => {
   it('registry maps platforms to their renderers', () => {
     expect(PLATFORM_SETUP_SNIPPETS['openclaw']('u', 'k')).toContain('openclaw');
     expect(PLATFORM_SETUP_SNIPPETS['codex']('u/v1', 'k')).toContain('wire_api = "responses"');
-    expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('Base URL: u');
-    expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('n8n-nodes-thinker');
+    expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('Base URL: u/v1');
+    expect(PLATFORM_SETUP_SNIPPETS['n8n']('u/v1', 'k')).toContain('OpenAI Chat Model');
     expect(Object.keys(PLATFORM_SETUP_SNIPPETS).sort()).toEqual([
       'claude-code',
       'codex',

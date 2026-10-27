@@ -53,7 +53,6 @@ const SetupField: Component<{ label: string; value: string; copyable?: boolean }
 const N8nSetup: Component<Props> = (props) => {
   const [keyRevealed, setKeyRevealed] = createSignal(false);
 
-  const credentialBaseUrl = () => props.baseUrl.replace(/\/v1\/?$/, '');
   const hasFullKey = () => !!props.apiKey;
   const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : 'thk_YOUR_KEY');
   const copyKey = () => props.apiKey ?? masked();
@@ -62,16 +61,13 @@ const N8nSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-step__desc">
-        <RichText
-          text={t('harnesses.guides.n8nIntro')}
-          parts={{ node: <code>n8n-nodes-thinker</code>, auto: <code>auto</code> }}
-        />
+        <RichText text={t('harnesses.guides.n8nIntro')} parts={{ auto: <code>auto</code> }} />
       </p>
 
       <p class="setup-method__hint">
         {t('harnesses.guides.n8nReference')}{' '}
         <a
-          href="https://docs.n8n.io/integrations/community-nodes/installation-and-management/"
+          href="https://docs.n8n.io/integrations/builtin/credentials/openai/"
           target="_blank"
           rel="noreferrer"
         >
@@ -81,7 +77,7 @@ const N8nSetup: Component<Props> = (props) => {
 
       <div class="setup-onboard-fields" role="list" aria-label={t('harnesses.guides.n8nValues')}>
         {/* i18n-ignore: labels mirror the n8n credential fields */}
-        <SetupField label="Base URL" value={credentialBaseUrl()} copyable />
+        <SetupField label="Base URL" value={props.baseUrl} copyable />
         <div class="setup-onboard-fields__row" role="listitem">
           {/* i18n-ignore: labels mirror the n8n credential fields */}
           <span class="setup-onboard-fields__label">API Key</span>

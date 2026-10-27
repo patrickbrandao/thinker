@@ -207,9 +207,9 @@ export default {
     wizard:
       'Run the onboarding wizard and select {{ option }} when prompted. Then enter the following values:',
     n8nIntro:
-      'In n8n, install the {{ node }} community node (built from the Thinker repository), then add the Thinker Chat Model node to your AI Agent or Basic LLM Chain, or the Thinker node for direct calls. Create or select Thinker credentials, paste the values below, and set the node model to {{ auto }}.',
+      'In n8n, add the built-in OpenAI Chat Model node to your AI Agent or Basic LLM Chain. Create an OpenAI credential, paste the values below (the Base URL points it at Thinker), and set the node model to {{ auto }}.',
     n8nReference: 'Reference:',
-    n8nDocs: 'n8n community node installation docs',
+    n8nDocs: 'n8n OpenAI credential docs',
     n8nValues: 'n8n credential values',
     openClawIntro:
       'Register Thinker in your OpenClaw config to route each request to the best provider using the model {{ model }}',
