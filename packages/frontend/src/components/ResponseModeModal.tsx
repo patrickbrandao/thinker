@@ -6,6 +6,8 @@ import type {
   TierAssignment,
 } from '../services/api.js';
 import { STAGES, DEFAULT_STAGE } from '../services/providers.js';
+import { positionLabel, stageLabel } from '../services/routing.js';
+import { t } from '../i18n/index.js';
 
 export interface IncompatibleModel {
   model: string;
@@ -30,7 +32,7 @@ interface Props {
 
 function tierLabel(tierId: string): string {
   const stage = [DEFAULT_STAGE, ...STAGES].find((s) => s.id === tierId);
-  return stage?.label ?? tierId;
+  return stage ? stageLabel(stage) : tierId;
 }
 
 function getIncompatibleModels(
@@ -44,22 +46,22 @@ function getIncompatibleModels(
   const hasStream = (model: string) => caps.get(model)?.includes('stream') ?? false;
 
   const result: IncompatibleModel[] = [];
-  for (const t of tiers) {
-    const route = t.override_route;
+  for (const tier of tiers) {
+    const route = tier.override_route;
     if (route && !hasStream(route.model)) {
       result.push({
         model: route.model,
-        tier: t.tier,
-        tierLabel: tierLabel(t.tier),
+        tier: tier.tier,
+        tierLabel: tierLabel(tier.tier),
         position: 'Primary',
       });
     }
-    for (const [i, fb] of (t.fallback_routes ?? []).entries()) {
+    for (const [i, fb] of (tier.fallback_routes ?? []).entries()) {
       if (!hasStream(fb.model)) {
         result.push({
           model: fb.model,
-          tier: t.tier,
-          tierLabel: tierLabel(t.tier),
+          tier: tier.tier,
+          tierLabel: tierLabel(tier.tier),
           position: `Fallback ${i + 1}`,
         });
       }
@@ -99,8 +101,12 @@ const ResponseModeModal: Component<Props> = (props) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div class="routing-modal__header">
-          <div class="routing-modal__title">Response mode</div>
-          <button class="modal__close" onClick={() => props.onClose()} aria-label="Close">
+          <div class="routing-modal__title">{t('routing.responseMode.title')}</div>
+          <button
+            class="modal__close"
+            onClick={() => props.onClose()}
+            aria-label={t('common.close')}
+          >
             <svg
               width="16"
               height="16"
@@ -120,7 +126,9 @@ const ResponseModeModal: Component<Props> = (props) => {
 
         <div class="response-mode-modal__body">
           <div class="response-mode-modal__field-header">
-            <span class="response-mode-modal__field-title">Stream mode</span>
+            <span class="response-mode-modal__field-title">
+              {t('routing.responseMode.streamMode')}
+            </span>
             <button
               class="routing-switch"
               classList={{
@@ -138,25 +146,16 @@ const ResponseModeModal: Component<Props> = (props) => {
           <Show
             when={isStream()}
             fallback={
-              <p class="response-mode-modal__desc">
-                Responses are returned as a single payload once the model finishes generating.
-                Compatible with all models.
-              </p>
+              <p class="response-mode-modal__desc">{t('routing.responseMode.bufferedDescAll')}</p>
             }
           >
-            <p class="response-mode-modal__desc">
-              Responses are streamed token by token as the model generates them. Only models with
-              streaming support are used.
-            </p>
+            <p class="response-mode-modal__desc">{t('routing.responseMode.streamDescOnly')}</p>
           </Show>
 
           <Show when={!isStream() && incompatible().length > 0}>
             <div class="response-mode-modal__blocker">
               <p class="response-mode-modal__blocker-text">
-                Stream mode is unavailable because{' '}
-                {incompatible().length === 1 ? 'this model does' : 'these models do'} not support
-                streaming. Change {incompatible().length === 1 ? 'it' : 'them'} to enable stream
-                mode.
+                {t('routing.responseMode.unavailable', incompatible().length)}
               </p>
               <div class="response-mode-modal__blocker-list">
                 <For each={incompatible()}>
@@ -164,7 +163,7 @@ const ResponseModeModal: Component<Props> = (props) => {
                     <div class="response-mode-modal__blocker-row">
                       <span class="response-mode-modal__blocker-model">{item.model}</span>
                       <span class="response-mode-modal__blocker-meta">
-                        {item.tierLabel} · {item.position}
+                        {item.tierLabel} · {positionLabel(item.position)}
                       </span>
                       <button
                         class="btn btn--outline btn--sm"
@@ -178,7 +177,7 @@ const ResponseModeModal: Component<Props> = (props) => {
                           )
                         }
                       >
-                        Change
+                        {t('routing.change')}
                       </button>
                     </div>
                   )}

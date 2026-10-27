@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import { applyUserLocale, t } from '../i18n/index.js';
 import { ApiError, BASE_URL } from './api/core.js';
 import { invalidateAll } from './api/cache.js';
 import { setActiveOrganization, type MeResponse } from './api/organizations.js';
@@ -66,6 +67,7 @@ export async function loadMe(): Promise<MeResponse> {
     if (res.ok) {
       const body = (await res.json()) as MeResponse;
       setMe(body);
+      applyUserLocale(body.userId);
       const stored = getActiveOrganizationId();
       if (body.organization && stored !== body.organization.id) {
         setActiveOrganizationId(body.organization.id);
@@ -88,7 +90,9 @@ export async function loadMe(): Promise<MeResponse> {
       continue;
     }
     throw new ApiError(
-      typeof body?.message === 'string' ? body.message : `Request failed (${res.status})`,
+      typeof body?.message === 'string'
+        ? body.message
+        : t('ui.errors.requestFailed', { status: res.status }),
       res.status,
       body?.code,
     );

@@ -2,6 +2,7 @@ import { For, Show, type Component } from 'solid-js';
 import ProviderBanner from './ProviderBanner.js';
 import EmailProviderSetup from './EmailProviderSetup.js';
 import type { EmailProviderConfig } from '../services/api.js';
+import { t } from '../i18n/index.js';
 
 interface EmailProviderSectionProps {
   emailProvider: EmailProviderConfig | null | undefined;
@@ -51,7 +52,7 @@ const EmailProviderSection: Component<EmailProviderSectionProps> = (props) => (
         >
           <div class="provider-card">
             <div class="provider-card__header">
-              <span class="provider-card__label">Your provider</span>
+              <span class="provider-card__label">{t('harnesses.email.yourProvider')}</span>
               <div
                 class="skeleton skeleton--text"
                 style="width: 16px; height: 16px; border-radius: calc(var(--radius) - 2px);"

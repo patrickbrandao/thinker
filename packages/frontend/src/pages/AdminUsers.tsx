@@ -11,10 +11,11 @@ import {
   type OrgRole,
 } from '../services/api/organizations.js';
 import { formatTimeAgo } from '../services/formatters.js';
-import { ALL_ROLES, ROLE_LABELS } from '../services/permissions.js';
+import { ALL_ROLES, roleLabel } from '../services/permissions.js';
 import { isInstanceAdmin, me } from '../services/session-store.js';
 import { toast } from '../services/toast-store.js';
 import '../styles/organization.css';
+import { t } from '../i18n/index.js';
 
 /**
  * Instance-admin account management: every user with their organizations,
@@ -86,7 +87,7 @@ const AdminUsers: Component = () => {
     setBusyUser(userId);
     try {
       await setInstanceAdmin(userId, next);
-      toast.success(next ? 'Instance admin granted' : 'Instance admin revoked');
+      toast.success(next ? t('org.users.adminGranted') : t('org.users.adminRevoked'));
     } catch {
       // toasted by fetchMutate
     } finally {
@@ -97,32 +98,26 @@ const AdminUsers: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>Users - Thinker</Title>
-      <Meta name="description" content="Manage the accounts of this Thinker instance." />
+      <Title>{t('common.pageTitle', { page: t('org.users.title') })}</Title>
+      <Meta name="description" content={t('org.users.metaDescription')} />
       <Show
         when={isInstanceAdmin()}
         fallback={
-          <ErrorState
-            title="Not available"
-            message="Only instance administrators can manage user accounts."
-          />
+          <ErrorState title={t('org.users.notAvailable')} message={t('org.users.adminsOnly')} />
         }
       >
         <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
           <div>
-            <h1 class="page-header__title">Users</h1>
-            <p class="page-header__subtitle">
-              Every account on this Thinker instance. New accounts get a temporary password and must
-              change it at the first sign-in.
-            </p>
+            <h1 class="page-header__title">{t('org.users.title')}</h1>
+            <p class="page-header__subtitle">{t('org.users.subtitle')}</p>
           </div>
         </div>
 
-        <h2 class="settings-section__title">Create user</h2>
+        <h2 class="settings-section__title">{t('org.users.create')}</h2>
         <div class="settings-card">
-          <form class="org-form" onSubmit={handleCreate} aria-label="Create user">
+          <form class="org-form" onSubmit={handleCreate} aria-label={t('org.users.create')}>
             <label class="org-form__field">
-              Email
+              {t('common.email')}
               <input
                 class="auth-form__input"
                 type="email"
@@ -132,7 +127,7 @@ const AdminUsers: Component = () => {
               />
             </label>
             <label class="org-form__field">
-              Name
+              {t('common.name')}
               <input
                 class="auth-form__input"
                 type="text"
@@ -142,25 +137,25 @@ const AdminUsers: Component = () => {
               />
             </label>
             <label class="org-form__field">
-              Organization (optional)
+              {t('org.users.orgOptional')}
               <select
                 class="org-select"
                 value={orgId()}
                 onChange={(e) => setOrgId(e.currentTarget.value)}
               >
-                <option value="">None</option>
+                <option value="">{t('common.none')}</option>
                 <For each={orgs() ?? []}>{(o) => <option value={o.id}>{o.name}</option>}</For>
               </select>
             </label>
             <label class="org-form__field">
-              Role
+              {t('common.role')}
               <select
                 class="org-select"
                 value={role()}
                 disabled={!orgId()}
                 onChange={(e) => setRole(e.currentTarget.value as OrgRole)}
               >
-                <For each={ALL_ROLES}>{(r) => <option value={r}>{ROLE_LABELS[r]}</option>}</For>
+                <For each={ALL_ROLES}>{(r) => <option value={r}>{roleLabel(r)}</option>}</For>
               </select>
             </label>
             <label class="org-form__field org-form__field--inline">
@@ -169,11 +164,11 @@ const AdminUsers: Component = () => {
                 checked={makeAdmin()}
                 onChange={(e) => setMakeAdmin(e.currentTarget.checked)}
               />
-              Instance admin
+              {t('org.users.instanceAdmin')}
             </label>
             <div class="org-form__actions">
               <button class="btn btn--primary btn--sm" type="submit" disabled={creating()}>
-                Create user
+                {t('org.users.create')}
               </button>
             </div>
           </form>
@@ -190,17 +185,17 @@ const AdminUsers: Component = () => {
           </Show>
         </div>
 
-        <h2 class="settings-section__title">All users</h2>
+        <h2 class="settings-section__title">{t('org.users.all')}</h2>
         <Show when={!users.error} fallback={<ErrorState error={users.error} onRetry={refetch} />}>
           <div class="panel org-table-wrap" style="padding: 0;">
             <table class="data-table org-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Organizations</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Instance admin</th>
+                  <th>{t('org.users.user')}</th>
+                  <th>{t('org.users.organizations')}</th>
+                  <th>{t('common.status')}</th>
+                  <th>{t('org.users.created')}</th>
+                  <th>{t('org.users.instanceAdmin')}</th>
                   <th />
                 </tr>
               </thead>
@@ -208,7 +203,7 @@ const AdminUsers: Component = () => {
                 <Show when={users.loading && !users()}>
                   <tr>
                     <td colspan="6" class="org-table__muted">
-                      Loading users...
+                      {t('org.users.loading')}
                     </td>
                   </tr>
                 </Show>
@@ -221,7 +216,7 @@ const AdminUsers: Component = () => {
                           <div style="font-weight: 500;">
                             {user.name || user.email}
                             <Show when={isSelf()}>
-                              <span class="org-table__muted"> (you)</span>
+                              <span class="org-table__muted"> {t('org.page.you')}</span>
                             </Show>
                           </div>
                           <div class="org-table__muted">{user.email}</div>
@@ -229,13 +224,13 @@ const AdminUsers: Component = () => {
                         <td>
                           <Show
                             when={user.organizations.length > 0}
-                            fallback={<span class="org-table__muted">None</span>}
+                            fallback={<span class="org-table__muted">{t('common.none')}</span>}
                           >
                             <div class="org-table__orgs">
                               <For each={user.organizations}>
                                 {(o) => (
                                   <span class="role-badge">
-                                    {o.name} · {ROLE_LABELS[o.role]}
+                                    {o.name} · {roleLabel(o.role)}
                                   </span>
                                 )}
                               </For>
@@ -245,10 +240,10 @@ const AdminUsers: Component = () => {
                         <td>
                           <Show
                             when={user.mustChangePassword}
-                            fallback={<span class="org-table__muted">Active</span>}
+                            fallback={<span class="org-table__muted">{t('org.page.active')}</span>}
                           >
                             <span class="role-badge role-badge--warning">
-                              Pending password change
+                              {t('org.page.pendingPassword')}
                             </span>
                           </Show>
                         </td>
@@ -256,11 +251,11 @@ const AdminUsers: Component = () => {
                         <td>
                           <input
                             type="checkbox"
-                            aria-label={`Instance admin: ${user.email}`}
+                            aria-label={t('org.users.instanceAdminOf', { email: user.email })}
                             checked={user.isInstanceAdmin}
                             // Revoking your own flag would lock you out of this page.
                             disabled={isSelf() || busyUser() === user.id}
-                            title={isSelf() ? 'You cannot revoke your own admin access' : undefined}
+                            title={isSelf() ? t('org.users.cannotRevokeSelf') : undefined}
                             onChange={(e) =>
                               void handleToggleAdmin(user.id, e.currentTarget.checked)
                             }
@@ -275,7 +270,7 @@ const AdminUsers: Component = () => {
                                 class="btn btn--outline btn--sm"
                                 onClick={() => setConfirmReset(user.id)}
                               >
-                                Reset password
+                                {t('org.users.resetPassword')}
                               </button>
                             }
                           >
@@ -285,14 +280,14 @@ const AdminUsers: Component = () => {
                               disabled={busyUser() === user.id}
                               onClick={() => void handleReset(user.id, user.email)}
                             >
-                              Confirm reset
+                              {t('org.users.confirmReset')}
                             </button>
                             <button
                               type="button"
                               class="btn btn--outline btn--sm"
                               onClick={() => setConfirmReset(null)}
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                           </Show>
                         </td>

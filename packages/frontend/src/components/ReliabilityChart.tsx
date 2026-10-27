@@ -20,6 +20,7 @@ import {
   fillDailyGaps,
 } from '../services/chart-utils.js';
 import type { StatusTimeseries } from '../services/api/analytics.js';
+import { t } from '../i18n/index.js';
 
 // ---------------------------------------------------------------------------
 // Colors per series mode
@@ -54,10 +55,10 @@ function colorFor(key: string, mode: string, idx: number): string {
 }
 
 function keyLabel(key: string): string {
-  if (key === 'none') return 'No error';
-  if (key === 'success') return 'Success';
-  if (key === 'error') return 'Error';
-  if (key === 'fallback') return 'Success - recovered by Fallback';
+  if (key === 'none') return t('overview.chart.series.none');
+  if (key === 'success') return t('overview.chart.series.success');
+  if (key === 'error') return t('overview.chart.series.error');
+  if (key === 'fallback') return t('overview.chart.series.fallback');
   return key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
 

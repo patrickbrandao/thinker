@@ -6,6 +6,8 @@ import { mcpEndpoint } from '../../services/install-endpoints.js';
 import { checkMcpEnabled } from '../../services/setup-status.js';
 
 import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
+import RichText from '../../components/RichText.jsx';
+import { t } from '../../i18n/index.js';
 
 interface ClientSetup {
   id: string;
@@ -80,47 +82,41 @@ const McpServer: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>MCP server - Thinker</Title>
-      <Meta
-        name="description"
-        content="Connect Claude, Cursor, Codex and other MCP clients to this Thinker install over OAuth."
-      />
+      <Title>{t('common.pageTitle', { page: t('harnesses.mcp.title') })}</Title>
+      <Meta name="description" content={t('harnesses.mcp.metaDescription')} />
       <div class="page-header">
         <div>
-          <h1 class="page-header__title">MCP server</h1>
-          <p class="page-header__subtitle">
-            Manage harnesses, providers, routing and the request log from any MCP client
-          </p>
+          <h1 class="page-header__title">{t('harnesses.mcp.title')}</h1>
+          <p class="page-header__subtitle">{t('harnesses.mcp.subtitle')}</p>
         </div>
       </div>
 
       <Show when={enabled() === false}>
         <div class="panel">
-          <div class="panel__title">Not available on this install</div>
+          <div class="panel__title">{t('harnesses.mcp.unavailableTitle')}</div>
           <p class="integration-panel__desc" style="margin-bottom: 0;">
-            The MCP server needs this install to be reachable over HTTPS, because MCP clients
-            authorize against an HTTPS resource URL. It is switched off here, either because{' '}
-            <code>BETTER_AUTH_URL</code> is a plain-HTTP address or because{' '}
-            <code>MCP_ENABLED=false</code> is set. The dashboard, the gateway and the CLI are
-            unaffected.
+            <RichText
+              text={t('harnesses.mcp.unavailableDesc')}
+              parts={{
+                authUrl: <code>BETTER_AUTH_URL</code>,
+                flag: <code>MCP_ENABLED=false</code>,
+              }}
+            />
           </p>
         </div>
       </Show>
 
       <Show when={enabled() === true}>
         <div class="panel">
-          <div class="panel__title">Your endpoint</div>
-          <p class="integration-panel__desc">
-            Point any MCP client here. It signs in with OAuth, so the first connection opens a
-            consent screen in your browser and keeps a short-lived, revocable token.
-          </p>
+          <div class="panel__title">{t('harnesses.mcp.endpointTitle')}</div>
+          <p class="integration-panel__desc">{t('harnesses.mcp.endpointDesc')}</p>
           <CodeBlock code={endpoint()} language="bash" />
         </div>
 
         <div class="panel">
-          <div class="panel__title">Connect your client</div>
+          <div class="panel__title">{t('harnesses.mcp.connectTitle')}</div>
           <div class="integration-panel__tabs">
-            <div class="panel__tabs" role="tablist" aria-label="MCP client">
+            <div class="panel__tabs" role="tablist" aria-label={t('harnesses.mcp.clientTabs')}>
               <For each={clients()}>
                 {(client) => (
                   <button
@@ -140,7 +136,7 @@ const McpServer: Component = () => {
                         height="16"
                       />
                     </Show>
-                    {client.label}
+                    {client.id === 'other' ? t('harnesses.platformOther') : client.label}
                   </button>
                 )}
               </For>
@@ -151,7 +147,7 @@ const McpServer: Component = () => {
 
         <div class="panel">
           <div class="integration-panel__header">
-            <div class="panel__title">Read-only or read-and-write</div>
+            <div class="panel__title">{t('harnesses.mcp.modeTitle')}</div>
             <a
               href={THINKER_DOCS_URL}
               target="_blank"
@@ -159,12 +155,11 @@ const McpServer: Component = () => {
               class="btn btn--outline btn--sm"
               style="text-decoration: none;"
             >
-              Full tool list
+              {t('harnesses.mcp.toolList')}
             </a>
           </div>
           <p class="integration-panel__desc" style="margin-bottom: 0;">
-            The consent screen asks which you want. A read-only connection never sees the write
-            tools at all, so it can look but not touch.
+            {t('harnesses.mcp.modeDesc')}
           </p>
         </div>
       </Show>

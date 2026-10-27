@@ -5,20 +5,19 @@ import { formatNumber } from '../services/formatters.js';
 // The card grid styles: this component owns the dependency so the agent
 // Overview renders styled cards even when loaded directly (deep link/refresh).
 import '../styles/analytics-overview.css';
-import {
-  RECOVERED_REQUESTS_TOOLTIP,
-  REQUEST_SUCCESS_RATE_TOOLTIP,
-  type ReliabilityStats,
-} from '../services/api/analytics.js';
+import { type ReliabilityStats } from '../services/api/analytics.js';
+import { formatRate } from '../services/overview-format.js';
+import { intlLocale, t } from '../i18n/index.js';
 
 function fmtPct(v: number): string {
-  const pct = v * 100;
-  return pct === 100 || pct === 0 ? `${pct}%` : `${pct.toFixed(1)}%`;
+  if (v === 1 || v === 0)
+    return new Intl.NumberFormat(intlLocale(), { style: 'percent' }).format(v);
+  return formatRate(v);
 }
 
 function trendBadge(current: number, previous: number) {
   if (previous === 0 && current === 0) return null;
-  if (previous === 0) return <span class="trend trend--neutral">new</span>;
+  if (previous === 0) return <span class="trend trend--neutral">{t('overview.kpi.new')}</span>;
   const pct = ((current - previous) / previous) * 100;
   if (Math.abs(pct) < 0.5) return null;
   const clamped = Math.max(-999, Math.min(999, Math.round(pct)));
@@ -41,7 +40,9 @@ export interface ReliabilityKpiCardsProps {
   noLinks?: boolean;
 }
 
-const viewMore = (): JSX.Element => <span class="view-more-link">View more</span>;
+const viewMore = (): JSX.Element => (
+  <span class="view-more-link">{t('overview.kpi.viewMore')}</span>
+);
 
 /**
  * The reliability story, request-first: Success rate · Recovered requests %
@@ -80,7 +81,9 @@ const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
         }
       : {};
   const scopeTitle = (subject: string) =>
-    props.agentName ? `View this harness's ${subject}` : `View ${subject} across all harnesses`;
+    props.agentName
+      ? t('overview.kpi.scopeHarness', { subject })
+      : t('overview.kpi.scopeAll', { subject });
   const recovered = () => props.stats?.fallback_saves?.value ?? 0;
   const recoveredPrev = () => props.stats?.fallback_saves?.previous ?? 0;
   const recoveredPct = () => {
@@ -100,8 +103,8 @@ const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
         <div class="overview-stats">
           <div class="overview-stat-card">
             <span class="overview-stat-card__label">
-              Success rate
-              <InfoTooltip text={REQUEST_SUCCESS_RATE_TOOLTIP} />
+              {t('overview.kpi.successRate')}
+              <InfoTooltip text={t('overview.tips.requestSuccessRate')} />
             </span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">{fmtPct(s().success_rate.value)}</span>
@@ -112,12 +115,12 @@ const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
             class="overview-stat-card"
             {...linkProps(
               requestsLink('&status=ok&trigger=fallback'),
-              scopeTitle('recovered requests'),
+              scopeTitle(t('overview.kpi.subjectRecovered')),
             )}
           >
             <span class="overview-stat-card__label">
-              Recovered requests
-              <InfoTooltip text={RECOVERED_REQUESTS_TOOLTIP} />
+              {t('overview.kpi.recoveredRequests')}
+              <InfoTooltip text={t('overview.tips.recoveredRequests')} />
             </span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">{fmtPct(recoveredPct())}</span>
@@ -129,10 +132,10 @@ const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
             class="overview-stat-card overview-stat-card--fallback"
             {...linkProps(
               requestsLink('&status=ok&trigger=fallback'),
-              scopeTitle('requests recovered by fallback'),
+              scopeTitle(t('overview.kpi.subjectRecoveredByFallback')),
             )}
           >
-            <span class="overview-stat-card__label">Recovered by Fallback</span>
+            <span class="overview-stat-card__label">{t('overview.kpi.recoveredByFallback')}</span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">{formatNumber(recovered())}</span>
               {trendBadge(recovered(), recoveredPrev())}
@@ -141,9 +144,12 @@ const ReliabilityKpiCards: Component<ReliabilityKpiCardsProps> = (props) => {
           </div>
           <div
             class="overview-stat-card overview-stat-card--destructive"
-            {...linkProps(requestsLink('&status=failed'), scopeTitle('failed requests'))}
+            {...linkProps(
+              requestsLink('&status=failed'),
+              scopeTitle(t('overview.kpi.subjectFailed')),
+            )}
           >
-            <span class="overview-stat-card__label">Failed requests</span>
+            <span class="overview-stat-card__label">{t('overview.kpi.failedRequests')}</span>
             <div class="overview-stat-card__value-row">
               <span class="overview-stat-card__value">
                 {formatNumber(s().errors_remaining.value)}

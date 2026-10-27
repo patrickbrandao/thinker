@@ -1,8 +1,9 @@
 import { For, Show, createResource, createSignal, type Component } from 'solid-js';
 import { createOrganization, listOrganizations } from '../services/api/organizations.js';
-import { ROLE_LABELS } from '../services/permissions.js';
+import { roleLabel } from '../services/permissions.js';
 import { isInstanceAdmin, me, switchOrganization } from '../services/session-store.js';
 import '../styles/organization.css';
+import { t } from '../i18n/index.js';
 
 /**
  * Active-organization picker at the top of the sidebar. Switching stores the
@@ -53,7 +54,7 @@ const OrgSwitcher: Component = () => {
   return (
     <div class="org-switcher">
       <label class="org-switcher__label" for="org-switcher-select">
-        Organization
+        {t('org.switcher.label')}
       </label>
       <div class="org-switcher__row">
         <Show
@@ -73,8 +74,8 @@ const OrgSwitcher: Component = () => {
           <button
             type="button"
             class="sidebar__section-add"
-            title="New organization"
-            aria-label="New organization"
+            title={t('org.switcher.newOrg')}
+            aria-label={t('org.switcher.newOrg')}
             onClick={() => setCreateOpen(true)}
           >
             <svg
@@ -91,7 +92,9 @@ const OrgSwitcher: Component = () => {
         </Show>
       </div>
       <Show when={activeRole()}>
-        {(role) => <span class="org-switcher__role">Your role: {ROLE_LABELS[role()]}</span>}
+        {(role) => (
+          <span class="org-switcher__role">{t('org.yourRole', { role: roleLabel(role()) })}</span>
+        )}
       </Show>
 
       <Show when={createOpen()}>
@@ -116,10 +119,10 @@ const OrgSwitcher: Component = () => {
               id="new-org-title"
               style="margin: 0 0 var(--gap-md); font-size: var(--font-size-lg);"
             >
-              New organization
+              {t('org.switcher.newOrg')}
             </h3>
             <label class="org-form__field" style="margin-bottom: var(--gap-lg);">
-              Name
+              {t('common.name')}
               <input
                 ref={(el) => setTimeout(() => el.focus(), 50)}
                 class="auth-form__input"
@@ -131,10 +134,10 @@ const OrgSwitcher: Component = () => {
             </label>
             <div style="display: flex; justify-content: flex-end; gap: var(--gap-sm);">
               <button type="button" class="btn btn--outline btn--sm" onClick={closeCreate}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="submit" class="btn btn--primary btn--sm" disabled={creating()}>
-                Create
+                {t('common.create')}
               </button>
             </div>
           </form>

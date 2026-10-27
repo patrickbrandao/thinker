@@ -1,4 +1,5 @@
 import type { OrgRole } from './api/organizations.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Role checks for the dashboard (ADR 0006 §5). They only shape the UI: the
@@ -7,12 +8,10 @@ import type { OrgRole } from './api/organizations.js';
 
 const RANK: Record<OrgRole, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 
-export const ROLE_LABELS: Record<OrgRole, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-  viewer: 'Viewer',
-};
+/** Display name of a role in the active language. */
+export function roleLabel(role: OrgRole): string {
+  return t(`org.roles.${role}`);
+}
 
 export const ALL_ROLES: OrgRole[] = ['owner', 'admin', 'member', 'viewer'];
 

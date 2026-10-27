@@ -1,0 +1,46 @@
+/** Account preferences page (/account). */
+export default {
+  title: 'Account Preferences',
+  metaDescription: 'Manage your profile, workspace, and theme preferences.',
+  subtitle: 'Your profile, workspace details, and display preferences',
+  profile: {
+    title: 'Profile information',
+    displayName: 'Display name',
+    displayNameDesc: 'Name shown throughout the dashboard.',
+    email: 'Email',
+    emailDesc: 'Used for account notifications.',
+    managedBy: 'Profile information is managed through your authentication provider.',
+  },
+  security: {
+    title: 'Security',
+    currentPassword: 'Current password',
+    currentPasswordDesc: 'Confirm the password you use today.',
+    newPassword: 'New password',
+    newPasswordDesc: 'At least 8 characters.',
+    confirmPassword: 'Confirm new password',
+    confirmPasswordDesc: 'Re-enter the new password to confirm.',
+    submit: 'Change password',
+    mismatch: 'New passwords do not match',
+    tooShort: 'New password must be at least 8 characters',
+    sameAsCurrent: 'New password must differ from the current password',
+    failed: 'Failed to change password',
+    changed: 'Password changed. Other devices have been signed out.',
+  },
+  workspace: {
+    title: 'Workspace',
+    desc: 'Your unique workspace identifier. You may need this for support requests or advanced integrations.',
+    copyId: 'Copy workspace ID',
+  },
+  appearance: {
+    title: 'Appearance',
+    desc: 'Choose how Thinker looks for you.',
+    light: 'Light',
+    dark: 'Dark',
+    system: 'System',
+  },
+  language: {
+    title: 'Language',
+    desc: 'Choose the dashboard language. Saved for your user on this browser.',
+    label: 'Dashboard language',
+  },
+};

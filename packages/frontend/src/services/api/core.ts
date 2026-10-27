@@ -5,6 +5,7 @@ import {
   markPasswordChangeRequired,
   withOrganizationHeader,
 } from '../org-context.js';
+import { t } from '../../i18n/index.js';
 
 export const BASE_URL = '/api/v1';
 
@@ -72,16 +73,18 @@ async function doFetchJson<T>(url: string, loginRedirect = true): Promise<T> {
       if (loginRedirect && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
-      throw new Error('Session expired');
+      throw new Error(t('ui.errors.sessionExpired'));
     }
-    throw new Error(body || 'Unauthorized');
+    throw new Error(body || t('ui.errors.unauthorized'));
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     if (res.status === 403 && isPasswordChangeRequiredBody(safeParse(body))) {
       markPasswordChangeRequired();
     }
-    throw new Error(body || `API error: ${res.status} ${res.statusText}`);
+    throw new Error(
+      body || t('ui.errors.apiError', { status: res.status, statusText: res.statusText }),
+    );
   }
   return res.json() as Promise<T>;
 }
@@ -102,7 +105,7 @@ export async function parseErrorMessage(res: Response): Promise<string> {
   } catch {
     // not JSON — fall through
   }
-  return `Request failed (${res.status})`;
+  return t('ui.errors.requestFailed', { status: res.status });
 }
 
 /**

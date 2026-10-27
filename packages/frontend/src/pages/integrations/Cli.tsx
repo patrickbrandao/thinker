@@ -4,6 +4,8 @@ import CodeBlock from '../../components/CodeBlock.jsx';
 import { installOrigin } from '../../services/install-endpoints.js';
 
 import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
+import RichText from '../../components/RichText.jsx';
+import { t } from '../../i18n/index.js';
 
 /** Installed from a checkout of the Thinker repository; it is not published to a registry. */
 const INSTALL = `git clone https://github.com/patrickbrandao/thinker.git\ncd thinker && npm ci && npm run build --workspace=packages/shared --workspace=packages/cli\nnpm install -g ./packages/cli`;
@@ -26,43 +28,37 @@ const Cli: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>CLI - Thinker</Title>
-      <Meta
-        name="description"
-        content="Install the thinker CLI and manage harnesses, providers, routing and request logs from the terminal."
-      />
+      <Title>{t('common.pageTitle', { page: 'CLI' })}</Title>
+      <Meta name="description" content={t('harnesses.cli.metaDescription')} />
       <div class="page-header">
         <div>
           <h1 class="page-header__title">CLI</h1>
-          <p class="page-header__subtitle">
-            Everything the dashboard does, from a terminal, a script, or a coding agent
-          </p>
+          <p class="page-header__subtitle">{t('harnesses.cli.subtitle')}</p>
         </div>
       </div>
 
       <div class="integration-grid">
         <div class="panel">
-          <div class="panel__title">1. Install</div>
+          <div class="panel__title">{t('harnesses.cli.installTitle')}</div>
           <p class="integration-panel__desc">
-            The CLI ships in the Thinker repository. Install it from a checkout of the release that
-            matches this instance; the command is <code>thinker</code>.
+            <RichText
+              text={t('harnesses.cli.installDesc')}
+              parts={{ command: <code>thinker</code> }}
+            />
           </p>
           <CodeBlock code={INSTALL} language="bash" />
         </div>
 
         <div class="panel">
-          <div class="panel__title">2. Sign in</div>
-          <p class="integration-panel__desc">
-            This opens your browser, you approve, and the CLI stores a token for this host. The
-            token never travels through the URL.
-          </p>
+          <div class="panel__title">{t('harnesses.cli.signInTitle')}</div>
+          <p class="integration-panel__desc">{t('harnesses.cli.signInDesc')}</p>
           <CodeBlock code={login()} language="bash" />
         </div>
       </div>
 
       <div class="panel" style="margin-top: var(--gap-lg);">
         <div class="integration-panel__header">
-          <div class="panel__title">3. Drive it</div>
+          <div class="panel__title">{t('harnesses.cli.driveTitle')}</div>
           <a
             href={THINKER_DOCS_URL}
             target="_blank"
@@ -70,13 +66,10 @@ const Cli: Component = () => {
             class="btn btn--outline btn--sm"
             style="text-decoration: none;"
           >
-            Documentation
+            {t('harnesses.cli.documentation')}
           </a>
         </div>
-        <p class="integration-panel__desc">
-          Create a harness, connect a provider, set a route, and prove it works with one real
-          request.
-        </p>
+        <p class="integration-panel__desc">{t('harnesses.cli.driveDesc')}</p>
         <CodeBlock code={EXAMPLE} language="bash" />
       </div>
     </div>

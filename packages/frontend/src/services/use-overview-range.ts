@@ -1,8 +1,16 @@
 import { createSignal } from 'solid-js';
 import { COMPACT_COLUMNS } from '../components/message-table-types.js';
+import { t } from '../i18n/index.js';
 
 export const RANGE_STORAGE_KEY = 'thinker_chart_range';
 export const VALID_RANGES = new Set(['24h', '7d', '30d', '90d', '365d']);
+
+const RANGES = ['24h', '7d', '30d', '90d', '365d'] as const;
+
+/** Range selector options, labelled in the active language. Call from JSX. */
+export function rangeOptions(): Array<{ label: string; value: string }> {
+  return RANGES.map((value) => ({ label: t(`overview.range.${value}`), value }));
+}
 
 /**
  * Shared range signal + localStorage persistence for Overview pages.

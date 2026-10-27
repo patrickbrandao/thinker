@@ -2,6 +2,8 @@ import { createSignal, Show, type Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
 import CodeBlock from './CodeBlock.jsx';
 import { highlight } from '../services/syntax-highlight.js';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 type SubTab = 'cli' | 'wizard';
 
@@ -74,14 +76,12 @@ const HermesSetup: Component<Props> = (props) => {
 
   return (
     <div class="setup-agents-card">
-      <p class="setup-step__desc">
-        Point Hermes at the Thinker endpoint to route requests across multiple models.
-      </p>
+      <p class="setup-step__desc">{t('harnesses.guides.hermesIntro')}</p>
 
       <div
         class="setup-segment setup-segment--full"
         role="tablist"
-        aria-label="Configuration method"
+        aria-label={t('harnesses.guides.configMethod')}
       >
         <button
           class="setup-segment__btn"
@@ -90,7 +90,7 @@ const HermesSetup: Component<Props> = (props) => {
           role="tab"
           aria-selected={subTab() === 'cli'}
         >
-          Configuration file
+          {t('harnesses.guides.hermesFileTab')}
         </button>
         <button
           class="setup-segment__btn"
@@ -99,17 +99,23 @@ const HermesSetup: Component<Props> = (props) => {
           role="tab"
           aria-selected={subTab() === 'wizard'}
         >
+          {/* i18n-ignore: names the Hermes command */}
           Hermes onboard
         </button>
       </div>
 
       <Show when={subTab() === 'cli'}>
-        <p class="setup-method__hint">Open the Hermes configuration file:</p>
+        <p class="setup-method__hint">{t('harnesses.guides.hermesOpen')}</p>
         <CodeBlock code="hermes config edit" language="bash" />
 
         <p class="setup-method__hint" style="margin-top: 12px;">
-          Add the following <code class="setup-model-hint__code">model:</code> section to your{' '}
-          <code class="setup-model-hint__code">config.yaml</code>:
+          <RichText
+            text={t('harnesses.guides.hermesAdd')}
+            parts={{
+              section: <code class="setup-model-hint__code">model:</code>,
+              file: <code class="setup-model-hint__code">config.yaml</code>,
+            }}
+          />
         </p>
         <div class="setup-cli-block">
           <div class="setup-cli-block__actions">
@@ -117,8 +123,10 @@ const HermesSetup: Component<Props> = (props) => {
               <button
                 class="setup-onboard-fields__eye"
                 onClick={() => setCliKeyRevealed(!cliKeyRevealed())}
-                aria-label={cliKeyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                title={cliKeyRevealed() ? 'Hide key' : 'Reveal key'}
+                aria-label={
+                  cliKeyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                }
+                title={cliKeyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
               >
                 <EyeIcon open={cliKeyRevealed()} />
               </button>
@@ -132,7 +140,12 @@ const HermesSetup: Component<Props> = (props) => {
           </div>
         </div>
 
-        <div class="setup-onboard-fields" role="list" aria-label="Configuration values">
+        <div
+          class="setup-onboard-fields"
+          role="list"
+          aria-label={t('harnesses.guides.configValues')}
+        >
+          {/* i18n-ignore: YAML keys of config.yaml */}
           <OnboardField label="provider" value="custom" copyable />
           <OnboardField label="base_url" value={props.baseUrl} copyable />
           <div class="setup-onboard-fields__row" role="listitem">
@@ -143,8 +156,10 @@ const HermesSetup: Component<Props> = (props) => {
                 <button
                   class="setup-onboard-fields__eye"
                   onClick={() => setCliKeyRevealed(!cliKeyRevealed())}
-                  aria-label={cliKeyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                  title={cliKeyRevealed() ? 'Hide key' : 'Reveal key'}
+                  aria-label={
+                    cliKeyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                  }
+                  title={cliKeyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
                 >
                   <EyeIcon open={cliKeyRevealed()} />
                 </button>
@@ -152,19 +167,29 @@ const HermesSetup: Component<Props> = (props) => {
               <CopyButton text={copyKey()} />
             </span>
           </div>
+          {/* i18n-ignore: YAML keys of config.yaml */}
           <OnboardField label="default" value="auto" copyable />
         </div>
       </Show>
 
       <Show when={subTab() === 'wizard'}>
         <p class="setup-method__hint">
-          Run the onboarding wizard and select <strong>Custom endpoint</strong> when prompted. Then
-          enter the following values:
+          <RichText
+            text={t('harnesses.guides.wizard')}
+            // i18n-ignore: option name in the Hermes wizard
+            parts={{ option: <strong>Custom endpoint</strong> }}
+          />
         </p>
         <CodeBlock code="hermes model" language="bash" />
-        <div class="setup-onboard-fields" role="list" aria-label="Configuration values">
+        <div
+          class="setup-onboard-fields"
+          role="list"
+          aria-label={t('harnesses.guides.configValues')}
+        >
+          {/* i18n-ignore: labels mirror the Hermes wizard prompts */}
           <OnboardField label="API base URL" value={props.baseUrl} copyable />
           <div class="setup-onboard-fields__row" role="listitem">
+            {/* i18n-ignore: labels mirror the Hermes wizard prompts */}
             <span class="setup-onboard-fields__label">API Key</span>
             <span class="setup-onboard-fields__value">
               <code>{wizKey()}</code>
@@ -172,8 +197,10 @@ const HermesSetup: Component<Props> = (props) => {
                 <button
                   class="setup-onboard-fields__eye"
                   onClick={() => setWizKeyRevealed(!wizKeyRevealed())}
-                  aria-label={wizKeyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                  title={wizKeyRevealed() ? 'Hide key' : 'Reveal key'}
+                  aria-label={
+                    wizKeyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                  }
+                  title={wizKeyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
                 >
                   <EyeIcon open={wizKeyRevealed()} />
                 </button>
@@ -181,6 +208,7 @@ const HermesSetup: Component<Props> = (props) => {
               <CopyButton text={copyKey()} />
             </span>
           </div>
+          {/* i18n-ignore: labels mirror the Hermes wizard prompts */}
           <OnboardField label="Model name" value="auto" copyable />
         </div>
       </Show>

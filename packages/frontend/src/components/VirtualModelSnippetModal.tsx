@@ -3,6 +3,8 @@ import FrameworkSnippets from './FrameworkSnippets.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import type { VirtualModel } from '../services/api/virtual-models.js';
+import { richText } from './VirtualModelsHint.js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   agentName: string;
@@ -41,9 +43,13 @@ const VirtualModelSnippetModal: Component<Props> = (props) => {
       >
         <div class="virtual-model-snippet-modal__header">
           <h2 id="virtual-model-snippet-title" class="virtual-model-snippet-modal__title">
-            Use “{props.virtualModel.name}”
+            {t('models.snippet.title', { name: props.virtualModel.name })}
           </h2>
-          <button class="modal__close" onClick={() => props.onClose()} aria-label="Close">
+          <button
+            class="modal__close"
+            onClick={() => props.onClose()}
+            aria-label={t('common.close')}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -57,15 +63,13 @@ const VirtualModelSnippetModal: Component<Props> = (props) => {
           </button>
         </div>
         <p class="modal-card__desc virtual-model-snippet-modal__desc">
-          Send <code>model: "{props.virtualModel.name}"</code> with this harness's key. No header is
-          needed, and clients that pick models from <code>/v1/models</code> list it there while it
-          is active.
+          {richText(t('models.snippet.desc'), {
+            model: <code>model: "{props.virtualModel.name}"</code>,
+            endpoint: <code>/v1/models</code>,
+          })}
         </p>
         <Show when={!props.virtualModel.enabled}>
-          <p class="virtual-model-snippet-modal__inactive">
-            This virtual model is inactive. Activate it before sending requests, or they will be
-            handled as a regular model id.
-          </p>
+          <p class="virtual-model-snippet-modal__inactive">{t('models.snippet.inactive')}</p>
         </Show>
 
         <FrameworkSnippets
@@ -77,7 +81,7 @@ const VirtualModelSnippetModal: Component<Props> = (props) => {
 
         <div class="virtual-model-snippet-modal__footer">
           <button class="btn btn--primary" type="button" onClick={() => props.onClose()}>
-            Done
+            {t('models.snippet.done')}
           </button>
         </div>
       </div>

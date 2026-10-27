@@ -9,6 +9,7 @@ import {
   type RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 
 function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
   navigator.clipboard
@@ -68,7 +69,7 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
       setPhase('awaiting');
       schedulePoll(result.device_code, Math.max(result.interval, 5));
     } catch {
-      setError('Failed to start GitHub login. Please try again.');
+      setError(t('providerSetup.copilot.failedStart'));
       setPhase('error');
     }
   };
@@ -86,7 +87,7 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
         if (cancelled) return;
         const nextErrors = errorCount + 1;
         if (nextErrors >= MAX_POLL_ERRORS) {
-          setError('Connection lost. Please try again.');
+          setError(t('providerSetup.copilot.connectionLost'));
           setPhase('error');
         } else {
           schedulePoll(code, delaySec, nextErrors);
@@ -99,17 +100,17 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
   const handlePollResult = (status: CopilotPollStatus, currentDelay: number): number => {
     if (status === 'complete') {
       setPhase('success');
-      toast.success('GitHub Copilot connected');
+      toast.success(t('providerSetup.copilot.connected'));
       props.onConnected();
       return 0;
     }
     if (status === 'expired') {
-      setError('Device code expired. Please try again.');
+      setError(t('providerSetup.copilot.expired'));
       setPhase('error');
       return 0;
     }
     if (status === 'denied') {
-      setError('Authorization was denied.');
+      setError(t('providerSetup.copilot.denied'));
       setPhase('error');
       return 0;
     }
@@ -151,7 +152,11 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
 
   return (
     <div class="provider-detail">
-      <button class="modal-back-btn" onClick={props.onBack} aria-label="Back to providers">
+      <button
+        class="modal-back-btn"
+        onClick={props.onBack}
+        aria-label={t('providerSetup.shared.backToProviders')}
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -166,7 +171,7 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
 
       <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 15px;">
         <div>
-          <div class="routing-modal__title">Connect provider</div>
+          <div class="routing-modal__title">{t('providerSetup.shared.connectProvider')}</div>
         </div>
       </div>
 
@@ -183,15 +188,15 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
           when={isMultiKey()}
           fallback={
             <p class="provider-detail__hint" style="color: var(--success-color, #22c55e);">
-              Connected via GitHub device login.
+              {t('providerSetup.copilot.viaDeviceLogin')}
             </p>
           }
         >
           <div class="provider-detail__field">
-            <label class="provider-detail__label">Accounts</label>
+            <label class="provider-detail__label">{t('providerSetup.shared.accounts')}</label>
             <ul
               role="list"
-              aria-label="Accounts for GitHub Copilot"
+              aria-label={t('providerSetup.shared.accountsFor', { name: 'GitHub Copilot' })}
               style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
             >
               <For each={activeKeys()}>
@@ -202,15 +207,15 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
                         {k.label}
                       </div>
                       <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                        Connected via GitHub Copilot subscription
+                        {t('providerSetup.copilot.viaSubscription')}
                       </div>
                     </div>
                     <button
                       class="provider-detail__disconnect-icon"
                       disabled={busy()}
                       onClick={() => handleDeleteKey(k.label)}
-                      aria-label={`Delete account ${k.label}`}
-                      title="Delete account"
+                      aria-label={t('providerSetup.shared.deleteAccountNamed', { label: k.label })}
+                      title={t('providerSetup.shared.deleteAccount')}
                     >
                       <svg
                         width="16"
@@ -244,7 +249,7 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
             onClick={startLogin}
           >
             <Show when={!busy()} fallback={<span class="spinner" />}>
-              Add another key
+              {t('providerSetup.shared.addAnotherKey')}
             </Show>
           </button>
         </Show>
@@ -254,21 +259,19 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
           onClick={handleDisconnect}
         >
           <Show when={!busy()} fallback={<span class="spinner" />}>
-            Disconnect
+            {t('providerSetup.shared.disconnect')}
           </Show>
         </button>
       </Show>
 
       {/* Idle / Error — show start button */}
       <Show when={!props.connected && (phase() === 'idle' || phase() === 'error')}>
-        <p class="provider-detail__hint">
-          Requires an active GitHub Copilot subscription. This will open a GitHub device login.
-        </p>
+        <p class="provider-detail__hint">{t('providerSetup.copilot.requires')}</p>
         <Show when={error()}>
           <div class="provider-detail__error">{error()}</div>
         </Show>
         <button class="btn btn--primary provider-detail__action" onClick={startLogin}>
-          Sign in with GitHub
+          {t('providerSetup.copilot.signIn')}
         </button>
       </Show>
 
@@ -283,17 +286,20 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
       <Show when={phase() === 'awaiting'}>
         <div class="copilot-device-login__code-box">
           <p class="provider-detail__hint" style="margin-bottom: 12px;">
-            Copy the code, then open GitHub to enter it:
+            {t('providerSetup.copilot.copyCode')}
           </p>
           <div class="copilot-device-login__code-row">
-            <div class="copilot-device-login__code" aria-label="Device code">
+            <div
+              class="copilot-device-login__code"
+              aria-label={t('providerSetup.copilot.deviceCode')}
+            >
               {userCode()}
             </div>
             <button
               class="copilot-device-login__copy-btn"
               onClick={() => copyToClipboard(userCode(), setCopied)}
-              aria-label={copied() ? 'Copied' : 'Copy device code'}
-              title={copied() ? 'Copied' : 'Copy'}
+              aria-label={copied() ? t('common.copied') : t('providerSetup.copilot.copyDeviceCode')}
+              title={copied() ? t('common.copied') : t('common.copy')}
             >
               <Show
                 when={copied()}
@@ -336,11 +342,11 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open GitHub
+            {t('providerSetup.copilot.openGithub')}
           </a>
           <p class="copilot-device-login__waiting">
             <span class="spinner" style="width: 14px; height: 14px; margin-right: 8px;" />
-            Waiting for authorization...
+            {t('providerSetup.copilot.waiting')}
           </p>
         </div>
       </Show>
@@ -348,7 +354,7 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
       {/* Success */}
       <Show when={phase() === 'success'}>
         <p class="provider-detail__hint" style="color: var(--success-color, #22c55e);">
-          GitHub Copilot connected successfully.
+          {t('providerSetup.copilot.success')}
         </p>
       </Show>
     </div>

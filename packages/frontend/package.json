@@ -10,13 +10,15 @@
     "pretest": "npm run build --workspace=thinker-shared",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/",
+    "lint": "eslint src/ && node scripts/check-i18n.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "pretypecheck": "npm run build --workspace=thinker-shared",
     "typecheck": "tsc6 -p tsconfig.json --noEmit",
     "pretypecheck:ts7": "npm run build --workspace=thinker-shared",
     "typecheck:ts7": "node ../../scripts/tsgo.mjs -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@solid-primitives/i18n": "^2.2.1",
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^1.0.0",
     "better-auth": "1.7.13",

@@ -4,6 +4,7 @@ import { formatCost, formatDuration, formatNumber } from '../../services/formatt
 import { providerIcon } from '../ProviderIcon.jsx';
 import { resolveProviderId } from '../../services/routing-utils.js';
 import MarkdownContent from './MarkdownContent.jsx';
+import { t } from '../../i18n/index.js';
 
 interface Props {
   column: ColumnData;
@@ -43,7 +44,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
     <section
       class="playground-column"
       role="region"
-      aria-label={`Response from ${props.column.displayName}`}
+      aria-label={t('playground.column.responseFrom', { name: props.column.displayName ?? '' })}
     >
       <header class="playground-column__header">
         <Show
@@ -63,7 +64,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
             type="button"
             class="playground-column__title"
             onClick={() => props.onChangeModel(props.column.id)}
-            title="Change model"
+            title={t('playground.column.changeModel')}
           >
             <span class="playground-column__title-left">
               <span class="playground-column__icon">
@@ -93,10 +94,10 @@ const PlaygroundColumn: Component<Props> = (props) => {
             aria-pressed={!!props.isBest}
             aria-label={
               props.isBest
-                ? `Unmark ${props.column.displayName} as best answer`
-                : `Mark ${props.column.displayName} as best answer`
+                ? t('playground.column.unmarkBest', { name: props.column.displayName ?? '' })
+                : t('playground.column.markBestNamed', { name: props.column.displayName ?? '' })
             }
-            title={props.isBest ? 'Your best answer' : 'Mark as best answer'}
+            title={props.isBest ? t('playground.column.yourBest') : t('playground.column.markBest')}
             onClick={() => props.onMarkBest?.()}
           >
             <StarIcon filled={!!props.isBest} />
@@ -105,8 +106,10 @@ const PlaygroundColumn: Component<Props> = (props) => {
         <Show when={props.column.status === 'success' && !props.onMarkBest && props.isBest}>
           <span
             class="playground-column__best playground-column__best--on playground-column__best--static"
-            title="Your best answer"
-            aria-label={`${props.column.displayName} was marked the best answer`}
+            title={t('playground.column.yourBest')}
+            aria-label={t('playground.column.wasMarkedBest', {
+              name: props.column.displayName ?? '',
+            })}
           >
             <StarIcon filled={true} />
           </span>
@@ -115,7 +118,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
           <button
             type="button"
             class="playground-column__remove"
-            aria-label={`Remove ${props.column.displayName}`}
+            aria-label={t('playground.column.remove', { name: props.column.displayName ?? '' })}
             onClick={() => props.onRemove(props.column.id)}
           >
             ×
@@ -125,7 +128,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
 
       <div class="playground-column__body">
         <Show when={props.column.status === 'idle'}>
-          <p class="playground-column__placeholder">Type a prompt below to run this model.</p>
+          <p class="playground-column__placeholder">{t('playground.column.placeholder')}</p>
         </Show>
         <Show when={props.column.status === 'loading' && !props.column.response}>
           <div class="playground-column__skeleton" aria-hidden="true">
@@ -163,16 +166,16 @@ const PlaygroundColumn: Component<Props> = (props) => {
                 class="btn btn--sm btn--primary"
                 onClick={() => props.onRetry(props.column.id)}
               >
-                Retry
+                {t('common.retry')}
               </button>
             </Show>
           </div>
         </Show>
       </div>
 
-      <footer class="playground-column__metrics" aria-label="Response metrics">
+      <footer class="playground-column__metrics" aria-label={t('playground.column.metrics')}>
         <div class="playground-column__metric">
-          <span class="playground-column__metric-label">Cost</span>
+          <span class="playground-column__metric-label">{t('playground.column.cost')}</span>
           <span class="playground-column__metric-value-row">
             <span class="playground-column__metric-value">
               {props.column.metrics?.cost != null
@@ -180,7 +183,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
                 : metricsDash}
             </span>
             <Show when={props.isCheapest && props.column.status === 'success'}>
-              <span class="playground-column__win-badge" title="Cheapest model for this request">
+              <span class="playground-column__win-badge" title={t('playground.column.cheapest')}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -195,19 +198,19 @@ const PlaygroundColumn: Component<Props> = (props) => {
           </span>
         </div>
         <div class="playground-column__metric">
-          <span class="playground-column__metric-label">Output</span>
+          <span class="playground-column__metric-label">{t('playground.column.output')}</span>
           <span class="playground-column__metric-value">
             {props.column.metrics ? formatNumber(props.column.metrics.outputTokens) : metricsDash}
           </span>
         </div>
         <div class="playground-column__metric">
-          <span class="playground-column__metric-label">Duration</span>
+          <span class="playground-column__metric-label">{t('playground.column.duration')}</span>
           <span class="playground-column__metric-value-row">
             <span class="playground-column__metric-value">
               {props.column.metrics ? formatDuration(props.column.metrics.durationMs) : metricsDash}
             </span>
             <Show when={props.isFastest && props.column.status === 'success'}>
-              <span class="playground-column__win-badge" title="Fastest model for this request">
+              <span class="playground-column__win-badge" title={t('playground.column.fastest')}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -234,7 +237,7 @@ const PlaygroundColumn: Component<Props> = (props) => {
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open()}
               >
-                <span>Response headers</span>
+                <span>{t('playground.column.responseHeaders')}</span>
                 <svg
                   class="playground-column__headers-caret"
                   classList={{ 'playground-column__headers-caret--open': open() }}

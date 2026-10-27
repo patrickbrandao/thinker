@@ -1,0 +1,274 @@
+import type en from '../en/harnesses.js';
+import type { Catalog } from '../../types.js';
+
+const ptBR: Catalog<typeof en> = {
+  category: {
+    personal: 'Agente de IA',
+    automation: 'Automação',
+    app: 'App com SDK de IA',
+    coding: 'Assistente de código',
+  },
+  platformOther: 'Outro',
+  key: {
+    revealAria: 'Mostrar chave de API',
+    hideAria: 'Ocultar chave de API',
+    revealInCodeAria: 'Mostrar chave de API no código',
+    hideInCodeAria: 'Ocultar chave de API no código',
+    reveal: 'Mostrar chave',
+    hide: 'Ocultar chave',
+    revealShort: 'Mostrar',
+    hideShort: 'Ocultar',
+  },
+  deleted: 'Harness "{{ name }}" excluído',
+  workspace: {
+    title: 'Meus harnesses',
+    metaDescription:
+      'Veja e gerencie todos os seus harnesses. Acompanhe uso, requisições e custos.',
+    subtitle: 'Veja e gerencie todos os harnesses conectados',
+    layout: 'Layout da lista de harnesses',
+    gridView: 'Visualização em grade',
+    tableView: 'Visualização em tabela',
+    connect: 'Conectar harness',
+    colHarness: 'Harness',
+    colRequests: 'Requisições',
+    colTokens: 'Tokens',
+    colCost: 'Custo',
+    colLastActive: 'Última atividade',
+    emptyTitle: 'Nenhum harness ainda',
+    emptyBody:
+      'Conecte um harness ou um app de IA para assumir o controle do roteamento e dos custos.',
+    connectFirst: 'Conectar seu primeiro harness',
+    duplicate: 'Duplicar',
+    actionsFor: 'Ações de {{ name }}',
+    deleteTitle: 'Excluir {{ name }}',
+    deleteBody:
+      'Isso exclui para sempre o harness {{ name }} e todos os dados dele. Essa ação não pode ser desfeita.',
+    deleteConfirm: 'Para confirmar, digite {{ name }} abaixo',
+    deleteButton: 'Excluir harness',
+  },
+  detail: {
+    back: '← Harnesses',
+    overview: 'Visão geral',
+    routing: 'Roteamento',
+    providers: 'Provedores',
+    limits: 'Limites',
+    settings: 'Configurações',
+  },
+  settings: {
+    pageTitle: 'Configurações de {{ name }}',
+    metaDescription: 'Configure {{ name }}.',
+    intro: 'Renomeie o agente, gerencie as chaves de API e veja as instruções de configuração',
+    readOnly:
+      'Você tem acesso somente leitura. Leitores não podem alterar as configurações do harness.',
+    nameTitle: 'Nome do harness',
+    nameDesc: 'O nome de exibição deste harness em todo o painel.',
+    typeTitle: 'Tipo de harness',
+    notSet: 'Não definido',
+    change: 'Alterar',
+    errorMessage: 'Ocorreu um erro.',
+    apiKeyTitle: 'Chave de API',
+    apiKeyLabel: 'Chave de API do harness',
+    apiKeyDesc:
+      'Esta chave autentica as requisições do seu harness ao Thinker. Rotacionar gera uma chave nova e invalida a atual na hora.',
+    rotating: 'Rotacionando...',
+    rotate: 'Rotacionar chave',
+    rotated: 'Chave de API rotacionada',
+    setupTitle: 'Configuração',
+    keyLoadError:
+      'Não foi possível carregar sua chave de API. Use {{ rotate }} acima para gerar uma nova.',
+    dangerTitle: 'Zona de perigo',
+    deleteTitle: 'Excluir este harness',
+    deleteDesc:
+      'Exclui para sempre este harness, a chave de API dele e todas as mensagens e análises. Essa ação não pode ser desfeita.',
+    deleteButton: 'Excluir harness',
+    deleteModalTitle: 'Excluir {{ name }}',
+    deleteModalBody:
+      'Isso exclui para sempre o harness {{ name }} e todos os dados dele. Essa ação não pode ser desfeita.',
+    deleteModalConfirm: 'Para confirmar, digite {{ name }} na caixa abaixo',
+    deleteModalButton: 'Excluir este harness',
+    changeTypeTitle: 'Alterar tipo de harness',
+    changeTypeDesc: 'Escolha o novo tipo e a plataforma deste harness.',
+  },
+  recording: {
+    title: 'Logs',
+    enable: 'Ativar logs',
+    desc: 'Registra o conteúdo completo de cada requisição e de cada tentativa, para você ver o que o seu agente envia. Os logs ficam na página Requisições, dentro de cada requisição, e permanecem no seu próprio banco de dados.',
+    enabledToast: 'Logs ativados',
+    disabledToast: 'Logs desativados',
+  },
+  help: {
+    title: 'Ajuda e suporte',
+    metaDescription: 'Ajuda com o Thinker: documentação e rastreador de issues.',
+    subtitle: 'Dúvidas, bugs ou ideias? O Thinker é open source e acompanhado no GitHub',
+    docsTitle: 'Documentação',
+    docsDesc: 'Guias de instalação, configuração e provedores.',
+    openDocs: 'Abrir documentação',
+    issuesTitle: 'Issues',
+    issuesDesc:
+      'Relate um bug ou faça uma pergunta no GitHub. Não inclua chaves, tokens nem logs de requisições.',
+    openIssues: 'Abrir issues',
+  },
+  cli: {
+    metaDescription:
+      'Instale a CLI thinker e gerencie harnesses, provedores, roteamento e logs de requisições pelo terminal.',
+    subtitle:
+      'Tudo o que o painel faz, a partir de um terminal, de um script ou de um agente de código',
+    installTitle: '1. Instalar',
+    installDesc:
+      'A CLI vem no repositório do Thinker. Instale a partir de um checkout da versão que corresponde a esta instância; o comando é {{ command }}.',
+    signInTitle: '2. Entrar',
+    signInDesc:
+      'Isso abre o navegador, você aprova e a CLI guarda um token para este host. O token nunca passa pela URL.',
+    driveTitle: '3. Usar',
+    documentation: 'Documentação',
+    driveDesc:
+      'Crie um harness, conecte um provedor, defina uma rota e comprove que funciona com uma requisição real.',
+  },
+  mcp: {
+    title: 'Servidor MCP',
+    metaDescription:
+      'Conecte Claude, Cursor, Codex e outros clientes MCP a esta instalação do Thinker via OAuth.',
+    subtitle:
+      'Gerencie harnesses, provedores, roteamento e o log de requisições de qualquer cliente MCP',
+    unavailableTitle: 'Indisponível nesta instalação',
+    unavailableDesc:
+      'O servidor MCP exige que esta instalação seja acessível por HTTPS, porque os clientes MCP se autorizam contra uma URL de recurso HTTPS. Ele está desligado aqui, porque {{ authUrl }} é um endereço HTTP simples ou porque {{ flag }} está definido. O painel, o gateway e a CLI não são afetados.',
+    endpointTitle: 'Seu endpoint',
+    endpointDesc:
+      'Aponte qualquer cliente MCP para cá. Ele entra com OAuth: a primeira conexão abre uma tela de consentimento no navegador e guarda um token revogável de curta duração.',
+    connectTitle: 'Conecte seu cliente',
+    clientTabs: 'Cliente MCP',
+    modeTitle: 'Somente leitura ou leitura e escrita',
+    toolList: 'Lista completa de ferramentas',
+    modeDesc:
+      'A tela de consentimento pergunta qual você quer. Uma conexão somente leitura nem vê as ferramentas de escrita: pode olhar, mas não mexer.',
+  },
+  typeSelect: {
+    aria: 'Tipo de harness: {{ type }}',
+    select: 'Selecionar',
+  },
+  add: {
+    title: 'Conectar harness',
+    desc: 'Dê um nome ao harness para acompanhar o uso de LLM, os custos e as mensagens em tempo real.',
+    type: 'Tipo',
+    name: 'Nome do harness',
+    namePlaceholder: 'ex.: Meu harness',
+    settings: 'Configurações',
+    enableLogs: 'Ativar logs',
+    logsHint:
+      'Veja exatamente o que o seu agente envia em cada tentativa e depure mais rápido. Os logs ficam no seu próprio banco de dados.',
+    connected: 'Harness "{{ name }}" conectado',
+  },
+  duplicateModal: {
+    title: 'Duplicar "{{ name }}"',
+    desc: 'Cria um harness novo com os mesmos provedores, roteamento e configuração de níveis. Uma chave de API nova é gerada. A telemetria e o histórico de requisições ficam com o original.',
+    newName: 'Nome do novo harness',
+    copyPlaceholder: '{{ name }}-copia',
+    copied: 'O que é copiado',
+    providers: (n: number) =>
+      `${n === 1 ? 'credencial' : 'credenciais'} de provedor (chaves de API criptografadas e assinaturas)`,
+    tiers: (n: number) => (n === 1 ? 'ajuste de nível' : 'ajustes de nível'),
+    specificity: (n: number) =>
+      n === 1 ? 'ajuste de especificidade' : 'ajustes de especificidade',
+    notCopied: 'O que não é copiado',
+    requests: 'Requisições',
+    logs: 'Logs',
+    notificationRules: 'Regras de notificação',
+    submit: 'Duplicar harness',
+    done: '"{{ source }}" duplicado como "{{ target }}"',
+  },
+  setupModal: {
+    title: 'Configurar harness: {{ name }}',
+    desc: 'Conecte o seu harness ao Thinker para começar a rotear requisições.',
+    keyErrorTitle: 'Não foi possível carregar a chave de API',
+    keyErrorMessage: 'Não foi possível buscar a chave de API do seu harness. Tente de novo.',
+  },
+  setupStep: {
+    connectNamed: 'Conecte o seu harness {{ name }} ao Thinker',
+    connectTool: 'Conecte o {{ name }} ao Thinker',
+    connectDefault: 'Conecte o seu harness ao Thinker',
+    pointAt: 'Aponte o seu harness para o endpoint do Thinker usando o modelo {{ model }}',
+    method: 'Método de configuração',
+    agents: 'Agentes',
+    toolkits: 'Toolkits',
+    framework: 'Framework de agente',
+  },
+  guides: {
+    claudeSettings:
+      'Adicione este bloco em {{ file }}. Toda execução do {{ cmd }} passará pelo Thinker com {{ auto }}.',
+    claudeContext:
+      'Atrás de um gateway, o Claude Code assume uma janela de contexto de 200k e compacta sessões longas cedo. Para trabalhos com contexto longo, fixe um modelo de 1M em vez de {{ auto }}, por exemplo {{ example }}.',
+    codexConfig:
+      'Adicione este bloco ao seu {{ file }} global. O Codex CLI e o Desktop leem esse arquivo. Reinicie o Codex depois de salvar.',
+    codexExport:
+      'Exporte a sua chave do Thinker e abra o Codex CLI no mesmo terminal. No Desktop, deixe essa variável disponível no ambiente que abre o app e depois feche e reabra o Codex por completo. Um export em outro terminal não atualiza um app já aberto.',
+    craft:
+      'No Craft, adicione uma conexão por chave de API com um endpoint personalizado compatível com OpenAI. Defina a URL base como {{ url }} {{ copy }}, use o modelo {{ auto }} e cole esta chave de API:',
+    nanobot:
+      'Edite {{ file }} atualizando primeiro os valores existentes de {{ defaults }} e depois adicione o bloco de provedor {{ custom }} abaixo.',
+    openCode: 'Adicione este bloco ao seu {{ file }} global.',
+    configMethod: 'Método de configuração',
+    configValues: 'Valores de configuração',
+    hermesIntro:
+      'Aponte o Hermes para o endpoint do Thinker para rotear requisições entre vários modelos.',
+    hermesFileTab: 'Arquivo de configuração',
+    hermesOpen: 'Abra o arquivo de configuração do Hermes:',
+    hermesAdd: 'Adicione a seção {{ section }} a seguir no seu {{ file }}:',
+    wizard:
+      'Rode o assistente de configuração e escolha {{ option }} quando for perguntado. Depois informe os valores a seguir:',
+    n8nIntro:
+      'No n8n, instale o community node {{ node }} (gerado a partir do repositório do Thinker) e adicione o node Thinker Chat Model ao seu AI Agent ou Basic LLM Chain, ou o node Thinker para chamadas diretas. Crie ou escolha credenciais do Thinker, cole os valores abaixo e defina o modelo do node como {{ auto }}.',
+    n8nReference: 'Referência:',
+    n8nDocs: 'documentação de instalação de community nodes do n8n',
+    n8nValues: 'Valores da credencial do n8n',
+    openClawIntro:
+      'Registre o Thinker na configuração do OpenClaw para rotear cada requisição ao melhor provedor usando o modelo {{ model }}',
+    openClawCliTab: 'Configuração pela CLI',
+    openClawCli: 'Defina a configuração do provedor e o modelo padrão direto por comandos da CLI.',
+  },
+  snippets: {
+    toolkitTabs: 'SDK / toolkit',
+    language: 'Linguagem',
+    openaiApi: 'API da OpenAI',
+    model: 'Modelo',
+    connectionDetails: 'Dados de conexão',
+    baseUrl: 'URL base',
+    apiKey: 'Chave de API',
+    header: 'Header',
+  },
+  email: {
+    editTitle: 'Editar provedor de e-mail',
+    configureTitle: 'Configurar provedor de e-mail',
+    modalDesc: 'Informe suas credenciais de API para ativar o envio de alertas por e-mail.',
+    provider: 'Provedor',
+    apiKey: 'Chave de API',
+    change: 'Alterar',
+    getKey: 'Obter chave de API do {{ provider }}',
+    domain: 'Domínio de envio',
+    domainPlaceholder: 'ex.: notificacoes.minhaempresa.com',
+    notificationEmail: 'E-mail de notificação',
+    notificationPlaceholder: 'voce@exemplo.com',
+    notificationHint: 'Para onde os alertas de limite serão enviados.',
+    sendTest: 'Enviar e-mail de teste',
+    testing: 'Testando...',
+    testAndSave: 'Testar e salvar',
+    testAndConnect: 'Testar e conectar',
+    keyRequired: 'A chave de API é obrigatória',
+    keyTooShort: 'A chave de API precisa ter no mínimo 8 caracteres',
+    resendPrefix: 'A chave de API do Resend precisa começar com re_',
+    sendgridPrefix: 'A chave de API do SendGrid precisa começar com SG.',
+    domainRequired: 'O domínio é obrigatório',
+    domainInvalid: 'Formato de domínio inválido',
+    needRecipient: 'Informe um e-mail de notificação para receber o teste',
+    testFailed: 'O teste de e-mail falhou. Confira suas credenciais',
+    testSent: 'E-mail de teste enviado para {{ to }}',
+    connected: '{{ provider }} conectado',
+    yourProvider: 'Seu provedor',
+    setupSubtitle: 'Escolha um serviço para enviar as notificações de alerta por e-mail.',
+    resendDesc: 'API de e-mail',
+    mailgunDesc: 'E-mail transacional',
+    sendgridDesc: 'Entrega de e-mail',
+  },
+};
+
+export default ptBR;

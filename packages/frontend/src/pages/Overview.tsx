@@ -40,19 +40,13 @@ import {
   RANGE_STORAGE_KEY,
   VALID_RANGES,
   useOverviewColumns,
+  rangeOptions,
   useOverviewRange,
 } from '../services/use-overview-range.js';
+import { t } from '../i18n/index.js';
 import '../styles/overview.css';
 import '../styles/charts.css';
 import '../styles/routing.css';
-
-const AGENT_RANGE_OPTIONS = [
-  { label: 'Last 24 hours', value: '24h' },
-  { label: 'Last 7 days', value: '7d' },
-  { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 90 days', value: '90d' },
-  { label: 'Last 365 days', value: '365d' },
-];
 
 interface OverviewData {
   summary: {
@@ -388,10 +382,16 @@ const Overview: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>{agentDisplayName() ?? decodeURIComponent(params.agentName)} Overview - Thinker</Title>
+      <Title>
+        {t('overview.agentPageTitle', {
+          name: agentDisplayName() ?? decodeURIComponent(params.agentName),
+        })}
+      </Title>
       <Meta
         name="description"
-        content={`Monitor ${agentDisplayName() ?? decodeURIComponent(params.agentName)} performance, costs, tokens, and activity.`}
+        content={t('overview.agentMetaDescription', {
+          name: agentDisplayName() ?? decodeURIComponent(params.agentName),
+        })}
       />
       <div
         class="page-header"
@@ -399,11 +399,11 @@ const Overview: Component = () => {
       >
         <div class="header-controls">
           <Show when={showDashboard()}>
-            <Select value={range()} onChange={handleRangeChange} options={AGENT_RANGE_OPTIONS} />
+            <Select value={range()} onChange={handleRangeChange} options={rangeOptions()} />
           </Show>
           <Show when={showEmptyState() && !setupCompleted()}>
             <button class="btn btn--primary btn--sm" onClick={() => setSetupOpen(true)}>
-              Set up harness
+              {t('overview.empty.setupHarness')}
             </button>
           </Show>
         </div>
@@ -422,19 +422,19 @@ const Overview: Component = () => {
               when={setupCompleted()}
               fallback={
                 <div class="empty-state">
-                  <div class="empty-state__title">No activity yet</div>
-                  <p>Set up your harness and send a message. Usage data shows up here.</p>
+                  <div class="empty-state__title">{t('overview.empty.noActivity')}</div>
+                  <p>{t('overview.empty.agentSetup')}</p>
                   <button
                     class="btn btn--primary btn--sm"
                     style="margin-top: var(--gap-md);"
                     onClick={() => setSetupOpen(true)}
                   >
-                    Set up harness
+                    {t('overview.empty.setupHarness')}
                   </button>
                   <div class="empty-state__img-wrapper">
                     <img
                       src="/example-overview.svg"
-                      alt="Example dashboard overview showing cost and token charts"
+                      alt={t('overview.empty.exampleAlt')}
                       class="empty-state__img"
                       loading="lazy"
                     />
@@ -443,8 +443,8 @@ const Overview: Component = () => {
               }
             >
               <div class="empty-state">
-                <div class="empty-state__title">No activity yet</div>
-                <p>Connect a provider to start routing LLM calls.</p>
+                <div class="empty-state__title">{t('overview.empty.noActivity')}</div>
+                <p>{t('overview.empty.agentConnect')}</p>
                 <button
                   class="btn btn--primary btn--sm"
                   style="margin-top: var(--gap-md);"
@@ -454,12 +454,12 @@ const Overview: Component = () => {
                     })
                   }
                 >
-                  Connect provider
+                  {t('overview.empty.connectProvider')}
                 </button>
                 <div class="empty-state__img-wrapper">
                   <img
                     src="/example-overview.svg"
-                    alt="Example dashboard overview showing cost and token charts"
+                    alt={t('overview.empty.exampleAlt')}
                     class="empty-state__img"
                     loading="lazy"
                   />
@@ -475,9 +475,7 @@ const Overview: Component = () => {
                   <Show when={d().has_data === false}>
                     <div class="waiting-banner">
                       <i class="bxd bx-florist" />
-                      <p>
-                        No activity yet. Your dashboard updates seconds after the first LLM call.
-                      </p>
+                      <p>{t('overview.empty.waiting')}</p>
                     </div>
                   </Show>
                   <ReliabilityKpiCards
@@ -507,7 +505,7 @@ const Overview: Component = () => {
                         recoveredTimeseries={recoveredTs()}
                         costValue={d().summary?.cost_today?.value ?? 0}
                         costTrendPct={d().summary?.cost_today?.trend_pct ?? 0}
-                        costInfoTooltip="Actual API key costs only. Subscription usage is not included."
+                        costInfoTooltip={t('overview.costInfo')}
                         tokensValue={d().summary?.tokens_today?.value ?? 0}
                         tokensTrendPct={d().summary?.tokens_today?.trend_pct ?? 0}
                         range={range()}
@@ -518,7 +516,7 @@ const Overview: Component = () => {
                         seriesFilters={
                           <Show when={activeView() !== 'requests' && allProviders().length > 1}>
                             <FilterSelect
-                              noun="providers"
+                              noun={t('overview.nounProviders')}
                               items={allProviders()}
                               selected={effectiveSelected()}
                               colorMap={providerColorMap()}
@@ -542,9 +540,9 @@ const Overview: Component = () => {
                       class="panel__title"
                       style="display: flex; justify-content: space-between; align-items: center;"
                     >
-                      Recent Requests
+                      {t('overview.recentRequests')}
                       <A href={`/harnesses/${params.agentName}/messages`} class="view-more-link">
-                        View more
+                        {t('overview.viewMore')}
                       </A>
                     </div>
                     <MessageTable

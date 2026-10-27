@@ -1,10 +1,14 @@
 import { createResource, For, Show, type Component } from 'solid-js';
-import { formatNumber } from '../services/formatters.js';
+import { formatErrorClass, formatNumber } from '../services/formatters.js';
 import { messagePing } from '../services/sse.js';
 import { getErrorBreakdown } from '../services/api/analytics.js';
+import { locale, t } from '../i18n/index.js';
 
 function label(key: string): string {
-  return key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  // Other languages use the translated error-class labels; English keeps the
+  // raw class name, humanized.
+  const translated = locale() === 'en' ? null : formatErrorClass(key);
+  return translated ?? key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export interface ErrorClassCardProps {
@@ -33,10 +37,10 @@ const ErrorClassCard: Component<ErrorClassCardProps> = (props) => {
 
   return (
     <div class="error-class-card">
-      <div class="error-class-card__title">Error classes by frequency</div>
+      <div class="error-class-card__title">{t('overview.errorClasses.title')}</div>
       <Show
         when={sorted().length > 0}
-        fallback={<p class="error-class-card__empty">No errors in this period</p>}
+        fallback={<p class="error-class-card__empty">{t('overview.errorClasses.empty')}</p>}
       >
         <div class="error-class-card__list">
           <For each={sorted()}>

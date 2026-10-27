@@ -1,0 +1,36 @@
+import type en from '../en/nav.js';
+import type { Catalog } from '../../types.js';
+
+const ptBR: Catalog<typeof en> = {
+  skipToContent: 'Pular para o conteúdo principal',
+  closeMenu: 'Fechar menu de navegação',
+  openMenu: 'Abrir menu de navegação',
+  dashboardContent: 'Conteúdo do painel',
+  navigation: 'Navegação',
+  overview: 'Visão geral',
+  requests: 'Requisições',
+  harnesses: 'Harnesses',
+  createHarness: 'Criar harness',
+  sectionProviders: 'PROVEDORES',
+  local: 'Locais',
+  usageBased: 'Por uso',
+  subscriptions: 'Assinaturas',
+  sectionIntegrations: 'INTEGRAÇÕES',
+  mcpServer: 'Servidor MCP',
+  sectionTools: 'FERRAMENTAS',
+  playground: 'Playground',
+  sectionOrganization: 'ORGANIZAÇÃO',
+  membersSettings: 'Membros e configurações',
+  users: 'Usuários',
+  userFallback: 'Usuário',
+  harnessActions: 'Ações do harness',
+  settings: 'Configurações',
+  duplicateHarness: 'Duplicar harness',
+  docs: 'Documentação',
+  userMenu: 'Menu do usuário',
+  accountPreferences: 'Preferências da conta',
+  logOut: 'Sair',
+  version: 'Versão {{ version }}',
+};
+
+export default ptBR;

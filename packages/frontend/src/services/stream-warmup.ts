@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 /**
  * Stream warm-up override (#244): how long the gateway waits for the first
  * streamed chunk before failing over. The UI edits seconds; the API stores ms
@@ -6,7 +8,13 @@
 export const MIN_STREAM_WARMUP_SECONDS = 1;
 export const MAX_STREAM_WARMUP_SECONDS = 600;
 
-export const STREAM_WARMUP_ERROR = `Enter a value between ${MIN_STREAM_WARMUP_SECONDS} and ${MAX_STREAM_WARMUP_SECONDS} seconds, or leave it empty.`;
+/** Validation message for an out-of-range warm-up, in the active language. */
+export function streamWarmupError(): string {
+  return t('routing.warmupError', {
+    min: MIN_STREAM_WARMUP_SECONDS,
+    max: MAX_STREAM_WARMUP_SECONDS,
+  });
+}
 
 /** Stored ms to the text shown in the seconds input ('' when unset). */
 export function warmupMsToSecondsInput(ms: number | null | undefined): string {

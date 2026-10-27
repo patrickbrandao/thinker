@@ -1,5 +1,6 @@
 import { resolveProviderMetadataIdentity } from 'thinker-shared';
 import { PROVIDERS, type ProviderDef } from './providers.js';
+import { t } from '../i18n/index.js';
 
 export function getProvider(id: string): ProviderDef | undefined {
   return PROVIDERS.find((p) => p.id === id);
@@ -12,19 +13,22 @@ export function validateApiKey(
   if (provider.noKeyRequired) return { valid: true };
 
   const trimmed = key.replace(/\s/g, '');
-  if (!trimmed) return { valid: false, error: 'API key is required' };
+  if (!trimmed) return { valid: false, error: t('providerSetup.validation.apiKeyRequired') };
 
   if (provider.keyPrefix && !trimmed.startsWith(provider.keyPrefix)) {
     return {
       valid: false,
-      error: `${provider.name} keys start with "${provider.keyPrefix}"`,
+      error: t('providerSetup.validation.keyPrefix', {
+        name: provider.name,
+        prefix: provider.keyPrefix,
+      }),
     };
   }
 
   if (provider.minKeyLength && trimmed.length < provider.minKeyLength) {
     return {
       valid: false,
-      error: `Key is too short (minimum ${provider.minKeyLength} characters)`,
+      error: t('providerSetup.validation.keyTooShort', { n: provider.minKeyLength }),
     };
   }
 
@@ -53,19 +57,19 @@ export function validateSubscriptionKey(
   key: string,
 ): { valid: boolean; error?: string } {
   const trimmed = key.replace(/\s/g, '');
-  if (!trimmed) return { valid: false, error: 'Token is required' };
+  if (!trimmed) return { valid: false, error: t('providerSetup.validation.tokenRequired') };
   const prefix = SUBSCRIPTION_PREFIXES[provider.id];
   if (prefix && !trimmed.startsWith(prefix)) {
     return {
       valid: false,
-      error: `${provider.name} subscription tokens start with "${prefix}"`,
+      error: t('providerSetup.validation.subscriptionPrefix', { name: provider.name, prefix }),
     };
   }
   const apiPrefix = API_KEY_PREFIXES[provider.id];
   if (apiPrefix && trimmed.startsWith(apiPrefix)) {
     return {
       valid: false,
-      error: 'This looks like an API key. Use the API Key tab instead.',
+      error: t('providerSetup.validation.looksLikeApiKey'),
     };
   }
   // Providers that expose a paste-token alternative alongside an OAuth flow
@@ -82,7 +86,7 @@ export function validateSubscriptionKey(
   if (trimmed.length < minLength) {
     return {
       valid: false,
-      error: `Token is too short (minimum ${minLength} characters)`,
+      error: t('providerSetup.validation.tokenTooShort', { n: minLength }),
     };
   }
   return { valid: true };

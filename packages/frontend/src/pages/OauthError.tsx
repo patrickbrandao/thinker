@@ -1,15 +1,13 @@
 import { Title } from '@solidjs/meta';
 import type { Component } from 'solid-js';
+import { t } from '../i18n/index.js';
 
 const OauthError: Component = () => (
   <>
-    <Title>MCP authorization error - Thinker</Title>
+    <Title>{t('common.pageTitle', { page: t('auth.oauthError.pageTitle') })}</Title>
     <div class="auth-header">
-      <h1 class="auth-header__title">Cannot authorize this MCP client</h1>
-      <p class="auth-header__subtitle">
-        The client requested a callback URL that is not in its registered client metadata. Check the
-        client configuration and try again.
-      </p>
+      <h1 class="auth-header__title">{t('auth.oauthError.title')}</h1>
+      <p class="auth-header__subtitle">{t('auth.oauthError.body')}</p>
     </div>
     <p class="auth-form__error" role="alert">
       invalid_redirect_uri

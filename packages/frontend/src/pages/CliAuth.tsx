@@ -3,6 +3,7 @@ import { Title } from '@solidjs/meta';
 import { Show, createSignal, type Component } from 'solid-js';
 import { fetchMutate } from '../services/api/core.js';
 import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
+import { t } from '../i18n/index.js';
 
 /** Mirrors the backend's `state` contract on POST /api/v1/cli/authorize. */
 const STATE_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -86,7 +87,7 @@ const CliAuth: Component = () => {
 
   return (
     <div class="auth-layout">
-      <Title>Authorize CLI - Thinker</Title>
+      <Title>{t('common.pageTitle', { page: t('auth.cli.pageTitle') })}</Title>
       <div class="auth-card" style="text-align: center;">
         <div class="auth-logo">
           <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
@@ -96,10 +97,10 @@ const CliAuth: Component = () => {
           when={request()}
           fallback={
             <div class="auth-header">
-              <h1 class="auth-header__title">Invalid login request</h1>
+              <h1 class="auth-header__title">{t('auth.cli.invalidTitle')}</h1>
               <p class="auth-header__subtitle">
-                This link is missing or malformed. Return to your terminal and run{' '}
-                <code>thinker login</code> again.
+                {t('auth.cli.invalidBefore')} <code>thinker login</code>{' '}
+                {t('auth.cli.invalidAfter')}
               </p>
             </div>
           }
@@ -109,10 +110,10 @@ const CliAuth: Component = () => {
             fallback={
               <>
                 <div class="auth-header">
-                  <h1 class="auth-header__title">Authorize the Thinker CLI?</h1>
+                  <h1 class="auth-header__title">{t('auth.cli.title')}</h1>
                   <p class="auth-header__subtitle">
-                    This grants the CLI on this machine full access to your workspace. Revoke it any
-                    time by running <code>thinker logout</code>.
+                    {t('auth.cli.grantBefore')} <code>thinker logout</code>
+                    {t('auth.cli.grantAfter')}
                   </p>
                 </div>
                 {/* .auth-form is the column that stretches the submit button edge
@@ -132,20 +133,18 @@ const CliAuth: Component = () => {
                     disabled={phase() === 'working'}
                   >
                     {phase() === 'working'
-                      ? 'Authorizing...'
+                      ? t('auth.cli.authorizing')
                       : phase() === 'error'
-                        ? 'Try again'
-                        : 'Authorize'}
+                        ? t('common.tryAgain')
+                        : t('auth.cli.authorize')}
                   </button>
                 </div>
               </>
             }
           >
             <div class="auth-header">
-              <h1 class="auth-header__title">Connected</h1>
-              <p class="auth-header__subtitle">
-                You can close this page and return to your terminal.
-              </p>
+              <h1 class="auth-header__title">{t('auth.cli.connected')}</h1>
+              <p class="auth-header__subtitle">{t('auth.cli.closePage')}</p>
             </div>
           </Show>
         </Show>

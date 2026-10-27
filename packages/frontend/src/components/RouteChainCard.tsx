@@ -26,6 +26,7 @@ import ModelPickerModal from './ModelPickerModal.js';
 import RouteKeyChip from './RouteKeyChip.js';
 import KeyPickerModal from './KeyPickerModal.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 
 function providerIdForModel(model: string, apiModels: AvailableModel[]): string | undefined {
   const m =
@@ -161,7 +162,10 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
   const priceLabel = (): string => {
     const info = modelInfo();
     if (!info) return '';
-    return `${pricePerM(info.input_price_per_token)} in · ${pricePerM(info.output_price_per_token)} out per 1M`;
+    return t('routing.pricePerM', {
+      input: pricePerM(info.input_price_per_token),
+      output: pricePerM(info.output_price_per_token),
+    });
   };
 
   const effectiveAuth = (): AuthType | null => {
@@ -217,9 +221,9 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
     try {
       await props.persistFallbacks(next, nextRoutes);
       props.onFallbacksUpdate(next, nextRoutes);
-      toast.success('Fallback added');
+      toast.success(t('routing.fallbackAdded'));
     } catch {
-      toast.error('Failed to add fallback');
+      toast.error(t('routing.fallbackAddFailed'));
     }
   };
 
@@ -305,8 +309,8 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
               type="button"
               class="header-tier-card__icon-btn"
               onClick={() => setMenuOpen(!menuOpen())}
-              aria-label={`Options for ${props.chain.name}`}
-              title="Options"
+              aria-label={t('routing.chain.optionsFor', { name: props.chain.name })}
+              title={t('routing.chain.options')}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -331,7 +335,7 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
           when={currentModel()}
           fallback={
             <button class="routing-card__header-add" onClick={() => setPickerMode('primary')}>
-              + Add model
+              {t('routing.addModel')}
             </button>
           }
         >
@@ -354,7 +358,7 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
                 <path d="m7.77,12.97c.49.41,1.23.06,1.23-.58v-2.4h6c2.21,0,4,1.79,4,4v5c0,.55.45,1,1,1s1-.45,1-1v-5c0-3.31-2.69-6-6-6h-6v-2.4c0-.64-.74-.98-1.23-.58l-4.08,3.4c-.36.3-.36.85,0,1.15l4.08,3.4Z" />
               </svg>
             )}
-            Reset
+            {t('routing.reset')}
           </button>
         </Show>
       </div>
@@ -367,7 +371,7 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
             <div
               class="routing-card__model-chip"
               classList={{ 'routing-card__model-chip--skipped': primarySkipped() }}
-              title={primarySkipped() ? 'Skipped while Stream mode is active' : undefined}
+              title={primarySkipped() ? t('routing.skippedWhileStream') : undefined}
               onClick={() => setPickerMode('primary')}
             >
               <div class="routing-card__chip-main">
@@ -460,9 +464,9 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
                       e.stopPropagation();
                       setPickerMode('primary');
                     }}
-                    aria-label={`Change model for ${props.chain.name}`}
+                    aria-label={t('routing.changeModelFor', { name: props.chain.name })}
                   >
-                    <span class="routing-tooltip">Change</span>
+                    <span class="routing-tooltip">{t('routing.change')}</span>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="12"
@@ -484,10 +488,12 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
                     <span class="routing-card__chip-meta">
                       <span class="routing-card__chip-price">
                         {formatPerRequestCost(modelInfo()?.cost_per_request) ??
-                          'Included in subscription'}
+                          t('routing.includedInSubscription')}
                       </span>
                       <Show when={primarySkipped()}>
-                        <span class="routing-card__skipped-badge">Skipped in Stream</span>
+                        <span class="routing-card__skipped-badge">
+                          {t('routing.skippedInStream')}
+                        </span>
                       </Show>
                     </span>
                   }
@@ -495,7 +501,9 @@ const RouteChainCard: Component<RouteChainCardProps> = (props) => {
                   <span class="routing-card__chip-meta">
                     <span class="routing-card__chip-price">{priceLabel()}</span>
                     <Show when={primarySkipped()}>
-                      <span class="routing-card__skipped-badge">Skipped in Stream</span>
+                      <span class="routing-card__skipped-badge">
+                        {t('routing.skippedInStream')}
+                      </span>
                     </Show>
                   </span>
                 </Show>

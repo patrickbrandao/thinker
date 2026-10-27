@@ -3,6 +3,7 @@ import { Title, Meta } from '@solidjs/meta';
 import { type Component, createSignal, createUniqueId, onMount, Show } from 'solid-js';
 import { authClient } from '../services/auth-client.js';
 import { checkEmailConfigured } from '../services/setup-status.js';
+import { t } from '../i18n/index.js';
 
 const RequestResetForm: Component = () => {
   const [email, setEmail] = createSignal('');
@@ -33,7 +34,7 @@ const RequestResetForm: Component = () => {
     setLoading(false);
 
     if (authError) {
-      setError(authError.message ?? 'Failed to send reset email');
+      setError(authError.message ?? t('auth.reset.sendFailed'));
       return;
     }
 
@@ -43,25 +44,24 @@ const RequestResetForm: Component = () => {
   return (
     <>
       <div class="auth-header">
-        <h1 class="auth-header__title">Reset your password</h1>
+        <h1 class="auth-header__title">{t('auth.reset.title')}</h1>
         <p class="auth-header__subtitle">
           {!emailConfigured()
-            ? "Email isn't set up on this server"
+            ? t('auth.reset.noEmail')
             : sent()
-              ? 'Check your email for a reset link'
-              : 'Enter your email to receive a reset link'}
+              ? t('auth.reset.checkEmail')
+              : t('auth.reset.enterEmail')}
         </p>
       </div>
 
       <Show when={!emailConfigured()}>
         <div class="auth-form">
           <div class="auth-form__notice" role="status">
-            Password reset by email isn't available on this install. Ask an admin to reset your
-            password, or sign in and update it from your{' '}
+            {t('auth.reset.unavailableBefore')}{' '}
             <A href="/account" class="auth-form__notice-link">
-              Account
+              {t('auth.reset.accountLink')}
             </A>{' '}
-            page.
+            {t('auth.reset.unavailableAfter')}
           </div>
         </div>
       </Show>
@@ -74,14 +74,14 @@ const RequestResetForm: Component = () => {
             </div>
           )}
           <label class="auth-form__label" for={emailId}>
-            Email
+            {t('common.email')}
             <input
               ref={(el) => requestAnimationFrame(() => el.focus())}
               id={emailId}
               class="auth-form__input"
               type="email"
               autocomplete="email"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={email()}
               onInput={(e) => setEmail(e.currentTarget.value)}
               required
@@ -89,14 +89,14 @@ const RequestResetForm: Component = () => {
             />
           </label>
           <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : 'Send reset link'}
+            {loading() ? <span class="spinner" /> : t('auth.reset.sendLink')}
           </button>
         </form>
       </Show>
 
       <div class="auth-footer">
         <A href="/login" class="auth-footer__link">
-          Back to sign in
+          {t('auth.backToSignIn')}
         </A>
       </div>
     </>
@@ -118,7 +118,7 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
     setError('');
 
     if (password() !== confirmPassword()) {
-      setError('Passwords do not match');
+      setError(t('auth.reset.mismatch'));
       return;
     }
 
@@ -132,7 +132,7 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
     setLoading(false);
 
     if (authError) {
-      setError(authError.message ?? 'Failed to reset password');
+      setError(authError.message ?? t('auth.reset.failed'));
       return;
     }
 
@@ -142,9 +142,9 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
   return (
     <>
       <div class="auth-header">
-        <h1 class="auth-header__title">Set new password</h1>
+        <h1 class="auth-header__title">{t('auth.reset.setNewTitle')}</h1>
         <p class="auth-header__subtitle">
-          {success() ? 'Your password has been reset' : 'Enter your new password'}
+          {success() ? t('auth.reset.done') : t('auth.reset.enterNew')}
         </p>
       </div>
 
@@ -153,13 +153,11 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
         fallback={
           <>
             <div class="auth-form">
-              <div class="auth-form__success">
-                Your password has been updated. You can now sign in with your new password.
-              </div>
+              <div class="auth-form__success">{t('auth.reset.updated')}</div>
             </div>
             <div class="auth-footer">
               <A href="/login" class="auth-footer__link">
-                Sign in
+                {t('auth.login.submit')}
               </A>
             </div>
           </>
@@ -172,14 +170,14 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
             </div>
           )}
           <label class="auth-form__label" for={passwordId}>
-            New password
+            {t('auth.reset.newPassword')}
             <input
               ref={(el) => requestAnimationFrame(() => el.focus())}
               id={passwordId}
               class="auth-form__input"
               type="password"
               autocomplete="new-password"
-              placeholder="Enter new password"
+              placeholder={t('auth.reset.newPlaceholder')}
               value={password()}
               onInput={(e) => setPassword(e.currentTarget.value)}
               required
@@ -188,13 +186,13 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
             />
           </label>
           <label class="auth-form__label" for={confirmId}>
-            Confirm password
+            {t('auth.reset.confirmPassword')}
             <input
               id={confirmId}
               class="auth-form__input"
               type="password"
               autocomplete="new-password"
-              placeholder="Confirm new password"
+              placeholder={t('auth.reset.confirmPlaceholder')}
               value={confirmPassword()}
               onInput={(e) => setConfirmPassword(e.currentTarget.value)}
               required
@@ -203,13 +201,13 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
             />
           </label>
           <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : 'Reset password'}
+            {loading() ? <span class="spinner" /> : t('auth.reset.submit')}
           </button>
         </form>
 
         <div class="auth-footer">
           <A href="/login" class="auth-footer__link">
-            Back to sign in
+            {t('auth.backToSignIn')}
           </A>
         </div>
       </Show>
@@ -223,10 +221,10 @@ const ResetPassword: Component = () => {
 
   return (
     <>
-      <Title>Reset Password - Thinker</Title>
-      <Meta name="description" content="Reset your Thinker account password." />
+      <Title>{t('common.pageTitle', { page: t('auth.reset.pageTitle') })}</Title>
+      <Meta name="description" content={t('auth.reset.metaDescription')} />
       <Show when={token()} fallback={<RequestResetForm />}>
-        {(t) => <SetNewPasswordForm token={t()} />}
+        {(tok) => <SetNewPasswordForm token={tok()} />}
       </Show>
     </>
   );

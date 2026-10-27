@@ -1,5 +1,6 @@
 import { createSignal, For, Show, onCleanup, type Component, type JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
+import { t } from '../i18n/index.js';
 
 export interface SelectOption {
   label: string;
@@ -68,7 +69,7 @@ const Select: Component<SelectProps> = (props) => {
   };
 
   const selected = () => props.options.find((o) => o.value === props.value);
-  const selectedLabel = () => selected()?.label ?? props.placeholder ?? 'Select...';
+  const selectedLabel = () => selected()?.label ?? props.placeholder ?? t('ui.selectPlaceholder');
 
   const handleClickOutside = (e: MouseEvent) => {
     const target = e.target as Node;

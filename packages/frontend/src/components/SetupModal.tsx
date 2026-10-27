@@ -5,6 +5,8 @@ import { platformIcon } from 'thinker-shared';
 import ErrorState from './ErrorState.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
 import { createActiveVirtualModelNames } from './VirtualModelsHint.jsx';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 const SetupModal: Component<{
   open: boolean;
@@ -63,10 +65,17 @@ const SetupModal: Component<{
                 />
               </Show>
               <span class="setup-modal__title-text">
-                Set up harness: <em>{props.agentName}</em>
+                <RichText
+                  text={t('harnesses.setupModal.title')}
+                  parts={{ name: <em>{props.agentName}</em> }}
+                />
               </span>
             </div>
-            <button class="modal__close" onClick={() => props.onClose()} aria-label="Close">
+            <button
+              class="modal__close"
+              onClick={() => props.onClose()}
+              aria-label={t('common.close')}
+            >
               <svg
                 width="16"
                 height="16"
@@ -83,15 +92,15 @@ const SetupModal: Component<{
               </svg>
             </button>
           </div>
-          <p class="modal-card__desc">Connect your harness to Thinker to start routing requests.</p>
+          <p class="modal-card__desc">{t('harnesses.setupModal.desc')}</p>
 
           <Show
             when={!apiKeyData.error || !!props.apiKey}
             fallback={
               <ErrorState
                 error={apiKeyData.error}
-                title="Could not load API key"
-                message="Failed to fetch your harness's API key. Please try again."
+                title={t('harnesses.setupModal.keyErrorTitle')}
+                message={t('harnesses.setupModal.keyErrorMessage')}
                 onRetry={refetchKey}
               />
             }
@@ -107,7 +116,7 @@ const SetupModal: Component<{
 
           <div class="setup-modal__nav">
             <button class="setup-modal__next" onClick={handleGoToRouting}>
-              Done
+              {t('common.done')}
             </button>
           </div>
         </div>

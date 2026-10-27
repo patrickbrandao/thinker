@@ -9,6 +9,7 @@ import {
 import { getProvider } from '../../services/provider-utils.js';
 import { resolveProviderId } from '../../services/routing-utils.js';
 import { providerIcon } from '../ProviderIcon.jsx';
+import { t } from '../../i18n/index.js';
 
 const WinnerBadge: Component = () => (
   <span class="playground-summary__winner-icon">
@@ -95,17 +96,17 @@ const PlaygroundSummaryTable: Component<Props> = (props) => {
 
   return (
     <Show when={successColumns().length >= 2}>
-      <section class="playground-summary" aria-label="Run summary">
-        <h2 class="playground-summary__title">Comparison</h2>
+      <section class="playground-summary" aria-label={t('playground.summary.label')}>
+        <h2 class="playground-summary__title">{t('playground.summary.title')}</h2>
         <table class="playground-summary__table">
           <thead>
             <tr>
-              <th scope="col">Provider</th>
-              <th scope="col">Model</th>
-              <th scope="col">Cost</th>
-              <th scope="col">Output tokens</th>
-              <th scope="col">Duration</th>
-              <th scope="col">Best</th>
+              <th scope="col">{t('playground.summary.provider')}</th>
+              <th scope="col">{t('playground.summary.model')}</th>
+              <th scope="col">{t('playground.summary.cost')}</th>
+              <th scope="col">{t('playground.summary.outputTokens')}</th>
+              <th scope="col">{t('playground.summary.duration')}</th>
+              <th scope="col">{t('playground.summary.best')}</th>
             </tr>
           </thead>
           <tbody>
@@ -140,7 +141,9 @@ const PlaygroundSummaryTable: Component<Props> = (props) => {
                     tabindex={clickable() ? 0 : undefined}
                     aria-pressed={clickable() ? isBest(col) : undefined}
                     aria-label={
-                      clickable() ? `Mark ${col.displayName} as the best answer` : undefined
+                      clickable()
+                        ? t('playground.summary.markBest', { name: col.displayName ?? '' })
+                        : undefined
                     }
                     onClick={pick}
                     onKeyDown={(e) => {

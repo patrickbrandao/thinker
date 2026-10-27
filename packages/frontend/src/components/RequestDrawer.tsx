@@ -15,6 +15,8 @@ import { providerIcon } from './ProviderIcon.jsx';
 import { FallbackIcon } from './message-table-cells.jsx';
 import { authBadgeFor } from './AuthBadge.js';
 import RequestMessages, { type RecordingView } from './RequestMessages.jsx';
+import { intlLocale, t } from '../i18n/index.js';
+import { usd } from '../services/formatters.js';
 import '../styles/request-drawer.css';
 
 export interface RequestDrawerProps {
@@ -58,7 +60,7 @@ interface Attempt {
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
-  const mon = d.toLocaleString('en-US', { month: 'short' });
+  const mon = d.toLocaleString(intlLocale(), { month: 'short' });
   const day = d.getDate();
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
@@ -67,11 +69,11 @@ function fmtDate(iso: string): string {
 }
 
 function statusLabel(status: string): string {
-  if (status === 'pending') return 'Pending';
-  if (status === 'cancelled') return 'Cancelled';
-  if (isSuccessStatus(status)) return 'Success';
-  if (status === 'rate_limited') return 'Rate limited';
-  return 'Failed';
+  if (status === 'pending') return t('messages.drawer.status.pending');
+  if (status === 'cancelled') return t('messages.drawer.status.cancelled');
+  if (isSuccessStatus(status)) return t('messages.drawer.status.success');
+  if (status === 'rate_limited') return t('messages.drawer.status.rate_limited');
+  return t('messages.drawer.status.failed');
 }
 
 /** The attempt's HTTP code as displayed: 200 for success, the provider's
@@ -104,7 +106,7 @@ function attemptErrorMessage(
     return att.error_message;
   }
   if (typeof requestMessage === 'string' && requestMessage.trim()) return requestMessage;
-  return 'Request failed without an error message.';
+  return t('messages.drawer.noErrorMessage');
 }
 
 function inferType(att: any, index: number): Attempt['type'] {
@@ -214,26 +216,26 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
   const visibleTabs = createMemo(() => {
     const att = currentAttempt();
     const tabs: Array<{ value: AttemptTab; label: string }> = [
-      { value: 'details', label: 'Details' },
+      { value: 'details', label: t('messages.drawer.tabs.details') },
     ];
     if (att?.recording) {
-      tabs.push({ value: 'messages', label: 'Messages' });
-      tabs.push({ value: 'tools', label: 'Tools' });
-      tabs.push({ value: 'raw', label: 'Raw' });
+      tabs.push({ value: 'messages', label: t('messages.drawer.tabs.messages') });
+      tabs.push({ value: 'tools', label: t('messages.drawer.tabs.tools') });
+      tabs.push({ value: 'raw', label: t('messages.drawer.tabs.raw') });
     }
     if (att?.request_headers && Object.keys(att.request_headers).length > 0) {
-      tabs.push({ value: 'headers', label: 'Request headers' });
+      tabs.push({ value: 'headers', label: t('messages.drawer.tabs.headers') });
     }
     if (att?.request_params && Object.keys(att.request_params).length > 0) {
-      tabs.push({ value: 'params', label: 'Model params' });
+      tabs.push({ value: 'params', label: t('messages.drawer.tabs.params') });
     }
     return tabs;
   });
 
   const recordingView = createMemo((): RecordingView => {
-    const t = tab();
-    if (t === 'tools') return 'tools';
-    if (t === 'raw') return 'raw';
+    const current = tab();
+    if (current === 'tools') return 'tools';
+    if (current === 'raw') return 'raw';
     return 'messages';
   });
 
@@ -248,7 +250,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
   // Reset tab if current tab disappears
   createEffect(() => {
     const tabs = visibleTabs();
-    if (tabs.length > 0 && !tabs.some((t) => t.value === tab())) {
+    if (tabs.length > 0 && !tabs.some((x) => x.value === tab())) {
       setTab(tabs[0]!.value);
     }
   });
@@ -277,8 +279,14 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
               {/* ── Request header (full width) ── */}
               <div class="drawer__header">
                 <div class="drawer__title-row">
-                  <h3 class="drawer__title">Request {msg().id?.slice(0, 12)}</h3>
-                  <button class="drawer__close" onClick={props.onClose} aria-label="Close">
+                  <h3 class="drawer__title">
+                    {t('messages.drawer.title', { id: msg().id?.slice(0, 12) ?? '' })}
+                  </h3>
+                  <button
+                    class="drawer__close"
+                    onClick={props.onClose}
+                    aria-label={t('messages.drawer.close')}
+                  >
                     <svg
                       width="16"
                       height="16"
@@ -299,7 +307,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                     {statusLabel(requestStatus())}
                   </span>
                   <Show when={headerProvider()}>
-                    <span class="drawer__meta-sep">&middot;</span>
+                    <span class="drawer__meta-sep">{'\u00b7'}</span>
                     <span
                       class="drawer__meta-text"
                       style="display: inline-flex; align-items: center; gap: 4px;"
@@ -314,13 +322,15 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                   <Show when={msg().virtual_model_name}>
                     <span
                       class="tier-badge tier-badge--virtual"
-                      title={`Virtual model: ${msg().virtual_model_name}`}
+                      title={t('messages.table.virtualModel', {
+                        name: msg().virtual_model_name,
+                      })}
                     >
                       {msg().virtual_model_name}
                     </span>
                   </Show>
                   <Show when={msg().timestamp}>
-                    <span class="drawer__meta-sep">&middot;</span>
+                    <span class="drawer__meta-sep">{'\u00b7'}</span>
                     <span class="drawer__meta-text">{fmtDate(msg().timestamp)}</span>
                   </Show>
                 </div>
@@ -330,7 +340,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                 {/* Attempts sidebar — hidden when no attempts */}
                 <Show when={attempts().length > 0}>
                   <div class="drawer__sidebar">
-                    <div class="drawer__sidebar-title">Attempts</div>
+                    <div class="drawer__sidebar-title">{t('messages.drawer.attempts')}</div>
                     <For each={attempts()}>
                       {(att, idx) => (
                         <button
@@ -363,7 +373,9 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                               </svg>
                             )}
                           </span>
-                          <span class="attempt-item__model">{att.model ?? 'No provider'}</span>
+                          <span class="attempt-item__model">
+                            {att.model ?? t('messages.drawer.noProvider')}
+                          </span>
                           <span class={`attempt-code ${attemptStatusClass(att.status)}`}>
                             {attemptCode(att)}
                           </span>
@@ -381,14 +393,14 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                       <>
                         <div class="panel__tabs drawer__tabs-full" role="tablist">
                           <For each={visibleTabs()}>
-                            {(t) => (
+                            {(item) => (
                               <button
                                 class="panel__tab"
-                                classList={{ 'panel__tab--active': tab() === t.value }}
+                                classList={{ 'panel__tab--active': tab() === item.value }}
                                 role="tab"
-                                onClick={() => setTab(t.value)}
+                                onClick={() => setTab(item.value)}
                               >
-                                {t.label}
+                                {item.label}
                               </button>
                             )}
                           </For>
@@ -396,7 +408,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                         <div class="drawer__body">
                           <Show when={tab() === 'details'}>
                             <div style="color: hsl(var(--muted-foreground));">
-                              Thinker rejected this request before contacting a provider.
+                              {t('messages.drawer.rejected')}
                             </div>
                           </Show>
                         </div>
@@ -408,14 +420,14 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                         {/* Tabs */}
                         <div class="panel__tabs drawer__tabs-full" role="tablist">
                           <For each={visibleTabs()}>
-                            {(t) => (
+                            {(item) => (
                               <button
                                 class="panel__tab"
-                                classList={{ 'panel__tab--active': tab() === t.value }}
+                                classList={{ 'panel__tab--active': tab() === item.value }}
                                 role="tab"
-                                onClick={() => setTab(t.value)}
+                                onClick={() => setTab(item.value)}
                               >
-                                {t.label}
+                                {item.label}
                               </button>
                             )}
                           </For>
@@ -436,7 +448,9 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                             <Show when={tab() === 'details'}>
                               <div class="drawer-metadata">
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Status</span>
+                                  <span class="drawer-kv__key">
+                                    {t('messages.drawer.kv.status')}
+                                  </span>
                                   <span style="display: inline-flex; align-items: center; gap: 6px;">
                                     {statusLabel(att().status)}
                                     <span
@@ -447,11 +461,17 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                   </span>
                                 </div>
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Type</span>
-                                  <span style="text-transform: capitalize;">{att().type}</span>
+                                  <span class="drawer-kv__key">{t('messages.drawer.kv.type')}</span>
+                                  <span style="text-transform: capitalize;">
+                                    {att().type === 'fallback'
+                                      ? t('messages.drawer.type.fallback')
+                                      : t('messages.drawer.type.initial')}
+                                  </span>
                                 </div>
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Provider</span>
+                                  <span class="drawer-kv__key">
+                                    {t('messages.drawer.kv.provider')}
+                                  </span>
                                   <span style="display: inline-flex; align-items: center; gap: 6px;">
                                     {providerIcon(att().provider, 14)}
                                     {att().provider ?? '-'}
@@ -459,29 +479,39 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                 </div>
                                 <Show when={att().auth_type}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Auth</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.auth')}
+                                    </span>
                                     <span>{att().auth_type}</span>
                                   </div>
                                 </Show>
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Model</span>
+                                  <span class="drawer-kv__key">
+                                    {t('messages.drawer.kv.model')}
+                                  </span>
                                   <span>{att().model ?? '-'}</span>
                                 </div>
                                 <Show when={att().model_id && att().model_id !== att().model}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Model ID</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.modelId')}
+                                    </span>
                                     <span>{att().model_id}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().trace_id}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Trace ID</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.traceId')}
+                                    </span>
                                     <span>{att().trace_id}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().virtual_model_name}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Virtual model</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.virtualModel')}
+                                    </span>
                                     <span>
                                       <span class="tier-badge tier-badge--virtual">
                                         {att().virtual_model_name}
@@ -491,47 +521,64 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                 </Show>
                                 <Show when={att().routing_tier}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Routing tier</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.routingTier')}
+                                    </span>
                                     <span>{att().routing_tier}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().routing_reason}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Reason</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.reason')}
+                                    </span>
                                     <span>{att().routing_reason}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().service_type}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Service type</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.serviceType')}
+                                    </span>
                                     <span>{att().service_type}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().session_key}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Session</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.session')}
+                                    </span>
                                     <span>{att().session_key}</span>
                                   </div>
                                 </Show>
                                 <Show when={att().duration_ms != null}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Duration</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.duration')}
+                                    </span>
+                                    {/* i18n-ignore */}
                                     <span>{att().duration_ms}ms</span>
                                   </div>
                                 </Show>
                                 <Show when={att().cost != null}>
                                   <div class="drawer-kv">
-                                    <span class="drawer-kv__key">Cost</span>
-                                    <span>${att().cost?.toFixed(4)}</span>
+                                    <span class="drawer-kv__key">
+                                      {t('messages.drawer.kv.cost')}
+                                    </span>
+                                    <span>{usd(att().cost ?? 0, 4)}</span>
                                   </div>
                                 </Show>
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Input tokens</span>
-                                  <span>{att().input_tokens?.toLocaleString()}</span>
+                                  <span class="drawer-kv__key">
+                                    {t('messages.drawer.kv.inputTokens')}
+                                  </span>
+                                  <span>{att().input_tokens?.toLocaleString(intlLocale())}</span>
                                 </div>
                                 <div class="drawer-kv">
-                                  <span class="drawer-kv__key">Output tokens</span>
-                                  <span>{att().output_tokens?.toLocaleString()}</span>
+                                  <span class="drawer-kv__key">
+                                    {t('messages.drawer.kv.outputTokens')}
+                                  </span>
+                                  <span>{att().output_tokens?.toLocaleString(intlLocale())}</span>
                                 </div>
 
                                 {/* ── The attempt's story, in reading order ──────
@@ -549,14 +596,16 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                     <div style="margin-bottom: 8px;">
                                       <span class="trigger-badge trigger-badge--fallback">
                                         <FallbackIcon />
-                                        fallback
+                                        {t('messages.table.fallbackBadge')}
                                       </span>
                                     </div>
                                     <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground));">
                                       {isSuccessStatus(att().status)
-                                        ? 'This fallback recovered the request.'
-                                        : 'This fallback attempt failed.'}{' '}
-                                      Fell back from {att().fallback_from_model}.
+                                        ? t('messages.drawer.fallbackRecovered')
+                                        : t('messages.drawer.fallbackFailed')}{' '}
+                                      {t('messages.drawer.fellBackFrom', {
+                                        model: att().fallback_from_model ?? '',
+                                      })}
                                     </div>
                                   </div>
                                 </Show>
@@ -566,7 +615,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                 <Show when={att().error_message}>
                                   <div class="drawer-context-card drawer-context-card--error">
                                     <div style="font-size: var(--font-size-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: hsl(var(--foreground));">
-                                      Error
+                                      {t('messages.drawer.error')}
                                     </div>
                                     <div style="font-size: var(--font-size-sm); color: hsl(var(--destructive)); font-family: var(--font-mono, monospace); overflow-wrap: anywhere; white-space: pre-wrap; margin-bottom: 8px;">
                                       {att().error_message}
@@ -585,20 +634,24 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                         <tbody>
                                           <Show when={att().error_origin}>
                                             <tr>
-                                              <td class="error-recovery-row__meta-label">Origin</td>
+                                              <td class="error-recovery-row__meta-label">
+                                                {t('messages.drawer.origin')}
+                                              </td>
                                               <td>{att().error_origin}</td>
                                             </tr>
                                           </Show>
                                           <Show when={att().error_class}>
                                             <tr>
-                                              <td class="error-recovery-row__meta-label">Type</td>
+                                              <td class="error-recovery-row__meta-label">
+                                                {t('messages.drawer.errorType')}
+                                              </td>
                                               <td>{att().error_class}</td>
                                             </tr>
                                           </Show>
                                           <Show when={att().error_http_status}>
                                             <tr>
                                               <td class="error-recovery-row__meta-label">
-                                                HTTP status
+                                                {t('messages.drawer.httpStatus')}
                                               </td>
                                               <td>{att().error_http_status}</td>
                                             </tr>
@@ -622,15 +675,20 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                     <div style="margin-bottom: 8px;">
                                       <span class="trigger-badge trigger-badge--fallback">
                                         <FallbackIcon />
-                                        fallback
+                                        {t('messages.table.fallbackBadge')}
                                       </span>
                                     </div>
                                     <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground));">
-                                      This attempt failed.{' '}
+                                      {t('messages.drawer.attemptFailed')}{' '}
                                       {isSuccessStatus(attempts()[att().index]?.status)
-                                        ? 'Recovered by fallback to'
-                                        : 'Continued with fallback to'}{' '}
-                                      {attempts()[att().index]?.model} (attempt {att().index + 1}).
+                                        ? t('messages.drawer.recoveredBy', {
+                                            model: attempts()[att().index]?.model ?? '',
+                                            n: att().index + 1,
+                                          })
+                                        : t('messages.drawer.continuedWith', {
+                                            model: attempts()[att().index]?.model ?? '',
+                                            n: att().index + 1,
+                                          })}
                                     </div>
                                   </div>
                                 </Show>
@@ -690,7 +748,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
             class="drawer__body"
             style="display: flex; align-items: center; justify-content: center; height: 200px; color: hsl(var(--muted-foreground));"
           >
-            Loading...
+            {t('messages.drawer.loading')}
           </div>
         </Show>
       </div>

@@ -32,6 +32,8 @@ import type {
   RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { richText } from '../components/VirtualModelsHint.js';
+import { t } from '../i18n/index.js';
 import { deleteVirtualModelPrompt } from '../services/virtual-model-form.js';
 import '../styles/routing-header-tiers.css';
 import '../styles/routing-virtual-models.css';
@@ -98,7 +100,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
     () => props.agentName(),
     (name, info) =>
       listVirtualModels(name).catch((err) => {
-        toast.error(err instanceof Error ? err.message : 'Failed to load virtual models');
+        toast.error(err instanceof Error ? err.message : t('models.section.loadFailed'));
         // A failed reload keeps what is on screen.
         return info.refetching ? (info.value ?? []) : ([] as VirtualModel[]);
       }),
@@ -139,7 +141,11 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
   const handleToggle = (vm: VirtualModel, enabled: boolean) =>
     runBusy(vm.id, 'enabled', async () => {
       const saved = await toggleVirtualModel(props.agentName(), vm.id, enabled);
-      toast.success(enabled ? `"${vm.name}" is active` : `"${vm.name}" is inactive`);
+      toast.success(
+        enabled
+          ? t('models.section.isActive', { name: vm.name })
+          : t('models.section.isInactive', { name: vm.name }),
+      );
       return saved;
     });
 
@@ -194,7 +200,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
     try {
       await deleteVirtualModel(props.agentName(), vm.id);
       mutate((prev) => prev?.filter((v) => v.id !== vm.id));
-      toast.success(`Deleted "${vm.name}"`);
+      toast.success(t('models.section.deleted', { name: vm.name }));
     } catch {
       // fetchMutate already showed the backend message.
     }
@@ -237,7 +243,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
     setArmedId(null);
   };
 
-  const createButton = (label = 'Create virtual model') => (
+  const createButton = (label = t('models.section.create')) => (
     <button
       type="button"
       class="btn btn--primary btn--sm routing-section__cta"
@@ -251,12 +257,8 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
     <div class="routing-section routing-section--virtual-models">
       <div class="routing-section__header routing-section__header--header-tiers">
         <div>
-          <h2 class="routing-section__title">Virtual models</h2>
-          <p class="routing-section__subtitle">
-            Model names this harness can send in the "model" field, each with its own model and
-            fallbacks. No header needed: they are listed in /v1/models and take precedence over
-            custom tiers.
-          </p>
+          <h2 class="routing-section__title">{t('models.section.title')}</h2>
+          <p class="routing-section__subtitle">{t('models.section.subtitle')}</p>
         </div>
         <Show when={items().length > 0}>{createButton()}</Show>
       </div>
@@ -266,10 +268,11 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
         fallback={
           <Show when={!list.loading}>
             <div class="routing-section__empty">
-              <div class="routing-section__empty-title">No virtual models yet</div>
+              <div class="routing-section__empty-title">{t('models.section.emptyTitle')}</div>
               <div class="routing-section__empty-desc">
-                Create a name such as <code>deepseek/flash</code> and pick its models. Clients that
-                only choose a model, like Claude Code or a /v1/models picker, can then use it.
+                {richText(t('models.section.emptyDesc'), {
+                  example: <code>deepseek/flash</code>,
+                })}
               </div>
               {createButton()}
             </div>
@@ -336,8 +339,8 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                         type="button"
                         class="virtual-model-card__drag"
                         data-vm-handle={vm.id}
-                        aria-label={`Reorder ${vm.name}. Drag, or use the arrow keys.`}
-                        title="Drag to reorder"
+                        aria-label={t('models.section.reorder', { name: vm.name })}
+                        title={t('models.section.dragToReorder')}
                         onPointerDown={() => setArmedId(vm.id)}
                         onPointerUp={() => {
                           if (!dragId()) setArmedId(null);
@@ -394,7 +397,7 @@ const RoutingVirtualModelsSection: Component<RoutingVirtualModelsSectionProps> =
                 if (created) {
                   mutate((prev) => [...(prev ?? []), saved]);
                   setSnippetFor(saved);
-                  toast.success(`Created "${saved.name}"`);
+                  toast.success(t('models.section.created', { name: saved.name }));
                 } else {
                   replace(saved);
                 }

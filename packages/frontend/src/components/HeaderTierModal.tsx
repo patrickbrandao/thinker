@@ -11,10 +11,12 @@ import {
   type SeenHeader,
 } from '../services/api/header-tiers.js';
 import { toast } from '../services/toast-store.js';
+import { t, tMaybe } from '../i18n/index.js';
+import { positionLabel } from '../services/routing.js';
 import {
   MAX_STREAM_WARMUP_SECONDS,
   MIN_STREAM_WARMUP_SECONDS,
-  STREAM_WARMUP_ERROR,
+  streamWarmupError,
   parseWarmupSeconds,
   warmupMsToSecondsInput,
 } from '../services/stream-warmup.js';
@@ -71,7 +73,9 @@ const HeaderTierModal: Component<Props> = (props) => {
   // When editing, exclude the row being edited from uniqueness checks so its
   // own current values don't trip the "already exists" errors.
   const otherTiers = createMemo(() =>
-    editingTier ? props.existingTiers.filter((t) => t.id !== editingTier.id) : props.existingTiers,
+    editingTier
+      ? props.existingTiers.filter((tier) => tier.id !== editingTier.id)
+      : props.existingTiers,
   );
 
   /** Models in this tier that don't support streaming. */
@@ -107,7 +111,7 @@ const HeaderTierModal: Component<Props> = (props) => {
         sublabel:
           r.top_values.length > 0
             ? `${r.count}× · ${r.top_values.slice(0, 3).join(' · ')}`
-            : `${r.count}× seen`,
+            : t('routing.headerTierModal.seenCount', { count: r.count }),
       }));
   };
 
@@ -120,42 +124,44 @@ const HeaderTierModal: Component<Props> = (props) => {
 
   const validateName = (raw: string): string | undefined => {
     const trimmed = raw.trim();
-    if (!trimmed) return 'Name is required';
-    if (trimmed.length > MAX_NAME_LEN) return `Name must be ${MAX_NAME_LEN} characters or fewer`;
+    if (!trimmed) return t('routing.headerTierModal.nameRequired');
+    if (trimmed.length > MAX_NAME_LEN) {
+      return t('routing.headerTierModal.nameTooLong', { max: MAX_NAME_LEN });
+    }
     const lower = trimmed.toLowerCase();
-    if (otherTiers().some((t) => t.name.toLowerCase() === lower)) {
-      return 'A tier with this name already exists';
+    if (otherTiers().some((tier) => tier.name.toLowerCase() === lower)) {
+      return t('routing.headerTierModal.nameTaken');
     }
     return undefined;
   };
 
   const validateKey = (raw: string): string | undefined => {
     const key = raw.trim().toLowerCase();
-    if (!key) return 'Header key is required';
+    if (!key) return t('routing.headerTierModal.keyRequired');
     if (!HEADER_KEY_RE.test(key)) {
-      return 'Header keys can only contain lowercase letters, digits, and hyphens';
+      return t('routing.headerTierModal.keyInvalid');
     }
     if (RESERVED_KEYS.has(key)) {
-      return "This header is stripped for security and can't be used as a match rule";
+      return t('routing.headerTierModal.keyReserved');
     }
     return undefined;
   };
 
   const validateValue = (rawValue: string, rawKey: string): string | undefined => {
     const v = rawValue.trim();
-    if (!v) return 'Header value is required';
+    if (!v) return t('routing.headerTierModal.valueRequired');
     if (v.length > MAX_HEADER_VALUE_LEN) {
-      return `Header value must be ${MAX_HEADER_VALUE_LEN} characters or fewer`;
+      return t('routing.headerTierModal.valueTooLong', { max: MAX_HEADER_VALUE_LEN });
     }
     // Quotes and backslashes would break the rendered SDK snippets (Python/TS
     // wrap the value in `"..."`, cURL wraps it in `'...'`). Reject up front
     // instead of escaping inside every snippet generator.
     if (v.includes('"') || v.includes("'") || v.includes('\\')) {
-      return 'Header value cannot contain quotes or backslashes';
+      return t('routing.headerTierModal.valueQuotes');
     }
     const key = rawKey.trim().toLowerCase();
-    if (otherTiers().some((t) => t.header_key === key && t.header_value === v)) {
-      return 'Another tier already matches this header key and value';
+    if (otherTiers().some((tier) => tier.header_key === key && tier.header_value === v)) {
+      return t('routing.headerTierModal.valueTaken');
     }
     return undefined;
   };
@@ -167,7 +173,7 @@ const HeaderTierModal: Component<Props> = (props) => {
 
   const warmupError = (): string | undefined =>
     triedSubmit() && parseWarmupSeconds(warmupSeconds()) === undefined
-      ? STREAM_WARMUP_ERROR
+      ? streamWarmupError()
       : undefined;
 
   const isValid = (): boolean =>
@@ -203,20 +209,26 @@ const HeaderTierModal: Component<Props> = (props) => {
       props.onSaved(saved);
       props.onClose();
     } catch (err) {
-      const fallback = editingTier ? 'Failed to update tier' : 'Failed to create tier';
+      const fallback = editingTier
+        ? t('routing.updateTierFailed')
+        : t('routing.headerTierModal.createFailed');
       toast.error(err instanceof Error ? err.message : fallback);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const titleText = editingTier ? 'Edit custom tier' : 'Create custom tier';
-  const descText = editingTier
-    ? 'Update the header rule, name, or color for this tier. Model and fallbacks are managed on the card.'
-    : 'Custom routing lets you identify requests based on their headers and assign specific models to them.';
+  const titleText = () =>
+    editingTier ? t('routing.headerTierModal.editTitle') : t('routing.createCustomTier');
+  const descText = () =>
+    editingTier ? t('routing.headerTierModal.editDesc') : t('routing.headerTierModal.createDesc');
   const submitLabel = (): string => {
-    if (editingTier) return submitting() ? 'Saving…' : 'Save changes';
-    return submitting() ? 'Creating…' : 'Create tier';
+    if (editingTier) {
+      return submitting() ? t('routing.headerTierModal.saving') : t('common.saveChanges');
+    }
+    return submitting()
+      ? t('routing.headerTierModal.creating')
+      : t('routing.headerTierModal.create');
   };
 
   return (
@@ -243,7 +255,7 @@ const HeaderTierModal: Component<Props> = (props) => {
               type="button"
               class="modal__close header-tier-modal__close"
               onClick={props.onClose}
-              aria-label="Close"
+              aria-label={t('common.close')}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -258,7 +270,12 @@ const HeaderTierModal: Component<Props> = (props) => {
             </button>
           }
         >
-          <button type="button" class="modal-back-btn" onClick={props.onBack} aria-label="Back">
+          <button
+            type="button"
+            class="modal-back-btn"
+            onClick={props.onBack}
+            aria-label={t('common.back')}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -272,12 +289,12 @@ const HeaderTierModal: Component<Props> = (props) => {
           </button>
         </Show>
         <h2 class="modal-card__title" id="header-tier-modal-title">
-          {titleText}
+          {titleText()}
         </h2>
-        <p class="modal-card__desc">{descText}</p>
+        <p class="modal-card__desc">{descText()}</p>
 
         <label class="modal-card__field-label" for="header-tier-name">
-          Tier name
+          {t('routing.headerTierModal.tierName')}
         </label>
         <input
           ref={(el) => requestAnimationFrame(() => el.focus())}
@@ -286,7 +303,7 @@ const HeaderTierModal: Component<Props> = (props) => {
           classList={{ 'modal-card__input--error': nameError() !== undefined }}
           type="text"
           value={name()}
-          placeholder="My custom tier"
+          placeholder={t('routing.headerTierModal.tierNamePlaceholder')}
           maxlength={MAX_NAME_LEN}
           onInput={(e) => setName(e.currentTarget.value)}
         />
@@ -295,7 +312,7 @@ const HeaderTierModal: Component<Props> = (props) => {
         </Show>
 
         <label class="modal-card__field-label" for="header-tier-key">
-          Header key
+          {t('routing.headerTierModal.headerKey')}
         </label>
         <HeaderComboBox
           id="header-tier-key"
@@ -305,11 +322,11 @@ const HeaderTierModal: Component<Props> = (props) => {
           placeholder="x-thinker-tier"
           invalid={keyError() !== undefined}
           errorMessage={keyError()}
-          freeFormHint={`Use "${headerKey().trim()}" as a custom header`}
+          freeFormHint={t('routing.headerTierModal.useCustomHeader', { value: headerKey().trim() })}
         />
 
         <label class="modal-card__field-label" for="header-tier-value">
-          Header value
+          {t('routing.headerTierModal.headerValue')}
         </label>
         <HeaderComboBox
           id="header-tier-value"
@@ -320,18 +337,24 @@ const HeaderTierModal: Component<Props> = (props) => {
           invalid={valueError() !== undefined}
           errorMessage={valueError()}
           disabled={!headerKey().trim()}
-          freeFormHint={`Use "${headerValue().trim()}" as a custom value`}
+          freeFormHint={t('routing.headerTierModal.useCustomValue', {
+            value: headerValue().trim(),
+          })}
         />
 
-        <div class="modal-card__field-label">Badge color</div>
-        <div class="header-tier-modal__swatches" role="radiogroup" aria-label="Badge color">
+        <div class="modal-card__field-label">{t('routing.headerTierModal.badgeColor')}</div>
+        <div
+          class="header-tier-modal__swatches"
+          role="radiogroup"
+          aria-label={t('routing.headerTierModal.badgeColor')}
+        >
           <For each={TIER_COLORS}>
             {(c) => (
               <button
                 type="button"
                 role="radio"
                 aria-checked={badgeColor() === c}
-                aria-label={c}
+                aria-label={tMaybe(`routing.colors.${c}`) ?? c}
                 class="header-tier-modal__swatch"
                 classList={{
                   [`header-tier-modal__swatch--${c}`]: true,
@@ -344,7 +367,9 @@ const HeaderTierModal: Component<Props> = (props) => {
         </div>
 
         <div class="response-mode-modal__field-header" style="margin-top: 16px;">
-          <span class="response-mode-modal__field-title">Stream mode</span>
+          <span class="response-mode-modal__field-title">
+            {t('routing.responseMode.streamMode')}
+          </span>
           <button
             class="routing-switch"
             classList={{
@@ -365,28 +390,24 @@ const HeaderTierModal: Component<Props> = (props) => {
         <Show
           when={streamMode()}
           fallback={
-            <p class="response-mode-modal__desc">
-              Responses are returned as a single payload once the model finishes generating.
-            </p>
+            <p class="response-mode-modal__desc">{t('routing.responseMode.bufferedDesc')}</p>
           }
         >
-          <p class="response-mode-modal__desc">
-            Responses are streamed token by token as the model generates them.
-          </p>
+          <p class="response-mode-modal__desc">{t('routing.responseMode.streamDesc')}</p>
         </Show>
         <Show when={!streamMode() && incompatibleModels().length > 0}>
           <div class="response-mode-modal__blocker" style="margin-top: 8px;">
             <p class="response-mode-modal__blocker-text">
-              {incompatibleModels().length === 1 ? 'This model does' : 'These models do'} not
-              support streaming. Change {incompatibleModels().length === 1 ? 'it' : 'them'} to
-              enable stream mode.
+              {t('routing.headerTierModal.incompatible', incompatibleModels().length)}
             </p>
             <div class="response-mode-modal__blocker-list">
               <For each={incompatibleModels()}>
                 {(item) => (
                   <div class="response-mode-modal__blocker-row">
                     <span class="response-mode-modal__blocker-model">{item.model}</span>
-                    <span class="response-mode-modal__blocker-meta">{item.position}</span>
+                    <span class="response-mode-modal__blocker-meta">
+                      {positionLabel(item.position)}
+                    </span>
                   </div>
                 )}
               </For>
@@ -399,7 +420,7 @@ const HeaderTierModal: Component<Props> = (props) => {
           for="header-tier-stream-warmup"
           style="margin-top: 16px;"
         >
-          Stream warm-up (seconds)
+          {t('routing.headerTierModal.warmupLabel')}
         </label>
         <input
           id="header-tier-stream-warmup"
@@ -410,16 +431,13 @@ const HeaderTierModal: Component<Props> = (props) => {
           max={MAX_STREAM_WARMUP_SECONDS}
           step="1"
           value={warmupSeconds()}
-          placeholder="Inherit"
+          placeholder={t('routing.headerTierModal.warmupPlaceholder')}
           onInput={(e) => setWarmupSeconds(e.currentTarget.value)}
         />
         <Show when={warmupError()}>
           <div class="header-tier-modal__error">{warmupError()}</div>
         </Show>
-        <p class="response-mode-modal__desc">
-          Optional. How long a streaming request waits for the first token before failing over.
-          Leave empty to use the connection setting or the default.
-        </p>
+        <p class="response-mode-modal__desc">{t('routing.headerTierModal.warmupHelp')}</p>
 
         <div class="header-tier-modal__footer">
           <Show when={editingTier && props.onDelete}>
@@ -427,18 +445,20 @@ const HeaderTierModal: Component<Props> = (props) => {
               type="button"
               class="btn btn--outline header-tier-modal__delete-btn"
               onClick={() => {
-                if (confirm(`Delete tier "${editingTier!.name}"?`)) {
+                if (
+                  confirm(t('routing.headerTierModal.confirmDelete', { name: editingTier!.name }))
+                ) {
                   props.onDelete!(editingTier!.id);
                 }
               }}
             >
-              Delete tier
+              {t('routing.headerTierModal.deleteTier')}
             </button>
           </Show>
           <div class="header-tier-modal__footer-right">
             <Show when={!props.onBack}>
               <button type="button" class="btn btn--ghost" onClick={props.onClose}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </Show>
             <button type="button" class="btn btn--primary" disabled={submitting()} onClick={submit}>

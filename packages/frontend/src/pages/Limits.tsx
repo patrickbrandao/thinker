@@ -9,6 +9,7 @@ import LimitRuleTable from '../components/LimitRuleTable.js';
 import LimitHistoryTable from '../components/LimitHistoryTable.js';
 import { KebabMenu, DeleteRuleModal, RemoveProviderModal } from '../components/LimitModals.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
 import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
@@ -79,7 +80,7 @@ const Limits: Component = () => {
     // failure must not leave the modal open claiming nothing happened.
     setRemovingProvider(false);
     setShowRemoveProvider(false);
-    toast.success('Email provider removed');
+    toast.success(t('limits.toast.providerRemoved'));
     try {
       await refetchProvider();
     } catch {
@@ -116,10 +117,10 @@ const Limits: Component = () => {
     try {
       if (editing) {
         await updateNotificationRule(editing.id, { ...data });
-        toast.success('Rule updated');
+        toast.success(t('limits.toast.ruleUpdated'));
       } else {
         await createNotificationRule({ agent_name: agentName(), ...data });
-        toast.success('Rule created');
+        toast.success(t('limits.toast.ruleCreated'));
       }
       await refetchRules();
       setShowModal(false);
@@ -142,7 +143,7 @@ const Limits: Component = () => {
     try {
       await deleteNotificationRule(target.id);
       await refetchRules();
-      toast.success('Rule deleted');
+      toast.success(t('limits.toast.ruleDeleted'));
     } catch {
       // error toast from fetchMutate
     } finally {
@@ -165,16 +166,14 @@ const Limits: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>{agentDisplayName() ?? agentName()} Limits - Thinker</Title>
+      <Title>{t('limits.pageTitle', { name: agentDisplayName() ?? agentName() })}</Title>
       <Meta
         name="description"
-        content={`Configure limits and alerts for ${agentDisplayName() ?? agentName()}.`}
+        content={t('limits.metaDescription', { name: agentDisplayName() ?? agentName() })}
       />
 
       <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
-        <span class="breadcrumb">
-          Get notified or block requests when token or cost thresholds are exceeded
-        </span>
+        <span class="breadcrumb">{t('limits.subtitle')}</span>
         <Show when={roleCan.manageProviders()}>
           <button
             class="btn btn--primary btn--sm"
@@ -197,7 +196,7 @@ const Limits: Component = () => {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Create rule
+            {t('limits.createRule')}
           </button>
         </Show>
       </div>
@@ -219,10 +218,7 @@ const Limits: Component = () => {
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          <span>
-            One or more hard limits triggered. New proxy requests for this harness will be blocked
-            until the usage resets in the next period.
-          </span>
+          <span>{t('limits.hardLimitTriggered')}</span>
         </div>
       </Show>
 
@@ -244,19 +240,13 @@ const Limits: Component = () => {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <div>
-            <strong>Connect a provider to set hard limits</strong>
-            <p>
-              Hard limits automatically block proxy requests when usage exceeds a threshold. Email
-              alerts work without a connected provider &mdash; only hard limits require one.
-            </p>
+            <strong>{t('limits.connectProviderTitle')}</strong>
+            <p>{t('limits.connectProviderBody')}</p>
           </div>
         </div>
       </Show>
 
-      <ReadOnlyRegion
-        readOnly={!roleCan.manageProviders()}
-        notice="You have read-only access to limits and notifications. Only admins and owners can change them."
-      >
+      <ReadOnlyRegion readOnly={!roleCan.manageProviders()} notice={t('limits.readOnlyNotice')}>
         <EmailProviderSection
           emailProvider={savedProvider()}
           loading={emailProvider.loading || emailProvider.state === 'unresolved'}

@@ -12,10 +12,11 @@ import {
   type OrgRole,
 } from '../services/api/organizations.js';
 import { setActiveOrganizationId } from '../services/org-context.js';
-import { ROLE_LABELS, assignableRoles, canEditMember } from '../services/permissions.js';
+import { assignableRoles, canEditMember, roleLabel } from '../services/permissions.js';
 import { currentRole, me, roleCan, setMe } from '../services/session-store.js';
 import { toast } from '../services/toast-store.js';
 import '../styles/organization.css';
+import { t } from '../i18n/index.js';
 
 /**
  * Settings of the active organization: name, members and roles, and deletion.
@@ -42,7 +43,7 @@ const Organization: Component = () => {
       const res = await renameOrganization(current.id, trimmed);
       const m = me();
       if (m?.organization) setMe({ ...m, organization: { ...m.organization, name: res.name } });
-      toast.success('Organization renamed');
+      toast.success(t('org.page.renamed'));
     } catch {
       // toasted by fetchMutate
     } finally {
@@ -94,7 +95,7 @@ const Organization: Component = () => {
         setTempPassword({ email: res.member.email, password: res.temporaryPassword });
       } else {
         setTempPassword(null);
-        toast.success(`${res.member.email} already had an account and was added`);
+        toast.success(t('org.page.existingAdded', { email: res.member.email }));
       }
       setEmail('');
       setMemberName('');
@@ -150,35 +151,35 @@ const Organization: Component = () => {
 
   return (
     <div class="container--md">
-      <Title>Organization - Thinker</Title>
-      <Meta name="description" content="Manage the organization's name and members." />
+      <Title>{t('common.pageTitle', { page: t('org.page.title') })}</Title>
+      <Meta name="description" content={t('org.page.metaDescription')} />
       <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
         <div>
-          <h1 class="page-header__title">{org()?.name ?? 'Organization'}</h1>
+          <h1 class="page-header__title">{org()?.name ?? t('org.page.title')}</h1>
           <p class="page-header__subtitle">
-            Members, roles and settings of this organization.
-            <Show when={currentRole()}>{(r) => <> Your role: {ROLE_LABELS[r()]}.</>}</Show>
+            {t('org.page.subtitle')}
+            <Show when={currentRole()}>
+              {(r) => <> {t('org.yourRole', { role: roleLabel(r()) })}.</>}
+            </Show>
           </p>
         </div>
       </div>
 
       {/* ── General ─────────────────────────────────── */}
-      <h2 class="settings-section__title">General</h2>
+      <h2 class="settings-section__title">{t('org.page.general')}</h2>
       <form class="settings-card" onSubmit={handleRename}>
         <div class="settings-card__row">
           <div class="settings-card__label">
-            <span class="settings-card__label-title">Organization name</span>
+            <span class="settings-card__label-title">{t('org.gate.orgName')}</span>
             <span class="settings-card__label-desc">
-              {roleCan.manageOrganization()
-                ? 'Shown in the organization switcher.'
-                : 'Only owners can rename the organization.'}
+              {roleCan.manageOrganization() ? t('org.page.nameDesc') : t('org.page.nameReadOnly')}
             </span>
           </div>
           <div class="settings-card__control">
             <input
               class="settings-card__input"
               type="text"
-              aria-label="Organization name"
+              aria-label={t('org.gate.orgName')}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
               readonly={!roleCan.manageOrganization()}
@@ -193,20 +194,20 @@ const Organization: Component = () => {
               type="submit"
               disabled={renaming() || !name().trim() || name().trim() === org()?.name}
             >
-              Save
+              {t('common.save')}
             </button>
           </div>
         </Show>
       </form>
 
       {/* ── Members ─────────────────────────────────── */}
-      <h2 class="settings-section__title">Members</h2>
+      <h2 class="settings-section__title">{t('org.page.members')}</h2>
 
       <Show when={roleCan.manageMembers()}>
         <div class="settings-card">
-          <form class="org-form" onSubmit={handleAdd} aria-label="Add member">
+          <form class="org-form" onSubmit={handleAdd} aria-label={t('org.page.addMember')}>
             <label class="org-form__field">
-              Email
+              {t('common.email')}
               <input
                 class="auth-form__input"
                 type="email"
@@ -216,7 +217,7 @@ const Organization: Component = () => {
               />
             </label>
             <label class="org-form__field">
-              Name (new accounts)
+              {t('org.page.nameNewAccounts')}
               <input
                 class="auth-form__input"
                 type="text"
@@ -225,18 +226,18 @@ const Organization: Component = () => {
               />
             </label>
             <label class="org-form__field">
-              Role
+              {t('common.role')}
               <select
                 class="org-select"
                 value={role()}
                 onChange={(e) => setRole(e.currentTarget.value as OrgRole)}
               >
-                <For each={roleOptions()}>{(r) => <option value={r}>{ROLE_LABELS[r]}</option>}</For>
+                <For each={roleOptions()}>{(r) => <option value={r}>{roleLabel(r)}</option>}</For>
               </select>
             </label>
             <div class="org-form__actions">
               <button class="btn btn--primary btn--sm" type="submit" disabled={adding()}>
-                Add member
+                {t('org.page.addMember')}
               </button>
             </div>
           </form>
@@ -259,9 +260,9 @@ const Organization: Component = () => {
           <table class="data-table org-table" style="width: 100%;">
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Role</th>
-                <th>Status</th>
+                <th>{t('org.page.member')}</th>
+                <th>{t('common.role')}</th>
+                <th>{t('common.status')}</th>
                 <th />
               </tr>
             </thead>
@@ -269,7 +270,7 @@ const Organization: Component = () => {
               <Show when={members.loading && !members()}>
                 <tr>
                   <td colspan="4" class="org-table__muted">
-                    Loading members...
+                    {t('org.page.loadingMembers')}
                   </td>
                 </tr>
               </Show>
@@ -284,7 +285,7 @@ const Organization: Component = () => {
                         <div style="font-weight: 500;">
                           {member.name || member.email}
                           <Show when={isSelf()}>
-                            <span class="org-table__muted"> (you)</span>
+                            <span class="org-table__muted"> {t('org.page.you')}</span>
                           </Show>
                         </div>
                         <div class="org-table__muted">{member.email}</div>
@@ -292,11 +293,11 @@ const Organization: Component = () => {
                       <td>
                         <Show
                           when={editable()}
-                          fallback={<span class="role-badge">{ROLE_LABELS[member.role]}</span>}
+                          fallback={<span class="role-badge">{roleLabel(member.role)}</span>}
                         >
                           <select
                             class="org-select"
-                            aria-label={`Role of ${member.email}`}
+                            aria-label={t('org.page.roleOf', { email: member.email })}
                             value={member.role}
                             disabled={busyMember() === member.userId}
                             onChange={(e) =>
@@ -304,7 +305,7 @@ const Organization: Component = () => {
                             }
                           >
                             <For each={roleOptions()}>
-                              {(r) => <option value={r}>{ROLE_LABELS[r]}</option>}
+                              {(r) => <option value={r}>{roleLabel(r)}</option>}
                             </For>
                           </select>
                         </Show>
@@ -312,10 +313,10 @@ const Organization: Component = () => {
                       <td>
                         <Show
                           when={member.mustChangePassword}
-                          fallback={<span class="org-table__muted">Active</span>}
+                          fallback={<span class="org-table__muted">{t('org.page.active')}</span>}
                         >
                           <span class="role-badge role-badge--warning">
-                            Pending password change
+                            {t('org.page.pendingPassword')}
                           </span>
                         </Show>
                       </td>
@@ -329,7 +330,7 @@ const Organization: Component = () => {
                                 class="btn btn--ghost btn--sm"
                                 onClick={() => setConfirmRemove(member.userId)}
                               >
-                                Remove
+                                {t('common.remove')}
                               </button>
                             }
                           >
@@ -339,14 +340,14 @@ const Organization: Component = () => {
                               disabled={busyMember() === member.userId}
                               onClick={() => void handleRemove(member.userId)}
                             >
-                              Confirm remove
+                              {t('org.page.confirmRemove')}
                             </button>
                             <button
                               type="button"
                               class="btn btn--outline btn--sm"
                               onClick={() => setConfirmRemove(null)}
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                           </Show>
                         </Show>
@@ -362,15 +363,14 @@ const Organization: Component = () => {
 
       {/* ── Danger zone ─────────────────────────────── */}
       <Show when={roleCan.manageOrganization()}>
-        <h2 class="settings-section__title settings-section__title--danger">Danger zone</h2>
+        <h2 class="settings-section__title settings-section__title--danger">
+          {t('org.page.dangerZone')}
+        </h2>
         <div class="settings-card settings-card--danger">
           <div class="settings-card__row">
             <div class="settings-card__label">
-              <span class="settings-card__label-title">Delete this organization</span>
-              <span class="settings-card__label-desc">
-                Permanently delete the organization with its harnesses, providers, routing and
-                request logs. This action cannot be undone.
-              </span>
+              <span class="settings-card__label-title">{t('org.page.deleteThis')}</span>
+              <span class="settings-card__label-desc">{t('org.page.deleteDesc')}</span>
             </div>
             <div class="settings-card__control">
               <button
@@ -381,7 +381,7 @@ const Organization: Component = () => {
                   setDeleteOpen(true);
                 }}
               >
-                Delete organization
+                {t('org.page.deleteOrg')}
               </button>
             </div>
           </div>
@@ -409,17 +409,17 @@ const Organization: Component = () => {
               id="delete-org-title"
               style="margin: 0 0 var(--gap-md); font-size: var(--font-size-lg);"
             >
-              Delete {org()?.name}
+              {t('org.page.deleteNamed', { name: org()?.name ?? '' })}
             </h3>
             <p style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: var(--gap-md);">
-              Everything in this organization is deleted for all its members. This action cannot be
-              undone.
+              {t('org.page.deleteWarning')}
             </p>
             <label
               for="delete-org-confirm"
               style="display: block; font-size: var(--font-size-sm); margin-bottom: var(--gap-sm);"
             >
-              To confirm, type <strong>"{org()?.name}"</strong> in the box below
+              {t('org.page.typeToConfirmBefore')} <strong>"{org()?.name}"</strong>{' '}
+              {t('org.page.typeToConfirmAfter')}
             </label>
             <input
               id="delete-org-confirm"
@@ -435,7 +435,7 @@ const Organization: Component = () => {
                 class="btn btn--outline btn--sm"
                 onClick={() => setDeleteOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -443,7 +443,7 @@ const Organization: Component = () => {
                 disabled={deleteConfirm() !== org()?.name || deleting()}
                 onClick={() => void handleDelete()}
               >
-                Delete this organization
+                {t('org.page.deleteThis')}
               </button>
             </div>
           </div>

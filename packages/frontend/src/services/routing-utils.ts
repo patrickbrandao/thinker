@@ -1,6 +1,8 @@
 import { PROVIDERS } from './providers.js';
 import { inferProviderFromModel, SHARED_PROVIDERS } from 'thinker-shared';
 import type { AuthType, ModelRoute, RoutingProvider } from './api.js';
+import { t } from '../i18n/index.js';
+import { usd } from './formatters.js';
 
 export interface RouteSlots {
   override_route?: ModelRoute | null;
@@ -135,10 +137,10 @@ export function routeKeySelectionForModel(input: {
 export function pricePerM(perToken: number | null | undefined): string {
   if (perToken == null) return '\u2014';
   const perM = Number(perToken) * 1_000_000;
-  if (perM === 0) return 'Free';
-  if (perM < 0.01) return '< $0.01';
-  if (perM < 1) return `$${perM.toFixed(3)}`;
-  return `$${perM.toFixed(2)}`;
+  if (perM === 0) return t('routing.free');
+  if (perM < 0.01) return `< ${usd(0.01, 2)}`;
+  if (perM < 1) return usd(perM, 3);
+  return usd(perM, 2);
 }
 
 /**

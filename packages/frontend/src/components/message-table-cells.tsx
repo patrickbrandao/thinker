@@ -1,4 +1,4 @@
-import { Show, type JSX } from 'solid-js';
+import { createMemo, Show, type JSX } from 'solid-js';
 import { A } from '@solidjs/router';
 import { routingTierLabel, type MessageRow, type MessageColumnKey } from './message-table-types.js';
 import InfoTooltip from './InfoTooltip.jsx';
@@ -8,6 +8,7 @@ import {
   formatTime,
   formatDuration,
   customProviderColor,
+  usd,
 } from '../services/formatters.js';
 import {
   inferProviderFromModel,
@@ -20,6 +21,7 @@ import { getModelDisplayName } from '../services/model-display.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.jsx';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
 import { platformIcon, isSuccessStatus } from 'thinker-shared';
+import { tMaybe, t } from '../i18n/index.js';
 
 const MONO = 'font-family: var(--font-mono);';
 const MONO_XS =
@@ -61,38 +63,23 @@ export function FallbackIcon(): JSX.Element {
   );
 }
 
-const HEADER_LABELS: Record<MessageColumnKey, string> = {
-  date: 'Date',
-  message: 'Request',
-  cost: 'Cost',
-  totalTokens: 'Tokens',
-  input: 'Input',
-  output: 'Output',
-  model: 'Model',
-  cache: 'Cache',
-  duration: 'Latency',
-  status: 'Status',
-  attempts: 'Attempts',
-  recovery: 'Recovery attempts',
-  agent: 'Harness',
-};
+const headerLabel = (key: MessageColumnKey, tooltips?: boolean): string =>
+  key === 'totalTokens' && tooltips
+    ? t('messages.table.header.totalTokensLong')
+    : (tMaybe(`messages.table.header.${key}`) ?? key);
 
-const TOOLTIP_TEXT: Partial<Record<MessageColumnKey, string>> = {
-  totalTokens: 'Tokens are units of text that AI models process. More tokens = higher cost.',
-  input: "Tokens sent to the model (your prompt). Also called 'input tokens'.",
-  output: "Tokens returned by the model (its response). Also called 'output tokens'.",
-};
+const tooltipText = (key: MessageColumnKey): string | undefined =>
+  tMaybe(`messages.table.tooltip.${key}`);
 
 export function columnHeader(key: MessageColumnKey, tooltips?: boolean): JSX.Element {
-  const label = key === 'totalTokens' && tooltips ? 'Total Tokens' : HEADER_LABELS[key];
-  const tip = TOOLTIP_TEXT[key];
-  return tip && (tooltips || key !== 'totalTokens') ? (
+  const hasTip = tooltipText(key) !== undefined;
+  return hasTip && (tooltips || key !== 'totalTokens') ? (
     <>
-      {label}
-      <InfoTooltip text={tip} />
+      {headerLabel(key, tooltips)}
+      <InfoTooltip text={tooltipText(key)!} />
     </>
   ) : (
-    <>{label}</>
+    <>{headerLabel(key, tooltips)}</>
   );
 }
 
@@ -106,7 +93,7 @@ export function MessageCell(item: MessageRow): JSX.Element {
       {item.id.slice(0, 8)}
       {item.routing_reason === 'heartbeat' && (
         <span
-          title="Heartbeat"
+          title={t('messages.table.heartbeat')}
           style="display: inline-flex; align-items: center; margin-left: 4px; color: hsl(var(--muted-foreground)); opacity: 0.7;"
         >
           {<HeartbeatIcon />}
@@ -131,9 +118,9 @@ export function CostCell(item: MessageRow): JSX.Element {
           <span
             title={
               isPerRequestSubscription
-                ? `Per-request subscription cost: $${Number(item.cost!).toFixed(6)}`
+                ? t('messages.table.perRequestCost', { amount: usd(Number(item.cost!), 6) })
                 : item.cost != null && Number(item.cost) > 0 && Number(item.cost) < 0.01
-                  ? `$${Number(item.cost).toFixed(6)}`
+                  ? usd(Number(item.cost), 6)
                   : undefined
             }
           >
@@ -141,8 +128,11 @@ export function CostCell(item: MessageRow): JSX.Element {
           </span>
         }
       >
-        <span style="color: hsl(var(--muted-foreground));" title="Included in subscription">
-          $0.00
+        <span
+          style="color: hsl(var(--muted-foreground));"
+          title={t('messages.table.includedInSubscription')}
+        >
+          {usd(0, 2)}
         </span>
       </Show>
     </td>
@@ -233,7 +223,7 @@ export function ModelCell(item: MessageRow): JSX.Element {
         {item.virtual_model_name ? (
           <span
             class="tier-badge tier-badge--virtual"
-            title={`Virtual model: ${item.virtual_model_name}`}
+            title={t('messages.table.virtualModel', { name: item.virtual_model_name })}
           >
             {item.virtual_model_name}
           </span>
@@ -256,8 +246,8 @@ export function ModelCell(item: MessageRow): JSX.Element {
             {(item.routing_tier === 'direct' || item.routing_tier === 'default') && (
               <span class="tier-badge-tooltip__bubble">
                 {item.routing_tier === 'direct'
-                  ? 'The caller requested a specific model. No routing applied.'
-                  : 'Routed through the default tier.'}
+                  ? t('messages.table.directTier')
+                  : t('messages.table.defaultTier')}
               </span>
             )}
           </span>
@@ -282,7 +272,10 @@ export function CacheCell(item: MessageRow): JSX.Element {
   return (
     <td style={`width: 192px; ${MONO_XS}`}>
       {has
-        ? `Read: ${formatNumber(item.cache_read_tokens ?? 0)} / Write: ${formatNumber(item.cache_creation_tokens ?? 0)}`
+        ? t('messages.table.cache', {
+            read: formatNumber(item.cache_read_tokens ?? 0),
+            write: formatNumber(item.cache_creation_tokens ?? 0),
+          })
         : '\u2014'}
     </td>
   );
@@ -339,11 +332,11 @@ export function RecoveryCell(item: MessageRow): JSX.Element {
       <span style="display: inline-flex; align-items: center; gap: 4px;">
         <span
           class="trigger-badge trigger-badge--fallback"
-          title="Fallback"
+          title={t('messages.table.fallback')}
           style="padding: 1px 3px;"
         >
           <FallbackIcon />
-          fallback
+          {t('messages.table.fallbackBadge')}
         </span>
       </span>
     </td>
@@ -353,17 +346,10 @@ export function RecoveryCell(item: MessageRow): JSX.Element {
 /**
  * Compact origin descriptor appended to "Failed" (e.g. "Failed: Provider").
  */
-const ERROR_DESCRIPTORS: Record<string, string> = {
-  provider: 'Provider',
-  transport: 'Transport',
-  config: 'Setup',
-  policy: 'Custom limit',
-  internal: 'Thinker error',
-  request: 'Bad request',
-};
-
 function statusErrorDescriptor(item: MessageRow): string | null {
-  return item.error_origin ? (ERROR_DESCRIPTORS[item.error_origin] ?? null) : null;
+  return item.error_origin
+    ? (tMaybe(`messages.table.errorDescriptor.${item.error_origin}`) ?? null)
+    : null;
 }
 
 /**
@@ -378,11 +364,16 @@ function describeStatusPill(item: MessageRow): {
 } {
   const isSuccess = isSuccessStatus(item.status);
   if (isSuccess) {
-    return { label: 'Success', cls: 'status-badge status-badge--ok', limitAgent: null };
+    return {
+      label: t('messages.table.success'),
+      cls: 'status-badge status-badge--ok',
+      limitAgent: null,
+    };
   }
   if (item.status === 'pending' || item.status === 'cancelled') {
     return {
-      label: item.status === 'pending' ? 'Pending' : 'Cancelled',
+      label:
+        item.status === 'pending' ? t('messages.table.pending') : t('messages.table.cancelled'),
       cls: 'status-badge status-badge--neutral',
       limitAgent: null,
     };
@@ -391,7 +382,7 @@ function describeStatusPill(item: MessageRow): {
   // limit...) lives in the drawer's error message, and rides here only as a
   // hover title so the column reads binary at a glance.
   return {
-    label: 'Failed',
+    label: t('messages.table.failed'),
     title: statusErrorDescriptor(item) ?? undefined,
     cls: 'status-badge status-badge--error',
     limitAgent: item.error_origin === 'policy' ? item.agent_name : null,
@@ -399,26 +390,27 @@ function describeStatusPill(item: MessageRow): {
 }
 
 export function StatusCell(item: MessageRow, _agentName: string | undefined): JSX.Element {
-  const pill = describeStatusPill(item);
+  // Read inside a memo so the pill follows the active language.
+  const pill = createMemo(() => describeStatusPill(item));
 
   // A Thinker software limit is one red pill linking to its agent's limits page.
-  if (pill.limitAgent) {
+  if (pill().limitAgent) {
     return (
       <td>
         <A
-          class={pill.cls}
-          href={`/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`}
-          title="Thinker usage limit reached - open your limits"
+          class={pill().cls}
+          href={`/harnesses/${encodeURIComponent(pill().limitAgent!)}/limits`}
+          title={t('messages.table.limitReached')}
         >
-          {pill.label}
+          {pill().label}
         </A>
       </td>
     );
   }
 
   const badge = (
-    <span class={pill.cls} title={pill.title}>
-      {pill.label}
+    <span class={pill().cls} title={pill().title}>
+      {pill().label}
     </span>
   );
 

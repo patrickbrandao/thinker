@@ -9,6 +9,7 @@ import {
   type RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../services/routing-params.js';
 import CustomProviderForm from './CustomProviderForm.js';
 import CopilotDeviceLogin from './CopilotDeviceLogin.js';
@@ -207,7 +208,7 @@ const ProviderSelectContent: Component<ProviderSelectContentProps> = (props) => 
       if (result?.notifications?.length) {
         for (const msg of result.notifications) toast.error(msg);
       }
-      toast.success('Provider disconnected');
+      toast.success(t('providerSetup.tabs.providerDisconnected'));
       props.onUpdate();
     } catch {
       // error toast from fetchMutate
@@ -234,13 +235,13 @@ const ProviderSelectContent: Component<ProviderSelectContentProps> = (props) => 
         if (result?.notifications?.length) {
           for (const msg of result.notifications) toast.error(msg);
         }
-        toast.success(`${provDef.name} subscription disconnected`);
+        toast.success(t('providerSetup.shared.subscriptionDisconnected', { name: provDef.name }));
       } else {
         await connectProvider(props.agentName, {
           provider: provId,
           authType: 'subscription',
         });
-        toast.success(`${provDef.name} subscription connected`);
+        toast.success(t('providerSetup.shared.subscriptionConnected', { name: provDef.name }));
       }
       props.onUpdate();
     } catch {

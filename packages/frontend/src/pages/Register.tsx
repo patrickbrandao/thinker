@@ -6,6 +6,7 @@ import { authClient } from '../services/auth-client.js';
 import { appendSearch } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
 import { checkSignupEnabled, checkSocialProviders } from '../services/setup-status.js';
+import { t } from '../i18n/index.js';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 // New accounts land on the onboarding flow, which hands off to the dashboard.
@@ -77,7 +78,7 @@ const Register: Component = () => {
       if (authError.code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL') {
         setAlreadyExists(true);
       }
-      setError(authError.message ?? 'Registration failed');
+      setError(authError.message ?? t('auth.register.failed'));
       return;
     }
     setAlreadyExists(false);
@@ -101,7 +102,7 @@ const Register: Component = () => {
     });
 
     if (resendError) {
-      setError(resendError.message ?? 'Failed to resend verification email');
+      setError(resendError.message ?? t('auth.resendFailed'));
       return;
     }
 
@@ -110,19 +111,16 @@ const Register: Component = () => {
 
   return (
     <>
-      <Title>Sign Up - Thinker</Title>
-      <Meta
-        name="description"
-        content="Create a Thinker account to start monitoring your AI harnesses."
-      />
+      <Title>{t('common.pageTitle', { page: t('auth.register.pageTitle') })}</Title>
+      <Meta name="description" content={t('auth.register.metaDescription')} />
       <Show
         when={!emailSent()}
         fallback={
           <>
             <div class="auth-header">
-              <h1 class="auth-header__title">Check your email</h1>
+              <h1 class="auth-header__title">{t('auth.checkEmail')}</h1>
               <p class="auth-header__subtitle">
-                We sent a verification link to <strong>{email()}</strong>
+                {t('auth.register.sentLinkTo')} <strong>{email()}</strong>
               </p>
             </div>
 
@@ -132,31 +130,29 @@ const Register: Component = () => {
                   {error()}
                 </div>
               )}
-              <div class="auth-form__success">
-                Click the link in your email to verify your account and get started.
-              </div>
+              <div class="auth-form__success">{t('auth.register.clickLink')}</div>
               <button
                 class="auth-form__link-btn"
                 onClick={handleResend}
                 disabled={resendCooldown() > 0}
               >
                 {resendCooldown() > 0
-                  ? `Resend in ${resendCooldown()}s`
-                  : 'Resend verification email'}
+                  ? t('auth.resendIn', { seconds: resendCooldown() })
+                  : t('auth.resendVerification')}
               </button>
             </div>
 
             <div class="auth-footer">
               <A href={appendSearch('/login', location.search)} class="auth-footer__link">
-                Back to sign in
+                {t('auth.backToSignIn')}
               </A>
             </div>
           </>
         }
       >
         <div class="auth-header">
-          <h1 class="auth-header__title">Create an account</h1>
-          <p class="auth-header__subtitle">Monitor your AI harnesses' costs and usage</p>
+          <h1 class="auth-header__title">{t('auth.register.title')}</h1>
+          <p class="auth-header__subtitle">{t('auth.register.subtitle')}</p>
         </div>
 
         <SocialButtons
@@ -167,20 +163,20 @@ const Register: Component = () => {
 
         <Show when={socialProviders().length > 0}>
           <div class="auth-divider">
-            <span class="auth-divider__text">or</span>
+            <span class="auth-divider__text">{t('auth.or')}</span>
           </div>
         </Show>
 
         <form class="auth-form" onSubmit={handleSubmit}>
           <Show when={alreadyExists()}>
             <div id={errorId} class="auth-form__error" role="alert">
-              An account with this email already exists.{' '}
+              {t('auth.register.alreadyExists')}{' '}
               <A href={appendSearch('/login', location.search)} class="auth-form__error-link">
-                Sign in
+                {t('auth.register.signIn')}
               </A>{' '}
-              or{' '}
+              {t('auth.or')}{' '}
               <A href="/reset-password" class="auth-form__error-link">
-                reset your password
+                {t('auth.register.resetPassword')}
               </A>
               .
             </div>
@@ -191,14 +187,14 @@ const Register: Component = () => {
             </div>
           </Show>
           <label class="auth-form__label" for={nameId}>
-            Name
+            {t('common.name')}
             <input
               ref={(el) => requestAnimationFrame(() => el.focus())}
               id={nameId}
               class="auth-form__input"
               type="text"
               autocomplete="name"
-              placeholder="Your name"
+              placeholder={t('auth.register.namePlaceholder')}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
               required
@@ -206,13 +202,13 @@ const Register: Component = () => {
             />
           </label>
           <label class="auth-form__label" for={emailId}>
-            Email
+            {t('common.email')}
             <input
               id={emailId}
               class="auth-form__input"
               type="email"
               autocomplete="email"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={email()}
               onInput={(e) => setEmail(e.currentTarget.value)}
               required
@@ -220,13 +216,13 @@ const Register: Component = () => {
             />
           </label>
           <label class="auth-form__label" for={passwordId}>
-            Password
+            {t('common.password')}
             <input
               id={passwordId}
               class="auth-form__input"
               type="password"
               autocomplete="new-password"
-              placeholder="Create a password"
+              placeholder={t('auth.register.passwordPlaceholder')}
               value={password()}
               onInput={(e) => setPassword(e.currentTarget.value)}
               required
@@ -235,13 +231,13 @@ const Register: Component = () => {
             />
           </label>
           <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : 'Create account'}
+            {loading() ? <span class="spinner" /> : t('auth.register.submit')}
           </button>
         </form>
         <div class="auth-footer">
-          <span>Already have an account? </span>
+          <span>{t('auth.register.haveAccount')} </span>
           <A href={appendSearch('/login', location.search)} class="auth-footer__link">
-            Sign in
+            {t('auth.register.signIn')}
           </A>
         </div>
       </Show>

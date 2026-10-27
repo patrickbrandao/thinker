@@ -12,6 +12,8 @@ import { formatCost, formatNumber, formatTime } from '../services/formatters.js'
 import Sparkline from '../components/Sparkline.jsx';
 import { agentPing, analyticsPing } from '../services/sse.js';
 import { platformIcon } from 'thinker-shared';
+import RichText from '../components/RichText.jsx';
+import { t } from '../i18n/index.js';
 
 interface Agent {
   agent_name: string;
@@ -107,12 +109,12 @@ const Workspace: Component = () => {
   // Shared by the grid card menu and the table row menu so both views stay in sync.
   const harnessActionItems = (agentName: string) => [
     {
-      label: 'Duplicate',
+      label: t('harnesses.workspace.duplicate'),
       icon: <DuplicateIcon />,
       onClick: () => setDuplicateSource(agentName),
     },
     {
-      label: 'Delete',
+      label: t('common.delete'),
       danger: true,
       icon: <DeleteIcon />,
       onClick: () => {
@@ -136,7 +138,7 @@ const Workspace: Component = () => {
     setDeleting(true);
     try {
       await deleteAgent(target);
-      toast.success(`Harness "${target}" deleted`);
+      toast.success(t('harnesses.deleted', { name: target }));
       closeDeleteModal();
       await refetch();
     } catch {
@@ -148,25 +150,22 @@ const Workspace: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>My Harnesses - Thinker</Title>
-      <Meta
-        name="description"
-        content="View and manage all your harnesses. Monitor usage, requests, and costs."
-      />
+      <Title>{t('common.pageTitle', { page: t('harnesses.workspace.title') })}</Title>
+      <Meta name="description" content={t('harnesses.workspace.metaDescription')} />
       <div class="page-header">
         <div>
-          <h1>My Harnesses</h1>
-          <span class="breadcrumb">View and manage all your connected harnesses</span>
+          <h1>{t('harnesses.workspace.title')}</h1>
+          <span class="breadcrumb">{t('harnesses.workspace.subtitle')}</span>
         </div>
         <div class="header-controls">
-          <div class="panel__tabs" role="group" aria-label="Harness list layout">
+          <div class="panel__tabs" role="group" aria-label={t('harnesses.workspace.layout')}>
             <button
               type="button"
               class="panel__tab"
               classList={{ 'panel__tab--active': view() === 'grid' }}
               aria-pressed={view() === 'grid'}
-              aria-label="Grid view"
-              title="Grid view"
+              aria-label={t('harnesses.workspace.gridView')}
+              title={t('harnesses.workspace.gridView')}
               onClick={() => switchView('grid')}
             >
               <svg
@@ -184,8 +183,8 @@ const Workspace: Component = () => {
               class="panel__tab"
               classList={{ 'panel__tab--active': view() === 'table' }}
               aria-pressed={view() === 'table'}
-              aria-label="Table view"
-              title="Table view"
+              aria-label={t('harnesses.workspace.tableView')}
+              title={t('harnesses.workspace.tableView')}
               onClick={() => switchView('table')}
             >
               <svg
@@ -215,7 +214,7 @@ const Workspace: Component = () => {
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              Connect Harness
+              {t('harnesses.workspace.connect')}
             </button>
           </Show>
         </div>
@@ -231,12 +230,12 @@ const Workspace: Component = () => {
                 <table class="data-table" style="width: 100%;">
                   <thead>
                     <tr>
-                      <th>Harness</th>
-                      <th>Requests</th>
-                      <th>Tokens</th>
-                      <th>Cost</th>
-                      <th>Last active</th>
-                      <th aria-label="Actions" />
+                      <th>{t('harnesses.workspace.colHarness')}</th>
+                      <th>{t('harnesses.workspace.colRequests')}</th>
+                      <th>{t('harnesses.workspace.colTokens')}</th>
+                      <th>{t('harnesses.workspace.colCost')}</th>
+                      <th>{t('harnesses.workspace.colLastActive')}</th>
+                      <th aria-label={t('common.actions')} />
                     </tr>
                   </thead>
                   <tbody>
@@ -297,17 +296,15 @@ const Workspace: Component = () => {
             when={data()?.agents?.length}
             fallback={
               <div class="empty-state">
-                <div class="empty-state__title">No harnesses yet</div>
-                <p>
-                  Connect a harness or an AI app to take control of your routing and your costs.
-                </p>
+                <div class="empty-state__title">{t('harnesses.workspace.emptyTitle')}</div>
+                <p>{t('harnesses.workspace.emptyBody')}</p>
                 <Show when={roleCan.editHarnesses()}>
                   <button
                     class="btn btn--primary btn--sm"
                     style="margin-top: var(--gap-md);"
                     onClick={() => setModalOpen(true)}
                   >
-                    Connect your first harness
+                    {t('harnesses.workspace.connectFirst')}
                   </button>
                 </Show>
               </div>
@@ -320,12 +317,12 @@ const Workspace: Component = () => {
                   <table class="data-table" style="width: 100%;">
                     <thead>
                       <tr>
-                        <th>Harness</th>
-                        <th>Requests</th>
-                        <th>Tokens</th>
-                        <th>Cost</th>
-                        <th>Last active</th>
-                        <th aria-label="Actions" />
+                        <th>{t('harnesses.workspace.colHarness')}</th>
+                        <th>{t('harnesses.workspace.colRequests')}</th>
+                        <th>{t('harnesses.workspace.colTokens')}</th>
+                        <th>{t('harnesses.workspace.colCost')}</th>
+                        <th>{t('harnesses.workspace.colLastActive')}</th>
+                        <th aria-label={t('common.actions')} />
                       </tr>
                     </thead>
                     <tbody>
@@ -358,7 +355,9 @@ const Workspace: Component = () => {
                             <td class="workspace-table__actions">
                               <Show when={roleCan.editHarnesses()}>
                                 <ActionMenu
-                                  ariaLabel={`Actions for ${agent.agent_name}`}
+                                  ariaLabel={t('harnesses.workspace.actionsFor', {
+                                    name: agent.agent_name,
+                                  })}
                                   items={harnessActionItems(agent.agent_name)}
                                 />
                               </Show>
@@ -395,13 +394,17 @@ const Workspace: Component = () => {
                         </div>
                         <div class="agent-card__stats">
                           <div class="agent-card__stat">
-                            <span class="agent-card__stat-label">Tokens</span>
+                            <span class="agent-card__stat-label">
+                              {t('harnesses.workspace.colTokens')}
+                            </span>
                             <span class="agent-card__stat-value">
                               {formatNumber(agent.total_tokens)}
                             </span>
                           </div>
                           <div class="agent-card__stat">
-                            <span class="agent-card__stat-label">Requests</span>
+                            <span class="agent-card__stat-label">
+                              {t('harnesses.workspace.colRequests')}
+                            </span>
                             <span class="agent-card__stat-value">
                               {formatNumber(agent.message_count)}
                             </span>
@@ -414,7 +417,9 @@ const Workspace: Component = () => {
                       <Show when={roleCan.editHarnesses()}>
                         <ActionMenu
                           class="agent-card__menu"
-                          ariaLabel={`Actions for ${agent.agent_name}`}
+                          ariaLabel={t('harnesses.workspace.actionsFor', {
+                            name: agent.agent_name,
+                          })}
                           items={harnessActionItems(agent.agent_name)}
                         />
                       </Show>
@@ -457,18 +462,24 @@ const Workspace: Component = () => {
               id="workspace-delete-title"
               style="margin: 0 0 var(--gap-md); font-size: var(--font-size-lg);"
             >
-              Delete {deleteTarget()}
+              {t('harnesses.workspace.deleteTitle', { name: deleteTarget() ?? '' })}
             </h3>
             <p style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: var(--gap-md);">
-              This will permanently delete the{' '}
-              <strong style="color: hsl(var(--foreground));">{deleteTarget()}</strong> harness and
-              all its data. This action cannot be undone.
+              <RichText
+                text={t('harnesses.workspace.deleteBody')}
+                parts={{
+                  name: <strong style="color: hsl(var(--foreground));">{deleteTarget()}</strong>,
+                }}
+              />
             </p>
             <label
               for="workspace-delete-confirm"
               style="display: block; font-size: var(--font-size-sm); color: hsl(var(--foreground)); margin-bottom: var(--gap-sm);"
             >
-              To confirm, type <strong>"{deleteTarget()}"</strong> below
+              <RichText
+                text={t('harnesses.workspace.deleteConfirm')}
+                parts={{ name: <strong>"{deleteTarget()}"</strong> }}
+              />
             </label>
             <input
               id="workspace-delete-confirm"
@@ -486,7 +497,7 @@ const Workspace: Component = () => {
                 onClick={closeDeleteModal}
                 disabled={deleting()}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -494,7 +505,7 @@ const Workspace: Component = () => {
                 onClick={handleDelete}
                 disabled={deleteConfirmName() !== deleteTarget() || deleting()}
               >
-                {deleting() ? <span class="spinner" /> : 'Delete harness'}
+                {deleting() ? <span class="spinner" /> : t('harnesses.workspace.deleteButton')}
               </button>
             </div>
           </div>

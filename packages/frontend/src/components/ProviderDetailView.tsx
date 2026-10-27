@@ -17,6 +17,7 @@ import {
   type AuthType,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import { formatTimeAgo } from '../services/formatters.js';
 import CopyButton from './CopyButton.js';
 import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
@@ -134,7 +135,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
         provider: props.provId,
         authType: props.selectedAuthType(),
       });
-      toast.success(`${provDef.name} connected`);
+      toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
       props.onBack();
       props.onUpdate();
     } catch {
@@ -166,11 +167,11 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
         refreshed = true;
         setRefreshedModelCount(result.model_count);
         setRefreshedAt(result.last_fetched_at);
-        toast.success(
-          `${provDef.name}: refreshed ${result.model_count} model${result.model_count === 1 ? '' : 's'}`,
-        );
+        toast.success(t('providerSetup.detail.refreshed', provDef.name, result.model_count));
       } else {
-        toast.error(result.error ?? `Couldn't refresh ${provDef.name}`);
+        toast.error(
+          result.error ?? t('providerSetup.detail.couldNotRefresh', { name: provDef.name }),
+        );
       }
       await props.onUpdate();
       if (refreshed) {
@@ -209,7 +210,11 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
   return (
     <div class="provider-detail">
       {/* Back arrow */}
-      <button class="modal-back-btn" onClick={props.onBack} aria-label="Back to providers">
+      <button
+        class="modal-back-btn"
+        onClick={props.onBack}
+        aria-label={t('providerSetup.shared.backToProviders')}
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -225,7 +230,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       {/* Title */}
       <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 15px;">
         <div>
-          <div class="routing-modal__title">Connect provider</div>
+          <div class="routing-modal__title">{t('providerSetup.shared.connectProvider')}</div>
         </div>
       </div>
 
@@ -250,7 +255,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
           <div class="provider-detail__name">
             {provDef.name}
             <Show when={provDef.beta}>
-              <span class="provider-detail__beta-badge">beta</span>
+              <span class="provider-detail__beta-badge">{t('providerSetup.shared.beta')}</span>
             </Show>
           </div>
         </div>
@@ -272,7 +277,9 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
               >
                 <path d="M4 11h11v2H4zm0-5h16v2H4zm0 10h8v2H4zm15-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" />
               </svg>
-              {isSubMode() ? 'Add connection' : 'Add another key'}
+              {isSubMode()
+                ? t('providerSetup.shared.addConnection')
+                : t('providerSetup.shared.addAnotherKey')}
             </button>
           </Show>
         </div>
@@ -293,16 +300,17 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       <Show when={connected()}>
         <div class="provider-detail__models-bar">
           <span>
-            {modelCount()} model
-            {modelCount() === 1 ? '' : 's'}
-            <Show when={lastFetchedAgo()}> - last refreshed: {lastFetchedAgo()}</Show>
+            {t('providerSetup.detail.models', modelCount())}
+            <Show when={lastFetchedAgo()}>
+              {(ago) => t('providerSetup.detail.lastRefreshed', { ago: ago() })}
+            </Show>
           </span>
           <button
             class="btn btn--outline btn--sm provider-detail__refresh-btn"
             disabled={refreshing() || props.busy()}
             onClick={handleRefreshModels}
-            aria-label={`Refresh models from ${provDef.name}`}
-            title={`Refresh models from ${provDef.name}`}
+            aria-label={t('providerSetup.detail.refreshModelsFrom', { name: provDef.name })}
+            title={t('providerSetup.detail.refreshModelsFrom', { name: provDef.name })}
           >
             <svg
               width="14"
@@ -319,7 +327,9 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
               <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
               <path d="M21 3v5h-5" />
             </svg>
-            {refreshing() ? 'Refreshing…' : 'Refresh models'}
+            {refreshing()
+              ? t('providerSetup.detail.refreshing')
+              : t('providerSetup.detail.refreshModels')}
           </button>
         </div>
       </Show>
@@ -328,14 +338,16 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       <Show when={showConnectFlow() && isSubMode() && provDef.subscriptionSignInUrl}>
         <p class="provider-detail__hint">
           {provDef.subscriptionSignInHint ??
-            `Sign in to your ${provDef.name} account to get your API key, then paste it below.`}
+            t('providerSetup.detail.signInHint', { name: provDef.name })}
         </p>
         <a
           class="btn btn--primary btn--sm provider-detail__signin-btn"
           href={provDef.subscriptionSignInUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`${provDef.subscriptionSignInLabel ?? 'Sign in'} (opens in a new tab)`}
+          aria-label={t('providerSetup.detail.opensNewTab', {
+            label: provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn'),
+          })}
         >
           <svg
             width="14"
@@ -352,7 +364,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
             <polyline points="15 3 21 3 21 9" />
             <line x1="10" y1="14" x2="21" y2="3" />
           </svg>
-          {provDef.subscriptionSignInLabel ?? 'Sign in'}
+          {provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn')}
         </a>
       </Show>
 
@@ -360,8 +372,8 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       <Show when={showConnectFlow() && isSubMode() && provDef.subscriptionCommand}>
         <p class="provider-detail__hint">
           {isCommandOnly()
-            ? 'Run the command below to log in via your browser.'
-            : 'Run the command below, then paste the token.'}
+            ? t('providerSetup.detail.runCommandLogin')
+            : t('providerSetup.detail.runCommandPaste')}
         </p>
         <div class="modal-terminal">
           <div class="modal-terminal__header">
@@ -371,7 +383,9 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
               <span class="modal-terminal__dot modal-terminal__dot--green" />
             </div>
             <div class="modal-terminal__tabs">
-              <span class="modal-terminal__tab modal-terminal__tab--active">Terminal</span>
+              <span class="modal-terminal__tab modal-terminal__tab--active">
+                {t('providerSetup.detail.terminal')}
+              </span>
             </div>
           </div>
           <div class="modal-terminal__body">
@@ -387,8 +401,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       {/* Command-only subscription */}
       <Show when={showConnectFlow() && isCommandOnly()}>
         <p class="provider-detail__hint" style="margin-top: 16px;">
-          A browser window will open for you to log in. Once authenticated, the connection will be
-          detected automatically.
+          {t('providerSetup.detail.browserWillOpen')}
         </p>
         <Show when={connected()}>
           <button
@@ -397,13 +410,13 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
             onClick={handleDisconnect}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Disconnect
+              {t('providerSetup.shared.disconnect')}
             </Show>
           </button>
         </Show>
         <Show when={!connected()}>
           <button class="btn btn--primary provider-detail__action" onClick={props.onBack}>
-            Done
+            {t('common.done')}
           </button>
         </Show>
       </Show>
@@ -469,7 +482,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
       {/* Ollama (no key) */}
       <Show when={isOllama}>
         <div class="provider-detail__field">
-          <span class="provider-detail__no-key">No API key required for local models</span>
+          <span class="provider-detail__no-key">{t('providerSetup.detail.noKeyLocal')}</span>
           <Show when={getRoutingProviderApiKeyUrl(props.provId)}>
             <a
               href={getRoutingProviderApiKeyUrl(props.provId)}
@@ -478,7 +491,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
               class="provider-detail__docs-link"
               style="margin-left: 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));"
             >
-              Get {provDef.name} ↗
+              {t('providerSetup.shared.getProduct', { name: provDef.name })}
             </a>
           </Show>
         </div>
@@ -489,7 +502,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
             onClick={handleOllamaConnect}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Connect
+              {t('providerSetup.shared.connect')}
             </Show>
           </button>
         </Show>
@@ -500,7 +513,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
             onClick={handleDisconnect}
           >
             <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              Disconnect
+              {t('providerSetup.shared.disconnect')}
             </Show>
           </button>
         </Show>

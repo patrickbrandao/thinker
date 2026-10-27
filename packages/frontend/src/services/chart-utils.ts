@@ -1,6 +1,8 @@
 import { onMount, onCleanup, createEffect, on } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import uPlot from 'uplot';
+import { intlLocale, locale } from '../i18n/index.js';
+import { dayMonth } from './overview-format.js';
 
 interface UseChartLifecycleOptions<T> {
   el: () => HTMLDivElement;
@@ -82,8 +84,6 @@ export function useChartLifecycle<T>(opts: UseChartLifecycleOptions<T>): void {
   });
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export function createFormatLegendTimestamp(
   range?: string,
 ): (_u: uPlot, epochSec: number) => string {
@@ -91,18 +91,22 @@ export function createFormatLegendTimestamp(
   return (_u: uPlot, epochSec: number): string => {
     if (epochSec == null || isNaN(epochSec)) return '';
     const d = new Date(epochSec * 1000);
-    const mon = MONTHS[d.getMonth()]!;
-    const day = d.getDate();
-    if (multiDay) return `${mon} ${day}`;
+    if (multiDay) return dayMonth(d);
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${mon} ${day}, ${hh}:${mm}`;
+    return `${dayMonth(d)}, ${hh}:${mm}`;
   };
 }
 
 export function formatLegendTokens(_u: uPlot, val: number): string {
   if (val == null || isNaN(val)) return '';
   val = Math.round(val);
+  if (locale() !== 'en') {
+    return new Intl.NumberFormat(intlLocale(), {
+      notation: val >= 1_000 ? 'compact' : 'standard',
+      maximumFractionDigits: 1,
+    }).format(val);
+  }
   if (val >= 1_000_000) {
     const v = val / 1_000_000;
     return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}M`;
@@ -215,9 +219,7 @@ export function formatAxisTimestamp(epochSec: number, range: string): string {
     const mm = String(d.getMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
   }
-  const mon = MONTHS[d.getMonth()]!;
-  const day = d.getDate();
-  return `${mon} ${day}`;
+  return dayMonth(d);
 }
 
 export function isMultiDayRange(range?: string): boolean {

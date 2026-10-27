@@ -6,6 +6,7 @@ import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
 import { refreshAgents } from '../services/sse.js';
 import { type AgentCategory, type AgentPlatform, PLATFORMS_BY_CATEGORY } from 'thinker-shared';
+import { t } from '../i18n/index.js';
 
 /**
  * "Connect Harness" modal extracted from Workspace so it can be reused by other
@@ -89,7 +90,7 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
       // The user dismissed the modal while the request was in flight — honour
       // that dismissal and skip every success side effect + the navigation.
       if (isStale(token)) return;
-      toast.success(`Harness "${agentName}" connected`);
+      toast.success(t('harnesses.add.connected', { name: agentName }));
       props.onClose();
       resetForm();
       const slug = result?.agent?.name ?? agentName;
@@ -161,15 +162,13 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
           onKeyDown={handleKeyDown}
         >
           <h2 class="modal-card__title" id="add-agent-title">
-            Connect Harness
+            {t('harnesses.add.title')}
           </h2>
-          <p class="modal-card__desc">
-            Name your harness to start tracking its LLM usage, costs, and messages in real time.
-          </p>
+          <p class="modal-card__desc">{t('harnesses.add.desc')}</p>
 
           <div class="agent-type-select-row">
             <div>
-              <label class="modal-card__field-label">Type</label>
+              <label class="modal-card__field-label">{t('harnesses.add.type')}</label>
               <AgentTypeSelect
                 category={category()}
                 platform={platform()}
@@ -180,14 +179,14 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
             </div>
             <div style="flex: 1;">
               <label class="modal-card__field-label" for="agent-name-input">
-                Harness name
+                {t('harnesses.add.name')}
               </label>
               <input
                 ref={(el) => requestAnimationFrame(() => el.focus())}
                 id="agent-name-input"
                 class="modal-card__input modal-card__input--lg"
                 type="text"
-                placeholder="e.g. My Cool Harness"
+                placeholder={t('harnesses.add.namePlaceholder')}
                 value={name()}
                 onInput={(e) => setName(e.currentTarget.value)}
                 disabled={creating()}
@@ -199,24 +198,23 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
             <div class="model-params__group">
               {/* Same label treatment as the Type / Harness name field labels,
                   not the larger Model-params group header. */}
-              <div class="modal-card__field-label add-agent-toggles__header">Settings</div>
+              <div class="modal-card__field-label add-agent-toggles__header">
+                {t('harnesses.add.settings')}
+              </div>
               <div class="model-params__group-card">
                 <div class="model-params__row">
                   <div class="model-params__row-text">
                     <div class="model-params__label-title">
-                      <span>Enable logs</span>
+                      <span>{t('harnesses.add.enableLogs')}</span>
                     </div>
-                    <div class="model-params__label-hint">
-                      See exactly what your agent sends on every attempt, and debug it faster. Logs
-                      stay in your own database.
-                    </div>
+                    <div class="model-params__label-hint">{t('harnesses.add.logsHint')}</div>
                   </div>
                   <div class="model-params__row-control">
                     <button
                       type="button"
                       role="switch"
                       aria-checked={recordingEnabled()}
-                      aria-label="Enable logs"
+                      aria-label={t('harnesses.add.enableLogs')}
                       class="settings-switch"
                       classList={{ 'settings-switch--on': recordingEnabled() }}
                       disabled={creating()}
@@ -238,7 +236,7 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
               onClick={handleCreate}
               disabled={!name().trim() || creating()}
             >
-              {creating() ? <span class="spinner" /> : 'Create'}
+              {creating() ? <span class="spinner" /> : t('common.create')}
             </button>
           </div>
         </div>

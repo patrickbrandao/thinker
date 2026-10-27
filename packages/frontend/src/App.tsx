@@ -14,6 +14,7 @@ import MeGate from './components/MeGate.jsx';
 import VersionIndicator from './components/VersionIndicator.jsx';
 import { connectSse } from './services/sse.js';
 import { RightSidebarProvider, useRightSidebar } from './services/right-sidebar.jsx';
+import { t } from './i18n/index.js';
 
 const SseConnector: ParentComponent = (props) => {
   onMount(() => {
@@ -43,7 +44,7 @@ const AppInner: ParentComponent = (props) => {
   return (
     <div class="app-shell">
       <a href="#main-content" class="skip-link">
-        Skip to main content
+        {t('nav.skipToContent')}
       </a>
       <Header
         showMobileNavToggle={showSidebar()}
@@ -55,7 +56,7 @@ const AppInner: ParentComponent = (props) => {
           <button
             type="button"
             class="mobile-nav-backdrop"
-            aria-label="Close navigation menu"
+            aria-label={t('nav.closeMenu')}
             onClick={() => setMobileNavOpen(false)}
           />
         </Show>
@@ -68,7 +69,7 @@ const AppInner: ParentComponent = (props) => {
           id="main-content"
           class="main-content"
           classList={{ 'main-content--full': !showSidebar() }}
-          aria-label="Dashboard content"
+          aria-label={t('nav.dashboardContent')}
         >
           {props.children}
         </main>

@@ -4,6 +4,7 @@ import { Title } from '@solidjs/meta';
 import { agentPath } from '../services/routing.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { agentPlatformIcon } from '../services/agent-platform-store.js';
+import { t } from '../i18n/index.js';
 
 /**
  * AgentDetail — horizontal-tabbed shell for the agent detail view.
@@ -39,7 +40,7 @@ const AgentDetail: ParentComponent = (props) => {
           href="/harnesses"
           style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-decoration: none;"
         >
-          ← Harnesses
+          {t('harnesses.detail.back')}
         </A>
       </div>
 
@@ -68,7 +69,7 @@ const AgentDetail: ParentComponent = (props) => {
           class="panel__tab"
           classList={{ 'panel__tab--active': isActive('/overview') }}
         >
-          Overview
+          {t('harnesses.detail.overview')}
         </A>
         <A
           href={path('/routing')}
@@ -77,7 +78,7 @@ const AgentDetail: ParentComponent = (props) => {
           class="panel__tab"
           classList={{ 'panel__tab--active': isActive('/routing') }}
         >
-          Routing
+          {t('harnesses.detail.routing')}
         </A>
         <A
           href={path('/providers')}
@@ -86,7 +87,7 @@ const AgentDetail: ParentComponent = (props) => {
           class="panel__tab"
           classList={{ 'panel__tab--active': isActive('/providers') }}
         >
-          Providers
+          {t('harnesses.detail.providers')}
         </A>
         <A
           href={path('/guardrails')}
@@ -95,7 +96,7 @@ const AgentDetail: ParentComponent = (props) => {
           class="panel__tab"
           classList={{ 'panel__tab--active': isActive('/guardrails') }}
         >
-          Limits
+          {t('harnesses.detail.limits')}
         </A>
         <A
           href={path('/settings')}
@@ -104,7 +105,7 @@ const AgentDetail: ParentComponent = (props) => {
           class="panel__tab"
           classList={{ 'panel__tab--active': isActive('/settings') }}
         >
-          Settings
+          {t('harnesses.detail.settings')}
         </A>
       </div>
       <hr style="border: none; border-top: 1px solid hsl(var(--border)); margin: 8px 0 24px;" />

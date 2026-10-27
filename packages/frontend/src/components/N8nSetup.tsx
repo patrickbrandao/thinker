@@ -1,5 +1,7 @@
 import { createSignal, Show, type Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 interface Props {
   apiKey: string | null;
@@ -60,26 +62,28 @@ const N8nSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-step__desc">
-        In n8n, install the <code>n8n-nodes-thinker</code> community node (built from the Thinker
-        repository), then add the Thinker Chat Model node to your AI Agent or Basic LLM Chain, or
-        the Thinker node for direct calls. Create or select Thinker credentials, paste the values
-        below, and set the node model to <code>auto</code>.
+        <RichText
+          text={t('harnesses.guides.n8nIntro')}
+          parts={{ node: <code>n8n-nodes-thinker</code>, auto: <code>auto</code> }}
+        />
       </p>
 
       <p class="setup-method__hint">
-        Reference:{' '}
+        {t('harnesses.guides.n8nReference')}{' '}
         <a
           href="https://docs.n8n.io/integrations/community-nodes/installation-and-management/"
           target="_blank"
           rel="noreferrer"
         >
-          n8n community node installation docs
+          {t('harnesses.guides.n8nDocs')}
         </a>
       </p>
 
-      <div class="setup-onboard-fields" role="list" aria-label="n8n credential values">
+      <div class="setup-onboard-fields" role="list" aria-label={t('harnesses.guides.n8nValues')}>
+        {/* i18n-ignore: labels mirror the n8n credential fields */}
         <SetupField label="Base URL" value={credentialBaseUrl()} copyable />
         <div class="setup-onboard-fields__row" role="listitem">
+          {/* i18n-ignore: labels mirror the n8n credential fields */}
           <span class="setup-onboard-fields__label">API Key</span>
           <span class="setup-onboard-fields__value">
             <code>{visibleKey()}</code>
@@ -87,8 +91,10 @@ const N8nSetup: Component<Props> = (props) => {
               <button
                 class="setup-onboard-fields__eye"
                 onClick={() => setKeyRevealed(!keyRevealed())}
-                aria-label={keyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                title={keyRevealed() ? 'Hide key' : 'Reveal key'}
+                aria-label={
+                  keyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                }
+                title={keyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
               >
                 <EyeIcon open={keyRevealed()} />
               </button>
@@ -96,6 +102,7 @@ const N8nSetup: Component<Props> = (props) => {
             <CopyButton text={copyKey()} />
           </span>
         </div>
+        {/* i18n-ignore: labels mirror the n8n credential fields */}
         <SetupField label="Model" value="auto" copyable />
       </div>
     </div>

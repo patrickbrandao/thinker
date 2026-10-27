@@ -24,6 +24,7 @@ import { customProviderColor, formatPerRequestCost } from '../services/formatter
 import { inferProviderFromModel, pricePerM, resolveProviderId } from '../services/routing-utils.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { toast } from '../services/toast-store.js';
+import { t } from '../i18n/index.js';
 import ModelCapabilityBadges, {
   CAPABILITY_ICONS,
   CAPABILITY_LABELS,
@@ -104,8 +105,7 @@ const wasFetchedToday = (fetchedAt: string | null | undefined, now: Date): boole
 };
 
 const unavailableCapabilityLabel = (capability: ModelCapability): string => {
-  if (capability === 'stream') return 'Stream unavailable';
-  return `${capability.charAt(0).toUpperCase()}${capability.slice(1)} unavailable`;
+  return t('models.picker.unavailable', { capability: CAPABILITY_LABELS[capability] });
 };
 
 const ModelPickerModal: Component<Props> = (props) => {
@@ -200,11 +200,9 @@ const ModelPickerModal: Component<Props> = (props) => {
     try {
       const result = await refreshProviderModels(props.agentName, provId, activeTab());
       if (result.ok) {
-        toast.success(
-          `${displayName}: refreshed ${result.model_count} model${result.model_count === 1 ? '' : 's'}`,
-        );
+        toast.success(t('models.picker.refreshed', displayName, result.model_count));
       } else {
-        toast.error(result.error ?? `Couldn't refresh ${displayName}`);
+        toast.error(result.error ?? t('models.picker.refreshFailed', { name: displayName }));
       }
       await notifyProviderRefreshed();
     } catch {
@@ -372,9 +370,9 @@ const ModelPickerModal: Component<Props> = (props) => {
     providerId?: string,
     authType?: AuthType,
   ): string | null => {
-    const t = props.tiers.find((r) => r.tier === props.tierId);
-    if (!t) return null;
-    const primaryRoute = t.override_route ?? null;
+    const tier = props.tiers.find((r) => r.tier === props.tierId);
+    if (!tier) return null;
+    const primaryRoute = tier.override_route ?? null;
     if (primaryRoute) {
       const matches =
         providerId && authType
@@ -382,9 +380,9 @@ const ModelPickerModal: Component<Props> = (props) => {
             primaryRoute.provider.toLowerCase() === providerId.toLowerCase() &&
             primaryRoute.authType === authType
           : primaryRoute.model === modelName;
-      if (matches) return 'Primary';
+      if (matches) return t('models.positionPrimary');
     }
-    const fbRoutes = t.fallback_routes ?? [];
+    const fbRoutes = tier.fallback_routes ?? [];
     const idx =
       providerId && authType
         ? fbRoutes.findIndex(
@@ -394,7 +392,7 @@ const ModelPickerModal: Component<Props> = (props) => {
               r.authType === authType,
           )
         : fbRoutes.findIndex((r) => r.model === modelName);
-    if (idx !== -1) return `Fallback ${idx + 1}`;
+    if (idx !== -1) return t('models.positionFallback', { n: idx + 1 });
     return null;
   };
 
@@ -461,13 +459,21 @@ const ModelPickerModal: Component<Props> = (props) => {
         <div class="routing-modal__header">
           <div>
             <div class="routing-modal__title" id="model-picker-title">
-              Select a model
+              {t('models.picker.title')}
             </div>
             <Show when={tierLabel()}>
-              {(label) => <div class="routing-modal__subtitle">{label()} tier</div>}
+              {(label) => (
+                <div class="routing-modal__subtitle">
+                  {t('models.picker.tierSubtitle', { label: label() })}
+                </div>
+              )}
             </Show>
           </div>
-          <button class="modal__close" onClick={() => props.onClose()} aria-label="Close">
+          <button
+            class="modal__close"
+            onClick={() => props.onClose()}
+            aria-label={t('common.close')}
+          >
             <svg
               width="16"
               height="16"
@@ -515,7 +521,7 @@ const ModelPickerModal: Component<Props> = (props) => {
                     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
-                  Subscription
+                  {t('models.picker.subscription')}
                 </button>
               </Show>
               <Show when={hasApiKey()}>
@@ -541,7 +547,7 @@ const ModelPickerModal: Component<Props> = (props) => {
                   >
                     <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
                   </svg>
-                  Usage-based
+                  {t('models.picker.usageBased')}
                 </button>
               </Show>
               <Show when={hasLocal()}>
@@ -566,7 +572,7 @@ const ModelPickerModal: Component<Props> = (props) => {
                   >
                     <path d="m13.18 6.75 2.66-4.22-1.69-1.07L12 4.87 9.85 1.46 8.16 2.53l2.66 4.22-8.67 13.72A1.006 1.006 0 0 0 3 22.01h18c.36 0 .7-.2.88-.52s.16-.71-.03-1.02zM10.24 20 12 16.98 13.76 20zm5.83 0-3.21-5.5c-.36-.62-1.37-.62-1.73 0L7.92 20H4.81L12 8.62 19.19 20h-3.11Z" />
                   </svg>
-                  Local
+                  {t('models.picker.local')}
                 </button>
               </Show>
             </div>
@@ -594,8 +600,8 @@ const ModelPickerModal: Component<Props> = (props) => {
               ref={(el) => requestAnimationFrame(() => el.focus())}
               class="routing-modal__search"
               type="text"
-              placeholder="Search models or providers..."
-              aria-label="Search models or providers"
+              placeholder={t('models.searchPlaceholder')}
+              aria-label={t('models.searchLabel')}
               value={search()}
               onInput={(e) => setSearch(e.currentTarget.value)}
             />
@@ -611,7 +617,7 @@ const ModelPickerModal: Component<Props> = (props) => {
                 classList={{ 'routing-modal__cap-pill--active': showFreeOnly() }}
                 onClick={() => setShowFreeOnly(!showFreeOnly())}
               >
-                Free models only
+                {t('models.picker.freeOnly')}
               </button>
             </Show>
           </div>
@@ -636,11 +642,11 @@ const ModelPickerModal: Component<Props> = (props) => {
 
         <Show when={groupedModels().length > 0}>
           <div class="routing-modal__table-head" aria-hidden="true">
-            <span>Model</span>
-            <span>Capabilities</span>
-            <span>Input</span>
-            <span>Output</span>
-            <span>Price</span>
+            <span>{t('models.picker.colModel')}</span>
+            <span>{t('models.picker.colCapabilities')}</span>
+            <span>{t('models.picker.colInput')}</span>
+            <span>{t('models.picker.colOutput')}</span>
+            <span>{t('models.picker.colPrice')}</span>
           </div>
         </Show>
         <Show
@@ -649,20 +655,20 @@ const ModelPickerModal: Component<Props> = (props) => {
             <div class="routing-modal__list">
               <div class="routing-modal__empty">
                 {search().trim()
-                  ? 'No models match your search.'
+                  ? t('models.noSearchMatch')
                   : showFreeOnly()
-                    ? 'No free models available from your connected providers.'
+                    ? t('models.picker.noFree')
                     : isSub()
-                      ? 'No subscription providers connected. Connect a provider to see models.'
+                      ? t('models.picker.noSubscription')
                       : isLocal()
-                        ? 'No local providers connected. Connect a local provider to see models.'
-                        : 'No API key providers connected. Connect a provider to see models.'}
+                        ? t('models.picker.noLocal')
+                        : t('models.picker.noApiKey')}
                 <Show when={!search().trim() && !showFreeOnly() && props.onConnectProviders}>
                   <button
                     class="btn btn--primary btn--sm"
                     onClick={() => props.onConnectProviders?.()}
                   >
-                    Connect provider
+                    {t('models.picker.connectProvider')}
                   </button>
                 </Show>
               </div>
@@ -712,8 +718,8 @@ const ModelPickerModal: Component<Props> = (props) => {
                         e.stopPropagation();
                         void handleRefreshGroup(item.provId, item.name);
                       }}
-                      aria-label={`Refresh ${item.name} models`}
-                      title={`Refresh ${item.name} models`}
+                      aria-label={t('models.picker.refreshModels', { name: item.name })}
+                      title={t('models.picker.refreshModels', { name: item.name })}
                     >
                       <svg
                         width="12"
@@ -771,13 +777,15 @@ const ModelPickerModal: Component<Props> = (props) => {
                         </span>
                       </span>
                       <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">Capabilities</span>
+                        <span class="routing-modal__model-cell-label">
+                          {t('models.picker.colCapabilities')}
+                        </span>
                         <Show
                           when={actionCapabilitiesFor(model.pricing).length > 0}
                           fallback={
                             <span
                               class="model-capability-badges model-capability-badges--compact"
-                              aria-label="No stream or tools"
+                              aria-label={t('models.picker.noStreamOrTools')}
                             />
                           }
                         >
@@ -789,7 +797,9 @@ const ModelPickerModal: Component<Props> = (props) => {
                         </Show>
                       </span>
                       <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">Input</span>
+                        <span class="routing-modal__model-cell-label">
+                          {t('models.picker.colInput')}
+                        </span>
                         <ModelModalityBadges
                           modalities={inputModalitiesFor(model.pricing)}
                           direction="input"
@@ -798,7 +808,9 @@ const ModelPickerModal: Component<Props> = (props) => {
                         />
                       </span>
                       <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">Output</span>
+                        <span class="routing-modal__model-cell-label">
+                          {t('models.picker.colOutput')}
+                        </span>
                         <ModelModalityBadges
                           modalities={outputModalitiesFor(model.pricing)}
                           direction="output"
@@ -807,23 +819,27 @@ const ModelPickerModal: Component<Props> = (props) => {
                         />
                       </span>
                       <span class="routing-modal__model-cell routing-modal__model-cell--price">
-                        <span class="routing-modal__model-cell-label">Price</span>
+                        <span class="routing-modal__model-cell-label">
+                          {t('models.picker.colPrice')}
+                        </span>
                         <Show
                           when={isPaid()}
                           fallback={
                             <span class="routing-modal__model-price">
                               {isLocal()
-                                ? 'Runs on your machine'
+                                ? t('models.picker.runsLocally')
                                 : (formatPerRequestCost(model.pricing.cost_per_request) ??
-                                  'Included in subscription')}
+                                  t('models.picker.included'))}
                             </span>
                           }
                         >
                           <Show when={model.pricing}>
                             {(p) => (
                               <span class="routing-modal__model-price">
-                                {pricePerM(p().input_price_per_token)} in ·{' '}
-                                {pricePerM(p().output_price_per_token)} out
+                                {t('models.picker.priceInOut', {
+                                  input: pricePerM(p().input_price_per_token),
+                                  output: pricePerM(p().output_price_per_token),
+                                })}
                               </span>
                             )}
                           </Show>

@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
 import '../styles/organization.css';
+import { t } from '../i18n/index.js';
 
 interface TemporaryPasswordBoxProps {
   /** Who the password belongs to, shown in the title. */
@@ -15,11 +16,8 @@ interface TemporaryPasswordBoxProps {
  */
 const TemporaryPasswordBox: Component<TemporaryPasswordBoxProps> = (props) => (
   <div class="temp-password" role="status">
-    <span class="temp-password__title">Temporary password for {props.email}</span>
-    <span class="temp-password__warning">
-      Copy it now and share it securely. It will not be shown again. The user must choose a new
-      password at the first sign-in.
-    </span>
+    <span class="temp-password__title">{t('org.tempPassword.title', { email: props.email })}</span>
+    <span class="temp-password__warning">{t('org.tempPassword.warning')}</span>
     <div class="temp-password__row">
       <code class="temp-password__value" data-testid="temporary-password">
         {props.password}
@@ -28,7 +26,7 @@ const TemporaryPasswordBox: Component<TemporaryPasswordBoxProps> = (props) => (
     </div>
     <div class="temp-password__actions">
       <button type="button" class="btn btn--outline btn--sm" onClick={() => props.onDismiss()}>
-        I saved it
+        {t('org.tempPassword.saved')}
       </button>
     </div>
   </div>

@@ -11,7 +11,8 @@ vi.mock('solid-js/web', async (importOriginal) => {
 vi.mock('../../src/components/LimitRuleTable.js', () => ({
   formatThreshold: (r: any) =>
     r.metric_type === 'cost' ? `$${Number(r.threshold).toFixed(2)}` : `${r.threshold} tokens`,
-  PERIOD_LABELS: { hour: 'Per hour', day: 'Per day', week: 'Per week', month: 'Per month' } as Record<string, string>,
+  periodLabel: (p: string) =>
+    ({ hour: 'Per hour', day: 'Per day', week: 'Per week', month: 'Per month' } as Record<string, string>)[p],
 }));
 
 const makeRule = (overrides: Partial<NotificationRule> = {}): NotificationRule => ({

@@ -22,9 +22,6 @@ import {
   getConnectionAttemptHttpStatusTimeseries,
   getConnectionAttemptBreakdown,
   attemptSuccessRate,
-  TOTAL_ATTEMPTS_TOOLTIP,
-  CONNECTION_SUCCESS_RATE_TOOLTIP,
-  CONNECTION_HARNESS_SUCCESS_RATE_TOOLTIP,
 } from '../../services/api/analytics.js';
 import { platformIcon } from 'thinker-shared';
 import { PROVIDERS } from '../../services/providers.js';
@@ -49,12 +46,13 @@ import { AGENT_COLORS } from '../../components/MultiAgentTokenChart.jsx';
 import Select from '../../components/Select.jsx';
 import { setConnectionBreadcrumb } from '../../services/connection-breadcrumb-store.js';
 import { toast } from '../../services/toast-store.js';
+import { t, tMaybe } from '../../i18n/index.js';
 import {
   MAX_STREAM_WARMUP_SECONDS,
   MIN_STREAM_WARMUP_SECONDS,
-  STREAM_WARMUP_ERROR,
   parseWarmupSeconds,
   warmupMsToSecondsInput,
+  streamWarmupError,
 } from '../../services/stream-warmup.js';
 import { roleCan } from '../../services/session-store.js';
 import '../../styles/charts.css';
@@ -64,10 +62,10 @@ import { getModelDisplayName } from '../../services/model-display.js';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import '../../styles/routing.css';
 
-const AUTH_TYPE_LABELS: Record<string, string> = {
-  subscription: 'Subscriptions',
-  api_key: 'Usage-based',
-  local: 'Local',
+const AUTH_TYPE_KIND: Record<string, string> = {
+  subscription: 'subscriptions',
+  api_key: 'byok',
+  local: 'local',
 };
 
 const BACK_LINKS: Record<string, string> = {
@@ -126,13 +124,9 @@ interface AnalyticsResponse {
   attempts: { total: number; successful: number; success_rate: number };
 }
 
-const CD_RANGE_OPTIONS = [
-  { label: 'Last 24 hours', value: '24h' },
-  { label: 'Last 7 days', value: '7d' },
-  { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 90 days', value: '90d' },
-  { label: 'Last 365 days', value: '365d' },
-];
+const CD_RANGES = ['24h', '7d', '30d', '90d', '365d'] as const;
+const cdRangeOptions = () =>
+  CD_RANGES.map((value) => ({ label: t(`providers.detail.range.${value}`), value }));
 
 const ConnectionDetail: Component = () => {
   const params = useParams<{ connectionId: string }>();
@@ -176,17 +170,20 @@ const ConnectionDetail: Component = () => {
   // card's current window, so the list matches what the card counted.
   const requestsLink = (extra: string) =>
     `/messages?connections=${encodeURIComponent(params.connectionId)}&range=${chartRange()}${extra}`;
-  const viewMore = () => <span class="view-more-link">View more</span>;
+  const viewMore = () => <span class="view-more-link">{t('providers.detail.viewMore')}</span>;
 
   const backLink = () =>
     BACK_LINKS[conn()?.auth_type ?? 'subscription'] ?? '/providers/subscriptions';
-  const backLabel = () => AUTH_TYPE_LABELS[conn()?.auth_type ?? 'subscription'] ?? 'Providers';
+  const backLabel = () => {
+    const kind = AUTH_TYPE_KIND[conn()?.auth_type ?? 'subscription'];
+    return (kind && tMaybe(`providers.kind.${kind}`)) ?? t('providers.kind.providers');
+  };
 
   // Set breadcrumb for Header
   createEffect(() => {
     const c = conn();
     if (c) {
-      setConnectionBreadcrumb(providerDisplayName(), backLink(), backLabel(), c.provider, c.label);
+      setConnectionBreadcrumb(providerDisplayName(), backLink(), backLabel, c.provider, c.label);
     }
   });
   onCleanup(() => setConnectionBreadcrumb(null));
@@ -566,7 +563,7 @@ const ConnectionDetail: Component = () => {
     if (!c) return;
     const newLabel = renameValue().trim();
     if (!newLabel) {
-      setRenameError('Name cannot be empty');
+      setRenameError(t('providers.nameEmpty'));
       return;
     }
     if (newLabel === c.label) {
@@ -577,11 +574,11 @@ const ConnectionDetail: Component = () => {
     setRenameError('');
     try {
       await renameConnection(c.provider, c.label, newLabel, c.auth_type as any);
-      toast.success('Connection renamed');
+      toast.success(t('providers.connectionRenamed'));
       closeManageModal();
       refetchDetail();
     } catch (e: any) {
-      setRenameError(e?.message ?? 'Failed to rename');
+      setRenameError(e?.message ?? t('providers.renameFailed'));
     } finally {
       setRenaming(false);
     }
@@ -595,17 +592,17 @@ const ConnectionDetail: Component = () => {
     if (!c) return;
     const ms = parseWarmupSeconds(warmupValue());
     if (ms === undefined) {
-      setWarmupError(STREAM_WARMUP_ERROR);
+      setWarmupError(streamWarmupError());
       return;
     }
     setSavingWarmup(true);
     setWarmupError('');
     try {
       await setConnectionStreamWarmup(c.id, ms);
-      toast.success('Stream warm-up saved');
+      toast.success(t('providers.detail.warmupSaved'));
       refetchDetail();
     } catch (e: any) {
-      setWarmupError(e?.message ?? 'Failed to save');
+      setWarmupError(e?.message ?? t('providers.detail.saveFailed'));
     } finally {
       setSavingWarmup(false);
     }
@@ -618,10 +615,10 @@ const ConnectionDetail: Component = () => {
     setDeletingConnection(true);
     try {
       await disconnectConnection(c.provider, c.auth_type as any, c.label);
-      toast.success('Connection removed');
+      toast.success(t('providers.detail.connectionRemoved'));
       navigate(backLink());
     } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to disconnect');
+      toast.error(e?.message ?? t('providers.detail.disconnectFailed'));
     } finally {
       setDeletingConnection(false);
     }
@@ -631,10 +628,10 @@ const ConnectionDetail: Component = () => {
     setRefreshingModels(true);
     try {
       await refreshConnectionModels();
-      toast.success('Models refreshed');
+      toast.success(t('providers.detail.modelsRefreshed'));
       refetchDetail();
     } catch {
-      toast.error('Failed to refresh models');
+      toast.error(t('providers.detail.refreshFailed'));
     } finally {
       setRefreshingModels(false);
     }
@@ -653,30 +650,30 @@ const ConnectionDetail: Component = () => {
   return (
     <div class="container--lg">
       <Show when={hasError()}>
-        <Title>Couldn't load connection | Thinker</Title>
+        <Title>{t('providers.detail.loadErrorTitle')}</Title>
         <div style="padding: 48px 0; text-align: center;">
           <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 8px;">
-            Couldn't load this connection
+            {t('providers.detail.loadErrorHeading')}
           </div>
           <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 16px;">
-            Something went wrong loading this connection. Please try again.
+            {t('providers.detail.loadErrorBody')}
           </div>
           <button type="button" class="btn btn--outline btn--sm" onClick={() => refetchDetail()}>
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       </Show>
       <Show when={notFound()}>
-        <Title>Connection not found | Thinker</Title>
+        <Title>{t('providers.detail.notFoundTitle')}</Title>
         <div style="padding: 48px 0; text-align: center;">
           <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 8px;">
-            Connection not found
+            {t('providers.detail.notFoundHeading')}
           </div>
           <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 16px;">
-            This connection no longer exists or you don't have access to it.
+            {t('providers.detail.notFoundBody')}
           </div>
           <A href="/" class="btn btn--outline btn--sm" style="text-decoration: none;">
-            Back to overview
+            {t('providers.detail.backToOverview')}
           </A>
         </div>
       </Show>
@@ -693,7 +690,10 @@ const ConnectionDetail: Component = () => {
           return (
             <>
               <Title>
-                {providerDisplayName()} / {c.label} | Thinker
+                {t('providers.detail.pageTitle', {
+                  provider: providerDisplayName(),
+                  label: c.label,
+                })}
               </Title>
 
               {/* Back link */}
@@ -749,7 +749,7 @@ const ConnectionDetail: Component = () => {
                           class="connection-detail__badge"
                           style="padding: 2px 8px; border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;"
                         >
-                          Custom
+                          {t('providers.custom')}
                         </span>
                       </Show>
                       <Show
@@ -759,7 +759,7 @@ const ConnectionDetail: Component = () => {
                             class="connection-detail__badge"
                             style="padding: 4px 12px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); font-weight: 500;"
                           >
-                            Inactive
+                            {t('providers.inactive')}
                           </span>
                         }
                       >
@@ -767,7 +767,7 @@ const ConnectionDetail: Component = () => {
                           class="connection-detail__badge"
                           style="padding: 4px 12px; background: hsl(var(--success)); color: white; font-size: var(--font-size-sm); font-weight: 600;"
                         >
-                          Active
+                          {t('providers.active')}
                         </span>
                       </Show>
                     </div>
@@ -775,19 +775,21 @@ const ConnectionDetail: Component = () => {
                   <div class="connection-detail__meta">
                     <span>
                       <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        Connection name:
+                        {t('providers.detail.connectionName')}
                       </span>{' '}
                       <span style="color: hsl(var(--muted-foreground));">{c.label}</span>
                     </span>
                     <span>
-                      <span style="font-weight: 600; color: hsl(var(--foreground));">Models:</span>{' '}
+                      <span style="font-weight: 600; color: hsl(var(--foreground));">
+                        {t('providers.detail.models')}
+                      </span>{' '}
                       <span style="color: hsl(var(--muted-foreground));">
                         {c.cached_model_count}
                       </span>
                     </span>
                     <span>
                       <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        First connection:
+                        {t('providers.detail.firstConnection')}
                       </span>{' '}
                       <span style="color: hsl(var(--muted-foreground));">
                         {c.connected_at ? formatTimeAgo(c.connected_at) : '—'}
@@ -795,7 +797,7 @@ const ConnectionDetail: Component = () => {
                     </span>
                     <span>
                       <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        Last used:
+                        {t('providers.detail.lastUsed')}
                       </span>{' '}
                       <span style="color: hsl(var(--muted-foreground));">
                         {c.last_used_at ? formatTimeAgo(c.last_used_at) : '—'}
@@ -806,7 +808,7 @@ const ConnectionDetail: Component = () => {
                 <div class="connection-detail__controls">
                   <Show when={allAgents().length > 1}>
                     <FilterSelect
-                      noun="harnesses"
+                      noun={t('providers.detail.harnessesNoun')}
                       items={allAgents()}
                       selected={effectiveSelected()}
                       colorMap={agentColorMap()}
@@ -818,11 +820,11 @@ const ConnectionDetail: Component = () => {
                   <Select
                     value={chartRange()}
                     onChange={setChartRange}
-                    options={CD_RANGE_OPTIONS}
+                    options={cdRangeOptions()}
                   />
                   <Show when={roleCan.manageProviders()}>
                     <button class="btn btn--outline btn--sm" onClick={openManageModal}>
-                      Manage
+                      {t('providers.detail.manage')}
                     </button>
                   </Show>
                 </div>
@@ -833,8 +835,8 @@ const ConnectionDetail: Component = () => {
               <div class="overview-stats" style="margin-bottom: 16px;">
                 <div class="overview-stat-card">
                   <span class="overview-stat-card__label">
-                    Success rate
-                    <InfoTooltip text={CONNECTION_SUCCESS_RATE_TOOLTIP} />
+                    {t('providers.successRate')}
+                    <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
                   </span>
                   <div class="overview-stat-card__value-row">
                     <span class="overview-stat-card__value">
@@ -851,10 +853,12 @@ const ConnectionDetail: Component = () => {
                 <div
                   class="overview-stat-card"
                   style="cursor: pointer;"
-                  title="View the requests holding these succeeded attempts"
+                  title={t('providers.detail.succeededTitle')}
                   onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
                 >
-                  <span class="overview-stat-card__label">Succeeded attempts</span>
+                  <span class="overview-stat-card__label">
+                    {t('providers.detail.succeededAttempts')}
+                  </span>
                   <div class="overview-stat-card__value-row">
                     <span class="overview-stat-card__value">
                       {formatNumber(breakdown()?.succeeded ?? 0)}
@@ -865,10 +869,12 @@ const ConnectionDetail: Component = () => {
                 <div
                   class="overview-stat-card"
                   style="cursor: pointer;"
-                  title="View the requests holding these failed attempts"
+                  title={t('providers.detail.failedTitle')}
                   onClick={() => navigate(requestsLink('&attempts=has_failed'))}
                 >
-                  <span class="overview-stat-card__label">Failed attempts</span>
+                  <span class="overview-stat-card__label">
+                    {t('providers.detail.failedAttempts')}
+                  </span>
                   <div class="overview-stat-card__value-row">
                     <span class="overview-stat-card__value">
                       {formatNumber(breakdown()?.failed ?? 0)}
@@ -879,17 +885,21 @@ const ConnectionDetail: Component = () => {
                 <div
                   class="overview-stat-card"
                   style="cursor: pointer;"
-                  title="View the requests where this connection ran a fallback retry"
+                  title={t('providers.detail.fallbackTitle')}
                   onClick={() => navigate(requestsLink('&trigger=fallback'))}
                 >
-                  <span class="overview-stat-card__label">Fallback retries</span>
+                  <span class="overview-stat-card__label">
+                    {t('providers.detail.fallbackRetries')}
+                  </span>
                   <div class="overview-stat-card__value-row">
                     <span class="overview-stat-card__value">
                       {formatNumber(breakdown()?.fallback_retries ?? 0)}
                     </span>
                     <Show when={(breakdown()?.fallback_retries ?? 0) > 0}>
                       <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                        {formatNumber(breakdown()?.fallback_retries_succeeded ?? 0)} succeeded
+                        {t('providers.detail.succeeded', {
+                          count: formatNumber(breakdown()?.fallback_retries_succeeded ?? 0),
+                        })}
                       </span>
                     </Show>
                     {viewMore()}
@@ -913,8 +923,8 @@ const ConnectionDetail: Component = () => {
                     <UnifiedChartCard
                       activeTab={chartView()}
                       onTabChange={setChartView}
-                      requestsLabel="Attempts"
-                      requestsInfoTooltip={TOTAL_ATTEMPTS_TOOLTIP}
+                      requestsLabel={t('providers.detail.attempts')}
+                      requestsInfoTooltip={t('ui.analytics.totalAttempts')}
                       requestsValue={attemptTotals().attempts}
                       requestsTrendPct={0}
                       tokensValue={analytics()!.summary.tokens.value}
@@ -949,7 +959,7 @@ const ConnectionDetail: Component = () => {
                               }}
                               onClick={() => setGroupBy('http')}
                             >
-                              By HTTP status
+                              {t('providers.detail.byHttpStatus')}
                             </button>
                             <button
                               class="chart-card__filter-btn"
@@ -958,7 +968,7 @@ const ConnectionDetail: Component = () => {
                               }}
                               onClick={() => setGroupBy('status')}
                             >
-                              By attempt status
+                              {t('providers.detail.byAttemptStatus')}
                             </button>
                             <button
                               class="chart-card__filter-btn"
@@ -967,7 +977,7 @@ const ConnectionDetail: Component = () => {
                               }}
                               onClick={() => setGroupBy('harness')}
                             >
-                              By harness
+                              {t('providers.detail.byHarness')}
                             </button>
                           </Show>
                           <Show
@@ -977,7 +987,7 @@ const ConnectionDetail: Component = () => {
                             }
                           >
                             <FilterSelect
-                              noun="harnesses"
+                              noun={t('providers.detail.harnessesNoun')}
                               items={allAgents()}
                               selected={effectiveSelected()}
                               colorMap={agentColorMap()}
@@ -999,13 +1009,13 @@ const ConnectionDetail: Component = () => {
                   class="panel__title"
                   style="display: flex; justify-content: space-between; align-items: center;"
                 >
-                  Recent Requests
+                  {t('providers.detail.recentRequests')}
                 </div>
                 <Show
                   when={detail()!.recent_messages.length > 0}
                   fallback={
                     <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      No requests yet.
+                      {t('providers.detail.noRequests')}
                     </div>
                   }
                 >
@@ -1013,10 +1023,10 @@ const ConnectionDetail: Component = () => {
                     <table class="data-table">
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          <th>Request ID</th>
-                          <th>Model</th>
-                          <th>Tokens</th>
+                          <th>{t('providers.detail.colDate')}</th>
+                          <th>{t('providers.detail.colRequestId')}</th>
+                          <th>{t('providers.detail.colModel')}</th>
+                          <th>{t('providers.detail.colTokens')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1057,12 +1067,12 @@ const ConnectionDetail: Component = () => {
 
               {/* Models (full width) */}
               <div class="panel scroll-panel" style="margin-bottom: 24px;">
-                <div class="panel__title">Models</div>
+                <div class="panel__title">{t('providers.detail.modelsTitle')}</div>
                 <Show
                   when={detail()!.model_usage.length > 0}
                   fallback={
                     <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      No model usage data yet.
+                      {t('providers.detail.noModelUsage')}
                     </div>
                   }
                 >
@@ -1070,11 +1080,11 @@ const ConnectionDetail: Component = () => {
                     <table class="data-table">
                       <thead>
                         <tr>
-                          <th>Model</th>
-                          <th>Tokens</th>
-                          <th>% of total</th>
+                          <th>{t('providers.detail.colModel')}</th>
+                          <th>{t('providers.detail.colTokens')}</th>
+                          <th>{t('providers.detail.colPctTotal')}</th>
                           <Show when={isByok()}>
-                            <th>Cost</th>
+                            <th>{t('providers.detail.colCost')}</th>
                           </Show>
                         </tr>
                       </thead>
@@ -1119,12 +1129,12 @@ const ConnectionDetail: Component = () => {
 
               {/* Harnesses (full width) */}
               <div class="panel scroll-panel" style="margin-bottom: 0;">
-                <div class="panel__title">Harnesses</div>
+                <div class="panel__title">{t('providers.detail.harnessesTitle')}</div>
                 <Show
                   when={detail()!.agents.length > 0}
                   fallback={
                     <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      No harnesses have used this provider yet.
+                      {t('providers.detail.noHarnesses')}
                     </div>
                   }
                 >
@@ -1132,21 +1142,21 @@ const ConnectionDetail: Component = () => {
                     <table class="data-table">
                       <thead>
                         <tr>
-                          <th>Harness</th>
-                          <th>Tokens (30d)</th>
-                          <th>% of total</th>
+                          <th>{t('providers.detail.colHarness')}</th>
+                          <th>{t('providers.detail.colTokens30d')}</th>
+                          <th>{t('providers.detail.colPctTotal')}</th>
                           <Show when={isByok()}>
-                            <th>Cost (30d)</th>
+                            <th>{t('providers.detail.colCost30d')}</th>
                           </Show>
                           <th class="rel-col">
-                            Total attempts
-                            <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+                            {t('providers.totalAttempts')}
+                            <InfoTooltip text={t('ui.analytics.totalAttempts')} />
                           </th>
                           <th class="rel-col">
-                            Success rate
-                            <InfoTooltip text={CONNECTION_HARNESS_SUCCESS_RATE_TOOLTIP} />
+                            {t('providers.successRate')}
+                            <InfoTooltip text={t('ui.analytics.connectionHarnessSuccessRate')} />
                           </th>
-                          <th>Last used</th>
+                          <th>{t('providers.lastUsed')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1256,7 +1266,7 @@ const ConnectionDetail: Component = () => {
                             type="button"
                             onClick={closeManageModal}
                             style="background: none; border: none; cursor: pointer; padding: 4px; color: hsl(var(--muted-foreground)); font-size: 18px; line-height: 1;"
-                            aria-label="Close"
+                            aria-label={t('providers.detail.close')}
                           >
                             ✕
                           </button>
@@ -1265,7 +1275,7 @@ const ConnectionDetail: Component = () => {
                         {/* Connection name */}
                         <div style="margin-bottom: 16px;">
                           <label style="display: block; font-size: var(--font-size-sm); font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 6px;">
-                            Connection name
+                            {t('providers.detail.connectionNameLabel')}
                           </label>
                           <div style="display: flex; align-items: center; gap: 8px;">
                             <input
@@ -1286,7 +1296,9 @@ const ConnectionDetail: Component = () => {
                               disabled={renaming() || renameValue().trim() === conn()?.label}
                               onClick={handleRename}
                             >
-                              {renaming() ? 'Saving...' : 'Save'}
+                              {renaming()
+                                ? t('providers.detail.saving')
+                                : t('providers.detail.save')}
                             </button>
                           </div>
                           <Show when={renameError()}>
@@ -1302,7 +1314,7 @@ const ConnectionDetail: Component = () => {
                             for="connection-stream-warmup"
                             style="display: block; font-size: var(--font-size-sm); font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 6px;"
                           >
-                            Stream warm-up (seconds)
+                            {t('providers.detail.streamWarmup')}
                           </label>
                           <div style="display: flex; align-items: center; gap: 8px;">
                             <input
@@ -1311,7 +1323,7 @@ const ConnectionDetail: Component = () => {
                               min={MIN_STREAM_WARMUP_SECONDS}
                               max={MAX_STREAM_WARMUP_SECONDS}
                               step="1"
-                              placeholder="Inherit"
+                              placeholder={t('providers.detail.inherit')}
                               class={`provider-detail__input${warmupError() ? ' provider-detail__input--error' : ''}`}
                               value={warmupValue()}
                               onInput={(e) => {
@@ -1328,12 +1340,13 @@ const ConnectionDetail: Component = () => {
                               disabled={savingWarmup() || warmupUnchanged()}
                               onClick={handleSaveWarmup}
                             >
-                              {savingWarmup() ? 'Applying...' : 'Apply'}
+                              {savingWarmup()
+                                ? t('providers.detail.applying')
+                                : t('providers.detail.apply')}
                             </button>
                           </div>
                           <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;">
-                            Optional. How long a streaming request waits for the first token before
-                            failing over. Leave empty to use the default.
+                            {t('providers.detail.warmupHint')}
                           </div>
                           <Show when={warmupError()}>
                             <div style="color: hsl(var(--destructive)); font-size: var(--font-size-sm); margin-top: 4px;">
@@ -1346,7 +1359,7 @@ const ConnectionDetail: Component = () => {
                           {/* Models */}
                           <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid hsl(var(--border));">
                             <span style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));">
-                              {c.cached_model_count ?? 0} models
+                              {t('providers.detail.modelCount', c.cached_model_count ?? 0)}
                             </span>
                             {/* Custom provider models are entered by hand; discovery skips them. */}
                             <Show when={!isCustomProvider()}>
@@ -1356,19 +1369,21 @@ const ConnectionDetail: Component = () => {
                                 onClick={handleRefreshModels}
                                 style="display: inline-flex; align-items: center; gap: 6px;"
                               >
-                                {refreshingModels() ? 'Refreshing...' : 'Refresh models'}
+                                {refreshingModels()
+                                  ? t('providers.detail.refreshing')
+                                  : t('providers.detail.refreshModels')}
                               </button>
                             </Show>
                           </div>
 
                           {/* Connection info */}
                           <div style="padding: 12px 0; border-top: 1px solid hsl(var(--border)); font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));">
-                            Connected via{' '}
+                            {t('providers.detail.connectedVia')}{' '}
                             {c.auth_type === 'subscription'
-                              ? c.auth_type
+                              ? t('providers.detail.viaSubscription')
                               : c.auth_type === 'api_key'
-                                ? 'API key'
-                                : 'local server'}
+                                ? t('providers.detail.viaApiKey')
+                                : t('providers.detail.viaLocal')}
                           </div>
 
                           {/* Actions */}
@@ -1378,14 +1393,16 @@ const ConnectionDetail: Component = () => {
                               onClick={handleDisconnect}
                               disabled={deletingConnection()}
                             >
-                              {deletingConnection() ? 'Disconnecting...' : 'Disconnect'}
+                              {deletingConnection()
+                                ? t('providers.detail.disconnecting')
+                                : t('providers.detail.disconnect')}
                             </button>
                             <button
                               class="btn btn--outline btn--sm"
                               onClick={closeManageModal}
                               disabled={deletingConnection()}
                             >
-                              Done
+                              {t('providers.detail.done')}
                             </button>
                           </div>
                         </Show>
@@ -1396,10 +1413,10 @@ const ConnectionDetail: Component = () => {
                             fallback={
                               <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid hsl(var(--border));">
                                 <button class="btn btn--danger btn--sm" onClick={openDeleteConfirm}>
-                                  Delete
+                                  {t('providers.detail.delete')}
                                 </button>
                                 <button class="btn btn--outline btn--sm" onClick={closeManageModal}>
-                                  Close
+                                  {t('providers.detail.close')}
                                 </button>
                               </div>
                             }
@@ -1415,21 +1432,20 @@ const ConnectionDetail: Component = () => {
                                   id="delete-connection-confirm-title"
                                   class="connection-delete-confirmation__title"
                                 >
-                                  Delete usage history?
+                                  {t('providers.detail.deleteHistoryTitle')}
                                 </h3>
                                 <p
                                   id="delete-connection-confirm-copy"
                                   class="connection-delete-confirmation__copy"
                                 >
-                                  This will permanently delete this inactive connection and its
-                                  usage history. This action cannot be undone.
+                                  {t('providers.detail.deleteHistoryBody')}
                                 </p>
                               </div>
                               <label
                                 for="delete-connection-confirm-input"
                                 class="connection-delete-confirmation__label"
                               >
-                                Type the connection name to confirm
+                                {t('providers.detail.typeNameToConfirm')}
                               </label>
                               <input
                                 id="delete-connection-confirm-input"
@@ -1450,14 +1466,16 @@ const ConnectionDetail: Component = () => {
                                   onClick={closeDeleteConfirm}
                                   disabled={deletingConnection()}
                                 >
-                                  Cancel
+                                  {t('providers.detail.cancel')}
                                 </button>
                                 <button
                                   class="btn btn--danger btn--sm"
                                   onClick={handleDisconnect}
                                   disabled={!deleteConfirmMatches() || deletingConnection()}
                                 >
-                                  {deletingConnection() ? 'Deleting...' : 'Delete connection'}
+                                  {deletingConnection()
+                                    ? t('providers.detail.deleting')
+                                    : t('providers.detail.deleteConnection')}
                                 </button>
                               </div>
                             </div>
@@ -1481,7 +1499,7 @@ const ConnectionDetail: Component = () => {
                       class="modal-card routing-modal"
                       role="dialog"
                       aria-modal="true"
-                      aria-label="Edit custom provider"
+                      aria-label={t('providers.detail.editCustomProvider')}
                       style="max-width: 600px; max-height: 85vh; overflow-y: auto;"
                     >
                       <CustomProviderForm

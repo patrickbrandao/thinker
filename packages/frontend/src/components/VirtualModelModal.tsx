@@ -24,6 +24,7 @@ import {
   virtualModelNameError,
   type VirtualModelFormErrors,
 } from '../services/virtual-model-form.js';
+import { t } from '../i18n/index.js';
 
 interface Props {
   agentName: string;
@@ -88,17 +89,21 @@ const VirtualModelModal: Component<Props> = (props) => {
   const chainRows = (): { route: VirtualModelRouteInput; position: string }[] => {
     if (editing) {
       const rows: { route: VirtualModelRouteInput; position: string }[] = [];
-      if (editing.override_route) rows.push({ route: editing.override_route, position: 'Primary' });
+      if (editing.override_route)
+        rows.push({ route: editing.override_route, position: t('models.positionPrimary') });
       (editing.fallback_routes ?? []).forEach((r, i) =>
-        rows.push({ route: r, position: `Fallback ${i + 1}` }),
+        rows.push({ route: r, position: t('models.positionFallback', { n: i + 1 }) }),
       );
       return rows;
     }
     const p = primary();
     if (!p) return [];
     return [
-      { route: p, position: 'Primary' },
-      ...fallbacks().map((r, i) => ({ route: r, position: `Fallback ${i + 1}` })),
+      { route: p, position: t('models.positionPrimary') },
+      ...fallbacks().map((r, i) => ({
+        route: r,
+        position: t('models.positionFallback', { n: i + 1 }),
+      })),
     ];
   };
 
@@ -206,10 +211,10 @@ const VirtualModelModal: Component<Props> = (props) => {
     }
   };
 
-  const title = editing ? 'Edit virtual model' : 'Create virtual model';
+  const title = () => (editing ? t('models.vmModal.titleEdit') : t('models.vmModal.titleCreate'));
   const submitLabel = (): string => {
-    if (editing) return submitting() ? 'Saving…' : 'Save changes';
-    return submitting() ? 'Creating…' : 'Create virtual model';
+    if (editing) return submitting() ? t('models.vmModal.saving') : t('models.vmModal.saveChanges');
+    return submitting() ? t('models.vmModal.creating') : t('models.vmModal.create');
   };
 
   return (
@@ -237,7 +242,7 @@ const VirtualModelModal: Component<Props> = (props) => {
             type="button"
             class="modal__close virtual-model-modal__close"
             onClick={props.onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -251,16 +256,14 @@ const VirtualModelModal: Component<Props> = (props) => {
             </svg>
           </button>
           <h2 class="modal-card__title" id="virtual-model-modal-title">
-            {title}
+            {title()}
           </h2>
           <p class="modal-card__desc">
-            {editing
-              ? 'Rename the virtual model or change how it routes. The primary model and fallbacks are managed on the card.'
-              : 'A virtual model is a model name this harness can send in the "model" field. It routes through its own primary model and fallbacks, with no header needed.'}
+            {editing ? t('models.vmModal.descEdit') : t('models.vmModal.descCreate')}
           </p>
 
           <label class="modal-card__field-label" for="virtual-model-name">
-            Name
+            {t('models.vmModal.name')}
           </label>
           <input
             ref={(el) => requestAnimationFrame(() => el.focus())}
@@ -269,7 +272,7 @@ const VirtualModelModal: Component<Props> = (props) => {
             classList={{ 'modal-card__input--error': nameError() !== undefined }}
             type="text"
             value={name()}
-            placeholder="deepseek/flash"
+            placeholder="deepseek/flash" // i18n-ignore
             maxlength={VIRTUAL_MODEL_NAME_MAX_LENGTH}
             autocomplete="off"
             spellcheck={false}
@@ -285,8 +288,7 @@ const VirtualModelModal: Component<Props> = (props) => {
             when={nameError()}
             fallback={
               <div id="virtual-model-name-hint" class="virtual-model-modal__hint">
-                Letters, numbers, dots, underscores, colons, hyphens and single slashes, up to{' '}
-                {VIRTUAL_MODEL_NAME_MAX_LENGTH} characters. "auto" is reserved.
+                {t('models.vmModal.nameHint', { max: VIRTUAL_MODEL_NAME_MAX_LENGTH })}
               </div>
             }
           >
@@ -302,7 +304,7 @@ const VirtualModelModal: Component<Props> = (props) => {
           />
 
           <Show when={!editing}>
-            <div class="modal-card__field-label">Models</div>
+            <div class="modal-card__field-label">{t('models.vmModal.models')}</div>
             <div class="virtual-model-modal__chain">
               <For each={chainRows()}>
                 {(row, i) => (
@@ -324,7 +326,10 @@ const VirtualModelModal: Component<Props> = (props) => {
                     <button
                       type="button"
                       class="virtual-model-modal__route-remove"
-                      aria-label={`Remove ${row.position.toLowerCase()} ${row.route.model}`}
+                      aria-label={t('models.vmModal.removeRoute', {
+                        position: row.position.toLowerCase(),
+                        model: row.route.model,
+                      })}
                       onClick={() => removeRow(i())}
                     >
                       ×
@@ -340,7 +345,7 @@ const VirtualModelModal: Component<Props> = (props) => {
                     class="btn btn--outline btn--sm"
                     onClick={() => setPicker('primary')}
                   >
-                    + Choose primary model
+                    {t('models.vmModal.choosePrimary')}
                   </button>
                 }
               >
@@ -350,32 +355,31 @@ const VirtualModelModal: Component<Props> = (props) => {
                     class="btn btn--outline btn--sm"
                     onClick={() => setPicker('fallback')}
                   >
-                    + Add fallback ({fallbacks().length}/{MAX_VIRTUAL_MODEL_FALLBACKS})
+                    {t('models.vmModal.addFallback', {
+                      count: fallbacks().length,
+                      max: MAX_VIRTUAL_MODEL_FALLBACKS,
+                    })}
                   </button>
                 </Show>
               </Show>
               <Show when={!primary()}>
-                <div class="virtual-model-modal__hint">
-                  Optional. Without models, requests for this name fail with M301 unless Continue on
-                  Default is on.
-                </div>
+                <div class="virtual-model-modal__hint">{t('models.vmModal.noModelsHint')}</div>
               </Show>
             </div>
           </Show>
 
           <div class="virtual-model-modal__switch-row">
             <div>
-              <span class="response-mode-modal__field-title">Continue on Default</span>
-              <p class="response-mode-modal__desc">
-                When every model of this chain is unavailable or fails, continue with the Default
-                tier's models.
-              </p>
+              <span class="response-mode-modal__field-title">
+                {t('models.vmModal.continueOnDefault')}
+              </span>
+              <p class="response-mode-modal__desc">{t('models.vmModal.continueDesc')}</p>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={continueOnDefault()}
-              aria-label="Continue on Default"
+              aria-label={t('models.vmModal.continueOnDefault')}
               class="routing-switch"
               classList={{ 'routing-switch--on': continueOnDefault() }}
               onClick={() => setContinueOnDefault(!continueOnDefault())}
@@ -388,18 +392,16 @@ const VirtualModelModal: Component<Props> = (props) => {
 
           <div class="virtual-model-modal__switch-row">
             <div>
-              <span class="response-mode-modal__field-title">Stream mode</span>
+              <span class="response-mode-modal__field-title">{t('models.vmModal.streamMode')}</span>
               <p class="response-mode-modal__desc">
-                {streamMode()
-                  ? 'Responses are streamed token by token as the model generates them.'
-                  : 'Responses are returned as a single payload once the model finishes generating.'}
+                {streamMode() ? t('models.vmModal.streamOn') : t('models.vmModal.streamOff')}
               </p>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={streamMode()}
-              aria-label="Stream mode"
+              aria-label={t('models.vmModal.streamMode')}
               class="routing-switch"
               classList={{
                 'routing-switch--on': streamMode(),
@@ -416,8 +418,9 @@ const VirtualModelModal: Component<Props> = (props) => {
           <Show when={!streamMode() && incompatible().length > 0}>
             <div class="response-mode-modal__blocker">
               <p class="response-mode-modal__blocker-text">
-                {incompatible().length === 1 ? 'This model does' : 'These models do'} not support
-                streaming.
+                {incompatible().length === 1
+                  ? t('models.vmModal.noStreamOne')
+                  : t('models.vmModal.noStreamMany')}
               </p>
               <div class="response-mode-modal__blocker-list">
                 <For each={incompatible()}>
@@ -449,12 +452,12 @@ const VirtualModelModal: Component<Props> = (props) => {
                   }
                 }}
               >
-                Delete
+                {t('common.delete')}
               </button>
             </Show>
             <div class="header-tier-modal__footer-right">
               <button type="button" class="btn btn--ghost" onClick={props.onClose}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"

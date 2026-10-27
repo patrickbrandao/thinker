@@ -5,12 +5,13 @@ import { ApiError } from '../services/api/core.js';
 import { changeOwnPassword } from '../services/api/organizations.js';
 import { markPasswordChangeRequired } from '../services/org-context.js';
 import { loadMe, me } from '../services/session-store.js';
+import { t } from '../i18n/index.js';
 
 /** Client-side checks before the request. Returns an error message or null. */
 export function validateNewPassword(current: string, next: string, confirm: string): string | null {
-  if (next.length < 8) return 'New password must be at least 8 characters';
-  if (next !== confirm) return 'New passwords do not match';
-  if (next === current) return 'New password must differ from the current password';
+  if (next.length < 8) return t('account.security.tooShort');
+  if (next !== confirm) return t('account.security.mismatch');
+  if (next === current) return t('account.security.sameAsCurrent');
   return null;
 }
 
@@ -49,9 +50,9 @@ const ChangePassword: Component = () => {
       window.location.replace('/');
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
-        setError(err.message || 'The current password is incorrect');
+        setError(err.message || t('auth.changePassword.incorrect'));
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to change password');
+        setError(err instanceof Error ? err.message : t('account.security.failed'));
       }
     } finally {
       setBusy(false);
@@ -65,13 +66,13 @@ const ChangePassword: Component = () => {
 
   return (
     <>
-      <Title>Change password - Thinker</Title>
-      <Meta name="description" content="Choose a new password for your Thinker account." />
+      <Title>{t('common.pageTitle', { page: t('auth.changePassword.pageTitle') })}</Title>
+      <Meta name="description" content={t('auth.changePassword.metaDescription')} />
       <div class="auth-header">
-        <h1 class="auth-header__title">Choose a new password</h1>
+        <h1 class="auth-header__title">{t('auth.changePassword.title')}</h1>
         <p class="auth-header__subtitle">
-          <Show when={required()} fallback="Update the password you use to sign in.">
-            Your account uses a temporary password. Choose a new one to continue.
+          <Show when={required()} fallback={t('auth.changePassword.optionalSubtitle')}>
+            {t('auth.changePassword.requiredSubtitle')}
           </Show>
         </p>
       </div>
@@ -82,7 +83,7 @@ const ChangePassword: Component = () => {
           </div>
         </Show>
         <label class="auth-form__label">
-          {required() ? 'Temporary password' : 'Current password'}
+          {required() ? t('auth.changePassword.temporary') : t('account.security.currentPassword')}
           <input
             class="auth-form__input"
             type="password"
@@ -93,7 +94,7 @@ const ChangePassword: Component = () => {
           />
         </label>
         <label class="auth-form__label">
-          New password
+          {t('account.security.newPassword')}
           <input
             class="auth-form__input"
             type="password"
@@ -105,7 +106,7 @@ const ChangePassword: Component = () => {
           />
         </label>
         <label class="auth-form__label">
-          Confirm new password
+          {t('account.security.confirmPassword')}
           <input
             class="auth-form__input"
             type="password"
@@ -117,12 +118,12 @@ const ChangePassword: Component = () => {
           />
         </label>
         <button class="auth-form__submit" type="submit" disabled={busy()}>
-          {busy() ? <span class="spinner" /> : 'Change password'}
+          {busy() ? <span class="spinner" /> : t('account.security.submit')}
         </button>
       </form>
       <div class="auth-footer">
         <button type="button" class="auth-form__link-btn" onClick={() => void signOut()}>
-          Log out
+          {t('nav.logOut')}
         </button>
       </div>
     </>

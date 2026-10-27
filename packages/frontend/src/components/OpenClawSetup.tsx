@@ -2,6 +2,8 @@ import { createSignal, Show, type Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
 import CodeBlock from './CodeBlock.jsx';
 import { getOpenClawSnippet, getOpenClawWizardSnippet } from '../services/framework-snippets.js';
+import RichText from './RichText.jsx';
+import { t } from '../i18n/index.js';
 
 type SubTab = 'cli' | 'wizard';
 
@@ -70,14 +72,16 @@ const OpenClawSetup: Component<Props> = (props) => {
   return (
     <div class="setup-agents-card">
       <p class="setup-step__desc">
-        Register Thinker in your OpenClaw config to route each request to the best provider using
-        the model <code class="setup-model-hint__code">thinker/auto</code>
+        <RichText
+          text={t('harnesses.guides.openClawIntro')}
+          parts={{ model: <code class="setup-model-hint__code">thinker/auto</code> }}
+        />
       </p>
 
       <div
         class="setup-segment setup-segment--full"
         role="tablist"
-        aria-label="Configuration method"
+        aria-label={t('harnesses.guides.configMethod')}
       >
         <button
           class="setup-segment__btn"
@@ -86,7 +90,7 @@ const OpenClawSetup: Component<Props> = (props) => {
           role="tab"
           aria-selected={subTab() === 'cli'}
         >
-          CLI configuration
+          {t('harnesses.guides.openClawCliTab')}
         </button>
         <button
           class="setup-segment__btn"
@@ -95,22 +99,23 @@ const OpenClawSetup: Component<Props> = (props) => {
           role="tab"
           aria-selected={subTab() === 'wizard'}
         >
+          {/* i18n-ignore: names the openclaw command */}
           openclaw onboard
         </button>
       </div>
 
       <Show when={subTab() === 'cli'}>
-        <p class="setup-method__hint">
-          Set the provider config and default model directly via CLI commands.
-        </p>
+        <p class="setup-method__hint">{t('harnesses.guides.openClawCli')}</p>
         <div class="setup-cli-block">
           <div class="setup-cli-block__actions">
             <Show when={hasFullKey()}>
               <button
                 class="modal-terminal__copy"
                 onClick={() => setCliKeyRevealed(!cliKeyRevealed())}
-                aria-label={cliKeyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                title={cliKeyRevealed() ? 'Hide key' : 'Reveal key'}
+                aria-label={
+                  cliKeyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                }
+                title={cliKeyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
               >
                 <EyeIcon open={cliKeyRevealed()} />
               </button>
@@ -123,13 +128,22 @@ const OpenClawSetup: Component<Props> = (props) => {
 
       <Show when={subTab() === 'wizard'}>
         <p class="setup-method__hint">
-          Run the onboarding wizard and select <strong>Custom Provider</strong> when prompted. Then
-          enter the following values:
+          <RichText
+            text={t('harnesses.guides.wizard')}
+            // i18n-ignore: option name in the openclaw wizard
+            parts={{ option: <strong>Custom Provider</strong> }}
+          />
         </p>
         <CodeBlock code={getOpenClawWizardSnippet()} language="bash" />
-        <div class="setup-onboard-fields" role="list" aria-label="Configuration values">
+        <div
+          class="setup-onboard-fields"
+          role="list"
+          aria-label={t('harnesses.guides.configValues')}
+        >
+          {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
           <OnboardField label="API Base URL" value={props.baseUrl} copyable />
           <div class="setup-onboard-fields__row" role="listitem">
+            {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
             <span class="setup-onboard-fields__label">API Key</span>
             <span class="setup-onboard-fields__value">
               <code>{wizKey()}</code>
@@ -137,8 +151,10 @@ const OpenClawSetup: Component<Props> = (props) => {
                 <button
                   class="setup-onboard-fields__eye"
                   onClick={() => setWizKeyRevealed(!wizKeyRevealed())}
-                  aria-label={wizKeyRevealed() ? 'Hide API key' : 'Reveal API key'}
-                  title={wizKeyRevealed() ? 'Hide key' : 'Reveal key'}
+                  aria-label={
+                    wizKeyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                  }
+                  title={wizKeyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
                 >
                   <EyeIcon open={wizKeyRevealed()} />
                 </button>
@@ -146,8 +162,11 @@ const OpenClawSetup: Component<Props> = (props) => {
               <CopyButton text={copyKey()} />
             </span>
           </div>
+          {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
           <OnboardField label="Endpoint compatibility" value="OpenAI Chat Completions-compatible" />
+          {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
           <OnboardField label="Model ID" value="auto" copyable />
+          {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
           <OnboardField label="Endpoint ID" value="thinker" copyable />
         </div>
       </Show>

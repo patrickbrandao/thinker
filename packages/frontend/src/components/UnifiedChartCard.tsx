@@ -1,7 +1,8 @@
 import { Show, Suspense, lazy, type Component, type JSX } from 'solid-js';
 import InfoTooltip from './InfoTooltip.jsx';
 import { formatNumber, formatCost } from '../services/formatters.js';
-import { RECOVERED_REQUESTS_TOOLTIP, type StatusTimeseries } from '../services/api/analytics.js';
+import { type StatusTimeseries } from '../services/api/analytics.js';
+import { t } from '../i18n/index.js';
 
 const MultiAgentTokenChart = lazy(() => import('./MultiAgentTokenChart.jsx'));
 const ReliabilityChart = lazy(() => import('./ReliabilityChart.jsx'));
@@ -74,13 +75,13 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
   const tabTitle = (): string => {
     switch (props.activeTab) {
       case 'requests':
-        return props.requestsLabel ?? 'Requests';
+        return props.requestsLabel ?? t('overview.chart.requests');
       case 'recovered':
-        return 'Recovered requests';
+        return t('overview.chart.recoveredRequests');
       case 'cost':
-        return 'Cost';
+        return t('overview.chart.cost');
       case 'tokens':
-        return 'Token usage';
+        return t('overview.chart.tokenUsage');
     }
   };
 
@@ -95,7 +96,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
           onClick={() => props.onTabChange('requests')}
         >
           <span class="chart-card__label">
-            {props.requestsLabel ?? 'Requests'}
+            {props.requestsLabel ?? t('overview.chart.requests')}
             <Show when={props.requestsInfoTooltip}>
               <InfoTooltip text={props.requestsInfoTooltip!} />
             </Show>
@@ -113,8 +114,8 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
             onClick={() => props.onTabChange('recovered')}
           >
             <span class="chart-card__label">
-              Recovered requests
-              <InfoTooltip text={RECOVERED_REQUESTS_TOOLTIP} />
+              {t('overview.chart.recoveredRequests')}
+              <InfoTooltip text={t('overview.tips.recoveredRequests')} />
             </span>
             <div class="chart-card__value-row">
               <span class="chart-card__value">{formatNumber(props.recoveredValue ?? 0)}</span>
@@ -130,13 +131,13 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
             onClick={() => props.onTabChange('cost')}
           >
             <span class="chart-card__label">
-              Cost
+              {t('overview.chart.cost')}
               <Show when={props.costInfoTooltip}>
                 <InfoTooltip text={props.costInfoTooltip!} />
               </Show>
             </span>
             <div class="chart-card__value-row">
-              <span class="chart-card__value">{formatCost(props.costValue!) ?? '$0.00'}</span>
+              <span class="chart-card__value">{formatCost(props.costValue!) ?? formatCost(0)}</span>
               {trendBadge(props.costTrendPct ?? 0)}
             </div>
           </button>
@@ -147,7 +148,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
           classList={{ 'chart-card__stat--active': props.activeTab === 'tokens' }}
           onClick={() => props.onTabChange('tokens')}
         >
-          <span class="chart-card__label">Token usage</span>
+          <span class="chart-card__label">{t('overview.chart.tokenUsage')}</span>
           <div class="chart-card__value-row">
             <span class="chart-card__value">{formatNumber(props.tokensValue)}</span>
             {trendBadge(props.tokensTrendPct)}
@@ -167,20 +168,21 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
 
       {/* ── Chart body ── */}
       <div class="chart-card__body">
-        <Suspense fallback={EMPTY('Loading chart…')}>
+        <Suspense fallback={EMPTY(t('overview.chart.loading'))}>
           <Show when={props.activeTab === 'requests'}>
             <Show
               when={props.requestStatusTimeseries}
               fallback={
                 <Show
                   when={props.agentRequestTimeseries?.agents.length}
-                  fallback={EMPTY('No request data for this time range')}
+                  fallback={EMPTY(t('overview.chart.noRequestData'))}
                 >
                   <MultiAgentTokenChart
                     agents={props.agentRequestTimeseries!.agents}
                     timeseries={props.agentRequestTimeseries!.timeseries}
                     range={props.range}
                     colorMap={props.colorMap}
+                    // i18n-ignore: chart mode flag, not shown
                     label="Requests"
                   />
                 </Show>
@@ -188,7 +190,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
             >
               <Show
                 when={props.requestStatusTimeseries!.buckets.length > 0}
-                fallback={EMPTY('No request data for this time range')}
+                fallback={EMPTY(t('overview.chart.noRequestData'))}
               >
                 <ReliabilityChart
                   timeseries={props.requestStatusTimeseries!}
@@ -201,7 +203,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
           <Show when={props.activeTab === 'recovered'}>
             <Show
               when={props.recoveredTimeseries && props.recoveredTimeseries.buckets.length > 0}
-              fallback={EMPTY('No recovered requests in this time range')}
+              fallback={EMPTY(t('overview.chart.noRecovered'))}
             >
               <ReliabilityChart
                 timeseries={props.recoveredTimeseries!}
@@ -213,13 +215,14 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
           <Show when={props.activeTab === 'cost'}>
             <Show
               when={props.agentCostTimeseries?.agents.length}
-              fallback={EMPTY('No cost data for this time range')}
+              fallback={EMPTY(t('overview.chart.noCostData'))}
             >
               <MultiAgentTokenChart
                 agents={props.agentCostTimeseries!.agents}
                 timeseries={props.agentCostTimeseries!.timeseries}
                 range={props.range}
                 colorMap={props.colorMap}
+                // i18n-ignore: chart mode flag, not shown
                 label="Cost"
               />
             </Show>
@@ -227,7 +230,7 @@ const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
           <Show when={props.activeTab === 'tokens'}>
             <Show
               when={props.agentTimeseries?.agents.length}
-              fallback={EMPTY('No token data for this time range')}
+              fallback={EMPTY(t('overview.chart.noTokenData'))}
             >
               <MultiAgentTokenChart
                 agents={props.agentTimeseries!.agents}

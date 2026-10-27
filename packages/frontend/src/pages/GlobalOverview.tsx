@@ -62,13 +62,10 @@ import {
   recoveredCount,
   successRate,
   attemptSuccessRate,
-  TOTAL_ATTEMPTS_TOOLTIP,
-  MODEL_SUCCESS_RATE_TOOLTIP,
-  PROVIDER_SUCCESS_RATE_TOOLTIP,
-  CONNECTION_SUCCESS_RATE_TOOLTIP,
-  HARNESS_SUCCESS_RATE_TOOLTIP,
-  HARNESS_TOTAL_REQUESTS_TOOLTIP,
 } from '../services/api/analytics.js';
+import { formatRate } from '../services/overview-format.js';
+import { rangeOptions } from '../services/use-overview-range.js';
+import { t } from '../i18n/index.js';
 
 interface ProviderGroup {
   provider: string;
@@ -125,14 +122,6 @@ interface AgentRow {
   total_tokens: number;
   sparkline: number[];
 }
-
-const RANGE_OPTIONS = [
-  { label: 'Last 24 hours', value: '24h' },
-  { label: 'Last 7 days', value: '7d' },
-  { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 90 days', value: '90d' },
-  { label: 'Last 365 days', value: '365d' },
-];
 
 const RANGE_STORAGE_KEY = 'thinker_global_range';
 const GROUP_STORAGE_KEY = 'thinker_global_group';
@@ -573,7 +562,7 @@ const GlobalOverview: Component = () => {
 
   return (
     <div class="container--lg">
-      <Title>Overview | Thinker</Title>
+      <Title>{t('overview.pageTitle')}</Title>
 
       {/* Add Harness Modal */}
       <AddAgentModal open={addAgentOpen()} onClose={dismissAddAgent} />
@@ -581,12 +570,12 @@ const GlobalOverview: Component = () => {
       {/* ── 1. Page Header ──────────────────────────────────────────── */}
       <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
         <div>
-          <h1 class="page-header__title">Overview</h1>
-          <p class="page-header__subtitle">All your harnesses and providers</p>
+          <h1 class="page-header__title">{t('overview.title')}</h1>
+          <p class="page-header__subtitle">{t('overview.subtitle')}</p>
         </div>
         <Show when={!hasNoAgents() || !hasNoProviders()}>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <Select value={chartRange()} onChange={setChartRange} options={RANGE_OPTIONS} />
+            <Select value={chartRange()} onChange={setChartRange} options={rangeOptions()} />
           </div>
         </Show>
       </div>
@@ -607,14 +596,13 @@ const GlobalOverview: Component = () => {
             <path d="M11 18c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v11c0 .55.45 1 1 1zm-1-2H8v-2h2zm0-9v5H8V7zm9 11c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1v14c0 .55.45 1 1 1zm-1-2h-2v-6h2zM16 4h2v4h-2z" />
           </svg>
           <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground));">
-            No activity yet
+            {t('overview.empty.noActivity')}
           </div>
           <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-            Set up your harness and connect at least one provider. Once your harness sends requests,
-            data will appear here.
+            {t('overview.empty.setupAndConnect')}
           </div>
           <button class="btn btn--primary btn--sm" onClick={() => setAddAgentOpen(true)}>
-            Set up harness
+            {t('overview.empty.setupHarness')}
           </button>
         </div>
       </Show>
@@ -634,17 +622,17 @@ const GlobalOverview: Component = () => {
             <path d="M11 18c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v11c0 .55.45 1 1 1zm-1-2H8v-2h2zm0-9v5H8V7zm9 11c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1v14c0 .55.45 1 1 1zm-1-2h-2v-6h2zM16 4h2v4h-2z" />
           </svg>
           <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground));">
-            No providers connected
+            {t('overview.empty.noProviders')}
           </div>
           <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-            Connect a model provider to start routing your harnesses' LLM calls.
+            {t('overview.empty.connectToRoute')}
           </div>
           <A
             href="/providers/subscriptions"
             class="btn btn--primary btn--sm"
             style="text-decoration: none;"
           >
-            Connect provider
+            {t('overview.empty.connectProvider')}
           </A>
         </div>
       </Show>
@@ -694,7 +682,7 @@ const GlobalOverview: Component = () => {
               recoveredTimeseries={recoveredTs()}
               costValue={o().summary.cost_today.value}
               costTrendPct={o().summary.cost_today.trend_pct}
-              costInfoTooltip="Actual API key costs only. Subscription usage is not included."
+              costInfoTooltip={t('overview.costInfo')}
               tokensValue={o().summary.tokens_today.value}
               tokensTrendPct={o().summary.tokens_today.trend_pct}
               range={chartRange()}
@@ -717,14 +705,14 @@ const GlobalOverview: Component = () => {
                       }}
                       onClick={() => setGroupBy('status')}
                     >
-                      By request status
+                      {t('overview.groupBy.status')}
                     </button>
                     <button
                       class="chart-card__filter-btn"
                       classList={{ 'chart-card__filter-btn--active': requestsGroup() === 'agent' }}
                       onClick={() => setGroupBy('agent')}
                     >
-                      By harness
+                      {t('overview.groupBy.harness')}
                     </button>
                   </Show>
                   <Show when={chartView() !== 'requests'}>
@@ -735,20 +723,24 @@ const GlobalOverview: Component = () => {
                       }}
                       onClick={() => setGroupBy('provider')}
                     >
-                      By provider
+                      {t('overview.groupBy.provider')}
                     </button>
                     <button
                       class="chart-card__filter-btn"
                       classList={{ 'chart-card__filter-btn--active': usageGroup() === 'agent' }}
                       onClick={() => setGroupBy('agent')}
                     >
-                      By harness
+                      {t('overview.groupBy.harness')}
                     </button>
                   </Show>
                   <Show when={chartView() !== 'requests' || requestsGroup() === 'agent'}>
                     <div style="min-width: 140px;">
                       <FilterSelect
-                        noun={groupBy() === 'provider' ? 'providers' : 'harnesses'}
+                        noun={
+                          groupBy() === 'provider'
+                            ? t('overview.nounProviders')
+                            : t('overview.nounHarnesses')
+                        }
                         items={allAgents()}
                         selected={effectiveSelected()}
                         colorMap={agentColorMap()}
@@ -775,9 +767,9 @@ const GlobalOverview: Component = () => {
             class="panel__title"
             style="display: flex; justify-content: space-between; align-items: center;"
           >
-            Recent Requests
+            {t('overview.recentRequests')}
             <A href="/messages" class="view-more-link">
-              View more
+              {t('overview.viewMore')}
             </A>
           </div>
           <div class="scroll-panel__body" onScroll={toggleScrollFade}>
@@ -809,22 +801,22 @@ const GlobalOverview: Component = () => {
 
         {/* ── 5. Model usage (full width) ────────────────────────────── */}
         <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">Model usage</div>
+          <div class="panel__title">{t('overview.modelUsage.title')}</div>
           <div class="scroll-panel__body" onScroll={toggleScrollFade}>
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Model</th>
-                  <th style="text-align: right;">Tokens</th>
-                  <th style="text-align: right;">Share</th>
-                  <th style="text-align: right;">Est. cost</th>
+                  <th>{t('overview.modelUsage.model')}</th>
+                  <th style="text-align: right;">{t('overview.modelUsage.tokens')}</th>
+                  <th style="text-align: right;">{t('overview.modelUsage.share')}</th>
+                  <th style="text-align: right;">{t('overview.modelUsage.estCost')}</th>
                   <th class="rel-col">
-                    Total attempts
-                    <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+                    {t('overview.totalAttempts')}
+                    <InfoTooltip text={t('overview.tips.totalAttempts')} />
                   </th>
                   <th class="rel-col">
-                    Success rate
-                    <InfoTooltip text={MODEL_SUCCESS_RATE_TOOLTIP} />
+                    {t('overview.successRate')}
+                    <InfoTooltip text={t('overview.tips.modelSuccessRate')} />
                   </th>
                 </tr>
               </thead>
@@ -899,7 +891,7 @@ const GlobalOverview: Component = () => {
                         </div>
                       </td>
                       <td style="text-align: right; font-variant-numeric: tabular-nums;">
-                        {formatCost(row.estimated_cost) ?? '$0.00'}
+                        {formatCost(row.estimated_cost) ?? formatCost(0)}
                       </td>
                       {(() => {
                         const rel = () => modelReliability()?.find((r) => r.model === row.model);
@@ -913,7 +905,7 @@ const GlobalOverview: Component = () => {
                             <td class="rel-col">
                               {(() => {
                                 const rate = rel() ? attemptSuccessRate(rel()!) : null;
-                                return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
+                                return rate == null ? '—' : formatRate(rate);
                               })()}
                             </td>
                           </>
@@ -928,7 +920,7 @@ const GlobalOverview: Component = () => {
                       colspan="3"
                       style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
                     >
-                      No model data yet
+                      {t('overview.modelUsage.empty')}
                     </td>
                   </tr>
                 </Show>
@@ -939,26 +931,26 @@ const GlobalOverview: Component = () => {
 
         {/* ── 6. Provider connections (full width) ────────────────────── */}
         <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">Provider connections</div>
+          <div class="panel__title">{t('overview.connections.title')}</div>
           <div class="scroll-panel__body" onScroll={toggleScrollFade}>
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Provider</th>
-                  <th>Connection name</th>
-                  <th>Type</th>
-                  <th>Status</th>
+                  <th>{t('overview.connections.provider')}</th>
+                  <th>{t('overview.connections.name')}</th>
+                  <th>{t('overview.connections.type')}</th>
+                  <th>{t('overview.connections.status')}</th>
                   <th class="rel-col">
-                    Total attempts
-                    <InfoTooltip text={TOTAL_ATTEMPTS_TOOLTIP} />
+                    {t('overview.totalAttempts')}
+                    <InfoTooltip text={t('overview.tips.totalAttempts')} />
                   </th>
                   <th class="rel-col">
-                    Failed attempts
-                    <InfoTooltip text="Attempts this connection failed on the filtered period. Click a count to see the requests holding them." />
+                    {t('overview.connections.failedAttempts')}
+                    <InfoTooltip text={t('overview.connections.failedAttemptsTip')} />
                   </th>
                   <th class="rel-col">
-                    Success rate
-                    <InfoTooltip text={CONNECTION_SUCCESS_RATE_TOOLTIP} />
+                    {t('overview.successRate')}
+                    <InfoTooltip text={t('overview.tips.connectionSuccessRate')} />
                   </th>
                 </tr>
               </thead>
@@ -1018,7 +1010,7 @@ const GlobalOverview: Component = () => {
                                   </span>
                                   {isCustom && (
                                     <span style="font-size: 10px; font-weight: 500; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); padding: 1px 6px; border-radius: var(--radius-sm);">
-                                      custom
+                                      {t('overview.connections.custom')}
                                     </span>
                                   )}
                                 </>
@@ -1027,7 +1019,7 @@ const GlobalOverview: Component = () => {
                           </div>
                         </td>
                         <td style="color: hsl(var(--muted-foreground));">
-                          {connection.label || 'Default'}
+                          {connection.label || t('overview.connections.defaultLabel')}
                         </td>
                         <td>
                           <span
@@ -1045,12 +1037,12 @@ const GlobalOverview: Component = () => {
                             when={isActive()}
                             fallback={
                               <span style="display: inline-flex; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;">
-                                Inactive
+                                {t('overview.connections.inactive')}
                               </span>
                             }
                           >
                             <span style="display: inline-flex; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--success)); color: white; font-size: var(--font-size-xs); font-weight: 600;">
-                              Active
+                              {t('overview.connections.active')}
                             </span>
                           </Show>
                         </td>
@@ -1084,7 +1076,7 @@ const GlobalOverview: Component = () => {
                                     <a
                                       class="count-link"
                                       href={`/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange()}&attempts=has_failed`}
-                                      title="View the requests holding these failed attempts"
+                                      title={t('overview.connections.failedLinkTitle')}
                                       onClick={(e) => {
                                         // The row navigates to the connection; this cell
                                         // drills into the Requests log instead.
@@ -1103,7 +1095,7 @@ const GlobalOverview: Component = () => {
                               <td class="rel-col">
                                 {(() => {
                                   const rate = rel() ? attemptSuccessRate(rel()!) : null;
-                                  return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
+                                  return rate == null ? '—' : formatRate(rate);
                                 })()}
                               </td>
                             </>
@@ -1119,7 +1111,7 @@ const GlobalOverview: Component = () => {
                       colspan="7"
                       style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
                     >
-                      No connections yet
+                      {t('overview.connections.empty')}
                     </td>
                   </tr>
                 </Show>
@@ -1130,21 +1122,21 @@ const GlobalOverview: Component = () => {
 
         {/* ── 7. Harnesses (full width) ──────────────────────────────── */}
         <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">Harnesses</div>
+          <div class="panel__title">{t('overview.harnesses.title')}</div>
           <div class="scroll-panel__body" onScroll={toggleScrollFade}>
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Harness</th>
-                  <th>Usage</th>
+                  <th>{t('overview.harnesses.harness')}</th>
+                  <th>{t('overview.harnesses.usage')}</th>
                   <th class="rel-col">
-                    Total requests
-                    <InfoTooltip text={HARNESS_TOTAL_REQUESTS_TOOLTIP} />
+                    {t('overview.harnesses.totalRequests')}
+                    <InfoTooltip text={t('overview.tips.harnessTotalRequests')} />
                   </th>
-                  <th class="rel-col">Recovered requests</th>
+                  <th class="rel-col">{t('overview.harnesses.recoveredRequests')}</th>
                   <th class="rel-col">
-                    Success rate
-                    <InfoTooltip text={HARNESS_SUCCESS_RATE_TOOLTIP} />
+                    {t('overview.successRate')}
+                    <InfoTooltip text={t('overview.tips.harnessSuccessRate')} />
                   </th>
                 </tr>
               </thead>
@@ -1187,7 +1179,9 @@ const GlobalOverview: Component = () => {
                                   </span>
                                 </Show>
                                 <span style="font-variant-numeric: tabular-nums;">
-                                  {formatNumber(usage()?.total ?? 0)} tokens
+                                  {t('overview.harnesses.tokens', {
+                                    n: formatNumber(usage()?.total ?? 0),
+                                  })}
                                 </span>
                               </div>
                             );
@@ -1203,7 +1197,7 @@ const GlobalOverview: Component = () => {
                               <a
                                 class="count-link"
                                 href={link}
-                                title="View this harness's requests"
+                                title={t('overview.harnesses.requestsLinkTitle')}
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -1230,7 +1224,7 @@ const GlobalOverview: Component = () => {
                                       <a
                                         class="count-link"
                                         href={link}
-                                        title="View this harness's recovered requests"
+                                        title={t('overview.harnesses.recoveredLinkTitle')}
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
@@ -1246,7 +1240,7 @@ const GlobalOverview: Component = () => {
                               <td class="rel-col">
                                 {(() => {
                                   const rate = rel() ? successRate(rel()!) : null;
-                                  return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
+                                  return rate == null ? '—' : formatRate(rate);
                                 })()}
                               </td>
                             </>
@@ -1262,7 +1256,7 @@ const GlobalOverview: Component = () => {
                       colspan="5"
                       style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
                     >
-                      No harnesses yet
+                      {t('overview.harnesses.empty')}
                     </td>
                   </tr>
                 </Show>
