@@ -41,9 +41,9 @@ it('finds harnesses by part of the name, only in the active organization', async
 });
 
 it('ignores queries shorter than two characters and treats wildcards literally', async () => {
-  expect((await asA(api().get('/api/v1/search').query({ q: 'c' })).expect(200)).body.results).toEqual(
-    [],
-  );
+  expect(
+    (await asA(api().get('/api/v1/search').query({ q: 'c' })).expect(200)).body.results,
+  ).toEqual([]);
   expect(
     (await asA(api().get('/api/v1/search').query({ q: '%%' })).expect(200)).body.results,
   ).toEqual([]);
@@ -73,4 +73,69 @@ it('lists failed requests of the last 24 hours as alerts', async () => {
 
   const other = await asB(api().get('/api/v1/alerts')).expect(200);
   expect(other.body.items.map((i: { id: string }) => i.id)).not.toContain(failed);
+});
+
+it('builds the topology with routes and the traffic of the window', async () => {
+  const [agent] = await ds.query(`SELECT id FROM agents WHERE name = 'console-search-bot'`);
+  const vm = randomUUID();
+  await ds.query(
+    `INSERT INTO virtual_models (id, tenant_id, agent_id, name, override_route, fallback_routes)
+     VALUES ($1, $2, $3, 'topo-fast', $4, $5)`,
+    [
+      vm,
+      TEST_TENANT_ID,
+      agent.id,
+      JSON.stringify({ provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' }),
+      JSON.stringify([{ provider: 'anthropic', authType: 'api_key', model: 'claude-haiku' }]),
+    ],
+  );
+  await ds.query(
+    `INSERT INTO agent_messages (id, tenant_id, agent_id, agent_name, timestamp, status, model,
+                                 provider, auth_type, virtual_model_id, cost_usd,
+                                 input_tokens, output_tokens)
+     VALUES ($1, $3, $4, 'console-search-bot', now(), 'ok', 'gpt-4o-mini', 'openai', 'api_key',
+             $5, 0.5, 100, 50),
+            ($2, $3, $4, 'console-search-bot', now() - interval '3 days', 'ok', 'gpt-4o-mini',
+             'openai', 'api_key', $5, 1, 10, 10)`,
+    [randomUUID(), randomUUID(), TEST_TENANT_ID, agent.id, vm],
+  );
+
+  const res = await asA(api().get('/api/v1/topology').query({ range: '24h' })).expect(200);
+  const harness = `harness:${agent.id}`;
+  const hub = `virtual:${vm}`;
+  expect(res.body.harnesses).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: harness, requests: 1, tokens: 150 })]),
+  );
+  expect(res.body.hubs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: `auto:${agent.id}`, kind: 'auto' }),
+      expect.objectContaining({ id: hub, kind: 'virtual', name: 'topo-fast', requests: 1 }),
+    ]),
+  );
+  expect(res.body.links).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ source: harness, target: hub, kind: 'entry', requests: 1 }),
+      expect.objectContaining({
+        source: hub,
+        target: 'provider:openai:api_key',
+        kind: 'primary',
+        requests: 1,
+      }),
+      expect.objectContaining({
+        source: hub,
+        target: 'provider:anthropic:api_key',
+        kind: 'fallback',
+        requests: 0,
+      }),
+    ]),
+  );
+  const openai = res.body.providers.find((p: { id: string }) => p.id === 'provider:openai:api_key');
+  expect(openai).toMatchObject({ requests: 1, costUsd: 0.5, models: ['gpt-4o-mini'] });
+
+  const week = await asA(api().get('/api/v1/topology').query({ range: '7d' })).expect(200);
+  expect(week.body.range).toBe('7d');
+  expect(week.body.hubs.find((h: { id: string }) => h.id === hub).requests).toBe(2);
+
+  const other = await asB(api().get('/api/v1/topology')).expect(200);
+  expect(other.body.harnesses.map((h: { id: string }) => h.id)).not.toContain(harness);
 });

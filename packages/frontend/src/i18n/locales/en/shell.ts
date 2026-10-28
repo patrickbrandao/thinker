@@ -50,14 +50,27 @@ export default {
   },
   flow: {
     subtitle: 'How traffic flows from your harnesses through routing to providers.',
-    preview: 'Preview',
-    emptyHint:
-      'The topology view is being prepared. Harnesses, routes and providers will appear here.',
+    hint: 'Double-click a node to open it.',
+    empty: 'No harness yet. Create one and its routes and providers will appear here.',
+    emptyActive: 'No traffic in this period.',
+    activeOnly: 'Only with traffic',
+    ranges: { '1h': '1h', '24h': '24h', '7d': '7d', '30d': '30d' },
+    range: 'Period',
     kinds: {
       entry: 'Harness',
       hub: 'Route',
       item: 'Provider',
       group: 'Pool',
+    },
+    hubs: { auto: 'Auto routing', virtual: 'Virtual model', header: 'Header tier' },
+    links: { primary: 'Primary route', fallback: 'Fallback', usage: 'Used, not configured' },
+    auth: { api_key: 'API key', subscription: 'Subscription', local: 'Local' },
+    disabled: 'disabled',
+    notConnected: 'not connected',
+    models: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
+    metrics: {
+      requests: (n: string) => `${n} req`,
+      errors: (n: string) => `${n} err`,
     },
   },
 };

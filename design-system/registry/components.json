@@ -628,6 +628,14 @@
         "shell.css"
       ]
     },
+    "flow-edge": {
+      "classes": [
+        "flow-edge"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "flow-node": {
       "classes": [
         "flow-node"
@@ -1928,8 +1936,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 190,
-    "classes": 199,
+    "blocks": 191,
+    "classes": 200,
     "canonicalRules": 3,
     "ghostRules": 3
   }

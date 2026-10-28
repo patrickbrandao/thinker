@@ -37,3 +37,53 @@ export function searchConsole(q: string): Promise<{ results: SearchResult[] }> {
 export function getAlerts(): Promise<{ items: AlertItem[]; total: number }> {
   return fetchJson('/alerts', undefined, { cache: false });
 }
+
+export type TopologyRange = '1h' | '24h' | '7d' | '30d';
+
+interface Usage {
+  requests: number;
+  errors: number;
+  costUsd: number;
+  tokens: number;
+}
+
+export interface Topology {
+  range: TopologyRange;
+  harnesses: Array<
+    Usage & { id: string; name: string; displayName: string | null; platform: string | null }
+  >;
+  hubs: Array<
+    Usage & {
+      id: string;
+      kind: 'auto' | 'virtual' | 'header';
+      agentId: string;
+      agentName: string;
+      name: string;
+      enabled: boolean;
+    }
+  >;
+  providers: Array<
+    Usage & {
+      id: string;
+      provider: string;
+      authType: string;
+      name: string;
+      connections: Array<{ id: string; label: string; active: boolean }>;
+      models: string[];
+    }
+  >;
+  links: TopologyLink[];
+}
+
+export interface TopologyLink {
+  source: string;
+  target: string;
+  kind: 'entry' | 'primary' | 'fallback' | 'usage';
+  requests: number;
+  errors: number;
+}
+
+/** Harnesses, routing points, providers and the traffic of the window. */
+export function getTopology(range: TopologyRange): Promise<Topology> {
+  return fetchJson('/topology', { range }, { cache: false });
+}

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -32,13 +32,19 @@ function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowC
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
   const flow = useReactFlow();
+  const shape = useRef('');
 
   useEffect(() => {
     const laid = autoLayout(graph, { keepPositions: true });
     setNodes(laid.nodes);
     setEdges(validEdges(laid.nodes, laid.edges).map((e) => ({ type: 'flow', ...e })));
-    // Fit after React Flow measured the new nodes.
-    requestAnimationFrame(() => void flow.fitView({ padding: 0.2, duration: 200 }));
+    // Re-frame only when the set of nodes changed, so a data refresh keeps
+    // the user's pan and zoom. Fit after React Flow measured the new nodes.
+    const next = laid.nodes.map((n) => n.id).join('|');
+    if (next !== shape.current) {
+      shape.current = next;
+      requestAnimationFrame(() => void flow.fitView({ padding: 0.2, duration: 200 }));
+    }
   }, [graph, setNodes, setEdges, flow]);
 
   // `f` frames the whole graph (skill shortcut), unless typing in a field.
@@ -76,7 +82,7 @@ function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowC
       >
         <Background variant={BackgroundVariant.Dots} gap={GRID} size={1} />
         <Controls position="bottom-left" showInteractive={false} />
-        {nodes.length > 12 ? <MiniMap pannable zoomable /> : null}
+        {nodes.length > 24 ? <MiniMap pannable zoomable position="top-right" /> : null}
       </ReactFlow>
       {hint ? <div className="stage-hint">{hint}</div> : null}
       {ports?.length ? (
