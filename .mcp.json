@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "thinker-routing": {
-      "type": "http",
-      "url": "https://skills-mcp.langwizard.net/virtual/thinker-routing/mcp"
-    }
-  }
-}
