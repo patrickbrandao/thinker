@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import OpenCodeSetup from '../../src/components/OpenCodeSetup';
+import OpenCodeSetup, { getOpenCodeConfig } from '../../src/components/OpenCodeSetup';
 
 const writeText = vi.fn().mockResolvedValue(undefined);
 
@@ -63,6 +63,26 @@ describe('OpenCodeSetup', () => {
     fireEvent.click(copyFullConfig!);
     await vi.waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"apiKey": "thk_secret"'));
+    });
+  });
+});
+
+describe('getOpenCodeConfig', () => {
+  it('writes the OpenCode 2 format with auto and the virtual models', () => {
+    const config = JSON.parse(
+      getOpenCodeConfig('http://localhost:38240/v1', 'thk_YOUR_KEY', ['fast', 'auto', 'premium']),
+    );
+    expect(config.provider).toBeUndefined();
+    expect(config.model).toBe('thinker/auto');
+    expect(config.providers.thinker).toEqual({
+      package: 'aisdk:@ai-sdk/openai-compatible',
+      name: 'Thinker',
+      settings: { baseURL: 'http://localhost:38240/v1', apiKey: 'thk_YOUR_KEY' },
+      models: {
+        auto: { name: 'Thinker Auto' },
+        fast: { name: 'Thinker fast' },
+        premium: { name: 'Thinker premium' },
+      },
     });
   });
 });

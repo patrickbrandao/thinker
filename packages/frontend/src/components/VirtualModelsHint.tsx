@@ -48,7 +48,7 @@ function howToUse(platform: string | null | undefined, example: string): ReactNo
       });
     case 'opencode':
       return richText(t('models.hint.opencode'), {
-        a: code('provider.thinker.models'),
+        a: code('providers.thinker.models'),
         b: code(`thinker/${example}`),
       });
     case 'hermes':

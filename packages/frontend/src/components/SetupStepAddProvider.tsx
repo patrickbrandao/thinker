@@ -79,8 +79,14 @@ interface SnippetProps {
   baseUrl: string;
 }
 
+/** Guides that write the virtual models into the config themselves. */
+type GuideProps = SnippetProps & { virtualModels: readonly string[] };
+
 /** The guide for one harness, or null when it has none. */
-function harnessGuide(id: string | null | undefined, props: SnippetProps): ReactNode {
+function harnessGuide(
+  id: string | null | undefined,
+  { virtualModels, ...props }: GuideProps,
+): ReactNode {
   switch (id) {
     case 'openclaw':
       return <OpenClawSetup {...props} />;
@@ -95,7 +101,7 @@ function harnessGuide(id: string | null | undefined, props: SnippetProps): React
     case 'claude-code':
       return <ClaudeCodeSetup {...props} />;
     case 'opencode':
-      return <OpenCodeSetup {...props} />;
+      return <OpenCodeSetup {...props} virtualModels={virtualModels} />;
     case 'codex':
       return <CodexSetup {...props} />;
     default:
@@ -119,7 +125,7 @@ export default function SetupStepAddProvider({
 
   if (platform) {
     // Platform-filtered mode: show only the relevant guide.
-    const guide = harnessGuide(platform, snippetProps);
+    const guide = harnessGuide(platform, { ...snippetProps, virtualModels });
     const defaultToolkit = toolkitId ?? (platform === 'other' ? 'curl' : undefined);
     // Toolkit snippets carry their own model picker.
     const hintPlatform = toolkitId || platform === 'other' ? 'toolkits' : platform;
@@ -203,7 +209,7 @@ export default function SetupStepAddProvider({
             </div>
           </div>
 
-          {harnessGuide(activeAgent, snippetProps)}
+          {harnessGuide(activeAgent, { ...snippetProps, virtualModels })}
           <VirtualModelsHint names={virtualModels} platform={activeAgent} />
         </>
       )}
