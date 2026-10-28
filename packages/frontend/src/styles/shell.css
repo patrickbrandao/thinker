@@ -343,6 +343,10 @@
   .page.wide {
     max-width: 1480px;
   }
+  /* Data-heavy pages (Requests): every column fits on wide screens. */
+  .page.full {
+    max-width: none;
+  }
   .page.narrow {
     max-width: 760px;
   }

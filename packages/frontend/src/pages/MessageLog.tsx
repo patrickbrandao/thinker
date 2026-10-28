@@ -797,7 +797,7 @@ export default function MessageLog() {
   };
 
   return (
-    <div className="page wide" onClick={handlePageClick}>
+    <div className="page full" onClick={handlePageClick}>
       <title>
         {routeAgent
           ? t('messages.log.pageTitleAgent', { agent: agentLabel })
