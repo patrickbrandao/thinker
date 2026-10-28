@@ -6,6 +6,7 @@ import {
   PEER_IP_HEADER,
   clientIpInfo,
 } from '../utils/client-ip';
+import { markRequestReceived } from '../utils/request-received';
 
 const logger = new Logger('ClientIp');
 const WARN_INTERVAL_MS = 60_000;
@@ -30,6 +31,7 @@ function warnMissingHeader(peer: string): void {
  * in those internal headers are overwritten.
  */
 export function clientIpMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  markRequestReceived(req);
   const info = clientIpInfo(req, warnMissingHeader);
   Object.defineProperty(req, 'ip', { value: info.clientIp, configurable: true, enumerable: true });
   req.headers[CLIENT_IP_HEADER] = info.clientIp;

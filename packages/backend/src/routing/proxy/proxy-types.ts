@@ -4,6 +4,7 @@ import { ProviderEndpoint } from './provider-endpoints';
 import type { AttemptRecordingCapture } from './attempt-recording-capture';
 import type { ThinkingBlock, ThinkingBlockRouteContext } from './thinking-block-cache';
 import { CallerAttribution } from './caller-classifier';
+import type { AttemptTiming } from './request-timeline';
 
 /**
  * Optional lookup to re-inject cached thought_signature values that were
@@ -69,6 +70,8 @@ export interface ProviderAttemptRef {
   startedAtMs: number;
   startedAt: string;
   completedAtMs?: number;
+  /** Provider-side marks for the Request timeline (request-timeline.ts). */
+  timing?: AttemptTiming;
   pendingWrite: Promise<boolean>;
   completeFailure?: (failure: {
     status: number;

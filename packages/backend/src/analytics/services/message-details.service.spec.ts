@@ -148,6 +148,7 @@ describe('MessageDetailsService', () => {
       request_headers: null,
       request_params: null,
       caller_attribution: null,
+      timeline: null,
       virtual_model_id: null,
       virtual_model_name: null,
     });

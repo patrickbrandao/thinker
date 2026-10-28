@@ -16,6 +16,8 @@ export interface CallerAttribution {
   clientIpSource?: ClientIpSource;
   /** TCP peer that delivered the request (the reverse proxy, when there is one). */
   peerIp?: string;
+  /** TCP source port of that peer connection. */
+  peerPort?: number;
 }
 
 type HeaderMap = Record<string, string | string[] | undefined>;

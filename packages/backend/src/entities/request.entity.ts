@@ -2,6 +2,7 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 import { timestampType } from '../common/utils/postgres-sql';
 import type { CallerAttribution } from '../routing/proxy/caller-classifier';
 import type { ProxyApiMode } from '../routing/proxy/proxy-types';
+import type { RequestTimeline } from '../routing/proxy/request-timeline';
 
 /**
  * One request made by a caller to Thinker.
@@ -90,6 +91,10 @@ export class ThinkerRequest {
 
   @Column('jsonb', { nullable: true })
   request_params!: object | null;
+
+  /** Timestamped events of the Request (routing/proxy/request-timeline.ts). */
+  @Column('jsonb', { nullable: true })
+  timeline?: RequestTimeline | null;
 
   @Column('varchar', { nullable: true })
   feedback_rating!: string | null;

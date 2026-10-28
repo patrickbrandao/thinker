@@ -51,6 +51,7 @@ import { toNativeResponsesRequest } from './responses-adapter';
 import { dropUnsupportedAnthropicTools } from './anthropic-messages-adapter';
 import { responsesToolNames, ResponsesToolNames } from './responses-tools';
 import { forwardKiroChat } from './kiro-adapter';
+import { markProviderSent, timeProviderResponse } from './request-timeline';
 import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
@@ -418,7 +419,8 @@ export class ProviderClient {
         requestBody: requestSource,
         wireFormat: 'kiro_chat',
       });
-      const response = await forwardKiroChat({
+      markProviderSent(opts.attempt);
+      const kiroResponse = await forwardKiroChat({
         apiKey,
         model: bareModel,
         body: requestSource,
@@ -427,6 +429,7 @@ export class ProviderClient {
         timeoutMs: PROVIDER_TIMEOUT_MS,
         extraHeaders,
       });
+      const response = timeProviderResponse(kiroResponse, opts.attempt);
       return {
         response,
         isGoogle: false,
@@ -497,7 +500,8 @@ export class ProviderClient {
       }
     }
 
-    const result = await this.executeFetch(
+    markProviderSent(attempt);
+    const fetched = await this.executeFetch(
       url,
       finalHeaders,
       requestBody,
@@ -515,6 +519,7 @@ export class ProviderClient {
       },
       endpoint.requiresSsrfRevalidation === true,
     );
+    const result = { ...fetched, response: timeProviderResponse(fetched.response, attempt) };
     const response =
       !stream &&
       endpoint.format === 'openai' &&

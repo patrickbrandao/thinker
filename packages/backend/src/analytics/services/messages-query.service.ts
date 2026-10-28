@@ -541,6 +541,7 @@ export class MessagesQueryService {
       .addSelect(`COALESCE(SUM(${safeCost}), 0)`, 'cost')
       .addSelect('r.status', 'status')
       .addSelect('r.api_mode', 'api_mode')
+      .addSelect(`substring(r.caller_attribution from '"clientIp":"([^"]+)"')`, 'client_ip')
       .addSelect('r.error_message', 'error_message')
       .addSelect('r.error_code', 'error_code')
       .addSelect('r.error_origin', 'error_origin')
@@ -622,6 +623,7 @@ export class MessagesQueryService {
       .addSelect('at.cache_creation_tokens', 'cache_creation_tokens')
       .addSelect('at.duration_ms', 'duration_ms')
       .addSelect('NULL', 'api_mode')
+      .addSelect(`substring(at.caller_attribution from '"clientIp":"([^"]+)"')`, 'client_ip')
       .addSelect('1', 'attempt_count')
       .addSelect(
         'CASE WHEN at.fallback_from_model IS NOT NULL THEN 1 ELSE 0 END',

@@ -10,6 +10,34 @@ export interface AttemptRecording {
   wire_format: string;
 }
 
+export type RequestTimelineEventType =
+  | 'received'
+  | 'provider_request'
+  | 'provider_skipped'
+  | 'provider_response'
+  | 'provider_error'
+  | 'first_chunk'
+  | 'last_chunk'
+  | 'response_started'
+  | 'response_completed';
+
+export interface RequestTimelineEvent {
+  type: RequestTimelineEventType;
+  /** Epoch milliseconds. */
+  at: number;
+  attempt?: number;
+  provider?: string;
+  model?: string;
+  status?: number;
+  chunks?: number;
+  bytes?: number;
+}
+
+export interface RequestTimeline {
+  version: 1;
+  events: RequestTimelineEvent[];
+}
+
 export interface MessageDetailResponse {
   message: {
     id: string;
@@ -69,7 +97,14 @@ export interface MessageDetailResponse {
       appName?: string;
       appUrl?: string;
       categories?: string[];
+      /** Client address resolved behind the trusted proxies. */
+      clientIp?: string;
+      clientIpSource?: 'x-forwarded-for' | 'x-real-ip' | 'tcp';
+      /** TCP peer that reached the container (the reverse proxy, when there is one). */
+      peerIp?: string;
+      peerPort?: number;
     } | null;
+    timeline?: RequestTimeline | null;
     attempts?: Array<{
       id: string;
       model: string | null;

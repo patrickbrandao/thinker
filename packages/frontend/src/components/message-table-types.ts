@@ -2,6 +2,8 @@ export interface MessageRow {
   id: string;
   timestamp: string;
   agent_name: string | null;
+  /** Client address resolved behind the trusted proxies. */
+  client_ip?: string | null;
   model: string | null;
   provider?: string | null;
   custom_provider_name?: string | null;
@@ -54,7 +56,8 @@ export type MessageColumnKey =
   | 'duration'
   | 'status'
   | 'attempts'
-  | 'agent';
+  | 'agent'
+  | 'clientIp';
 
 // Reading order: identity first (status, when, who, what), THEN the
 // mechanics (attempts / recovery attempts), then payload and usage. The global
@@ -74,6 +77,7 @@ export const COMPACT_COLUMNS: MessageColumnKey[] = [
 export const DETAILED_COLUMNS: MessageColumnKey[] = [
   'status',
   'date',
+  'clientIp',
   'model',
   'attempts',
   'message',
