@@ -1,14 +1,20 @@
-import { createResource, Show, type Component } from 'solid-js';
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import { platformIcon } from 'thinker-shared';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
-import { platformIcon } from 'thinker-shared';
+import { useFocusTrap } from '../services/use-focus-trap.js';
+import { useResource } from '../lib/use-resource.js';
 import ErrorState from './ErrorState.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
-import { createActiveVirtualModelNames } from './VirtualModelsHint.jsx';
+import { useActiveVirtualModelNames } from './VirtualModelsHint.jsx';
 import RichText from './RichText.jsx';
+import { monoIconClass } from './setup-ui.jsx';
+import { Button, cx, IconButton } from './ui.jsx';
 import { t } from '../i18n/index.js';
 
-const SetupModal: Component<{
+interface Props {
   open: boolean;
   agentName: string;
   apiKey?: string | null;
@@ -17,112 +23,108 @@ const SetupModal: Component<{
   onClose: () => void;
   onDone?: () => void;
   onGoToRouting?: () => void;
-}> = (props) => {
-  const [apiKeyData, { refetch: refetchKey }] = createResource(
-    () => (props.open ? props.agentName : null),
-    (n) => (n ? getAgentKey(n) : null),
-  );
+}
 
-  const virtualModels = createActiveVirtualModelNames(() => (props.open ? props.agentName : null));
+export default function SetupModal({
+  open,
+  agentName,
+  apiKey,
+  agentPlatform,
+  agentCategory,
+  onClose,
+  onDone,
+  onGoToRouting,
+}: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, ref);
+  const keyData = useResource(() => getAgentKey(agentName), [agentName], { enabled: open });
+  const virtualModels = useActiveVirtualModelNames(open ? agentName : null);
 
-  const baseUrl = () => {
-    return `${installOrigin()}/v1`;
-  };
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const icon = platformIcon(agentPlatform, agentCategory);
+  const baseUrl = `${installOrigin()}/v1`;
 
   const handleGoToRouting = () => {
-    props.onDone?.();
-    props.onClose();
-    props.onGoToRouting?.();
+    onDone?.();
+    onClose();
+    onGoToRouting?.();
   };
 
-  return (
-    <Show when={props.open}>
+  return createPortal(
+    <div
+      className="overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        class="modal-overlay setup-modal__overlay"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) props.onClose();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') props.onClose();
-        }}
+        ref={ref}
+        className="modal wide max-w-[600px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-modal-title"
+        tabIndex={-1}
       >
-        <div
-          class="modal-card setup-modal"
-          style="max-width: 600px;"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="setup-modal-title"
-        >
-          <div class="setup-modal__header">
-            <div class="modal-card__title" id="setup-modal-title">
-              <Show when={platformIcon(props.agentPlatform, props.agentCategory)}>
-                <img
-                  src={platformIcon(props.agentPlatform, props.agentCategory)}
-                  alt=""
-                  width="28"
-                  height="28"
-                  class="platform-icon setup-modal__platform-icon"
-                />
-              </Show>
-              <span class="setup-modal__title-text">
-                <RichText
-                  text={t('harnesses.setupModal.title')}
-                  parts={{ name: <em>{props.agentName}</em> }}
-                />
-              </span>
-            </div>
-            <button
-              class="modal__close"
-              onClick={() => props.onClose()}
-              aria-label={t('common.close')}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
-          </div>
-          <p class="modal-card__desc">{t('harnesses.setupModal.desc')}</p>
-
-          <Show
-            when={!apiKeyData.error || !!props.apiKey}
-            fallback={
-              <ErrorState
-                error={apiKeyData.error}
-                title={t('harnesses.setupModal.keyErrorTitle')}
-                message={t('harnesses.setupModal.keyErrorMessage')}
-                onRetry={refetchKey}
+        <div className="modal-head">
+          <h2 id="setup-modal-title" className="flex min-w-0 items-center gap-2">
+            {icon ? (
+              <img
+                src={icon}
+                alt=""
+                width="24"
+                height="24"
+                className={cx('shrink-0', monoIconClass(icon))}
               />
-            }
-          >
-            <SetupStepAddProvider
-              apiKey={props.apiKey ?? apiKeyData()?.apiKey ?? null}
-              keyPrefix={apiKeyData()?.keyPrefix ?? null}
-              baseUrl={baseUrl()}
-              platform={props.agentPlatform}
-              virtualModels={virtualModels()}
-            />
-          </Show>
+            ) : null}
+            <span className="truncate">
+              <RichText
+                text={t('harnesses.setupModal.title')}
+                parts={{ name: <em className="not-italic text-accent">{agentName}</em> }}
+              />
+            </span>
+          </h2>
+          <IconButton label={t('common.close')} onClick={onClose}>
+            <X />
+          </IconButton>
+        </div>
+        <div className="modal-body flex flex-col gap-4">
+          <p className="text-sm text-dim">{t('harnesses.setupModal.desc')}</p>
 
-          <div class="setup-modal__nav">
-            <button class="setup-modal__next" onClick={handleGoToRouting}>
+          {keyData.error && !apiKey ? (
+            <ErrorState
+              error={keyData.error}
+              title={t('harnesses.setupModal.keyErrorTitle')}
+              message={t('harnesses.setupModal.keyErrorMessage')}
+              onRetry={() => void keyData.reload()}
+            />
+          ) : (
+            <SetupStepAddProvider
+              apiKey={apiKey ?? keyData.data?.apiKey ?? null}
+              keyPrefix={keyData.data?.keyPrefix ?? null}
+              baseUrl={baseUrl}
+              platform={agentPlatform}
+              virtualModels={virtualModels}
+            />
+          )}
+
+          <div className="actions flex justify-end">
+            <Button className="setup-modal__next" onClick={handleGoToRouting}>
               {t('common.done')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </Show>
+    </div>,
+    document.body,
   );
-};
-
-export default SetupModal;
+}

@@ -1,15 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 let searchParams: Record<string, string> = {};
-vi.mock('@solidjs/router', () => ({
-  useSearchParams: () => [searchParams, vi.fn()],
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
+  useSearchParams: () => [new URLSearchParams(searchParams as Record<string, string>), vi.fn()],
   useNavigate: () => vi.fn(),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children?: unknown }) => <title>{String(props.children ?? '')}</title>,
-  Meta: () => null,
 }));
 
 const mockFetchMutate = vi.fn();
@@ -60,77 +56,75 @@ describe('CliAuth', () => {
   });
 
   it('shows the Authorize button for a valid request', () => {
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.getByRole('button', { name: /authorize/i })).toBeTruthy();
   });
 
   it('states the full scope and how to revoke', () => {
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     // The informed-consent boundary: understating the grant is a spec failure.
-    expect(
-      screen.getByText(/full access to your workspace\. Revoke it any time/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/full access to your workspace\. Revoke it any time/i)).toBeTruthy();
     expect(screen.getByText('thinker logout')).toBeTruthy();
   });
 
   it('rejects a port below the unprivileged range', () => {
     searchParams = { ...VALID, port: '80' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
     expect(screen.getByText(/invalid/i)).toBeTruthy();
   });
 
   it('rejects a port above the valid range', () => {
     searchParams = { ...VALID, port: '70000' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a non-numeric port', () => {
     searchParams = { ...VALID, port: '43210abc' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a missing port', () => {
     searchParams = { state: VALID.state };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a malformed state', () => {
     searchParams = { ...VALID, state: 'bad state!' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a state shorter than 16 characters', () => {
     searchParams = { ...VALID, state: 'tooshort' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a missing state', () => {
     searchParams = { port: VALID.port };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a missing PKCE challenge', () => {
     searchParams = { port: VALID.port, state: VALID.state };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects a malformed PKCE challenge', () => {
     searchParams = { ...VALID, code_challenge: 'tooshort' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
   it('rejects an unsupported PKCE method', () => {
     searchParams = { ...VALID, code_challenge_method: 'plain' };
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     expect(screen.queryByRole('button', { name: /authorize/i })).toBeNull();
   });
 
@@ -139,7 +133,7 @@ describe('CliAuth', () => {
     const { assign, restore } = stubLocation();
     restoreLocation = restore;
 
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
 
     await waitFor(() => expect(assign).toHaveBeenCalled());
@@ -162,7 +156,7 @@ describe('CliAuth', () => {
     const { assign, restore } = stubLocation();
     restoreLocation = restore;
 
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
 
     await waitFor(() => expect(assign).toHaveBeenCalled());
@@ -176,7 +170,7 @@ describe('CliAuth', () => {
     const { restore } = stubLocation();
     restoreLocation = restore;
 
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
 
     expect(await screen.findByText(/close this page/i)).toBeTruthy();
@@ -191,7 +185,7 @@ describe('CliAuth', () => {
     const { restore } = stubLocation();
     restoreLocation = restore;
 
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     const button = screen.getByRole('button', { name: /authorize/i }) as HTMLButtonElement;
     fireEvent.click(button);
 
@@ -204,14 +198,14 @@ describe('CliAuth', () => {
 
   it('shows the server error when authorization fails', async () => {
     mockFetchMutate.mockRejectedValue(new Error('nope'));
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
     expect(await screen.findByText(/nope/)).toBeTruthy();
   });
 
   it('stringifies a non-Error rejection', async () => {
     mockFetchMutate.mockRejectedValue('plain string failure');
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
     expect(await screen.findByText(/plain string failure/)).toBeTruthy();
   });
@@ -221,7 +215,7 @@ describe('CliAuth', () => {
     const { assign, restore } = stubLocation();
     restoreLocation = restore;
 
-    render(() => <CliAuth />);
+    render(<CliAuth />);
     fireEvent.click(screen.getByRole('button', { name: /authorize/i }));
     // The failure leaves a live button, not a dead end.
     const retry = (await screen.findByRole('button', { name: /try again/i })) as HTMLButtonElement;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.stubGlobal('navigator', {
   clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -17,13 +17,11 @@ vi.mock('../../src/services/api.js', async (importOriginal) => ({
 }));
 
 import VirtualModelsHint, {
-  createActiveVirtualModelNames,
+  useActiveVirtualModelNames,
 } from '../../src/components/VirtualModelsHint';
 import SetupStepAddProvider from '../../src/components/SetupStepAddProvider';
 import FrameworkSnippets from '../../src/components/FrameworkSnippets';
-import VirtualModelSnippetModal from '../../src/components/VirtualModelSnippetModal';
 import { getSnippetForToolkit, withSnippetModel } from '../../src/services/framework-snippets';
-import type { VirtualModel } from '../../src/services/api/virtual-models';
 
 const base = { apiKey: null, keyPrefix: null, baseUrl: 'http://localhost:2099/v1' };
 
@@ -72,15 +70,15 @@ describe('FrameworkSnippets model', () => {
   beforeEach(() => localStorage.clear());
 
   it('uses a fixed model in the code and the Model field', () => {
-    const { container } = render(() => <FrameworkSnippets {...base} model="deepseek/flash" />);
+    const { container } = render(<FrameworkSnippets {...base} model="deepseek/flash" />);
     expect(container.querySelector('code.hljs')!.textContent).toContain('deepseek/flash');
     expect(screen.queryByRole('radiogroup', { name: 'Model' })).toBeNull();
   });
 
   it('offers auto and the virtual models to pick from', () => {
-    const { container } = render(() => (
-      <FrameworkSnippets {...base} modelOptions={['deepseek/flash', 'cheap']} />
-    ));
+    const { container } = render(
+      <FrameworkSnippets {...base} modelOptions={['deepseek/flash', 'cheap']} />,
+    );
     const group = screen.getByRole('radiogroup', { name: 'Model' });
     expect(group.textContent).toBe('autodeepseek/flashcheap');
     expect(container.querySelector('code.hljs')!.textContent).toContain('auto');
@@ -92,7 +90,7 @@ describe('FrameworkSnippets model', () => {
 
 describe('VirtualModelsHint', () => {
   it('renders nothing without virtual models', () => {
-    render(() => <VirtualModelsHint names={[]} platform="claude-code" />);
+    render(<VirtualModelsHint names={[]} platform="claude-code" />);
     expect(screen.queryByTestId('virtual-models-hint')).toBeNull();
   });
 
@@ -107,7 +105,7 @@ describe('VirtualModelsHint', () => {
     ['toolkits', 'Pick one above'],
     ['craft', 'model name instead of'],
   ])('explains how %s picks one', (platform, text) => {
-    render(() => <VirtualModelsHint names={['fast', 'cheap']} platform={platform} />);
+    render(<VirtualModelsHint names={['fast', 'cheap']} platform={platform} />);
     const hint = screen.getByTestId('virtual-models-hint');
     expect(hint.textContent).toContain('fast');
     expect(hint.textContent).toContain('cheap');
@@ -115,11 +113,22 @@ describe('VirtualModelsHint', () => {
   });
 });
 
-describe('createActiveVirtualModelNames', () => {
+describe('useActiveVirtualModelNames', () => {
   beforeEach(() => {
     mockList.mockClear();
     listImpl = null;
   });
+
+  /** Renders the hook and exposes its latest value. */
+  function probe(agentName: string | null) {
+    const result = { names: [] as string[] };
+    function Probe() {
+      result.names = useActiveVirtualModelNames(agentName);
+      return <span>{result.names.join(',')}</span>;
+    }
+    render(<Probe />);
+    return result;
+  }
 
   it('returns the active names in order', async () => {
     mockList.mockResolvedValue([
@@ -127,12 +136,8 @@ describe('createActiveVirtualModelNames', () => {
       { name: 'b', enabled: false },
       { name: 'c', enabled: true },
     ]);
-    let names!: () => string[];
-    render(() => {
-      names = createActiveVirtualModelNames(() => 'demo');
-      return <span>{names().join(',')}</span>;
-    });
-    await waitFor(() => expect(names()).toEqual(['a', 'c']));
+    const result = probe('demo');
+    await waitFor(() => expect(result.names).toEqual(['a', 'c']));
     expect(mockList).toHaveBeenCalledWith('demo');
   });
 
@@ -144,23 +149,15 @@ describe('createActiveVirtualModelNames', () => {
       calls.push(name);
       return Promise.reject(new Error('offline'));
     };
-    let failed!: () => string[];
-    render(() => {
-      failed = createActiveVirtualModelNames(() => 'other');
-      return <span>{failed().length}</span>;
-    });
-    await new Promise((r) => setTimeout(r, 10));
+    const result = probe('other');
+    await act(() => new Promise((r) => setTimeout(r, 10)));
     expect(calls).toEqual(['other']);
-    expect(failed()).toEqual([]);
+    expect(result.names).toEqual([]);
   });
 
   it('does not load without an agent', () => {
-    let none!: () => string[];
-    render(() => {
-      none = createActiveVirtualModelNames(() => null);
-      return null;
-    });
-    expect(none()).toEqual([]);
+    const result = probe(null);
+    expect(result.names).toEqual([]);
     expect(mockList).not.toHaveBeenCalled();
   });
 });
@@ -169,22 +166,22 @@ describe('SetupStepAddProvider with virtual models', () => {
   beforeEach(() => localStorage.clear());
 
   it('lists them under a filtered harness setup', () => {
-    render(() => (
-      <SetupStepAddProvider {...base} platform="claude-code" virtualModels={['deepseek/flash']} />
-    ));
+    render(
+      <SetupStepAddProvider {...base} platform="claude-code" virtualModels={['deepseek/flash']} />,
+    );
     const hint = screen.getByTestId('virtual-models-hint');
     expect(hint.textContent).toContain('deepseek/flash');
     expect(hint.textContent).toContain('/model deepseek/flash');
   });
 
   it('offers them in toolkit snippets', () => {
-    render(() => <SetupStepAddProvider {...base} platform="curl" virtualModels={['cheap']} />);
+    render(<SetupStepAddProvider {...base} platform="curl" virtualModels={['cheap']} />);
     expect(screen.getByRole('radio', { name: 'cheap' })).toBeTruthy();
     expect(screen.getByTestId('virtual-models-hint').textContent).toContain('Pick one above');
   });
 
   it('follows the selected agent tab and the toolkits tab', () => {
-    render(() => <SetupStepAddProvider {...base} virtualModels={['cheap']} />);
+    render(<SetupStepAddProvider {...base} virtualModels={['cheap']} />);
     expect(screen.getByTestId('virtual-models-hint').textContent).toContain('thinker/cheap');
     fireEvent.click(screen.getByRole('tab', { name: /Hermes/ }));
     expect(screen.getByTestId('virtual-models-hint').textContent).toContain('hermes model');
@@ -193,44 +190,13 @@ describe('SetupStepAddProvider with virtual models', () => {
   });
 
   it('shows nothing extra without virtual models', () => {
-    render(() => <SetupStepAddProvider {...base} platform="codex" />);
+    render(<SetupStepAddProvider {...base} platform="codex" />);
     expect(screen.queryByTestId('virtual-models-hint')).toBeNull();
   });
 });
 
 describe('VirtualModelSnippetModal', () => {
-  const vm: VirtualModel = {
-    id: 'vm-1',
-    agent_id: 'agent-1',
-    name: 'deepseek/flash',
-    sort_order: 0,
-    enabled: false,
-    override_route: null,
-    fallback_routes: null,
-    continue_on_default: false,
-    response_mode: 'buffered',
-    output_modality: 'text',
-    created_at: '',
-    updated_at: '',
-    shadows: [],
-    context_length: null,
-  };
-
-  it('shows the harness key, base URL and the model, and closes', async () => {
-    mockGetAgentKey.mockResolvedValue({ apiKey: 'thk_test', keyPrefix: 'thk_te' });
-    const onClose = vi.fn();
-    const { container } = render(() => (
-      <VirtualModelSnippetModal agentName="demo" virtualModel={vm} onClose={onClose} />
-    ));
-    expect(screen.getByText('Use “deepseek/flash”')).toBeTruthy();
-    expect(screen.getByText(/This virtual model is inactive/)).toBeTruthy();
-    await waitFor(() => expect(container.textContent).toContain('thk_test'));
-    expect(mockGetAgentKey).toHaveBeenCalledWith('demo');
-    expect(container.querySelector('code.hljs')!.textContent).toContain('"deepseek/flash"');
-    expect(container.textContent).toContain('/v1');
-    fireEvent.click(screen.getByText('Done'));
-    fireEvent.click(screen.getByLabelText('Close'));
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(3);
-  });
+  // VirtualModelSnippetModal belongs to the routing area and is not ported to
+  // React in this worktree; its case comes back when it is.
+  it.todo('shows the harness key, base URL and the model, and closes');
 });

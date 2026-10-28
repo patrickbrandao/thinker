@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@solidjs/testing-library';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import CodexSetup from '../../src/components/CodexSetup';
 
@@ -15,9 +15,9 @@ describe('CodexSetup', () => {
   });
 
   it('renders a paste-ready config.toml and a placeholder key export when the full key is unavailable', async () => {
-    const { container } = render(() => (
-      <CodexSetup apiKey={null} keyPrefix="thk_live" baseUrl="http://localhost:38240/v1" />
-    ));
+    const { container } = render(
+      <CodexSetup apiKey={null} keyPrefix="thk_live" baseUrl="http://localhost:38240/v1" />,
+    );
 
     expect(container.textContent).toContain('~/.codex/config.toml');
     expect(container.textContent).toContain('launch Codex CLI from the same terminal');
@@ -40,9 +40,7 @@ describe('CodexSetup', () => {
 
     fireEvent.click(copyButtons[0]!);
     await vi.waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(
-        expect.stringContaining('model_provider = "thinker"'),
-      );
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('model_provider = "thinker"'));
     });
 
     fireEvent.click(copyButtons[1]!);
@@ -53,13 +51,9 @@ describe('CodexSetup', () => {
   });
 
   it('reveals and hides the full API key without changing the copy payload', async () => {
-    const { container } = render(() => (
-      <CodexSetup
-        apiKey="thk_secret"
-        keyPrefix="thk_live"
-        baseUrl="http://localhost:38240/v1"
-      />
-    ));
+    const { container } = render(
+      <CodexSetup apiKey="thk_secret" keyPrefix="thk_live" baseUrl="http://localhost:38240/v1" />,
+    );
 
     expect(container.textContent).toContain('export THINKER_API_KEY="thk_live..."');
     expect(container.textContent).not.toContain('thk_secret');

@@ -1,8 +1,9 @@
-import { useSearchParams } from '@solidjs/router';
-import { Title } from '@solidjs/meta';
-import { Show, createSignal, type Component } from 'solid-js';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router';
+import AuthLayout from '../layouts/AuthLayout.jsx';
+import { AuthHeader } from '../components/auth-ui.jsx';
+import { Button } from '../components/ui.jsx';
 import { fetchMutate } from '../services/api/core.js';
-import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 import { t } from '../i18n/index.js';
 
 /** Mirrors the backend's `state` contract on POST /api/v1/cli/authorize. */
@@ -15,52 +16,50 @@ const PORT_RE = /^\d{1,5}$/;
 const MIN_PORT = 1024;
 const MAX_PORT = 65535;
 
+interface CliRequest {
+  port: number;
+  state: string;
+  codeChallenge: string;
+}
+
+/** The whole request, or null if any part is unusable. */
+function parseRequest(params: URLSearchParams): CliRequest | null {
+  const rawPort = params.get('port') ?? '';
+  const parsedPort = PORT_RE.test(rawPort) ? Number(rawPort) : NaN;
+  const port = parsedPort >= MIN_PORT && parsedPort <= MAX_PORT ? parsedPort : null;
+
+  const rawState = params.get('state') ?? '';
+  const state = STATE_RE.test(rawState) ? rawState : null;
+
+  // PKCE S256 challenge; the method is pinned (only S256 is accepted).
+  const rawChallenge = params.get('code_challenge') ?? '';
+  const method = params.get('code_challenge_method') ?? CHALLENGE_METHOD;
+  const codeChallenge =
+    CODE_CHALLENGE_RE.test(rawChallenge) && method === CHALLENGE_METHOD ? rawChallenge : null;
+
+  return port !== null && state !== null && codeChallenge !== null
+    ? { port, state, codeChallenge }
+    : null;
+}
+
 /**
  * Browser half of `thinker login`: confirms the user wants to grant the CLI on
  * this machine a workspace token, then hands a one-time code to the CLI's
  * loopback listener. The explicit click is a security boundary — a drive-by
  * link must never silently mint a token.
  */
-const CliAuth: Component = () => {
+export default function CliAuth() {
   const [params] = useSearchParams();
-  const [phase, setPhase] = createSignal<'idle' | 'working' | 'done' | 'error'>('idle');
-  const [error, setError] = createSignal('');
-
-  const port = () => {
-    const raw = String(params.port ?? '');
-    if (!PORT_RE.test(raw)) return null;
-    const parsed = Number(raw);
-    return parsed >= MIN_PORT && parsed <= MAX_PORT ? parsed : null;
-  };
-
-  const state = () => {
-    const raw = String(params.state ?? '');
-    return STATE_RE.test(raw) ? raw : null;
-  };
-
-  /** PKCE S256 challenge; the method is pinned (only S256 is accepted). */
-  const codeChallenge = () => {
-    const raw = String(params.code_challenge ?? '');
-    if (!CODE_CHALLENGE_RE.test(raw)) return null;
-    const method = String(params.code_challenge_method ?? CHALLENGE_METHOD);
-    return method === CHALLENGE_METHOD ? raw : null;
-  };
-
-  /**
-   * The whole request, or null if any part is unusable. One accessor so the
-   * button's visibility and the values `authorize` sends can never disagree.
-   */
-  const request = () => {
-    const p = port();
-    const s = state();
-    const c = codeChallenge();
-    return p !== null && s !== null && c !== null ? { port: p, state: s, codeChallenge: c } : null;
-  };
+  const [phase, setPhase] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
+  const [error, setError] = useState('');
+  // One value so the button's visibility and the values `authorize` sends can
+  // never disagree.
+  const request = parseRequest(params);
 
   const authorize = async () => {
     // Snapshot every param before the await: the callback URL must echo exactly
-    // the state we POSTed. The button only renders when `request()` is non-null.
-    const { port: loopbackPort, state: requestState, codeChallenge: requestChallenge } = request()!;
+    // the state we POSTed. The button only renders when `request` is non-null.
+    const { port: loopbackPort, state: requestState, codeChallenge: requestChallenge } = request!;
     setPhase('working');
     try {
       const { code } = await fetchMutate<{ code: string }>('/cli/authorize', {
@@ -86,71 +85,48 @@ const CliAuth: Component = () => {
   };
 
   return (
-    <div class="auth-layout">
-      <Title>{t('common.pageTitle', { page: t('auth.cli.pageTitle') })}</Title>
-      <div class="auth-card" style="text-align: center;">
-        <div class="auth-logo">
-          <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
-          <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
-        </div>
-        <Show
-          when={request()}
-          fallback={
-            <div class="auth-header">
-              <h1 class="auth-header__title">{t('auth.cli.invalidTitle')}</h1>
-              <p class="auth-header__subtitle">
-                {t('auth.cli.invalidBefore')} <code>thinker login</code>{' '}
-                {t('auth.cli.invalidAfter')}
-              </p>
-            </div>
+    <AuthLayout>
+      <title>{t('common.pageTitle', { page: t('auth.cli.pageTitle') })}</title>
+      {!request ? (
+        <AuthHeader
+          title={t('auth.cli.invalidTitle')}
+          subtitle={
+            <>
+              {t('auth.cli.invalidBefore')} <code>thinker login</code> {t('auth.cli.invalidAfter')}
+            </>
           }
-        >
-          <Show
-            when={phase() === 'done'}
-            fallback={
+        />
+      ) : phase === 'done' ? (
+        <AuthHeader title={t('auth.cli.connected')} subtitle={t('auth.cli.closePage')} />
+      ) : (
+        <>
+          <AuthHeader
+            title={t('auth.cli.title')}
+            subtitle={
               <>
-                <div class="auth-header">
-                  <h1 class="auth-header__title">{t('auth.cli.title')}</h1>
-                  <p class="auth-header__subtitle">
-                    {t('auth.cli.grantBefore')} <code>thinker logout</code>
-                    {t('auth.cli.grantAfter')}
-                  </p>
-                </div>
-                {/* .auth-form is the column that stretches the submit button edge
-                    to edge, exactly as on the sign-in page. */}
-                <div class="auth-form">
-                  {/* A failed authorize consumed nothing server-side, so the
-                      error is shown above a live button rather than replacing it. */}
-                  <Show when={phase() === 'error'}>
-                    <div class="auth-form__error" role="alert">
-                      {error()}
-                    </div>
-                  </Show>
-                  <button
-                    class="auth-form__submit"
-                    type="button"
-                    onClick={authorize}
-                    disabled={phase() === 'working'}
-                  >
-                    {phase() === 'working'
-                      ? t('auth.cli.authorizing')
-                      : phase() === 'error'
-                        ? t('common.tryAgain')
-                        : t('auth.cli.authorize')}
-                  </button>
-                </div>
+                {t('auth.cli.grantBefore')} <code>thinker logout</code>
+                {t('auth.cli.grantAfter')}
               </>
             }
-          >
-            <div class="auth-header">
-              <h1 class="auth-header__title">{t('auth.cli.connected')}</h1>
-              <p class="auth-header__subtitle">{t('auth.cli.closePage')}</p>
-            </div>
-          </Show>
-        </Show>
-      </div>
-    </div>
+          />
+          <div className="flex flex-col gap-3">
+            {/* A failed authorize consumed nothing server-side, so the error
+                is shown above a live button rather than replacing it. */}
+            {phase === 'error' ? (
+              <div className="form-error" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <Button block onClick={authorize} disabled={phase === 'working'}>
+              {phase === 'working'
+                ? t('auth.cli.authorizing')
+                : phase === 'error'
+                  ? t('common.tryAgain')
+                  : t('auth.cli.authorize')}
+            </Button>
+          </div>
+        </>
+      )}
+    </AuthLayout>
   );
-};
-
-export default CliAuth;
+}

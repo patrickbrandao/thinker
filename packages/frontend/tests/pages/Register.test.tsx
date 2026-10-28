@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockSignUpEmail = vi.fn().mockResolvedValue({});
 const mockSignInSocial = vi.fn().mockResolvedValue({});
@@ -9,21 +9,17 @@ let mockLocationSearch = '';
 const mockNavigate = vi.fn();
 const mockCheckSignupEnabled = vi.fn().mockResolvedValue(true);
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
+  Link: (props: any) => (
+    <a href={props.to} className={props.className}>
       {props.children}
     </a>
   ),
   useLocation: () => ({ search: mockLocationSearch }),
   useNavigate: () => mockNavigate,
   // SocialButtons reads the query to build its callbacks.
-  useSearchParams: () => [{}],
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
+  useSearchParams: () => [new URLSearchParams({} as Record<string, string>), vi.fn()],
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
@@ -56,7 +52,7 @@ describe('Register', () => {
   it('redirects to /login, keeping the query, when sign-up is disabled', async () => {
     mockCheckSignupEnabled.mockResolvedValue(false);
     mockLocationSearch = '?redirect=%2Fmessages';
-    render(() => <Register />);
+    render(<Register />);
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/login?redirect=%2Fmessages', { replace: true });
     });
@@ -64,41 +60,41 @@ describe('Register', () => {
   });
 
   it('stays on the page when sign-up is enabled', async () => {
-    render(() => <Register />);
+    render(<Register />);
     await vi.waitFor(() => expect(mockCheckSocialProviders).toHaveBeenCalled());
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('renders create account heading', () => {
-    render(() => <Register />);
+    render(<Register />);
     expect(screen.getByText('Create an account')).toBeDefined();
   });
 
   it('renders name, email, and password inputs', () => {
-    render(() => <Register />);
+    render(<Register />);
     expect(screen.getByPlaceholderText('Your name')).toBeDefined();
     expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     expect(screen.getByPlaceholderText('Create a password')).toBeDefined();
   });
 
   it('renders create account button', () => {
-    render(() => <Register />);
+    render(<Register />);
     expect(screen.getByText('Create account')).toBeDefined();
   });
 
   it('has link to sign in', () => {
-    render(() => <Register />);
+    render(<Register />);
     expect(screen.getByText('Sign in')).toBeDefined();
   });
 
   it('preserves the query string on sign-in links', () => {
     mockLocationSearch = '?redirect=%2Fmessages';
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     expect(container.querySelector('a[href="/login?redirect=%2Fmessages"]')).not.toBeNull();
   });
 
   it('links to no hosted terms or privacy policy', () => {
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     expect(screen.queryByText('Terms')).toBeNull();
     expect(screen.queryByText('Privacy Policy')).toBeNull();
     expect(container.querySelector('a[href^="http"]')).toBeNull();
@@ -106,7 +102,7 @@ describe('Register', () => {
 
   it('submits registration form', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -122,7 +118,7 @@ describe('Register', () => {
 
   it('shows email verification after successful signup', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -138,7 +134,7 @@ describe('Register', () => {
 
   it('shows error on failed registration', async () => {
     mockSignUpEmail.mockResolvedValue({ error: { message: 'Something went wrong' } });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'exists@test.com' },
@@ -158,7 +154,7 @@ describe('Register', () => {
     mockSignUpEmail.mockResolvedValue({
       error: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'User already exists' },
     });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'exists@test.com' },
@@ -176,7 +172,7 @@ describe('Register', () => {
 
   it('sends email signups straight to the onboarding flow', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -197,7 +193,7 @@ describe('Register', () => {
 
   it('sends social signups straight to the onboarding flow', async () => {
     mockCheckSocialProviders.mockResolvedValue(['github']);
-    render(() => <Register />);
+    render(<Register />);
 
     await fireEvent.click(await screen.findByText('Continue with GitHub'));
 
@@ -220,7 +216,7 @@ describe('Register', () => {
       data: { token: 'tok', user: { id: 'u1' } },
       error: null,
     });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'new@test.com' },
@@ -240,7 +236,7 @@ describe('Register', () => {
 
   it('shows loading state during submission', async () => {
     mockSignUpEmail.mockReturnValue(new Promise(() => {}));
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
@@ -257,7 +253,7 @@ describe('Register', () => {
 
   it('shows resend button after successful signup', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -280,7 +276,7 @@ describe('Register', () => {
     vi.useFakeTimers();
     mockSignUpEmail.mockResolvedValue({ error: null });
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -313,7 +309,7 @@ describe('Register', () => {
     vi.useFakeTimers();
     mockSignUpEmail.mockResolvedValue({ error: null });
     mockSendVerificationEmail.mockResolvedValue({ error: { message: 'Too many requests' } });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -340,7 +336,7 @@ describe('Register', () => {
 
   it('stores email as last auth method on successful signup', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -356,7 +352,7 @@ describe('Register', () => {
 
   it('does not store last auth method when signup fails', async () => {
     mockSignUpEmail.mockResolvedValue({ error: { message: 'boom' } });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
@@ -373,7 +369,7 @@ describe('Register', () => {
 
   it('shows back to sign in link on verification screen', async () => {
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Register />);
+    const { container } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },
@@ -390,7 +386,7 @@ describe('Register', () => {
 
   it('never renders a plan picker, even with the legacy plan step', () => {
     mockLocationSearch = '?step=plan';
-    render(() => <Register />);
+    render(<Register />);
     expect(screen.getByText('Create an account')).toBeDefined();
     expect(screen.queryByText('Choose your plan')).toBeNull();
     expect(screen.queryByText(/Pro/)).toBeNull();
@@ -399,7 +395,7 @@ describe('Register', () => {
   it('clears the cooldown interval on unmount', async () => {
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
     mockSignUpEmail.mockResolvedValue({ error: null });
-    const { container, unmount } = render(() => <Register />);
+    const { container, unmount } = render(<Register />);
     fireEvent.input(container.querySelector('input[type="text"]')!, { target: { value: 'Test' } });
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'test@test.com' },

@@ -1,25 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockSignInEmail = vi.fn().mockResolvedValue({});
 const mockSendVerificationEmail = vi.fn().mockResolvedValue({});
 
 let mockSearchParams: Record<string, string> = {};
 let mockLocationSearch = '';
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
+  Link: (props: any) => (
+    <a href={props.to} className={props.className}>
       {props.children}
     </a>
   ),
   useLocation: () => ({ search: mockLocationSearch }),
   useNavigate: () => vi.fn(),
-  useSearchParams: () => [mockSearchParams],
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
+  useSearchParams: () => [new URLSearchParams(mockSearchParams as Record<string, string>), vi.fn()],
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
@@ -56,24 +52,24 @@ describe('Login', () => {
   });
 
   it('renders welcome message', () => {
-    render(() => <Login />);
+    render(<Login />);
     expect(screen.getByText('Welcome back')).toBeDefined();
   });
 
   it('renders email and password inputs', () => {
-    render(() => <Login />);
+    render(<Login />);
     expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     expect(screen.getByPlaceholderText('Enter your password')).toBeDefined();
   });
 
   it('renders sign in button', () => {
-    render(() => <Login />);
+    render(<Login />);
     expect(screen.getByText('Sign in')).toBeDefined();
   });
 
   it('dev-only button signs in with the seed admin credentials', async () => {
     mockSignInEmail.mockResolvedValue({ error: null });
-    render(() => <Login />);
+    render(<Login />);
     fireEvent.click(await screen.findByRole('button', { name: /sign in as dev/i }));
     await vi.waitFor(() => {
       expect(mockSignInEmail).toHaveBeenCalledWith({
@@ -86,7 +82,7 @@ describe('Login', () => {
 
   it('dev-only button surfaces an error when sign-in fails', async () => {
     mockSignInEmail.mockResolvedValue({ error: {} });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.click(await screen.findByRole('button', { name: /sign in as dev/i }));
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Dev sign-in failed');
@@ -94,13 +90,13 @@ describe('Login', () => {
   });
 
   it('has link to register when sign-up is enabled', async () => {
-    render(() => <Login />);
+    render(<Login />);
     await vi.waitFor(() => expect(screen.getByText('Sign up')).toBeDefined());
   });
 
   it('preserves the query string on the register link', async () => {
     mockLocationSearch = '?redirect=%2Fmessages';
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() =>
       expect(container.querySelector('a[href="/register?redirect=%2Fmessages"]')).not.toBeNull(),
     );
@@ -108,7 +104,7 @@ describe('Login', () => {
 
   it('hides the sign-up link when sign-up is disabled', async () => {
     mockCheckSignupEnabled.mockResolvedValue(false);
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => expect(mockCheckSignupEnabled).toHaveBeenCalled());
     await Promise.resolve();
     expect(container.querySelector('a[href^="/register"]')).toBeNull();
@@ -119,7 +115,7 @@ describe('Login', () => {
     'explains a closed sign-up for the social callback error %s',
     async (code) => {
       mockSearchParams = { error: code };
-      render(() => <Login />);
+      render(<Login />);
       await vi.waitFor(() => {
         expect(screen.getByRole('alert').textContent).toContain('does not allow sign-up');
       });
@@ -127,13 +123,13 @@ describe('Login', () => {
   );
 
   it('has forgot password link', () => {
-    render(() => <Login />);
+    render(<Login />);
     expect(screen.getByText('Forgot password?')).toBeDefined();
   });
 
   it('shows or divider when social providers are available', async () => {
     mockCheckSocialProviders.mockResolvedValue(['google']);
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('or');
     });
@@ -141,7 +137,7 @@ describe('Login', () => {
 
   it('hides or divider when no social providers are available', async () => {
     mockCheckSocialProviders.mockResolvedValue([]);
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       expect(container.querySelector('.auth-divider')).toBeNull();
     });
@@ -149,7 +145,7 @@ describe('Login', () => {
 
   it('submits login form', async () => {
     mockSignInEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement;
     const passwordInput = container.querySelector('input[type="password"]') as HTMLInputElement;
     fireEvent.input(emailInput, { target: { value: 'test@test.com' } });
@@ -166,7 +162,7 @@ describe('Login', () => {
 
   it('shows error on failed login', async () => {
     mockSignInEmail.mockResolvedValue({ error: { message: 'Invalid credentials' } });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement;
     const passwordInput = container.querySelector('input[type="password"]') as HTMLInputElement;
     fireEvent.input(emailInput, { target: { value: 'bad@test.com' } });
@@ -179,7 +175,7 @@ describe('Login', () => {
 
   it('shows loading state during submission', async () => {
     mockSignInEmail.mockReturnValue(new Promise(() => {}));
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -197,7 +193,7 @@ describe('Login', () => {
     mockSignInEmail.mockResolvedValue({
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -214,7 +210,7 @@ describe('Login', () => {
     mockSignInEmail.mockResolvedValue({
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -232,7 +228,7 @@ describe('Login', () => {
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -265,7 +261,7 @@ describe('Login', () => {
 
     mockSearchParams = { redirect: '/messages?range=30d' };
     mockSignInEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -290,7 +286,7 @@ describe('Login', () => {
     mockLocationSearch =
       '?client_id=client&redirect_uri=http%3A%2F%2F127.0.0.1%2Fcallback&ba_param=client_id&ba_param=redirect_uri&sig=abc';
     mockSignInEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -310,7 +306,7 @@ describe('Login', () => {
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -335,7 +331,7 @@ describe('Login', () => {
 
   it('shows default error when authError has no message', async () => {
     mockSignInEmail.mockResolvedValue({ error: { message: '' } });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -350,7 +346,7 @@ describe('Login', () => {
 
   it('shows error from search params on mount', async () => {
     mockSearchParams = { error: 'oauth_failed' };
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Login failed');
     });
@@ -359,7 +355,7 @@ describe('Login', () => {
   it('offers email verification after an unlinked social login', async () => {
     mockSearchParams = { oauth: 'failed', error: 'account_not_linked', redirect: '/messages' };
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('This email already has an account');
     });
@@ -382,7 +378,7 @@ describe('Login', () => {
 
   it('shows a generic error when social login has no error code', async () => {
     mockSearchParams = { oauth: 'failed' };
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Login failed');
     });
@@ -394,7 +390,7 @@ describe('Login', () => {
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -427,7 +423,7 @@ describe('Login', () => {
 
   it('stores email as last auth method on successful sign-in', async () => {
     mockSignInEmail.mockResolvedValue({ error: null });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -442,7 +438,7 @@ describe('Login', () => {
 
   it('does not store last auth method when sign-in fails', async () => {
     mockSignInEmail.mockResolvedValue({ error: { message: 'nope' } });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 't@t.com' },
     });
@@ -459,7 +455,7 @@ describe('Login', () => {
   it('forwards lastUsed to SocialButtons when previous method was a provider', async () => {
     mockCheckSocialProviders.mockResolvedValue(['github']);
     setLastAuthMethod('github');
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     await vi.waitFor(() => {
       const githubBtn = container.querySelector('.auth-social-btn--github');
       expect(githubBtn).not.toBeNull();
@@ -472,7 +468,7 @@ describe('Login', () => {
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
     mockSendVerificationEmail.mockResolvedValue({ error: { message: 'Rate limited' } });
-    const { container } = render(() => <Login />);
+    const { container } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'user@test.com' },
     });
@@ -498,7 +494,7 @@ describe('Login', () => {
       error: { message: 'Email is not verified', code: 'EMAIL_NOT_VERIFIED' },
     });
     mockSendVerificationEmail.mockResolvedValue({ error: null });
-    const { container, unmount } = render(() => <Login />);
+    const { container, unmount } = render(<Login />);
     fireEvent.input(container.querySelector('input[type="email"]')!, {
       target: { value: 'u@t.com' },
     });

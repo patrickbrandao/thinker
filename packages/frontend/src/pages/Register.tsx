@@ -1,7 +1,13 @@
-import { A, useLocation, useNavigate } from '@solidjs/router';
-import { Title, Meta } from '@solidjs/meta';
-import { type Component, createSignal, createUniqueId, onCleanup, onMount, Show } from 'solid-js';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
 import SocialButtons from '../components/SocialButtons.jsx';
+import {
+  AuthDivider,
+  AuthFooter,
+  AuthHeader,
+  authLinkButtonClass,
+} from '../components/auth-ui.jsx';
+import { Button, Field } from '../components/ui.jsx';
 import { authClient } from '../services/auth-client.js';
 import { appendSearch } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
@@ -12,43 +18,52 @@ const RESEND_COOLDOWN_SECONDS = 60;
 // New accounts land on the onboarding flow, which hands off to the dashboard.
 const POST_SIGNUP_URL = '/welcome';
 
-const Register: Component = () => {
-  const [name, setName] = createSignal('');
-  const [email, setEmail] = createSignal('');
-  const [password, setPassword] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [emailSent, setEmailSent] = createSignal(false);
-  const [alreadyExists, setAlreadyExists] = createSignal(false);
-  const [resendCooldown, setResendCooldown] = createSignal(0);
-  const [socialProviders, setSocialProviders] = createSignal<string[]>([]);
-  const [lastAuthMethod] = createSignal(getLastAuthMethod());
+export default function Register() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [alreadyExists, setAlreadyExists] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [socialProviders, setSocialProviders] = useState<string[]>([]);
+  const [lastAuthMethod] = useState(getLastAuthMethod);
   const location = useLocation();
   const navigate = useNavigate();
-  const nameId = createUniqueId();
-  const emailId = createUniqueId();
-  const passwordId = createUniqueId();
-  const errorId = createUniqueId();
+  const nameId = useId();
+  const emailId = useId();
+  const passwordId = useId();
+  const errorId = useId();
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  onMount(async () => {
-    if (!(await checkSignupEnabled())) {
-      // Public sign-up is closed: new accounts come from an admin.
-      navigate(appendSearch('/login', location.search), { replace: true });
-      return;
-    }
-    setSocialProviders(await checkSocialProviders());
-  });
-
-  let cooldownInterval: ReturnType<typeof setInterval> | undefined;
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      if (!(await checkSignupEnabled())) {
+        // Public sign-up is closed: new accounts come from an admin.
+        if (alive) navigate(appendSearch('/login', location.search), { replace: true });
+        return;
+      }
+      const providers = await checkSocialProviders();
+      if (alive) setSocialProviders(providers);
+    })();
+    return () => {
+      alive = false;
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    };
+    // Mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startCooldown = () => {
     setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    if (cooldownInterval) clearInterval(cooldownInterval);
-    cooldownInterval = setInterval(() => {
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    cooldownInterval.current = setInterval(() => {
       setResendCooldown((prev) => {
         if (prev <= 1) {
-          clearInterval(cooldownInterval);
-          cooldownInterval = undefined;
+          clearInterval(cooldownInterval.current);
+          cooldownInterval.current = undefined;
           return 0;
         }
         return prev - 1;
@@ -56,19 +71,15 @@ const Register: Component = () => {
     }, 1000);
   };
 
-  onCleanup(() => {
-    if (cooldownInterval) clearInterval(cooldownInterval);
-  });
-
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     const { data, error: authError } = await authClient.signUp.email({
-      name: name(),
-      email: email(),
-      password: password(),
+      name,
+      email,
+      password,
       callbackURL: POST_SIGNUP_URL,
     });
 
@@ -94,10 +105,10 @@ const Register: Component = () => {
   };
 
   const handleResend = async () => {
-    if (resendCooldown() > 0) return;
+    if (resendCooldown > 0) return;
 
     const { error: resendError } = await authClient.sendVerificationEmail({
-      email: email(),
+      email,
       callbackURL: POST_SIGNUP_URL,
     });
 
@@ -109,140 +120,131 @@ const Register: Component = () => {
     startCooldown();
   };
 
-  return (
+  const loginHref = appendSearch('/login', location.search);
+  const describedBy = error ? errorId : undefined;
+
+  const head = (
     <>
-      <Title>{t('common.pageTitle', { page: t('auth.register.pageTitle') })}</Title>
-      <Meta name="description" content={t('auth.register.metaDescription')} />
-      <Show
-        when={!emailSent()}
-        fallback={
-          <>
-            <div class="auth-header">
-              <h1 class="auth-header__title">{t('auth.checkEmail')}</h1>
-              <p class="auth-header__subtitle">
-                {t('auth.register.sentLinkTo')} <strong>{email()}</strong>
-              </p>
-            </div>
-
-            <div class="auth-form">
-              {error() && (
-                <div class="auth-form__error" role="alert">
-                  {error()}
-                </div>
-              )}
-              <div class="auth-form__success">{t('auth.register.clickLink')}</div>
-              <button
-                class="auth-form__link-btn"
-                onClick={handleResend}
-                disabled={resendCooldown() > 0}
-              >
-                {resendCooldown() > 0
-                  ? t('auth.resendIn', { seconds: resendCooldown() })
-                  : t('auth.resendVerification')}
-              </button>
-            </div>
-
-            <div class="auth-footer">
-              <A href={appendSearch('/login', location.search)} class="auth-footer__link">
-                {t('auth.backToSignIn')}
-              </A>
-            </div>
-          </>
-        }
-      >
-        <div class="auth-header">
-          <h1 class="auth-header__title">{t('auth.register.title')}</h1>
-          <p class="auth-header__subtitle">{t('auth.register.subtitle')}</p>
-        </div>
-
-        <SocialButtons
-          enabledProviders={socialProviders()}
-          lastUsed={lastAuthMethod()}
-          callbackURL={POST_SIGNUP_URL}
-        />
-
-        <Show when={socialProviders().length > 0}>
-          <div class="auth-divider">
-            <span class="auth-divider__text">{t('auth.or')}</span>
-          </div>
-        </Show>
-
-        <form class="auth-form" onSubmit={handleSubmit}>
-          <Show when={alreadyExists()}>
-            <div id={errorId} class="auth-form__error" role="alert">
-              {t('auth.register.alreadyExists')}{' '}
-              <A href={appendSearch('/login', location.search)} class="auth-form__error-link">
-                {t('auth.register.signIn')}
-              </A>{' '}
-              {t('auth.or')}{' '}
-              <A href="/reset-password" class="auth-form__error-link">
-                {t('auth.register.resetPassword')}
-              </A>
-              .
-            </div>
-          </Show>
-          <Show when={error() && !alreadyExists()}>
-            <div id={errorId} class="auth-form__error" role="alert">
-              {error()}
-            </div>
-          </Show>
-          <label class="auth-form__label" for={nameId}>
-            {t('common.name')}
-            <input
-              ref={(el) => requestAnimationFrame(() => el.focus())}
-              id={nameId}
-              class="auth-form__input"
-              type="text"
-              autocomplete="name"
-              placeholder={t('auth.register.namePlaceholder')}
-              value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
-              required
-              aria-describedby={error() ? errorId : undefined}
-            />
-          </label>
-          <label class="auth-form__label" for={emailId}>
-            {t('common.email')}
-            <input
-              id={emailId}
-              class="auth-form__input"
-              type="email"
-              autocomplete="email"
-              placeholder={t('auth.emailPlaceholder')}
-              value={email()}
-              onInput={(e) => setEmail(e.currentTarget.value)}
-              required
-              aria-describedby={error() ? errorId : undefined}
-            />
-          </label>
-          <label class="auth-form__label" for={passwordId}>
-            {t('common.password')}
-            <input
-              id={passwordId}
-              class="auth-form__input"
-              type="password"
-              autocomplete="new-password"
-              placeholder={t('auth.register.passwordPlaceholder')}
-              value={password()}
-              onInput={(e) => setPassword(e.currentTarget.value)}
-              required
-              minLength={8}
-              aria-describedby={error() ? errorId : undefined}
-            />
-          </label>
-          <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : t('auth.register.submit')}
-          </button>
-        </form>
-        <div class="auth-footer">
-          <span>{t('auth.register.haveAccount')} </span>
-          <A href={appendSearch('/login', location.search)} class="auth-footer__link">
-            {t('auth.register.signIn')}
-          </A>
-        </div>
-      </Show>
+      <title>{t('common.pageTitle', { page: t('auth.register.pageTitle') })}</title>
+      <meta name="description" content={t('auth.register.metaDescription')} />
     </>
   );
-};
 
-export default Register;
+  if (emailSent)
+    return (
+      <>
+        {head}
+        <AuthHeader
+          title={t('auth.checkEmail')}
+          subtitle={
+            <>
+              {t('auth.register.sentLinkTo')} <strong className="text-ink">{email}</strong>
+            </>
+          }
+        />
+        <div className="flex flex-col gap-3">
+          {error ? (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <div className="form-notice">{t('auth.register.clickLink')}</div>
+          <button
+            type="button"
+            className={authLinkButtonClass}
+            onClick={handleResend}
+            disabled={resendCooldown > 0}
+          >
+            {resendCooldown > 0
+              ? t('auth.resendIn', { seconds: resendCooldown })
+              : t('auth.resendVerification')}
+          </button>
+        </div>
+        <AuthFooter>
+          <Link to={loginHref}>{t('auth.backToSignIn')}</Link>
+        </AuthFooter>
+      </>
+    );
+
+  return (
+    <>
+      {head}
+      <AuthHeader title={t('auth.register.title')} subtitle={t('auth.register.subtitle')} />
+
+      <SocialButtons
+        enabledProviders={socialProviders}
+        lastUsed={lastAuthMethod}
+        callbackURL={POST_SIGNUP_URL}
+      />
+
+      {socialProviders.length > 0 ? <AuthDivider /> : null}
+
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+        {alreadyExists ? (
+          <div id={errorId} className="form-error" role="alert">
+            {t('auth.register.alreadyExists')}{' '}
+            <Link to={loginHref} className="font-medium text-danger underline">
+              {t('auth.register.signIn')}
+            </Link>{' '}
+            {t('auth.or')}{' '}
+            <Link to="/reset-password" className="font-medium text-danger underline">
+              {t('auth.register.resetPassword')}
+            </Link>
+            .
+          </div>
+        ) : error ? (
+          <div id={errorId} className="form-error" role="alert">
+            {error}
+          </div>
+        ) : null}
+        <Field label={t('common.name')} htmlFor={nameId}>
+          <input
+            autoFocus
+            id={nameId}
+            className="field"
+            type="text"
+            autoComplete="name"
+            placeholder={t('auth.register.namePlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            aria-describedby={describedBy}
+          />
+        </Field>
+        <Field label={t('common.email')} htmlFor={emailId}>
+          <input
+            id={emailId}
+            className="field"
+            type="email"
+            autoComplete="email"
+            placeholder={t('auth.emailPlaceholder')}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            aria-describedby={describedBy}
+          />
+        </Field>
+        <Field label={t('common.password')} htmlFor={passwordId}>
+          <input
+            id={passwordId}
+            className="field"
+            type="password"
+            autoComplete="new-password"
+            placeholder={t('auth.register.passwordPlaceholder')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            aria-describedby={describedBy}
+          />
+        </Field>
+        <Button type="submit" block busy={loading}>
+          {t('auth.register.submit')}
+        </Button>
+      </form>
+      <AuthFooter>
+        {t('auth.register.haveAccount')} <Link to={loginHref}>{t('auth.register.signIn')}</Link>
+      </AuthFooter>
+    </>
+  );
+}

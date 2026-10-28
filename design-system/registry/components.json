@@ -848,7 +848,6 @@
         "routing-providers.css",
         "routing.css",
         "tokens.css",
-        "welcome.css",
         "wizard.css"
       ]
     },
@@ -1765,7 +1764,6 @@
         "routing-providers.css",
         "routing-tabs.css",
         "theme.css",
-        "welcome.css",
         "wizard.css"
       ]
     },
@@ -1963,8 +1961,7 @@
       ],
       "files": [
         "routing-providers.css",
-        "routing.css",
-        "welcome.css"
+        "routing.css"
       ]
     },
     "recovery-card": {
@@ -2115,8 +2112,7 @@
         "routing-cards--wide"
       ],
       "files": [
-        "routing.css",
-        "welcome.css"
+        "routing.css"
       ]
     },
     "routing-cards-backdrop": {
@@ -2465,8 +2461,7 @@
         "settings-switch__track"
       ],
       "files": [
-        "agents.css",
-        "welcome.css"
+        "agents.css"
       ]
     },
     "setup-agents-card": {
@@ -3124,113 +3119,6 @@
         "overview.css"
       ]
     },
-    "welcome": {
-      "classes": [
-        "welcome",
-        "welcome__actions",
-        "welcome__actions--split",
-        "welcome__actions--sticky",
-        "welcome__actions-note",
-        "welcome__agent-wait",
-        "welcome__agent-wait--success",
-        "welcome__agent-wait-heading",
-        "welcome__availability-note",
-        "welcome__error",
-        "welcome__eyebrow",
-        "welcome__first-request",
-        "welcome__form-panel",
-        "welcome__harness-summary",
-        "welcome__harness-summary-icon",
-        "welcome__harness-summary-name",
-        "welcome__harness-summary-type",
-        "welcome__inline-code",
-        "welcome__input-hint",
-        "welcome__launch-orbit",
-        "welcome__launch-rocket",
-        "welcome__launch-rocket--complete",
-        "welcome__launch-stack",
-        "welcome__launch-stack--complete",
-        "welcome__launch-stack-header",
-        "welcome__launch-track",
-        "welcome__liftoff",
-        "welcome__liftoff-action",
-        "welcome__liftoff-beacon",
-        "welcome__liftoff-copy",
-        "welcome__liftoff-description",
-        "welcome__liftoff-earth",
-        "welcome__liftoff-exit",
-        "welcome__liftoff-flash",
-        "welcome__liftoff-kicker",
-        "welcome__liftoff-orbit",
-        "welcome__liftoff-plume",
-        "welcome__liftoff-plume-inner",
-        "welcome__liftoff-rocket",
-        "welcome__liftoff-smoke",
-        "welcome__liftoff-stars",
-        "welcome__liftoff-stars--far",
-        "welcome__liftoff-stars--near",
-        "welcome__liftoff-status",
-        "welcome__liftoff-title",
-        "welcome__liftoff-title--launch",
-        "welcome__liftoff-title--orbit",
-        "welcome__liftoff-titles",
-        "welcome__logo-dark",
-        "welcome__logo-light",
-        "welcome__logo-mark",
-        "welcome__main",
-        "welcome__model-badge",
-        "welcome__nav",
-        "welcome__nav-btn",
-        "welcome__nav-check",
-        "welcome__nav-dot",
-        "welcome__nav-hint",
-        "welcome__nav-item",
-        "welcome__nav-item--active",
-        "welcome__nav-item--done",
-        "welcome__nav-label",
-        "welcome__nav-mobile-rocket",
-        "welcome__nav-mobile-rocket--complete",
-        "welcome__output",
-        "welcome__panel",
-        "welcome__panel--playground",
-        "welcome__panel--setup",
-        "welcome__panel-desc",
-        "welcome__panel-header",
-        "welcome__panel-title",
-        "welcome__pending",
-        "welcome__plan-heading",
-        "welcome__plan-section",
-        "welcome__playground",
-        "welcome__playground-actions",
-        "welcome__playground-link",
-        "welcome__progress",
-        "welcome__progress-header",
-        "welcome__prompt-label",
-        "welcome__provider-connected",
-        "welcome__provider-list",
-        "welcome__request-failure",
-        "welcome__response",
-        "welcome__rocket-flame",
-        "welcome__route-test-heading",
-        "welcome__route-test-section",
-        "welcome__route-test-title",
-        "welcome__section-desc",
-        "welcome__section-heading",
-        "welcome__setup-snippets",
-        "welcome__sidebar",
-        "welcome__sidebar-footer",
-        "welcome__sidebar-top",
-        "welcome__skip-row",
-        "welcome__spinner",
-        "welcome__stats",
-        "welcome__success-icon",
-        "welcome__text-link",
-        "welcome__textarea"
-      ],
-      "files": [
-        "welcome.css"
-      ]
-    },
     "workspace-table": {
       "classes": [
         "workspace-table__actions",
@@ -3503,48 +3391,6 @@
       "value": "toastSlideIn 200ms ease-out",
       "file": "toast.css",
       "line": 26
-    },
-    {
-      "selector": ".welcome__progress-header span",
-      "prop": "letter-spacing",
-      "value": "0.02em",
-      "file": "welcome.css",
-      "line": 554
-    },
-    {
-      "selector": ".welcome__text-link:focus-visible",
-      "prop": "outline",
-      "value": "2px solid hsl(var(--ring))",
-      "file": "welcome.css",
-      "line": 860
-    },
-    {
-      "selector": ".welcome__text-link:focus-visible",
-      "prop": "outline-offset",
-      "value": "3px",
-      "file": "welcome.css",
-      "line": 861
-    },
-    {
-      "selector": ".welcome__route-test-heading",
-      "prop": "align-items",
-      "value": "center",
-      "file": "welcome.css",
-      "line": 896
-    },
-    {
-      "selector": ".welcome__route-test-heading",
-      "prop": "gap",
-      "value": "10px",
-      "file": "welcome.css",
-      "line": 897
-    },
-    {
-      "selector": ".welcome__text-link",
-      "prop": "padding",
-      "value": "6px 0",
-      "file": "welcome.css",
-      "line": 1090
     }
   ],
   "ghostRules": [
@@ -3843,54 +3689,6 @@
       "file": "modals.css",
       "line": 110,
       "losesTo": "overview.css:55"
-    },
-    {
-      "selector": ".welcome__progress-header span",
-      "prop": "letter-spacing",
-      "value": "0.09em",
-      "file": "welcome.css",
-      "line": 548,
-      "losesTo": "welcome.css:554"
-    },
-    {
-      "selector": ".welcome__text-link:focus-visible",
-      "prop": "outline",
-      "value": "3px solid hsl(var(--ring))",
-      "file": "welcome.css",
-      "line": 726,
-      "losesTo": "welcome.css:860"
-    },
-    {
-      "selector": ".welcome__text-link:focus-visible",
-      "prop": "outline-offset",
-      "value": "2px",
-      "file": "welcome.css",
-      "line": 727,
-      "losesTo": "welcome.css:861"
-    },
-    {
-      "selector": ".welcome__route-test-heading",
-      "prop": "align-items",
-      "value": "flex-start",
-      "file": "welcome.css",
-      "line": 868,
-      "losesTo": "welcome.css:896"
-    },
-    {
-      "selector": ".welcome__route-test-heading",
-      "prop": "gap",
-      "value": "14px",
-      "file": "welcome.css",
-      "line": 870,
-      "losesTo": "welcome.css:897"
-    },
-    {
-      "selector": ".welcome__text-link",
-      "prop": "padding",
-      "value": "0",
-      "file": "welcome.css",
-      "line": 1079,
-      "losesTo": "welcome.css:1090"
     }
   ],
   "componentSheets": {
@@ -3912,17 +3710,17 @@
       "pages/RoutingHeaderTiersSection.tsx",
       "pages/RoutingVirtualModelsSection.tsx"
     ],
-    "routing-modal.css": [
-      "pages/Welcome.tsx"
-    ],
-    "routing-providers.css": [
-      "pages/Welcome.tsx"
-    ],
     "routing-specificity.css": [
       "pages/RoutingSpecificitySection.tsx"
     ],
     "routing-virtual-models.css": [
       "pages/RoutingVirtualModelsSection.tsx"
+    ],
+    "routing-providers.css": [
+      "(via @import)"
+    ],
+    "routing-modal.css": [
+      "(via @import)"
     ],
     "routing-tabs.css": [
       "(via @import)"
@@ -3930,11 +3728,7 @@
     "routing.css": [
       "pages/GlobalOverview.tsx",
       "pages/Overview.tsx",
-      "pages/Routing.tsx",
-      "pages/Welcome.tsx"
-    ],
-    "welcome.css": [
-      "pages/Welcome.tsx"
+      "pages/Routing.tsx"
     ]
   },
   "orphanStylesheets": [
@@ -3944,16 +3738,17 @@
     "model-filter.css",
     "organization.css",
     "playground.css",
-    "request-drawer.css"
+    "request-drawer.css",
+    "welcome.css"
   ],
   "tokensOutsideSource": [],
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 228,
-    "classes": 1249,
-    "canonicalRules": 43,
-    "ghostRules": 43
+    "blocks": 227,
+    "classes": 1149,
+    "canonicalRules": 37,
+    "ghostRules": 37
   },
   "missingImports": [
     "/Users/patrickbrandao/Projects/thinker/packages/frontend/src/styles/canvas.css",

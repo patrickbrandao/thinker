@@ -1,4 +1,4 @@
-import { createSignal, createMemo, Show, Switch, Match, type Component } from 'solid-js';
+import { useState, type ReactNode } from 'react';
 import FrameworkSnippets from './FrameworkSnippets.jsx';
 import OpenClawSetup from './OpenClawSetup.jsx';
 import HermesSetup from './HermesSetup.jsx';
@@ -9,8 +9,10 @@ import ClaudeCodeSetup from './ClaudeCodeSetup.jsx';
 import OpenCodeSetup from './OpenCodeSetup.jsx';
 import CodexSetup from './CodexSetup.jsx';
 import VirtualModelsHint from './VirtualModelsHint.jsx';
-import type { ToolkitId } from '../services/framework-snippets.js';
 import RichText from './RichText.jsx';
+import { CHIP, monoIconClass, SetupHint, SetupSegment } from './setup-ui.jsx';
+import { cx } from './ui.jsx';
+import type { ToolkitId } from '../services/framework-snippets.js';
 import { t } from '../i18n/index.js';
 
 type SetupTab = 'toolkits' | 'agents';
@@ -52,6 +54,17 @@ const NAMED_TOOLS: Record<string, string> = {
   codex: 'Codex',
 };
 
+/** Agent tabs of the unfiltered view, in display order. */
+const AGENT_TABS: { id: AgentId; label: string; icon: string }[] = [
+  { id: 'openclaw', label: 'OpenClaw', icon: '/icons/openclaw.svg' },
+  { id: 'hermes', label: 'Hermes Agent', icon: '/icons/hermes.svg' },
+  { id: 'nanobot', label: 'Nanobot', icon: '/icons/nanobot.png' },
+  { id: 'craft', label: 'Craft Agent', icon: '/icons/craft.png' },
+  { id: 'claude-code', label: 'Claude Code', icon: '/icons/providers/claude-code.svg' },
+  { id: 'opencode', label: 'OpenCode', icon: '/icons/providers/opencode.svg' },
+  { id: 'codex', label: 'Codex', icon: '/icons/providers/codex.svg' },
+];
+
 function headingFor(platform: string | null | undefined): string {
   const harness = platform ? NAMED_HARNESSES[platform] : undefined;
   if (harness) return t('harnesses.setupStep.connectNamed', { name: harness });
@@ -60,253 +73,140 @@ function headingFor(platform: string | null | undefined): string {
   return t('harnesses.setupStep.connectDefault');
 }
 
-const SetupStepAddProvider: Component<Props> = (props) => {
-  const [activeTab, setActiveTab] = createSignal<SetupTab>('agents');
-  const [activeAgent, setActiveAgent] = createSignal<AgentId>('openclaw');
+interface SnippetProps {
+  apiKey: string | null;
+  keyPrefix: string | null;
+  baseUrl: string;
+}
 
-  const snippetProps = createMemo(() => ({
-    apiKey: props.apiKey,
-    keyPrefix: props.keyPrefix,
-    baseUrl: props.baseUrl,
-  }));
+/** The guide for one harness, or null when it has none. */
+function harnessGuide(id: string | null | undefined, props: SnippetProps): ReactNode {
+  switch (id) {
+    case 'openclaw':
+      return <OpenClawSetup {...props} />;
+    case 'hermes':
+      return <HermesSetup {...props} />;
+    case 'nanobot':
+      return <NanobotSetup {...props} />;
+    case 'craft':
+      return <CraftAgentSetup {...props} />;
+    case 'n8n':
+      return <N8nSetup {...props} />;
+    case 'claude-code':
+      return <ClaudeCodeSetup {...props} />;
+    case 'opencode':
+      return <OpenCodeSetup {...props} />;
+    case 'codex':
+      return <CodexSetup {...props} />;
+    default:
+      return null;
+  }
+}
 
-  const isFiltered = () => !!props.platform;
-  const toolkitId = () => (props.platform ? PLATFORM_TO_TOOLKIT[props.platform] : undefined);
-  const virtualModels = (): readonly string[] => props.virtualModels ?? [];
-  /** Hint flavor: toolkit snippets carry their own model picker. */
-  const filteredHintPlatform = () =>
-    toolkitId() || props.platform === 'other' ? 'toolkits' : props.platform;
+export default function SetupStepAddProvider({
+  apiKey,
+  keyPrefix,
+  baseUrl,
+  hideFullKey,
+  platform,
+  virtualModels = [],
+}: Props) {
+  const [activeTab, setActiveTab] = useState<SetupTab>('agents');
+  const [activeAgent, setActiveAgent] = useState<AgentId>('openclaw');
+
+  const snippetProps: SnippetProps = { apiKey, keyPrefix, baseUrl };
+  const toolkitId = platform ? PLATFORM_TO_TOOLKIT[platform] : undefined;
+
+  if (platform) {
+    // Platform-filtered mode: show only the relevant guide.
+    const guide = harnessGuide(platform, snippetProps);
+    const defaultToolkit = toolkitId ?? (platform === 'other' ? 'curl' : undefined);
+    // Toolkit snippets carry their own model picker.
+    const hintPlatform = toolkitId || platform === 'other' ? 'toolkits' : platform;
+    return (
+      <div>
+        <h3 className="setup-step__heading text-[15px] font-semibold text-ink">
+          {headingFor(platform)}
+        </h3>
+        {guide ??
+          (defaultToolkit ? (
+            <FrameworkSnippets
+              {...snippetProps}
+              hideFullKey={hideFullKey}
+              defaultToolkit={defaultToolkit}
+              modelOptions={virtualModels}
+            />
+          ) : null)}
+        <VirtualModelsHint names={virtualModels} platform={hintPlatform} />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <h3 class="setup-step__heading">{headingFor(props.platform)}</h3>
+      <h3 className="setup-step__heading text-[15px] font-semibold text-ink">
+        {headingFor(platform)}
+      </h3>
+      <SetupHint className="mb-3 mt-1">
+        <RichText
+          text={t('harnesses.setupStep.pointAt')}
+          parts={{ model: <code className={CHIP}>auto</code> }}
+        />
+      </SetupHint>
 
-      {/* Platform-filtered mode: show only relevant content */}
-      <Show when={isFiltered()}>
-        <Switch>
-          <Match when={props.platform === 'openclaw'}>
-            <OpenClawSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'hermes'}>
-            <HermesSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'nanobot'}>
-            <NanobotSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'craft'}>
-            <CraftAgentSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'n8n'}>
-            <N8nSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'claude-code'}>
-            <ClaudeCodeSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'opencode'}>
-            <OpenCodeSetup {...snippetProps()} />
-          </Match>
-          <Match when={props.platform === 'codex'}>
-            <CodexSetup {...snippetProps()} />
-          </Match>
-          <Match when={toolkitId()}>
-            <FrameworkSnippets
-              {...snippetProps()}
-              hideFullKey={props.hideFullKey}
-              defaultToolkit={toolkitId()!}
-              modelOptions={virtualModels()}
-            />
-          </Match>
-          <Match when={props.platform === 'other'}>
-            <FrameworkSnippets
-              {...snippetProps()}
-              hideFullKey={props.hideFullKey}
-              defaultToolkit="curl"
-              modelOptions={virtualModels()}
-            />
-          </Match>
-        </Switch>
-        <VirtualModelsHint names={virtualModels()} platform={filteredHintPlatform()} />
-      </Show>
+      <SetupSegment
+        label={t('harnesses.setupStep.method')}
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { key: 'agents', label: t('harnesses.setupStep.agents') },
+          { key: 'toolkits', label: t('harnesses.setupStep.toolkits') },
+        ]}
+      />
 
-      {/* Default / "other": show full tabbed UI */}
-      <Show when={!isFiltered()}>
-        <p class="setup-step__desc">
-          <RichText
-            text={t('harnesses.setupStep.pointAt')}
-            parts={{ model: <code class="setup-model-hint__code">auto</code> }}
-          />
-        </p>
-
-        <div class="setup-segment" role="tablist" aria-label={t('harnesses.setupStep.method')}>
-          <button
-            class="setup-segment__btn"
-            classList={{ 'setup-segment__btn--active': activeTab() === 'agents' }}
-            onClick={() => setActiveTab('agents')}
-            role="tab"
-            aria-selected={activeTab() === 'agents'}
-          >
-            {t('harnesses.setupStep.agents')}
-          </button>
-          <button
-            class="setup-segment__btn"
-            classList={{ 'setup-segment__btn--active': activeTab() === 'toolkits' }}
-            onClick={() => setActiveTab('toolkits')}
-            role="tab"
-            aria-selected={activeTab() === 'toolkits'}
-          >
-            {t('harnesses.setupStep.toolkits')}
-          </button>
-        </div>
-
-        <Show when={activeTab() === 'toolkits'}>
+      {activeTab === 'toolkits' ? (
+        <>
           <FrameworkSnippets
-            {...snippetProps()}
-            hideFullKey={props.hideFullKey}
-            modelOptions={virtualModels()}
+            {...snippetProps}
+            hideFullKey={hideFullKey}
+            modelOptions={virtualModels}
           />
-          <VirtualModelsHint names={virtualModels()} platform="toolkits" />
-        </Show>
-
-        <Show when={activeTab() === 'agents'}>
-          <div class="setup-method-tabs">
-            <div class="panel__tabs" role="tablist" aria-label={t('harnesses.setupStep.framework')}>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'openclaw' }}
-                onClick={() => setActiveAgent('openclaw')}
-                role="tab"
-                aria-selected={activeAgent() === 'openclaw'}
-              >
-                <img
-                  src="/icons/openclaw.svg"
-                  alt=""
-                  class="panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                OpenClaw
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'hermes' }}
-                onClick={() => setActiveAgent('hermes')}
-                role="tab"
-                aria-selected={activeAgent() === 'hermes'}
-              >
-                <img
-                  src="/icons/hermes.svg"
-                  alt=""
-                  class="platform-icon panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                Hermes Agent
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'nanobot' }}
-                onClick={() => setActiveAgent('nanobot')}
-                role="tab"
-                aria-selected={activeAgent() === 'nanobot'}
-              >
-                <img
-                  src="/icons/nanobot.png"
-                  alt=""
-                  class="panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                Nanobot
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'craft' }}
-                onClick={() => setActiveAgent('craft')}
-                role="tab"
-                aria-selected={activeAgent() === 'craft'}
-              >
-                <img src="/icons/craft.png" alt="" class="panel__tab-icon" width="16" height="16" />
-                Craft Agent
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'claude-code' }}
-                onClick={() => setActiveAgent('claude-code')}
-                role="tab"
-                aria-selected={activeAgent() === 'claude-code'}
-              >
-                <img
-                  src="/icons/providers/claude-code.svg"
-                  alt=""
-                  class="panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                Claude Code
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'opencode' }}
-                onClick={() => setActiveAgent('opencode')}
-                role="tab"
-                aria-selected={activeAgent() === 'opencode'}
-              >
-                <img
-                  src="/icons/providers/opencode.svg"
-                  alt=""
-                  class="panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                OpenCode
-              </button>
-              <button
-                class="panel__tab"
-                classList={{ 'panel__tab--active': activeAgent() === 'codex' }}
-                onClick={() => setActiveAgent('codex')}
-                role="tab"
-                aria-selected={activeAgent() === 'codex'}
-              >
-                <img
-                  src="/icons/providers/codex.svg"
-                  alt=""
-                  class="panel__tab-icon"
-                  width="16"
-                  height="16"
-                />
-                Codex
-              </button>
+          <VirtualModelsHint names={virtualModels} platform="toolkits" />
+        </>
+      ) : (
+        <>
+          <div className="setup-method-tabs mt-3">
+            <div
+              className="tabs mb-0!"
+              role="tablist"
+              aria-label={t('harnesses.setupStep.framework')}
+            >
+              {AGENT_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={cx('tab', activeAgent === tab.id && 'is-active')}
+                  onClick={() => setActiveAgent(tab.id)}
+                  role="tab"
+                  aria-selected={activeAgent === tab.id}
+                >
+                  <img
+                    src={tab.icon}
+                    alt=""
+                    className={cx('tab-icon', monoIconClass(tab.icon))}
+                    width="16"
+                    height="16"
+                  />
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <Switch>
-            <Match when={activeAgent() === 'openclaw'}>
-              <OpenClawSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'hermes'}>
-              <HermesSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'nanobot'}>
-              <NanobotSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'craft'}>
-              <CraftAgentSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'claude-code'}>
-              <ClaudeCodeSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'opencode'}>
-              <OpenCodeSetup {...snippetProps()} />
-            </Match>
-            <Match when={activeAgent() === 'codex'}>
-              <CodexSetup {...snippetProps()} />
-            </Match>
-          </Switch>
-          <VirtualModelsHint names={virtualModels()} platform={activeAgent()} />
-        </Show>
-      </Show>
+          {harnessGuide(activeAgent, snippetProps)}
+          <VirtualModelsHint names={virtualModels} platform={activeAgent} />
+        </>
+      )}
     </div>
   );
-};
-
-export default SetupStepAddProvider;
+}

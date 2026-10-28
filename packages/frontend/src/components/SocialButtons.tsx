@@ -1,5 +1,5 @@
-import { For, Show, type Component, type JSX } from 'solid-js';
-import { useLocation, useSearchParams } from '@solidjs/router';
+import type { ReactNode } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 import { authClient } from '../services/auth-client.js';
 import { buildSocialAuthUrls } from '../services/auth-redirects.js';
 import { setLastAuthMethod } from '../services/last-auth-method.js';
@@ -18,13 +18,14 @@ const handleSocialLogin = (
   urls: { callbackURL: string; errorCallbackURL: string },
 ) => {
   setLastAuthMethod(provider);
-  authClient.signIn.social({
+  void authClient.signIn.social({
     provider,
     ...urls,
   });
 };
 
-const providerIcons: Record<Provider, () => JSX.Element> = {
+// Brand marks keep their official colors (like ProviderIcon).
+const providerIcons: Record<Provider, () => ReactNode> = {
   google: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -63,42 +64,46 @@ interface SocialButtonsProps {
   callbackURL?: string;
 }
 
-const SocialButtons: Component<SocialButtonsProps> = (props) => {
+export default function SocialButtons({
+  enabledProviders,
+  lastUsed,
+  callbackURL,
+}: SocialButtonsProps) {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const visible = () => {
-    if (!props.enabledProviders) return allProviders;
-    return allProviders.filter((p) => props.enabledProviders!.includes(p.id));
-  };
+  const visible = enabledProviders
+    ? allProviders.filter((p) => enabledProviders.includes(p.id))
+    : allProviders;
+  if (visible.length === 0) return null;
+
   const authUrls = () => ({
-    ...buildSocialAuthUrls(searchParams, location.search),
-    ...(props.callbackURL ? { callbackURL: props.callbackURL } : {}),
+    ...buildSocialAuthUrls(Object.fromEntries(searchParams), location.search),
+    ...(callbackURL ? { callbackURL } : {}),
   });
 
   return (
-    <Show when={visible().length > 0}>
-      <div class="auth-social-group">
-        <For each={visible()}>
-          {(provider) => (
-            <button
-              class={`auth-social-btn auth-social-btn--${provider.id}`}
-              onClick={() => handleSocialLogin(provider.id, authUrls())}
+    <div className="auth-social-group flex flex-col gap-2">
+      {visible.map((provider) => (
+        <button
+          key={provider.id}
+          type="button"
+          className={`auth-social-btn auth-social-btn--${provider.id} btn btn-ghost btn-block relative`}
+          onClick={() => handleSocialLogin(provider.id, authUrls())}
+        >
+          <span className="inline-flex" aria-hidden="true">
+            {providerIcons[provider.id]()}
+          </span>
+          <span>{t('auth.continueWith', { provider: provider.label })}</span>
+          {lastUsed === provider.id ? (
+            <span
+              className="auth-last-used badge is-accent absolute right-2"
+              aria-label={t('auth.lastUsed')}
             >
-              <span class="auth-social-btn__icon">{providerIcons[provider.id]()}</span>
-              <span class="auth-social-btn__label">
-                {t('auth.continueWith', { provider: provider.label })}
-              </span>
-              <Show when={props.lastUsed === provider.id}>
-                <span class="auth-last-used" aria-label={t('auth.lastUsed')}>
-                  {t('auth.lastUsed')}
-                </span>
-              </Show>
-            </button>
-          )}
-        </For>
-      </div>
-    </Show>
+              {t('auth.lastUsed')}
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </div>
   );
-};
-
-export default SocialButtons;
+}

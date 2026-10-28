@@ -1,10 +1,12 @@
-import { createSignal, onMount, Show, type Component } from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
+import { useEffect, useId, useState, type FormEvent } from 'react';
+import { AuthFooter, AuthHeader, authLinkButtonClass } from '../components/auth-ui.jsx';
+import { Button, Field } from '../components/ui.jsx';
 import { authClient } from '../services/auth-client.js';
 import { ApiError } from '../services/api/core.js';
 import { changeOwnPassword } from '../services/api/organizations.js';
 import { markPasswordChangeRequired } from '../services/org-context.js';
 import { loadMe, me } from '../services/session-store.js';
+import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
 
 /** Client-side checks before the request. Returns an error message or null. */
@@ -21,30 +23,34 @@ export function validateNewPassword(current: string, next: string, confirm: stri
  * `password_change_required`; the rest of the dashboard stays blocked until the
  * change succeeds.
  */
-const ChangePassword: Component = () => {
-  const [current, setCurrent] = createSignal('');
-  const [next, setNext] = createSignal('');
-  const [confirm, setConfirm] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [busy, setBusy] = createSignal(false);
+export default function ChangePassword() {
+  const profile = useSignal(me);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const currentId = useId();
+  const nextId = useId();
+  const confirmId = useId();
 
-  onMount(() => {
+  useEffect(() => {
     if (!me()) void loadMe().catch(() => {});
-  });
+  }, []);
 
-  const required = () => me()?.mustChangePassword !== false;
+  const required = profile?.mustChangePassword !== false;
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const problem = validateNewPassword(current(), next(), confirm());
+    const problem = validateNewPassword(current, next, confirm);
     if (problem) {
       setError(problem);
       return;
     }
     setBusy(true);
     try {
-      await changeOwnPassword(current(), next(), { silent: true });
+      await changeOwnPassword(current, next, { silent: true });
       markPasswordChangeRequired(false);
       // Full reload: every resource, cache and the session start clean.
       window.location.replace('/');
@@ -66,68 +72,71 @@ const ChangePassword: Component = () => {
 
   return (
     <>
-      <Title>{t('common.pageTitle', { page: t('auth.changePassword.pageTitle') })}</Title>
-      <Meta name="description" content={t('auth.changePassword.metaDescription')} />
-      <div class="auth-header">
-        <h1 class="auth-header__title">{t('auth.changePassword.title')}</h1>
-        <p class="auth-header__subtitle">
-          <Show when={required()} fallback={t('auth.changePassword.optionalSubtitle')}>
-            {t('auth.changePassword.requiredSubtitle')}
-          </Show>
-        </p>
-      </div>
-      <form class="auth-form" onSubmit={handleSubmit}>
-        <Show when={error()}>
-          <div class="auth-form__error" role="alert">
-            {error()}
+      <title>{t('common.pageTitle', { page: t('auth.changePassword.pageTitle') })}</title>
+      <meta name="description" content={t('auth.changePassword.metaDescription')} />
+      <AuthHeader
+        title={t('auth.changePassword.title')}
+        subtitle={
+          required
+            ? t('auth.changePassword.requiredSubtitle')
+            : t('auth.changePassword.optionalSubtitle')
+        }
+      />
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+        {error ? (
+          <div className="form-error" role="alert">
+            {error}
           </div>
-        </Show>
-        <label class="auth-form__label">
-          {required() ? t('auth.changePassword.temporary') : t('account.security.currentPassword')}
+        ) : null}
+        <Field
+          label={
+            required ? t('auth.changePassword.temporary') : t('account.security.currentPassword')
+          }
+          htmlFor={currentId}
+        >
           <input
-            class="auth-form__input"
+            id={currentId}
+            className="field"
             type="password"
-            autocomplete="current-password"
-            value={current()}
-            onInput={(e) => setCurrent(e.currentTarget.value)}
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
             required
           />
-        </label>
-        <label class="auth-form__label">
-          {t('account.security.newPassword')}
+        </Field>
+        <Field label={t('account.security.newPassword')} htmlFor={nextId}>
           <input
-            class="auth-form__input"
+            id={nextId}
+            className="field"
             type="password"
-            autocomplete="new-password"
-            value={next()}
-            onInput={(e) => setNext(e.currentTarget.value)}
-            required
-            minLength={8}
-          />
-        </label>
-        <label class="auth-form__label">
-          {t('account.security.confirmPassword')}
-          <input
-            class="auth-form__input"
-            type="password"
-            autocomplete="new-password"
-            value={confirm()}
-            onInput={(e) => setConfirm(e.currentTarget.value)}
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
             required
             minLength={8}
           />
-        </label>
-        <button class="auth-form__submit" type="submit" disabled={busy()}>
-          {busy() ? <span class="spinner" /> : t('account.security.submit')}
-        </button>
+        </Field>
+        <Field label={t('account.security.confirmPassword')} htmlFor={confirmId}>
+          <input
+            id={confirmId}
+            className="field"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            minLength={8}
+          />
+        </Field>
+        <Button type="submit" block busy={busy}>
+          {t('account.security.submit')}
+        </Button>
       </form>
-      <div class="auth-footer">
-        <button type="button" class="auth-form__link-btn" onClick={() => void signOut()}>
+      <AuthFooter>
+        <button type="button" className={authLinkButtonClass} onClick={() => void signOut()}>
           {t('nav.logOut')}
         </button>
-      </div>
+      </AuthFooter>
     </>
   );
-};
-
-export default ChangePassword;
+}

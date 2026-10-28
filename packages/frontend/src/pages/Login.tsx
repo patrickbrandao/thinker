@@ -1,15 +1,13 @@
-import { A, useLocation, useSearchParams } from '@solidjs/router';
-import { Title, Meta } from '@solidjs/meta';
-import {
-  type Component,
-  createSignal,
-  createUniqueId,
-  lazy,
-  onCleanup,
-  onMount,
-  Show,
-} from 'solid-js';
+import { lazy, Suspense, useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import SocialButtons from '../components/SocialButtons.jsx';
+import {
+  AuthDivider,
+  AuthFooter,
+  AuthHeader,
+  authLinkButtonClass,
+} from '../components/auth-ui.jsx';
+import { Button, Field } from '../components/ui.jsx';
 import { authClient } from '../services/auth-client.js';
 import { appendSearch, getAuthDestination } from '../services/auth-redirects.js';
 import { getLastAuthMethod, setLastAuthMethod } from '../services/last-auth-method.js';
@@ -25,49 +23,61 @@ const DevSignInButton = import.meta.env.DEV
   ? lazy(() => import('../components/DevSignInButton.jsx'))
   : null;
 
-const Login: Component = () => {
-  const [email, setEmail] = createSignal('');
-  const [password, setPassword] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [needsVerification, setNeedsVerification] = createSignal(false);
-  const [resendCooldown, setResendCooldown] = createSignal(0);
-  const [socialProviders, setSocialProviders] = createSignal<string[]>([]);
-  const [lastAuthMethod] = createSignal(getLastAuthMethod());
-  const [signupEnabled, setSignupEnabled] = createSignal(false);
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [socialProviders, setSocialProviders] = useState<string[]>([]);
+  const [lastAuthMethod] = useState(getLastAuthMethod);
+  const [signupEnabled, setSignupEnabled] = useState(false);
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const emailId = createUniqueId();
-  const passwordId = createUniqueId();
-  const errorId = createUniqueId();
+  const emailId = useId();
+  const passwordId = useId();
+  const errorId = useId();
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  onMount(async () => {
-    if (searchParams.error === 'account_not_linked') {
+  useEffect(() => {
+    let alive = true;
+    const code = searchParams.get('error');
+    if (code === 'account_not_linked') {
       setNeedsVerification(true);
       setError(t('auth.login.accountNotLinked'));
-    } else if (
-      searchParams.error === 'signup_disabled' ||
-      searchParams.error === 'unable_to_create_user'
-    ) {
+    } else if (code === 'signup_disabled' || code === 'unable_to_create_user') {
       setError(t('auth.login.signupDisabled'));
-    } else if (searchParams.error || searchParams.oauth === 'failed') {
+    } else if (code || searchParams.get('oauth') === 'failed') {
       setError(t('auth.login.oauthFailed'));
     }
-    const [providers, signup] = await Promise.all([checkSocialProviders(), checkSignupEnabled()]);
-    setSocialProviders(providers);
-    setSignupEnabled(signup);
-  });
+    void Promise.all([checkSocialProviders(), checkSignupEnabled()]).then(([providers, signup]) => {
+      if (!alive) return;
+      setSocialProviders(providers);
+      setSignupEnabled(signup);
+    });
+    return () => {
+      alive = false;
+    };
+    // Mount only: the error comes from the callback URL the page loaded with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  let cooldownInterval: ReturnType<typeof setInterval> | undefined;
+  useEffect(
+    () => () => {
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    },
+    [],
+  );
 
   const startCooldown = () => {
     setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    if (cooldownInterval) clearInterval(cooldownInterval);
-    cooldownInterval = setInterval(() => {
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    cooldownInterval.current = setInterval(() => {
       setResendCooldown((prev) => {
         if (prev <= 1) {
-          clearInterval(cooldownInterval);
-          cooldownInterval = undefined;
+          clearInterval(cooldownInterval.current);
+          cooldownInterval.current = undefined;
           return 0;
         }
         return prev - 1;
@@ -75,20 +85,13 @@ const Login: Component = () => {
     }, 1000);
   };
 
-  onCleanup(() => {
-    if (cooldownInterval) clearInterval(cooldownInterval);
-  });
-
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setNeedsVerification(false);
     setLoading(true);
 
-    const { error: authError } = await authClient.signIn.email({
-      email: email(),
-      password: password(),
-    });
+    const { error: authError } = await authClient.signIn.email({ email, password });
 
     setLoading(false);
 
@@ -107,7 +110,7 @@ const Login: Component = () => {
     }
 
     setLastAuthMethod('email');
-    window.location.href = getAuthDestination(searchParams, location.search);
+    window.location.href = getAuthDestination(Object.fromEntries(searchParams), location.search);
   };
 
   // Dev shortcut: fill + submit the seed admin. One click, no credentials in the URL;
@@ -131,15 +134,15 @@ const Login: Component = () => {
   };
 
   const handleResendVerification = async () => {
-    if (resendCooldown() > 0) return;
-    if (!email().trim()) {
+    if (resendCooldown > 0) return;
+    if (!email.trim()) {
       setError(t('auth.login.enterEmailForLink'));
       return;
     }
 
     const { error: resendError } = await authClient.sendVerificationEmail({
-      email: email(),
-      callbackURL: getAuthDestination(searchParams, location.search),
+      email,
+      callbackURL: getAuthDestination(Object.fromEntries(searchParams), location.search),
     });
 
     if (resendError) {
@@ -151,92 +154,83 @@ const Login: Component = () => {
     setError(t('auth.login.verificationSent'));
   };
 
+  const describedBy = error ? errorId : undefined;
+
   return (
     <>
-      <Title>{t('common.pageTitle', { page: t('auth.login.pageTitle') })}</Title>
-      <Meta name="description" content={t('auth.login.metaDescription')} />
-      <div class="auth-header">
-        <h1 class="auth-header__title">{t('auth.login.title')}</h1>
-        <p class="auth-header__subtitle">{t('auth.login.subtitle')}</p>
-      </div>
+      <title>{t('common.pageTitle', { page: t('auth.login.pageTitle') })}</title>
+      <meta name="description" content={t('auth.login.metaDescription')} />
+      <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
 
-      <SocialButtons enabledProviders={socialProviders()} lastUsed={lastAuthMethod()} />
+      <SocialButtons enabledProviders={socialProviders} lastUsed={lastAuthMethod} />
 
-      <Show when={socialProviders().length > 0}>
-        <div class="auth-divider">
-          <span class="auth-divider__text">{t('auth.or')}</span>
-        </div>
-      </Show>
+      {socialProviders.length > 0 ? <AuthDivider /> : null}
 
-      <form class="auth-form" onSubmit={handleSubmit}>
-        {import.meta.env.DEV && DevSignInButton && (
-          <DevSignInButton disabled={loading()} onSignIn={signInAsDev} />
-        )}
-        {error() && (
-          <div id={errorId} class="auth-form__error" role="alert">
-            {error()}
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+        {import.meta.env.DEV && DevSignInButton ? (
+          <Suspense fallback={null}>
+            <DevSignInButton disabled={loading} onSignIn={signInAsDev} />
+          </Suspense>
+        ) : null}
+        {error ? (
+          <div id={errorId} className="form-error" role="alert">
+            {error}
           </div>
-        )}
-        <label class="auth-form__label" for={emailId}>
-          {t('common.email')}
+        ) : null}
+        <Field label={t('common.email')} htmlFor={emailId}>
           <input
-            ref={(el) => requestAnimationFrame(() => el.focus())}
+            autoFocus
             id={emailId}
-            class="auth-form__input"
+            className="field"
             type="email"
-            autocomplete="email"
+            autoComplete="email"
             placeholder={t('auth.emailPlaceholder')}
-            value={email()}
-            onInput={(e) => setEmail(e.currentTarget.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
-            aria-describedby={error() ? errorId : undefined}
+            aria-describedby={describedBy}
           />
-        </label>
-        <Show when={needsVerification()}>
+        </Field>
+        {needsVerification ? (
           <button
             type="button"
-            class="auth-form__link-btn"
+            className={authLinkButtonClass}
             onClick={handleResendVerification}
-            disabled={resendCooldown() > 0}
+            disabled={resendCooldown > 0}
           >
-            {resendCooldown() > 0
-              ? t('auth.resendIn', { seconds: resendCooldown() })
+            {resendCooldown > 0
+              ? t('auth.resendIn', { seconds: resendCooldown })
               : t('auth.sendVerification')}
           </button>
-        </Show>
-        <label class="auth-form__label" for={passwordId}>
-          {t('common.password')}
+        ) : null}
+        <Field label={t('common.password')} htmlFor={passwordId}>
           <input
             id={passwordId}
-            class="auth-form__input"
+            className="field"
             type="password"
-            autocomplete="current-password"
+            autoComplete="current-password"
             placeholder={t('auth.login.passwordPlaceholder')}
-            value={password()}
-            onInput={(e) => setPassword(e.currentTarget.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
-            aria-describedby={error() ? errorId : undefined}
+            aria-describedby={describedBy}
           />
-        </label>
-        <div class="auth-form__actions">
-          <A href="/reset-password" class="auth-form__forgot">
+        </Field>
+        <div className="flex justify-end">
+          <Link to="/reset-password" className="text-sm">
             {t('auth.login.forgot')}
-          </A>
+          </Link>
         </div>
-        <button class="auth-form__submit" type="submit" disabled={loading()}>
-          {loading() ? <span class="spinner" /> : t('auth.login.submit')}
-        </button>
+        <Button type="submit" block busy={loading}>
+          {t('auth.login.submit')}
+        </Button>
       </form>
-      <Show when={signupEnabled()}>
-        <div class="auth-footer">
-          <span>{t('auth.login.noAccount')} </span>
-          <A href={appendSearch('/register', location.search)} class="auth-footer__link">
-            {t('auth.login.signUp')}
-          </A>
-        </div>
-      </Show>
+      {signupEnabled ? (
+        <AuthFooter>
+          {t('auth.login.noAccount')}{' '}
+          <Link to={appendSearch('/register', location.search)}>{t('auth.login.signUp')}</Link>
+        </AuthFooter>
+      ) : null}
     </>
   );
-};
-
-export default Login;
+}
