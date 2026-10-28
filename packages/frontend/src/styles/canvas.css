@@ -146,6 +146,61 @@
     font-size: 18px;
     font-weight: 700;
   }
+  .flow-node .node-name {
+    min-width: 0;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .node-hub .node-routes {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .node-hub .node-route {
+    position: relative;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Sit on the node's right border (12px padding + 2px border). */
+  .node-hub .node-route .react-flow__handle {
+    right: -14px;
+  }
+  .node-client {
+    min-width: 0;
+    padding: 6px 10px;
+  }
+  .node-client .node-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .node-client .node-ip {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .node-client .node-pill {
+    padding: 0 7px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 16px;
+  }
 
   /* Handles */
   .react-flow__handle {

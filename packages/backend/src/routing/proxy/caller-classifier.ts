@@ -9,6 +9,14 @@ export interface CallerAttribution {
   appName?: string;
   appUrl?: string;
   categories?: string[];
+  /** Client address as Express resolved it (honors the trusted proxy setting). */
+  clientIp?: string;
+}
+
+/** `req.ip` without the IPv4-mapped IPv6 prefix; undefined when unknown. */
+export function clientIpOf(ip: string | undefined): string | undefined {
+  if (!ip) return undefined;
+  return sanitize(ip.startsWith('::ffff:') ? ip.slice(7) : ip, 64);
 }
 
 type HeaderMap = Record<string, string | string[] | undefined>;

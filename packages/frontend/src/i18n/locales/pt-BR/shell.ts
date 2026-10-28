@@ -59,6 +59,7 @@ const shell: Catalog<typeof en> = {
     ranges: { '1h': '1h', '24h': '24h', '7d': '7d', '30d': '30d' },
     range: 'Período',
     kinds: {
+      client: 'Cliente',
       entry: 'Harness',
       hub: 'Rota',
       item: 'Provedor',

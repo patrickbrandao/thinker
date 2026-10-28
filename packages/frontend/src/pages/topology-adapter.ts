@@ -1,11 +1,11 @@
-import type { FlowEdge, FlowNode, FlowPort, Graph } from '../components/flow/types.js';
+import type { FlowEdge, FlowNode, FlowPort, FlowRoute, Graph } from '../components/flow/types.js';
 import type { Topology, TopologyLink } from '../services/api/console.js';
 import { formatCost, formatNumber } from '../services/formatters.js';
 import { PROVIDERS } from '../services/providers.js';
 import { t, tMaybe } from '../i18n/index.js';
 
 /** Color slot of each kind of route link (legend and edges). */
-const LINK_SLOT: Record<Exclude<TopologyLink['kind'], 'entry'>, number> = {
+const LINK_SLOT: Record<Exclude<TopologyLink['kind'], 'entry' | 'client'>, number> = {
   primary: 1,
   fallback: 2,
   usage: 3,
@@ -32,10 +32,17 @@ const harnessHref = (name: string, sub = '') => `/harnesses/${encodeURIComponent
 const providerName = (provider: string, fallback: string) =>
   PROVIDERS.find((p) => p.id === provider.toLowerCase())?.name ?? fallback;
 
+const ROUTE_ORDER = { primary: 0, fallback: 1, usage: 2 } as const;
+
+/** Handle of a routing point for one final model (and the provider serving it). */
+const routeHandle = (l: TopologyLink) => `route:${l.target}>${l.model ?? ''}`;
+const isRoute = (l: TopologyLink) => l.kind !== 'entry' && l.kind !== 'client';
+
 /**
  * Turns the topology API payload into a flow graph:
- * harness (entry) → routing point (hub: auto, virtual model)
- * → provider (item, or group when it has several connections).
+ * client address → harness (entry) → routing point (hub: auto, virtual model)
+ * → provider (item, or group when it has several connections). A routing
+ * point has one output handle per final model, linked to its provider.
  * With `activeOnly`, nodes and links without traffic in the window are left
  * out (a harness stays when any of its routes carried traffic).
  */
@@ -44,7 +51,23 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
   const used = new Set(links.flatMap((l) => [l.source, l.target]));
   const keep = (id: string) => !options.activeOnly || used.has(id);
 
+  const providerIds = new Set(data.providers.filter((p) => keep(p.id)).map((p) => p.id));
+  const routesOf = new Map<string, TopologyLink[]>();
+  for (const l of links) {
+    if (!isRoute(l) || !providerIds.has(l.target)) continue;
+    routesOf.set(l.source, [...(routesOf.get(l.source) ?? []), l]);
+  }
+  const called = new Set(links.filter((l) => l.kind === 'client').map((l) => l.target));
+
   const nodes: FlowNode[] = [];
+  for (const c of data.clients ?? []) {
+    nodes.push({
+      id: c.id,
+      type: 'client',
+      position: { x: 0, y: 0 },
+      data: { kind: 'client', title: c.ip, count: c.requests },
+    });
+  }
   for (const h of data.harnesses) {
     if (!keep(h.id)) continue;
     nodes.push({
@@ -53,6 +76,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
       position: { x: 0, y: 0 },
       data: {
         kind: 'entry',
+        inbound: called.has(h.id),
         title: h.displayName || h.name,
         subtitle: h.platform,
         metrics: usageMetrics(h),
@@ -67,15 +91,27 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
   );
   for (const hub of hubs) {
     if (!keep(hub.id)) continue;
-    const kindLabel = t(`shell.flow.hubs.${hub.kind}`);
+    const routes: FlowRoute[] = [...(routesOf.get(hub.id) ?? [])]
+      .sort(
+        (a, b) =>
+          ROUTE_ORDER[a.kind as keyof typeof ROUTE_ORDER] -
+          ROUTE_ORDER[b.kind as keyof typeof ROUTE_ORDER],
+      )
+      .map((l) => ({
+        id: routeHandle(l),
+        label: l.model ?? l.target,
+        port: LINK_SLOT[l.kind as keyof typeof LINK_SLOT],
+      }));
     nodes.push({
       id: hub.id,
       type: 'hub',
       position: { x: 0, y: 0 },
       data: {
         kind: 'hub',
+        label: t('shell.flow.hubs.virtual'),
         title: hub.name,
-        subtitle: hub.enabled ? kindLabel : `${kindLabel} · ${t('shell.flow.disabled')}`,
+        subtitle: hub.enabled ? null : t('shell.flow.disabled'),
+        routes,
         metrics: usageMetrics(hub),
         href: harnessHref(hub.agentName, '/routing'),
       },
@@ -116,13 +152,15 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
   const edges: FlowEdge[] = links
     .filter((l) => ids.has(l.source) && ids.has(l.target))
     .map((l) => ({
-      id: `${l.source}>${l.target}`,
+      id: l.model ? `${l.source}>${l.target}>${l.model}` : `${l.source}>${l.target}`,
       source: l.source,
       target: l.target,
+      ...(isRoute(l) ? { sourceHandle: routeHandle(l) } : {}),
       data: {
-        port: l.kind === 'entry' ? undefined : LINK_SLOT[l.kind],
+        port: isRoute(l) ? LINK_SLOT[l.kind as keyof typeof LINK_SLOT] : undefined,
         live: l.requests,
-        label: l.requests > 0 ? formatNumber(l.requests) : undefined,
+        // The client node already shows its count.
+        label: l.requests > 0 && l.kind !== 'client' ? formatNumber(l.requests) : undefined,
         state: l.requests > 0 && l.errors * 2 >= l.requests ? 'error' : undefined,
       },
     }));

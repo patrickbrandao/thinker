@@ -43,6 +43,8 @@ interface Usage {
 
 export interface Topology {
   range: TopologyRange;
+  /** Client addresses that called a harness in the window. */
+  clients?: Array<{ id: string; ip: string; requests: number; errors: number }>;
   harnesses: Array<
     Usage & { id: string; name: string; displayName: string | null; platform: string | null }
   >;
@@ -72,7 +74,9 @@ export interface Topology {
 export interface TopologyLink {
   source: string;
   target: string;
-  kind: 'entry' | 'primary' | 'fallback' | 'usage';
+  kind: 'client' | 'entry' | 'primary' | 'fallback' | 'usage';
+  /** Final model of a routing point → provider link. */
+  model?: string;
   requests: number;
   errors: number;
 }

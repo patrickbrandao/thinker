@@ -43,18 +43,29 @@ export interface TopologyProvider extends Usage {
   models: string[];
 }
 
-export type LinkKind = 'entry' | 'primary' | 'fallback' | 'usage';
+/** A client address that called a harness in the window. */
+export interface TopologyClient {
+  id: string;
+  ip: string;
+  requests: number;
+  errors: number;
+}
+
+export type LinkKind = 'client' | 'entry' | 'primary' | 'fallback' | 'usage';
 
 export interface TopologyLink {
   source: string;
   target: string;
   kind: LinkKind;
+  /** Final model of a routing point → provider link. */
+  model?: string;
   requests: number;
   errors: number;
 }
 
 export interface Topology {
   range: TopologyRange;
+  clients: TopologyClient[];
   harnesses: TopologyHarness[];
   hubs: TopologyHub[];
   providers: TopologyProvider[];
@@ -64,6 +75,7 @@ export interface Topology {
 const CUSTOM_PREFIX = 'custom:';
 const zero = (): Usage => ({ requests: 0, errors: 0, costUsd: 0, tokens: 0 });
 
+export const clientNodeId = (ip: string) => `client:${ip}`;
 export const harnessNodeId = (agentId: string) => `harness:${agentId}`;
 export const autoHubId = (agentId: string) => `auto:${agentId}`;
 export const virtualHubId = (id: string) => `virtual:${id}`;
@@ -103,59 +115,60 @@ export class TopologyService {
 
   async build(tenantId: string, range: TopologyRange): Promise<Topology> {
     const hours = TOPOLOGY_RANGES[range];
-    const [agents, tiers, specificity, virtuals, connections, customs, usage] = await Promise.all([
-      this.ds.query(
-        `SELECT id, name, display_name, agent_platform
+    const [agents, tiers, specificity, virtuals, connections, customs, usage, callers] =
+      await Promise.all([
+        this.ds.query(
+          `SELECT id, name, display_name, agent_platform
              FROM agents
             WHERE tenant_id = $1 AND deleted_at IS NULL AND is_playground = false
             ORDER BY name`,
-        [tenantId],
-      ) as Promise<
-        Array<{
-          id: string;
-          name: string;
-          display_name: string | null;
-          agent_platform: string | null;
-        }>
-      >,
-      this.ds.query(
-        `SELECT t.agent_id, NULL AS hub_id, t.override_route, t.auto_assigned_route,
+          [tenantId],
+        ) as Promise<
+          Array<{
+            id: string;
+            name: string;
+            display_name: string | null;
+            agent_platform: string | null;
+          }>
+        >,
+        this.ds.query(
+          `SELECT t.agent_id, NULL AS hub_id, t.override_route, t.auto_assigned_route,
                   t.fallback_routes
              FROM tier_assignments t JOIN agents a ON a.id = t.agent_id
             WHERE a.tenant_id = $1 AND a.deleted_at IS NULL`,
-        [tenantId],
-      ) as Promise<RouteRow[]>,
-      this.ds.query(
-        `SELECT s.agent_id, NULL AS hub_id, s.override_route, s.auto_assigned_route,
+          [tenantId],
+        ) as Promise<RouteRow[]>,
+        this.ds.query(
+          `SELECT s.agent_id, NULL AS hub_id, s.override_route, s.auto_assigned_route,
                   s.fallback_routes
              FROM specificity_assignments s JOIN agents a ON a.id = s.agent_id
             WHERE a.tenant_id = $1 AND a.deleted_at IS NULL AND s.is_active = true`,
-        [tenantId],
-      ) as Promise<RouteRow[]>,
-      this.ds.query(
-        `SELECT id, agent_id, name, enabled, override_route, fallback_routes,
+          [tenantId],
+        ) as Promise<RouteRow[]>,
+        this.ds.query(
+          `SELECT id, agent_id, name, enabled, override_route, fallback_routes,
                   NULL AS auto_assigned_route
              FROM virtual_models WHERE tenant_id = $1 ORDER BY sort_order, name`,
-        [tenantId],
-      ) as Promise<Array<RouteRow & { id: string; name: string; enabled: boolean }>>,
-      this.ds.query(
-        `SELECT id, provider, auth_type, label, is_active
+          [tenantId],
+        ) as Promise<Array<RouteRow & { id: string; name: string; enabled: boolean }>>,
+        this.ds.query(
+          `SELECT id, provider, auth_type, label, is_active
              FROM tenant_providers WHERE tenant_id = $1 ORDER BY provider, priority, label`,
-        [tenantId],
-      ) as Promise<
-        Array<{
-          id: string;
-          provider: string;
-          auth_type: string | null;
-          label: string;
-          is_active: boolean;
-        }>
-      >,
-      this.ds.query(`SELECT id, name FROM custom_providers WHERE tenant_id = $1`, [
-        tenantId,
-      ]) as Promise<Array<{ id: string; name: string }>>,
-      this.ds.query(
-        `SELECT agent_id, virtual_model_id, provider, auth_type, model,
+          [tenantId],
+        ) as Promise<
+          Array<{
+            id: string;
+            provider: string;
+            auth_type: string | null;
+            label: string;
+            is_active: boolean;
+          }>
+        >,
+        this.ds.query(`SELECT id, name FROM custom_providers WHERE tenant_id = $1`, [
+          tenantId,
+        ]) as Promise<Array<{ id: string; name: string }>>,
+        this.ds.query(
+          `SELECT agent_id, virtual_model_id, provider, auth_type, model,
                   count(*)::int AS attempts,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3))::int AS errors,
@@ -165,9 +178,23 @@ export class TopologyService {
             WHERE tenant_id = $1 AND agent_id IS NOT NULL
               AND timestamp >= now() - make_interval(hours => $2)
             GROUP BY agent_id, virtual_model_id, provider, auth_type, model`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
-      ) as Promise<UsageRow[]>,
-    ]);
+          [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        ) as Promise<UsageRow[]>,
+        // The proxy stamps the client address into caller_attribution (JSON text).
+        this.ds.query(
+          `SELECT agent_id, ip,
+                  count(*) FILTER (WHERE superseded = false)::int AS requests,
+                  count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors
+             FROM (SELECT agent_id, superseded, status,
+                          substring(caller_attribution from '"clientIp":"([^"]+)"') AS ip
+                     FROM agent_messages
+                    WHERE tenant_id = $1 AND agent_id IS NOT NULL
+                      AND timestamp >= now() - make_interval(hours => $2)) m
+            WHERE ip IS NOT NULL
+            GROUP BY agent_id, ip`,
+          [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        ) as Promise<Array<{ agent_id: string; ip: string; requests: number; errors: number }>>,
+      ]);
 
     const customNames = new Map(customs.map((c) => [`${CUSTOM_PREFIX}${c.id}`, c.name]));
     const agentIds = new Set(agents.map((a) => a.id));
@@ -235,11 +262,16 @@ export class TopologyService {
     }
 
     const links = new Map<string, TopologyLink>();
-    const link = (source: string, target: string, kind: LinkKind): TopologyLink => {
-      const key = `${source}>${target}`;
+    const link = (
+      source: string,
+      target: string,
+      kind: LinkKind,
+      model?: string | null,
+    ): TopologyLink => {
+      const key = model ? `${source}>${target}>${model}` : `${source}>${target}`;
       let edge = links.get(key);
       if (!edge) {
-        edge = { source, target, kind, requests: 0, errors: 0 };
+        edge = { source, target, kind, requests: 0, errors: 0, ...(model ? { model } : {}) };
         links.set(key, edge);
       } else if (kind === 'primary' || (kind === 'fallback' && edge.kind === 'usage')) {
         edge.kind = kind;
@@ -258,7 +290,7 @@ export class TopologyService {
         if (!route?.provider || !route.model) continue;
         const provider = ensureProvider(route.provider, route.authType);
         providerModels.get(provider.id)!.add(route.model);
-        link(hubId, provider.id, kind);
+        link(hubId, provider.id, kind, route.model);
       }
     };
     for (const row of [...tiers, ...specificity]) {
@@ -295,8 +327,22 @@ export class TopologyService {
       provider.errors += row.errors;
       provider.costUsd += cost;
       provider.tokens += tokens;
-      const edge = link(hubId, provider.id, 'usage');
+      const edge = link(hubId, provider.id, 'usage', row.model);
       edge.requests += row.attempts;
+      edge.errors += row.errors;
+    }
+
+    // Client addresses, each linked to the harnesses it called.
+    const clients = new Map<string, TopologyClient>();
+    for (const row of callers) {
+      if (!harnesses.has(harnessNodeId(row.agent_id))) continue;
+      const id = clientNodeId(row.ip);
+      const client = clients.get(id) ?? { id, ip: row.ip, requests: 0, errors: 0 };
+      client.requests += row.requests;
+      client.errors += row.errors;
+      clients.set(id, client);
+      const edge = link(id, harnessNodeId(row.agent_id), 'client');
+      edge.requests += row.requests;
       edge.errors += row.errors;
     }
 
@@ -308,6 +354,7 @@ export class TopologyService {
 
     return {
       range,
+      clients: [...clients.values()].sort((a, b) => b.requests - a.requests),
       harnesses: [...harnesses.values()],
       hubs: [...hubs.values()],
       providers: providerList,
