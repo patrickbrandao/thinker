@@ -973,7 +973,7 @@ export default function GlobalOverview() {
   };
 
   return (
-    <div className="page wide">
+    <div className="page full">
       <title>{t('overview.pageTitle')}</title>
       <AddAgentModal open={addAgentOpen} onClose={dismissAddAgent} />
 

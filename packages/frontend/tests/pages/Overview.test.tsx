@@ -66,6 +66,7 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatStatus: (s: string) => s,
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,
   formatTime: (t: string) => t,
+  formatDateTime: (t: string) => t,
   formatErrorMessage: (s: string) => s,
   customProviderColor: vi.fn(() => '#6366f1'),
 }));
@@ -749,9 +750,9 @@ describe('Overview', () => {
       mockGetOverview.mockResolvedValue(dataWithError);
       const { container } = renderOverview();
       await vi.waitFor(() => {
-        const badge = container.querySelector('.status-badge--error');
+        const badge = container.querySelector('.status-shape[title^="Failed"]');
         expect(badge).not.toBeNull();
-        expect(badge!.textContent).toContain('Failed');
+        expect(badge!.getAttribute('title')).toMatch(/^Failed/);
       });
       expect(container.querySelector('.status-badge-tooltip')).toBeNull();
     });
@@ -1274,10 +1275,10 @@ describe('Overview', () => {
     mockGetOverview.mockResolvedValue(dataWithFallback);
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      // Fallback is surfaced in the Recovery column, not a Model-cell badge.
-      const badge = container.querySelector('.trigger-badge--fallback');
+      // Fallback is surfaced as the status shape, not a Model-cell badge.
+      const badge = container.querySelector('.status-shape[title="Succeeded after a fallback"]');
       expect(badge).not.toBeNull();
-      expect(badge!.getAttribute('title')).toBe('Fallback');
+      expect(badge!.getAttribute('title')).toBe('Succeeded after a fallback');
     });
   });
 
@@ -1310,9 +1311,9 @@ describe('Overview', () => {
       // Status is binary: any non-ok row is "Failed" (with an origin
       // descriptor); fallback_error is no longer its own pill.
       expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
-      const badge = container.querySelector('.status-badge--error');
+      const badge = container.querySelector('.status-shape[title^="Failed"]');
       expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(badge!.getAttribute('title')).toMatch(/^Failed/);
     });
   });
 

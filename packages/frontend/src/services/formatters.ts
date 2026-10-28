@@ -69,6 +69,18 @@ export function formatTrend(pct: number): string {
 /**
  * Format a timestamp to a date + time string (e.g., Feb 27, 09:22:41).
  */
+/** Local `yyyy-mm-dd hh:MM:ss` (24h), e.g. for log tables. */
+export function formatDateTime(ts: string): string {
+  const normalized = ts.replace(' ', 'T');
+  const d = new Date(normalized.endsWith('Z') ? normalized : normalized + 'Z');
+  if (Number.isNaN(d.getTime())) return '—';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
+}
+
 export function formatTime(ts: string): string {
   const normalized = ts.replace(' ', 'T');
   const d = new Date(normalized.endsWith('Z') ? normalized : normalized + 'Z');

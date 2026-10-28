@@ -5,7 +5,7 @@ import InfoTooltip from './InfoTooltip.js';
 import {
   formatCost,
   formatNumber,
-  formatTime,
+  formatDateTime,
   formatDuration,
   customProviderColor,
   usd,
@@ -85,7 +85,9 @@ export function columnHeader(key: MessageColumnKey, tooltips?: boolean): ReactNo
 }
 
 export function DateCell(item: MessageRow) {
-  return <td className={cx('w-[1%] whitespace-nowrap', MONO_XS)}>{formatTime(item.timestamp)}</td>;
+  return (
+    <td className={cx('w-[1%] whitespace-nowrap', MONO_XS)}>{formatDateTime(item.timestamp)}</td>
+  );
 }
 
 export function MessageCell(item: MessageRow) {
@@ -301,22 +303,16 @@ export function AgentCell(
   );
 }
 
+/** `attempts / recovery attempts`, e.g. `3 / 2` when two fallbacks ran. */
 export function AttemptsCell(item: MessageRow) {
-  return <td className={MONO_XS}>{item.attempt_count ?? 1}</td>;
-}
-
-export function RecoveryCell(item: MessageRow) {
-  if (!item.fallback_from_model) return <td className={MONO_XS}>{DASH}</td>;
-
+  const attempts = item.attempt_count ?? 1;
+  const recovery = item.recovery_count ?? (item.fallback_from_model ? 1 : 0);
   return (
-    <td>
-      <span
-        className="trigger-badge trigger-badge--fallback badge is-info"
-        title={t('messages.table.fallback')}
-      >
-        <FallbackIcon />
-        {t('messages.table.fallbackBadge')}
-      </span>
+    <td
+      className={cx('whitespace-nowrap', MONO_XS)}
+      title={t('messages.table.attemptsTitle', { attempts, recovery })}
+    >
+      {attempts} / {recovery}
     </td>
   );
 }
@@ -330,67 +326,101 @@ function statusErrorDescriptor(item: MessageRow): string | null {
     : null;
 }
 
+export type StatusShape = 'success' | 'fallback' | 'failed' | 'limit' | 'pending' | 'cancelled';
+
 /**
- * Outcome status pill. Pending and caller-cancelled work is neutral; completed
- * outcomes remain the familiar Success/Failed binary.
+ * The outcome as one shape, so the column reads at a glance: green circle
+ * (success), amber triangle (succeeded through a fallback), red square
+ * (failed), red octagon (a Thinker limit stopped it), hollow blue circle
+ * (pending), gray diamond (cancelled by the caller). The label rides as the
+ * tooltip and the accessible name.
  */
-function describeStatusPill(item: MessageRow): {
-  label: string;
-  title?: string;
-  cls: string;
-  limitAgent: string | null;
-} {
-  if (isSuccessStatus(item.status)) {
-    return {
-      label: t('messages.table.success'),
-      cls: 'status-badge status-badge--ok badge is-ok',
-      limitAgent: null,
-    };
+export function statusShape(item: MessageRow): StatusShape {
+  if (isSuccessStatus(item.status)) return item.fallback_from_model ? 'fallback' : 'success';
+  if (item.status === 'pending') return 'pending';
+  if (item.status === 'cancelled') return 'cancelled';
+  return item.error_origin === 'policy' ? 'limit' : 'failed';
+}
+
+function statusLabel(shape: StatusShape, item: MessageRow): string {
+  switch (shape) {
+    case 'success':
+      return t('messages.table.success');
+    case 'fallback':
+      return t('messages.table.successFallback');
+    case 'pending':
+      return t('messages.table.pending');
+    case 'cancelled':
+      return t('messages.table.cancelled');
+    case 'limit':
+      return t('messages.table.limitReached');
+    case 'failed': {
+      const origin = statusErrorDescriptor(item);
+      return origin ? `${t('messages.table.failed')}: ${origin}` : t('messages.table.failed');
+    }
   }
-  if (item.status === 'pending' || item.status === 'cancelled') {
-    return {
-      label:
-        item.status === 'pending' ? t('messages.table.pending') : t('messages.table.cancelled'),
-      cls: 'status-badge status-badge--neutral badge',
-      limitAgent: null,
-    };
+}
+
+export function StatusShapeIcon({ shape }: { shape: StatusShape }) {
+  const common = { width: 12, height: 12, viewBox: '0 0 12 12', 'aria-hidden': true } as const;
+  switch (shape) {
+    case 'success':
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="5" fill="var(--ok)" />
+        </svg>
+      );
+    case 'fallback':
+      return (
+        <svg {...common}>
+          <path d="M6 0.8 11.4 11H0.6Z" fill="var(--warn)" />
+        </svg>
+      );
+    case 'failed':
+      return (
+        <svg {...common}>
+          <rect x="1" y="1" width="10" height="10" rx="1" fill="var(--danger)" />
+        </svg>
+      );
+    case 'limit':
+      return (
+        <svg {...common}>
+          <path d="M3.9 0.5h4.2l3.4 3.4v4.2l-3.4 3.4H3.9L0.5 8.1V3.9Z" fill="var(--danger)" />
+        </svg>
+      );
+    case 'pending':
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="4.2" fill="none" stroke="var(--info)" strokeWidth="1.8" />
+        </svg>
+      );
+    case 'cancelled':
+      return (
+        <svg {...common}>
+          <path d="M6 0.6 11.4 6 6 11.4 0.6 6Z" fill="var(--text-faint)" />
+        </svg>
+      );
   }
-  // The pill stays a plain "Failed": the cause (provider, setup, custom
-  // limit...) lives in the drawer's error message, and rides here only as a
-  // hover title so the column reads binary at a glance.
-  return {
-    label: t('messages.table.failed'),
-    title: statusErrorDescriptor(item) ?? undefined,
-    cls: 'status-badge status-badge--error badge is-danger',
-    limitAgent: item.error_origin === 'policy' ? item.agent_name : null,
-  };
 }
 
 export function StatusCell(item: MessageRow, _agentName: string | undefined) {
-  const pill = describeStatusPill(item);
+  const shape = statusShape(item);
+  const label = statusLabel(shape, item);
+  const icon = (
+    <span className="status-shape" role="img" aria-label={label} title={label}>
+      <StatusShapeIcon shape={shape} />
+    </span>
+  );
 
-  // A Thinker software limit is one red pill linking to its agent's limits page.
-  if (pill.limitAgent) {
+  // A Thinker software limit links to its agent's limits page.
+  if (shape === 'limit' && item.agent_name) {
     return (
-      <td>
-        <Link
-          className={cx(pill.cls, 'no-underline hover:underline')}
-          to={`/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`}
-          title={t('messages.table.limitReached')}
-        >
-          {pill.label}
-        </Link>
+      <td className="w-[1%]">
+        <Link to={`/harnesses/${encodeURIComponent(item.agent_name)}/limits`}>{icon}</Link>
       </td>
     );
   }
-
-  return (
-    <td>
-      <span className={pill.cls} title={pill.title}>
-        {pill.label}
-      </span>
-    </td>
-  );
+  return <td className="w-[1%]">{icon}</td>;
 }
 
 export interface CellRenderContext {
@@ -427,8 +457,6 @@ export function renderCell(key: MessageColumnKey, item: MessageRow, ctx: CellRen
       return StatusCell(item, ctx.agentName);
     case 'attempts':
       return AttemptsCell(item);
-    case 'recovery':
-      return RecoveryCell(item);
     case 'agent':
       return AgentCell(item, ctx.agentPlatformLookup);
   }
