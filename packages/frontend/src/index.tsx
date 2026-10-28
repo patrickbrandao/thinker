@@ -32,6 +32,7 @@ const GlobalOverview = lazyReload(() => import('./pages/GlobalOverview.jsx'));
 const AgentDetail = lazyReload(() => import('./pages/AgentDetail.jsx'));
 const AgentOverview = lazyReload(() => import('./pages/AgentOverview.jsx'));
 const AgentProviders = lazyReload(() => import('./pages/AgentProviders.jsx'));
+const AgentModels = lazyReload(() => import('./pages/AgentModels.jsx'));
 const AgentLimitsRedirect = lazyReload(() => import('./pages/AgentLimitsRedirect.jsx'));
 const AgentMessagesRedirect = lazyReload(() => import('./pages/AgentMessagesRedirect.jsx'));
 const MessageLog = lazyReload(() => import('./pages/MessageLog.jsx'));
@@ -258,6 +259,14 @@ function AppRoutes() {
               element={
                 <Lazy>
                   <Routing />
+                </Lazy>
+              }
+            />
+            <Route
+              path="models"
+              element={
+                <Lazy>
+                  <AgentModels />
                 </Lazy>
               }
             />

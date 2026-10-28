@@ -180,6 +180,8 @@ Em **Configurações** de cada harness, a opção **Listagem de modelos** decide
 | **Restrita** | `auto`, os virtuais ativos e os modelos reais ligados a eles por roteamento e fallback: os tiers que o `auto` alcança (só o Default com o roteamento por complexidade desligado; senão todos os slots e as atribuições de especificidade) e as rotas de cada virtual, incluindo a cadeia do Default quando ele continua no Default. |
 | **Aberta** (padrão) | Todos os modelos disponíveis. |
 
+A aba **Modelos** do harness, ao lado de **Roteamento**, mostra essa mesma lista, na mesma ordem e já com a listagem e o sombreamento aplicados, em uma tabela com tipo (auto, virtual ou modelo), provedor, janela de contexto, preço de entrada e saída por milhão de tokens e detalhes: para um virtual, o modelo principal, os fallbacks, se continua no `auto` e se responde por stream; para um modelo real, as capacidades. Os preços de `auto` e dos virtuais aparecem como "Varia", porque dependem do modelo que atender. Pela API do dashboard, a lista sai em `GET /api/v1/routing/:agente/model-list`.
+
 A opção só muda a lista. Um harness ainda pode pedir pelo nome um modelo que não aparece nela.
 
 ## Servidor MCP
