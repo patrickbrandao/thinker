@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('../../src/services/api.js', () => ({
   copilotDeviceCode: vi.fn(),
@@ -25,6 +25,30 @@ const mockCopilotPollToken = copilotPollToken as ReturnType<typeof vi.fn>;
 const mockDisconnectProvider = disconnectProvider as ReturnType<typeof vi.fn>;
 const mockToast = toast as { error: ReturnType<typeof vi.fn>; success: ReturnType<typeof vi.fn> };
 
+// Every test runs on fake timers, so RTL's polling waitFor cannot tick. These
+// helpers run each step inside act() and let promise continuations settle.
+async function flush() {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  });
+}
+
+async function click(el: HTMLElement) {
+  fireEvent.click(el);
+  await flush();
+}
+
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+async function waitFor<T>(assertion: () => T): Promise<T> {
+  await flush();
+  return assertion();
+}
+
 function renderComponent(overrides: Partial<Parameters<typeof CopilotDeviceLogin>[0]> = {}) {
   const props = {
     agentName: 'test-agent',
@@ -34,7 +58,7 @@ function renderComponent(overrides: Partial<Parameters<typeof CopilotDeviceLogin
     onDisconnected: vi.fn(),
     ...overrides,
   };
-  const result = render(() => <CopilotDeviceLogin {...props} />);
+  const result = render(<CopilotDeviceLogin {...props} />);
   return { ...result, props };
 }
 
@@ -42,6 +66,10 @@ describe('CopilotDeviceLogin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows Sign in button in idle state', () => {
@@ -52,14 +80,14 @@ describe('CopilotDeviceLogin', () => {
 
   it('calls onBack when back button is clicked', async () => {
     const { props } = renderComponent();
-    await fireEvent.click(screen.getByLabelText('Back to providers'));
+    await click(screen.getByLabelText('Back to providers'));
     expect(props.onBack).toHaveBeenCalled();
   });
 
   it('shows loading state after clicking Sign in', async () => {
     mockCopilotDeviceCode.mockReturnValue(new Promise(() => {})); // never resolves
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
     // Sign in button should be gone, loading spinner appears
     expect(screen.queryByText('Sign in with GitHub')).toBeNull();
     expect(document.querySelector('.spinner')).toBeTruthy();
@@ -77,7 +105,7 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     await waitFor(() => {
       expect(screen.getByText('ABCD-1234')).toBeDefined();
@@ -103,7 +131,7 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Copy device code')).toBeDefined();
@@ -114,7 +142,7 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotDeviceCode.mockRejectedValue(new Error('Network error'));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to start GitHub login. Please try again.')).toBeDefined();
@@ -134,10 +162,10 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockResolvedValue({ status: 'complete' });
 
     const { props } = renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     // Advance timer to trigger the first poll
-    await vi.advanceTimersByTimeAsync(5000);
+    await advance(5000);
 
     await waitFor(() => {
       expect(screen.getByText('GitHub Copilot connected successfully.')).toBeDefined();
@@ -157,8 +185,8 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockResolvedValue({ status: 'expired' });
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
-    await vi.advanceTimersByTimeAsync(5000);
+    await click(screen.getByText('Sign in with GitHub'));
+    await advance(5000);
 
     await waitFor(() => {
       expect(screen.getByText('Device code expired. Please try again.')).toBeDefined();
@@ -176,8 +204,8 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockResolvedValue({ status: 'denied' });
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
-    await vi.advanceTimersByTimeAsync(5000);
+    await click(screen.getByText('Sign in with GitHub'));
+    await advance(5000);
 
     await waitFor(() => {
       expect(screen.getByText('Authorization was denied.')).toBeDefined();
@@ -195,11 +223,11 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockRejectedValue(new Error('Network error'));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     // Advance through 5 failed poll attempts (5 seconds each)
     for (let i = 0; i < 5; i++) {
-      await vi.advanceTimersByTimeAsync(5000);
+      await advance(5000);
     }
 
     await waitFor(() => {
@@ -225,7 +253,7 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     renderComponent({ connected: true });
-    await fireEvent.click(screen.getByText('Add another key'));
+    await click(screen.getByText('Add another key'));
 
     await waitFor(() => {
       expect(mockCopilotDeviceCode).toHaveBeenCalledWith('test-agent');
@@ -298,7 +326,7 @@ describe('CopilotDeviceLogin', () => {
       ],
     });
 
-    await fireEvent.click(screen.getByLabelText('Delete account Work'));
+    await click(screen.getByLabelText('Delete account Work'));
 
     await waitFor(() => {
       expect(mockDisconnectProvider).toHaveBeenCalledWith(
@@ -343,7 +371,7 @@ describe('CopilotDeviceLogin', () => {
       ],
     });
 
-    await fireEvent.click(screen.getByLabelText('Delete account Work'));
+    await click(screen.getByLabelText('Delete account Work'));
 
     await waitFor(() => {
       expect(mockDisconnectProvider).toHaveBeenCalledWith(
@@ -360,7 +388,7 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotDeviceCode.mockRejectedValue(new Error('Network error'));
 
     renderComponent({ connected: true });
-    await fireEvent.click(screen.getByText('Add another key'));
+    await click(screen.getByText('Add another key'));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to start GitHub login. Please try again.')).toBeDefined();
@@ -371,7 +399,7 @@ describe('CopilotDeviceLogin', () => {
     mockDisconnectProvider.mockResolvedValue({});
 
     const { props } = renderComponent({ connected: true });
-    await fireEvent.click(screen.getByText('Disconnect'));
+    await click(screen.getByText('Disconnect'));
 
     await waitFor(() => {
       expect(props.onDisconnected).toHaveBeenCalled();
@@ -385,7 +413,7 @@ describe('CopilotDeviceLogin', () => {
     });
 
     renderComponent({ connected: true });
-    await fireEvent.click(screen.getByText('Disconnect'));
+    await click(screen.getByText('Disconnect'));
 
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith('Tier affected');
@@ -396,7 +424,7 @@ describe('CopilotDeviceLogin', () => {
     mockDisconnectProvider.mockRejectedValue(new Error('fail'));
 
     const { props } = renderComponent({ connected: true });
-    await fireEvent.click(screen.getByText('Disconnect'));
+    await click(screen.getByText('Disconnect'));
 
     await waitFor(() => {
       // Should not crash — onDisconnected should NOT be called
@@ -418,13 +446,13 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Copy device code')).toBeDefined();
     });
 
-    await fireEvent.click(screen.getByLabelText('Copy device code'));
+    await click(screen.getByLabelText('Copy device code'));
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith('COPY-ME');
@@ -435,7 +463,7 @@ describe('CopilotDeviceLogin', () => {
     });
 
     // After timeout, label reverts to "Copy device code"
-    await vi.advanceTimersByTimeAsync(2000);
+    await advance(2000);
     await waitFor(() => {
       expect(screen.getByLabelText('Copy device code')).toBeDefined();
     });
@@ -455,13 +483,13 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Copy device code')).toBeDefined();
     });
 
-    await fireEvent.click(screen.getByLabelText('Copy device code'));
+    await click(screen.getByLabelText('Copy device code'));
 
     // Should not crash — label stays "Copy device code" (not "Copied")
     await waitFor(() => {
@@ -483,16 +511,16 @@ describe('CopilotDeviceLogin', () => {
       .mockResolvedValueOnce({ status: 'complete' });
 
     const { props } = renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     // First poll at 5 seconds
-    await vi.advanceTimersByTimeAsync(5000);
+    await advance(5000);
     await waitFor(() => {
       expect(mockCopilotPollToken).toHaveBeenCalledTimes(1);
     });
 
     // After slow_down, delay increases by 5 -> next poll at 10 seconds
-    await vi.advanceTimersByTimeAsync(10000);
+    await advance(10000);
 
     await waitFor(() => {
       expect(screen.getByText('GitHub Copilot connected successfully.')).toBeDefined();
@@ -513,16 +541,16 @@ describe('CopilotDeviceLogin', () => {
       .mockResolvedValueOnce({ status: 'complete' });
 
     const { props } = renderComponent();
-    await fireEvent.click(screen.getByText('Sign in with GitHub'));
+    await click(screen.getByText('Sign in with GitHub'));
 
     // First poll at 5 seconds — returns pending
-    await vi.advanceTimersByTimeAsync(5000);
+    await advance(5000);
     await waitFor(() => {
       expect(mockCopilotPollToken).toHaveBeenCalledTimes(1);
     });
 
     // Second poll at 5 more seconds — same delay for pending
-    await vi.advanceTimersByTimeAsync(5000);
+    await advance(5000);
 
     await waitFor(() => {
       expect(screen.getByText('GitHub Copilot connected successfully.')).toBeDefined();
@@ -530,12 +558,12 @@ describe('CopilotDeviceLogin', () => {
     expect(props.onConnected).toHaveBeenCalled();
   });
 
-  it("clears the pending poll timeout on unmount", async () => {
-    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+  it('clears the pending poll timeout on unmount', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     mockCopilotDeviceCode.mockResolvedValue({
-      device_code: "dc_test",
-      user_code: "ABCD-1234",
-      verification_uri: "https://github.com/login/device",
+      device_code: 'dc_test',
+      user_code: 'ABCD-1234',
+      verification_uri: 'https://github.com/login/device',
       expires_in: 900,
       interval: 5,
     });
@@ -543,9 +571,9 @@ describe('CopilotDeviceLogin', () => {
     mockCopilotPollToken.mockReturnValue(new Promise(() => {}));
 
     const { unmount } = renderComponent();
-    await fireEvent.click(screen.getByText("Sign in with GitHub"));
+    await click(screen.getByText('Sign in with GitHub'));
     await waitFor(() => {
-      expect(screen.getByText("ABCD-1234")).toBeDefined();
+      expect(screen.getByText('ABCD-1234')).toBeDefined();
     });
 
     unmount();

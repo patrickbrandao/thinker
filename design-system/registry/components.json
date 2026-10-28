@@ -745,21 +745,6 @@
         "routing-providers.css"
       ]
     },
-    "connection-detail": {
-      "classes": [
-        "connection-detail__badge",
-        "connection-detail__badges",
-        "connection-detail__controls",
-        "connection-detail__header",
-        "connection-detail__identity",
-        "connection-detail__meta",
-        "connection-detail__title",
-        "connection-detail__title-row"
-      ],
-      "files": [
-        "connection-detail.css"
-      ]
-    },
     "connection-label-cell": {
       "classes": [
         "connection-label-cell",
@@ -935,7 +920,6 @@
         "custom-select__value"
       ],
       "files": [
-        "connection-detail.css",
         "custom-select.css",
         "routing-providers.css"
       ]
@@ -2154,7 +2138,6 @@
       ],
       "files": [
         "analytics-overview.css",
-        "connection-detail.css",
         "layout.css",
         "theme.css"
       ]
@@ -4454,12 +4437,7 @@
   "componentSheets": {
     "analytics-overview.css": [
       "components/ReliabilityKpiCards.tsx",
-      "pages/GlobalOverview.tsx",
-      "pages/providers/ConnectionDetail.tsx",
-      "pages/providers/ProviderConnectionsPage.tsx"
-    ],
-    "connection-detail.css": [
-      "pages/providers/ConnectionDetail.tsx"
+      "pages/GlobalOverview.tsx"
     ],
     "model-filter.css": [
       "pages/MessageLog.tsx"
@@ -4498,14 +4476,11 @@
       "(via @import)"
     ],
     "routing.css": [
-      "pages/AgentProviders.tsx",
       "pages/GlobalOverview.tsx",
       "pages/MessageLog.tsx",
       "pages/Overview.tsx",
       "pages/Routing.tsx",
-      "pages/Welcome.tsx",
-      "pages/providers/ConnectionDetail.tsx",
-      "pages/providers/ProviderConnectionsPage.tsx"
+      "pages/Welcome.tsx"
     ],
     "syntax-highlight.css": [
       "services/syntax-highlight.ts"
@@ -4516,6 +4491,7 @@
   },
   "orphanStylesheets": [
     "agent-chart-tooltip.css",
+    "connection-detail.css",
     "filter-select.css",
     "organization.css",
     "playground.css"
@@ -4524,8 +4500,8 @@
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 273,
-    "classes": 1422,
+    "blocks": 272,
+    "classes": 1414,
     "canonicalRules": 47,
     "ghostRules": 47
   },

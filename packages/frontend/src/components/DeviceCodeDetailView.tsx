@@ -1,18 +1,8 @@
-import {
-  createEffect,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-  type Accessor,
-  type Component,
-  type Setter,
-} from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
 import type { ProviderDef } from '../services/providers.js';
 import {
   connectProvider,
   getDeviceCodeApi,
-  renameProviderKey,
   type AuthType,
   type MinimaxOAuthRegion,
   type RoutingProvider,
@@ -21,64 +11,65 @@ import { suggestNextProviderKeyLabel } from '../services/provider-key-labels.js'
 import { validateSubscriptionKey } from '../services/provider-utils.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
-import Select from './Select.jsx';
+import Select from './Select.js';
+import { Button } from './ui.js';
+import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
 
 interface Props {
   provDef: ProviderDef;
   provId: string;
   agentName: string;
-  connected: Accessor<boolean>;
-  selectedAuthType: Accessor<AuthType>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
+  connected: boolean;
+  selectedAuthType: AuthType;
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
   onBack: () => void;
   onUpdate: () => void;
   onClose: () => void;
-  addKeyOpen?: Accessor<boolean>;
-  setAddKeyOpen?: Setter<boolean>;
-  activeKeys?: Accessor<RoutingProvider[]>;
+  addKeyOpen?: boolean;
+  setAddKeyOpen?: (open: boolean) => void;
+  activeKeys?: RoutingProvider[];
 }
 
-const MAX_LABEL_LENGTH = 50;
 const KIRO_DEFAULT_REGION = 'us-east-1';
 const KIRO_REGION_OPTIONS = [
-  { value: 'us-east-2', label: 'us-east-2' },
-  { value: 'us-east-1', label: 'us-east-1' },
-  { value: 'us-west-1', label: 'us-west-1' },
-  { value: 'us-west-2', label: 'us-west-2' },
-  { value: 'af-south-1', label: 'af-south-1' },
-  { value: 'ap-east-1', label: 'ap-east-1' },
-  { value: 'ap-south-2', label: 'ap-south-2' },
-  { value: 'ap-southeast-3', label: 'ap-southeast-3' },
-  { value: 'ap-southeast-5', label: 'ap-southeast-5' },
-  { value: 'ap-southeast-4', label: 'ap-southeast-4' },
-  { value: 'ap-south-1', label: 'ap-south-1' },
-  { value: 'ap-southeast-6', label: 'ap-southeast-6' },
-  { value: 'ap-northeast-3', label: 'ap-northeast-3' },
-  { value: 'ap-northeast-2', label: 'ap-northeast-2' },
-  { value: 'ap-southeast-1', label: 'ap-southeast-1' },
-  { value: 'ap-southeast-2', label: 'ap-southeast-2' },
-  { value: 'ap-east-2', label: 'ap-east-2' },
-  { value: 'ap-southeast-7', label: 'ap-southeast-7' },
-  { value: 'ap-northeast-1', label: 'ap-northeast-1' },
-  { value: 'ca-central-1', label: 'ca-central-1' },
-  { value: 'ca-west-1', label: 'ca-west-1' },
-  { value: 'eu-central-1', label: 'eu-central-1' },
-  { value: 'eu-west-1', label: 'eu-west-1' },
-  { value: 'eu-west-2', label: 'eu-west-2' },
-  { value: 'eu-south-1', label: 'eu-south-1' },
-  { value: 'eu-west-3', label: 'eu-west-3' },
-  { value: 'eu-south-2', label: 'eu-south-2' },
-  { value: 'eu-north-1', label: 'eu-north-1' },
-  { value: 'eu-central-2', label: 'eu-central-2' },
-  { value: 'il-central-1', label: 'il-central-1' },
-  { value: 'mx-central-1', label: 'mx-central-1' },
-  { value: 'me-south-1', label: 'me-south-1' },
-  { value: 'me-central-1', label: 'me-central-1' },
-  { value: 'sa-east-1', label: 'sa-east-1' },
-  { value: 'us-gov-east-1', label: 'us-gov-east-1' },
-  { value: 'us-gov-west-1', label: 'us-gov-west-1' },
-];
+  'us-east-2',
+  'us-east-1',
+  'us-west-1',
+  'us-west-2',
+  'af-south-1',
+  'ap-east-1',
+  'ap-south-2',
+  'ap-southeast-3',
+  'ap-southeast-5',
+  'ap-southeast-4',
+  'ap-south-1',
+  'ap-southeast-6',
+  'ap-northeast-3',
+  'ap-northeast-2',
+  'ap-southeast-1',
+  'ap-southeast-2',
+  'ap-east-2',
+  'ap-southeast-7',
+  'ap-northeast-1',
+  'ca-central-1',
+  'ca-west-1',
+  'eu-central-1',
+  'eu-west-1',
+  'eu-west-2',
+  'eu-south-1',
+  'eu-west-3',
+  'eu-south-2',
+  'eu-north-1',
+  'eu-central-2',
+  'il-central-1',
+  'mx-central-1',
+  'me-south-1',
+  'me-central-1',
+  'sa-east-1',
+  'us-gov-east-1',
+  'us-gov-west-1',
+].map((region) => ({ value: region, label: region }));
 
 interface DeviceCodeFlow {
   flowId: string;
@@ -90,37 +81,42 @@ interface DeviceCodeFlow {
 
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 
-const DeviceCodeDetailView: Component<Props> = (props) => {
-  const [flow, setFlow] = createSignal<DeviceCodeFlow | null>(null);
-  const [statusMessage, setStatusMessage] = createSignal<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = createSignal<MinimaxOAuthRegion>('global');
-  const [kiroStartUrl, setKiroStartUrl] = createSignal('');
-  const [kiroRegion, setKiroRegion] = createSignal(KIRO_DEFAULT_REGION);
-  const [kiroConfigError, setKiroConfigError] = createSignal<string | null>(null);
-  const [altToken, setAltToken] = createSignal('');
-  const [altError, setAltError] = createSignal<string | null>(null);
-  const [renamingId, setRenamingId] = createSignal<string | null>(null);
-  const [renameValue, setRenameValue] = createSignal('');
-  const [addingAccount, setAddingAccount] = createSignal(false);
+export default function DeviceCodeDetailView(props: Props) {
+  const [flow, setFlowState] = useState<DeviceCodeFlow | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<MinimaxOAuthRegion>('global');
+  const [kiroStartUrl, setKiroStartUrl] = useState('');
+  const [kiroRegion, setKiroRegion] = useState(KIRO_DEFAULT_REGION);
+  const [kiroConfigError, setKiroConfigError] = useState<string | null>(null);
+  const [altToken, setAltToken] = useState('');
+  const [altError, setAltError] = useState<string | null>(null);
+  const [addingAccount, setAddingAccount] = useState(false);
+  const latest = useRef(props);
+  latest.current = props;
+  // The poll loop spans renders, so it reads the flow and its bookkeeping
+  // from refs instead of render-time state.
+  const flowRef = useRef<DeviceCodeFlow | null>(null);
+  const pollTimer = useRef<number | undefined>(undefined);
+  const isDisposed = useRef(false);
+  const activeFlowGeneration = useRef(0);
 
-  const api = () => getDeviceCodeApi(props.provId);
-  const isKiro = () => props.provId === 'kiro';
-  const isMultiKey = () => (props.activeKeys?.() ?? []).length > 1;
-  const activeKeyLabels = () => (props.activeKeys?.() ?? []).map((k) => k.label);
-  const showConnectFlow = () => !props.connected() || addingAccount();
-  const showConnectedFlow = () => props.connected() && !addingAccount();
+  const setFlow = (next: DeviceCodeFlow | null) => {
+    flowRef.current = next;
+    setFlowState(next);
+  };
 
-  // When "Add another key" is clicked in the header, launch a new device code flow.
-  createEffect(() => {
-    if (props.addKeyOpen?.() && props.connected() && !props.busy()) {
-      setAddingAccount(true);
-      props.setAddKeyOpen?.(false);
-      void handleStart();
-    }
-  });
+  const api = () => getDeviceCodeApi(latest.current.provId);
+  const isKiro = props.provId === 'kiro';
+  const hasRegion = api().hasRegion;
+  const activeKeys = props.activeKeys ?? [];
+  const isMultiKey = activeKeys.length > 1;
+  const showConnectFlow = !props.connected || addingAccount;
+  const via = props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower');
+  const alt = props.provDef.subscriptionTokenAlternative;
+  const kiroErrorId = kiroConfigError ? 'kiro-identity-error' : undefined;
 
   const handleAltConnect = async () => {
-    const trimmed = altToken().replace(/\s/g, '');
+    const trimmed = altToken.replace(/\s/g, '');
     const result = validateSubscriptionKey(props.provDef, trimmed);
     if (!result.valid) {
       setAltError(result.error!);
@@ -128,7 +124,9 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
     }
     props.setBusy(true);
     try {
-      const label = addingAccount() ? suggestNextProviderKeyLabel(activeKeyLabels()) : undefined;
+      const label = addingAccount
+        ? suggestNextProviderKeyLabel(activeKeys.map((k) => k.label))
+        : undefined;
       await connectProvider(props.agentName, {
         provider: props.provId,
         apiKey: trimmed,
@@ -137,33 +135,30 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
         // needs to route to the right MiniMax host (api.minimax.io vs
         // api.minimaxi.com). Stick the picker's current value on the row so
         // the proxy fallback honors CN tokens.
-        region: selectedRegion(),
+        region: selectedRegion,
         ...(label && { label }),
       });
       toast.success(t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }));
       setAddingAccount(false);
       setAltToken('');
-      props.onUpdate();
+      latest.current.onUpdate();
     } catch {
       // error toast from fetchMutate
     } finally {
-      props.setBusy(false);
+      latest.current.setBusy(false);
     }
   };
-  let pollTimer: number | undefined;
-  let isDisposed = false;
-  let activeFlowGeneration = 0;
 
   const buildStartOptions = () => {
-    if (api().hasRegion) {
-      return { region: selectedRegion() };
+    if (hasRegion) {
+      return { region: selectedRegion };
     }
-    if (!isKiro()) {
+    if (!isKiro) {
       return undefined;
     }
 
-    const startUrl = kiroStartUrl().trim();
-    const region = kiroRegion().trim().toLowerCase();
+    const startUrl = kiroStartUrl.trim();
+    const region = kiroRegion.trim().toLowerCase();
     if (!/^[a-z]{2}(?:-[a-z0-9]+)+-\d$/.test(region)) {
       setKiroConfigError(t('providerSetup.device.invalidRegion'));
       return null;
@@ -184,100 +179,34 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
     return startUrl ? { startUrl, region } : { region };
   };
 
-  const connectHint = () => {
-    if (api().hasRegion) {
-      return t('providerSetup.device.hintMinimax');
-    }
-    if (isKiro()) {
-      return t('providerSetup.device.hintKiro');
-    }
-    return t('providerSetup.device.hintDefault');
-  };
+  const connectHint = hasRegion
+    ? t('providerSetup.device.hintMinimax')
+    : isKiro
+      ? t('providerSetup.device.hintKiro')
+      : t('providerSetup.device.hintDefault');
 
   const clearPollTimer = () => {
-    if (pollTimer !== undefined) {
-      window.clearTimeout(pollTimer);
-      pollTimer = undefined;
+    if (pollTimer.current !== undefined) {
+      window.clearTimeout(pollTimer.current);
+      pollTimer.current = undefined;
     }
   };
 
-  const schedulePoll = (delayMs: number, flowGeneration = activeFlowGeneration) => {
+  const isStale = (flowGeneration: number) =>
+    isDisposed.current || flowGeneration !== activeFlowGeneration.current;
+
+  const schedulePoll = (delayMs: number, flowGeneration = activeFlowGeneration.current) => {
     clearPollTimer();
-    if (isDisposed || flowGeneration !== activeFlowGeneration) return;
-    pollTimer = window.setTimeout(() => {
-      if (isDisposed || flowGeneration !== activeFlowGeneration) return;
+    if (isStale(flowGeneration)) return;
+    pollTimer.current = window.setTimeout(() => {
+      if (isStale(flowGeneration)) return;
       void runPoll(flowGeneration);
     }, delayMs);
   };
 
-  const handleDisconnect = async () => {
-    props.setBusy(true);
-    try {
-      const result = await api().revoke(props.agentName);
-      if (result?.notifications?.length) {
-        for (const msg of result.notifications) {
-          toast.error(msg);
-        }
-      }
-      props.onBack();
-      props.onUpdate();
-    } catch {
-      // error toast from fetchMutate
-    } finally {
-      props.setBusy(false);
-    }
-  };
-
-  const handleDeleteKey = async (label: string) => {
-    props.setBusy(true);
-    try {
-      const result = await api().revoke(props.agentName, label);
-      if (result?.notifications?.length) {
-        for (const msg of result.notifications) {
-          toast.error(msg);
-        }
-      }
-      props.onUpdate();
-    } catch {
-      // error toast from fetchMutate
-    } finally {
-      props.setBusy(false);
-    }
-  };
-
-  const startRename = (k: RoutingProvider) => {
-    setRenamingId(k.id);
-    setRenameValue(k.label);
-  };
-
-  const commitRename = async (k: RoutingProvider) => {
-    const newLabel = renameValue().trim();
-    if (!newLabel || newLabel === k.label) {
-      setRenamingId(null);
-      return;
-    }
-    props.setBusy(true);
-    try {
-      await renameProviderKey(
-        props.agentName,
-        props.provId,
-        k.label,
-        newLabel,
-        props.selectedAuthType(),
-      );
-      toast.success(t('providerSetup.shared.renamedTo', { label: newLabel }));
-      setRenamingId(null);
-      props.onUpdate();
-    } catch {
-      // toast handled upstream
-    } finally {
-      props.setBusy(false);
-    }
-  };
-
-  const runPoll = async (flowGeneration = activeFlowGeneration) => {
-    if (isDisposed || flowGeneration !== activeFlowGeneration) return;
-    const current = flow();
+  const runPoll = async (flowGeneration = activeFlowGeneration.current) => {
+    if (isStale(flowGeneration)) return;
+    const current = flowRef.current;
     if (!current) return;
 
     if (Date.now() >= current.expiresAt) {
@@ -290,20 +219,20 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
 
     try {
       const result = await api().poll(current.flowId);
-      if (isDisposed || flowGeneration !== activeFlowGeneration) return;
-      const latest = flow();
-      if (!latest || latest.flowId !== current.flowId) {
+      if (isStale(flowGeneration)) return;
+      const latestFlow = flowRef.current;
+      if (!latestFlow || latestFlow.flowId !== current.flowId) {
         return;
       }
 
       if (result.status === 'success') {
         clearPollTimer();
         toast.success(
-          t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }),
+          t('providerSetup.shared.subscriptionConnected', { name: latest.current.provDef.name }),
         );
         setAddingAccount(false);
         setFlow(null);
-        props.onUpdate();
+        latest.current.onUpdate();
         return;
       }
 
@@ -312,18 +241,19 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
         setStatusMessage(null);
         setFlow(null);
         toast.error(
-          result.message ?? t('providerSetup.device.loginFailed', { name: props.provDef.name }),
+          result.message ??
+            t('providerSetup.device.loginFailed', { name: latest.current.provDef.name }),
         );
         return;
       }
 
       setStatusMessage(result.message ?? t('providerSetup.device.waitingApproval'));
       schedulePoll(
-        result.pollIntervalMs ?? latest.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
+        result.pollIntervalMs ?? latestFlow.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
         flowGeneration,
       );
     } catch {
-      if (isDisposed || flowGeneration !== activeFlowGeneration) return;
+      if (isStale(flowGeneration)) return;
       clearPollTimer();
       setStatusMessage(null);
       setFlow(null);
@@ -348,14 +278,13 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
     // the popup is about:blank (same-origin) so this assignment can't throw.
     popup.opener = null;
 
-    props.setBusy(true);
-    const flowGeneration = ++activeFlowGeneration;
+    latest.current.setBusy(true);
+    const flowGeneration = ++activeFlowGeneration.current;
     clearPollTimer();
     setStatusMessage(null);
     try {
-      const current = api();
-      const nextFlow = await current.start(props.agentName, startOptions);
-      if (isDisposed || flowGeneration !== activeFlowGeneration) {
+      const nextFlow = await api().start(latest.current.agentName, startOptions);
+      if (isStale(flowGeneration)) {
         popup.close();
         return;
       }
@@ -364,19 +293,31 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
       schedulePoll(nextFlow.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS, flowGeneration);
     } catch {
       popup.close();
-      if (isDisposed || flowGeneration !== activeFlowGeneration) return;
+      if (isStale(flowGeneration)) return;
       setFlow(null);
     } finally {
-      if (isDisposed || flowGeneration !== activeFlowGeneration) return;
-      props.setBusy(false);
+      if (!isStale(flowGeneration)) latest.current.setBusy(false);
     }
   };
 
-  onCleanup(() => {
-    isDisposed = true;
-    activeFlowGeneration += 1;
-    clearPollTimer();
-  });
+  // When "Add another key" is clicked in the header, launch a new device code flow.
+  useEffect(() => {
+    if (props.addKeyOpen && props.connected && !props.busy) {
+      setAddingAccount(true);
+      props.setAddKeyOpen?.(false);
+      void handleStart();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.addKeyOpen, props.connected, props.busy]);
+
+  useEffect(() => {
+    isDisposed.current = false;
+    return () => {
+      isDisposed.current = true;
+      activeFlowGeneration.current += 1;
+      clearPollTimer();
+    };
+  }, []);
 
   const cancelAddAccount = () => {
     setAddingAccount(false);
@@ -387,288 +328,187 @@ const DeviceCodeDetailView: Component<Props> = (props) => {
     clearPollTimer();
   };
 
-  return (
-    <>
-      <Show when={showConnectFlow()}>
-        <Show
-          when={flow()}
-          fallback={
-            <>
-              <div class="subscription-detail__primary">
-                <p class="provider-detail__hint" style="margin-bottom: 0;">
-                  {connectHint()}
-                </p>
-                <Show when={api().hasRegion}>
-                  <div class="provider-detail__field">
-                    <label class="provider-detail__label" for="minimax-region">
-                      {t('providerSetup.shared.region')}
-                    </label>
-                    <select
-                      id="minimax-region"
-                      class="provider-detail__input"
-                      value={selectedRegion()}
-                      disabled={props.busy()}
-                      onChange={(e) =>
-                        setSelectedRegion(e.currentTarget.value as MinimaxOAuthRegion)
-                      }
-                    >
-                      <option value="global">{t('providerSetup.device.regionGlobal')}</option>
-                      <option value="cn">{t('providerSetup.device.regionCn')}</option>
-                    </select>
-                  </div>
-                </Show>
-                <Show when={isKiro()}>
-                  <div class="provider-detail__field">
-                    <span class="provider-detail__label">{t('providerSetup.shared.region')}</span>
+  const revoke = async (label?: string) => {
+    props.setBusy(true);
+    try {
+      const deviceApi = api();
+      const result = await (label
+        ? deviceApi.revoke(props.agentName, label)
+        : deviceApi.revoke(props.agentName));
+      if (result?.notifications?.length) {
+        for (const msg of result.notifications) toast.error(msg);
+      }
+      if (!label) latest.current.onBack();
+      latest.current.onUpdate();
+    } catch {
+      // error toast from fetchMutate
+    } finally {
+      latest.current.setBusy(false);
+    }
+  };
+
+  if (showConnectFlow) {
+    return (
+      <div className="flex flex-col gap-4">
+        {flow ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-dim">
+              {t('providerSetup.device.tabOpened', { name: props.provDef.name })}
+            </p>
+            {statusMessage ? <p className="text-sm text-muted">{statusMessage}</p> : null}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-dim">{connectHint}</p>
+              {hasRegion ? (
+                <div>
+                  <label className="label" htmlFor="minimax-region">
+                    {t('providerSetup.shared.region')}
+                  </label>
+                  <select
+                    id="minimax-region"
+                    className="field"
+                    value={selectedRegion}
+                    disabled={props.busy}
+                    onChange={(e) => setSelectedRegion(e.currentTarget.value as MinimaxOAuthRegion)}
+                  >
+                    <option value="global">{t('providerSetup.device.regionGlobal')}</option>
+                    <option value="cn">{t('providerSetup.device.regionCn')}</option>
+                  </select>
+                </div>
+              ) : null}
+              {isKiro ? (
+                <>
+                  <div>
+                    <span className="label">{t('providerSetup.shared.region')}</span>
                     <Select
                       label={t('providerSetup.shared.region')}
                       options={KIRO_REGION_OPTIONS}
-                      value={kiroRegion()}
-                      disabled={props.busy()}
+                      value={kiroRegion}
+                      disabled={props.busy}
                       portal
                       maxDropdownHeight={240}
-                      ariaDescribedBy={kiroConfigError() ? 'kiro-identity-error' : undefined}
+                      ariaDescribedBy={kiroErrorId}
                       onChange={(value) => {
                         setKiroRegion(value);
                         setKiroConfigError(null);
                       }}
                     />
                   </div>
-                  <div class="provider-detail__field">
-                    <label class="provider-detail__label" for="kiro-start-url">
+                  <div>
+                    <label className="label" htmlFor="kiro-start-url">
                       {t('providerSetup.device.startUrl')}{' '}
-                      <span class="provider-detail__label-muted">
-                        {t('providerSetup.device.optional')}
-                      </span>
+                      <span className="text-faint">{t('providerSetup.device.optional')}</span>
                     </label>
                     <input
                       id="kiro-start-url"
-                      class="provider-detail__input"
-                      classList={{ 'provider-detail__input--error': !!kiroConfigError() }}
+                      className="field"
+                      aria-invalid={kiroConfigError ? true : undefined}
                       type="url"
-                      inputmode="url"
-                      autocomplete="off"
+                      inputMode="url"
+                      autoComplete="off"
                       // i18n-ignore: example URL
                       placeholder="https://your-domain.awsapps.com/start"
-                      value={kiroStartUrl()}
-                      disabled={props.busy()}
-                      aria-describedby={kiroConfigError() ? 'kiro-identity-error' : undefined}
-                      onInput={(e) => {
+                      value={kiroStartUrl}
+                      disabled={props.busy}
+                      aria-describedby={kiroErrorId}
+                      onChange={(e) => {
                         setKiroStartUrl(e.currentTarget.value);
                         setKiroConfigError(null);
                       }}
                     />
                   </div>
-                  <Show when={kiroConfigError()}>
-                    <div id="kiro-identity-error" class="provider-detail__error">
-                      {kiroConfigError()}
+                  {kiroConfigError ? (
+                    <div id="kiro-identity-error" className="form-error">
+                      {kiroConfigError}
                     </div>
-                  </Show>
-                </Show>
-                <button
-                  class="btn btn--primary subscription-detail__btn"
-                  disabled={props.busy()}
-                  onClick={handleStart}
+                  ) : null}
+                </>
+              ) : null}
+              <Button block busy={props.busy} onClick={() => void handleStart()}>
+                {t('providerSetup.device.connectWith', { name: props.provDef.name })}
+              </Button>
+            </div>
+            {alt ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 text-xs text-faint">
+                  <span className="h-px flex-1 bg-line" />
+                  <span>{alt.dividerLabel}</span>
+                  <span className="h-px flex-1 bg-line" />
+                </div>
+                <input
+                  id="minimax-alt-token"
+                  className="field font-mono"
+                  aria-invalid={altError ? true : undefined}
+                  type="text"
+                  autoComplete="off"
+                  placeholder={alt.placeholder}
+                  aria-label={t('providerSetup.device.codingPlanToken', {
+                    name: props.provDef.name,
+                  })}
+                  value={altToken}
+                  disabled={props.busy}
+                  onChange={(e) => {
+                    setAltToken(e.currentTarget.value);
+                    setAltError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleAltConnect();
+                  }}
+                />
+                {altError ? <div className="form-error">{altError}</div> : null}
+                <Button
+                  variant="ghost"
+                  block
+                  busy={props.busy}
+                  disabled={!altToken.trim()}
+                  onClick={() => void handleAltConnect()}
                 >
-                  <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                    {t('providerSetup.device.connectWith', { name: props.provDef.name })}
-                  </Show>
-                </button>
+                  {t('providerSetup.device.connectWithToken')}
+                </Button>
               </div>
-              <Show when={props.provDef.subscriptionTokenAlternative}>
-                {(alt) => (
-                  <div class="subscription-detail__alt">
-                    <div class="subscription-detail__alt-divider">
-                      <span>{alt().dividerLabel}</span>
-                    </div>
-                    <input
-                      id="minimax-alt-token"
-                      class="provider-detail__input provider-detail__input--masked"
-                      classList={{ 'provider-detail__input--error': !!altError() }}
-                      type="text"
-                      autocomplete="off"
-                      placeholder={alt().placeholder}
-                      aria-label={t('providerSetup.device.codingPlanToken', {
-                        name: props.provDef.name,
-                      })}
-                      value={altToken()}
-                      disabled={props.busy()}
-                      onInput={(e) => {
-                        setAltToken(e.currentTarget.value);
-                        setAltError(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAltConnect();
-                      }}
-                    />
-                    <Show when={altError()}>
-                      <div class="provider-detail__error">{altError()}</div>
-                    </Show>
-                    <button
-                      class="btn btn--outline subscription-detail__btn"
-                      disabled={props.busy() || !altToken().trim()}
-                      onClick={handleAltConnect}
-                    >
-                      <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                        {t('providerSetup.device.connectWithToken')}
-                      </Show>
-                    </button>
-                  </div>
-                )}
-              </Show>
-            </>
-          }
-        >
-          <>
-            <p class="provider-detail__hint">
-              {t('providerSetup.device.tabOpened', { name: props.provDef.name })}
-            </p>
-            <Show when={statusMessage()}>
-              <p class="provider-detail__hint" style="margin-top: 12px;">
-                {statusMessage()}
-              </p>
-            </Show>
+            ) : null}
           </>
-        </Show>
-        <Show when={addingAccount()}>
-          <button
-            class="btn btn--outline provider-detail__action"
-            disabled={props.busy()}
-            onClick={cancelAddAccount}
-          >
+        )}
+        {addingAccount ? (
+          <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
             {t('common.cancel')}
-          </button>
-        </Show>
-      </Show>
-      <Show when={showConnectedFlow()}>
-        {/* Multi-key list */}
-        <Show when={isMultiKey()}>
-          <div class="provider-detail__field">
-            <label class="provider-detail__label">{t('providerSetup.shared.accounts')}</label>
-            <ul
-              role="list"
-              aria-label={t('providerSetup.shared.accountsFor', { name: props.provDef.name })}
-              style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
-            >
-              <For each={props.activeKeys!()}>
-                {(k) => (
-                  <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / 0.3);">
-                    <Show
-                      when={renamingId() === k.id}
-                      fallback={
-                        <>
-                          <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                              {k.label}
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                              {t('providerSetup.shared.connectedVia', {
-                                via:
-                                  props.provDef.subscriptionLabel ??
-                                  t('providerSetup.shared.subscriptionLower'),
-                              })}
-                            </div>
-                          </div>
-                          <button
-                            class="btn btn--outline btn--sm"
-                            style="flex-shrink: 0;"
-                            disabled={props.busy()}
-                            onClick={() => startRename(k)}
-                          >
-                            {t('providerSetup.shared.rename')}
-                          </button>
-                          <button
-                            class="provider-detail__disconnect-icon"
-                            disabled={props.busy()}
-                            onClick={() => handleDeleteKey(k.label)}
-                            aria-label={t('providerSetup.shared.deleteAccountNamed', {
-                              label: k.label,
-                            })}
-                            title={t('providerSetup.shared.deleteAccount')}
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </>
-                      }
-                    >
-                      <input
-                        class="provider-detail__input"
-                        type="text"
-                        maxlength={MAX_LABEL_LENGTH}
-                        aria-label={t('providerSetup.shared.renameNamed', { label: k.label })}
-                        value={renameValue()}
-                        onInput={(e) => setRenameValue(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitRename(k);
-                          if (e.key === 'Escape') setRenamingId(null);
-                        }}
-                      />
-                      <button
-                        class="btn btn--primary btn--sm"
-                        disabled={props.busy()}
-                        onClick={() => commitRename(k)}
-                      >
-                        {t('common.save')}
-                      </button>
-                      <button
-                        class="btn btn--outline btn--sm"
-                        disabled={props.busy()}
-                        onClick={() => setRenamingId(null)}
-                      >
-                        {t('common.cancel')}
-                      </button>
-                    </Show>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-          <button
-            class="btn btn--outline provider-detail__action provider-detail__disconnect"
-            disabled={props.busy()}
-            onClick={handleDisconnect}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.shared.disconnectAll')}
-            </Show>
-          </button>
-        </Show>
-        {/* Single key — original view */}
-        <Show when={!isMultiKey()}>
-          <div class="provider-detail__field">
-            <span class="provider-detail__no-key">
-              {t('providerSetup.shared.connectedVia', {
-                via: props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower'),
-              })}
-            </span>
-          </div>
-          <button
-            class="btn btn--outline provider-detail__action provider-detail__disconnect"
-            disabled={props.busy()}
-            onClick={handleDisconnect}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.shared.disconnect')}
-            </Show>
-          </button>
-        </Show>
-      </Show>
-    </>
-  );
-};
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
-export default DeviceCodeDetailView;
+  return (
+    <div className="flex flex-col gap-4">
+      {isMultiKey ? (
+        <SubscriptionAccountList
+          keys={activeKeys}
+          ariaLabel={t('providerSetup.shared.accountsFor', { name: props.provDef.name })}
+          via={via}
+          busy={props.busy}
+          onDelete={(label) => void revoke(label)}
+          onRename={(key, newLabel) =>
+            renameSubscriptionKey({
+              agentName: props.agentName,
+              provId: props.provId,
+              authType: props.selectedAuthType,
+              key,
+              newLabel,
+              setBusy: props.setBusy,
+              onUpdate: props.onUpdate,
+            })
+          }
+        />
+      ) : (
+        <p className="text-sm text-dim">{t('providerSetup.shared.connectedVia', { via })}</p>
+      )}
+      <Button variant="ghost" block busy={props.busy} onClick={() => void revoke()}>
+        {isMultiKey
+          ? t('providerSetup.shared.disconnectAll')
+          : t('providerSetup.shared.disconnect')}
+      </Button>
+    </div>
+  );
+}

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
-import { createSignal, type Accessor, type Setter } from 'solid-js';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+
+type T = () => T;
 
 const mockConnectProvider = vi.fn();
 const mockDisconnectProvider = vi.fn();
@@ -33,31 +35,31 @@ vi.mock('../../src/components/ProviderKeyForm.js', () => ({
   default: (props: {
     provId: string;
     agentName: string;
-    isSubMode: Accessor<boolean>;
-    connected: Accessor<boolean>;
-    selectedAuthType: Accessor<AuthType>;
-    busy: Accessor<boolean>;
-    keyInput: Accessor<string>;
-    editing: Accessor<boolean>;
-    validationError: Accessor<string | null>;
+    isSubMode: boolean;
+    connected: boolean;
+    selectedAuthType: AuthType;
+    busy: boolean;
+    keyInput: string;
+    editing: boolean;
+    validationError: string | null;
     providers: RoutingProvider[];
     onBack: () => void;
     onUpdate: () => void;
   }) => (
     <div
       data-agent={props.agentName}
-      data-auth={props.selectedAuthType()}
-      data-busy={String(props.busy())}
-      data-connected={String(props.connected())}
-      data-editing={String(props.editing())}
+      data-auth={props.selectedAuthType}
+      data-busy={String(props.busy)}
+      data-connected={String(props.connected)}
+      data-editing={String(props.editing)}
       data-has-back={String(Boolean(props.onBack))}
       data-has-update={String(Boolean(props.onUpdate))}
-      data-input={props.keyInput()}
-      data-is-sub-mode={String(props.isSubMode())}
+      data-input={props.keyInput}
+      data-is-sub-mode={String(props.isSubMode)}
       data-provider-count={String(props.providers.length)}
       data-provider-id={props.provId}
       data-testid="provider-key-form"
-      data-validation-error={props.validationError() ?? ''}
+      data-validation-error={props.validationError ?? ''}
     />
   ),
   MAX_KEYS_PER_PROVIDER: 50,
@@ -66,15 +68,15 @@ vi.mock('../../src/components/ProviderKeyForm.js', () => ({
 vi.mock('../../src/components/OAuthDetailView.js', () => ({
   default: (props: {
     provId: string;
-    connected: Accessor<boolean>;
-    selectedAuthType: Accessor<AuthType>;
-    busy: Accessor<boolean>;
+    connected: boolean;
+    selectedAuthType: AuthType;
+    busy: boolean;
     onClose: () => void;
   }) => (
     <div
-      data-auth={props.selectedAuthType()}
-      data-busy={String(props.busy())}
-      data-connected={String(props.connected())}
+      data-auth={props.selectedAuthType}
+      data-busy={String(props.busy)}
+      data-connected={String(props.connected)}
       data-has-close={String(Boolean(props.onClose))}
       data-provider-id={props.provId}
       data-testid="oauth-detail-view"
@@ -85,15 +87,15 @@ vi.mock('../../src/components/OAuthDetailView.js', () => ({
 vi.mock('../../src/components/AnthropicOAuthDetailView.js', () => ({
   default: (props: {
     provId: string;
-    connected: Accessor<boolean>;
-    selectedAuthType: Accessor<AuthType>;
-    busy: Accessor<boolean>;
+    connected: boolean;
+    selectedAuthType: AuthType;
+    busy: boolean;
     onClose: () => void;
   }) => (
     <div
-      data-auth={props.selectedAuthType()}
-      data-busy={String(props.busy())}
-      data-connected={String(props.connected())}
+      data-auth={props.selectedAuthType}
+      data-busy={String(props.busy)}
+      data-connected={String(props.connected)}
       data-has-close={String(Boolean(props.onClose))}
       data-provider-id={props.provId}
       data-testid="anthropic-oauth-detail-view"
@@ -104,15 +106,15 @@ vi.mock('../../src/components/AnthropicOAuthDetailView.js', () => ({
 vi.mock('../../src/components/DeviceCodeDetailView.js', () => ({
   default: (props: {
     provId: string;
-    connected: Accessor<boolean>;
-    selectedAuthType: Accessor<AuthType>;
-    busy: Accessor<boolean>;
+    connected: boolean;
+    selectedAuthType: AuthType;
+    busy: boolean;
     onClose: () => void;
   }) => (
     <div
-      data-auth={props.selectedAuthType()}
-      data-busy={String(props.busy())}
-      data-connected={String(props.connected())}
+      data-auth={props.selectedAuthType}
+      data-busy={String(props.busy)}
+      data-connected={String(props.connected)}
       data-has-close={String(Boolean(props.onClose))}
       data-provider-id={props.provId}
       data-testid="device-code-detail-view"
@@ -132,32 +134,49 @@ function createTestProps(
     busy: boolean;
   }> = {},
 ) {
-  const [busy, setBusy] = createSignal(overrides.busy ?? false);
-  const [keyInput, setKeyInput] = createSignal('');
-  const [editing, setEditing] = createSignal(false);
-  const [validationError, setValidationError] = createSignal<string | null>(null);
-  const [selectedAuthType, setSelectedAuthType] = createSignal<AuthType>(
-    overrides.selectedAuthType ?? 'api_key',
-  );
-
   return {
     provId: overrides.provId ?? 'ollama',
     agentName: 'test-agent',
     providers: overrides.providers ?? [],
-    selectedAuthType: selectedAuthType as Accessor<AuthType>,
-    busy,
-    setBusy: setBusy as Setter<boolean>,
-    keyInput,
-    setKeyInput: setKeyInput as Setter<string>,
-    editing,
-    setEditing: setEditing as Setter<boolean>,
-    validationError,
-    setValidationError: setValidationError as Setter<string | null>,
+    selectedAuthType: overrides.selectedAuthType ?? ('api_key' as AuthType),
+    busy: overrides.busy ?? false,
     onBack: vi.fn(),
     onUpdate: vi.fn(),
     onClose: vi.fn(),
   };
 }
+
+type TestProps = ReturnType<typeof createTestProps>;
+
+/** Owns the state the parent (ProviderSelectContent) holds for the view. */
+function Harness({ props, providers }: { props: TestProps; providers?: RoutingProvider[] }) {
+  const [busy, setBusy] = useState(props.busy);
+  const [keyInput, setKeyInput] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [selectedAuthType] = useState<AuthType>(props.selectedAuthType);
+  return (
+    <ProviderDetailView
+      provId={props.provId}
+      agentName={props.agentName}
+      providers={providers ?? props.providers}
+      selectedAuthType={selectedAuthType}
+      busy={busy}
+      setBusy={setBusy}
+      keyInput={keyInput}
+      setKeyInput={setKeyInput}
+      editing={editing}
+      setEditing={setEditing}
+      validationError={validationError}
+      setValidationError={setValidationError}
+      onBack={props.onBack}
+      onUpdate={props.onUpdate}
+      onClose={props.onClose}
+    />
+  );
+}
+
+const renderView = (props: TestProps) => render(<Harness props={props} />);
 
 describe('ProviderDetailView', () => {
   beforeEach(() => {
@@ -175,13 +194,13 @@ describe('ProviderDetailView', () => {
   describe('Ollama connect flow', () => {
     it('shows Connect button for disconnected Ollama', () => {
       const props = createTestProps({ provId: 'ollama', providers: [] });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByText('Connect')).toBeDefined();
     });
 
     it('calls connectProvider and callbacks on successful connect', async () => {
       const props = createTestProps({ provId: 'ollama', providers: [] });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByText('Connect'));
 
@@ -199,7 +218,7 @@ describe('ProviderDetailView', () => {
     it('handles connect failure gracefully', async () => {
       mockConnectProvider.mockRejectedValueOnce(new Error('fail'));
       const props = createTestProps({ provId: 'ollama', providers: [] });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByText('Connect'));
 
@@ -227,7 +246,7 @@ describe('ProviderDetailView', () => {
         provId: 'ollama',
         providers: connectedOllamaProviders,
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByText('Disconnect')).toBeDefined();
     });
 
@@ -236,7 +255,7 @@ describe('ProviderDetailView', () => {
         provId: 'ollama',
         providers: connectedOllamaProviders,
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByText('Disconnect'));
 
@@ -253,7 +272,7 @@ describe('ProviderDetailView', () => {
         provId: 'ollama',
         providers: connectedOllamaProviders,
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByText('Disconnect'));
 
@@ -271,7 +290,7 @@ describe('ProviderDetailView', () => {
         provId: 'ollama',
         providers: connectedOllamaProviders,
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByText('Disconnect'));
 
@@ -299,7 +318,7 @@ describe('ProviderDetailView', () => {
         providers: connectedOpenaiSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('oauth-detail-view')).toBeDefined();
     });
   });
@@ -321,7 +340,7 @@ describe('ProviderDetailView', () => {
         providers: connectedGeminiSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('oauth-detail-view')).toBeDefined();
     });
   });
@@ -339,7 +358,7 @@ describe('ProviderDetailView', () => {
 
     it('shows only the closure note when there is no connection', () => {
       const props = createTestProps({ provId: 'gemini', selectedAuthType: 'subscription' });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByRole('note').textContent).toContain(
         'no longer allows new Gemini sign-ins',
       );
@@ -353,7 +372,7 @@ describe('ProviderDetailView', () => {
         providers: [googleSub()],
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('oauth-detail-view')).toBeDefined();
       expect(screen.getByRole('note')).toBeDefined();
       expect(screen.queryByText('Add connection')).toBeNull();
@@ -365,14 +384,14 @@ describe('ProviderDetailView', () => {
         providers: [googleSub({ provider: 'openai' })],
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByText('Add connection')).toBeDefined();
       expect(screen.queryByRole('note')).toBeNull();
     });
 
     it('leaves the Google API key flow untouched', () => {
       const props = createTestProps({ provId: 'gemini', selectedAuthType: 'api_key' });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('provider-key-form')).toBeDefined();
       expect(screen.queryByRole('note')).toBeNull();
     });
@@ -395,7 +414,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('anthropic-oauth-detail-view')).toBeDefined();
     });
   });
@@ -417,7 +436,7 @@ describe('ProviderDetailView', () => {
         providers: connectedCopilotSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByTestId('device-code-detail-view')).toBeDefined();
     });
   });
@@ -428,7 +447,7 @@ describe('ProviderDetailView', () => {
         provId: 'kiro',
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       const view = screen.getByTestId('device-code-detail-view');
       expect(view).toBeDefined();
       expect(view.getAttribute('data-provider-id')).toBe('kiro');
@@ -437,7 +456,7 @@ describe('ProviderDetailView', () => {
 
   it('renders back button', () => {
     const props = createTestProps();
-    render(() => <ProviderDetailView {...props} />);
+    renderView(props);
     const btn = screen.getByLabelText('Back to providers');
     expect(btn).toBeDefined();
     fireEvent.click(btn);
@@ -446,7 +465,7 @@ describe('ProviderDetailView', () => {
 
   it('renders ProviderKeyForm for non-Ollama providers', () => {
     const props = createTestProps({ provId: 'anthropic' });
-    render(() => <ProviderDetailView {...props} />);
+    renderView(props);
     expect(screen.getByTestId('provider-key-form')).toBeDefined();
   });
 
@@ -463,7 +482,7 @@ describe('ProviderDetailView', () => {
     }));
     const props = createTestProps({ provId: 'openai', providers });
 
-    render(() => <ProviderDetailView {...props} />);
+    renderView(props);
 
     expect(screen.getByText('Add another key')).toBeDefined();
   });
@@ -484,7 +503,7 @@ describe('ProviderDetailView', () => {
 
     it('hides the refresh button when the provider is not connected', () => {
       const props = createTestProps({ provId: 'anthropic', providers: [] });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.queryByLabelText('Refresh models from Anthropic')).toBeNull();
     });
 
@@ -494,7 +513,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
       expect(screen.getByLabelText('Refresh models from Anthropic')).toBeDefined();
       expect(screen.getByText(/12 models - last refreshed: 5m ago/)).toBeDefined();
     });
@@ -505,7 +524,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -526,7 +545,12 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      const [providers, setProviders] = createSignal(connectedAnthropicSub);
+      let setProviders!: (next: RoutingProvider[]) => void;
+      function Parent() {
+        const [providers, set] = useState(connectedAnthropicSub);
+        setProviders = set;
+        return <Harness props={props} providers={providers} />;
+      }
       props.onUpdate.mockImplementation(() => {
         setProviders([
           {
@@ -536,7 +560,7 @@ describe('ProviderDetailView', () => {
           },
         ]);
       });
-      render(() => <ProviderDetailView {...props} providers={providers()} />);
+      render(<Parent />);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -558,7 +582,7 @@ describe('ProviderDetailView', () => {
             finishUpdate = resolve;
           }),
       );
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -584,7 +608,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -605,7 +629,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -627,7 +651,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 
@@ -643,7 +667,7 @@ describe('ProviderDetailView', () => {
         providers: connectedAnthropicSub,
         selectedAuthType: 'subscription',
       });
-      render(() => <ProviderDetailView {...props} />);
+      renderView(props);
 
       fireEvent.click(screen.getByLabelText('Refresh models from Anthropic'));
 

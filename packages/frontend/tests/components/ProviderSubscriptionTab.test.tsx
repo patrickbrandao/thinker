@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 
 import ProviderSubscriptionTab from '../../src/components/ProviderSubscriptionTab';
 import type { ProviderDef } from '../../src/services/providers';
@@ -18,7 +18,7 @@ const provider = (overrides: Partial<ProviderDef> & { id: string; name: string }
   }) as ProviderDef;
 
 const baseProps = {
-  busy: () => false,
+  busy: false,
   isSubscriptionConnected: () => false,
   isSubscriptionWithToken: () => false,
   onOpenDetail: vi.fn(),
@@ -28,15 +28,8 @@ const baseProps = {
 
 const renderTab = (
   subs: ProviderDef[],
-  overrides: Partial<typeof baseProps> = {},
-) =>
-  render(() => (
-    <ProviderSubscriptionTab
-      {...baseProps}
-      {...overrides}
-      subscriptionProviders={subs}
-    />
-  ));
+  overrides: Partial<Omit<typeof baseProps, 'busy'> & { busy: boolean }> = {},
+) => render(<ProviderSubscriptionTab {...baseProps} {...overrides} subscriptionProviders={subs} />);
 
 describe('ProviderSubscriptionTab', () => {
   it('renders the hint, link, and falls back to default "Subscription" label', () => {
@@ -82,10 +75,10 @@ describe('ProviderSubscriptionTab', () => {
   ])('opens detail view when provider has %s', (_, extra) => {
     const onOpenDetail = vi.fn();
     const onToggle = vi.fn();
-    const { container } = renderTab(
-      [provider({ id: 'dv', name: 'DV', ...extra })],
-      { onOpenDetail, onToggle },
-    );
+    const { container } = renderTab([provider({ id: 'dv', name: 'DV', ...extra })], {
+      onOpenDetail,
+      onToggle,
+    });
     fireEvent.click(container.querySelector('button.provider-toggle') as HTMLButtonElement);
     expect(onOpenDetail).toHaveBeenCalledWith('dv', 'subscription');
     expect(onToggle).not.toHaveBeenCalled();
@@ -153,10 +146,10 @@ describe('ProviderSubscriptionTab', () => {
   it('uses isSubscriptionConnected for providers with no auth mode (undefined)', () => {
     const isSubscriptionWithToken = vi.fn(() => false);
     const isSubscriptionConnected = vi.fn(() => false);
-    renderTab(
-      [provider({ id: 'plain2', name: 'Plain2' })],
-      { isSubscriptionWithToken, isSubscriptionConnected },
-    );
+    renderTab([provider({ id: 'plain2', name: 'Plain2' })], {
+      isSubscriptionWithToken,
+      isSubscriptionConnected,
+    });
     expect(isSubscriptionConnected).toHaveBeenCalledWith('plain2');
     expect(isSubscriptionWithToken).not.toHaveBeenCalled();
   });
@@ -254,7 +247,7 @@ describe('ProviderSubscriptionTab', () => {
   it('disables the provider tile button when busy() is true', () => {
     const { container } = renderTab(
       [provider({ id: 'p', name: 'P', subscriptionAuthMode: 'popup_oauth' })],
-      { busy: () => true },
+      { busy: true },
     );
     const btn = container.querySelector('button.provider-toggle') as HTMLButtonElement;
     expect(btn.hasAttribute('disabled')).toBe(true);

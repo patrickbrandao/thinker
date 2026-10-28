@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // ─────────────────────────────────────────────────────────────────────────
 // NOTE (post-#2207 realignment)
@@ -177,7 +177,7 @@ describe('ProviderSelectModal', () => {
       customProviderPrefill?: unknown;
     } = {},
   ) =>
-    render(() => (
+    render(
       <ProviderSelectModal
         providers={props.providers ?? []}
         customProviders={props.customProviders as never}
@@ -186,8 +186,8 @@ describe('ProviderSelectModal', () => {
         agentName="test-agent"
         providerDeepLink={props.deepLink as never}
         customProviderPrefill={props.customProviderPrefill as never}
-      />
-    ));
+      />,
+    );
 
   const openApiKey = (providerId: string, providers: RoutingProvider[] = []) =>
     renderModal({ providers, deepLink: { providerId, authType: 'api_key' } });
@@ -227,9 +227,10 @@ describe('ProviderSelectModal', () => {
   // ── Overlay / modal-card behavior (survives on ProviderSelectModal) ──────
 
   it('renders the modal overlay and card', () => {
-    const { container } = renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    expect(container.querySelector('.modal-overlay')).not.toBeNull();
-    expect(container.querySelector('.modal-card')).not.toBeNull();
+    renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
+    // The ui.tsx Modal portals to document.body.
+    expect(document.querySelector('.overlay')).not.toBeNull();
+    expect(document.querySelector('.modal[role="dialog"]')).not.toBeNull();
   });
 
   it('renders the detail-view title for the selected provider', () => {
@@ -238,22 +239,23 @@ describe('ProviderSelectModal', () => {
   });
 
   it('calls onClose when clicking overlay background', () => {
-    const { container } = renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const overlay = container.querySelector('.modal-overlay')!;
-    fireEvent.click(overlay);
+    renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
+    const overlay = document.querySelector('.overlay')!;
+    fireEvent.mouseDown(overlay);
     expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('does not close when clicking inside the modal card', () => {
-    const { container } = renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const card = container.querySelector('.modal-card')!;
+    renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
+    const card = document.querySelector('.modal')!;
+    fireEvent.mouseDown(card);
     fireEvent.click(card);
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it('calls onClose on Escape key', () => {
-    const { container } = renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const overlay = container.querySelector('.modal-overlay')!;
+    renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
+    const overlay = document.querySelector('.overlay')!;
     fireEvent.keyDown(overlay, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -740,8 +742,8 @@ describe('ProviderSelectModal', () => {
       // Anthropic subscription uses an OAuth flow, not an API key from the
       // dashboard, so the console.anthropic.com/settings/keys URL would be
       // misleading and is intentionally suppressed.
-      const { container } = openSubscription('anthropic');
-      const link = container.querySelector<HTMLAnchorElement>(
+      openSubscription('anthropic');
+      const link = document.querySelector<HTMLAnchorElement>(
         'a[href="https://console.anthropic.com/settings/keys"]',
       );
       expect(link).toBeNull();
@@ -862,7 +864,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('shows MiniMax pending status while waiting for approval', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},
@@ -894,7 +896,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('stays open when MiniMax approval succeeds', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},
@@ -923,7 +925,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('toasts MiniMax poll errors and resets to the connect view', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},
@@ -955,7 +957,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('toasts a retry message when MiniMax polling throws and resets to the connect view', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},
@@ -985,7 +987,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('toasts on expired MiniMax codes and resets to the connect view', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},
@@ -1148,7 +1150,7 @@ describe('ProviderSelectModal', () => {
     });
 
     it('stops MiniMax polling after the modal unmounts', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.spyOn(window, 'open').mockReturnValue({
         close: vi.fn(),
         opener: {},

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { act, render, fireEvent, screen } from '@testing-library/react';
+import { useState } from 'react';
 import type { ProviderDef } from '../../src/services/providers';
 import type { AuthType, RoutingProvider } from '../../src/services/api';
 
@@ -46,6 +46,12 @@ import { suggestNextProviderKeyLabel } from '../../src/services/provider-key-lab
 
 /* ── Test helpers ───────────────────────────────────────────── */
 
+/** Lets the pending connect/disconnect promises and their state updates settle. */
+const flush = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
 function makeProviderDef(overrides: Partial<ProviderDef> = {}): ProviderDef {
   return {
     id: 'test',
@@ -77,24 +83,20 @@ interface MountOpts {
   onUpdate?: () => void;
 }
 
-function mount(opts: MountOpts) {
-  const [busy, setBusy] = createSignal(false);
-  const [keyInput, setKeyInput] = createSignal(opts.keyInput ?? '');
-  const [editing, setEditing] = createSignal(opts.editing ?? false);
-  const [validationError, setValidationError] = createSignal<string | null>(null);
-  const [addKeyOpen, setAddKeyOpen] = createSignal(opts.addKeyOpen ?? false);
-
-  const onBack = opts.onBack ?? vi.fn();
-  const onUpdate = opts.onUpdate ?? vi.fn();
-
-  const result = render(() => (
+function Harness(opts: MountOpts & { onBack: () => void; onUpdate: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [keyInput, setKeyInput] = useState(opts.keyInput ?? '');
+  const [editing, setEditing] = useState(opts.editing ?? false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [addKeyOpen, setAddKeyOpen] = useState(opts.addKeyOpen ?? false);
+  return (
     <ProviderKeyForm
       provDef={opts.provDef}
       provId={opts.provId ?? opts.provDef.id}
       agentName="test-agent"
-      isSubMode={() => opts.isSubMode ?? false}
-      connected={() => opts.connected ?? false}
-      selectedAuthType={() => opts.selectedAuthType ?? 'api_key'}
+      isSubMode={opts.isSubMode ?? false}
+      connected={opts.connected ?? false}
+      selectedAuthType={opts.selectedAuthType ?? 'api_key'}
       busy={busy}
       setBusy={setBusy}
       keyInput={keyInput}
@@ -107,12 +109,17 @@ function mount(opts: MountOpts) {
       providers={opts.providers}
       addKeyOpen={addKeyOpen}
       setAddKeyOpen={setAddKeyOpen}
-      onBack={onBack}
-      onUpdate={onUpdate}
+      onBack={opts.onBack}
+      onUpdate={opts.onUpdate}
     />
-  ));
+  );
+}
 
-  return { ...result, setKeyInput, setAddKeyOpen, onBack, onUpdate };
+function mount(opts: MountOpts) {
+  const onBack = opts.onBack ?? vi.fn();
+  const onUpdate = opts.onUpdate ?? vi.fn();
+  const result = render(<Harness {...opts} onBack={onBack} onUpdate={onUpdate} />);
+  return { ...result, onBack, onUpdate };
 }
 
 /* ── Tests ──────────────────────────────────────────────────── */
@@ -284,8 +291,7 @@ describe('ProviderKeyForm', () => {
       const connectBtn = container.querySelector('.provider-detail__action') as HTMLButtonElement;
       expect(connectBtn).not.toBeNull();
       fireEvent.click(connectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'openai',
@@ -325,8 +331,7 @@ describe('ProviderKeyForm', () => {
 
       const connectBtn = container.querySelector('.provider-detail__action') as HTMLButtonElement;
       fireEvent.click(connectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'zai',
@@ -362,8 +367,7 @@ describe('ProviderKeyForm', () => {
 
       const connectBtn = container.querySelector('.provider-detail__action') as HTMLButtonElement;
       fireEvent.click(connectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'bedrock',
@@ -397,7 +401,7 @@ describe('ProviderKeyForm', () => {
 
       const endpoint = container.querySelector('#qwen-subscription-endpoint') as HTMLSelectElement;
       fireEvent.change(endpoint, { target: { value: 'custom' } });
-      fireEvent.input(screen.getByLabelText('Base URL'), {
+      fireEvent.change(screen.getByLabelText('Base URL'), {
         target: {
           value: 'https://workspace-123.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
         },
@@ -405,8 +409,7 @@ describe('ProviderKeyForm', () => {
 
       const connectBtn = container.querySelector('.provider-detail__action') as HTMLButtonElement;
       fireEvent.click(connectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'qwen',
@@ -440,7 +443,7 @@ describe('ProviderKeyForm', () => {
 
       const endpoint = container.querySelector('#qwen-subscription-endpoint') as HTMLSelectElement;
       fireEvent.change(endpoint, { target: { value: 'workspace-eu-central-1' } });
-      fireEvent.input(screen.getByLabelText('Base URL'), {
+      fireEvent.change(screen.getByLabelText('Base URL'), {
         target: {
           value: 'https://workspace-123.eu-central-1.maas.aliyuncs.com/compatible-mode/v1',
         },
@@ -448,8 +451,7 @@ describe('ProviderKeyForm', () => {
 
       const connectBtn = container.querySelector('.provider-detail__action') as HTMLButtonElement;
       fireEvent.click(connectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'qwen',
@@ -528,8 +530,7 @@ describe('ProviderKeyForm', () => {
       ) as HTMLButtonElement;
       expect(saveBtn).not.toBeNull();
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(toastSuccess).toHaveBeenCalledWith('OpenAI key updated');
     });
 
@@ -550,8 +551,7 @@ describe('ProviderKeyForm', () => {
         b.textContent?.includes('Save'),
       ) as HTMLButtonElement;
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(toastSuccess).toHaveBeenCalledWith('Anthropic token updated');
     });
 
@@ -573,8 +573,7 @@ describe('ProviderKeyForm', () => {
         b.textContent?.includes('Save'),
       ) as HTMLButtonElement;
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       // Even though isSubMode() is true, isApiKeyCredential() short-circuits
       // the "token" label and we use "key".
       expect(toastSuccess).toHaveBeenCalledWith('Ollama Cloud key updated');
@@ -617,8 +616,7 @@ describe('ProviderKeyForm', () => {
         b.textContent?.includes('Save'),
       ) as HTMLButtonElement;
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'zai',
@@ -657,8 +655,7 @@ describe('ProviderKeyForm', () => {
         b.textContent?.includes('Save'),
       ) as HTMLButtonElement;
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'openai',
@@ -698,8 +695,7 @@ describe('ProviderKeyForm', () => {
         b.textContent?.includes('Save'),
       ) as HTMLButtonElement;
       fireEvent.click(saveBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'zai',
@@ -717,8 +713,7 @@ describe('ProviderKeyForm', () => {
         '.provider-detail__disconnect-icon',
       ) as HTMLButtonElement;
       fireEvent.click(disconnectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(revokeOpenaiOAuthMock).not.toHaveBeenCalled();
       expect(disconnectProviderMock).toHaveBeenCalled();
     });
@@ -742,8 +737,7 @@ describe('ProviderKeyForm', () => {
         '.provider-detail__disconnect-icon',
       ) as HTMLButtonElement;
       fireEvent.click(disconnectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(revokeOpenaiOAuthMock).toHaveBeenCalledWith('test-agent');
       expect(disconnectProviderMock).toHaveBeenCalled();
     });
@@ -767,8 +761,7 @@ describe('ProviderKeyForm', () => {
         '.provider-detail__disconnect-icon',
       ) as HTMLButtonElement;
       fireEvent.click(disconnectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(revokeOpenaiOAuthMock).toHaveBeenCalled();
       // Even with the rejection, disconnectProvider runs.
       expect(disconnectProviderMock).toHaveBeenCalled();
@@ -784,8 +777,7 @@ describe('ProviderKeyForm', () => {
         '.provider-detail__disconnect-icon',
       ) as HTMLButtonElement;
       fireEvent.click(disconnectBtn);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(toastError).toHaveBeenCalledWith('Archived alert rule');
       expect(toastError).toHaveBeenCalledWith('Removed from tier');
     });
@@ -825,8 +817,7 @@ describe('ProviderKeyForm', () => {
       const { container } = mount({ provDef: def, keyInput: 'sk-test' });
       const input = container.querySelector('input') as HTMLInputElement;
       fireEvent.keyDown(input, { key: 'Enter' });
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(connectProviderMock).toHaveBeenCalled();
     });
 
@@ -840,8 +831,7 @@ describe('ProviderKeyForm', () => {
       });
       const editingInput = container.querySelector('input:not([disabled])') as HTMLInputElement;
       fireEvent.keyDown(editingInput, { key: 'Enter' });
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(connectProviderMock).toHaveBeenCalled();
       expect(toastSuccess).toHaveBeenCalledWith('OpenAI key updated');
     });
@@ -983,11 +973,10 @@ describe('ProviderKeyForm', () => {
       const renameInput = container.querySelector(
         'input[aria-label="Rename Personal"]',
       ) as HTMLInputElement;
-      fireEvent.input(renameInput, { target: { value: 'Home' } });
+      fireEvent.change(renameInput, { target: { value: 'Home' } });
       fireEvent.click(getByText('Save'));
 
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(renameProviderKeyMock).toHaveBeenCalledWith(
         'test-agent',
         'openai',
@@ -1031,8 +1020,7 @@ describe('ProviderKeyForm', () => {
       ) as HTMLButtonElement;
       fireEvent.click(deleteWork);
 
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(disconnectProviderMock).toHaveBeenCalledWith(
         'test-agent',
         'openai',
@@ -1062,11 +1050,10 @@ describe('ProviderKeyForm', () => {
       );
       fireEvent.click(renameBtns[0] as HTMLButtonElement);
       const input = container.querySelector('input[type="text"]') as HTMLInputElement;
-      fireEvent.input(input, { target: { value: 'Home' } });
+      fireEvent.change(input, { target: { value: 'Home' } });
       fireEvent.click(getByText('Save'));
 
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(renameProviderKeyMock).toHaveBeenCalledWith(
         'test-agent',
         'openai',
@@ -1091,11 +1078,10 @@ describe('ProviderKeyForm', () => {
       const apiKeyInput = container.querySelector(
         'input[placeholder="sk-..."]',
       ) as HTMLInputElement;
-      fireEvent.input(apiKeyInput, { target: { value: 'sk-second' } });
+      fireEvent.change(apiKeyInput, { target: { value: 'sk-second' } });
       fireEvent.click(getByText('Add key'));
 
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       // Default suggestion for the 2nd key is "Key 2".
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'openai',
@@ -1122,10 +1108,9 @@ describe('ProviderKeyForm', () => {
       // List mode is active because there are 2 keys; form is open via addKeyOpen.
       // The api-key input has id="add-key-value".
       const apiKeyInput = container.querySelector('#add-key-value') as HTMLInputElement;
-      fireEvent.input(apiKeyInput, { target: { value: 'sk-third' } });
+      fireEvent.change(apiKeyInput, { target: { value: 'sk-third' } });
       fireEvent.click(getByText('Add key'));
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'openai',
         apiKey: 'sk-third',
@@ -1166,10 +1151,9 @@ describe('ProviderKeyForm', () => {
         ],
       });
       const tokenInput = container.querySelector('#add-key-value') as HTMLInputElement;
-      fireEvent.input(tokenInput, { target: { value: 'sub-third-token' } });
+      fireEvent.change(tokenInput, { target: { value: 'sub-third-token' } });
       fireEvent.click(getByText('Add key'));
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'anthropic',
         apiKey: 'sub-third-token',
@@ -1220,10 +1204,9 @@ describe('ProviderKeyForm', () => {
       expect(screen.getByLabelText('Region')).toBe(endpoint);
       fireEvent.change(endpoint, { target: { value: 'cn' } });
       const tokenInput = container.querySelector('#add-key-value') as HTMLInputElement;
-      fireEvent.input(tokenInput, { target: { value: 'zai-third-key' } });
+      fireEvent.change(tokenInput, { target: { value: 'zai-third-key' } });
       fireEvent.click(getByText('Add key'));
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'zai',
@@ -1273,16 +1256,15 @@ describe('ProviderKeyForm', () => {
 
       const endpoint = container.querySelector('#add-key-endpoint') as HTMLSelectElement;
       fireEvent.change(endpoint, { target: { value: 'workspace-ap-northeast-1' } });
-      fireEvent.input(screen.getByLabelText('Base URL'), {
+      fireEvent.change(screen.getByLabelText('Base URL'), {
         target: {
           value: 'https://workspace-123.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1',
         },
       });
       const apiKeyInput = container.querySelector('#add-key-value') as HTMLInputElement;
-      fireEvent.input(apiKeyInput, { target: { value: 'sk-third' } });
+      fireEvent.change(apiKeyInput, { target: { value: 'sk-third' } });
       fireEvent.click(getByText('Add key'));
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'qwen',
@@ -1303,10 +1285,9 @@ describe('ProviderKeyForm', () => {
         providers: [makeProvider({ id: 'p1', label: 'Default', priority: 0 })],
       });
       const apiKeyInput = container.querySelector('#add-key-value') as HTMLInputElement;
-      fireEvent.input(apiKeyInput, { target: { value: 'sk-second' } });
+      fireEvent.change(apiKeyInput, { target: { value: 'sk-second' } });
       fireEvent.click(getByText('Add key'));
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       // No success toast, form remains open (the catch returned false).
       expect(toastSuccess).not.toHaveBeenCalled();
     });
@@ -1329,22 +1310,21 @@ describe('ProviderKeyForm', () => {
 
   describe('AddAnotherKeyAction (uncontrolled open)', () => {
     function mountAction(overrides: { isSubscription?: boolean } = {}) {
-      const [busy, setBusy] = createSignal(false);
       const def = makeProviderDef({ id: 'openai', name: 'OpenAI' });
-      return render(() => (
+      return render(
         <AddAnotherKeyAction
           onAdd={vi.fn().mockResolvedValue(true)}
-          busy={busy}
-          setBusy={setBusy}
+          busy={false}
+          setBusy={vi.fn()}
           provDef={def}
           placeholder="sk-..."
-          whereToGetUrl={() => undefined}
-          credentialNoun={() => 'API key'}
-          credentialOwnerName={() => 'OpenAI'}
-          existingLabels={() => ['Default']}
+          whereToGetUrl={undefined}
+          credentialNoun="API key"
+          credentialOwnerName="OpenAI"
+          existingLabels={['Default']}
           isSubscription={overrides.isSubscription}
-        />
-      ));
+        />,
+      );
     }
 
     it('shows "Add another key" when isSubscription is false or undefined', () => {
@@ -1360,72 +1340,68 @@ describe('ProviderKeyForm', () => {
     });
 
     it('auto-focuses the API key input when opened', async () => {
-      const { queryByText } = mountAction();
+      const { queryByText, container } = mountAction();
       const btn = queryByText(/Add another key/) as HTMLButtonElement;
       fireEvent.click(btn);
       // After clicking, the form opens and requestAnimationFrame fires focus.
-      // Just verify the form is now visible (input rendered).
-      await Promise.resolve();
       expect(queryByText('Add key')).not.toBeNull();
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      });
+      expect(document.activeElement).toBe(container.querySelector('#add-key-value'));
     });
   });
 
   /* ── Endpoint-region seeding on externally-controlled open ──────────────
-   * Drives the `on(isOpen, …)` effect's region branch: when the form opens
-   * with endpoint regions available but no region picked yet, it seeds the
-   * region select. `endpointRegions`, `initialEndpointRegion`, and `open` are
-   * passed reactively so the region is genuinely unset at the moment `open`
-   * flips true (the signal starts empty), forcing the `!endpointRegion()`
-   * branch to run. */
+   * Drives the open effect's region branch: when the form opens with
+   * endpoint regions available but no region picked yet, it seeds the region
+   * select. The form first mounts closed with no regions (the region state
+   * starts empty), then re-renders open with regions, forcing the
+   * `!endpointRegion` branch to run. */
   describe('AddAnotherKeyAction endpoint-region seeding', () => {
-    function mountControlled(opts: {
-      regions: () => { value: string; label: string }[];
-      initialEndpointRegion: () => string | undefined;
-      open: () => boolean;
+    type Region = { value: string; label: string };
+    function element(opts: {
+      regions: Region[];
+      initialEndpointRegion: string | undefined;
+      open: boolean;
     }) {
-      const [busy, setBusy] = createSignal(false);
       const def = makeProviderDef({
         id: 'zai',
         name: 'Z.ai',
         supportsSubscription: true,
         subscriptionCredentialKind: 'api-key',
       });
-      return render(() => (
+      return (
         <AddAnotherKeyAction
           onAdd={vi.fn().mockResolvedValue(true)}
-          busy={busy}
-          setBusy={setBusy}
+          busy={false}
+          setBusy={vi.fn()}
           provDef={def}
           placeholder="Paste token"
-          whereToGetUrl={() => undefined}
-          credentialNoun={() => 'API key'}
-          credentialOwnerName={() => 'Z.ai'}
-          existingLabels={() => ['Default']}
+          whereToGetUrl={undefined}
+          credentialNoun="API key"
+          credentialOwnerName="Z.ai"
+          existingLabels={['Default']}
           isSubscription
-          endpointRegions={opts.regions()}
-          initialEndpointRegion={opts.initialEndpointRegion()}
+          endpointRegions={opts.regions}
+          initialEndpointRegion={opts.initialEndpointRegion}
           open={opts.open}
         />
-      ));
+      );
     }
+    const regions: Region[] = [
+      { value: 'us-east', label: 'US East' },
+      { value: 'eu-west', label: 'EU West' },
+    ];
 
     it('falls back to the default region when no initial region is provided', () => {
-      // Regions start empty + no initial → the signal initializes undefined.
+      // Regions start empty + no initial → the state initializes undefined.
       // After regions arrive and the form opens, the effect seeds the select
       // with the first region (the `?? defaultEndpointRegion` branch).
-      const [regions, setRegions] = createSignal<{ value: string; label: string }[]>([]);
-      const [open, setOpen] = createSignal(false);
-      const { container } = mountControlled({
-        regions,
-        initialEndpointRegion: () => undefined,
-        open,
-      });
-
-      setRegions([
-        { value: 'us-east', label: 'US East' },
-        { value: 'eu-west', label: 'EU West' },
-      ]);
-      setOpen(true);
+      const { container, rerender } = render(
+        element({ regions: [], initialEndpointRegion: undefined, open: false }),
+      );
+      rerender(element({ regions, initialEndpointRegion: undefined, open: true }));
 
       const select = container.querySelector('#add-key-endpoint') as HTMLSelectElement;
       expect(select).not.toBeNull();
@@ -1433,23 +1409,12 @@ describe('ProviderKeyForm', () => {
     });
 
     it('prefers the provided initial region over the default when seeding', () => {
-      // initialEndpointRegion is set (reactively) before the form opens, so the
-      // effect seeds with it (the `props.initialEndpointRegion ??` branch).
-      const [regions, setRegions] = createSignal<{ value: string; label: string }[]>([]);
-      const [initial, setInitial] = createSignal<string | undefined>(undefined);
-      const [open, setOpen] = createSignal(false);
-      const { container } = mountControlled({
-        regions,
-        initialEndpointRegion: initial,
-        open,
-      });
-
-      setRegions([
-        { value: 'us-east', label: 'US East' },
-        { value: 'eu-west', label: 'EU West' },
-      ]);
-      setInitial('eu-west');
-      setOpen(true);
+      // initialEndpointRegion is set before the form opens, so the effect
+      // seeds with it (the `props.initialEndpointRegion ??` branch).
+      const { container, rerender } = render(
+        element({ regions: [], initialEndpointRegion: undefined, open: false }),
+      );
+      rerender(element({ regions, initialEndpointRegion: 'eu-west', open: true }));
 
       const select = container.querySelector('#add-key-endpoint') as HTMLSelectElement;
       expect(select).not.toBeNull();

@@ -1,8 +1,10 @@
-import { createResource, createSignal, Show, For, type Component } from 'solid-js';
-import { useNavigate, useSearchParams } from '@solidjs/router';
+import { useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { getAgents, createAgent } from '../services/api.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { t } from '../i18n/index.js';
+import { useResource } from '../lib/use-resource.js';
+import { Button } from '../components/ui.js';
 
 interface Agent {
   agent_name: string;
@@ -13,22 +15,19 @@ interface AgentsData {
   agents: Agent[];
 }
 
-const ConnectProvider: Component = () => {
+export default function ConnectProvider() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [creating, setCreating] = createSignal(false);
-
-  const str = (v: string | string[] | undefined): string | undefined =>
-    Array.isArray(v) ? v[0] : v;
+  const [creating, setCreating] = useState(false);
 
   const buildTarget = (agentName: string) => {
     const qp = new URLSearchParams();
-    const provider = str(searchParams.provider) || 'custom';
+    const provider = searchParams.get('provider') || 'custom';
     qp.set('provider', provider);
-    const name = str(searchParams.name);
-    const baseUrl = str(searchParams.baseUrl);
-    const apiKey = str(searchParams.apiKey);
-    const models = str(searchParams.models);
+    const name = searchParams.get('name');
+    const baseUrl = searchParams.get('baseUrl');
+    const apiKey = searchParams.get('apiKey');
+    const models = searchParams.get('models');
     if (name) qp.set('name', name);
     if (baseUrl) qp.set('baseUrl', baseUrl);
     if (apiKey) qp.set('apiKey', apiKey);
@@ -36,7 +35,12 @@ const ConnectProvider: Component = () => {
     return `/harnesses/${encodeURIComponent(agentName)}/routing?${qp.toString()}`;
   };
 
+  // StrictMode runs the mount effect twice in development; create one harness only.
+  const createStarted = useRef(false);
+
   const autoCreate = async () => {
+    if (createStarted.current) return;
+    createStarted.current = true;
     setCreating(true);
     try {
       const result = await createAgent({ name: 'my-agent' });
@@ -48,7 +52,7 @@ const ConnectProvider: Component = () => {
     }
   };
 
-  const [data] = createResource(async () => {
+  const data = useResource(async () => {
     const result = (await getAgents()) as AgentsData;
     const agents = result?.agents ?? [];
 
@@ -59,48 +63,46 @@ const ConnectProvider: Component = () => {
     }
 
     return agents;
-  });
+  }, []);
 
   const pickAgent = (agentName: string) => {
     navigate(buildTarget(agentName), { replace: true });
   };
 
+  const count = data.data?.length ?? 0;
+
   return (
-    <div class="container--sm" style="padding-top: 80px;">
-      <Show when={!data.loading && (data()?.length ?? 0) > 1}>
-        <div class="panel" style="max-width: 440px; margin: 0 auto; padding: 32px;">
-          <h2 style="margin: 0 0 8px;">{t('providers.connectPage.selectHarness')}</h2>
-          <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); margin: 0 0 24px;">
-            {t('providers.connectPage.question')}
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <For each={data()}>
-              {(agent) => (
-                <button
-                  class="btn btn--outline"
-                  style="justify-content: flex-start; text-align: left;"
-                  onClick={() => pickAgent(agent.agent_name)}
-                >
-                  {agent.display_name ?? agent.agent_name}
-                </button>
-              )}
-            </For>
+    <div className="page narrow pt-20">
+      {!data.loading && count > 1 ? (
+        <div className="panel mx-auto max-w-[440px] p-8">
+          <h2 className="mb-2 text-lg font-semibold text-ink">
+            {t('providers.connectPage.selectHarness')}
+          </h2>
+          <p className="mb-6 text-sm text-muted">{t('providers.connectPage.question')}</p>
+          <div className="flex flex-col gap-2">
+            {data.data!.map((agent) => (
+              <Button
+                key={agent.agent_name}
+                variant="ghost"
+                className="justify-start text-left"
+                onClick={() => pickAgent(agent.agent_name)}
+              >
+                {agent.display_name ?? agent.agent_name}
+              </Button>
+            ))}
           </div>
         </div>
-      </Show>
+      ) : null}
 
-      <Show when={data.loading || creating() || (data()?.length ?? 0) <= 1}>
-        <div style="display: flex; align-items: center; justify-content: center; min-height: 200px;">
+      {data.loading || creating || count <= 1 ? (
+        <div className="flex min-h-[200px] items-center justify-center">
           <span
-            class="spinner"
-            style="width: 24px; height: 24px;"
+            className="spinner size-6"
             role="status"
             aria-label={t('providers.connectPage.loading')}
           />
         </div>
-      </Show>
+      ) : null}
     </div>
   );
-};
-
-export default ConnectProvider;
+}

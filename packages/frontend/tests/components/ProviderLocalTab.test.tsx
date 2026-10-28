@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 
 import ProviderLocalTab from '../../src/components/ProviderLocalTab';
 import type { ProviderDef } from '../../src/services/providers';
@@ -17,7 +17,7 @@ const provider = (overrides: Partial<ProviderDef> & { id: string; name: string }
 const baseProps = {
   isConnected: () => false,
   onToggle: vi.fn(),
-  busy: () => false,
+  busy: false,
   onOpenDetail: vi.fn(),
   onEditCustom: vi.fn(),
   onOpenLocalServer: vi.fn(),
@@ -25,7 +25,7 @@ const baseProps = {
 
 describe('ProviderLocalTab', () => {
   it('renders local provider tiles alphabetically', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[
@@ -33,10 +33,10 @@ describe('ProviderLocalTab', () => {
           provider({ id: 'lmstudio', name: 'LM Studio' }),
         ]}
         customProviders={[]}
-      />
-    ));
-    const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map((n) =>
-      n.textContent?.trim() ?? '',
+      />,
+    );
+    const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map(
+      (n) => n.textContent?.trim() ?? '',
     );
     expect(names).toEqual(['LM Studio', 'Ollama']);
   });
@@ -48,34 +48,34 @@ describe('ProviderLocalTab', () => {
       name: 'LM Studio',
       defaultLocalPort: 1234,
     } as ProviderDef);
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[lmsProv]}
         customProviders={[]}
         onOpenLocalServer={onOpenLocalServer}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('button.provider-toggle') as HTMLButtonElement);
     expect(onOpenLocalServer).toHaveBeenCalledWith(lmsProv);
   });
 
   it('routes tiles without defaultLocalPort through onOpenDetail with local auth type', () => {
     const onOpenDetail = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
         customProviders={[]}
         onOpenDetail={onOpenDetail}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('button.provider-toggle') as HTMLButtonElement);
     expect(onOpenDetail).toHaveBeenCalledWith('ollama', 'local');
   });
 
   it('hides the empty LM Studio tile when a canonical-named custom provider already exists', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[
@@ -89,25 +89,25 @@ describe('ProviderLocalTab', () => {
             models: [],
           } as never,
         ]}
-      />
-    ));
+      />,
+    );
     // Only one LM Studio row — the custom one takes over.
-    const lmsRows = Array.from(container.querySelectorAll('.provider-toggle__name')).filter(
-      (n) => n.textContent?.includes('LM Studio'),
+    const lmsRows = Array.from(container.querySelectorAll('.provider-toggle__name')).filter((n) =>
+      n.textContent?.includes('LM Studio'),
     );
     expect(lmsRows.length).toBe(1);
   });
 
   it('does not surface freeform custom providers — those live in the API Keys tab', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[]}
         customProviders={[
           { id: 'cp-1', name: 'Groq', base_url: 'https://api.groq', models: [] } as never,
         ]}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).not.toContain('Groq');
   });
 
@@ -119,35 +119,35 @@ describe('ProviderLocalTab', () => {
       base_url: 'http://localhost:11434/v1',
       models: [],
     };
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[]}
         customProviders={[custom as never]}
         onEditCustom={onEditCustom}
-      />
-    ));
+      />,
+    );
     const btn = document.querySelector('button.provider-toggle') as HTMLButtonElement;
     fireEvent.click(btn);
     expect(onEditCustom).toHaveBeenCalledWith(custom);
   });
 
   it('shows the connected-switch when isConnected returns true', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
         customProviders={[]}
         isConnected={() => true}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.provider-toggle__switch--on')).not.toBeNull();
   });
 
   it('navigates to detail view when clicking a connected standard tile', () => {
     const onToggle = vi.fn();
     const onOpenDetail = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
@@ -155,8 +155,8 @@ describe('ProviderLocalTab', () => {
         isConnected={() => true}
         onToggle={onToggle}
         onOpenDetail={onOpenDetail}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('button.provider-toggle') as HTMLButtonElement);
     expect(onOpenDetail).toHaveBeenCalledWith('ollama', 'local');
     expect(onToggle).not.toHaveBeenCalled();
@@ -165,7 +165,7 @@ describe('ProviderLocalTab', () => {
   it('disconnects a connected standard tile when clicking the toggle switch', () => {
     const onToggle = vi.fn();
     const onOpenDetail = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
@@ -173,8 +173,8 @@ describe('ProviderLocalTab', () => {
         isConnected={() => true}
         onToggle={onToggle}
         onOpenDetail={onOpenDetail}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('.provider-toggle__switch') as HTMLElement);
     expect(onToggle).toHaveBeenCalledWith('ollama');
     expect(onOpenDetail).not.toHaveBeenCalled();
@@ -183,7 +183,7 @@ describe('ProviderLocalTab', () => {
   it('opens edit for a connected custom tile on click', () => {
     const onToggle = vi.fn();
     const onEditCustom = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[]}
@@ -198,8 +198,8 @@ describe('ProviderLocalTab', () => {
         isConnected={(key) => key === 'custom:cp-lms'}
         onToggle={onToggle}
         onEditCustom={onEditCustom}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('button.provider-toggle') as HTMLButtonElement);
     expect(onEditCustom).toHaveBeenCalled();
     expect(onToggle).not.toHaveBeenCalled();
@@ -208,7 +208,7 @@ describe('ProviderLocalTab', () => {
   it('disconnects a connected custom tile when clicking the toggle switch', () => {
     const onToggle = vi.fn();
     const onEditCustom = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[]}
@@ -223,8 +223,8 @@ describe('ProviderLocalTab', () => {
         isConnected={(key) => key === 'custom:cp-lms'}
         onToggle={onToggle}
         onEditCustom={onEditCustom}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('.provider-toggle__switch') as HTMLElement);
     expect(onToggle).toHaveBeenCalledWith('custom:cp-lms');
     expect(onEditCustom).not.toHaveBeenCalled();
@@ -233,7 +233,7 @@ describe('ProviderLocalTab', () => {
   it('opens connect flow when clicking the toggle on a disconnected standard tile', () => {
     const onToggle = vi.fn();
     const onOpenDetail = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
@@ -241,8 +241,8 @@ describe('ProviderLocalTab', () => {
         isConnected={() => false}
         onToggle={onToggle}
         onOpenDetail={onOpenDetail}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('.provider-toggle__switch') as HTMLElement);
     expect(onOpenDetail).toHaveBeenCalledWith('ollama', 'local');
     expect(onToggle).not.toHaveBeenCalled();
@@ -251,7 +251,7 @@ describe('ProviderLocalTab', () => {
   it('opens edit when clicking the toggle on a disconnected custom tile', () => {
     const onToggle = vi.fn();
     const onEditCustom = vi.fn();
-    render(() => (
+    render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[]}
@@ -266,22 +266,22 @@ describe('ProviderLocalTab', () => {
         isConnected={() => false}
         onToggle={onToggle}
         onEditCustom={onEditCustom}
-      />
-    ));
+      />,
+    );
     fireEvent.click(document.querySelector('.provider-toggle__switch') as HTMLElement);
     expect(onEditCustom).toHaveBeenCalled();
     expect(onToggle).not.toHaveBeenCalled();
   });
 
   it('disables all tiles while busy is true', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderLocalTab
         {...baseProps}
         localProviders={[provider({ id: 'ollama', name: 'Ollama' })]}
         customProviders={[]}
-        busy={() => true}
-      />
-    ));
+        busy={true}
+      />,
+    );
     const btn = container.querySelector('button.provider-toggle') as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });

@@ -1,13 +1,5 @@
-import {
-  createEffect,
-  onCleanup,
-  createSignal,
-  For,
-  Show,
-  type Component,
-  type Accessor,
-  type Setter,
-} from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { ProviderDef } from '../services/providers.js';
 import {
   getPopupOauthApi,
@@ -18,6 +10,7 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { monitorOAuthPopup } from '../services/oauth-popup.js';
+import { Button, IconButton } from './ui.js';
 
 const MAX_LABEL_LENGTH = 50;
 
@@ -41,98 +34,217 @@ function parseOAuthCallbackInput(raw: string, fallbackState: string | null) {
   return { code, state };
 }
 
+/**
+ * Connected subscription accounts with inline rename and per-account delete.
+ * Shared by the OAuth, Anthropic and device-code views. `onRename` resolves
+ * true when the rename landed, which closes the inline editor.
+ */
+export function SubscriptionAccountList({
+  keys,
+  ariaLabel,
+  via,
+  busy,
+  onRename,
+  onDelete,
+}: {
+  keys: RoutingProvider[];
+  ariaLabel: string;
+  via: string;
+  busy: boolean;
+  onRename: (key: RoutingProvider, newLabel: string) => Promise<boolean>;
+  onDelete: (label: string) => void;
+}) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const commitRename = async (k: RoutingProvider) => {
+    const newLabel = renameValue.trim();
+    if (!newLabel || newLabel === k.label) {
+      setRenamingId(null);
+      return;
+    }
+    if (await onRename(k, newLabel)) setRenamingId(null);
+  };
+
+  return (
+    <div>
+      <span className="label">{t('providerSetup.shared.accounts')}</span>
+      <ul role="list" aria-label={ariaLabel} className="flex flex-col gap-2">
+        {keys.map((k) => (
+          <li
+            key={k.id}
+            className="flex items-center gap-2 rounded-control border border-line bg-sunken px-2.5 py-2"
+          >
+            {renamingId === k.id ? (
+              <>
+                <input
+                  className="field min-w-0 flex-1"
+                  type="text"
+                  maxLength={MAX_LABEL_LENGTH}
+                  aria-label={t('providerSetup.shared.renameNamed', { label: k.label })}
+                  value={renameValue}
+                  autoFocus
+                  onChange={(e) => setRenameValue(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void commitRename(k);
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                />
+                <Button size="sm" disabled={busy} onClick={() => void commitRename(k)}>
+                  {t('common.save')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setRenamingId(null)}
+                >
+                  {t('common.cancel')}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-ink">{k.label}</div>
+                  <div className="text-xs text-muted">
+                    {t('providerSetup.shared.connectedVia', { via })}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="shrink-0"
+                  disabled={busy}
+                  onClick={() => {
+                    setRenamingId(k.id);
+                    setRenameValue(k.label);
+                  }}
+                >
+                  {t('providerSetup.shared.rename')}
+                </Button>
+                <IconButton
+                  label={t('providerSetup.shared.deleteAccountNamed', { label: k.label })}
+                  title={t('providerSetup.shared.deleteAccount')}
+                  className="shrink-0 hover:text-danger"
+                  disabled={busy}
+                  onClick={() => onDelete(k.label)}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </IconButton>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Renames a subscription key; resolves true on success (errors toast upstream). */
+export async function renameSubscriptionKey(opts: {
+  agentName: string;
+  provId: string;
+  authType: AuthType;
+  key: RoutingProvider;
+  newLabel: string;
+  setBusy: (busy: boolean) => void;
+  onUpdate: () => void;
+}): Promise<boolean> {
+  opts.setBusy(true);
+  try {
+    await renameProviderKey(
+      opts.agentName,
+      opts.provId,
+      opts.key.label,
+      opts.newLabel,
+      opts.authType,
+    );
+    toast.success(t('providerSetup.shared.renamedTo', { label: opts.newLabel }));
+    opts.onUpdate();
+    return true;
+  } catch {
+    // toast handled upstream
+    return false;
+  } finally {
+    opts.setBusy(false);
+  }
+}
+
 interface Props {
   provDef: ProviderDef;
   provId: string;
   agentName: string;
-  connected: Accessor<boolean>;
-  selectedAuthType: Accessor<AuthType>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
+  connected: boolean;
+  selectedAuthType: AuthType;
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
   onBack: () => void;
   onUpdate: () => void;
   onPollProviders?: () => void | Promise<void>;
   onClose: () => void;
-  addKeyOpen?: Accessor<boolean>;
-  setAddKeyOpen?: Setter<boolean>;
-  activeKeys?: Accessor<RoutingProvider[]>;
+  addKeyOpen?: boolean;
+  setAddKeyOpen?: (open: boolean) => void;
+  activeKeys?: RoutingProvider[];
 }
 
-const OAuthDetailView: Component<Props> = (props) => {
-  const [pasteFlowActive, setPasteFlowActive] = createSignal(false);
-  const [flowKeyCount, setFlowKeyCount] = createSignal<number | null>(null);
-  const [successHandled, setSuccessHandled] = createSignal(false);
-  const [pasteUrl, setPasteUrl] = createSignal('');
-  const [pasteError, setPasteError] = createSignal<string | null>(null);
-  const [oauthState, setOauthState] = createSignal<string | null>(null);
-  const [renamingId, setRenamingId] = createSignal<string | null>(null);
-  const [renameValue, setRenameValue] = createSignal('');
-  const [addingAccount, setAddingAccount] = createSignal(false);
+export default function OAuthDetailView(props: Props) {
+  const [pasteFlowActive, setPasteFlowActive] = useState(false);
+  const [flowKeyCount, setFlowKeyCount] = useState<number | null>(null);
+  const [pasteUrl, setPasteUrl] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [oauthState, setOauthState] = useState<string | null>(null);
+  const [addingAccount, setAddingAccount] = useState(false);
+  const successHandled = useRef(false);
+  const latest = useRef(props);
+  latest.current = props;
 
   // Dispose the OAuth popup monitor if the view unmounts mid-flow, otherwise its
   // 300ms URL poll keeps running after the component is gone.
-  let disposeOAuthMonitor: (() => void) | null = null;
-  onCleanup(() => disposeOAuthMonitor?.());
+  const disposeOAuthMonitor = useRef<(() => void) | null>(null);
+  useEffect(() => () => disposeOAuthMonitor.current?.(), []);
 
-  const isMultiKey = () => (props.activeKeys?.() ?? []).length > 1;
-  const isXaiProvider = () => props.provId === 'xai';
-  const isOpenAiProvider = () => props.provId === 'openai';
-  const callbackPlaceholder = () =>
-    isXaiProvider()
-      ? t('providerSetup.oauth.callbackPlaceholderXai')
-      : 'http://localhost:1455/auth/callback?code=...';
-  const showConnectFlow = () => !props.connected() || addingAccount() || pasteFlowActive();
-  const showConnectedFlow = () => props.connected() && !addingAccount() && !pasteFlowActive();
-  const activeKeyCount = () => (props.activeKeys?.() ?? []).length;
-  const flowHasConnected = () => {
-    const baseline = flowKeyCount();
-    if (baseline === null) return false;
-    return baseline > 0 ? activeKeyCount() > baseline : props.connected();
-  };
+  const activeKeys = props.activeKeys ?? [];
+  const activeKeyCount = activeKeys.length;
+  const isMultiKey = activeKeyCount > 1;
+  const isXaiProvider = props.provId === 'xai';
+  const isOpenAiProvider = props.provId === 'openai';
+  const callbackPlaceholder = isXaiProvider
+    ? t('providerSetup.oauth.callbackPlaceholderXai')
+    : 'http://localhost:1455/auth/callback?code=...';
+  const showConnectFlow = !props.connected || addingAccount || pasteFlowActive;
+  const via = props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower');
+  const flowHasConnected =
+    flowKeyCount === null
+      ? false
+      : flowKeyCount > 0
+        ? activeKeyCount > flowKeyCount
+        : props.connected;
 
+  // Reads only refs and stable setters, so the popup monitor can hold it.
   const finishOAuthSuccess = () => {
-    if (successHandled()) return;
-    setSuccessHandled(true);
+    if (successHandled.current) return;
+    successHandled.current = true;
     setPasteFlowActive(false);
     setFlowKeyCount(null);
     setPasteUrl('');
     setPasteError(null);
     setOauthState(null);
     setAddingAccount(false);
-    toast.success(t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }));
-    props.onUpdate();
+    toast.success(
+      t('providerSetup.shared.subscriptionConnected', { name: latest.current.provDef.name }),
+    );
+    latest.current.onUpdate();
   };
 
-  // When "Add another key" is clicked in the header, launch a new OAuth popup.
-  createEffect(() => {
-    if (props.addKeyOpen?.() && props.connected() && !props.busy()) {
-      setAddingAccount(true);
-      props.setAddKeyOpen?.(false);
-      void handleOAuthLogin();
-    }
-  });
-
-  const oauthApi = () => getPopupOauthApi(props.provId);
-
-  createEffect(() => {
-    if (!pasteFlowActive()) return;
-    const poll = props.onPollProviders ?? props.onUpdate;
-    const interval = window.setInterval(() => {
-      poll();
-    }, 2000);
-    onCleanup(() => window.clearInterval(interval));
-  });
-
-  createEffect(() => {
-    if (pasteFlowActive() && flowHasConnected()) finishOAuthSuccess();
-  });
+  const oauthApi = () => getPopupOauthApi(latest.current.provId);
 
   const handleOAuthLogin = async () => {
-    props.setBusy(true);
+    const p = latest.current;
+    p.setBusy(true);
     setPasteUrl('');
     setPasteError(null);
     try {
-      const { url } = await oauthApi().getUrl(props.agentName);
+      const { url } = await oauthApi().getUrl(p.agentName);
       try {
         setOauthState(new URL(url).searchParams.get('state'));
       } catch {
@@ -141,21 +253,21 @@ const OAuthDetailView: Component<Props> = (props) => {
       const popup = window.open(url, 'thinker-oauth', 'width=500,height=700');
       if (!popup) {
         toast.error(t('providerSetup.shared.popupBlocked'));
-        if (props.connected()) setAddingAccount(false);
+        if (latest.current.connected) setAddingAccount(false);
         setOauthState(null);
-        props.setBusy(false);
+        latest.current.setBusy(false);
         return;
       }
 
       setPasteFlowActive(true);
-      setFlowKeyCount(activeKeyCount());
-      setSuccessHandled(false);
-      props.setBusy(false);
+      setFlowKeyCount((latest.current.activeKeys ?? []).length);
+      successHandled.current = false;
+      latest.current.setBusy(false);
 
       // Dispose any in-flight monitor from a previous start before replacing it,
       // so repeated logins don't orphan the earlier poll/listener handle.
-      disposeOAuthMonitor?.();
-      disposeOAuthMonitor = monitorOAuthPopup(
+      disposeOAuthMonitor.current?.();
+      disposeOAuthMonitor.current = monitorOAuthPopup(
         popup,
         {
           onSuccess: finishOAuthSuccess,
@@ -163,20 +275,43 @@ const OAuthDetailView: Component<Props> = (props) => {
             // Popup closed without auto-redirect — user needs to paste the URL
           },
         },
-        `/oauth/${props.provId}/done`,
+        `/oauth/${p.provId}/done`,
       );
     } catch {
-      if (props.connected()) setAddingAccount(false);
-      props.setBusy(false);
+      if (latest.current.connected) setAddingAccount(false);
+      latest.current.setBusy(false);
     }
   };
 
+  // When "Add another key" is clicked in the header, launch a new OAuth popup.
+  useEffect(() => {
+    if (props.addKeyOpen && props.connected && !props.busy) {
+      setAddingAccount(true);
+      props.setAddKeyOpen?.(false);
+      void handleOAuthLogin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.addKeyOpen, props.connected, props.busy]);
+
+  useEffect(() => {
+    if (!pasteFlowActive) return;
+    const interval = window.setInterval(() => {
+      const poll = latest.current.onPollProviders ?? latest.current.onUpdate;
+      void poll();
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [pasteFlowActive]);
+
+  useEffect(() => {
+    if (pasteFlowActive && flowHasConnected) finishOAuthSuccess();
+  }, [pasteFlowActive, flowHasConnected]);
+
   const handlePasteSubmit = async () => {
-    const raw = pasteUrl().trim();
+    const raw = pasteUrl.trim();
     if (!raw) return;
 
     try {
-      const { code, state } = parseOAuthCallbackInput(raw, oauthState());
+      const { code, state } = parseOAuthCallbackInput(raw, oauthState);
       if (!code || !state) {
         setPasteError(
           props.provId === 'xai'
@@ -199,7 +334,7 @@ const OAuthDetailView: Component<Props> = (props) => {
           : t('providerSetup.oauth.exchangeFailed'),
       );
     } finally {
-      props.setBusy(false);
+      latest.current.setBusy(false);
     }
   };
 
@@ -207,310 +342,146 @@ const OAuthDetailView: Component<Props> = (props) => {
     setAddingAccount(false);
     setPasteFlowActive(false);
     setFlowKeyCount(null);
-    setSuccessHandled(false);
+    successHandled.current = false;
     setPasteUrl('');
     setPasteError(null);
     setOauthState(null);
   };
 
-  const handleDisconnect = async () => {
+  const revoke = async (label?: string) => {
     props.setBusy(true);
     try {
-      const result = await oauthApi().revoke(props.agentName);
+      const api = oauthApi();
+      const result = await (label
+        ? api.revoke(props.agentName, label)
+        : api.revoke(props.agentName));
       if (result?.notifications?.length) {
-        for (const msg of result.notifications) {
-          toast.error(msg);
-        }
+        for (const msg of result.notifications) toast.error(msg);
       }
-      props.onBack();
-      props.onUpdate();
+      if (!label) latest.current.onBack();
+      latest.current.onUpdate();
     } catch {
       // error toast from fetchMutate
     } finally {
-      props.setBusy(false);
+      latest.current.setBusy(false);
     }
   };
 
-  const handleDeleteKey = async (label: string) => {
-    props.setBusy(true);
-    try {
-      const result = await oauthApi().revoke(props.agentName, label);
-      if (result?.notifications?.length) {
-        for (const msg of result.notifications) {
-          toast.error(msg);
-        }
-      }
-      props.onUpdate();
-    } catch {
-      // error toast from fetchMutate
-    } finally {
-      props.setBusy(false);
-    }
-  };
-
-  const startRename = (k: RoutingProvider) => {
-    setRenamingId(k.id);
-    setRenameValue(k.label);
-  };
-
-  const commitRename = async (k: RoutingProvider) => {
-    const newLabel = renameValue().trim();
-    if (!newLabel || newLabel === k.label) {
-      setRenamingId(null);
-      return;
-    }
-    props.setBusy(true);
-    try {
-      await renameProviderKey(
-        props.agentName,
-        props.provId,
-        k.label,
-        newLabel,
-        props.selectedAuthType(),
-      );
-      toast.success(t('providerSetup.shared.renamedTo', { label: newLabel }));
-      setRenamingId(null);
-      props.onUpdate();
-    } catch {
-      // toast handled upstream
-    } finally {
-      props.setBusy(false);
-    }
-  };
+  if (showConnectFlow) {
+    return (
+      <div className="flex flex-col gap-3">
+        {pasteFlowActive ? (
+          <>
+            {isXaiProvider ? (
+              <p className="text-sm text-dim">{t('providerSetup.oauth.xaiWindowOpened')}</p>
+            ) : (
+              <>
+                <p className="text-sm text-dim">{t('providerSetup.oauth.windowOpened')}</p>
+                {isOpenAiProvider ? (
+                  <>
+                    <p className="text-sm text-dim">
+                      {t('providerSetup.oauth.copyUrlBefore')}{' '}
+                      <span className="font-medium text-ink">
+                        {t('providerSetup.oauth.copyUrlEmphasis')}
+                      </span>{' '}
+                      {t('providerSetup.oauth.copyUrlAfter')}
+                    </p>
+                    <video
+                      src="/images/oauth-callback-example.mp4"
+                      poster="/images/oauth-callback-example.png"
+                      preload="auto"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full rounded-control border border-line"
+                    />
+                  </>
+                ) : null}
+              </>
+            )}
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                className="field"
+                aria-invalid={pasteError ? true : undefined}
+                autoComplete="off"
+                placeholder={callbackPlaceholder}
+                value={pasteUrl}
+                onChange={(e) => {
+                  setPasteUrl(e.currentTarget.value);
+                  setPasteError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handlePasteSubmit();
+                }}
+              />
+              {pasteError ? <div className="form-error">{pasteError}</div> : null}
+              <Button
+                size="sm"
+                className="self-start"
+                busy={props.busy}
+                disabled={!pasteUrl.trim()}
+                onClick={() => void handlePasteSubmit()}
+              >
+                {t('providerSetup.shared.connect')}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-dim">
+              {t('providerSetup.oauth.loginToConnect', { name: props.provDef.name })}
+            </p>
+            <Button block busy={props.busy} onClick={() => void handleOAuthLogin()}>
+              {t('providerSetup.oauth.loginWith', { name: props.provDef.name })}
+            </Button>
+          </>
+        )}
+        {addingAccount ? (
+          <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
+            {t('common.cancel')}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
-    <>
-      <Show when={showConnectFlow()}>
-        <Show
-          when={pasteFlowActive()}
-          fallback={
-            <>
-              <p class="provider-detail__hint">
-                {t('providerSetup.oauth.loginToConnect', { name: props.provDef.name })}
-              </p>
-              <button
-                class="btn btn--primary provider-detail__action"
-                disabled={props.busy()}
-                onClick={handleOAuthLogin}
-              >
-                <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                  {t('providerSetup.oauth.loginWith', { name: props.provDef.name })}
-                </Show>
-              </button>
-            </>
+    <div className="flex flex-col gap-4">
+      {isMultiKey ? (
+        <SubscriptionAccountList
+          keys={activeKeys}
+          ariaLabel={t('providerSetup.shared.oauthAccountsFor', { name: props.provDef.name })}
+          via={via}
+          busy={props.busy}
+          onDelete={(label) => void revoke(label)}
+          onRename={(key, newLabel) =>
+            renameSubscriptionKey({
+              agentName: props.agentName,
+              provId: props.provId,
+              authType: props.selectedAuthType,
+              key,
+              newLabel,
+              setBusy: props.setBusy,
+              onUpdate: props.onUpdate,
+            })
           }
-        >
-          <Show
-            when={isXaiProvider()}
-            fallback={
-              <>
-                <p class="provider-detail__hint">{t('providerSetup.oauth.windowOpened')}</p>
-                <Show when={isOpenAiProvider()}>
-                  <p class="provider-detail__hint" style="margin-top: 8px;">
-                    {t('providerSetup.oauth.copyUrlBefore')}{' '}
-                    <span style="color: hsl(var(--foreground)); font-weight: 500;">
-                      {t('providerSetup.oauth.copyUrlEmphasis')}
-                    </span>{' '}
-                    {t('providerSetup.oauth.copyUrlAfter')}
-                  </p>
-                  <video
-                    src="/images/oauth-callback-example.mp4"
-                    poster="/images/oauth-callback-example.png"
-                    preload="auto"
-                    autoplay
-                    loop
-                    muted
-                    playsinline
-                    style="width: 100%; border-radius: var(--radius); border: 1px solid hsl(var(--border)); margin-top: 12px;"
-                  />
-                </Show>
-              </>
-            }
-          >
-            <p class="provider-detail__hint">{t('providerSetup.oauth.xaiWindowOpened')}</p>
-          </Show>
-          <div class="provider-detail__field" style="margin-top: 12px;">
-            <input
-              type="text"
-              class="provider-detail__input"
-              classList={{ 'provider-detail__input--error': !!pasteError() }}
-              autocomplete="off"
-              placeholder={callbackPlaceholder()}
-              value={pasteUrl()}
-              onInput={(e) => {
-                setPasteUrl(e.currentTarget.value);
-                setPasteError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handlePasteSubmit();
-              }}
-            />
-            <Show when={pasteError()}>
-              <div class="provider-detail__error">{pasteError()}</div>
-            </Show>
-            <button
-              class="btn btn--primary btn--sm provider-detail__action"
-              style="margin-top: 8px;"
-              disabled={props.busy() || !pasteUrl().trim()}
-              onClick={handlePasteSubmit}
-            >
-              <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                {t('providerSetup.shared.connect')}
-              </Show>
-            </button>
-          </div>
-        </Show>
-        <Show when={addingAccount()}>
-          <button
-            class="btn btn--outline provider-detail__action"
-            disabled={props.busy()}
-            onClick={cancelAddAccount}
-          >
-            {t('common.cancel')}
-          </button>
-        </Show>
-      </Show>
-      <Show when={showConnectedFlow()}>
-        {/* Multi-key list */}
-        <Show when={isMultiKey()}>
-          <div class="provider-detail__field">
-            <label class="provider-detail__label">{t('providerSetup.shared.accounts')}</label>
-            <ul
-              role="list"
-              aria-label={t('providerSetup.shared.oauthAccountsFor', { name: props.provDef.name })}
-              style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
-            >
-              <For each={props.activeKeys!()}>
-                {(k) => (
-                  <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / 0.3);">
-                    <Show
-                      when={renamingId() === k.id}
-                      fallback={
-                        <>
-                          <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                              {k.label}
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                              {t('providerSetup.shared.connectedVia', {
-                                via:
-                                  props.provDef.subscriptionLabel ??
-                                  t('providerSetup.shared.subscriptionLower'),
-                              })}
-                            </div>
-                          </div>
-                          <button
-                            class="btn btn--outline btn--sm"
-                            style="flex-shrink: 0;"
-                            disabled={props.busy()}
-                            onClick={() => startRename(k)}
-                          >
-                            {t('providerSetup.shared.rename')}
-                          </button>
-                          <button
-                            class="provider-detail__disconnect-icon"
-                            disabled={props.busy()}
-                            onClick={() => handleDeleteKey(k.label)}
-                            aria-label={t('providerSetup.shared.deleteAccountNamed', {
-                              label: k.label,
-                            })}
-                            title={t('providerSetup.shared.deleteAccount')}
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </>
-                      }
-                    >
-                      <input
-                        class="provider-detail__input"
-                        type="text"
-                        maxlength={MAX_LABEL_LENGTH}
-                        aria-label={t('providerSetup.shared.renameNamed', { label: k.label })}
-                        value={renameValue()}
-                        onInput={(e) => setRenameValue(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitRename(k);
-                          if (e.key === 'Escape') setRenamingId(null);
-                        }}
-                      />
-                      <button
-                        class="btn btn--primary btn--sm"
-                        disabled={props.busy()}
-                        onClick={() => commitRename(k)}
-                      >
-                        {t('common.save')}
-                      </button>
-                      <button
-                        class="btn btn--outline btn--sm"
-                        disabled={props.busy()}
-                        onClick={() => setRenamingId(null)}
-                      >
-                        {t('common.cancel')}
-                      </button>
-                    </Show>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-          <div class="provider-detail__footer">
-            <button
-              class="btn btn--outline provider-detail__disconnect"
-              disabled={props.busy()}
-              onClick={handleDisconnect}
-            >
-              <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                {t('providerSetup.shared.disconnectAll')}
-              </Show>
-            </button>
-            <div style="flex: 1;" />
-            <button class="btn btn--primary btn--sm" onClick={() => props.onClose()}>
-              {t('common.done')}
-            </button>
-          </div>
-        </Show>
-        {/* Single key — original view */}
-        <Show when={!isMultiKey()}>
-          <div class="provider-detail__field">
-            <span class="provider-detail__no-key">
-              {t('providerSetup.shared.connectedVia', {
-                via: props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower'),
-              })}
-            </span>
-          </div>
-          <div class="provider-detail__footer">
-            <button
-              class="btn btn--outline provider-detail__disconnect"
-              disabled={props.busy()}
-              onClick={handleDisconnect}
-            >
-              <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                {t('providerSetup.shared.disconnect')}
-              </Show>
-            </button>
-            <div style="flex: 1;" />
-            <button class="btn btn--primary btn--sm" onClick={() => props.onClose()}>
-              {t('common.done')}
-            </button>
-          </div>
-        </Show>
-      </Show>
-    </>
+        />
+      ) : (
+        <p className="text-sm text-dim">{t('providerSetup.shared.connectedVia', { via })}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" busy={props.busy} onClick={() => void revoke()}>
+          {isMultiKey
+            ? t('providerSetup.shared.disconnectAll')
+            : t('providerSetup.shared.disconnect')}
+        </Button>
+        <div className="flex-1" />
+        <Button size="sm" onClick={() => props.onClose()}>
+          {t('common.done')}
+        </Button>
+      </div>
+    </div>
   );
-};
-
-export default OAuthDetailView;
+}

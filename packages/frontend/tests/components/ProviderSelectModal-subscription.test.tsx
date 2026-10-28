@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // NOTE (post-#2207 realignment):
 // ProviderSelectModal no longer renders a provider list with subscription
@@ -31,7 +31,7 @@ const mockPollMinimaxOAuth = vi.fn();
 const mockStartMinimaxOAuth = vi.fn();
 const mockRenameProviderKey = vi.fn();
 
-vi.mock("../../src/services/api.js", () => ({
+vi.mock('../../src/services/api.js', () => ({
   connectProvider: (...args: unknown[]) => mockConnectProvider(...args),
   disconnectProvider: (...args: unknown[]) => mockDisconnectProvider(...args),
   refreshProviderModels: () => Promise.resolve({ ok: true, model_count: 0 }),
@@ -46,32 +46,33 @@ vi.mock("../../src/services/api.js", () => ({
   renameProviderKey: (...args: unknown[]) => mockRenameProviderKey(...args),
 }));
 
-vi.mock("../../src/services/toast-store.js", () => ({
+vi.mock('../../src/services/toast-store.js', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock("../../src/components/ProviderIcon.js", () => ({
-  providerIcon: () => null, customProviderLogo: () => null,
+vi.mock('../../src/components/ProviderIcon.js', () => ({
+  providerIcon: () => null,
+  customProviderLogo: () => null,
 }));
 
 // A subscription provider that stores a pasted token. In the detail view this
 // renders the subscription token form (ProviderKeyForm in subscription mode),
 // which is the surviving surface for subscription connect/disconnect.
-vi.mock("../../src/services/providers.js", () => {
+vi.mock('../../src/services/providers.js', () => {
   const testProvider = {
-    id: "test-sub",
-    name: "TestSub",
-    color: "#000",
-    initial: "T",
-    subtitle: "Test subscription provider",
-    keyPrefix: "",
+    id: 'test-sub',
+    name: 'TestSub',
+    color: '#000',
+    initial: 'T',
+    subtitle: 'Test subscription provider',
+    keyPrefix: '',
     minKeyLength: 0,
-    keyPlaceholder: "",
+    keyPlaceholder: '',
     models: [],
     supportsSubscription: true,
-    subscriptionAuthMode: "token",
-    subscriptionLabel: "TestSub Plan",
-    subscriptionKeyPlaceholder: "Paste your TestSub token",
+    subscriptionAuthMode: 'token',
+    subscriptionLabel: 'TestSub Plan',
+    subscriptionKeyPlaceholder: 'Paste your TestSub token',
   };
   return {
     PROVIDERS: [testProvider],
@@ -80,27 +81,27 @@ vi.mock("../../src/services/providers.js", () => {
   };
 });
 
-vi.mock("../../src/services/provider-utils.js", () => ({
+vi.mock('../../src/services/provider-utils.js', () => ({
   validateApiKey: () => ({ valid: true }),
   validateSubscriptionKey: () => ({ valid: true }),
 }));
 
-import ProviderSelectModal from "../../src/components/ProviderSelectModal";
-import { toast } from "../../src/services/toast-store.js";
-import type { RoutingProvider } from "../../src/services/api.js";
+import ProviderSelectModal from '../../src/components/ProviderSelectModal';
+import { toast } from '../../src/services/toast-store.js';
+import type { RoutingProvider } from '../../src/services/api.js';
 
-const VALID_TOKEN = "tok-abcdef123456";
+const VALID_TOKEN = 'tok-abcdef123456';
 
 const connectedSub: RoutingProvider = {
-  id: "p-sub",
-  provider: "test-sub",
+  id: 'p-sub',
+  provider: 'test-sub',
   is_active: true,
   has_api_key: true,
-  connected_at: "2025-01-01",
-  auth_type: "subscription",
+  connected_at: '2025-01-01',
+  auth_type: 'subscription',
 };
 
-describe("ProviderSelectModal — subscription detail view", () => {
+describe('ProviderSelectModal — subscription detail view', () => {
   let onClose: ReturnType<typeof vi.fn>;
   let onUpdate: ReturnType<typeof vi.fn>;
 
@@ -112,93 +113,93 @@ describe("ProviderSelectModal — subscription detail view", () => {
     mockDisconnectProvider.mockResolvedValue({ notifications: [] });
   });
 
-  it("connects a subscription provider when a token is pasted and Connect is clicked", async () => {
-    render(() => (
+  it('connects a subscription provider when a token is pasted and Connect is clicked', async () => {
+    render(
       <ProviderSelectModal
         providers={[]}
         onClose={onClose}
         onUpdate={onUpdate}
         agentName="test-agent"
-        providerDeepLink={{ providerId: "test-sub", authType: "subscription" }}
-      />
-    ));
-    fireEvent.input(screen.getByLabelText("TestSub setup token"), {
+        providerDeepLink={{ providerId: 'test-sub', authType: 'subscription' }}
+      />,
+    );
+    fireEvent.input(screen.getByLabelText('TestSub setup token'), {
       target: { value: VALID_TOKEN },
     });
-    fireEvent.click(screen.getByText("Connect"));
+    fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalledWith(
-        "test-agent",
+        'test-agent',
         expect.objectContaining({
-          provider: "test-sub",
+          provider: 'test-sub',
           apiKey: VALID_TOKEN,
-          authType: "subscription",
+          authType: 'subscription',
         }),
       );
     });
-    expect(toast.success).toHaveBeenCalledWith("TestSub connected");
+    expect(toast.success).toHaveBeenCalledWith('TestSub connected');
     expect(onUpdate).toHaveBeenCalled();
   });
 
-  it("disconnects a connected subscription provider from the detail view", async () => {
-    render(() => (
+  it('disconnects a connected subscription provider from the detail view', async () => {
+    render(
       <ProviderSelectModal
         providers={[connectedSub]}
         onClose={onClose}
         onUpdate={onUpdate}
         agentName="test-agent"
-        providerDeepLink={{ providerId: "test-sub", authType: "subscription" }}
-      />
-    ));
-    fireEvent.click(screen.getByLabelText("Disconnect provider"));
+        providerDeepLink={{ providerId: 'test-sub', authType: 'subscription' }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Disconnect provider'));
 
     await waitFor(() => {
       expect(mockDisconnectProvider).toHaveBeenCalledWith(
-        "test-agent",
-        "test-sub",
-        "subscription",
+        'test-agent',
+        'test-sub',
+        'subscription',
         undefined,
       );
     });
     expect(onUpdate).toHaveBeenCalled();
   });
 
-  it("shows disconnect notifications as error toasts", async () => {
+  it('shows disconnect notifications as error toasts', async () => {
     mockDisconnectProvider.mockResolvedValue({
-      notifications: ["Model X is no longer available."],
+      notifications: ['Model X is no longer available.'],
     });
-    render(() => (
+    render(
       <ProviderSelectModal
         providers={[connectedSub]}
         onClose={onClose}
         onUpdate={onUpdate}
         agentName="test-agent"
-        providerDeepLink={{ providerId: "test-sub", authType: "subscription" }}
-      />
-    ));
-    fireEvent.click(screen.getByLabelText("Disconnect provider"));
+        providerDeepLink={{ providerId: 'test-sub', authType: 'subscription' }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Disconnect provider'));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Model X is no longer available.");
+      expect(toast.error).toHaveBeenCalledWith('Model X is no longer available.');
     });
   });
 
-  it("handles connect error gracefully without calling onUpdate", async () => {
-    mockConnectProvider.mockRejectedValue(new Error("Network error"));
-    render(() => (
+  it('handles connect error gracefully without calling onUpdate', async () => {
+    mockConnectProvider.mockRejectedValue(new Error('Network error'));
+    render(
       <ProviderSelectModal
         providers={[]}
         onClose={onClose}
         onUpdate={onUpdate}
         agentName="test-agent"
-        providerDeepLink={{ providerId: "test-sub", authType: "subscription" }}
-      />
-    ));
-    fireEvent.input(screen.getByLabelText("TestSub setup token"), {
+        providerDeepLink={{ providerId: 'test-sub', authType: 'subscription' }}
+      />,
+    );
+    fireEvent.input(screen.getByLabelText('TestSub setup token'), {
       target: { value: VALID_TOKEN },
     });
-    fireEvent.click(screen.getByText("Connect"));
+    fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalled();
@@ -207,18 +208,18 @@ describe("ProviderSelectModal — subscription detail view", () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  it("shows the connected-via subscription label when already connected", () => {
-    render(() => (
+  it('shows the connected-via subscription label when already connected', () => {
+    render(
       <ProviderSelectModal
         providers={[connectedSub]}
         onClose={onClose}
         onUpdate={onUpdate}
         agentName="test-agent"
-        providerDeepLink={{ providerId: "test-sub", authType: "subscription" }}
-      />
-    ));
+        providerDeepLink={{ providerId: 'test-sub', authType: 'subscription' }}
+      />,
+    );
     // A connected subscription shows the masked token + Disconnect affordance.
-    expect(screen.getByLabelText("Current setup token (masked)")).toBeDefined();
-    expect(screen.getByLabelText("Disconnect provider")).toBeDefined();
+    expect(screen.getByLabelText('Current setup token (masked)')).toBeDefined();
+    expect(screen.getByLabelText('Disconnect provider')).toBeDefined();
   });
 });

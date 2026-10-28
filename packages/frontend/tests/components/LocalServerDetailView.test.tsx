@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 
 const { mockProbe, mockCreate, mockDelete, mockUpdate, mockCheckHost, mockToast } = vi.hoisted(
   () => ({
@@ -68,14 +68,14 @@ describe('LocalServerDetailView', () => {
     mockProbe.mockResolvedValue({ models: [{ model_name: 'llama-3.1-8b' }] });
 
     const onConnected = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={onConnected}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(mockProbe).toHaveBeenCalledWith('a1', 'http://localhost:1234/v1');
@@ -89,14 +89,14 @@ describe('LocalServerDetailView', () => {
       models: [{ model_name: 'm-a' }, { model_name: 'm-b' }, { model_name: 'm-c' }],
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       const toggles = container.querySelectorAll('.provider-toggle');
@@ -112,14 +112,14 @@ describe('LocalServerDetailView', () => {
     mockCreate.mockResolvedValue({ id: 'cp-1' });
     const onConnected = vi.fn();
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={onConnected}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const btn = await waitFor(() => {
       const b = Array.from(container.querySelectorAll('button')).find((x) =>
@@ -148,16 +148,18 @@ describe('LocalServerDetailView', () => {
   });
 
   it('shows the failure state with setup command and a Retry button when probe fails', async () => {
-    mockProbe.mockRejectedValue(new Error('No server is listening on http://localhost:1234/v1/models'));
+    mockProbe.mockRejectedValue(
+      new Error('No server is listening on http://localhost:1234/v1/models'),
+    );
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('No server is listening');
@@ -180,14 +182,14 @@ describe('LocalServerDetailView', () => {
     mockCheckHost.mockResolvedValue('host.docker.internal');
     mockProbe.mockRejectedValue(new Error('No server is listening'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('Running Thinker in Docker');
@@ -207,14 +209,14 @@ describe('LocalServerDetailView', () => {
       color: '#123456',
     };
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={unknownProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       const letter = container.querySelector('.provider-card__logo-letter');
@@ -226,17 +228,17 @@ describe('LocalServerDetailView', () => {
     // Default: reject — this is what the probe sees on mount.
     mockProbe.mockRejectedValue(new Error('No server is listening'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const docsLink = await waitFor(() => {
-      const a = container.querySelector<HTMLAnchorElement>('a.btn--outline');
+      const a = container.querySelector<HTMLAnchorElement>('a[target="_blank"]');
       if (!a) throw new Error('docs link not rendered yet');
       return a;
     });
@@ -266,20 +268,18 @@ describe('LocalServerDetailView', () => {
       models: [{ model_name: 'alpha' }, { model_name: 'beta' }],
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // Wait for initial probe to land.
     const toggles = await waitFor(() => {
-      const list = Array.from(
-        container.querySelectorAll<HTMLButtonElement>('.provider-toggle'),
-      );
+      const list = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-toggle'));
       if (list.length !== 2) throw new Error('waiting');
       return list;
     });
@@ -299,9 +299,7 @@ describe('LocalServerDetailView', () => {
     fireEvent.click(refreshBtn!);
 
     await waitFor(() => {
-      const rows = Array.from(
-        container.querySelectorAll<HTMLButtonElement>('.provider-toggle'),
-      );
+      const rows = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-toggle'));
       if (rows.length !== 3) throw new Error('waiting for 3 models');
       // alpha was toggled off before refresh and should stay off.
       const labels = rows.map((row) => ({
@@ -323,19 +321,17 @@ describe('LocalServerDetailView', () => {
     });
     mockCreate.mockResolvedValue({ id: 'cp-1' });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const toggles = await waitFor(() => {
-      const list = Array.from(
-        container.querySelectorAll<HTMLButtonElement>('.provider-toggle'),
-      );
+      const list = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-toggle'));
       if (list.length !== 2) throw new Error('waiting');
       return list;
     });
@@ -360,14 +356,14 @@ describe('LocalServerDetailView', () => {
     mockProbe.mockResolvedValue({ models: [{ model_name: 'only' }] });
     mockCreate.mockRejectedValue(new Error('DB down'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const btn = await waitFor(() => {
       const b = Array.from(container.querySelectorAll('button')).find((x) =>
@@ -392,18 +388,20 @@ describe('LocalServerDetailView', () => {
       value: { writeText },
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // Switch to CLI tab to reveal the copy button
     const cliTab = await waitFor(() => {
-      const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'));
+      const tabs = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'),
+      );
       const t = tabs.find((el) => el.textContent?.trim() === 'CLI');
       if (!t) throw new Error('CLI tab not yet rendered');
       return t;
@@ -434,18 +432,20 @@ describe('LocalServerDetailView', () => {
       value: { writeText },
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // Switch to CLI tab to reveal the copy button
     const cliTab = await waitFor(() => {
-      const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'));
+      const tabs = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'),
+      );
       const t = tabs.find((el) => el.textContent?.trim() === 'CLI');
       if (!t) throw new Error('CLI tab not yet rendered');
       return t;
@@ -481,20 +481,28 @@ describe('LocalServerDetailView', () => {
       name: 'LM Studio',
       base_url: 'http://localhost:1234/v1',
       models: [
-        { model_name: 'alpha', input_price_per_million_tokens: 0, output_price_per_million_tokens: 0 },
-        { model_name: 'beta', input_price_per_million_tokens: 0, output_price_per_million_tokens: 0 },
+        {
+          model_name: 'alpha',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
+        {
+          model_name: 'beta',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
       ],
     };
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         editData={editData}
         onConnected={onConnected}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // Wait for probe and verify edit mode title
     await waitFor(() => {
@@ -536,19 +544,23 @@ describe('LocalServerDetailView', () => {
       name: 'LM Studio',
       base_url: 'http://localhost:1234/v1',
       models: [
-        { model_name: 'alpha', input_price_per_million_tokens: 0, output_price_per_million_tokens: 0 },
+        {
+          model_name: 'alpha',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
       ],
     };
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         editData={editData}
         onConnected={onConnected}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const deleteBtn = await waitFor(() => {
       const b = Array.from(container.querySelectorAll('button')).find((x) =>
@@ -578,19 +590,23 @@ describe('LocalServerDetailView', () => {
       name: 'LM Studio',
       base_url: 'http://localhost:1234/v1',
       models: [
-        { model_name: 'alpha', input_price_per_million_tokens: 0, output_price_per_million_tokens: 0 },
+        {
+          model_name: 'alpha',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
       ],
     };
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         editData={editData}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const deleteBtn = await waitFor(() => {
       const b = Array.from(container.querySelectorAll('button')).find((x) =>
@@ -610,14 +626,14 @@ describe('LocalServerDetailView', () => {
   it('shows empty models state when server is reachable but returns no models', async () => {
     mockProbe.mockResolvedValue({ models: [] });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('no models are loaded');
@@ -633,19 +649,23 @@ describe('LocalServerDetailView', () => {
       name: 'LM Studio',
       base_url: 'http://localhost:1234/v1',
       models: [
-        { model_name: 'alpha', input_price_per_million_tokens: 0, output_price_per_million_tokens: 0 },
+        {
+          model_name: 'alpha',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
       ],
     };
 
-    render(() => (
+    render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         editData={editData}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith('LM Studio is no longer reachable');
@@ -660,21 +680,19 @@ describe('LocalServerDetailView', () => {
       value: { writeText },
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // Wait for the setup command copy button (inside the setup cmd block, not Docker caveat)
     const copyBtn = await waitFor(() => {
       // The copy button is a button with a title attribute
-      const candidates = Array.from(
-        container.querySelectorAll<HTMLButtonElement>('button[title]'),
-      );
+      const candidates = Array.from(container.querySelectorAll<HTMLButtonElement>('button[title]'));
       const b = candidates.find((el) => el.title === 'Copy' || el.title === 'Copied!');
       if (!b) throw new Error('copy button not yet rendered');
       return b;
@@ -694,19 +712,17 @@ describe('LocalServerDetailView', () => {
       value: { writeText },
     });
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const copyBtn = await waitFor(() => {
-      const candidates = Array.from(
-        container.querySelectorAll<HTMLButtonElement>('button[title]'),
-      );
+      const candidates = Array.from(container.querySelectorAll<HTMLButtonElement>('button[title]'));
       const b = candidates.find((el) => el.title === 'Copy' || el.title === 'Copied!');
       if (!b) throw new Error('copy button not yet rendered');
       return b;
@@ -724,15 +740,15 @@ describe('LocalServerDetailView', () => {
     mockProbe.mockRejectedValue(new Error('returned 404'));
     const onOpenCustomForm = vi.fn();
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={llamacppProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
         onOpenCustomForm={onOpenCustomForm}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('llama-server');
@@ -751,14 +767,14 @@ describe('LocalServerDetailView', () => {
   it('renders the notReachableHint link as a static span when no onOpenCustomForm callback is wired', async () => {
     mockProbe.mockRejectedValue(new Error('returned 404'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={llamacppProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('Recent llama.cpp builds expose /v1/models');
@@ -776,14 +792,14 @@ describe('LocalServerDetailView', () => {
   it('does NOT render the LM-Studio GUI fallback copy when the provider is llama.cpp', async () => {
     mockProbe.mockRejectedValue(new Error('No server is listening'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={llamacppProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       expect(container.textContent).toContain('<your-model>.gguf');
@@ -796,14 +812,14 @@ describe('LocalServerDetailView', () => {
     mockCheckHost.mockResolvedValue('host.docker.internal');
     mockProbe.mockRejectedValue(new Error('No server is listening'));
 
-    const { container } = render(() => (
+    const { container } = render(
       <LocalServerDetailView
         agentName="a1"
         provider={lmsProv}
         onConnected={vi.fn()}
         onBack={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     await waitFor(() => {
       const caveat = container.querySelector('.provider-detail__caveat');
@@ -814,12 +830,15 @@ describe('LocalServerDetailView', () => {
     });
 
     // Switch to CLI tab and verify the bind command is shown.
-    const cliTab = Array.from(container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'))
-      .find((el) => el.textContent?.trim() === 'CLI')!;
+    const cliTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.provider-detail__caveat button'),
+    ).find((el) => el.textContent?.trim() === 'CLI')!;
     fireEvent.click(cliTab);
 
     await waitFor(() => {
-      expect(container.querySelector('.provider-detail__caveat')!.textContent).toContain('--bind 0.0.0.0');
+      expect(container.querySelector('.provider-detail__caveat')!.textContent).toContain(
+        '--bind 0.0.0.0',
+      );
     });
   });
 });

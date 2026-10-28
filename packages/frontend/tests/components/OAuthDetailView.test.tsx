@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useState, type ComponentProps } from 'react';
 
 const mockGetOpenaiOAuthUrl = vi.fn();
 const mockSubmitOpenaiOAuthCallback = vi.fn();
@@ -100,6 +100,28 @@ function makeKey(overrides: Partial<RoutingProvider> = {}): RoutingProvider {
   };
 }
 
+type ViewProps = ComponentProps<typeof OAuthDetailView>;
+
+/** Holds busy / addKeyOpen state the way the parent does. */
+function Harness({
+  initialAddKeyOpen = false,
+  ...props
+}: Omit<ViewProps, 'busy' | 'setBusy' | 'addKeyOpen' | 'setAddKeyOpen'> & {
+  initialAddKeyOpen?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [addKeyOpen, setAddKeyOpen] = useState(initialAddKeyOpen);
+  return (
+    <OAuthDetailView
+      {...props}
+      busy={busy}
+      setBusy={setBusy}
+      addKeyOpen={addKeyOpen}
+      setAddKeyOpen={setAddKeyOpen}
+    />
+  );
+}
+
 function renderView(
   opts: {
     connected?: boolean;
@@ -109,56 +131,64 @@ function renderView(
     provDef?: ProviderDef;
   } = {},
 ) {
-  const [busy, setBusy] = createSignal(false);
-  const [addKeyOpen, setAddKeyOpen] = createSignal(opts.addKeyOpen ?? false);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
   const keys = opts.activeKeys ?? [];
   const providerId = opts.provId ?? 'openai';
-  const result = render(() => (
-    <OAuthDetailView
+  const result = render(
+    <Harness
       provDef={opts.provDef ?? provDef}
       provId={providerId}
       agentName="test-agent"
-      connected={() => opts.connected ?? false}
-      selectedAuthType={() => 'subscription'}
-      busy={busy}
-      setBusy={setBusy}
+      connected={opts.connected ?? false}
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-      addKeyOpen={addKeyOpen}
-      setAddKeyOpen={setAddKeyOpen}
-      activeKeys={() => keys}
-    />
-  ));
-  return { ...result, onBack, onUpdate, onClose, setAddKeyOpen };
+      initialAddKeyOpen={opts.addKeyOpen ?? false}
+      activeKeys={keys}
+    />,
+  );
+  return { ...result, onBack, onUpdate, onClose };
 }
 
 function renderReactiveView(opts: { connected?: boolean; activeKeys?: RoutingProvider[] } = {}) {
-  const [busy, setBusy] = createSignal(false);
-  const [connected, setConnected] = createSignal(opts.connected ?? false);
-  const [activeKeys, setActiveKeys] = createSignal(opts.activeKeys ?? []);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
-  const result = render(() => (
-    <OAuthDetailView
+  const ui = (connected: boolean, activeKeys: RoutingProvider[]) => (
+    <Harness
       provDef={provDef}
       provId="openai"
       agentName="test-agent"
       connected={connected}
-      selectedAuthType={() => 'subscription'}
-      busy={busy}
-      setBusy={setBusy}
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
       activeKeys={activeKeys}
     />
-  ));
+  );
+  let connected = opts.connected ?? false;
+  let activeKeys = opts.activeKeys ?? [];
+  const result = render(ui(connected, activeKeys));
+  const setConnected = (next: boolean) => {
+    connected = next;
+    result.rerender(ui(connected, activeKeys));
+  };
+  const setActiveKeys = (next: RoutingProvider[]) => {
+    activeKeys = next;
+    result.rerender(ui(connected, activeKeys));
+  };
   return { ...result, onBack, onUpdate, onClose, setConnected, setActiveKeys };
+}
+
+/** Lets pending promise continuations (and their state updates) settle. */
+async function flush() {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  });
 }
 
 describe('OAuthDetailView', () => {
@@ -204,7 +234,7 @@ describe('OAuthDetailView', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old name');
-    fireEvent.input(input, { target: { value: 'New name' } });
+    fireEvent.change(input, { target: { value: 'New name' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -259,7 +289,7 @@ describe('OAuthDetailView', () => {
       expect(screen.getByPlaceholderText(/localhost:1455/)).toBeDefined();
     });
 
-    fireEvent.input(screen.getByPlaceholderText(/localhost:1455/), {
+    fireEvent.change(screen.getByPlaceholderText(/localhost:1455/), {
       target: { value: 'http://localhost:1455/auth/callback?code=abc&state=xyz' },
     });
     fireEvent.click(screen.getByText('Cancel'));
@@ -311,7 +341,7 @@ describe('OAuthDetailView', () => {
     const input = await waitFor(() =>
       screen.getByPlaceholderText('Paste the xAI authorization code or callback URL'),
     );
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://127.0.0.1:56121/callback?code=xai-code&state=xai-state' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -335,7 +365,7 @@ describe('OAuthDetailView', () => {
     const input = await waitFor(() =>
       screen.getByPlaceholderText('Paste the xAI authorization code or callback URL'),
     );
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'raw-xai-code-from-consent-page' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -358,7 +388,7 @@ describe('OAuthDetailView', () => {
     const input = await waitFor(() =>
       screen.getByPlaceholderText('Paste the xAI authorization code or callback URL'),
     );
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: {
         value:
           'https://accounts.x.ai/oauth2/consent?response_type=code&state=consent-state manual-xai-code-from-page',
@@ -385,7 +415,7 @@ describe('OAuthDetailView', () => {
     const input = await waitFor(() =>
       screen.getByPlaceholderText('Paste the xAI authorization code or callback URL'),
     );
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'https://accounts.x.ai/oauth2/consent?state=pending-xai-state' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -494,7 +524,7 @@ describe('OAuthDetailView', () => {
 
     // Now the paste input should be visible
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://localhost:1455/auth/callback?code=abc123&state=xyz789' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -513,15 +543,16 @@ describe('OAuthDetailView', () => {
 
     const { onUpdate } = renderView();
     fireEvent.click(screen.getByText('Log in with OpenAI'));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
 
     expect(
       screen.getByPlaceholderText('http://localhost:1455/auth/callback?code=...'),
     ).toBeDefined();
     expect(onUpdate).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(2000);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
 
     expect(onUpdate).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
@@ -533,31 +564,29 @@ describe('OAuthDetailView', () => {
     vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
 
     const onPollProviders = vi.fn();
-    const [busy, setBusy] = createSignal(false);
     const onBack = vi.fn();
     const onUpdate = vi.fn();
     const onClose = vi.fn();
-    render(() => (
-      <OAuthDetailView
+    render(
+      <Harness
         provDef={provDef}
         provId="openai"
         agentName="test-agent"
-        connected={() => false}
-        selectedAuthType={() => 'subscription'}
-        busy={busy}
-        setBusy={setBusy}
+        connected={false}
+        selectedAuthType="subscription"
         onBack={onBack}
         onUpdate={onUpdate}
         onPollProviders={onPollProviders}
         onClose={onClose}
-        activeKeys={() => []}
-      />
-    ));
+        activeKeys={[]}
+      />,
+    );
     fireEvent.click(screen.getByText('Log in with OpenAI'));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
 
-    vi.advanceTimersByTime(2000);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
 
     expect(onPollProviders).toHaveBeenCalledTimes(1);
     expect(onUpdate).not.toHaveBeenCalled();
@@ -597,7 +626,7 @@ describe('OAuthDetailView', () => {
     await waitFor(() => expect(mockGetOpenaiOAuthUrl).toHaveBeenCalled());
 
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://localhost:1455/auth/callback?code=abc123' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -630,7 +659,7 @@ describe('OAuthDetailView', () => {
     await waitFor(() => expect(mockGetOpenaiOAuthUrl).toHaveBeenCalled());
 
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://localhost:1455/auth/callback?code=abc&state=xyz' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -649,7 +678,7 @@ describe('OAuthDetailView', () => {
     await waitFor(() => expect(mockGetOpenaiOAuthUrl).toHaveBeenCalled());
 
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
-    fireEvent.input(input, { target: { value: '   ' } });
+    fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.click(screen.getByText('Connect'));
 
     expect(mockSubmitOpenaiOAuthCallback).not.toHaveBeenCalled();
@@ -665,7 +694,7 @@ describe('OAuthDetailView', () => {
     await waitFor(() => expect(mockGetOpenaiOAuthUrl).toHaveBeenCalled());
 
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://localhost:1455/auth/callback?code=abc&state=xyz' },
     });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -759,7 +788,7 @@ describe('OAuthDetailView', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old name');
-    fireEvent.input(input, { target: { value: 'New name' } });
+    fireEvent.change(input, { target: { value: 'New name' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -778,7 +807,7 @@ describe('OAuthDetailView', () => {
 
     const input = await waitFor(() => screen.getByPlaceholderText(/localhost:1455/));
     // Submit invalid URL to trigger error
-    fireEvent.input(input, {
+    fireEvent.change(input, {
       target: { value: 'http://localhost:1455/auth/callback?code=abc' },
     });
     fireEvent.click(screen.getByText('Connect'));
@@ -788,7 +817,7 @@ describe('OAuthDetailView', () => {
     });
 
     // Typing again should clear the error
-    fireEvent.input(input, { target: { value: 'http://other' } });
+    fireEvent.change(input, { target: { value: 'http://other' } });
     expect(screen.queryByText(/URL is missing the authorization code/)).toBeNull();
   });
 

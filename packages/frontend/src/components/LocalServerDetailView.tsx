@@ -1,4 +1,5 @@
-import { createResource, createSignal, For, Show, type Component } from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, Container, Copy, RefreshCw, Server } from 'lucide-react';
 import { LOCAL_SERVER_HINTS, type LocalServerHint } from 'thinker-shared';
 import type { ProviderDef } from '../services/providers.js';
 import {
@@ -11,7 +12,9 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { checkLocalLlmHost } from '../services/setup-status.js';
+import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
+import { Button, IconButton, cx } from './ui.js';
 
 interface Props {
   agentName: string;
@@ -34,56 +37,94 @@ interface ProbeState {
   baseUrl: string;
 }
 
-const LocalServerDetailView: Component<Props> = (props) => {
-  const isEdit = () => !!props.editData;
-  const hint = (): LocalServerHint | undefined => LOCAL_SERVER_HINTS[props.provider.id];
+const DOCKER_HOST = 'host.docker.internal';
 
-  const [hostResource] = createResource(() => checkLocalLlmHost());
+/** Copies `text` and flips to a check for 2s; a failure toasts instead. */
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error(t('providerSetup.local.copyFailed'));
+    }
+  };
+  return { copied, copy };
+}
+
+/** A command in a code block with a copy button pinned to its right edge. */
+function CommandBlock({ command, ariaLabel }: { command: string; ariaLabel?: boolean }) {
+  const { copied, copy } = useCopy();
+  return (
+    <div className="relative">
+      <pre className="code whitespace-pre-wrap break-all pr-10 font-mono">{command}</pre>
+      <button
+        type="button"
+        className={cx('icon-btn absolute right-1.5 top-1/2 -translate-y-1/2', copied && 'text-ok')}
+        title={copied ? t('providerSetup.local.copiedBang') : t('common.copy')}
+        aria-label={
+          ariaLabel
+            ? copied
+              ? t('common.copied')
+              : t('providerSetup.local.copyCommand')
+            : undefined
+        }
+        onClick={() => void copy(command)}
+      >
+        {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+      </button>
+    </div>
+  );
+}
+
+export default function LocalServerDetailView(props: Props) {
+  const isEdit = !!props.editData;
+  const hint: LocalServerHint | undefined = LOCAL_SERVER_HINTS[props.provider.id];
+
+  const host = useResource(() => checkLocalLlmHost(), []);
   // `defaultLocalPort` is the gate that routes the tile click here in
   // the first place (see ProviderApiKeyTab), so it's always defined.
-  const resolvedBaseUrl = () => {
-    if (props.editData) return props.editData.base_url;
-    return `http://${hostResource() ?? 'localhost'}:${props.provider.defaultLocalPort!}/v1`;
-  };
+  const resolvedBaseUrl = props.editData
+    ? props.editData.base_url
+    : `http://${host.data ?? 'localhost'}:${props.provider.defaultLocalPort!}/v1`;
 
   // In edit mode, pre-select only the models that are already connected.
-  const initialSelected = () =>
-    props.editData ? new Set(props.editData.models.map((m) => m.model_name)) : new Set<string>();
-
-  const [selected, setSelected] = createSignal<Set<string>>(initialSelected());
-  const [connecting, setConnecting] = createSignal(false);
-  const [deleting, setDeleting] = createSignal(false);
-  const [refreshKey, setRefreshKey] = createSignal(0);
+  const [selected, setSelected] = useState<Set<string>>(() =>
+    props.editData ? new Set(props.editData.models.map((m) => m.model_name)) : new Set<string>(),
+  );
+  const [connecting, setConnecting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   // First probe seeds "all selected" (connect mode) or keeps the edit
   // selection (edit mode); subsequent probes intersect-preserve.
-  const [hasSeeded, setHasSeeded] = createSignal(isEdit());
+  const hasSeeded = useRef(isEdit);
 
-  const [probe] = createResource(
-    () => ({ key: refreshKey(), url: resolvedBaseUrl() }),
-    async ({ url }): Promise<ProbeState> => {
-      const wasConnected = hasSeeded();
-      try {
-        const { models } = await probeCustomProvider(props.agentName, url);
-        const names = models.map((m) => m.model_name);
-        setSelected((prev) => {
-          if (!hasSeeded()) {
-            setHasSeeded(true);
-            return new Set(names);
-          }
-          const available = new Set(names);
-          const next = new Set<string>();
-          for (const n of prev) if (available.has(n)) next.add(n);
-          return next;
-        });
-        return { models: names, baseUrl: url };
-      } catch (err) {
-        if (wasConnected) {
-          toast.error(t('providerSetup.local.noLongerReachable', { name: props.provider.name }));
-        }
-        throw err;
+  const probe = useResource<ProbeState>(async () => {
+    const url = resolvedBaseUrl;
+    const wasConnected = hasSeeded.current;
+    try {
+      const { models } = await probeCustomProvider(props.agentName, url);
+      const names = models.map((m) => m.model_name);
+      if (!hasSeeded.current) {
+        hasSeeded.current = true;
+        setSelected(new Set(names));
+      } else {
+        const available = new Set(names);
+        setSelected((prev) => new Set([...prev].filter((n) => available.has(n))));
       }
-    },
-  );
+      return { models: names, baseUrl: url };
+    } catch (err) {
+      if (wasConnected) {
+        toast.error(t('providerSetup.local.noLongerReachable', { name: props.provider.name }));
+      }
+      throw err;
+    }
+  }, [refreshKey, resolvedBaseUrl]);
 
   const retry = () => setRefreshKey((k) => k + 1);
 
@@ -97,29 +138,24 @@ const LocalServerDetailView: Component<Props> = (props) => {
   };
 
   const handleConnect = async () => {
-    const state = probe();
+    const state = probe.data;
     if (!state || state.models.length === 0) return;
-    const picked = Array.from(selected());
+    const picked = Array.from(selected);
+    const models = picked.map((name) => ({
+      model_name: name,
+      input_price_per_million_tokens: 0,
+      output_price_per_million_tokens: 0,
+    }));
     setConnecting(true);
     try {
       if (props.editData) {
-        await updateCustomProvider(props.agentName, props.editData.id, {
-          models: picked.map((name) => ({
-            model_name: name,
-            input_price_per_million_tokens: 0,
-            output_price_per_million_tokens: 0,
-          })),
-        });
+        await updateCustomProvider(props.agentName, props.editData.id, { models });
         toast.success(t('providerSetup.local.updated', props.provider.name, picked.length));
       } else {
         await createCustomProvider(props.agentName, {
           name: props.provider.name,
           base_url: state.baseUrl,
-          models: picked.map((name) => ({
-            model_name: name,
-            input_price_per_million_tokens: 0,
-            output_price_per_million_tokens: 0,
-          })),
+          models,
         });
         toast.success(t('providerSetup.local.connectedModels', props.provider.name, picked.length));
       }
@@ -153,245 +189,183 @@ const LocalServerDetailView: Component<Props> = (props) => {
     }
   };
 
-  return (
-    <div class="provider-detail">
-      <button
-        class="modal-back-btn"
-        onClick={props.onBack}
-        aria-label={t('providerSetup.shared.backToProviders')}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="M14.71 7.29a.996.996 0 0 0-1.41 0l-4 4a.996.996 0 0 0 0 1.41l4 4c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41L11.43 12l3.29-3.29a.996.996 0 0 0 0-1.41Z" />
-        </svg>
-      </button>
-
-      {/* Title */}
-      <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 15px;">
-        <div>
-          <div class="routing-modal__title">
-            {isEdit()
-              ? t('providerSetup.local.editProvider')
-              : t('providerSetup.shared.connectProvider')}
-          </div>
+  const data = probe.data;
+  const failed = !!probe.error;
+  let body;
+  if (probe.loading && !data) {
+    body = (
+      <div className="flex items-center gap-2 py-3 text-sm text-muted">
+        <span className="spinner" aria-hidden="true" />
+        <span>
+          {t('providerSetup.local.checking', {
+            url: resolvedBaseUrl || t('providerSetup.local.theServer'),
+          })}
+        </span>
+      </div>
+    );
+  } else if (!failed && data && data.models.length > 0) {
+    body = (
+      <>
+        <SuccessState
+          models={data.models}
+          baseUrl={data.baseUrl}
+          selected={selected}
+          onToggle={toggleModel}
+          refreshing={probe.loading}
+          onRefresh={retry}
+        />
+        <div className="flex items-center justify-end gap-3">
+          {isEdit ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mr-auto"
+              busy={deleting}
+              onClick={() => void handleDelete()}
+            >
+              {t('providerSetup.local.deleteProvider')}
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            busy={connecting}
+            disabled={selected.size === 0 || probe.loading}
+            onClick={() => void handleConnect()}
+          >
+            {isEdit
+              ? t('common.saveChanges')
+              : t('providerSetup.local.connectModels', selected.size)}
+          </Button>
         </div>
+      </>
+    );
+  } else if (!failed && data) {
+    body = (
+      <EmptyModelsState providerName={props.provider.name} baseUrl={data.baseUrl} onRetry={retry} />
+    );
+  } else {
+    body = (
+      <FailureState
+        providerName={props.provider.name}
+        hint={hint}
+        error={probe.error}
+        isDocker={host.data === DOCKER_HOST}
+        onRetry={retry}
+        onOpenCustomForm={props.onOpenCustomForm}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <IconButton label={t('providerSetup.shared.backToProviders')} onClick={props.onBack}>
+          <ChevronLeft size={16} aria-hidden="true" />
+        </IconButton>
+        <h2 className="text-base font-semibold text-ink">
+          {isEdit
+            ? t('providerSetup.local.editProvider')
+            : t('providerSetup.shared.connectProvider')}
+        </h2>
       </div>
 
-      {/* Provider row */}
-      <div class="provider-detail__header">
-        <span class="provider-detail__icon">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex size-8 items-center justify-center">
           {providerIcon(props.provider.id, 28) ?? (
             <span
-              class="provider-card__logo-letter"
-              style={{
-                background: props.provider.color,
-                width: '32px',
-                height: '32px',
-                'font-size': '13px',
-              }}
+              className="provider-card__logo-letter inline-flex size-8 items-center justify-center rounded-control text-xs font-semibold text-white"
+              // The provider's brand color is data, not a theme token.
+              style={{ background: props.provider.color }}
             >
               {props.provider.initial}
             </span>
           )}
         </span>
-        <div class="provider-detail__title-group">
-          <div class="provider-detail__name">{props.provider.name}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-ink">{props.provider.name}</div>
+          <div className="text-xs text-muted">{props.provider.subtitle}</div>
         </div>
       </div>
 
-      <div class="routing-modal__subtitle" style="margin-bottom: 20px;">
-        {props.provider.subtitle}
-      </div>
-
-      <Show
-        when={!probe.loading || probe()}
-        fallback={
-          <div
-            class="provider-detail__probe-status"
-            style="display: flex; align-items: center; gap: 8px; padding: 12px 0; color: hsl(var(--muted-foreground));"
-          >
-            <span class="spinner" aria-hidden="true" />
-            <span>
-              {t('providerSetup.local.checking', {
-                url: resolvedBaseUrl() || t('providerSetup.local.theServer'),
-              })}
-            </span>
-          </div>
-        }
-      >
-        <Show
-          when={!probe.error && probe()?.models?.length}
-          fallback={
-            <Show
-              when={!probe.error && probe() && probe()!.models.length === 0}
-              fallback={
-                <FailureState
-                  providerName={props.provider.name}
-                  hint={hint()}
-                  error={probe.error}
-                  onRetry={retry}
-                  onOpenCustomForm={props.onOpenCustomForm}
-                />
-              }
-            >
-              <EmptyModelsState
-                providerName={props.provider.name}
-                baseUrl={probe()?.baseUrl ?? ''}
-                onRetry={retry}
-              />
-            </Show>
-          }
-        >
-          <SuccessState
-            models={probe()?.models ?? []}
-            baseUrl={probe()?.baseUrl ?? ''}
-            selected={selected()}
-            onToggle={toggleModel}
-            refreshing={probe.loading}
-            onRefresh={retry}
-          />
-
-          <div style="display: flex; align-items: center; justify-content: flex-end; margin-top: 16px; gap: 12px;">
-            <Show when={isEdit()}>
-              <button
-                type="button"
-                class="btn btn--outline btn--sm"
-                style="margin-right: auto;"
-                disabled={deleting()}
-                onClick={handleDelete}
-              >
-                {deleting() ? <span class="spinner" /> : t('providerSetup.local.deleteProvider')}
-              </button>
-            </Show>
-            <button
-              type="button"
-              class="btn btn--primary btn--sm provider-detail__action"
-              disabled={connecting() || selected().size === 0 || probe.loading}
-              onClick={handleConnect}
-            >
-              {connecting() ? (
-                <span class="spinner" />
-              ) : isEdit() ? (
-                t('common.saveChanges')
-              ) : (
-                t('providerSetup.local.connectModels', selected().size)
-              )}
-            </button>
-          </div>
-        </Show>
-      </Show>
+      {body}
     </div>
   );
-};
+}
 
 /* ── Probe success ────────────────────────────────── */
 
-const SuccessState: Component<{
+function SuccessState(p: {
   models: string[];
   baseUrl: string;
   selected: Set<string>;
   onToggle: (name: string) => void;
   refreshing: boolean;
   onRefresh: () => void;
-}> = (p) => {
+}) {
   return (
     <div>
       {/* Header row: model count + refresh */}
-      <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="font-size: var(--font-size-sm); font-weight: 600; color: hsl(var(--foreground));">
+      <div className="mb-2 flex items-center">
+        <span className="text-sm font-semibold text-ink">
           {t('providerSetup.local.modelsAvailable', p.models.length, p.baseUrl)}
         </span>
-        <button
-          type="button"
+        <IconButton
+          label={t('providerSetup.local.refreshList')}
           title={t('providerSetup.local.refresh')}
+          className="ml-auto shrink-0"
           onClick={p.onRefresh}
           disabled={p.refreshing}
-          aria-label={t('providerSetup.local.refreshList')}
-          style="margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid hsl(var(--border)); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border-radius: var(--radius); cursor: pointer; flex-shrink: 0;"
         >
-          <Show when={!p.refreshing} fallback={<span class="spinner" aria-hidden="true" />}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
-              <path d="M21 3v5h-5" />
-            </svg>
-          </Show>
-        </button>
+          {p.refreshing ? (
+            <span className="spinner" aria-hidden="true" />
+          ) : (
+            <RefreshCw size={14} aria-hidden="true" />
+          )}
+        </IconButton>
       </div>
 
       {/* Model list with toggle switches */}
       <div
-        class="provider-detail__model-list"
-        style={`display: flex; flex-direction: column; max-height: 240px; overflow-y: auto; border-top: 1px solid hsl(var(--border)); opacity: ${p.refreshing ? 0.6 : 1}; pointer-events: ${p.refreshing ? 'none' : 'auto'}; transition: opacity 120ms;`}
+        className={cx(
+          'flex max-h-60 flex-col overflow-y-auto border-t border-line transition-opacity',
+          p.refreshing && 'pointer-events-none opacity-60',
+        )}
       >
-        <For each={p.models}>
-          {(name) => (
+        {p.models.map((name) => {
+          const on = p.selected.has(name);
+          return (
             <button
+              key={name}
               type="button"
-              class="provider-toggle"
-              style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; border: none; background: transparent; cursor: pointer; border-bottom: 1px solid hsl(var(--border));"
+              role="switch"
+              aria-checked={on}
+              className="provider-toggle flex w-full items-center justify-between gap-3 border-b border-line bg-transparent py-2.5 text-left"
               onClick={() => p.onToggle(name)}
             >
-              <span style="font-size: var(--font-size-sm); color: hsl(var(--foreground));">
-                {name}
-              </span>
+              <span className="truncate text-sm text-ink">{name}</span>
               <span
-                class="provider-toggle__switch"
-                classList={{ 'provider-toggle__switch--on': p.selected.has(name) }}
-              >
-                <span class="provider-toggle__switch-thumb" />
-              </span>
+                aria-hidden="true"
+                aria-checked={on}
+                className={cx(
+                  'switch provider-toggle__switch shrink-0',
+                  on && 'provider-toggle__switch--on',
+                )}
+              />
             </button>
-          )}
-        </For>
+          );
+        })}
       </div>
     </div>
   );
-};
+}
 
 /* ── Server reachable but no models loaded ────────── */
 
-const EmptyModelsState: Component<{
-  providerName: string;
-  baseUrl: string;
-  onRetry: () => void;
-}> = (p) => {
+function EmptyModelsState(p: { providerName: string; baseUrl: string; onRetry: () => void }) {
   return (
-    <div class="provider-detail__failure">
-      <div style="margin-bottom: 14px; display: flex; align-items: flex-start; gap: 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); padding: 12px 14px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--radius);">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          style="flex-shrink: 0; margin-top: 1px;"
-        >
-          <g fill="currentColor" opacity="0.4">
-            <path d="m19,3H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-          </g>
-          <g fill="currentColor" opacity="1">
-            <path d="m19,13H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-            <path d="M18 16A1 1 0 1 0 18 18 1 1 0 1 0 18 16z" />
-            <path d="M15 16A1 1 0 1 0 15 18 1 1 0 1 0 15 16z" />
-            <path d="M18 6A1 1 0 1 0 18 8 1 1 0 1 0 18 6z" />
-            <path d="M15 6A1 1 0 1 0 15 8 1 1 0 1 0 15 6z" />
-          </g>
-        </svg>
+    <div className="flex flex-col gap-3">
+      <div className="notice">
+        <Server aria-hidden="true" />
         <span>
           {t('providerSetup.local.noModelsLoaded', { url: p.baseUrl, name: p.providerName })}
         </span>
@@ -400,368 +374,172 @@ const EmptyModelsState: Component<{
       <video
         src="/icons/lmstudio-load-models.mp4"
         preload="none"
-        autoplay
+        autoPlay
         loop
         muted
-        playsinline
-        disablepictureinpicture
-        style="margin-bottom: 14px; width: 100%; border-radius: var(--radius); border: 1px solid hsl(var(--border)); pointer-events: none;"
+        playsInline
+        disablePictureInPicture
+        className="pointer-events-none w-full rounded-control border border-line"
       />
 
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <button
-          type="button"
-          class="btn btn--primary btn--sm"
-          style="margin-left: auto;"
-          onClick={p.onRetry}
-        >
+      <div className="flex justify-end">
+        <Button size="sm" onClick={p.onRetry}>
           {t('common.retry')}
-        </button>
+        </Button>
       </div>
     </div>
   );
-};
+}
 
 /* ── Probe failure ────────────────────────────────── */
 
-const FailureState: Component<{
+function FailureState(p: {
   providerName: string;
   hint?: LocalServerHint;
   error: unknown;
+  isDocker: boolean;
   onRetry: () => void;
   onOpenCustomForm?: () => void;
-}> = (p) => {
-  const errorMsg = () =>
+}) {
+  const errorMsg =
     p.error instanceof Error ? p.error.message : t('providerSetup.local.couldNotReach');
-  const [hostResource] = createResource(() => checkLocalLlmHost());
-  const isDocker = () => !!p.hint?.dockerBindNote && hostResource() === 'host.docker.internal';
-  const [copied, setCopied] = createSignal(false);
-  const copyCommand = async () => {
-    if (!p.hint) return;
-    try {
-      await navigator.clipboard.writeText(p.hint.setupCommand);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error(t('providerSetup.local.copyFailed'));
-    }
-  };
+  const isDocker = !!p.hint?.dockerBindNote && p.isDocker;
+  const notReachable = p.hint?.notReachableHint;
 
   return (
-    <div class="provider-detail__failure">
+    <div className="flex flex-col gap-4">
       {/* Docker caveat first — it's a prerequisite for the server to be reachable */}
-      <Show when={p.hint}>
-        <DockerCaveat hint={p.hint!} errorMsg={errorMsg()} />
-      </Show>
+      {p.hint && isDocker ? <DockerCaveat hint={p.hint} errorMsg={errorMsg} /> : null}
 
       {/* Error card — only shown outside Docker (DockerCaveat renders it inline when in Docker) */}
-      <Show when={!isDocker()}>
-        <div style="margin-bottom: 14px; display: flex; align-items: flex-start; gap: 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); padding: 12px 14px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); white-space: pre-line;">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            style="flex-shrink: 0; margin-top: 1px;"
-          >
-            <g fill="currentColor" opacity="0.4">
-              <path d="m19,3H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-            </g>
-            <g fill="currentColor" opacity="1">
-              <path d="m19,13H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-              <path d="M18 16A1 1 0 1 0 18 18 1 1 0 1 0 18 16z" />
-              <path d="M15 16A1 1 0 1 0 15 18 1 1 0 1 0 15 16z" />
-              <path d="M18 6A1 1 0 1 0 18 8 1 1 0 1 0 18 6z" />
-              <path d="M15 6A1 1 0 1 0 15 8 1 1 0 1 0 15 6z" />
-            </g>
-          </svg>
-          {errorMsg()}
+      {!isDocker ? (
+        <div className="notice whitespace-pre-line">
+          <Server aria-hidden="true" />
+          <span>{errorMsg}</span>
         </div>
-      </Show>
+      ) : null}
 
-      <Show when={p.hint}>
-        <div class="provider-detail__setup" style="margin-bottom: 20px;">
-          <div style="font-size: var(--font-size-sm); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 8px;">
-            {isDocker()
+      {p.hint ? (
+        <div className="flex flex-col gap-2">
+          <div className="text-sm font-semibold text-ink">
+            {isDocker
               ? t('providerSetup.local.startServerStep')
               : t('providerSetup.local.startServer')}
           </div>
-          <div style="position: relative;">
-            <pre
-              class="provider-detail__setup-cmd"
-              style="margin: 0; padding: 10px 40px 10px 12px; background: hsl(var(--muted)); border-radius: var(--radius); font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); white-space: pre-wrap; word-break: break-all;"
-            >
-              {p.hint!.setupCommand}
-            </pre>
-            <button
-              type="button"
-              title={copied() ? t('providerSetup.local.copiedBang') : t('common.copy')}
-              onClick={copyCommand}
-              style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; border-radius: var(--radius);"
-            >
-              <Show
-                when={!copied()}
-                fallback={
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                }
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              </Show>
-            </button>
-          </div>
-          <Show when={p.hint!.setupNote}>
-            <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 8px; line-height: 1.5;">
-              {p.hint!.setupNote}
-            </div>
-          </Show>
+          <CommandBlock command={p.hint.setupCommand} />
+          {p.hint.setupNote ? (
+            <div className="text-xs leading-relaxed text-muted">{p.hint.setupNote}</div>
+          ) : null}
           {/* GUI-launch fallback + setup video are LM-Studio specific; gate
               them on `persistsBindAcrossLaunches`, which today identifies
               GUI-wrapped local providers (CLI-only providers like llama.cpp
               don't have a "Developer → Start Server" menu to point at). */}
-          <Show when={p.hint!.persistsBindAcrossLaunches}>
-            <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 12px;">
-              {t('providerSetup.local.openDeveloper', { name: p.providerName })}
-            </div>
-            <video
-              src="/icons/lmstudio-start-server.mp4"
-              preload="none"
-              autoplay
-              loop
-              muted
-              playsinline
-              disablepictureinpicture
-              style="margin-top: 12px; width: 100%; border-radius: var(--radius); border: 1px solid hsl(var(--border)); pointer-events: none;"
-            />
-          </Show>
-          <Show when={p.hint!.notReachableHint}>
-            {(hint) => (
-              <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 12px; line-height: 1.5;">
-                {hint().before}
-                <Show
-                  when={p.onOpenCustomForm}
-                  // i18n-ignore: HTML quote entities
-                  fallback={<span>&ldquo;{hint().linkLabel}&rdquo;</span>}
-                >
-                  <button
-                    type="button"
-                    class="link-button"
-                    onClick={p.onOpenCustomForm}
-                    style="background: none; border: none; padding: 0; color: hsl(var(--primary)); text-decoration: underline; cursor: pointer; font: inherit;"
-                  >
-                    {hint().linkLabel}
-                  </button>
-                </Show>
-                {hint().after}
+          {p.hint.persistsBindAcrossLaunches ? (
+            <>
+              <div className="mt-1 text-xs text-muted">
+                {t('providerSetup.local.openDeveloper', { name: p.providerName })}
               </div>
-            )}
-          </Show>
+              <video
+                src="/icons/lmstudio-start-server.mp4"
+                preload="none"
+                autoPlay
+                loop
+                muted
+                playsInline
+                disablePictureInPicture
+                className="pointer-events-none w-full rounded-control border border-line"
+              />
+            </>
+          ) : null}
+          {notReachable ? (
+            <div className="mt-1 text-xs leading-relaxed text-muted">
+              {notReachable.before}
+              {p.onOpenCustomForm ? (
+                <button
+                  type="button"
+                  className="link-action underline"
+                  onClick={p.onOpenCustomForm}
+                >
+                  {notReachable.linkLabel}
+                </button>
+              ) : (
+                // i18n-ignore: HTML quote entities
+                <span>&ldquo;{notReachable.linkLabel}&rdquo;</span>
+              )}
+              {notReachable.after}
+            </div>
+          ) : null}
         </div>
-      </Show>
+      ) : null}
 
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <Show when={p.hint?.installUrl}>
+      <div className="flex items-center gap-2">
+        {p.hint?.installUrl ? (
           <a
-            href={p.hint!.installUrl}
+            href={p.hint.installUrl}
             target="_blank"
             rel="noopener noreferrer"
-            class="btn btn--outline btn--sm"
-            style="text-decoration: none;"
+            className="btn btn-ghost btn-sm"
           >
             {t('providerSetup.shared.getProduct', { name: p.providerName })}
           </a>
-        </Show>
-        <button
-          type="button"
-          class="btn btn--primary btn--sm"
-          style="margin-left: auto;"
-          onClick={p.onRetry}
-        >
+        ) : null}
+        <Button size="sm" className="ml-auto" onClick={p.onRetry}>
           {t('common.retry')}
-        </button>
+        </Button>
       </div>
     </div>
   );
-};
+}
 
 /* ── Docker caveat with GUI/CLI tabs ──────────────── */
 
-const DockerCaveat: Component<{ hint: LocalServerHint; errorMsg: string }> = (p) => {
-  const [hostResource] = createResource(() => checkLocalLlmHost());
-  const showCaveat = () => !!p.hint.dockerBindNote && hostResource() === 'host.docker.internal';
-  const bindCommand = () => p.hint.dockerBindCommand ?? p.hint.setupCommand;
-  const [copied, setCopied] = createSignal(false);
-  const [activeTab, setActiveTab] = createSignal<'gui' | 'cli'>('gui');
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(bindCommand());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error(t('providerSetup.local.copyFailed'));
-    }
-  };
+function DockerCaveat(p: { hint: LocalServerHint; errorMsg: string }) {
+  const [activeTab, setActiveTab] = useState<'gui' | 'cli'>('gui');
+  const bindCommand = p.hint.dockerBindCommand ?? p.hint.setupCommand;
+  const guiFix = p.hint.dockerGuiFix;
 
   return (
-    <Show when={showCaveat()}>
-      <div
-        class="provider-detail__caveat"
-        style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));"
-      >
-        {/* Alert cards: overview of both problems */}
-        <div style="margin-bottom: 14px; display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--radius);">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            style="flex-shrink: 0; margin-top: 1px;"
-          >
-            <path d="M20.17 9.82a5 5 0 0 0-.84.07 3.12 3.12 0 0 0-1.43-2.14l-.28-.16-.19.27a3.7 3.7 0 0 0-.51 1.19 2.84 2.84 0 0 0 .33 2.22 4.1 4.1 0 0 1-1.45.35H2.63a.63.63 0 0 0-.63.62 9.6 9.6 0 0 0 .58 3.39 5 5 0 0 0 2 2.6 8.86 8.86 0 0 0 4.42.95 13.3 13.3 0 0 0 2.42-.18 10.1 10.1 0 0 0 3.19-1.15A8.9 8.9 0 0 0 16.78 16a12 12 0 0 0 2.13-3.67h.19a3.08 3.08 0 0 0 2.23-.84 2.36 2.36 0 0 0 .59-.87l.08-.22-.2-.16a2.7 2.7 0 0 0-1.63-.42" />
-            <path d="M5.61 9.35H3.85a.16.16 0 0 0-.16.15v1.58a.16.16 0 0 0 .16.15h1.76a.16.16 0 0 0 .16-.15V9.5a.16.16 0 0 0-.16-.15m2.44 0H6.28a.16.16 0 0 0-.16.15v1.58a.16.16 0 0 0 .16.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15m2.47 0H8.75a.15.15 0 0 0-.15.15v1.58a.15.15 0 0 0 .15.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15m.67 0a.15.15 0 0 0-.19.15v1.58a.15.15 0 0 0 .15.15H13a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15zM6.28 7.09H8a.16.16 0 0 1 .16.16v1.56A.16.16 0 0 1 8 9H6.28a.15.15 0 0 1-.15-.15V7.24a.15.15 0 0 1 .15-.15m2.47 0h1.77a.15.15 0 0 1 .15.15v1.57a.16.16 0 0 1-.16.16H8.75a.15.15 0 0 1-.15-.15V7.24a.15.15 0 0 1 .15-.15m2.44 0H13a.15.15 0 0 1 .15.15v1.57A.15.15 0 0 1 13 9h-1.81a.16.16 0 0 1-.19-.19V7.24a.15.15 0 0 1 .19-.15" />
-            <rect width="2.07" height="1.88" x="11.04" y="4.82" rx=".15" />
-            <path d="M13.65 9.35a.15.15 0 0 0-.15.15v1.58a.15.15 0 0 0 .15.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15z" />
-          </svg>
-          <span>{p.hint.dockerBindNote}</span>
-        </div>
-
-        <div style="margin-bottom: 20px; display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); white-space: pre-line;">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            style="flex-shrink: 0; margin-top: 1px;"
-          >
-            <g fill="currentColor" opacity="0.4">
-              <path d="m19,3H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-            </g>
-            <g fill="currentColor" opacity="1">
-              <path d="m19,13H5c-1.65,0-3,1.35-3,3v2c0,1.65,1.35,3,3,3h14c1.65,0,3-1.35,3-3v-2c0-1.65-1.35-3-3-3Zm1,5c0,.55-.45,1-1,1H5c-.55,0-1-.45-1-1v-2c0-.55.45-1,1-1h14c.55,0,1,.45,1,1v2Z" />
-              <path d="M18 16A1 1 0 1 0 18 18 1 1 0 1 0 18 16z" />
-              <path d="M15 16A1 1 0 1 0 15 18 1 1 0 1 0 15 16z" />
-              <path d="M18 6A1 1 0 1 0 18 8 1 1 0 1 0 18 6z" />
-              <path d="M15 6A1 1 0 1 0 15 8 1 1 0 1 0 15 6z" />
-            </g>
-          </svg>
-          {p.errorMsg}
-        </div>
-
-        {/* Step 1: Running Thinker in Docker */}
-        <div style="font-size: var(--font-size-sm); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 12px;">
-          {t('providerSetup.local.dockerStep')}
-        </div>
-
-        {/* Tabs: GUI / CLI */}
-        <Show when={p.hint.dockerGuiFix}>
-          <div class="panel__tabs" style="margin-bottom: 12px; width: 100%;">
-            <button
-              type="button"
-              class="panel__tab"
-              classList={{ 'panel__tab--active': activeTab() === 'gui' }}
-              onClick={() => setActiveTab('gui')}
-              style="flex: 1;"
-            >
-              GUI
-            </button>
-            <button
-              type="button"
-              class="panel__tab"
-              classList={{ 'panel__tab--active': activeTab() === 'cli' }}
-              onClick={() => setActiveTab('cli')}
-              style="flex: 1;"
-            >
-              CLI
-            </button>
-          </div>
-
-          {/* GUI tab content */}
-          <Show when={activeTab() === 'gui'}>
-            <div style="margin-bottom: 16px; color: hsl(var(--foreground)); font-size: var(--font-size-sm);">
-              {p.hint.dockerGuiFix}
-            </div>
-          </Show>
-        </Show>
-
-        {/* CLI tab content (also shown when no GUI fix available) */}
-        <Show when={activeTab() === 'cli' || !p.hint.dockerGuiFix}>
-          <div style="position: relative; margin-bottom: 16px;">
-            <pre style="margin: 0; padding: 10px 40px 10px 12px; background: hsl(var(--muted)); border-radius: var(--radius); font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); white-space: pre-wrap; word-break: break-all;">
-              {bindCommand()}
-            </pre>
-            <button
-              type="button"
-              onClick={copy}
-              title={copied() ? t('providerSetup.local.copiedBang') : t('common.copy')}
-              aria-label={copied() ? t('common.copied') : t('providerSetup.local.copyCommand')}
-              style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; border-radius: var(--radius);"
-            >
-              <Show
-                when={!copied()}
-                fallback={
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                }
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              </Show>
-            </button>
-          </div>
-        </Show>
-
-        <Show when={p.hint.persistsBindAcrossLaunches}>
-          <div style="margin-bottom: 20px; font-size: var(--font-size-xs);">
-            {t('providerSetup.local.onlyOnce')}
-          </div>
-        </Show>
+    <div className="provider-detail__caveat flex flex-col gap-3 text-sm text-dim">
+      {/* Alert cards: overview of both problems */}
+      <div className="notice is-info">
+        <Container aria-hidden="true" />
+        <span>{p.hint.dockerBindNote}</span>
       </div>
-    </Show>
-  );
-};
+      <div className="notice whitespace-pre-line">
+        <Server aria-hidden="true" />
+        <span>{p.errorMsg}</span>
+      </div>
 
-export default LocalServerDetailView;
+      {/* Step 1: Running Thinker in Docker */}
+      <div className="text-sm font-semibold text-ink">{t('providerSetup.local.dockerStep')}</div>
+
+      {/* Tabs: GUI / CLI */}
+      {guiFix ? (
+        <>
+          <div className="segmented w-full">
+            {(['gui', 'cli'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className="flex-1"
+                aria-pressed={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+              >
+                {/* i18n-ignore: interface names */}
+                {tab === 'gui' ? 'GUI' : 'CLI'}
+              </button>
+            ))}
+          </div>
+          {activeTab === 'gui' ? <div className="text-sm text-ink">{guiFix}</div> : null}
+        </>
+      ) : null}
+
+      {/* CLI tab content (also shown when no GUI fix available) */}
+      {activeTab === 'cli' || !guiFix ? <CommandBlock command={bindCommand} ariaLabel /> : null}
+
+      {p.hint.persistsBindAcrossLaunches ? (
+        <div className="text-xs">{t('providerSetup.local.onlyOnce')}</div>
+      ) : null}
+    </div>
+  );
+}

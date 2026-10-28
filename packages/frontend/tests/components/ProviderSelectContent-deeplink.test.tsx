@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../src/services/api.js', () => ({
   connectProvider: vi.fn(),
@@ -46,15 +46,15 @@ describe('ProviderSelectContent — providerDeepLink', () => {
   });
 
   it('opens directly to the provider detail view when providerDeepLink is set', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         providerDeepLink={{ providerId: 'anthropic' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // The detail view should be visible (provider-modal__view--from-right)
     const detailView = container.querySelector('.provider-modal__view--from-right');
     expect(detailView).not.toBeNull();
@@ -63,15 +63,15 @@ describe('ProviderSelectContent — providerDeepLink', () => {
   });
 
   it('shows the correct provider name in the detail view', () => {
-    render(() => (
+    render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         providerDeepLink={{ providerId: 'anthropic' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(screen.getByText('Anthropic')).toBeDefined();
   });
 
@@ -80,15 +80,15 @@ describe('ProviderSelectContent — providerDeepLink', () => {
     // views. A deep-link entry has no list to go back to, so the Back button
     // calls onClose (dismissing the modal) instead of returning to a list.
     const onClose = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         providerDeepLink={{ providerId: 'gemini' }}
         onUpdate={onUpdate}
         onClose={onClose}
-      />
-    ));
+      />,
+    );
     // Should start in detail view
     expect(container.querySelector('.provider-modal__view--from-right')).not.toBeNull();
 
@@ -104,49 +104,49 @@ describe('ProviderSelectContent — providerDeepLink', () => {
   });
 
   it('renders no detail view when providerDeepLink is null', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         providerDeepLink={null}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Without a deep link there is nothing to render — the list view is gone.
     expect(container.querySelector('.provider-modal__view--from-right')).toBeNull();
   });
 
   it('renders no detail view when providerDeepLink is undefined', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Without a deep link there is nothing to render — the list view is gone.
     expect(container.querySelector('.provider-modal__view--from-right')).toBeNull();
   });
 
   it('opens detail view for gemini with correct auth type', () => {
-    render(() => (
+    render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
         providerDeepLink={{ providerId: 'gemini' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(screen.getByText('Google')).toBeDefined();
   });
 
   it('opens the custom-provider editor for a custom: deep link', async () => {
     // A `custom:<id>` deep link cannot resolve to a standard provider; the modal
     // must open the custom-provider editor for the matching custom provider.
-    render(() => (
+    render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
@@ -154,8 +154,8 @@ describe('ProviderSelectContent — providerDeepLink', () => {
         providerDeepLink={{ providerId: 'custom:cp-1', authType: 'api_key' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     await waitFor(() => expect(screen.getByText('Edit custom provider')).toBeDefined());
     // The provider list view is not shown.
     expect(screen.queryByText('Connect providers')).toBeNull();
@@ -164,27 +164,25 @@ describe('ProviderSelectContent — providerDeepLink', () => {
   it('resolves a custom: deep link once its custom providers load asynchronously', async () => {
     // The custom provider list can arrive after the modal mounts (resource still
     // resolving). The effect-based opener fires once the matching id appears.
-    const [providersList, setProvidersList] = (await import('solid-js')).createSignal<
-      CustomProviderData[]
-    >([]);
-    render(() => (
+    const view = (customProviders: CustomProviderData[]) => (
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
-        customProviders={providersList()}
+        customProviders={customProviders}
         providerDeepLink={{ providerId: 'custom:cp-1' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
       />
-    ));
+    );
+    const { rerender } = render(view([]));
     // Initially no match → the editor has not opened yet.
     expect(screen.queryByText('Edit custom provider')).toBeNull();
-    setProvidersList([customProvider]);
+    rerender(view([customProvider]));
     await waitFor(() => expect(screen.getByText('Edit custom provider')).toBeDefined());
   });
 
   it('opens no editor for a custom: deep link with no matching provider', () => {
-    render(() => (
+    render(
       <ProviderSelectContent
         agentName="test-agent"
         providers={[]}
@@ -192,8 +190,8 @@ describe('ProviderSelectContent — providerDeepLink', () => {
         providerDeepLink={{ providerId: 'custom:missing' }}
         onUpdate={onUpdate}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // No custom provider matches → the editor never opens (nothing renders).
     expect(screen.queryByText('Edit custom provider')).toBeNull();
   });

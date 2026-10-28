@@ -2,16 +2,13 @@
  * Verifies the LIVE-UPDATE requirement: the provider pages' usage resource
  * must re-fetch when the SSE ping signals change, so a newly ingested message
  * (analyticsPing) or a provider connect/disconnect/rename (routingPing) refreshes
- * the stats. We back the ping
- * mocks with real Solid signals and assert the usage endpoint is re-invoked
- * when either bumps; config (the cheap endpoint) must NOT re-fetch on pings.
+ * the stats. The ping mocks are real signals and the test asserts the usage
+ * endpoint is re-invoked when either bumps; config (the cheap endpoint) must
+ * NOT re-fetch on pings.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, render, waitFor } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
-
-const [analyticsPingSig, setAnalyticsPing] = createSignal(0);
-const [routingPingSig, setRoutingPing] = createSignal(0);
+import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 const mocks = vi.hoisted(() => ({
   getGlobalProviders: vi.fn(),
@@ -21,12 +18,6 @@ const mocks = vi.hoisted(() => ({
   getCustomProviders: vi.fn(),
 }));
 
-vi.mock('@solidjs/meta', () => ({ Title: () => null }));
-vi.mock('@solidjs/router', () => ({
-  useNavigate: () => vi.fn(),
-  useSearchParams: () => [{}, vi.fn()],
-}));
-
 vi.mock('../../src/services/api/providers.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/services/api/providers')>(
     '../../src/services/api/providers',
@@ -34,7 +25,7 @@ vi.mock('../../src/services/api/providers.js', async () => {
   return {
     getProviders: (...a: unknown[]) => mocks.getGlobalProviders(...a),
     getProviderUsage: (...a: unknown[]) => mocks.getProviderUsage(...a),
-    connectionUsage: () => Promise.resolve([]),
+    connectionUsage: () => undefined,
     mergeUsage: actual.mergeUsage,
   };
 });
@@ -49,10 +40,10 @@ vi.mock('../../src/services/api/routing.js', () => ({
   renameProviderKey: vi.fn(),
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  analyticsPing: () => analyticsPingSig(),
-  routingPing: () => routingPingSig(),
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { analyticsPing: signal(0), routingPing: signal(0) };
+});
 
 vi.mock('../../src/components/ProviderIcon.jsx', () => ({
   providerIcon: () => null,
@@ -60,11 +51,12 @@ vi.mock('../../src/components/ProviderIcon.jsx', () => ({
 vi.mock('../../src/components/Sparkline.jsx', () => ({ default: () => null }));
 
 import Byok from '../../src/pages/providers/Byok';
+import { analyticsPing, routingPing } from '../../src/services/sse';
 
 describe('provider usage live updates', () => {
   beforeEach(() => {
-    setAnalyticsPing(0);
-    setRoutingPing(0);
+    analyticsPing.set(0);
+    routingPing.set(0);
     mocks.getGlobalProviders.mockResolvedValue({
       providers: [
         {
@@ -100,17 +92,21 @@ describe('provider usage live updates', () => {
   });
 
   it('re-fetches usage on analyticsPing and routingPing, but not config', async () => {
-    render(() => <Byok />);
+    render(
+      <MemoryRouter>
+        <Byok />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => expect(mocks.getProviderUsage).toHaveBeenCalledTimes(1));
     expect(mocks.getGlobalProviders).toHaveBeenCalledTimes(1);
 
     // Coalesced message activity bumps analyticsPing → usage refetch.
-    setAnalyticsPing(1);
+    act(() => analyticsPing.set(1));
     await waitFor(() => expect(mocks.getProviderUsage).toHaveBeenCalledTimes(2));
 
     // A provider change bumps routingPing → usage refetch.
-    setRoutingPing(1);
+    act(() => routingPing.set(1));
     await waitFor(() => expect(mocks.getProviderUsage).toHaveBeenCalledTimes(3));
 
     // Config is the cheap endpoint; pings must not trigger it.

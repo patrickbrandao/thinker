@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@solidjs/testing-library';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 const mockNavigate = vi.fn();
 
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<typeof import('react-router')>()),
   useNavigate: () => mockNavigate,
-  useSearchParams: () => [{ name: 'Groq', baseUrl: 'https://api.groq.com/v1', apiKey: 'sk-test', models: 'llama-3.1' }],
 }));
+
+const DEFAULT_SEARCH =
+  '?name=Groq&baseUrl=https%3A%2F%2Fapi.groq.com%2Fv1&apiKey=sk-test&models=llama-3.1';
+
+const renderPage = (search = DEFAULT_SEARCH) =>
+  render(
+    <MemoryRouter initialEntries={[`/connect-provider${search}`]}>
+      <Routes>
+        <Route path="/connect-provider" element={<ConnectProvider />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 
 const mockGetAgents = vi.fn();
 const mockCreateAgent = vi.fn();
@@ -30,7 +43,7 @@ describe('ConnectProvider', () => {
   it('redirects to routing page when exactly one agent exists', async () => {
     mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'my-agent' }] });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
@@ -51,7 +64,7 @@ describe('ConnectProvider', () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     mockCreateAgent.mockResolvedValue({ agent: { name: 'my-agent' } });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({ name: 'my-agent' });
@@ -73,7 +86,7 @@ describe('ConnectProvider', () => {
       ],
     });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Select a harness')).toBeDefined();
@@ -91,7 +104,7 @@ describe('ConnectProvider', () => {
       ],
     });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Agent One')).toBeDefined();
@@ -107,7 +120,7 @@ describe('ConnectProvider', () => {
 
   it('shows spinner while loading', () => {
     mockGetAgents.mockReturnValue(new Promise(() => {})); // never resolves
-    const { container } = render(() => <ConnectProvider />);
+    const { container } = renderPage();
     expect(container.querySelector('.spinner')).not.toBeNull();
   });
 
@@ -115,7 +128,7 @@ describe('ConnectProvider', () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     mockCreateAgent.mockReturnValue(new Promise(() => {})); // never resolves
 
-    const { container } = render(() => <ConnectProvider />);
+    const { container } = renderPage();
 
     await waitFor(() => {
       expect(container.querySelector('.spinner')).not.toBeNull();
@@ -126,7 +139,7 @@ describe('ConnectProvider', () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     mockCreateAgent.mockRejectedValue(new Error('fail'));
 
-    const { container } = render(() => <ConnectProvider />);
+    const { container } = renderPage();
 
     await waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalled();
@@ -135,13 +148,10 @@ describe('ConnectProvider', () => {
 
   it('falls back to agent_name when display_name is missing', async () => {
     mockGetAgents.mockResolvedValue({
-      agents: [
-        { agent_name: 'raw-name-1' },
-        { agent_name: 'raw-name-2' },
-      ],
+      agents: [{ agent_name: 'raw-name-1' }, { agent_name: 'raw-name-2' }],
     });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('raw-name-1')).toBeDefined();
@@ -153,7 +163,7 @@ describe('ConnectProvider', () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     mockCreateAgent.mockResolvedValue({ agent: {} });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
@@ -167,7 +177,7 @@ describe('ConnectProvider', () => {
     mockGetAgents.mockResolvedValue({});
     mockCreateAgent.mockResolvedValue({ agent: { name: 'my-agent' } });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalled();
@@ -181,13 +191,9 @@ describe('ConnectProvider with provider deep-link', () => {
   });
 
   it('preserves provider param in redirect URL', async () => {
-    // Re-mock useSearchParams with a provider param
-    const routerMock = await import('@solidjs/router');
-    (routerMock as Record<string, unknown>).useSearchParams = () => [{ provider: 'anthropic' }];
-
     mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'my-agent' }] });
 
-    render(() => <ConnectProvider />);
+    renderPage('?provider=anthropic');
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
@@ -211,7 +217,7 @@ describe('ConnectProvider agent name URL encoding', () => {
     const unsafeName = 'test/agent?id=1&x=2#frag';
     mockGetAgents.mockResolvedValue({ agents: [{ agent_name: unsafeName }] });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalled();
@@ -235,7 +241,7 @@ describe('ConnectProvider agent name URL encoding', () => {
       ],
     });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Tricky')).toBeDefined();
@@ -252,7 +258,7 @@ describe('ConnectProvider agent name URL encoding', () => {
     const unicodeName = 'test-🤖-агент';
     mockGetAgents.mockResolvedValue({ agents: [{ agent_name: unicodeName }] });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalled();
@@ -270,7 +276,7 @@ describe('ConnectProvider agent name URL encoding', () => {
     const unsafeName = 'a/b?c=d&e=f#g';
     mockGetAgents.mockResolvedValue({ agents: [{ agent_name: unsafeName }] });
 
-    render(() => <ConnectProvider />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalled();

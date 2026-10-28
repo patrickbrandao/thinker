@@ -1,12 +1,5 @@
-import {
-  Show,
-  createSignal,
-  createMemo,
-  createEffect,
-  type Component,
-  type Accessor,
-  type Setter,
-} from 'solid-js';
+import { useEffect, useState } from 'react';
+import { ChevronLeft, ExternalLink, ListPlus, RefreshCw } from 'lucide-react';
 import { PROVIDERS } from '../services/providers.js';
 import { providerIcon } from './ProviderIcon.js';
 import {
@@ -25,20 +18,23 @@ import OAuthDetailView from './OAuthDetailView.js';
 import AnthropicOAuthDetailView from './AnthropicOAuthDetailView.js';
 import DeviceCodeDetailView from './DeviceCodeDetailView.js';
 import { getRoutingProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
+import { Badge, Button, cx } from './ui.js';
+
+type SetValue<T> = (value: T) => void;
 
 export interface ProviderDetailViewProps {
   provId: string;
   agentName: string;
   providers: RoutingProvider[];
-  selectedAuthType: Accessor<AuthType>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
-  keyInput: Accessor<string>;
-  setKeyInput: Setter<string>;
-  editing: Accessor<boolean>;
-  setEditing: Setter<boolean>;
-  validationError: Accessor<string | null>;
-  setValidationError: Setter<string | null>;
+  selectedAuthType: AuthType;
+  busy: boolean;
+  setBusy: SetValue<boolean>;
+  keyInput: string;
+  setKeyInput: SetValue<string>;
+  editing: boolean;
+  setEditing: SetValue<boolean>;
+  validationError: string | null;
+  setValidationError: SetValue<string | null>;
   onBack: () => void;
   onUpdate: () => void | Promise<void>;
   onPollProviders?: () => void | Promise<void>;
@@ -46,94 +42,78 @@ export interface ProviderDetailViewProps {
   initialAddKey?: boolean;
 }
 
-const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
+const Spinner = () => <span className="spinner" aria-hidden="true" />;
+
+export default function ProviderDetailView(props: ProviderDetailViewProps) {
   const provDef = PROVIDERS.find((p) => p.id === props.provId)!;
+  const authType = props.selectedAuthType;
+  const busy = props.busy;
 
-  const getProviderByAuth = (authType: AuthType) =>
-    props.providers.find((p) => p.provider === props.provId && p.auth_type === authType);
+  const getProviderByAuth = (at: AuthType) =>
+    props.providers.find((p) => p.provider === props.provId && p.auth_type === at);
 
-  const isConnectedApiKey = (): boolean => {
-    const p = getProviderByAuth('api_key');
-    return !!p && p.is_active && p.has_api_key;
-  };
+  const apiKeyRow = getProviderByAuth('api_key');
+  const subRow = getProviderByAuth('subscription');
+  const isConnectedApiKey = !!apiKeyRow && apiKeyRow.is_active && apiKeyRow.has_api_key;
+  const isSubscriptionConnected = !!subRow && subRow.is_active;
+  const isSubscriptionWithToken = !!subRow && subRow.is_active && subRow.has_api_key;
+  const isNoKeyConnected = !!apiKeyRow && apiKeyRow.is_active && !!provDef.noKeyRequired;
 
-  const isSubscriptionConnected = (): boolean => {
-    const p = getProviderByAuth('subscription');
-    return !!p && p.is_active;
-  };
-
-  const isSubscriptionWithToken = (): boolean => {
-    const p = getProviderByAuth('subscription');
-    return !!p && p.is_active && p.has_api_key;
-  };
-
-  const isNoKeyConnected = (): boolean => {
-    const p = getProviderByAuth('api_key');
-    return !!p && p.is_active && !!provDef.noKeyRequired;
-  };
-
-  const getKeyPrefixDisplay = (authType: AuthType): string => {
-    const p = getProviderByAuth(authType);
+  const getKeyPrefixDisplay = (at: AuthType): string => {
+    const p = getProviderByAuth(at);
     if (p?.key_prefix) return `${p.key_prefix}${'•'.repeat(8)}`;
     return '••••••••••••';
   };
 
-  const isSubMode = () => props.selectedAuthType() === 'subscription';
-  const subscriptionAuthMode = () =>
+  const isSubMode = authType === 'subscription';
+  const subscriptionAuthMode =
     provDef.subscriptionAuthMode ?? (provDef.subscriptionKeyPlaceholder ? 'token' : undefined);
-  const isPopupOAuthFlow = () => isSubMode() && subscriptionAuthMode() === 'popup_oauth';
-  const isPopupPasteFlow = () => isSubMode() && subscriptionAuthMode() === 'popup_paste';
-  const isDeviceCodeFlow = () => isSubMode() && subscriptionAuthMode() === 'device_code';
-  const isCommandOnly = () =>
-    isSubMode() &&
+  const isPopupOAuthFlow = isSubMode && subscriptionAuthMode === 'popup_oauth';
+  const isPopupPasteFlow = isSubMode && subscriptionAuthMode === 'popup_paste';
+  const isDeviceCodeFlow = isSubMode && subscriptionAuthMode === 'device_code';
+  const isCommandOnly =
+    isSubMode &&
     !!provDef.subscriptionCommand &&
     !provDef.subscriptionKeyPlaceholder &&
-    !subscriptionAuthMode();
-  const connected = () =>
-    isSubMode()
-      ? isCommandOnly()
-        ? isSubscriptionConnected()
-        : subscriptionAuthMode() === 'token'
-          ? isSubscriptionWithToken()
-          : isSubscriptionConnected()
-      : isConnectedApiKey() || isNoKeyConnected();
-  const isOllama = provDef.noKeyRequired;
+    !subscriptionAuthMode;
+  const connected = isSubMode
+    ? isCommandOnly
+      ? isSubscriptionConnected
+      : subscriptionAuthMode === 'token'
+        ? isSubscriptionWithToken
+        : isSubscriptionConnected
+    : isConnectedApiKey || isNoKeyConnected;
+  const isOllama = !!provDef.noKeyRequired;
 
-  const [addKeyOpen, setAddKeyOpen] = createSignal(false);
+  const [addKeyOpen, setAddKeyOpen] = useState(false);
 
-  createEffect(() => {
+  useEffect(() => {
     if (props.initialAddKey) setAddKeyOpen(true);
-  });
+  }, [props.initialAddKey]);
 
-  const supportsMultiKey = () => props.selectedAuthType() !== 'local';
+  const supportsMultiKey = authType !== 'local';
 
-  const activeKeys = createMemo(() =>
-    props.providers.filter(
-      (p) =>
-        p.provider === props.provId &&
-        p.auth_type === props.selectedAuthType() &&
-        p.is_active &&
-        p.has_api_key,
-    ),
+  const activeKeys = props.providers.filter(
+    (p) => p.provider === props.provId && p.auth_type === authType && p.is_active && p.has_api_key,
   );
 
   // Closed providers keep existing connections manageable but take no new ones.
-  const subscriptionClosed = () => isSubMode() && !!provDef.subscriptionClosedNote;
-  const showConnectFlow = () => !subscriptionClosed() || connected();
+  const subscriptionClosed = isSubMode && !!provDef.subscriptionClosedNote;
+  const showConnectFlow = !subscriptionClosed || connected;
 
-  const showAddKeyButton = () =>
-    connected() &&
-    !subscriptionClosed() &&
-    supportsMultiKey() &&
-    activeKeys().length < MAX_KEYS_PER_PROVIDER &&
-    !addKeyOpen();
+  const showAddKeyButton =
+    connected &&
+    !subscriptionClosed &&
+    supportsMultiKey &&
+    activeKeys.length < MAX_KEYS_PER_PROVIDER &&
+    !addKeyOpen;
 
   const handleOllamaConnect = async () => {
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
         provider: props.provId,
-        authType: props.selectedAuthType(),
+        authType: authType,
       });
       toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
       props.onBack();
@@ -145,24 +125,19 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
     }
   };
 
-  const [refreshing, setRefreshing] = createSignal(false);
-  const [refreshedModelCount, setRefreshedModelCount] = createSignal<number | null>(null);
-  const [refreshedAt, setRefreshedAt] = createSignal<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshedModelCount, setRefreshedModelCount] = useState<number | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
-  const activeProviderRow = () => getProviderByAuth(props.selectedAuthType());
-  const modelCount = () => refreshedModelCount() ?? activeProviderRow()?.cached_model_count ?? 0;
-  const lastFetchedAgo = () =>
-    formatTimeAgo(refreshedAt() ?? activeProviderRow()?.models_fetched_at ?? null);
+  const activeProviderRow = getProviderByAuth(authType);
+  const modelCount = refreshedModelCount ?? activeProviderRow?.cached_model_count ?? 0;
+  const lastFetchedAgo = formatTimeAgo(refreshedAt ?? activeProviderRow?.models_fetched_at ?? null);
 
   const handleRefreshModels = async () => {
     setRefreshing(true);
     let refreshed = false;
     try {
-      const result = await refreshProviderModels(
-        props.agentName,
-        props.provId,
-        props.selectedAuthType(),
-      );
+      const result = await refreshProviderModels(props.agentName, props.provId, authType);
       if (result.ok) {
         refreshed = true;
         setRefreshedModelCount(result.model_count);
@@ -188,11 +163,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
   const handleDisconnect = async () => {
     props.setBusy(true);
     try {
-      const result = await disconnectProvider(
-        props.agentName,
-        props.provId,
-        props.selectedAuthType(),
-      );
+      const result = await disconnectProvider(props.agentName, props.provId, authType);
       if (result?.notifications?.length) {
         for (const msg of result.notifications) {
           toast.error(msg);
@@ -207,329 +178,219 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
     }
   };
 
-  return (
-    <div class="provider-detail">
-      {/* Back arrow */}
-      <button
-        class="modal-back-btn"
-        onClick={props.onBack}
-        aria-label={t('providerSetup.shared.backToProviders')}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="M14.71 7.29a.996.996 0 0 0-1.41 0l-4 4a.996.996 0 0 0 0 1.41l4 4c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41L11.43 12l3.29-3.29a.996.996 0 0 0 0-1.41Z" />
-        </svg>
-      </button>
+  const disconnectButton = (
+    <Button
+      variant="ghost"
+      block
+      className="provider-detail__disconnect mt-4"
+      disabled={busy}
+      onClick={handleDisconnect}
+    >
+      {busy ? <Spinner /> : t('providerSetup.shared.disconnect')}
+    </Button>
+  );
 
-      {/* Title */}
-      <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 15px;">
-        <div>
-          <div class="routing-modal__title">{t('providerSetup.shared.connectProvider')}</div>
-        </div>
+  // Flow views share the same connection state; built once, passed to each.
+  const flowProps = {
+    provDef,
+    provId: props.provId,
+    agentName: props.agentName,
+    connected,
+    selectedAuthType: props.selectedAuthType,
+    busy: props.busy,
+    setBusy: props.setBusy,
+    onBack: props.onBack,
+    onUpdate: props.onUpdate,
+    onClose: props.onClose,
+    addKeyOpen,
+    setAddKeyOpen,
+    activeKeys,
+  };
+
+  const apiKeyUrl = getRoutingProviderApiKeyUrl(props.provId);
+
+  return (
+    <div className="provider-detail flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="modal-back-btn icon-btn"
+          onClick={props.onBack}
+          aria-label={t('providerSetup.shared.backToProviders')}
+          title={t('providerSetup.shared.backToProviders')}
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+        </button>
+        <h2 className="text-[15px] font-semibold text-ink">
+          {t('providerSetup.shared.connectProvider')}
+        </h2>
       </div>
 
       {/* Provider row */}
-      <div class="provider-detail__header" style="justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="provider-detail__icon">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center">
             {providerIcon(props.provId, 28) ?? (
               <span
-                class="provider-card__logo-letter"
-                style={{
-                  background: provDef.color,
-                  width: '32px',
-                  height: '32px',
-                  'font-size': '13px',
-                }}
+                className="flex h-8 w-8 items-center justify-center rounded-control bg-s3 text-[13px] font-semibold text-ink"
+                aria-hidden="true"
               >
                 {provDef.initial}
               </span>
             )}
           </span>
-          <div class="provider-detail__name">
+          <div className="flex items-center gap-2 truncate text-base font-semibold text-ink">
             {provDef.name}
-            <Show when={provDef.beta}>
-              <span class="provider-detail__beta-badge">{t('providerSetup.shared.beta')}</span>
-            </Show>
+            {provDef.beta ? <Badge tone="accent">{t('providerSetup.shared.beta')}</Badge> : null}
           </div>
         </div>
-        <div class="provider-detail__header-actions">
-          <Show when={showAddKeyButton()}>
-            <button
-              type="button"
-              class="btn btn--sm"
-              style="background: hsl(var(--foreground)); color: hsl(var(--background)); border: none; font-size: var(--font-size-xs); display: inline-flex; align-items: center; gap: 4px;"
-              onClick={() => setAddKeyOpen(true)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M4 11h11v2H4zm0-5h16v2H4zm0 10h8v2H4zm15-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" />
-              </svg>
-              {isSubMode()
-                ? t('providerSetup.shared.addConnection')
-                : t('providerSetup.shared.addAnotherKey')}
-            </button>
-          </Show>
-        </div>
+        {showAddKeyButton ? (
+          <Button size="sm" onClick={() => setAddKeyOpen(true)}>
+            <ListPlus size={14} aria-hidden="true" />
+            {isSubMode
+              ? t('providerSetup.shared.addConnection')
+              : t('providerSetup.shared.addAnotherKey')}
+          </Button>
+        ) : null}
       </div>
 
-      <Show when={subscriptionClosed()}>
-        <p class="provider-detail__hint" role="note">
+      {subscriptionClosed ? (
+        <p className="notice is-warn text-sm" role="note">
           {provDef.subscriptionClosedNote}
         </p>
-      </Show>
+      ) : null}
 
-      <Show when={isSubMode() && provDef.subscriptionRequirementNote}>
-        <p style="font-size: 14px; color: hsl(var(--muted-foreground)); margin: 0 0 12px; line-height: 1.5;">
-          {provDef.subscriptionRequirementNote}
-        </p>
-      </Show>
+      {isSubMode && provDef.subscriptionRequirementNote ? (
+        <p className="m-0 text-sm text-muted">{provDef.subscriptionRequirementNote}</p>
+      ) : null}
 
-      <Show when={connected()}>
-        <div class="provider-detail__models-bar">
+      {connected ? (
+        <div className="provider-detail__models-bar flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-sunken px-3 py-2 text-xs text-muted">
           <span>
-            {t('providerSetup.detail.models', modelCount())}
-            <Show when={lastFetchedAgo()}>
-              {(ago) => t('providerSetup.detail.lastRefreshed', { ago: ago() })}
-            </Show>
+            {t('providerSetup.detail.models', modelCount)}
+            {lastFetchedAgo
+              ? t('providerSetup.detail.lastRefreshed', { ago: lastFetchedAgo })
+              : null}
           </span>
-          <button
-            class="btn btn--outline btn--sm provider-detail__refresh-btn"
-            disabled={refreshing() || props.busy()}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="provider-detail__refresh-btn"
+            disabled={refreshing || busy}
             onClick={handleRefreshModels}
             aria-label={t('providerSetup.detail.refreshModelsFrom', { name: provDef.name })}
             title={t('providerSetup.detail.refreshModelsFrom', { name: provDef.name })}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-              classList={{ 'provider-detail__refresh-icon--spinning': refreshing() }}
-            >
-              <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
-              <path d="M21 3v5h-5" />
-            </svg>
-            {refreshing()
+            <RefreshCw size={14} aria-hidden="true" className={cx(refreshing && 'animate-spin')} />
+            {refreshing
               ? t('providerSetup.detail.refreshing')
               : t('providerSetup.detail.refreshModels')}
-          </button>
+          </Button>
         </div>
-      </Show>
+      ) : null}
 
       {/* Subscription sign-in URL instruction (token mode with external sign-in) */}
-      <Show when={showConnectFlow() && isSubMode() && provDef.subscriptionSignInUrl}>
-        <p class="provider-detail__hint">
-          {provDef.subscriptionSignInHint ??
-            t('providerSetup.detail.signInHint', { name: provDef.name })}
-        </p>
-        <a
-          class="btn btn--primary btn--sm provider-detail__signin-btn"
-          href={provDef.subscriptionSignInUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t('providerSetup.detail.opensNewTab', {
-            label: provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn'),
-          })}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+      {showConnectFlow && isSubMode && provDef.subscriptionSignInUrl ? (
+        <>
+          <p className="hint m-0">
+            {provDef.subscriptionSignInHint ??
+              t('providerSetup.detail.signInHint', { name: provDef.name })}
+          </p>
+          <a
+            className="btn btn-sm provider-detail__signin-btn self-start"
+            href={provDef.subscriptionSignInUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t('providerSetup.detail.opensNewTab', {
+              label: provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn'),
+            })}
           >
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-          {provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn')}
-        </a>
-      </Show>
+            <ExternalLink size={14} aria-hidden="true" />
+            {provDef.subscriptionSignInLabel ?? t('providerSetup.detail.signIn')}
+          </a>
+        </>
+      ) : null}
 
       {/* Subscription terminal instruction */}
-      <Show when={showConnectFlow() && isSubMode() && provDef.subscriptionCommand}>
-        <p class="provider-detail__hint">
-          {isCommandOnly()
-            ? t('providerSetup.detail.runCommandLogin')
-            : t('providerSetup.detail.runCommandPaste')}
-        </p>
-        <div class="modal-terminal">
-          <div class="modal-terminal__header">
-            <div class="modal-terminal__dots">
-              <span class="modal-terminal__dot modal-terminal__dot--red" />
-              <span class="modal-terminal__dot modal-terminal__dot--yellow" />
-              <span class="modal-terminal__dot modal-terminal__dot--green" />
-            </div>
-            <div class="modal-terminal__tabs">
-              <span class="modal-terminal__tab modal-terminal__tab--active">
-                {t('providerSetup.detail.terminal')}
-              </span>
-            </div>
+      {showConnectFlow && isSubMode && provDef.subscriptionCommand ? (
+        <>
+          <p className="hint m-0">
+            {isCommandOnly
+              ? t('providerSetup.detail.runCommandLogin')
+              : t('providerSetup.detail.runCommandPaste')}
+          </p>
+          <div
+            className="code-block relative"
+            aria-label={t('providerSetup.detail.terminal')}
+            role="group"
+          >
+            <CopyButton text={provDef.subscriptionCommand} className="absolute right-1 top-1" />
+            <pre className="code whitespace-pre-wrap break-all pr-10">
+              <span className="select-none text-faint">$ </span>
+              <span>{provDef.subscriptionCommand}</span>
+            </pre>
           </div>
-          <div class="modal-terminal__body">
-            <CopyButton text={provDef.subscriptionCommand!} />
-            <div>
-              <span class="modal-terminal__prompt">$</span>
-              <span class="modal-terminal__code">{provDef.subscriptionCommand}</span>
-            </div>
-          </div>
-        </div>
-      </Show>
+        </>
+      ) : null}
 
       {/* Command-only subscription */}
-      <Show when={showConnectFlow() && isCommandOnly()}>
-        <p class="provider-detail__hint" style="margin-top: 16px;">
-          {t('providerSetup.detail.browserWillOpen')}
-        </p>
-        <Show when={connected()}>
-          <button
-            class="btn btn--outline provider-detail__action provider-detail__disconnect"
-            disabled={props.busy()}
-            onClick={handleDisconnect}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.shared.disconnect')}
-            </Show>
-          </button>
-        </Show>
-        <Show when={!connected()}>
-          <button class="btn btn--primary provider-detail__action" onClick={props.onBack}>
-            {t('common.done')}
-          </button>
-        </Show>
-      </Show>
+      {showConnectFlow && isCommandOnly ? (
+        <>
+          <p className="hint m-0">{t('providerSetup.detail.browserWillOpen')}</p>
+          {connected ? (
+            disconnectButton
+          ) : (
+            <Button block className="mt-4" onClick={props.onBack}>
+              {t('common.done')}
+            </Button>
+          )}
+        </>
+      ) : null}
 
       {/* OAuth subscription */}
-      <Show when={showConnectFlow() && isPopupOAuthFlow()}>
-        <OAuthDetailView
-          provDef={provDef}
-          provId={props.provId}
-          agentName={props.agentName}
-          connected={connected}
-          selectedAuthType={props.selectedAuthType}
-          busy={props.busy}
-          setBusy={props.setBusy}
-          onBack={props.onBack}
-          onUpdate={props.onUpdate}
-          onPollProviders={props.onPollProviders}
-          onClose={props.onClose}
-          addKeyOpen={addKeyOpen}
-          setAddKeyOpen={setAddKeyOpen}
-          activeKeys={activeKeys}
-        />
-      </Show>
+      {showConnectFlow && isPopupOAuthFlow ? (
+        <OAuthDetailView {...flowProps} onPollProviders={props.onPollProviders} />
+      ) : null}
 
       {/* Paste-code OAuth subscription (Anthropic) */}
-      <Show when={showConnectFlow() && isPopupPasteFlow()}>
-        <AnthropicOAuthDetailView
-          provDef={provDef}
-          provId={props.provId}
-          agentName={props.agentName}
-          connected={connected}
-          selectedAuthType={props.selectedAuthType}
-          busy={props.busy}
-          setBusy={props.setBusy}
-          onBack={props.onBack}
-          onUpdate={props.onUpdate}
-          onClose={props.onClose}
-          addKeyOpen={addKeyOpen}
-          setAddKeyOpen={setAddKeyOpen}
-          activeKeys={activeKeys}
-        />
-      </Show>
+      {showConnectFlow && isPopupPasteFlow ? <AnthropicOAuthDetailView {...flowProps} /> : null}
 
       {/* Device-code subscription */}
-      <Show when={showConnectFlow() && isDeviceCodeFlow()}>
-        <DeviceCodeDetailView
-          provDef={provDef}
-          provId={props.provId}
-          agentName={props.agentName}
-          connected={connected}
-          selectedAuthType={props.selectedAuthType}
-          busy={props.busy}
-          setBusy={props.setBusy}
-          onBack={props.onBack}
-          onUpdate={props.onUpdate}
-          onClose={props.onClose}
-          addKeyOpen={addKeyOpen}
-          setAddKeyOpen={setAddKeyOpen}
-          activeKeys={activeKeys}
-        />
-      </Show>
+      {showConnectFlow && isDeviceCodeFlow ? <DeviceCodeDetailView {...flowProps} /> : null}
 
       {/* Ollama (no key) */}
-      <Show when={isOllama}>
-        <div class="provider-detail__field">
-          <span class="provider-detail__no-key">{t('providerSetup.detail.noKeyLocal')}</span>
-          <Show when={getRoutingProviderApiKeyUrl(props.provId)}>
-            <a
-              href={getRoutingProviderApiKeyUrl(props.provId)}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="provider-detail__docs-link"
-              style="margin-left: 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));"
-            >
-              {t('providerSetup.shared.getProduct', { name: provDef.name })}
-            </a>
-          </Show>
-        </div>
-        <Show when={!connected()}>
-          <button
-            class="btn btn--primary provider-detail__action"
-            disabled={props.busy()}
-            onClick={handleOllamaConnect}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.shared.connect')}
-            </Show>
-          </button>
-        </Show>
-        <Show when={connected()}>
-          <button
-            class="btn btn--outline provider-detail__action provider-detail__disconnect"
-            disabled={props.busy()}
-            onClick={handleDisconnect}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.shared.disconnect')}
-            </Show>
-          </button>
-        </Show>
-      </Show>
+      {isOllama ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-dim">{t('providerSetup.detail.noKeyLocal')}</span>
+            {apiKeyUrl ? (
+              <a
+                href={apiKeyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-action text-sm"
+              >
+                {t('providerSetup.shared.getProduct', { name: provDef.name })}
+              </a>
+            ) : null}
+          </div>
+          {connected ? (
+            disconnectButton
+          ) : (
+            <Button block className="mt-4" disabled={busy} onClick={handleOllamaConnect}>
+              {busy ? <Spinner /> : t('providerSetup.shared.connect')}
+            </Button>
+          )}
+        </>
+      ) : null}
 
       {/* API key / subscription token form (non-Ollama, non-command-only, non-OAuth) */}
-      <Show
-        when={
-          showConnectFlow() &&
-          !isOllama &&
-          !isCommandOnly() &&
-          !isPopupOAuthFlow() &&
-          !isPopupPasteFlow() &&
-          !isDeviceCodeFlow()
-        }
-      >
+      {showConnectFlow &&
+      !isOllama &&
+      !isCommandOnly &&
+      !isPopupOAuthFlow &&
+      !isPopupPasteFlow &&
+      !isDeviceCodeFlow ? (
         <ProviderKeyForm
           provDef={provDef}
           provId={props.provId}
@@ -552,9 +413,7 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
           onBack={props.onBack}
           onUpdate={props.onUpdate}
         />
-      </Show>
+      ) : null}
     </div>
   );
-};
-
-export default ProviderDetailView;
+}

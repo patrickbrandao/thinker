@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSignal } from 'solid-js';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { useState, type ComponentProps } from 'react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../src/services/api.js', () => {
   const startMinimaxOAuth = vi.fn();
@@ -58,23 +58,40 @@ const mockToast = toast as {
   success: ReturnType<typeof vi.fn>;
 };
 
+type ViewProps = ComponentProps<typeof DeviceCodeDetailView>;
+
+/** Holds busy / addKeyOpen state the way the parent does. */
+function Harness({
+  initialAddKeyOpen,
+  ...props
+}: Omit<ViewProps, 'busy' | 'setBusy' | 'addKeyOpen' | 'setAddKeyOpen'> & {
+  initialAddKeyOpen?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [addKeyOpen, setAddKeyOpen] = useState(initialAddKeyOpen ?? false);
+  return (
+    <DeviceCodeDetailView
+      {...props}
+      busy={busy}
+      setBusy={setBusy}
+      {...(initialAddKeyOpen !== undefined && { addKeyOpen, setAddKeyOpen })}
+    />
+  );
+}
+
 function renderMinimax() {
   const provDef = getProvider('minimax')!;
-  const [busy, setBusy] = createSignal(false);
-  const [authType] = createSignal<AuthType>('subscription');
   const props = {
     provDef,
     provId: 'minimax',
     agentName: 'test-agent',
-    connected: () => false,
-    selectedAuthType: authType,
-    busy,
-    setBusy,
+    connected: false,
+    selectedAuthType: 'subscription' as AuthType,
     onBack: vi.fn(),
     onUpdate: vi.fn(),
     onClose: vi.fn(),
   };
-  const result = render(() => <DeviceCodeDetailView {...props} />);
+  const result = render(<Harness {...props} />);
   return { ...result, props };
 }
 
@@ -92,7 +109,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
   it("rejects a token that doesn't start with sk-cp-", async () => {
     renderMinimax();
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
-    await fireEvent.input(input, { target: { value: 'sk-wrong-token-long-enough' } });
+    await fireEvent.change(input, { target: { value: 'sk-wrong-token-long-enough' } });
     await fireEvent.click(screen.getByText('Connect with token'));
     await waitFor(() => {
       expect(screen.getByText('MiniMax subscription tokens start with "sk-cp-"')).toBeDefined();
@@ -105,7 +122,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
     const { props } = renderMinimax();
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
     const validToken = 'sk-cp-' + 'a'.repeat(40);
-    await fireEvent.input(input, { target: { value: validToken } });
+    await fireEvent.change(input, { target: { value: validToken } });
     await fireEvent.click(screen.getByText('Connect with token'));
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalledWith('test-agent', {
@@ -127,7 +144,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
     await fireEvent.change(regionSelect, { target: { value: 'cn' } });
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
     const validToken = 'sk-cp-' + 'd'.repeat(40);
-    await fireEvent.input(input, { target: { value: validToken } });
+    await fireEvent.change(input, { target: { value: validToken } });
     await fireEvent.click(screen.getByText('Connect with token'));
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalledWith('test-agent', {
@@ -144,7 +161,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
     renderMinimax();
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
     const validToken = 'sk-cp-' + 'b'.repeat(40);
-    await fireEvent.input(input, { target: { value: validToken } });
+    await fireEvent.change(input, { target: { value: validToken } });
     await fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalled();
@@ -162,7 +179,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
     const { props } = renderMinimax();
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
     const validToken = 'sk-cp-' + 'c'.repeat(40);
-    await fireEvent.input(input, { target: { value: validToken } });
+    await fireEvent.change(input, { target: { value: validToken } });
     await fireEvent.click(screen.getByText('Connect with token'));
     await waitFor(() => {
       expect(mockConnectProvider).toHaveBeenCalled();
@@ -175,12 +192,12 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
   it('clears validation error when user edits the input', async () => {
     renderMinimax();
     const input = screen.getByLabelText('MiniMax Coding Plan token') as HTMLInputElement;
-    await fireEvent.input(input, { target: { value: 'bad-prefix-long-enough' } });
+    await fireEvent.change(input, { target: { value: 'bad-prefix-long-enough' } });
     await fireEvent.click(screen.getByText('Connect with token'));
     await waitFor(() => {
       expect(screen.getByText('MiniMax subscription tokens start with "sk-cp-"')).toBeDefined();
     });
-    await fireEvent.input(input, { target: { value: 'sk-cp-fresh' } });
+    await fireEvent.change(input, { target: { value: 'sk-cp-fresh' } });
     expect(screen.queryByText('MiniMax subscription tokens start with "sk-cp-"')).toBeNull();
   });
 });
@@ -207,26 +224,22 @@ function makeKey(overrides: Partial<RoutingProvider> = {}): RoutingProvider {
 
 function renderMultiKeyMinimax(keys: RoutingProvider[]) {
   const provDef = getProvider('minimax')!;
-  const [busy, setBusy] = createSignal(false);
-  const [authType] = createSignal<AuthType>('subscription');
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
-  const result = render(() => (
-    <DeviceCodeDetailView
+  const result = render(
+    <Harness
       provDef={provDef}
       provId="minimax"
       agentName="test-agent"
-      connected={() => true}
-      selectedAuthType={authType}
-      busy={busy}
-      setBusy={setBusy}
+      connected
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-      activeKeys={() => keys}
-    />
-  ));
+      activeKeys={keys}
+    />,
+  );
   return { ...result, onBack, onUpdate, onClose };
 }
 
@@ -252,7 +265,7 @@ describe('DeviceCodeDetailView — multi-key', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old');
-    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.change(input, { target: { value: 'New' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -372,7 +385,7 @@ describe('DeviceCodeDetailView — multi-key', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old');
-    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.change(input, { target: { value: 'New' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -384,31 +397,25 @@ describe('DeviceCodeDetailView — multi-key', () => {
 
 function renderConnectedWithAddKeyOpen() {
   const provDef = getProvider('minimax')!;
-  const [busy, setBusy] = createSignal(false);
-  const [authType] = createSignal<AuthType>('subscription');
-  const [addKeyOpen, setAddKeyOpen] = createSignal(true);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
   const keys = [makeKey()];
-  const result = render(() => (
-    <DeviceCodeDetailView
+  const result = render(
+    <Harness
       provDef={provDef}
       provId="minimax"
       agentName="test-agent"
-      connected={() => true}
-      selectedAuthType={authType}
-      busy={busy}
-      setBusy={setBusy}
+      connected
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-      addKeyOpen={addKeyOpen}
-      setAddKeyOpen={setAddKeyOpen}
-      activeKeys={() => keys}
-    />
-  ));
-  return { ...result, onBack, onUpdate, onClose, setAddKeyOpen };
+      initialAddKeyOpen
+      activeKeys={keys}
+    />,
+  );
+  return { ...result, onBack, onUpdate, onClose };
 }
 
 describe('DeviceCodeDetailView — addKeyOpen effect', () => {
@@ -466,15 +473,15 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
       } as unknown as Window);
 
       renderConnectedWithAddKeyOpen();
-
-      await waitFor(() => {
-        expect(startMinimaxOAuth).toHaveBeenCalledWith('test-agent', { region: 'global' });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
       });
-      await vi.advanceTimersByTimeAsync(2000);
+      expect(startMinimaxOAuth).toHaveBeenCalledWith('test-agent', { region: 'global' });
 
-      await waitFor(() => {
-        expect(screen.getByText('Still waiting for approval')).toBeDefined();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
       });
+      expect(screen.getByText('Still waiting for approval')).toBeDefined();
       openSpy.mockRestore();
     } finally {
       vi.useRealTimers();
@@ -489,7 +496,7 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
 
     const input = await waitFor(() => screen.getByLabelText('MiniMax Coding Plan token'));
     const validToken = 'sk-cp-' + 'e'.repeat(40);
-    fireEvent.input(input, { target: { value: validToken } });
+    fireEvent.change(input, { target: { value: validToken } });
     fireEvent.click(screen.getByText('Connect with token'));
 
     await waitFor(() => {
@@ -511,7 +518,7 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('MiniMax Coding Plan token')).toBeDefined();
     });
-    fireEvent.input(screen.getByLabelText('MiniMax Coding Plan token'), {
+    fireEvent.change(screen.getByLabelText('MiniMax Coding Plan token'), {
       target: { value: 'sk-cp-' + 'f'.repeat(40) },
     });
     fireEvent.click(screen.getByText('Cancel'));
@@ -523,21 +530,17 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
 
 function renderKiro() {
   const provDef = getProvider('kiro')!;
-  const [busy, setBusy] = createSignal(false);
-  const [authType] = createSignal<AuthType>('subscription');
   const props = {
     provDef,
     provId: 'kiro',
     agentName: 'test-agent',
-    connected: () => false,
-    selectedAuthType: authType,
-    busy,
-    setBusy,
+    connected: false,
+    selectedAuthType: 'subscription' as AuthType,
     onBack: vi.fn(),
     onUpdate: vi.fn(),
     onClose: vi.fn(),
   };
-  return { ...render(() => <DeviceCodeDetailView {...props} />), props };
+  return { ...render(<Harness {...props} />), props };
 }
 
 async function selectKiroRegion(value: string) {
@@ -616,7 +619,7 @@ describe('DeviceCodeDetailView — Kiro', () => {
     } as unknown as Window);
 
     renderKiro();
-    fireEvent.input(screen.getByLabelText(/Start URL/), {
+    fireEvent.change(screen.getByLabelText(/Start URL/), {
       target: { value: 'https://org.awsapps.com/start' },
     });
     await selectKiroRegion('eu-west-1');
@@ -666,7 +669,7 @@ describe('DeviceCodeDetailView — Kiro', () => {
     const openSpy = vi.spyOn(window, 'open');
 
     renderKiro();
-    fireEvent.input(screen.getByLabelText(/Start URL/), { target: { value: startUrl } });
+    fireEvent.change(screen.getByLabelText(/Start URL/), { target: { value: startUrl } });
     await selectKiroRegion(region);
     fireEvent.click(screen.getByText('Connect with Kiro'));
 

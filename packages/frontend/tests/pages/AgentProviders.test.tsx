@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetGlobalProviders = vi.fn();
@@ -8,12 +9,20 @@ const mockEnableEnabledProviders = vi.fn();
 const mockDisableEnabledProviders = vi.fn();
 const mockGetCustomProviders = vi.fn();
 
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: 'demo-agent' }),
-  // The empty-state fallback (NoConnectionsPrompt) renders <A> links to the
-  // provider pages, so the router mock must expose A alongside useParams.
-  A: (props: any) => props.children,
+// The empty-state prompt belongs to another area; a stub with its heading is
+// enough to tell the fallback rendered.
+vi.mock('../../src/components/NoConnectionsPrompt.jsx', () => ({
+  default: () => <div>No providers connected</div>,
 }));
+
+const renderPage = () =>
+  render(
+    <MemoryRouter initialEntries={['/harnesses/demo-agent/providers']}>
+      <Routes>
+        <Route path="/harnesses/:agentName/providers" element={<AgentProviders />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 
 vi.mock('../../src/services/api/providers.js', () => ({
   getProviders: (...args: unknown[]) => mockGetGlobalProviders(...args),
@@ -153,7 +162,7 @@ describe('AgentProviders', () => {
   });
 
   it('renders connected global providers with enable toggles', async () => {
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('OpenAI')).toBeDefined();
@@ -181,19 +190,20 @@ describe('AgentProviders', () => {
       ),
     });
 
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByTitle(longLabel)).toBeDefined();
     });
 
-    expect(screen.getByTitle(longLabel).style.textOverflow).toBe('ellipsis');
+    // Tailwind `truncate` = overflow hidden + text-overflow ellipsis + nowrap.
+    expect(screen.getByTitle(longLabel).className.split(' ')).toContain('truncate');
     expect(screen.getByRole('columnheader', { name: 'Models' })).toBeDefined();
     expect(screen.getByText('2')).toBeDefined();
   });
 
   it('enables a provider with PUT', async () => {
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Enable Anthropic Max')).toBeDefined();
@@ -206,7 +216,7 @@ describe('AgentProviders', () => {
   });
 
   it('blocks disabling with an error toast when the provider has routed models', async () => {
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
@@ -241,7 +251,7 @@ describe('AgentProviders', () => {
         { id: 'vm-2', name: 'cheap', agent: 'demo-agent', model: 'gpt-4o', position: 'fallback 2' },
       ],
     });
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
@@ -269,7 +279,7 @@ describe('AgentProviders', () => {
         },
       ],
     });
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
@@ -286,7 +296,7 @@ describe('AgentProviders', () => {
 
   it('disables directly with DELETE when no models are routed', async () => {
     mockGetAgentProviderDisableImpact.mockResolvedValue({ affected_tiers: [] });
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
@@ -301,7 +311,7 @@ describe('AgentProviders', () => {
 
   it('renders an empty state when no active providers exist', async () => {
     mockGetGlobalProviders.mockResolvedValue({ providers: [], model_counts: {} });
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('No providers connected')).toBeDefined();
@@ -313,7 +323,7 @@ describe('AgentProviders', () => {
     mockGetEnabledProviders.mockRejectedValue(new Error('access failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom failed'));
 
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('No providers connected')).toBeDefined();
@@ -322,7 +332,7 @@ describe('AgentProviders', () => {
 
   it('shows an error toast and aborts when the impact check fails', async () => {
     mockGetAgentProviderDisableImpact.mockRejectedValue(new Error('impact failed'));
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disable OpenAI Work')).toBeDefined();
@@ -339,7 +349,7 @@ describe('AgentProviders', () => {
     mockEnableEnabledProviders.mockRejectedValueOnce(new Error('enable failed'));
     mockGetAgentProviderDisableImpact.mockResolvedValue({ affected_tiers: [] });
     mockDisableEnabledProviders.mockRejectedValueOnce(new Error('disable failed'));
-    render(() => <AgentProviders />);
+    renderPage();
 
     await waitFor(() => {
       expect(screen.getByLabelText('Enable Anthropic Max')).toBeDefined();

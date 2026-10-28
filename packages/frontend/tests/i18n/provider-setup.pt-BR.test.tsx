@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
-import { resetLocaleForTests, setLocale } from '../../src/i18n';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { Fragment, useState, type ReactNode } from 'react';
+import { resetLocaleForTests, setLocale, useLocale } from '../../src/i18n';
 import { PROVIDERS } from '../../src/services/providers';
 import type { AuthType } from '../../src/services/api';
 
@@ -27,19 +27,20 @@ import ProviderSubscriptionTab from '../../src/components/ProviderSubscriptionTa
 
 const provDef = (id: string) => PROVIDERS.find((p) => p.id === id)!;
 
-function renderKeyForm(id: string) {
-  const [busy, setBusy] = createSignal(false);
-  const [keyInput, setKeyInput] = createSignal('');
-  const [editing, setEditing] = createSignal(false);
-  const [validationError, setValidationError] = createSignal<string | null>(null);
-  return render(() => (
+/** Holds the state the parent detail view owns. */
+function KeyFormHarness({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  return (
     <ProviderKeyForm
       provDef={provDef(id)}
       provId={id}
       agentName="demo"
-      isSubMode={() => false}
-      connected={() => false}
-      selectedAuthType={() => 'api_key' as AuthType}
+      isSubMode={false}
+      connected={false}
+      selectedAuthType={'api_key' as AuthType}
       busy={busy}
       setBusy={setBusy}
       keyInput={keyInput}
@@ -53,7 +54,17 @@ function renderKeyForm(id: string) {
       onBack={vi.fn()}
       onUpdate={vi.fn()}
     />
-  ));
+  );
+}
+
+/** The app remounts its tree on a language change; mirror that here. */
+function RemountOnLocale({ children }: { children: ReactNode }) {
+  const locale = useLocale();
+  return <Fragment key={locale}>{children}</Fragment>;
+}
+
+function renderKeyForm(id: string) {
+  return render(<KeyFormHarness id={id} />);
 }
 
 describe('provider setup in pt-BR', () => {
@@ -69,7 +80,7 @@ describe('provider setup in pt-BR', () => {
     expect(screen.getByText('Obter chave de API de OpenAI')).toBeDefined();
 
     const input = screen.getByLabelText('OpenAI: chave de API') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'nope' } });
+    fireEvent.change(input, { target: { value: 'nope' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByText('As chaves do OpenAI começam com "sk-"')).toBeDefined();
   });
@@ -82,23 +93,25 @@ describe('provider setup in pt-BR', () => {
   });
 
   it('renders the subscription tab and switches language live', () => {
-    const { container } = render(() => (
-      <ProviderSubscriptionTab
-        busy={() => false}
-        isSubscriptionConnected={() => false}
-        isSubscriptionWithToken={() => false}
-        onOpenDetail={vi.fn()}
-        onAddKey={vi.fn()}
-        onToggle={vi.fn()}
-        subscriptionProviders={[provDef('anthropic'), provDef('kiro')]}
-      />
-    ));
+    const { container } = render(
+      <RemountOnLocale>
+        <ProviderSubscriptionTab
+          busy={false}
+          isSubscriptionConnected={() => false}
+          isSubscriptionWithToken={() => false}
+          onOpenDetail={vi.fn()}
+          onAddKey={vi.fn()}
+          onToggle={vi.fn()}
+          subscriptionProviders={[provDef('anthropic'), provDef('kiro')]}
+        />
+      </RemountOnLocale>,
+    );
     expect(container.textContent).toContain('Use a assinatura ou o plano pago');
     expect(screen.getByText('Assinatura Claude Max / Pro')).toBeDefined();
     expect(screen.getByText('Assinatura Kiro')).toBeDefined();
     expect(screen.getByText('Guia de provedores por assinatura')).toBeDefined();
 
-    setLocale('en', { persist: false });
+    act(() => setLocale('en', { persist: false }));
     expect(screen.getByText('Claude Max / Pro subscription')).toBeDefined();
     expect(screen.getByText('Subscription provider guide')).toBeDefined();
   });

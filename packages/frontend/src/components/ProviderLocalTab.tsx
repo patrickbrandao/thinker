@@ -1,4 +1,4 @@
-import { For, type Accessor, type Component } from 'solid-js';
+import type { MouseEvent } from 'react';
 import {
   CANONICAL_LOCAL_IDS,
   SHARED_PROVIDER_BY_ID_OR_ALIAS,
@@ -9,6 +9,7 @@ import { customProviderColor } from '../services/formatters.js';
 import type { ProviderDef } from '../services/providers.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { t } from '../i18n/index.js';
+import { LetterBadge, ToggleSwitch, toggleRowClass } from './ProviderApiKeyTab.js';
 
 const resolveCanonicalId = (name: string): string | null => {
   const shared =
@@ -38,129 +39,121 @@ interface Props {
    * `providerKey` matches the argument to `isConnected()`.
    */
   onToggle: (providerKey: string) => void | Promise<void>;
-  busy: Accessor<boolean>;
+  busy: boolean;
   onOpenDetail: (provId: string, authType: AuthType) => void;
   onEditCustom: (cp: CustomProviderData) => void;
   onOpenLocalServer: (prov: ProviderDef) => void;
 }
 
-const ProviderLocalTab: Component<Props> = (props) => {
-  const mergedProviders = (): ListItem[] => {
-    const customs = props.customProviders ?? [];
-    const claimed = new Set<string>();
-    for (const cp of customs) {
-      const id = resolveCanonicalId(cp.name);
-      if (id) claimed.add(id);
-    }
-    const standards: ListItem[] = props.localProviders
-      .filter((prov) => !claimed.has(prov.id))
-      .map((prov) => ({ kind: 'standard', prov }));
-    // Only surface custom providers that resolve to a canonical local tile
-    // (LM Studio, Ollama named). Freeform custom providers stay on the API
-    // Keys tab since we don't know they point at localhost.
-    const customItems: ListItem[] = customs
-      .filter((cp) => resolveCanonicalId(cp.name) !== null)
-      .map((cp) => ({ kind: 'custom', cp }));
-    return [...standards, ...customItems].sort((a, b) => {
-      const nameA = a.kind === 'standard' ? a.prov.name : a.cp.name;
-      const nameB = b.kind === 'standard' ? b.prov.name : b.cp.name;
-      return nameA.localeCompare(nameB);
-    });
-  };
+export default function ProviderLocalTab(props: Props) {
+  const customs = props.customProviders ?? [];
+  const claimed = new Set<string>();
+  for (const cp of customs) {
+    const id = resolveCanonicalId(cp.name);
+    if (id) claimed.add(id);
+  }
+  const standards: ListItem[] = props.localProviders
+    .filter((prov) => !claimed.has(prov.id))
+    .map((prov) => ({ kind: 'standard', prov }));
+  // Only surface custom providers that resolve to a canonical local tile
+  // (LM Studio, Ollama named). Freeform custom providers stay on the API
+  // Keys tab since we don't know they point at localhost.
+  const customItems: ListItem[] = customs
+    .filter((cp) => resolveCanonicalId(cp.name) !== null)
+    .map((cp) => ({ kind: 'custom', cp }));
+  const merged = [...standards, ...customItems].sort((a, b) => {
+    const nameA = a.kind === 'standard' ? a.prov.name : a.cp.name;
+    const nameB = b.kind === 'standard' ? b.prov.name : b.cp.name;
+    return nameA.localeCompare(nameB);
+  });
 
   return (
     <>
-      <div class="provider-modal__tab-hint">{t('providerSetup.tabs.localHint')}</div>
-      <div class="provider-modal__list">
-        <For each={mergedProviders()}>
-          {(item) => {
-            if (item.kind === 'custom') {
-              const cp = item.cp;
-              const providerKey = `custom:${cp.id}`;
-              const connected = () => props.isConnected(providerKey);
-              const handleClick = () => {
-                props.onEditCustom(cp);
-              };
-              const handleToggle = (e: MouseEvent) => {
-                e.stopPropagation();
-                if (connected()) {
-                  props.onToggle(providerKey);
-                } else {
-                  props.onEditCustom(cp);
-                }
-              };
-              return (
-                <button class="provider-toggle" disabled={props.busy()} onClick={handleClick}>
-                  <span class="provider-toggle__icon">
-                    {customProviderLogo(cp.name, 20, cp.base_url) ?? (
-                      <span
-                        class="provider-card__logo-letter"
-                        style={{ background: customProviderColor(cp.name) }}
-                      >
-                        {cp.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </span>
-                  <span class="provider-toggle__info">
-                    <span class="provider-toggle__name">{cp.name}</span>
-                  </span>
-                  <span
-                    class="provider-toggle__switch"
-                    classList={{ 'provider-toggle__switch--on': connected() }}
-                    onClick={handleToggle}
-                  >
-                    <span class="provider-toggle__switch-thumb" />
-                  </span>
-                </button>
-              );
-            }
-
-            const prov = item.prov;
-            const connected = () => props.isConnected(prov.id);
-            const hasLocalPort = () => prov.defaultLocalPort !== undefined;
-
-            const handleClick = () => {
-              if (hasLocalPort()) {
-                props.onOpenLocalServer(prov);
-                return;
-              }
-              props.onOpenDetail(prov.id, 'local');
-            };
+      <p className="provider-modal__tab-hint mb-3 text-sm text-muted">
+        {t('providerSetup.tabs.localHint')}
+      </p>
+      <div className="provider-modal__list flex flex-col gap-1.5">
+        {merged.map((item) => {
+          if (item.kind === 'custom') {
+            const cp = item.cp;
+            const providerKey = `custom:${cp.id}`;
+            const connected = props.isConnected(providerKey);
             const handleToggle = (e: MouseEvent) => {
               e.stopPropagation();
-              if (connected()) {
-                props.onToggle(prov.id);
+              if (connected) {
+                void props.onToggle(providerKey);
               } else {
-                handleClick();
+                props.onEditCustom(cp);
               }
             };
-
             return (
-              <button class="provider-toggle" disabled={props.busy()} onClick={handleClick}>
-                <span class="provider-toggle__icon">
-                  {providerIcon(prov.id, 20) ?? (
-                    <span class="provider-card__logo-letter" style={{ background: prov.color }}>
-                      {prov.initial}
-                    </span>
+              <button
+                key={providerKey}
+                type="button"
+                className={toggleRowClass}
+                disabled={props.busy}
+                onClick={() => props.onEditCustom(cp)}
+              >
+                <span className="provider-toggle__icon inline-flex size-5 shrink-0 items-center justify-center">
+                  {customProviderLogo(cp.name, 20, cp.base_url) ?? (
+                    <LetterBadge color={customProviderColor(cp.name)}>
+                      {cp.name.charAt(0).toUpperCase()}
+                    </LetterBadge>
                   )}
                 </span>
-                <span class="provider-toggle__info">
-                  <span class="provider-toggle__name">{prov.name}</span>
+                <span className="provider-toggle__info min-w-0 flex-1">
+                  <span className="provider-toggle__name block truncate text-sm font-medium text-ink">
+                    {cp.name}
+                  </span>
                 </span>
-                <span
-                  class="provider-toggle__switch"
-                  classList={{ 'provider-toggle__switch--on': connected() }}
-                  onClick={handleToggle}
-                >
-                  <span class="provider-toggle__switch-thumb" />
-                </span>
+                <ToggleSwitch on={connected} onClick={handleToggle} />
               </button>
             );
-          }}
-        </For>
+          }
+
+          const prov = item.prov;
+          const connected = props.isConnected(prov.id);
+          const hasLocalPort = prov.defaultLocalPort !== undefined;
+
+          const handleClick = () => {
+            if (hasLocalPort) {
+              props.onOpenLocalServer(prov);
+              return;
+            }
+            props.onOpenDetail(prov.id, 'local');
+          };
+          const handleToggle = (e: MouseEvent) => {
+            e.stopPropagation();
+            if (connected) {
+              void props.onToggle(prov.id);
+            } else {
+              handleClick();
+            }
+          };
+
+          return (
+            <button
+              key={prov.id}
+              type="button"
+              className={toggleRowClass}
+              disabled={props.busy}
+              onClick={handleClick}
+            >
+              <span className="provider-toggle__icon inline-flex size-5 shrink-0 items-center justify-center">
+                {providerIcon(prov.id, 20) ?? (
+                  <LetterBadge color={prov.color}>{prov.initial}</LetterBadge>
+                )}
+              </span>
+              <span className="provider-toggle__info min-w-0 flex-1">
+                <span className="provider-toggle__name block truncate text-sm font-medium text-ink">
+                  {prov.name}
+                </span>
+              </span>
+              <ToggleSwitch on={connected} onClick={handleToggle} />
+            </button>
+          );
+        })}
       </div>
     </>
   );
-};
-
-export default ProviderLocalTab;
+}

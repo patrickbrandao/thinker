@@ -1,5 +1,5 @@
-import { useParams } from '@solidjs/router';
-import { createResource, createSignal, For, Show, type Component } from 'solid-js';
+import { useState } from 'react';
+import { useParams } from 'react-router';
 import {
   disableProviderForAgent,
   enableProviderForAgent,
@@ -13,11 +13,12 @@ import { PROVIDERS } from '../services/providers.js';
 import { toast } from '../services/toast-store.js';
 import { t, tMaybe } from '../i18n/index.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
-import { roleCan } from '../services/session-store.js';
-import { customProviderColor } from '../services/formatters.js';
+import { me, roleCan } from '../services/session-store.js';
 import { providerIcon } from '../components/ProviderIcon.jsx';
 import NoConnectionsPrompt from '../components/NoConnectionsPrompt.jsx';
-import '../styles/routing.css';
+import { Switch, cx } from '../components/ui.js';
+import { useResource } from '../lib/use-resource.js';
+import { useSignal } from '../lib/signal.js';
 
 interface AgentProviderConnection {
   userProviderId: string;
@@ -27,61 +28,56 @@ interface AgentProviderConnection {
   models: number;
 }
 
-const AgentProviders: Component = () => {
+export default function AgentProviders() {
+  useSignal(me);
   const params = useParams<{ agentName: string }>();
-  const agentName = () => decodeURIComponent(params.agentName);
+  const agentName = decodeURIComponent(params.agentName ?? '');
 
-  const [providers] = createResource(async () => {
+  const providers = useResource(async () => {
     try {
       return (await getGlobalProviders()).providers;
     } catch {
       return [];
     }
-  });
+  }, []);
 
-  const [access, { refetch: refetchAccess }] = createResource(
-    () => agentName(),
-    async (name) => {
-      try {
-        return new Set((await getEnabledProviders(name)).enabled);
-      } catch {
-        return new Set<string>();
-      }
-    },
-  );
-
-  const [customProviders] = createResource(
-    () => agentName(),
-    (name) => getCustomProviders(name).catch(() => []),
-  );
-
-  const connections = (): AgentProviderConnection[] => {
-    const rows: AgentProviderConnection[] = [];
-    for (const provider of providers() ?? []) {
-      for (const connection of provider.connections) {
-        if (!connection.is_active) continue;
-        rows.push({
-          userProviderId: connection.id,
-          provider: provider.provider,
-          authType: provider.auth_type,
-          label: connection.label,
-          models: connection.cached_model_count || provider.total_models,
-        });
-      }
+  const access = useResource(async () => {
+    try {
+      return new Set((await getEnabledProviders(agentName)).enabled);
+    } catch {
+      return new Set<string>();
     }
-    return rows;
-  };
+  }, [agentName]);
 
-  const [busy, setBusy] = createSignal<string | null>(null);
+  const customProviders = useResource(
+    () => getCustomProviders(agentName).catch(() => []),
+    [agentName],
+  );
 
-  const isEnabled = (userProviderId: string) => access()?.has(userProviderId) ?? false;
+  const connections: AgentProviderConnection[] = [];
+  for (const provider of providers.data ?? []) {
+    for (const connection of provider.connections) {
+      if (!connection.is_active) continue;
+      connections.push({
+        userProviderId: connection.id,
+        provider: provider.provider,
+        authType: provider.auth_type,
+        label: connection.label,
+        models: connection.cached_model_count || provider.total_models,
+      });
+    }
+  }
+
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const isEnabled = (userProviderId: string) => access.data?.has(userProviderId) ?? false;
 
   const providerName = (providerId: string) => {
     const known = PROVIDERS.find((provider) => provider.id === providerId);
     if (known) return known.name;
     if (providerId.startsWith('custom:')) {
       const customId = providerId.slice('custom:'.length);
-      const custom = (customProviders() ?? []).find((provider) => provider.id === customId);
+      const custom = (customProviders.data ?? []).find((provider) => provider.id === customId);
       if (custom) return custom.name;
     }
     return providerId;
@@ -90,8 +86,8 @@ const AgentProviders: Component = () => {
   const enableConnection = async (userProviderId: string) => {
     setBusy(userProviderId);
     try {
-      await enableProviderForAgent(agentName(), userProviderId);
-      await refetchAccess();
+      await enableProviderForAgent(agentName, userProviderId);
+      await access.reload();
     } catch {
       // fetchMutate already surfaces the toast.
     } finally {
@@ -113,7 +109,7 @@ const AgentProviders: Component = () => {
     // the assignments for them.
     let impact: AgentProviderDisableImpact;
     try {
-      impact = await getAgentProviderDisableImpact(agentName(), connection.userProviderId);
+      impact = await getAgentProviderDisableImpact(agentName, connection.userProviderId);
     } catch {
       setBusy(null);
       toast.error(t('providers.agentAccess.impactCheckFailed'));
@@ -138,8 +134,8 @@ const AgentProviders: Component = () => {
     }
 
     try {
-      await disableProviderForAgent(agentName(), connection.userProviderId);
-      await refetchAccess();
+      await disableProviderForAgent(agentName, connection.userProviderId);
+      await access.reload();
     } catch {
       // fetchMutate already surfaces the toast.
     } finally {
@@ -149,23 +145,21 @@ const AgentProviders: Component = () => {
 
   return (
     <div>
-      <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); margin-bottom: 16px;">
-        {t('providers.agentAccess.intro')}
-      </p>
+      <p className="mb-4 text-sm text-muted">{t('providers.agentAccess.intro')}</p>
 
       <ReadOnlyRegion
         readOnly={!roleCan.manageProviders()}
         notice={t('providers.agentAccess.readOnly')}
       >
-        <Show when={connections().length > 0} fallback={<NoConnectionsPrompt />}>
-          <div class="panel" style="padding: 0; overflow-x: auto;">
-            <table class="data-table" style="min-width: 600px; table-layout: fixed;">
+        {connections.length > 0 ? (
+          <div className="table-wrap">
+            <table className="data min-w-[600px] table-fixed">
               <colgroup>
-                <col style="width: 220px;" />
-                <col style="width: 120px;" />
+                <col className="w-[220px]" />
+                <col className="w-[120px]" />
                 <col />
-                <col style="width: 56px;" />
-                <col style="width: 64px;" />
+                <col className="w-[72px]" />
+                <col className="w-[64px]" />
               </colgroup>
               <thead>
                 <tr>
@@ -177,94 +171,62 @@ const AgentProviders: Component = () => {
                 </tr>
               </thead>
               <tbody>
-                <For each={connections()}>
-                  {(connection) => {
-                    const enabled = () => isEnabled(connection.userProviderId);
-                    const name = () => providerName(connection.provider);
-                    return (
-                      <tr style={{ opacity: enabled() ? '1' : '0.55' }}>
-                        <td>
-                          <span style="display: flex; align-items: center; gap: 10px;">
-                            <Show
-                              when={providerIcon(connection.provider, 20)}
-                              fallback={
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    'align-items': 'center',
-                                    'justify-content': 'center',
-                                    width: '20px',
-                                    height: '20px',
-                                    'border-radius': '4px',
-                                    'font-size': '11px',
-                                    'font-weight': '600',
-                                    color: 'white',
-                                    background: customProviderColor(name()),
-                                  }}
-                                >
-                                  {name().charAt(0).toUpperCase()}
-                                </span>
-                              }
-                            >
-                              <span style="display: flex; align-items: center; width: 20px; height: 20px;">
-                                {providerIcon(connection.provider, 20)}
-                              </span>
-                            </Show>
-                            <span style="font-weight: 500;">{name()}</span>
-                          </span>
-                        </td>
-                        <td>
-                          <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                            {tMaybe(`providers.authBadge.${connection.authType}`) ??
-                              connection.authType}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            title={connection.label}
-                            style={{
-                              display: 'block',
-                              overflow: 'hidden',
-                              'text-overflow': 'ellipsis',
-                              color: 'hsl(var(--muted-foreground))',
-                            }}
-                          >
-                            {connection.label}
-                          </span>
-                        </td>
-                        <td>{connection.models || '-'}</td>
-                        <td style="text-align: right;">
-                          <button
-                            class="routing-switch"
-                            classList={{ 'routing-switch--on': enabled() }}
-                            disabled={busy() === connection.userProviderId}
-                            aria-label={t(
-                              enabled()
-                                ? 'providers.agentAccess.disableAria'
-                                : 'providers.agentAccess.enableAria',
-                              {
-                                name: name(),
-                                label: connection.label,
-                              },
-                            )}
-                            onClick={() => void handleToggle(connection)}
-                          >
-                            <span class="routing-switch__track">
-                              <span class="routing-switch__thumb" />
+                {connections.map((connection) => {
+                  const enabled = isEnabled(connection.userProviderId);
+                  const name = providerName(connection.provider);
+                  const icon = providerIcon(connection.provider, 20);
+                  return (
+                    <tr key={connection.userProviderId} className={cx(!enabled && 'opacity-55')}>
+                      <td>
+                        <span className="flex items-center gap-2.5">
+                          {icon ? (
+                            <span className="flex size-5 shrink-0 items-center">{icon}</span>
+                          ) : (
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-accent-tint text-[11px] font-semibold text-accent">
+                              {name.charAt(0).toUpperCase()}
                             </span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  }}
-                </For>
+                          )}
+                          <span className="row-title truncate">{name}</span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="text-xs text-muted">
+                          {tMaybe(`providers.authBadge.${connection.authType}`) ??
+                            connection.authType}
+                        </span>
+                      </td>
+                      <td>
+                        <span title={connection.label} className="block truncate text-muted">
+                          {connection.label}
+                        </span>
+                      </td>
+                      <td className="num">{connection.models || '-'}</td>
+                      <td className="row-actions">
+                        <Switch
+                          checked={enabled}
+                          disabled={busy === connection.userProviderId}
+                          label={t(
+                            enabled
+                              ? 'providers.agentAccess.disableAria'
+                              : 'providers.agentAccess.enableAria',
+                            {
+                              name,
+                              label: connection.label,
+                            },
+                          )}
+                          onChange={() => void handleToggle(connection)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </Show>
+        ) : (
+          <NoConnectionsPrompt />
+        )}
       </ReadOnlyRegion>
     </div>
   );
-};
-
-export default AgentProviders;
+}
