@@ -443,7 +443,6 @@ describe('MessagesQueryService request-first queries', () => {
       error_class: 'rate_limit',
       routing_tier: 'balanced',
       specificity_category: 'specific',
-      header_tier_id: 'tier-1',
       triggers: ['none'],
       cursor: '2026-07-14T13:00:00Z|r-3',
       cost_min: 1,
@@ -469,7 +468,6 @@ describe('MessagesQueryService request-first queries', () => {
         expect.stringContaining('filtered_attempt.service_type = :requestServiceType'),
         expect.stringContaining('filtered_attempt.routing_tier = :requestTier'),
         expect.stringContaining('filtered_attempt.specificity_category = :requestSpecificity'),
-        expect.stringContaining('filtered_attempt.header_tier_id IN (:...requestHeaderTiers)'),
         expect.stringContaining('NOT EXISTS'),
       ]),
     );

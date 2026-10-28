@@ -59,16 +59,9 @@ interface MessagesData {
   provider_labels?: Record<string, string>;
 }
 
-interface HeaderTierFilterOption {
-  name: string;
-  /** Every custom-tier id this option covers — same name on several harnesses. */
-  ids: string[];
-}
-
 interface MessageFilterOptionsData {
   providers: string[];
   provider_labels?: Record<string, string>;
-  header_tiers?: HeaderTierFilterOption[];
   /** Every model this tenant has used in range — the Model filter's options. */
   models?: string[];
 }
@@ -82,7 +75,6 @@ interface AgentFilterOption {
 type ParamPatch = Record<string, string | undefined>;
 
 const SPECIFICITY_FILTER_PREFIX = 'specificity:';
-const HEADER_TIER_FILTER_PREFIX = 'header:';
 const MESSAGE_STATUS_FILTERS = ['ok', 'failed', 'cancelled'] as const;
 type MessageStatusFilter = (typeof MESSAGE_STATUS_FILTERS)[number];
 type MessageStatusFilterValue = '' | MessageStatusFilter;
@@ -434,8 +426,6 @@ export default function MessageLog() {
     if (tierFilter) {
       if (tierFilter.startsWith(SPECIFICITY_FILTER_PREFIX)) {
         q.specificity_category = tierFilter.slice(SPECIFICITY_FILTER_PREFIX.length);
-      } else if (tierFilter.startsWith(HEADER_TIER_FILTER_PREFIX)) {
-        q.header_tier_id = tierFilter.slice(HEADER_TIER_FILTER_PREFIX.length);
       } else {
         q.routing_tier = tierFilter;
       }
@@ -590,10 +580,6 @@ export default function MessageLog() {
         value: `${SPECIFICITY_FILTER_PREFIX}${stage.id}`,
       }),
     ),
-    ...(filterOptions?.header_tiers ?? []).map((tier) => ({
-      label: tier.name,
-      value: `${HEADER_TIER_FILTER_PREFIX}${tier.ids.join(',')}`,
-    })),
   ];
 
   /** Resolve provider ID to display name */

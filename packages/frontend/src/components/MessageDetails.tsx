@@ -298,7 +298,6 @@ function DetailsBody({ m }: { m: DetailMessage }) {
             value={
               // The name itself is in "Virtual model" just below.
               (m.virtual_model_name ? t('messages.details.routingVirtualModel') : null) ??
-              m.header_tier_name ??
               (m.specificity_category
                 ? m.specificity_category.replace(/_/g, ' ')
                 : routingTierLabel(m.routing_tier))

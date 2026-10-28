@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@testing-library/react';
+import type React from 'react';
+import { act, render, fireEvent, screen, waitFor } from '@testing-library/react';
 
 const mockList = vi.fn();
 const mockToggle = vi.fn();
@@ -105,13 +106,19 @@ function vm(name: string, id = name, extra: Partial<VirtualModel> = {}): Virtual
   };
 }
 
-function renderSection() {
+let openCreate: (() => void) | undefined;
+
+function renderSection(leading?: React.ReactNode) {
   return render(
     <RoutingVirtualModelsSection
       agentName="demo"
       models={[]}
       customProviders={[]}
       connectedProviders={[]}
+      leading={leading}
+      onCreateRef={(open) => {
+        openCreate = open;
+      }}
     />,
   );
 }
@@ -133,19 +140,20 @@ describe('RoutingVirtualModelsSection', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the empty state and opens the create modal', async () => {
-    mockList.mockResolvedValue([]);
-    renderSection();
-    await screen.findByText('No virtual models yet');
-    expect(screen.getByText('Virtual models')).toBeTruthy();
-    fireEvent.click(screen.getByText('Create virtual model'));
+  it('renders the leading card first and opens the create modal through the opener', async () => {
+    mockList.mockResolvedValue([vm('a', 'vm-a')]);
+    renderSection(<div data-testid="card-auto" />);
+    await screen.findByTestId('card-a');
+    expect(order()).toEqual(['auto', 'a']);
+    act(() => openCreate?.());
     await screen.findByText('creating');
   });
 
   it('opens the example after a create and adds the card', async () => {
     mockList.mockResolvedValue([]);
     renderSection();
-    fireEvent.click(await screen.findByText('Create virtual model'));
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    act(() => openCreate?.());
     fireEvent.click(await screen.findByText('save'));
     await screen.findByTestId('card-created');
     expect(screen.getByTestId('snippet').textContent).toContain('created');

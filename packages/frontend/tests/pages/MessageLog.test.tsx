@@ -1537,30 +1537,22 @@ describe('MessageLog', () => {
       expect(tierSelect.textContent).toContain('Simple');
     });
 
-    it('adds active task-specific categories and defined custom tiers to the tier options', async () => {
+    it('adds active task-specific categories to the tier options', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
       mockGetSpecificityAssignments.mockResolvedValue([
         { category: 'coding', is_active: true },
         { category: 'trading', is_active: false },
       ]);
-      mockGetMessageFilterOptions.mockResolvedValue({
-        providers: ['anthropic'],
-        header_tiers: [
-          { name: 'Premium', ids: ['ht-premium'] },
-          { name: 'Legacy', ids: ['ht-legacy'] },
-        ],
-      });
+      mockGetMessageFilterOptions.mockResolvedValue({ providers: ['anthropic'] });
 
       const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const tierSelect = selectWithOption(container, 'All tiers');
         expect(tierSelect.textContent).toContain('Coding');
-        expect(tierSelect.textContent).toContain('Premium');
       });
 
       const tierSelect = selectWithOption(container, 'All tiers');
       expect(tierSelect.textContent).not.toContain('Trading');
-      expect(tierSelect.textContent).toContain('Legacy');
       expect(tierSelect.textContent).not.toContain('Task:');
       expect(tierSelect.textContent).not.toContain('Custom:');
     });
@@ -1605,82 +1597,6 @@ describe('MessageLog', () => {
         const lastQ = calls[calls.length - 1]?.[0] ?? {};
         expect(lastQ.specificity_category).toBe('coding');
         expect(lastQ.routing_tier).toBeUndefined();
-      });
-    });
-
-    it('lists custom tiers on the global log, where no harness is selected', async () => {
-      mockAgentName = '';
-      mockGetMessages.mockResolvedValue(messagesData);
-      mockGetMessageFilterOptions.mockResolvedValue({
-        providers: ['anthropic'],
-        header_tiers: [{ name: 'Premium', ids: ['ht-premium-a', 'ht-premium-b'] }],
-      });
-
-      const { container } = render(<MessageLog />);
-
-      await vi.waitFor(() => {
-        const tierSelect = selectWithOption(container, 'All tiers');
-        expect(tierSelect.textContent).toContain('Premium');
-      });
-
-      // The regression was the options being fetched per harness: on the
-      // global log that resolved to nothing. Pin the request as unscoped, or
-      // an agent-scoped fetch would satisfy the assertion above.
-      expect(mockGetMessageFilterOptions).toHaveBeenCalled();
-      for (const [query] of mockGetMessageFilterOptions.mock.calls) {
-        expect(query).not.toHaveProperty('agent_name');
-      }
-    });
-
-    it('sends header_tier_id in the query when a custom tier is selected', async () => {
-      mockGetMessages.mockResolvedValue(messagesData);
-      mockGetMessageFilterOptions.mockResolvedValue({
-        providers: ['anthropic'],
-        header_tiers: [{ name: 'Premium', ids: ['ht-premium'] }],
-      });
-
-      const { container } = render(<MessageLog />);
-      await vi.waitFor(() => {
-        expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
-          2,
-        );
-        // A <select> ignores a value it has no option for, so wait for the option.
-        expect(selectWithOption(container, 'All tiers').textContent).toContain('Premium');
-      });
-
-      const tierSelect = selectWithOption(container, 'All tiers');
-      mockGetMessages.mockClear();
-      fireEvent.change(tierSelect, { target: { value: 'header:ht-premium' } });
-
-      await vi.waitFor(() => {
-        const calls = mockGetMessages.mock.calls;
-        const lastQ = calls[calls.length - 1]?.[0] ?? {};
-        expect(lastQ.header_tier_id).toBe('ht-premium');
-        expect(lastQ.routing_tier).toBeUndefined();
-      });
-    });
-
-    it('filters on every harness defining a same-named custom tier', async () => {
-      mockAgentName = '';
-      mockGetMessages.mockResolvedValue(messagesData);
-      mockGetMessageFilterOptions.mockResolvedValue({
-        providers: ['anthropic'],
-        header_tiers: [{ name: 'Premium', ids: ['ht-alpha', 'ht-beta'] }],
-      });
-
-      const { container } = render(<MessageLog />);
-      await vi.waitFor(() => {
-        expect(selectWithOption(container, 'All tiers').textContent).toContain('Premium');
-      });
-
-      const tierSelect = selectWithOption(container, 'All tiers');
-      mockGetMessages.mockClear();
-      fireEvent.change(tierSelect, { target: { value: 'header:ht-alpha,ht-beta' } });
-
-      await vi.waitFor(() => {
-        const calls = mockGetMessages.mock.calls;
-        const lastQ = calls[calls.length - 1]?.[0] ?? {};
-        expect(lastQ.header_tier_id).toBe('ht-alpha,ht-beta');
       });
     });
   });
@@ -1776,13 +1692,10 @@ describe('MessageLog', () => {
       });
     });
 
-    it('loads custom tier options for the selected agent in global mode', async () => {
+    it('loads filter options for the selected agent in global mode', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      mockGetMessageFilterOptions.mockResolvedValue({
-        providers: ['anthropic'],
-        header_tiers: [{ name: 'Premium', ids: ['ht-premium'] }],
-      });
+      mockGetMessageFilterOptions.mockResolvedValue({ providers: ['anthropic'] });
 
       const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
@@ -1801,8 +1714,6 @@ describe('MessageLog', () => {
         expect(mockGetMessageFilterOptions).toHaveBeenCalledWith(
           expect.objectContaining({ agent_name: 'agent-alpha' }),
         );
-        const tierSelect = selectWithOption(container, 'All tiers');
-        expect(tierSelect.textContent).toContain('Premium');
       });
     });
 

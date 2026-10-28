@@ -4,7 +4,6 @@ import { TenantProvider } from '../../../entities/tenant-provider.entity';
 import { TierAssignment } from '../../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
 import { Agent } from '../../../entities/agent.entity';
-import { HeaderTier } from '../../../entities/header-tier.entity';
 import type { Repository } from 'typeorm';
 import type { RoutingCacheService } from '../routing-cache.service';
 import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
@@ -48,7 +47,6 @@ describe('ProviderService — coverage completion', () => {
   let providerRepo: ReturnType<typeof makeRepo>;
   let tierRepo: ReturnType<typeof makeRepo>;
   let specRepo: ReturnType<typeof makeRepo>;
-  let headerTierRepo: ReturnType<typeof makeRepo>;
   let routingCache: {
     invalidateAgent: jest.Mock;
     invalidateTenant: jest.Mock;
@@ -62,7 +60,6 @@ describe('ProviderService — coverage completion', () => {
     providerRepo = makeRepo();
     tierRepo = makeRepo();
     specRepo = makeRepo();
-    headerTierRepo = makeRepo();
     routingCache = {
       invalidateAgent: jest.fn(),
       invalidateTenant: jest.fn(),
@@ -74,7 +71,6 @@ describe('ProviderService — coverage completion', () => {
       tierRepo as unknown as Repository<TierAssignment>,
       specRepo as unknown as Repository<SpecificityAssignment>,
       makeRepo() as unknown as Repository<Agent>,
-      headerTierRepo as unknown as Repository<HeaderTier>,
       { getByModel: jest.fn().mockReturnValue(undefined) } as unknown as ModelPricingCacheService,
       routingCache as unknown as RoutingCacheService,
     );
@@ -129,18 +125,14 @@ describe('ProviderService — coverage completion', () => {
         svc.renameKey('a', 'tenant-1', 'openai', 'api_key', 'Old', 'Taken'),
       ).rejects.toThrow('already exists');
     });
-    it('rewrites pinned fallback routes on specificity and header tiers', async () => {
+    it('rewrites pinned fallback routes on specificity assignments', async () => {
       providerRepo.find.mockResolvedValueOnce([provRow({ id: 't', label: 'Old' })]);
       const match = { ...route('openai', 'gpt-4o'), keyLabel: 'Old' };
       specRepo.find.mockResolvedValueOnce([
         { agent_id: 'agent-1', override_route: null, fallback_routes: [match] },
       ]);
-      headerTierRepo.find.mockResolvedValueOnce([
-        { agent_id: 'agent-1', override_route: null, fallback_routes: [match] },
-      ]);
       await svc.renameKey('agent-1', 'tenant-1', 'openai', 'api_key', 'Old', 'New');
       expect(specRepo.save).toHaveBeenCalled();
-      expect(headerTierRepo.save).toHaveBeenCalled();
     });
   });
 

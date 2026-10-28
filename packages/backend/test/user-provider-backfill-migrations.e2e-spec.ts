@@ -7,6 +7,7 @@ import { TenantProviders1792500000000 } from '../src/database/migrations/1792500
 import { TenantScopedConfigs1792600000000 } from '../src/database/migrations/1792600000000-TenantScopedConfigs';
 import { DropUserScopeFromRouting1792700000000 } from '../src/database/migrations/1792700000000-DropUserScopeFromRouting';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { DropHeaderTiers1804100000000 } from '../src/database/migrations/1804100000000-DropHeaderTiers';
 import { runMessageProviderBackfill } from '../src/database/backfills/backfill-message-providers';
 import { TypeOrmBackfillGateway } from '../src/database/backfills/backfill-message-providers.gateway';
 import { resolveE2eDatabaseUrl } from './e2e-db-guard';
@@ -48,6 +49,9 @@ describe('agent-message attribution backfill after provider lift (e2e)', () => {
     await ds.runMigrations({ transaction: 'each' });
 
     const schemaQr = ds.createQueryRunner();
+    // header_tiers is dropped by a later migration; restore it so the older
+    // routing migrations below can revert against it.
+    await new DropHeaderTiers1804100000000().down(schemaQr);
     await new AddRequestsAndProviderAttempts1801000000000().down(schemaQr);
     await schemaQr.release();
 

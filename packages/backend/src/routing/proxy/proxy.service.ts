@@ -118,9 +118,6 @@ export interface RoutingMeta {
   thinker_error_message?: string;
   auth_type?: AuthType;
   specificity_category?: string;
-  header_tier_id?: string;
-  header_tier_name?: string;
-  header_tier_color?: string;
   /** Virtual model the request named (ADR 0004); stamped on every recorded row. */
   virtual_model_id?: string;
   virtual_model_name?: string;
@@ -204,22 +201,18 @@ export interface ProxyResult {
  * The `agent_model_params` scope of each route of a resolved chain (ADR 0004,
  * section 9). A virtual model carries one scope per route: `virtual:<id>` for
  * its own routes and `tier:default` for the ones appended from the Default
- * tier. Every other origin (tier, specificity, header tier) has one scope for
+ * tier. Every other origin (tier, specificity) has one scope for
  * all of its routes. A route outside the resolved chain (the legacy
  * fallback-inference path) takes the scope of the chain's primary.
  */
 export function paramsScopeLookup(
-  resolved: Pick<
-    ResolvedRouting,
-    'tier' | 'specificity_category' | 'header_tier_id' | 'route_params_scopes'
-  >,
+  resolved: Pick<ResolvedRouting, 'tier' | 'specificity_category' | 'route_params_scopes'>,
 ): (route: ModelRoute | null | undefined) => string {
   const scopes = resolved.route_params_scopes;
   if (!scopes || scopes.length === 0) {
     const scopeKey = modelParamsScopeForRouting({
       tier: resolved.tier,
       specificityCategory: resolved.specificity_category,
-      headerTierId: resolved.header_tier_id,
     });
     return () => scopeKey;
   }
@@ -328,7 +321,6 @@ export class ProxyService {
         resolveRoutingChatBody,
         sessionMomentumKey,
         specificityOverride,
-        headers,
         apiMode,
       ),
     );
@@ -574,10 +566,7 @@ export class ProxyService {
     if (forward.response.ok && stream && forward.response.body) {
       const warmup = await peekStream(
         forward.response.body,
-        streamWarmupMsFor(route.provider, {
-          headerTierMs: resolved.header_tier_stream_warmup_ms,
-          connectionMs: credentials.streamWarmupMs,
-        }),
+        streamWarmupMsFor(route.provider, { connectionMs: credentials.streamWarmupMs }),
       );
       if (warmup.ok) {
         const peeked: ForwardResult = {
@@ -741,12 +730,11 @@ export class ProxyService {
    * Routing precedence for the three proxy surfaces (ADR 0004, section 5):
    *
    * 1. an enabled virtual model whose name equals `model`, ignoring case;
-   * 2. a header tier matching the request headers;
-   * 3. `auto` → automatic routing; a real ID → explicit route; an unknown
+   * 2. `auto` → automatic routing; a real ID → explicit route; an unknown
    *    name → M302.
    *
-   * A heartbeat (`auto` only) skips step 2 and goes straight to the simple
-   * tier, as it always has.
+   * A heartbeat (`auto` only) goes straight to the simple tier, as it always
+   * has.
    */
   /**
    * Context-window aware routing (#134): drops the routes of the resolved
@@ -799,7 +787,6 @@ export class ProxyService {
     resolveChatBody: ResolveChatBody | undefined,
     sessionMomentumKey: string | undefined,
     specificityOverride: ProxyRequestOptions['specificityOverride'],
-    headers: ProxyRequestOptions['headers'],
     apiMode: ProxyApiMode,
   ): Promise<ResolvedRouting> {
     const requestedModel = typeof body.model === 'string' ? body.model : undefined;
@@ -813,12 +800,6 @@ export class ProxyService {
         requestedModel,
       );
       if (virtual) return virtual;
-    }
-
-    const isHeartbeat = isAuto && this.detectHeartbeatBody(body, apiMode);
-    if (headers && !isHeartbeat) {
-      const headerTier = await this.resolveService.resolveHeaderTier(agentId, tenantId, headers);
-      if (headerTier) return headerTier;
     }
 
     // Every public proxy surface treats a concrete model as an explicit route.
@@ -839,7 +820,9 @@ export class ProxyService {
       };
     }
 
-    if (isHeartbeat) return this.resolveService.resolveForTier(agentId, tenantId, 'simple');
+    if (isAuto && this.detectHeartbeatBody(body, apiMode)) {
+      return this.resolveService.resolveForTier(agentId, tenantId, 'simple');
+    }
 
     const recentTiers = sessionMomentumKey
       ? this.momentum.getRecentTiers(sessionMomentumKey)
@@ -872,7 +855,7 @@ export class ProxyService {
   }
 
   /**
-   * Route the `model` a proxy client named in the body. Header tiers were
+   * Route the `model` a proxy client named in the body. Virtual models were
    * already tried by resolveRouting, so a request that reaches this path is
    * routed by its `model` alone.
    *
@@ -1124,7 +1107,6 @@ export class ProxyService {
       providerCacheKey,
       sessionCacheKey,
       args.clientAnthropicBeta,
-      resolved.header_tier_stream_warmup_ms,
     );
 
     this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
@@ -1284,9 +1266,6 @@ export class ProxyService {
       auth_type: resolved.route?.authType,
       specificity_category: resolved.specificity_category,
       provider_key_label: resolved.route?.keyLabel ?? undefined,
-      header_tier_id: resolved.header_tier_id,
-      header_tier_name: resolved.header_tier_name,
-      header_tier_color: resolved.header_tier_color,
       ...virtualModelFields(resolved),
       output_modality: resolved.output_modality,
       response_mode: resolved.response_mode ?? DEFAULT_RESPONSE_MODE,

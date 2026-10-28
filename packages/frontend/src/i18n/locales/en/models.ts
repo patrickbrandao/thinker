@@ -183,18 +183,12 @@ export default {
     default: 'Use one as the model name instead of {{ a }}.',
   },
   section: {
-    title: 'Virtual models',
-    subtitle:
-      'Model names this harness can send in the "model" field, each with its own model and fallbacks. No header needed: they are listed in /v1/models and take precedence over custom tiers.',
     loadFailed: 'Failed to load virtual models',
     isActive: '"{{ name }}" is active',
     isInactive: '"{{ name }}" is inactive',
     deleted: 'Deleted "{{ name }}"',
     created: 'Created "{{ name }}"',
     create: 'Create virtual model',
-    emptyTitle: 'No virtual models yet',
-    emptyDesc:
-      'Create a name such as {{ example }} and pick its models. Clients that only choose a model, like Claude Code or a /v1/models picker, can then use it.',
     reorder: 'Reorder {{ name }}. Drag, or use the arrow keys.',
     dragToReorder: 'Drag to reorder',
   },

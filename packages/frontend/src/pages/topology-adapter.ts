@@ -34,7 +34,7 @@ const providerName = (provider: string, fallback: string) =>
 
 /**
  * Turns the topology API payload into a flow graph:
- * harness (entry) → routing point (hub: auto, virtual model, header tier)
+ * harness (entry) → routing point (hub: auto, virtual model)
  * → provider (item, or group when it has several connections).
  * With `activeOnly`, nodes and links without traffic in the window are left
  * out (a harness stays when any of its routes carried traffic).

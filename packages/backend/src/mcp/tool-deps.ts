@@ -14,7 +14,6 @@ import { ProviderService } from '../routing/routing-core/provider.service';
 import { TierService } from '../routing/routing-core/tier.service';
 import { SpecificityService } from '../routing/routing-core/specificity.service';
 import { ResolveAgentService } from '../routing/routing-core/resolve-agent.service';
-import { HeaderTierService } from '../routing/header-tiers/header-tier.service';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
 import { RouteModelParamsService } from '../routing/model-params/route-model-params.service';
 import { VirtualModelService } from '../routing/virtual-models/virtual-model.service';
@@ -41,7 +40,6 @@ export interface McpToolDeps {
   tiers: TierService;
   specificity: SpecificityService;
   resolveAgent: ResolveAgentService;
-  headerTiers: HeaderTierService;
   virtualModels: VirtualModelService;
   customProviders: CustomProviderService;
   routeModelParams: RouteModelParamsService;

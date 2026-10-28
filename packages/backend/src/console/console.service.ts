@@ -4,13 +4,7 @@ import { DataSource } from 'typeorm';
 import { ERROR_MESSAGE_STATUSES } from '../analytics/services/query-helpers';
 
 export type SearchResultType =
-  | 'harness'
-  | 'connection'
-  | 'custom_provider'
-  | 'virtual_model'
-  | 'header_tier'
-  | 'model'
-  | 'member';
+  'harness' | 'connection' | 'custom_provider' | 'virtual_model' | 'model' | 'member';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -57,58 +51,49 @@ export class ConsoleService {
     const pattern = likePattern(query.slice(0, 100));
     const params = [tenantId, pattern, PER_TYPE_LIMIT];
 
-    const [harnesses, connections, customProviders, virtuals, headerTiers, models, members] =
-      await Promise.all([
-        this.ds.query(
-          `SELECT id, name, display_name, description, agent_platform
+    const [harnesses, connections, customProviders, virtuals, models, members] = await Promise.all([
+      this.ds.query(
+        `SELECT id, name, display_name, description, agent_platform
              FROM agents
             WHERE tenant_id = $1 AND deleted_at IS NULL AND is_playground = false
               AND (name ILIKE $2 OR display_name ILIKE $2 OR description ILIKE $2
                    OR agent_platform ILIKE $2)
             ORDER BY name LIMIT $3`,
-          params,
-        ),
-        this.ds.query(
-          `SELECT id, provider, label, auth_type
+        params,
+      ),
+      this.ds.query(
+        `SELECT id, provider, label, auth_type
              FROM tenant_providers
             WHERE tenant_id = $1 AND (provider ILIKE $2 OR label ILIKE $2)
             ORDER BY provider, label LIMIT $3`,
-          params,
-        ),
-        this.ds.query(
-          `SELECT id, name, alias, base_url
+        params,
+      ),
+      this.ds.query(
+        `SELECT id, name, alias, base_url
              FROM custom_providers
             WHERE tenant_id = $1 AND (name ILIKE $2 OR alias ILIKE $2 OR base_url ILIKE $2)
             ORDER BY name LIMIT $3`,
-          params,
-        ),
-        this.ds.query(
-          `SELECT v.id, v.name, a.name AS agent_name
+        params,
+      ),
+      this.ds.query(
+        `SELECT v.id, v.name, a.name AS agent_name
              FROM virtual_models v JOIN agents a ON a.id = v.agent_id AND a.deleted_at IS NULL
             WHERE v.tenant_id = $1 AND v.name ILIKE $2
             ORDER BY v.name LIMIT $3`,
-          params,
-        ),
-        this.ds.query(
-          `SELECT h.id, h.name, h.header_key, h.header_value, a.name AS agent_name
-             FROM header_tiers h JOIN agents a ON a.id = h.agent_id AND a.deleted_at IS NULL
-            WHERE h.tenant_id = $1
-              AND (h.name ILIKE $2 OR h.header_key ILIKE $2 OR h.header_value ILIKE $2)
-            ORDER BY h.name LIMIT $3`,
-          params,
-        ),
-        this.ds.query(
-          `SELECT DISTINCT ON (m->>'id', tp.provider) tp.id AS connection_id, tp.provider,
+        params,
+      ),
+      this.ds.query(
+        `SELECT DISTINCT ON (m->>'id', tp.provider) tp.id AS connection_id, tp.provider,
                   m->>'id' AS model_id, m->>'displayName' AS display_name
              FROM tenant_providers tp,
                   jsonb_array_elements(COALESCE(NULLIF(tp.cached_models, '')::jsonb, '[]'::jsonb)) m
             WHERE tp.tenant_id = $1 AND tp.is_active = true
               AND (m->>'id' ILIKE $2 OR m->>'displayName' ILIKE $2)
             ORDER BY m->>'id', tp.provider LIMIT $3`,
-          params,
-        ),
-        this.searchMembers(params),
-      ]);
+        params,
+      ),
+      this.searchMembers(params),
+    ]);
 
     return [
       ...harnesses.map(
@@ -150,21 +135,6 @@ export class ConsoleService {
         subtitle: r.agent_name,
         href: harnessHref(r.agent_name, '/routing'),
       })),
-      ...headerTiers.map(
-        (r: {
-          id: string;
-          name: string;
-          header_key: string;
-          header_value: string;
-          agent_name: string;
-        }) => ({
-          type: 'header_tier' as const,
-          id: r.id,
-          title: r.name,
-          subtitle: `${r.agent_name} · ${r.header_key}: ${r.header_value}`,
-          href: harnessHref(r.agent_name, '/routing'),
-        }),
-      ),
       ...models.map(
         (r: {
           connection_id: string;

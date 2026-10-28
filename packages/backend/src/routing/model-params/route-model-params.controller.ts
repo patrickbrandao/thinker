@@ -13,13 +13,13 @@ import { MinRole } from '../../common/decorators/roles.decorator';
 
 /**
  * Model params addressed by tier + model, for the CLI (`thinker routing params`).
- * `:tier` is `default` or a custom tier's name; `?model=` picks one of the
+ * `:tier` is `default`; `?model=` picks one of the
  * models the tier routes to and defaults to its primary. The query string
  * carries the model because model ids contain slashes.
  *
  * `virtual-model-params?virtual=<name>` is the same for a virtual model
  * (ADR 0004, section 9): a separate selector, since a virtual model and a
- * custom tier may share a name. It reads and writes the `virtual:<id>` scope.
+ * tier may share a name. It reads and writes the `virtual:<id>` scope.
  */
 @MinRole('admin')
 @Controller('api/v1/routing')

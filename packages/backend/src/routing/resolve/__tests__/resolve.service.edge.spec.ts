@@ -4,41 +4,28 @@ import { ResolveService } from '../resolve.service';
 import { Agent } from '../../../entities/agent.entity';
 import type { TierAssignment } from '../../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
-import type { HeaderTier } from '../../../entities/header-tier.entity';
 import type { TierService } from '../../routing-core/tier.service';
 import type { ProviderKeyService } from '../../routing-core/provider-key.service';
 import type { RoutingCacheService } from '../../routing-core/routing-cache.service';
 import type { SpecificityService } from '../../routing-core/specificity.service';
 import type { SpecificityPenaltyService } from '../../routing-core/specificity-penalty.service';
-import type { HeaderTierService } from '../../header-tiers/header-tier.service';
 import type { VirtualModelService } from '../../virtual-models/virtual-model.service';
-import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import type { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 
 /**
  * Edge-case tests for ResolveService. Mirrors resolve.service.spec.ts mocking.
- * Covers: header passthrough when the required header key is absent;
- * specificity confidence boundary at exactly MIN_SPECIFICITY_CONFIDENCE;
+ * Covers: specificity confidence boundary at exactly MIN_SPECIFICITY_CONFIDENCE;
  * logger output for orphaned overrides and low-confidence specificity.
  */
 jest.mock('../../../scoring', () => ({
   scoreRequest: jest.fn(),
   scanMessages: jest.fn(),
 }));
-jest.mock('../../../common/utils/provider-aliases', () => {
-  const actual = jest.requireActual('../../../common/utils/provider-aliases');
-  return { ...actual, inferProviderFromModelName: jest.fn(actual.inferProviderFromModelName) };
-});
-
 import { scoreRequest, scanMessages } from '../../../scoring';
-import { inferProviderFromModelName } from '../../../common/utils/provider-aliases';
 import { Logger } from '@nestjs/common';
 
 const mockedScore = scoreRequest as jest.MockedFunction<typeof scoreRequest>;
 const mockedScan = scanMessages as jest.MockedFunction<typeof scanMessages>;
-const mockedInferProvider = inferProviderFromModelName as jest.MockedFunction<
-  typeof inferProviderFromModelName
->;
 
 const route = (provider: string, authType: ModelRoute['authType'], model: string): ModelRoute => ({
   provider,
@@ -63,19 +50,6 @@ const codingSpecificity = (overrideModel = 'gpt-4o'): SpecificityAssignment =>
     fallback_routes: null,
   }) as unknown as SpecificityAssignment;
 
-const headerTierFixture = (overrides: Partial<HeaderTier> = {}): HeaderTier =>
-  ({
-    id: 'h1',
-    name: 'Premium',
-    header_key: 'x-tier',
-    header_value: 'gold',
-    enabled: true,
-    badge_color: 'red',
-    override_route: route('openai', 'api_key', 'gpt-4o'),
-    fallback_routes: null,
-    ...overrides,
-  }) as unknown as HeaderTier;
-
 describe('ResolveService — edge cases', () => {
   let tierService: jest.Mocked<Pick<TierService, 'getTiers'>>;
   let providerKeyService: jest.Mocked<
@@ -90,12 +64,10 @@ describe('ResolveService — edge cases', () => {
     >
   >;
   let specificityService: jest.Mocked<Pick<SpecificityService, 'getActiveAssignments'>>;
-  let pricingCache: jest.Mocked<Pick<ModelPricingCacheService, 'getByModel'>>;
   let discoveryService: jest.Mocked<
     Pick<ModelDiscoveryService, 'getModelForAgent' | 'getModelsForAgent'>
   >;
   let penaltyService: jest.Mocked<Pick<SpecificityPenaltyService, 'getPenaltiesForAgent'>>;
-  let headerTierService: jest.Mocked<Pick<HeaderTierService, 'list'>>;
   let agentRepo: { findOne: jest.Mock };
   let svc: ResolveService;
 
@@ -111,13 +83,11 @@ describe('ResolveService — edge cases', () => {
       hasRouteCredentials: jest.fn().mockResolvedValue(true),
     };
     specificityService = { getActiveAssignments: jest.fn().mockResolvedValue([]) };
-    pricingCache = { getByModel: jest.fn().mockReturnValue(undefined) };
     discoveryService = {
       getModelForAgent: jest.fn().mockResolvedValue(null),
       getModelsForAgent: jest.fn().mockResolvedValue([]),
     };
     penaltyService = { getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()) };
-    headerTierService = { list: jest.fn().mockResolvedValue([]) };
     agentRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'agent-1', complexity_routing_enabled: true }),
     };
@@ -128,15 +98,12 @@ describe('ResolveService — edge cases', () => {
       reason: 'scored',
     } as unknown as ReturnType<typeof scoreRequest>);
     mockedScan.mockReturnValue(null);
-    mockedInferProvider.mockReturnValue(undefined);
     svc = new ResolveService(
       tierService as unknown as TierService,
       providerKeyService as unknown as ProviderKeyService,
       specificityService as unknown as SpecificityService,
-      pricingCache as unknown as ModelPricingCacheService,
       discoveryService as unknown as ModelDiscoveryService,
       penaltyService as unknown as SpecificityPenaltyService,
-      headerTierService as unknown as HeaderTierService,
       agentRepo as unknown as Repository<Agent>,
       {
         addInvalidationListener: jest.fn(),
@@ -147,31 +114,6 @@ describe('ResolveService — edge cases', () => {
   });
 
   const messages = [{ role: 'user' as const, content: 'hello' }];
-
-  describe('header tier — missing header key', () => {
-    it('falls through when the required header key is absent from the request', async () => {
-      headerTierService.list.mockResolvedValue([headerTierFixture()]);
-      tierService.getTiers.mockResolvedValue([
-        {
-          tier: 'standard',
-          override_route: route('openai', 'api_key', 'gpt-4o-mini'),
-          auto_assigned_route: null,
-          fallback_routes: null,
-        } as TierAssignment,
-      ]);
-
-      // Headers object exists but lacks the configured header_key — the rule
-      // should not match and we should fall through to scored routing.
-      const result =
-        (await svc.resolveHeaderTier('agent-1', 'user-1', {
-          'other-header': 'value',
-        })) ?? (await svc.resolve('agent-1', 'user-1', messages));
-
-      expect(result.reason).not.toBe('header-match');
-      expect(result.reason).toBe('scored');
-      expect(result.route).toEqual(route('openai', 'api_key', 'gpt-4o-mini'));
-    });
-  });
 
   describe('specificity confidence boundary at 0.4', () => {
     beforeEach(() => {
@@ -267,15 +209,6 @@ describe('ResolveService — edge cases', () => {
       await svc.resolve('agent-1', 'user-1', messages);
 
       expectMessageLogged(warnSpy, 'Override orphaned unavailable for agent=agent-1');
-    });
-
-    it('emits a debug log when a header tier matches but has no override route', async () => {
-      headerTierService.list.mockResolvedValue([headerTierFixture({ override_route: null })]);
-      tierService.getTiers.mockResolvedValue([fallbackTierAssignment()]);
-
-      await svc.resolveHeaderTier('agent-1', 'user-1', { 'x-tier': 'gold' });
-
-      expectMessageLogged(debugSpy, 'Header tier "Premium" matched but has no model configured');
     });
   });
 });

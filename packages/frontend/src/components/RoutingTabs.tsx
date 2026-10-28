@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { t } from '../i18n/index.js';
 import { cx } from './ui.js';
 
-export type RoutingTabId = 'default' | 'specificity' | 'custom';
+export type RoutingTabId = 'default' | 'specificity';
 
 interface Tab {
   id: RoutingTabId;
@@ -12,7 +12,6 @@ interface Tab {
 
 export interface RoutingTabsProps {
   specificityEnabled: boolean;
-  customEnabled: boolean;
   /**
    * Gate for the deprecated Task-specific tab. When this returns false the tab
    * is not rendered at all — used to hide task-specific routing from agents that
@@ -20,20 +19,16 @@ export interface RoutingTabsProps {
    * Defaults to shown so existing callers/tests are unaffected.
    */
   showSpecificity?: boolean;
-  pipelineHelp?: ReactNode | null;
   /** Slot rendered to the right of the tabs (e.g. response mode toggle). */
   headerRight?: ReactNode;
-  /** When set, the help button is removed from the header. The parent manages the modal. */
-  onShowHelp?: () => void;
   children: {
     default: ReactNode;
     specificity: ReactNode;
-    custom: ReactNode;
   };
 }
 
 /**
- * Routing layer tabs (Default / Task-specific / Custom). The `panel__tab*` and
+ * Routing layer tabs (Default / Task-specific). The `panel__tab*` and
  * `routing-tabs__*` classes are stable test hooks; the look comes from `.tabs`.
  */
 export default function RoutingTabs(props: RoutingTabsProps) {
@@ -52,7 +47,6 @@ export default function RoutingTabs(props: RoutingTabsProps) {
           },
         ]
       : []),
-    { id: 'custom', label: t('routing.tabs.custom'), dot: props.customEnabled },
   ];
 
   return (
@@ -96,7 +90,6 @@ export default function RoutingTabs(props: RoutingTabsProps) {
       >
         {activeTab === 'default' ? props.children.default : null}
         {activeTab === 'specificity' && showSpecificity ? props.children.specificity : null}
-        {activeTab === 'custom' ? props.children.custom : null}
       </div>
     </div>
   );

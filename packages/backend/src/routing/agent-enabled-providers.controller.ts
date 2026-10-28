@@ -16,7 +16,6 @@ import { Agent } from '../entities/agent.entity';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
-import { HeaderTier } from '../entities/header-tier.entity';
 import { ProviderService } from './routing-core/provider.service';
 import { VirtualModelService } from './virtual-models/virtual-model.service';
 import {
@@ -41,8 +40,6 @@ export class AgentEnabledProvidersController {
     private readonly tierRepo: Repository<TierAssignment>,
     @InjectRepository(SpecificityAssignment)
     private readonly specificityRepo: Repository<SpecificityAssignment>,
-    @InjectRepository(HeaderTier)
-    private readonly headerTierRepo: Repository<HeaderTier>,
     private readonly providerService: ProviderService,
     private readonly virtualModels: VirtualModelService,
   ) {}
@@ -143,18 +140,6 @@ export class AgentEnabledProvidersController {
             model: fb.model,
             position: `fallback ${i + 1}`,
           });
-        }
-      }
-    }
-
-    const headerTiers = await this.headerTierRepo.find({ where: { agent_id: agentId } });
-    for (const tier of headerTiers) {
-      if (routeBelongsToDisabledProvider(tier.override_route)) {
-        affected.push({ tier: tier.name, model: tier.override_route!.model, position: 'primary' });
-      }
-      for (const [i, fb] of (tier.fallback_routes ?? []).entries()) {
-        if (routeBelongsToDisabledProvider(fb)) {
-          affected.push({ tier: tier.name, model: fb.model, position: `fallback ${i + 1}` });
         }
       }
     }

@@ -34,7 +34,6 @@ interface Props {
   /**
    * Extra request headers to weave into every snippet (OpenAI's defaultHeaders,
    * Vercel AI's headers, LangChain's configuration.defaultHeaders, curl -H).
-   * Used by the header-tier "How to send this" modal.
    */
   customHeaders?: Record<string, string>;
   /** Model the snippets send. Defaults to `auto`. */

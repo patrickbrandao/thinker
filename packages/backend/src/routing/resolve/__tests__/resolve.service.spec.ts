@@ -4,15 +4,12 @@ import { ResolveService } from '../resolve.service';
 import { Agent } from '../../../entities/agent.entity';
 import type { TierAssignment } from '../../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
-import type { HeaderTier } from '../../../entities/header-tier.entity';
 import type { TierService } from '../../routing-core/tier.service';
 import type { ProviderKeyService } from '../../routing-core/provider-key.service';
 import type { RoutingCacheService } from '../../routing-core/routing-cache.service';
 import type { SpecificityService } from '../../routing-core/specificity.service';
 import type { SpecificityPenaltyService } from '../../routing-core/specificity-penalty.service';
-import type { HeaderTierService } from '../../header-tiers/header-tier.service';
 import type { VirtualModelService } from '../../virtual-models/virtual-model.service';
-import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import type { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 
 /**
@@ -25,19 +22,10 @@ jest.mock('../../../scoring', () => ({
   scanMessages: jest.fn(),
 }));
 
-jest.mock('../../../common/utils/provider-aliases', () => {
-  const actual = jest.requireActual('../../../common/utils/provider-aliases');
-  return { ...actual, inferProviderFromModelName: jest.fn(actual.inferProviderFromModelName) };
-});
-
 import { scoreRequest, scanMessages } from '../../../scoring';
-import { inferProviderFromModelName } from '../../../common/utils/provider-aliases';
 
 const mockedScore = scoreRequest as jest.MockedFunction<typeof scoreRequest>;
 const mockedScan = scanMessages as jest.MockedFunction<typeof scanMessages>;
-const mockedInferProvider = inferProviderFromModelName as jest.MockedFunction<
-  typeof inferProviderFromModelName
->;
 
 const route = (provider: string, authType: ModelRoute['authType'], model: string): ModelRoute => ({
   provider,
@@ -59,7 +47,6 @@ describe('ResolveService', () => {
     >
   >;
   let specificityService: jest.Mocked<Pick<SpecificityService, 'getActiveAssignments'>>;
-  let pricingCache: jest.Mocked<Pick<ModelPricingCacheService, 'getByModel'>>;
   let discoveryService: jest.Mocked<
     Pick<
       ModelDiscoveryService,
@@ -67,7 +54,6 @@ describe('ResolveService', () => {
     >
   >;
   let penaltyService: jest.Mocked<Pick<SpecificityPenaltyService, 'getPenaltiesForAgent'>>;
-  let headerTierService: jest.Mocked<Pick<HeaderTierService, 'list'>>;
   let agentRepo: { findOne: jest.Mock };
   let routingCache: {
     addInvalidationListener: jest.Mock;
@@ -90,7 +76,6 @@ describe('ResolveService', () => {
       hasRouteCredentials: jest.fn().mockResolvedValue(true),
     };
     specificityService = { getActiveAssignments: jest.fn().mockResolvedValue([]) };
-    pricingCache = { getByModel: jest.fn().mockReturnValue(undefined) };
     discoveryService = {
       getModelForAgent: jest.fn().mockResolvedValue(null),
       getModelsForAgent: jest.fn().mockResolvedValue([]),
@@ -98,7 +83,6 @@ describe('ResolveService', () => {
       invalidateTenant: jest.fn(),
     };
     penaltyService = { getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()) };
-    headerTierService = { list: jest.fn().mockResolvedValue([]) };
     agentRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'agent-1', complexity_routing_enabled: true }),
     };
@@ -112,16 +96,13 @@ describe('ResolveService', () => {
       reason: 'scored',
     } as unknown as ReturnType<typeof scoreRequest>);
     mockedScan.mockReturnValue(null);
-    mockedInferProvider.mockReturnValue(undefined);
 
     svc = new ResolveService(
       tierService as unknown as TierService,
       providerKeyService as unknown as ProviderKeyService,
       specificityService as unknown as SpecificityService,
-      pricingCache as unknown as ModelPricingCacheService,
       discoveryService as unknown as ModelDiscoveryService,
       penaltyService as unknown as SpecificityPenaltyService,
-      headerTierService as unknown as HeaderTierService,
       agentRepo as unknown as Repository<Agent>,
       routingCache as unknown as RoutingCacheService,
       { list: jest.fn().mockResolvedValue([]) } as unknown as VirtualModelService,
@@ -129,14 +110,6 @@ describe('ResolveService', () => {
   });
 
   const messages = [{ role: 'user' as const, content: 'hello' }];
-
-  /**
-   * The proxy's steps 2 and 3 for `auto` (ADR 0004, section 5): a matching
-   * header tier, else automatic routing. resolve() itself never reads headers.
-   */
-  const resolveWithHeaders = async (headers: Record<string, string | string[]>) =>
-    (await svc.resolveHeaderTier('agent-1', 'user-1', headers)) ??
-    (await svc.resolve('agent-1', 'user-1', messages));
 
   describe('discovery cache invalidation bridge', () => {
     it('registers a routing-cache listener that invalidates the discovery cache', () => {
@@ -183,270 +156,6 @@ describe('ResolveService', () => {
 
       expect(resolveInput).toHaveBeenCalledTimes(1);
       expect(mockedScore).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('resolve — header tier match', () => {
-    it('resolve() itself never consults header tiers', async () => {
-      await svc.resolve('agent-1', 'user-1', messages);
-      await svc.resolveLazy('agent-1', 'user-1', async () => ({ messages }));
-
-      expect(headerTierService.list).not.toHaveBeenCalled();
-    });
-
-    it('returns the header-tier route when the rule matches', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: route('openai', 'api_key', 'gpt-4o'),
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-
-      expect(result.reason).toBe('header-match');
-      expect(result.route).toEqual(route('openai', 'api_key', 'gpt-4o'));
-      expect(result.header_tier_id).toBe('h1');
-      expect(result.header_tier_name).toBe('Premium');
-      expect(result.header_tier_color).toBe('red');
-    });
-
-    it('returns null when no header tiers exist', async () => {
-      headerTierService.list.mockResolvedValue([]);
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      // Falls through to scored tier — reason should be 'scored', not 'header-match'.
-      expect(result.reason).not.toBe('header-match');
-    });
-
-    it('falls through when the matched tier has no override route', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: null,
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).not.toBe('header-match');
-    });
-
-    it('falls through when the override model is not available', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: route('openai', 'api_key', 'gpt-4o'),
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-      providerKeyService.isModelAvailable.mockResolvedValue(false);
-      providerKeyService.isRouteAvailable.mockResolvedValue(false);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).not.toBe('header-match');
-    });
-
-    it('validates the override with the route-aware check, not the name-only one', async () => {
-      // Regression: a pinned override whose model id exists on two connections
-      // (openai api_key + subscription) must stay available — the name-only
-      // isModelAvailable lookup reports ambiguous ids as unavailable (#2210).
-      const pinned = route('openai', 'subscription', 'gpt-5.5');
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: pinned,
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-      providerKeyService.isModelAvailable.mockResolvedValue(false);
-      providerKeyService.isRouteAvailable.mockResolvedValue(true);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).toBe('header-match');
-      expect(result.route).toEqual(pinned);
-      expect(providerKeyService.isRouteAvailable).toHaveBeenCalledWith('user-1', pinned, 'agent-1');
-    });
-
-    it('promotes the first available fallback when the override is unavailable', async () => {
-      const primary = route('openai', 'subscription', 'gpt-5.5');
-      const deadFallback = route('gemini', 'api_key', 'gemini-pro-latest');
-      const liveFallback = route('minimax', 'subscription', 'MiniMax-M3');
-      const lastFallback = route('xai', 'subscription', 'grok-4.3');
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: primary,
-        fallback_routes: [deadFallback, liveFallback, lastFallback],
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-      providerKeyService.isRouteAvailable.mockImplementation(
-        async (_tenantId: string, r: ModelRoute) => r === liveFallback || r === lastFallback,
-      );
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).toBe('header-match');
-      expect(result.route).toEqual(liveFallback);
-      expect(result.fallback_routes).toEqual([lastFallback]);
-    });
-
-    it('matches when the header value is provided as an array', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        override_route: route('openai', 'api_key', 'gpt-4o'),
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-
-      const result = await resolveWithHeaders({ 'x-tier': ['silver', 'gold'] });
-      expect(result.reason).toBe('header-match');
-    });
-
-    it('skips disabled header tiers', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: false,
-        badge_color: 'red',
-        override_route: route('openai', 'api_key', 'gpt-4o'),
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).not.toBe('header-match');
-    });
-
-    it('returns null route when no provider can be resolved for the override model', async () => {
-      const tier = {
-        id: 'h1',
-        name: 'Premium',
-        header_key: 'x-tier',
-        header_value: 'gold',
-        enabled: true,
-        badge_color: 'red',
-        // Empty provider triggers the resolveProviderForModel fallback chain.
-        // authType '' is also falsy, so getAuthType is consulted.
-        override_route: {
-          provider: '',
-          authType: '',
-          model: 'mystery-model',
-        } as unknown as ModelRoute,
-        fallback_routes: null,
-      } as unknown as HeaderTier;
-      headerTierService.list.mockResolvedValue([tier]);
-
-      // None of the resolveProviderForModel paths produce a hit.
-      mockedInferProvider.mockReturnValue(undefined);
-      discoveryService.getModelForAgent.mockResolvedValue(undefined);
-      pricingCache.getByModel.mockReturnValue(undefined);
-      // No provider resolved → route is null even though authType defaults exist.
-      providerKeyService.getAuthType.mockResolvedValue('api_key');
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).toBe('header-match');
-      expect(result.route).toBeNull();
-    });
-  });
-
-  describe('resolveProviderForModel paths (via header tier with bare model)', () => {
-    // Provider field is empty (falsy) so resolveProviderForModel runs via the
-    // `||` short-circuit. authType is a real value so the route can be built
-    // when a provider is found.
-    const bareTier = {
-      id: 'h1',
-      name: 'P',
-      header_key: 'x-tier',
-      header_value: 'gold',
-      enabled: true,
-      badge_color: 'red',
-      override_route: {
-        model: 'gpt-4o',
-        provider: '',
-        authType: 'api_key',
-      } as unknown as ModelRoute,
-      fallback_routes: null,
-    } as unknown as HeaderTier;
-
-    it('uses prefix inference when an active provider matches', async () => {
-      headerTierService.list.mockResolvedValue([bareTier]);
-      mockedInferProvider.mockReturnValue('openai');
-      providerKeyService.hasActiveProvider.mockResolvedValue(true);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.reason).toBe('header-match');
-      expect(result.route?.provider).toBe('openai');
-    });
-
-    it('uses discovery when prefix inference is null', async () => {
-      headerTierService.list.mockResolvedValue([bareTier]);
-      mockedInferProvider.mockReturnValue(undefined);
-      discoveryService.getModelForAgent.mockResolvedValue({
-        id: 'gpt-4o',
-        provider: 'openai',
-        authType: 'api_key',
-      } as never);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.route?.provider).toBe('openai');
-    });
-
-    it('uses pricing cache when discovery has no entry', async () => {
-      headerTierService.list.mockResolvedValue([bareTier]);
-      mockedInferProvider.mockReturnValue(undefined);
-      discoveryService.getModelForAgent.mockResolvedValue(undefined);
-      pricingCache.getByModel.mockReturnValue({
-        provider: 'OpenAI',
-        model_name: 'gpt-4o',
-        display_name: null,
-        input_price_per_token: 0,
-        output_price_per_token: 0,
-      } as never);
-
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.route?.provider).toBe('OpenAI');
-    });
-
-    it('skips OpenRouter aggregator entries', async () => {
-      headerTierService.list.mockResolvedValue([bareTier]);
-      mockedInferProvider.mockReturnValue(undefined);
-      discoveryService.getModelForAgent.mockResolvedValue(undefined);
-      pricingCache.getByModel.mockReturnValue({
-        provider: 'OpenRouter',
-        model_name: 'gpt-4o',
-        display_name: null,
-        input_price_per_token: 0,
-        output_price_per_token: 0,
-      } as never);
-      const result = await resolveWithHeaders({ 'x-tier': 'gold' });
-      expect(result.route).toBeNull();
     });
   });
 

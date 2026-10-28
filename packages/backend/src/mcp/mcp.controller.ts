@@ -23,7 +23,6 @@ import { ProviderService } from '../routing/routing-core/provider.service';
 import { TierService } from '../routing/routing-core/tier.service';
 import { SpecificityService } from '../routing/routing-core/specificity.service';
 import { ResolveAgentService } from '../routing/routing-core/resolve-agent.service';
-import { HeaderTierService } from '../routing/header-tiers/header-tier.service';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
@@ -69,7 +68,6 @@ export class McpController {
     private readonly tiers: TierService,
     private readonly specificity: SpecificityService,
     private readonly resolveAgentService: ResolveAgentService,
-    private readonly headerTiers: HeaderTierService,
     private readonly virtualModels: VirtualModelService,
     private readonly customProviders: CustomProviderService,
     private readonly routeModelParams: RouteModelParamsService,
@@ -99,7 +97,6 @@ export class McpController {
       tiers: this.tiers,
       specificity: this.specificity,
       resolveAgent: this.resolveAgentService,
-      headerTiers: this.headerTiers,
       virtualModels: this.virtualModels,
       customProviders: this.customProviders,
       routeModelParams: this.routeModelParams,

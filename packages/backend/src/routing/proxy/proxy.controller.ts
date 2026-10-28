@@ -713,9 +713,6 @@ export class ProxyController {
                 providerKeyLabel: meta.provider_key_label,
                 tenantProviderId: meta.tenantProviderId,
                 requestParams: meta.request_params,
-                headerTierId: meta.header_tier_id,
-                headerTierName: meta.header_tier_name,
-                headerTierColor: meta.header_tier_color,
                 virtualModelId: meta.virtual_model_id,
                 virtualModelName: meta.virtual_model_name,
               }
@@ -917,9 +914,6 @@ export class ProxyController {
               routing: {
                 tier: meta.tier,
                 specificityCategory: meta.specificity_category,
-                headerTierId: meta.header_tier_id,
-                headerTierName: meta.header_tier_name,
-                headerTierColor: meta.header_tier_color,
                 virtualModelId: meta.virtual_model_id,
                 virtualModelName: meta.virtual_model_name,
               },

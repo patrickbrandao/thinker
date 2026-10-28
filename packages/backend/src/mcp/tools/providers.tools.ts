@@ -421,8 +421,8 @@ async function setAgentProviderEnabled(
 }
 
 /**
- * Routes that would break if this connection were disabled: a tier, header
- * tier or specificity assignment whose primary route or fallback resolves to
+ * Routes that would break if this connection were disabled: a tier or
+ * specificity assignment whose primary route or fallback resolves to
  * the connection. Mirrors AgentEnabledProvidersController.findAffectedRoutes.
  */
 async function findAffectedRoutes(
@@ -438,13 +438,6 @@ async function findAffectedRoutes(
     if (belongs(tier.override_route)) affected.push(`${tier.tier}: primary`);
     for (const [i, fallback] of (tier.fallback_routes ?? []).entries()) {
       if (belongs(fallback)) affected.push(`${tier.tier}: fallback ${i + 1}`);
-    }
-  }
-  const headerTiers = await deps.headerTiers.list(agentId);
-  for (const tier of headerTiers) {
-    if (belongs(tier.override_route)) affected.push(`${tier.name}: primary`);
-    for (const [i, fallback] of (tier.fallback_routes ?? []).entries()) {
-      if (belongs(fallback)) affected.push(`${tier.name}: fallback ${i + 1}`);
     }
   }
   const assignments = await deps.specificity.getAssignments(agentId);

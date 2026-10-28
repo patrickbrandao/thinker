@@ -24,7 +24,7 @@ function savedRange(): TopologyRange {
 
 /**
  * Topology and usage as a flow: harnesses → routing points (auto, virtual
- * models, header tiers) → providers, with the traffic of the chosen period on
+ * models) → providers, with the traffic of the chosen period on
  * every link. Refreshes when new requests arrive (SSE ping).
  */
 export default function Topology() {

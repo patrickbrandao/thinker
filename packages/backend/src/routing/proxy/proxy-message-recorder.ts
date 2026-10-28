@@ -40,12 +40,6 @@ import { normalizeProviderErrorForStorage } from './proxy-error-sanitizer';
 
 export const FAILED_WITHOUT_MESSAGE = 'Request failed without an error message.';
 
-export interface HeaderTierRef {
-  headerTierId?: string | null;
-  headerTierName?: string | null;
-  headerTierColor?: string | null;
-}
-
 /**
  * The virtual model a request named (ADR 0004). Stamped on every row of the
  * request, with the name as spelled at the time, so renames and deletes keep
@@ -56,7 +50,7 @@ export interface VirtualModelRef {
   virtualModelName?: string | null;
 }
 
-export interface ProviderErrorOpts extends HeaderTierRef, VirtualModelRef {
+export interface ProviderErrorOpts extends VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -71,7 +65,7 @@ export interface ProviderErrorOpts extends HeaderTierRef, VirtualModelRef {
   fallbackIndex?: number;
   authType?: string;
   /**
-   * Why the tier was selected (e.g. 'header-match', 'specificity', 'scored').
+   * Why the tier was selected (e.g. 'specificity', 'scored').
    * Persisted to agent_messages.routing_reason so single-shot upstream errors
    * keep the same audit context as their successful siblings.
    */
@@ -124,7 +118,7 @@ export interface ThinkerBlockedRequestOpts {
   apiMode?: ProxyApiMode;
   /**
    * How the request was classified, when Thinker failed after routing ran (a
-   * post-routing M500). Keeps tier and header-tier filters matching the row.
+   * post-routing M500). Keeps tier filters matching the row.
    * Provider stays null (the row still claims no provider attempt); the
    * requested model is still recorded in the model field.
    */
@@ -134,9 +128,6 @@ export interface ThinkerBlockedRequestOpts {
 export interface ThinkerBlockedRouting {
   tier?: string;
   specificityCategory?: string;
-  headerTierId?: string;
-  headerTierName?: string;
-  headerTierColor?: string;
   virtualModelId?: string;
   virtualModelName?: string;
 }
@@ -163,7 +154,7 @@ export interface CancelledRequestOpts {
   apiMode?: ProxyApiMode;
 }
 
-export interface FallbackSuccessOpts extends HeaderTierRef, VirtualModelRef {
+export interface FallbackSuccessOpts extends VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -175,8 +166,7 @@ export interface FallbackSuccessOpts extends HeaderTierRef, VirtualModelRef {
   timestamp?: string;
   authType?: string;
   /**
-   * Why the primary tier was selected (e.g. 'header-match', 'specificity',
-   * 'scored'). Persisted to agent_messages.routing_reason so fallback rows
+   * Why the primary tier was selected (e.g. 'specificity', 'scored'). Persisted to agent_messages.routing_reason so fallback rows
    * keep the same audit context as their non-fallback siblings.
    */
   reason?: string;
@@ -200,7 +190,7 @@ export interface FallbackSuccessOpts extends HeaderTierRef, VirtualModelRef {
   apiMode?: ProxyApiMode;
 }
 
-export interface SuccessMessageOpts extends HeaderTierRef, VirtualModelRef {
+export interface SuccessMessageOpts extends VirtualModelRef {
   requestId?: string;
   attemptNumber?: number;
   attempt?: ProviderAttemptRef;
@@ -729,9 +719,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution,
       requestHeaders,
       requestParams,
-      headerTierId,
-      headerTierName,
-      headerTierColor,
       virtualModelId,
       virtualModelName,
       apiMode,
@@ -773,9 +760,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       caller_attribution: callerAttribution ?? null,
       request_headers: requestHeaders ?? null,
       request_params: requestParams ?? null,
-      header_tier_id: headerTierId ?? null,
-      header_tier_name: headerTierName ?? null,
-      header_tier_color: headerTierColor ?? null,
       virtual_model_id: virtualModelId ?? null,
       virtual_model_name: virtualModelName ?? null,
     });
@@ -845,9 +829,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       caller_attribution: callerAttribution ?? null,
       request_headers: requestHeaders ?? null,
       request_params: null,
-      header_tier_id: routing?.headerTierId ?? null,
-      header_tier_name: routing?.headerTierName ?? null,
-      header_tier_color: routing?.headerTierColor ?? null,
       virtual_model_id: routing?.virtualModelId ?? null,
       virtual_model_name: routing?.virtualModelName ?? null,
     });
@@ -875,9 +856,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution?: CallerAttribution | null;
       requestHeaders?: Record<string, string> | null;
       requestParams?: RequestParamDefaults | null;
-      headerTierId?: string | null;
-      headerTierName?: string | null;
-      headerTierColor?: string | null;
       virtualModelId?: string | null;
       virtualModelName?: string | null;
     },
@@ -895,9 +873,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution,
       requestHeaders,
       requestParams,
-      headerTierId,
-      headerTierName,
-      headerTierColor,
       virtualModelId,
       virtualModelName,
     } = opts ?? {};
@@ -967,9 +942,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           request_headers: requestHeaders ?? null,
           // Each hop's own snapshot when the proxy computed one.
           request_params: (f.requestParams !== undefined ? f.requestParams : requestParams) ?? null,
-          header_tier_id: headerTierId ?? null,
-          header_tier_name: headerTierName ?? null,
-          header_tier_color: headerTierColor ?? null,
           virtual_model_id: virtualModelId ?? null,
           virtual_model_name: virtualModelName ?? null,
         }),
@@ -1011,9 +983,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution?: CallerAttribution | null;
       requestHeaders?: Record<string, string> | null;
       requestParams?: RequestParamDefaults | null;
-      headerTierId?: string | null;
-      headerTierName?: string | null;
-      headerTierColor?: string | null;
       virtualModelId?: string | null;
       virtualModelName?: string | null;
       /** Provider status for the superseded primary. */
@@ -1056,9 +1025,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       caller_attribution: opts?.callerAttribution ?? null,
       request_headers: opts?.requestHeaders ?? null,
       request_params: opts?.requestParams ?? null,
-      header_tier_id: opts?.headerTierId ?? null,
-      header_tier_name: opts?.headerTierName ?? null,
-      header_tier_color: opts?.headerTierColor ?? null,
       virtual_model_id: opts?.virtualModelId ?? null,
       virtual_model_name: opts?.virtualModelName ?? null,
     });
@@ -1104,9 +1070,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution,
       requestHeaders,
       requestParams,
-      headerTierId,
-      headerTierName,
-      headerTierColor,
       virtualModelId,
       virtualModelName,
       apiMode,
@@ -1165,9 +1128,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       caller_attribution: callerAttribution ?? null,
       request_headers: requestHeaders ?? null,
       request_params: requestParams ?? null,
-      header_tier_id: headerTierId ?? null,
-      header_tier_name: headerTierName ?? null,
-      header_tier_color: headerTierColor ?? null,
       virtual_model_id: virtualModelId ?? null,
       virtual_model_name: virtualModelName ?? null,
     });
@@ -1199,9 +1159,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       callerAttribution,
       requestHeaders,
       requestParams,
-      headerTierId,
-      headerTierName,
-      headerTierColor,
       virtualModelId,
       virtualModelName,
       apiMode,
@@ -1266,9 +1223,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       specificity_category: specificityCategory ?? null,
       provider_key_label: providerKeyLabel ?? null,
       tenant_provider_id: tenantProviderId ?? null,
-      header_tier_id: headerTierId ?? null,
-      header_tier_name: headerTierName ?? null,
-      header_tier_color: headerTierColor ?? null,
       virtual_model_id: virtualModelId ?? null,
       virtual_model_name: virtualModelName ?? null,
     });

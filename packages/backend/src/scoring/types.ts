@@ -47,7 +47,6 @@ export type ScoringReason =
   | 'heartbeat'
   | 'specificity'
   | 'default'
-  | 'header-match'
   | 'virtual-model';
 
 export interface DimensionScore {

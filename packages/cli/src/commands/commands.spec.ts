@@ -1807,7 +1807,7 @@ describe('routing test', () => {
     });
   });
 
-  it('proves tier escalation and explicit models, with a custom prompt', async () => {
+  it('proves explicit models, with a custom prompt', async () => {
     const { io, calls } = authedIo([completion('pong', 'grok-4.5')]);
     saveAgentKey(io.env, HOST, 'john', 'k');
     expect(
@@ -1819,17 +1819,15 @@ describe('routing test', () => {
         'ping',
         '--as',
         'openclaw',
-        '--tier',
-        'thorough',
         '--model',
         'grok-4.5',
       ]),
     ).toBe(0);
-    expect(calls[0].headers['x-thinker-tier']).toBe('thorough');
     const body = JSON.parse(calls[0].body!);
     expect(body.model).toBe('grok-4.5');
     expect(body.messages[0].content).toBe('custom ping');
-    expect(io.lastJson()).toMatchObject({ tier: 'thorough', served_model: 'grok-4.5' });
+    expect(io.lastJson()).toMatchObject({ served_model: 'grok-4.5' });
+    expect(io.lastJson()).not.toHaveProperty('tier');
   });
 
   it('tests anthropic-family agents through /v1/messages with an Anthropic body', async () => {
@@ -1942,32 +1940,6 @@ describe('routing test', () => {
     });
   });
 
-  it('routing custom create rolls back the tier when the route write fails', async () => {
-    const { io, calls } = authedIo([
-      { status: 201, body: { id: 't1' } }, // POST header-tiers
-      { status: 500, body: { message: 'boom' } }, // PUT override
-      { status: 200, body: {} }, // DELETE rollback
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'a',
-        '--name',
-        't',
-        '--model',
-        'm',
-        '--provider',
-        'p',
-        '--force',
-      ]),
-    ).toBe(1);
-    const last = calls[calls.length - 1];
-    expect(last.method).toBe('DELETE');
-    expect(last.url).toContain('/header-tiers/t1');
-  });
-
   it('surfaces real HTTP errors and transport failures', async () => {
     const { io } = authedIo([{ status: 429, body: { error: { message: 'rate limited' } } }]);
     saveAgentKey(io.env, HOST, 'john', 'k');
@@ -2062,9 +2034,6 @@ describe('requests get', () => {
       specificity_category: null,
       fallback_from_model: null,
       fallback_index: null,
-      header_tier_id: null,
-      header_tier_name: null,
-      header_tier_color: null,
       provider_key_label: null,
       custom_provider_name: null,
       cache_read_tokens: '0',
@@ -2093,22 +2062,20 @@ describe('requests get', () => {
     const { io: io2 } = authedIo([{ status: 200, body: { items: [row], next_cursor: null } }]);
     expect(await run(io2, ['requests', 'get', '--full'])).toBe(0);
     const full = (io2.lastJson() as { requests: Record<string, unknown>[] }).requests[0];
-    expect(full).toHaveProperty('header_tier_color');
+    expect(full).toHaveProperty('routing_reason');
     expect(full).toHaveProperty('cache_read_tokens');
   });
 
-  it('keeps meaningful conditionals: custom tier, fallback', async () => {
+  it('keeps meaningful conditionals: fallback, custom provider', async () => {
     const row = {
       id: 'r2',
       status: 'ok',
-      header_tier_name: 'deep',
       fallback_from_model: 'grok-4.5',
       custom_provider_name: 'My LiteLLM',
     };
     const { io } = authedIo([{ status: 200, body: { items: [row], next_cursor: null } }]);
     expect(await run(io, ['requests', 'get'])).toBe(0);
     expect((io.lastJson() as { requests: object[] }).requests[0]).toMatchObject({
-      header_tier_name: 'deep',
       fallback_from_model: 'grok-4.5',
       custom_provider_name: 'My LiteLLM',
     });
@@ -2153,7 +2120,7 @@ describe('requests get', () => {
 });
 
 describe('routing commands', () => {
-  it('status composes the real config: default route, custom tiers, toggles', async () => {
+  it('status composes the real config: default route, virtual models, toggles', async () => {
     const { io, calls } = authedIo([
       {
         status: 200,
@@ -2163,20 +2130,6 @@ describe('routing commands', () => {
             tier: 'default',
             override_route: { model: 'grok-4.5', provider: 'xai', authType: 'subscription' },
             fallback_routes: [{ model: 'grok-4.3', provider: 'xai' }],
-          },
-        ],
-      },
-      {
-        status: 200,
-        body: [
-          {
-            id: 'ht-1',
-            name: 'deep',
-            header_key: 'x-thinker-tier',
-            header_value: 'deep',
-            enabled: true,
-            override_route: { model: 'grok-4.5' },
-            fallback_routes: null,
           },
         ],
       },
@@ -2203,7 +2156,6 @@ describe('routing commands', () => {
     expect(urls).toEqual(
       [
         `${HOST}/api/v1/routing/john/tiers`,
-        `${HOST}/api/v1/routing/john/header-tiers`,
         `${HOST}/api/v1/routing/john/virtual-models`,
         `${HOST}/api/v1/routing/john/recording`,
       ].sort(),
@@ -2214,15 +2166,6 @@ describe('routing commands', () => {
         route: { model: 'grok-4.5', provider: 'xai', authType: 'subscription' },
         fallbacks: [{ model: 'grok-4.3', provider: 'xai' }],
       },
-      custom_tiers: [
-        {
-          name: 'deep',
-          trigger: 'x-thinker-tier: deep',
-          enabled: true,
-          route: { model: 'grok-4.5' },
-          fallbacks: [],
-        },
-      ],
       virtual_models: [
         {
           name: 'DeepSeek/Flash',
@@ -2244,13 +2187,11 @@ describe('routing commands', () => {
     const { io } = authedIo([
       { status: 200, body: [] },
       { status: 200, body: [] },
-      { status: 200, body: [] },
       { status: 200, body: { enabled: false } },
     ]);
     expect(await run(io, ['routing', 'status', 'john'])).toBe(0);
     expect(io.lastJson()).toMatchObject({
       default: { route: null, fallbacks: [] },
-      custom_tiers: [],
       virtual_models: [],
       routes_by_virtual_model: false,
       active_virtual_models: [],
@@ -2300,61 +2241,6 @@ describe('routing commands', () => {
     expect(calls[2].method).toBe('DELETE');
     expect(calls[2].url).toBe(`${HOST}/api/v1/routing/john/tiers/default/fallbacks`);
     expect((io.lastJson() as { fallbacks: unknown }).fallbacks).toEqual([]);
-  });
-
-  it('agent configure --tier upserts the named custom tier', async () => {
-    // existing tier: found by name, no create
-    const { io, calls } = authedIo([
-      { status: 200, body: DISCOVERED(['grok-4.5', 'fb']) },
-      { status: 200, body: [{ id: 'ht-9', name: 'Test' }] },
-      { status: 200, body: { ok: true } },
-      { status: 200, body: { models: ['fb'] } },
-    ]);
-    expect(
-      await run(io, [
-        'agent',
-        'configure',
-        'john',
-        '--tier',
-        'test',
-        '--models',
-        'grok-4.5,fb',
-        '--provider',
-        'xai',
-      ]),
-    ).toBe(0);
-    expect(calls[1].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
-    expect(calls[2].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/ht-9/override`);
-    expect((io.lastJson() as { tier: { created: boolean } }).tier.created).toBe(false);
-
-    // missing tier: created with the default trigger
-    const { io: io2, calls: calls2 } = authedIo([
-      { status: 200, body: DISCOVERED(['big-model']) },
-      { status: 200, body: [] },
-      { status: 201, body: { id: 'ht-new' } },
-      { status: 200, body: { ok: true } },
-      { status: 200, body: { ok: true } },
-    ]);
-    expect(
-      await run(io2, [
-        'agent',
-        'configure',
-        'john',
-        '--tier',
-        'heavy',
-        '--models',
-        'big-model',
-        '--provider',
-        'openai',
-      ]),
-    ).toBe(0);
-    expect(JSON.parse(calls2[2].body!)).toEqual({
-      name: 'heavy',
-      header_key: 'x-thinker-tier',
-      header_value: 'heavy',
-      badge_color: 'indigo',
-    });
-    expect((io2.lastJson() as { tier: { created: boolean } }).tier.created).toBe(true);
   });
 
   it('agent configure refuses undiscovered models and names both remedies', async () => {
@@ -2535,11 +2421,10 @@ describe('routing commands', () => {
     expect(io.lastJson()).toMatchObject({ error: 'missing_flag' });
 
     const { io: io2 } = authedIo([]);
-    // --recording keeps the command non-empty so the tier-needs-route rule fires
+    // --tier is no longer a configure flag.
     expect(
       await run(io2, ['agent', 'configure', 'john', '--tier', 'test', '--recording', 'true']),
     ).toBe(1);
-    expect((io2.lastJson() as { message: string }).message).toContain('--tier needs');
 
     const { io: io3 } = authedIo([]);
     expect(
@@ -2573,149 +2458,7 @@ describe('routing commands', () => {
     expect(io4.lastJson()).toMatchObject({ error: 'unknown_command' });
   });
 
-  it('custom create makes the tier, routes it, and sets fallbacks', async () => {
-    const { io, calls } = authedIo([
-      { status: 200, body: DISCOVERED(['grok-4.5', 'fb-1']) },
-      { status: 201, body: { id: 'ht-1', name: 'test' } },
-      { status: 200, body: { ok: true } },
-      { status: 200, body: { models: ['fb-1'] } },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'test',
-        '--model',
-        'grok-4.5',
-        '--provider',
-        'xai',
-        '--fallbacks',
-        'fb-1',
-      ]),
-    ).toBe(0);
-    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/john/available-models`);
-    expect(calls[1].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
-    expect(JSON.parse(calls[1].body!)).toEqual({
-      name: 'test',
-      header_key: 'x-thinker-tier',
-      header_value: 'test',
-      badge_color: 'indigo',
-    });
-    expect(calls[2].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/ht-1/override`);
-    expect(JSON.parse(calls[2].body!)).toEqual({
-      model: 'grok-4.5',
-      provider: 'xai',
-      authType: 'api_key',
-    });
-    expect(calls[3].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/ht-1/fallbacks`);
-    expect(io.lastJson()).toMatchObject({ agent: 'john', tier: { id: 'ht-1' } });
-  });
-
-  it('custom create rejects an empty --fallbacks list', async () => {
-    const { io } = authedIo([
-      { status: 201, body: { id: 'ht-x' } },
-      { status: 200, body: {} },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'm',
-        '--provider',
-        'p',
-        '--fallbacks',
-        ' , ',
-      ]),
-    ).toBe(1);
-    expect(io.lastJson()).toMatchObject({ error: 'missing_flag' });
-  });
-
-  it('custom create honors custom header key/value', async () => {
-    const { io, calls } = authedIo([
-      { status: 200, body: DISCOVERED(['m']) },
-      { status: 201, body: { id: 'ht-2' } },
-      { status: 200, body: { ok: true } },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'heavy',
-        '--model',
-        'm',
-        '--provider',
-        'openai',
-        '--header-key',
-        'x-task',
-        '--header-value',
-        'big',
-      ]),
-    ).toBe(0);
-    expect(JSON.parse(calls[1].body!)).toMatchObject({ header_key: 'x-task', header_value: 'big' });
-  });
-
-  it('custom create refuses a model the agent has not discovered, and --force overrides', async () => {
-    const { io, calls } = authedIo([{ status: 200, body: DISCOVERED(['known']) }]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'known',
-        '--provider',
-        'openai',
-        '--fallbacks',
-        'ghost-1,ghost-2',
-      ]),
-    ).toBe(1);
-    // Nothing was written: the tier is not created before the models check.
-    expect(calls).toHaveLength(1);
-    expect(io.lastJson()).toMatchObject({
-      error: 'unknown_model',
-      message: 'Not in the models discovered for "john": ghost-1, ghost-2',
-      hint: expect.stringContaining('thinker provider refresh'),
-    });
-    expect((io.lastJson() as { hint: string }).hint).toContain('--force');
-
-    const { io: io2, calls: calls2 } = authedIo([
-      { status: 201, body: { id: 'ht-f' } },
-      { status: 200, body: { ok: true } },
-    ]);
-    expect(
-      await run(io2, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'brand-new',
-        '--provider',
-        'openai',
-        '--force',
-      ]),
-    ).toBe(0);
-    // --force skips the lookup entirely — the tier POST is the first call.
-    expect(calls2[0].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
-  });
-
-  it('custom create rejects a model discovered only under another provider', async () => {
+  it('agent configure rejects a model discovered only under another provider', async () => {
     const { io, calls } = authedIo([
       {
         status: 200,
@@ -2726,116 +2469,17 @@ describe('routing commands', () => {
       },
     ]);
     expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'claude-x',
-        '--provider',
-        'openai',
-      ]),
+      await run(io, ['agent', 'configure', 'john', '--models', 'claude-x', '--provider', 'openai']),
     ).toBe(1);
     expect(io.lastJson()).toMatchObject({
       error: 'unknown_model',
       message: expect.stringContaining('under openai'),
     });
-    // Only the discovery call ran; no tier was written.
+    // Only the discovery call ran; nothing was written.
     expect(calls).toHaveLength(1);
   });
 
-  it('custom create accepts a provider-qualified model under its own provider', async () => {
-    const { io } = authedIo([
-      { status: 200, body: [{ model_name: 'gpt-4o', provider: 'openai' }] },
-      { status: 201, body: { id: 't1' } },
-      { status: 200, body: {} },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'openai/gpt-4o',
-        '--provider',
-        'openai',
-      ]),
-    ).toBe(0);
-  });
-
-  it('custom create allows a fallback discovered under another provider', async () => {
-    const { io, calls } = authedIo([
-      {
-        status: 200,
-        body: [
-          { model_name: 'gpt-4o', provider: 'openai' },
-          { model_name: 'claude-sonnet-4', provider: 'anthropic' },
-        ],
-      },
-      { status: 201, body: { id: 't1' } }, // POST header-tiers
-      { status: 200, body: {} }, // PUT override
-      { status: 200, body: {} }, // PUT fallbacks
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'gpt-4o',
-        '--provider',
-        'openai',
-        '--fallbacks',
-        'claude-sonnet-4',
-      ]),
-    ).toBe(0);
-    expect(calls).toHaveLength(4);
-    expect(calls[3].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/t1/fallbacks`);
-    expect(JSON.parse(calls[3].body!)).toEqual({ models: ['claude-sonnet-4'] });
-  });
-
-  it('custom create rejects an ambiguous fallback before writing anything', async () => {
-    const { io, calls } = authedIo([
-      {
-        status: 200,
-        body: [
-          { model_name: 'gpt-4o', provider: 'openai' },
-          { model_name: 'shared-model', provider: 'openai' },
-          { model_name: 'shared-model', provider: 'anthropic' },
-        ],
-      },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'gpt-4o',
-        '--provider',
-        'openai',
-        '--fallbacks',
-        'shared-model',
-      ]),
-    ).toBe(1);
-    expect(io.lastJson()).toMatchObject({ error: 'ambiguous_model' });
-    // Discovery only; the tier was never created.
-    expect(calls).toHaveLength(1);
-  });
-
-  it('custom create rejects a fallback exposed by two auth types of one provider', async () => {
+  it('agent configure rejects an ambiguous fallback before writing anything', async () => {
     const { io, calls } = authedIo([
       {
         status: 200,
@@ -2848,25 +2492,20 @@ describe('routing commands', () => {
     ]);
     expect(
       await run(io, [
-        'routing',
-        'custom',
-        'create',
+        'agent',
+        'configure',
         'john',
-        '--name',
-        'x',
-        '--model',
-        'gpt-4o',
+        '--models',
+        'gpt-4o,shared',
         '--provider',
         'openai',
-        '--fallbacks',
-        'shared',
       ]),
     ).toBe(1);
     expect(io.lastJson()).toMatchObject({ error: 'ambiguous_model' });
     expect(calls).toHaveLength(1);
   });
 
-  it('custom create normalizes a provider-qualified fallback to its bare id', async () => {
+  it('agent configure normalizes a provider-qualified fallback to its bare id', async () => {
     const { io, calls } = authedIo([
       {
         status: 200,
@@ -2875,67 +2514,29 @@ describe('routing commands', () => {
           { model_name: 'claude-sonnet-4', provider: 'anthropic', auth_type: 'api_key' },
         ],
       },
-      { status: 201, body: { id: 't1' } },
       { status: 200, body: {} },
       { status: 200, body: {} },
     ]);
     expect(
       await run(io, [
-        'routing',
-        'custom',
-        'create',
+        'agent',
+        'configure',
         'john',
-        '--name',
-        'x',
-        '--model',
-        'gpt-4o',
+        '--models',
+        'gpt-4o,anthropic/claude-sonnet-4',
         '--provider',
         'openai',
-        '--fallbacks',
-        'anthropic/claude-sonnet-4',
       ]),
     ).toBe(0);
     // The backend matches fallbacks by exact model id, so the bare id is written.
-    expect(JSON.parse(calls[3].body!)).toEqual({ models: ['claude-sonnet-4'] });
+    expect(calls[2].url).toBe(`${HOST}/api/v1/routing/john/tiers/default/fallbacks`);
+    expect(JSON.parse(calls[2].body!)).toEqual({ models: ['claude-sonnet-4'] });
   });
 
-  it('custom create accepts a native model id that already carries its provider prefix', async () => {
-    const { io } = authedIo([
-      { status: 200, body: [{ model_name: 'openai/gpt-4o', provider: 'openai' }] },
-      { status: 201, body: { id: 't1' } },
-      { status: 200, body: {} },
-    ]);
-    expect(
-      await run(io, [
-        'routing',
-        'custom',
-        'create',
-        'john',
-        '--name',
-        'x',
-        '--model',
-        'openai/gpt-4o',
-        '--provider',
-        'openai',
-      ]),
-    ).toBe(0);
-  });
-
-  it('custom list and delete resolve tiers by name', async () => {
-    const { io, calls } = authedIo([{ status: 200, body: [{ id: 'ht-1', name: 'test' }] }]);
-    expect(await run(io, ['routing', 'custom', 'list', 'john'])).toBe(0);
-    expect(calls[0].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
-
-    const { io: io2, calls: calls2 } = authedIo([
-      { status: 200, body: [{ id: 'ht-1', name: 'Test' }] },
-      { status: 200, body: { ok: true } },
-    ]);
-    expect(await run(io2, ['routing', 'custom', 'delete', 'john', 'test', '--yes'])).toBe(0);
-    expect(calls2[1].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/ht-1`);
-
-    const { io: io3 } = authedIo([{ status: 200, body: [] }]);
-    expect(await run(io3, ['routing', 'custom', 'delete', 'john', 'ghost', '--yes'])).toBe(1);
-    expect(io3.lastJson()).toMatchObject({ error: 'not_found' });
+  it('the routing custom commands are gone', async () => {
+    const { io, calls } = authedIo([]);
+    expect(await run(io, ['routing', 'custom', 'list', 'john'])).toBe(1);
+    expect(calls).toHaveLength(0);
   });
 
   it('params get reads a tier route, defaulting to the default tier primary', async () => {

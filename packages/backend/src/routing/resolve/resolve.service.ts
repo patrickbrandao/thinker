@@ -1,19 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { IncomingHttpHeaders } from 'http';
 import { TierService } from '../routing-core/tier.service';
 import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { RoutingCacheService } from '../routing-core/routing-cache.service';
 import { SpecificityService } from '../routing-core/specificity.service';
 import { SpecificityPenaltyService } from '../routing-core/specificity-penalty.service';
-import { HeaderTierService } from '../header-tiers/header-tier.service';
 import { VirtualModelService } from '../virtual-models/virtual-model.service';
 import {
   buildVirtualModelChain,
   type VirtualModelChainEntry,
 } from '../virtual-models/virtual-model-chain';
-import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import {
   readAutoAssignedRoute,
@@ -24,7 +21,6 @@ import {
 import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
 import { scoreRequest, ScorerInput, MomentumInput, scanMessages } from '../../scoring';
 import { ResolveResponse, RouteParamsScope } from '../dto/resolve-response';
-import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { Agent } from '../../entities/agent.entity';
 import {
   DEFAULT_RESPONSE_MODE,
@@ -33,14 +29,12 @@ import {
   TIERS,
 } from 'thinker-shared';
 import type {
-  AuthType,
   ModelRoute,
   ResponseMode,
   OutputModality,
   SpecificityCategory,
   TierSlot,
 } from 'thinker-shared';
-import type { HeaderTier } from '../../entities/header-tier.entity';
 import type { TierAssignment } from '../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
 
@@ -76,10 +70,8 @@ export class ResolveService {
     private readonly tierService: TierService,
     private readonly providerKeyService: ProviderKeyService,
     private readonly specificityService: SpecificityService,
-    private readonly pricingCache: ModelPricingCacheService,
     private readonly discoveryService: ModelDiscoveryService,
     private readonly penaltyService: SpecificityPenaltyService,
-    private readonly headerTierService: HeaderTierService,
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
     private readonly routingCache: RoutingCacheService,
@@ -120,10 +112,8 @@ export class ResolveService {
 
   /**
    * Automatic routing for `auto`: the Default tier, or specificity then
-   * complexity when complexity routing is on. Header tiers are not consulted
-   * here: the proxy applies them as a step of its own before this
-   * (ADR 0004, section 5), and `POST /api/v1/routing/resolve` has no headers
-   * to match.
+   * complexity when complexity routing is on. Virtual models are resolved by
+   * the proxy as a step of its own before this (ADR 0004, section 5).
    */
   async resolveLazy(
     agentId: string,
@@ -290,104 +280,10 @@ export class ResolveService {
   }
 
   /**
-   * Public so the proxy can apply header tiers ahead of an explicit `model` in
-   * the request body: a header rule is a deliberate override the operator
-   * configured, and it outranks the model an SDK happens to name.
-   *
-   * Returns null when no rule matches, and when the matched rule has no
-   * available route — both mean "keep looking".
-   */
-  async resolveHeaderTier(
-    agentId: string,
-    tenantId: string,
-    headers: IncomingHttpHeaders,
-  ): Promise<ResolveResponse | null> {
-    const allTiers = await this.headerTierService.list(agentId);
-    const tiers = allTiers.filter((t) => t.enabled);
-    if (tiers.length === 0) return null;
-
-    const match = tiers.find((t) => matchesHeaderRule(headers, t));
-    if (!match) return null;
-
-    const overrideRoute = readOverrideRoute(match);
-    if (!overrideRoute) {
-      this.logger.debug(
-        `Header tier "${match.name}" matched but has no model configured — falling through`,
-      );
-      return null;
-    }
-
-    // Guard against orphaned overrides (a model removed after the tier was
-    // configured). The route-aware check honors the override's pinned
-    // (provider, authType) so a model id shared by two connections — e.g.
-    // openai api_key + openai subscription both exposing gpt-5.5 — still
-    // counts as available (#2210).
-    const fallbackRoutes = readFallbackRoutes(match);
-    let primaryOverride: ModelRoute | null = overrideRoute;
-    let remainingFallbacks: ModelRoute[] | null = fallbackRoutes;
-    if (!(await this.providerKeyService.isRouteAvailable(tenantId, overrideRoute, agentId))) {
-      // An explicitly configured tier shouldn't die with its primary: promote
-      // the first available fallback instead of abandoning the whole tier.
-      this.logger.warn(
-        `Header tier "${match.name}" override ${overrideRoute.model} is unavailable ` +
-          `for agent=${agentId} — trying the tier's fallbacks`,
-      );
-      primaryOverride = null;
-      const candidates = fallbackRoutes ?? [];
-      for (let i = 0; i < candidates.length; i++) {
-        if (await this.providerKeyService.isRouteAvailable(tenantId, candidates[i], agentId)) {
-          primaryOverride = candidates[i];
-          const rest = candidates.slice(i + 1);
-          remainingFallbacks = rest.length > 0 ? rest : null;
-          break;
-        }
-      }
-      if (!primaryOverride) {
-        this.logger.warn(
-          `Header tier "${match.name}" has no available route ` +
-            `for agent=${agentId}; falling through to existing routing`,
-        );
-        return null;
-      }
-    }
-
-    const provider =
-      primaryOverride.provider ||
-      (await this.resolveProviderForModel(agentId, tenantId, primaryOverride.model));
-    const authType: AuthType =
-      primaryOverride.authType ??
-      (await this.providerKeyService.getAuthType(tenantId, provider ?? '', undefined, agentId));
-    const baseRoute: ModelRoute | null =
-      provider && authType
-        ? { provider, authType, model: primaryOverride.model, keyLabel: primaryOverride.keyLabel }
-        : null;
-    const route = baseRoute ? await this.enrichRouteKeyLabel(agentId, tenantId, baseRoute) : null;
-
-    const outputModality = outputModalityFor(match);
-    const responseMode = responseModeFor(match);
-    const effectiveRoutes = effectiveRoutesForResponseMode(responseMode, route, remainingFallbacks);
-
-    return {
-      tier: 'standard',
-      route: effectiveRoutes.primaryRoute,
-      fallback_routes: effectiveRoutes.fallbackRoutes,
-      output_modality: outputModality,
-      response_mode: responseMode,
-      confidence: 1,
-      score: 0,
-      reason: 'header-match',
-      header_tier_id: match.id,
-      header_tier_name: match.name,
-      header_tier_color: match.badge_color,
-      header_tier_stream_warmup_ms: match.stream_warmup_ms ?? null,
-    };
-  }
-
-  /**
    * Step 1 of the proxy precedence (ADR 0004, section 5): the enabled virtual
    * model of this agent whose name equals `requestedModel`, ignoring case and
    * with no other normalization. Returns null when none matches, so the
-   * caller moves on to header tiers and then to auto/explicit routing.
+   * caller moves on to auto/explicit routing.
    *
    * A match never falls through: with no route left, the result carries
    * `virtual_model_unavailable` (M301 at the proxy). The chain skips the
@@ -444,7 +340,7 @@ export class ResolveService {
       defaultOverride && defaultOverrideAvailable ? await normalize(defaultOverride) : null;
 
     // Availability (section 4, steps 1 and 2). The virtual's own routes pass
-    // the header-tier check. The Default part follows buildResolvedRouteChain:
+    // the route-aware availability check. The Default part follows buildResolvedRouteChain:
     // an available override heads it, otherwise the first route with
     // credentials does, and the routes after that head pass the same check as
     // the virtual's own routes. Independent checks run concurrently; only the
@@ -745,30 +641,6 @@ export class ResolveService {
     );
     return label ? { ...route, keyLabel: label } : route;
   }
-
-  /**
-   * Resolve provider for a model that has no explicit provider attached
-   * (e.g. legacy header-tier rows where override_route was backfilled with
-   * just the model). Used as a fallback only.
-   */
-  private async resolveProviderForModel(
-    agentId: string,
-    tenantId: string,
-    model: string,
-  ): Promise<string | null> {
-    // 1. Slash prefix on the model name when that provider is connected.
-    const prefix = inferProviderFromModelName(model);
-    if (prefix && (await this.providerKeyService.hasActiveProvider(tenantId, prefix, agentId))) {
-      return prefix;
-    }
-    // 2. Discovered models cache.
-    const discovered = await this.discoveryService.getModelForAgent(tenantId, model, agentId);
-    if (discovered) return discovered.provider;
-    // 3. Pricing cache (excluding the OpenRouter aggregator).
-    const pricing = this.pricingCache.getByModel(model);
-    if (pricing && pricing.provider !== 'OpenRouter') return pricing.provider;
-    return null;
-  }
 }
 
 /**
@@ -809,14 +681,6 @@ function noRouteDetail(
     );
   }
   return `"auto" uses the default tier, which has no model set.`;
-}
-
-function matchesHeaderRule(headers: IncomingHttpHeaders, tier: HeaderTier): boolean {
-  const raw = headers[tier.header_key];
-  if (raw == null) return false;
-  // Node gives repeated headers as string[]; match if any entry equals the rule.
-  if (Array.isArray(raw)) return raw.some((v) => v === tier.header_value);
-  return raw === tier.header_value;
 }
 
 function outputModalityFor(row: { output_modality?: OutputModality | null }): OutputModality {

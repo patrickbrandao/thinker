@@ -129,7 +129,7 @@ export interface ReorderVirtualModelsRequest {
   ids: string[];
 }
 
-/** Same shape as the header-tier override body. `route` wins when present. */
+/** Override body for a virtual model. `route` wins when present. */
 export interface SetVirtualModelOverrideRequest {
   model: string;
   provider?: string;
@@ -138,7 +138,7 @@ export interface SetVirtualModelOverrideRequest {
   route?: ModelRoute;
 }
 
-/** Same shape as the header-tier fallbacks body. */
+/** Fallbacks body for a virtual model. */
 export interface SetVirtualModelFallbacksRequest {
   models: string[];
   routes?: ModelRoute[];

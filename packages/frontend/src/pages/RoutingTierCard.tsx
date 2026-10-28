@@ -489,8 +489,17 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
   return (
     <div className="routing-card card flex flex-col gap-3 p-3">
       <div className="routing-card__header flex min-h-7 items-center justify-between gap-2">
-        <span className="routing-card__tier text-sm font-semibold text-ink">
-          {stageLabel(props.stage)}
+        <span className="routing-card__tier flex items-center gap-1.5 text-sm font-semibold text-ink">
+          {stageId === 'default' ? (
+            <>
+              {t('routing.tierCard.virtualModelLabel')}
+              <code className="routing-card__auto rounded-control border border-accent bg-accent-tint px-1.5 py-px font-mono font-bold text-accent">
+                auto
+              </code>
+            </>
+          ) : (
+            stageLabel(props.stage)
+          )}
         </span>
         <div className="flex items-center gap-1">
           {hasCustomizations ? (

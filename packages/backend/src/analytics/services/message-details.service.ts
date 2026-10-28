@@ -47,9 +47,6 @@ export interface MessageDetailResponse {
     request_headers: Record<string, string> | null;
     request_params: RequestParamDefaults | null;
     caller_attribution: CallerAttribution | null;
-    header_tier_id: string | null;
-    header_tier_name: string | null;
-    header_tier_color: string | null;
     virtual_model_id: string | null;
     virtual_model_name: string | null;
     attempts?: Array<{
@@ -201,9 +198,6 @@ export class MessageDetailsService {
         request_params: (request?.request_params ??
           message?.request_params) as RequestParamDefaults | null,
         caller_attribution: request?.caller_attribution ?? message?.caller_attribution ?? null,
-        header_tier_id: message?.header_tier_id ?? null,
-        header_tier_name: message?.header_tier_name ?? null,
-        header_tier_color: message?.header_tier_color ?? null,
         virtual_model_id: message?.virtual_model_id ?? null,
         virtual_model_name: message?.virtual_model_name ?? null,
         ...(request

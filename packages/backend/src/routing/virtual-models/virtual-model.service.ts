@@ -255,7 +255,7 @@ export class VirtualModelService {
     return this.persist(agentId, tenantId, row, catalog);
   }
 
-  /** Clears the primary and, as for header tiers, the fallbacks behind it. */
+  /** Clears the primary and the fallbacks behind it. */
   async clearOverride(agentId: string, id: string): Promise<void> {
     const row = await this.findOrThrow(agentId, id);
     assertStreamableResponseMode(row.response_mode, `virtual model "${row.name}"`, null, null);
@@ -314,7 +314,7 @@ export class VirtualModelService {
     }
     const rows = await this.repo.find({ where: { agent_id: agentId } });
     // Bound the loop by the stored row count, not the caller's array length
-    // (CodeQL: js/loop-bound-injection), as in HeaderTierService.reorder.
+    // (CodeQL: js/loop-bound-injection).
     if (ids.length !== rows.length) {
       throw new BadRequestException(
         'reorder list must include every existing virtual model exactly once',
@@ -440,8 +440,8 @@ export class VirtualModelService {
   /**
    * Strict write-time validation (ADR 0004 review): the route must resolve to
    * exactly one model the agent's enabled providers offer, or the write is a
-   * 400. Unlike a header tier, an explicit (provider, authType) the catalog
-   * does not list is not kept as given. A sent key label is then validated
+   * 400. An explicit (provider, authType) the catalog does not list is not
+   * kept as given. A sent key label is then validated
    * (see validateKeyLabel).
    */
   private async resolveOverrideRoute(

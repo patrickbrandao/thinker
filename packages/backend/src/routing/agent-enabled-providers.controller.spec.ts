@@ -5,7 +5,6 @@ import type { AgentEnabledProvider } from '../entities/agent-enabled-provider.en
 import type { TenantProvider } from '../entities/tenant-provider.entity';
 import type { TierAssignment } from '../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../entities/specificity-assignment.entity';
-import type { HeaderTier } from '../entities/header-tier.entity';
 import type { VirtualModel } from '../entities/virtual-model.entity';
 
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
@@ -52,11 +51,6 @@ function makeController(overrides: Record<string, unknown> = {}) {
     save: jest.fn().mockResolvedValue(undefined),
     ...((overrides.specificityRepo as object) ?? {}),
   };
-  const headerTierRepo = {
-    find: jest.fn().mockResolvedValue([]),
-    save: jest.fn().mockResolvedValue(undefined),
-    ...((overrides.headerTierRepo as object) ?? {}),
-  };
 
   const virtualModelService = {
     list: jest.fn().mockResolvedValue([]),
@@ -75,7 +69,6 @@ function makeController(overrides: Record<string, unknown> = {}) {
       tenantProviderRepo as never,
       tierRepo as never,
       specificityRepo as never,
-      headerTierRepo as never,
       providerService as never,
       virtualModelService as never,
     ),
@@ -85,7 +78,6 @@ function makeController(overrides: Record<string, unknown> = {}) {
     tenantProviderRepo,
     tierRepo,
     specificityRepo,
-    headerTierRepo,
     providerService,
     agent,
   };
@@ -414,7 +406,7 @@ describe('AgentEnabledProvidersController', () => {
       });
     });
 
-    it('reports affected specificity and header-tier routes (primary and fallback)', async () => {
+    it('reports affected specificity routes (primary and fallback)', async () => {
       const match = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
       const { controller } = makeController({
         tenantProviderRepo: {
@@ -438,23 +430,11 @@ describe('AgentEnabledProvidersController', () => {
             } as Partial<SpecificityAssignment>,
           ]),
         },
-        headerTierRepo: {
-          find: jest.fn().mockResolvedValue([
-            {
-              name: 'h1',
-              override_route: match,
-              auto_assigned_route: null,
-              fallback_routes: [match],
-            } as Partial<HeaderTier>,
-          ]),
-        },
       });
       const result = await controller.getDisableImpact(ctx, 'my-agent', PROVIDER_ID);
       expect(result.affected_tiers).toEqual([
         { tier: 'coding', model: 'gpt-4o', position: 'primary' },
         { tier: 'coding', model: 'gpt-4o', position: 'fallback 1' },
-        { tier: 'h1', model: 'gpt-4o', position: 'primary' },
-        { tier: 'h1', model: 'gpt-4o', position: 'fallback 1' },
       ]);
     });
 

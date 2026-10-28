@@ -182,10 +182,6 @@ Em **Configurações** de cada harness, a opção **Listagem de modelos** decide
 
 A opção só muda a lista. Um harness ainda pode pedir pelo nome um modelo que não aparece nela.
 
-## Roteamento por cabeçalho
-
-Um harness pode ter **tiers customizados** ativados por um cabeçalho de requisição (por exemplo `x-thinker-tier: premium`), cada um com seu modelo e fallbacks. Veja [Provedores e roteamento](provedores-e-roteamento.md#tiers-customizados-por-cabeçalho). Se o harness não deixa enviar cabeçalhos, use um modelo virtual. Um modelo virtual com o mesmo nome do `model` vence o tier por cabeçalho.
-
 ## Servidor MCP
 
 O Thinker expõe um servidor MCP remoto em `/api/v1/mcp` (OAuth 2.1), com ferramentas `thinker_*` para gerenciar harnesses, provedores e roteamento. Ele exige `BETTER_AUTH_URL` em HTTPS (ou localhost); veja [Instalação](instalacao-docker.md#porta-e-acesso-pela-rede).

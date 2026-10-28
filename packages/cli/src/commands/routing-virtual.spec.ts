@@ -322,7 +322,6 @@ describe('routing status with virtual models', () => {
   const status = (defaultRoute: unknown, virtualModels: unknown[]) =>
     authedIo([
       { status: 200, body: [{ tier: 'default', override_route: defaultRoute }] },
-      { status: 200, body: [] },
       { status: 200, body: virtualModels },
       { status: 200, body: { enabled: true } },
     ]);

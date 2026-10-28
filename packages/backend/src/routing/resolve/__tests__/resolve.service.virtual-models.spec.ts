@@ -9,9 +9,7 @@ import type { ProviderKeyService } from '../../routing-core/provider-key.service
 import type { RoutingCacheService } from '../../routing-core/routing-cache.service';
 import type { SpecificityService } from '../../routing-core/specificity.service';
 import type { SpecificityPenaltyService } from '../../routing-core/specificity-penalty.service';
-import type { HeaderTierService } from '../../header-tiers/header-tier.service';
 import type { VirtualModelService } from '../../virtual-models/virtual-model.service';
-import type { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import type { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 
 jest.mock('../../../scoring', () => ({
@@ -58,7 +56,6 @@ describe('ResolveService.resolveVirtualModel (ADR 0004)', () => {
     hasRouteCredentials: jest.Mock;
     getDefaultKeyLabel: jest.Mock;
   };
-  let headerTierService: { list: jest.Mock };
   let virtualModelService: { list: jest.Mock };
   let svc: ResolveService;
 
@@ -70,20 +67,17 @@ describe('ResolveService.resolveVirtualModel (ADR 0004)', () => {
       hasRouteCredentials: jest.fn().mockResolvedValue(true),
       getDefaultKeyLabel: jest.fn().mockResolvedValue(undefined),
     };
-    headerTierService = { list: jest.fn().mockResolvedValue([]) };
     virtualModelService = { list: jest.fn().mockResolvedValue([vm()]) };
     svc = new ResolveService(
       tierService as unknown as TierService,
       providerKeyService as unknown as ProviderKeyService,
       { getActiveAssignments: jest.fn() } as unknown as SpecificityService,
-      { getByModel: jest.fn() } as unknown as ModelPricingCacheService,
       {
         getModelForAgent: jest.fn(),
         invalidate: jest.fn(),
         invalidateTenant: jest.fn(),
       } as unknown as ModelDiscoveryService,
       { getPenaltiesForAgent: jest.fn() } as unknown as SpecificityPenaltyService,
-      headerTierService as unknown as HeaderTierService,
       { findOne: jest.fn() } as unknown as Repository<Agent>,
       {
         addInvalidationListener: jest.fn(),
@@ -147,10 +141,9 @@ describe('ResolveService.resolveVirtualModel (ADR 0004)', () => {
       'virtual:vm-1',
       'virtual:vm-1',
     ]);
-    // No scorer, no specificity, no header tiers.
+    // No scorer, no specificity.
     expect(scoreRequest).not.toHaveBeenCalled();
     expect(scanMessages).not.toHaveBeenCalled();
-    expect(headerTierService.list).not.toHaveBeenCalled();
   });
 
   it('skips an unavailable route and promotes the next one', async () => {

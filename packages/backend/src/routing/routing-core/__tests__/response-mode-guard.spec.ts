@@ -27,7 +27,7 @@ describe('assertStreamableResponseMode', () => {
     const custom = route('custom:abc', 'custom:abc/local-model');
 
     expect(() =>
-      assertStreamableResponseMode('stream', 'custom tier "local"', custom, null),
+      assertStreamableResponseMode('stream', 'virtual model "local"', custom, null),
     ).not.toThrow();
   });
 

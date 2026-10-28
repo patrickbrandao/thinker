@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as routing from '../../../src/services/api/routing';
 import * as specificity from '../../../src/services/api/specificity';
-import * as headerTiers from '../../../src/services/api/header-tiers';
 import type { ModelRoute } from '../../../src/services/api/routing';
 
 /**
@@ -9,8 +8,8 @@ import type { ModelRoute } from '../../../src/services/api/routing';
  * (model, provider, authType) triple AND the new structured `route` /
  * `routes` payload to every override / fallback endpoint. Older backends that
  * don't know about routes still get the legacy fields; newer backends pick up
- * the unambiguous tuple. These tests pin that contract for the three sibling
- * services (routing, specificity, header-tiers) so a single accidental
+ * the unambiguous tuple. These tests pin that contract for the two sibling
+ * services (routing, specificity) so a single accidental
  * regression on any of them fails loudly.
  */
 
@@ -189,83 +188,6 @@ describe('routing-routes dual-write API client', () => {
 
       const body = lastBody(fetchMock);
       expect(body).toEqual({ models: ['a', 'b'] });
-      expect(body).not.toHaveProperty('routes');
-    });
-  });
-
-  describe('overrideHeaderTier', () => {
-    it('sends legacy fields AND structured route when authType is provided', async () => {
-      const fetchMock = setupFetch({});
-      await headerTiers.overrideHeaderTier('my-agent', 'ht-1', 'gpt-4o', 'OpenAI', 'api_key');
-
-      const body = lastBody(fetchMock);
-      expect(body).toEqual({
-        model: 'gpt-4o',
-        provider: 'OpenAI',
-        authType: 'api_key',
-        route: { provider: 'OpenAI', authType: 'api_key', model: 'gpt-4o' },
-      });
-    });
-
-    it('omits the route key entirely when authType is not provided', async () => {
-      const fetchMock = setupFetch({});
-      await headerTiers.overrideHeaderTier('my-agent', 'ht-1', 'gpt-4o', 'OpenAI');
-
-      const body = lastBody(fetchMock);
-      expect(body).toEqual({ model: 'gpt-4o', provider: 'OpenAI' });
-      expect(body).not.toHaveProperty('route');
-    });
-
-    it('PUTs to the header-tier override path with the encoded id', async () => {
-      const fetchMock = setupFetch({});
-      await headerTiers.overrideHeaderTier(
-        'my-agent',
-        'ht with space',
-        'gpt-4o',
-        'OpenAI',
-        'api_key',
-      );
-      const [url, init] = fetchMock.mock.calls[0];
-      // header-tier path uses /override suffix and encodes the id.
-      expect(url).toContain('/routing/my-agent/header-tiers/ht%20with%20space/override');
-      expect((init as RequestInit).method).toBe('PUT');
-    });
-  });
-
-  describe('setHeaderTierFallbacks', () => {
-    it('sends only `models` when routes are not provided', async () => {
-      const fetchMock = setupFetch([]);
-      await headerTiers.setHeaderTierFallbacks('my-agent', 'ht-1', ['m1', 'm2']);
-
-      const body = lastBody(fetchMock);
-      expect(body).toEqual({ models: ['m1', 'm2'] });
-      expect(body).not.toHaveProperty('routes');
-    });
-
-    it('sends BOTH `models` and `routes` when lengths match', async () => {
-      const fetchMock = setupFetch([]);
-      const routes: ModelRoute[] = [
-        { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
-        { provider: 'openai', authType: 'subscription', model: 'gpt-4o' },
-      ];
-      await headerTiers.setHeaderTierFallbacks('my-agent', 'ht-1', ['gpt-4o', 'gpt-4o'], routes);
-
-      const body = lastBody(fetchMock);
-      expect(body).toEqual({ models: ['gpt-4o', 'gpt-4o'], routes });
-    });
-
-    it('drops `routes` defensively when lengths drift', async () => {
-      const fetchMock = setupFetch([]);
-      const routes: ModelRoute[] = [{ provider: 'openai', authType: 'api_key', model: 'gpt-4o' }];
-      await headerTiers.setHeaderTierFallbacks(
-        'my-agent',
-        'ht-1',
-        ['gpt-4o', 'claude-opus-4-6'],
-        routes,
-      );
-
-      const body = lastBody(fetchMock);
-      expect(body).toEqual({ models: ['gpt-4o', 'claude-opus-4-6'] });
       expect(body).not.toHaveProperty('routes');
     });
   });

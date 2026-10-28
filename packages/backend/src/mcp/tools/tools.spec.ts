@@ -123,14 +123,6 @@ function makeDeps(): McpToolDeps {
       resolve: jest.fn().mockResolvedValue(AGENT),
       invalidate: jest.fn(),
     } as never,
-    headerTiers: {
-      list: jest.fn().mockResolvedValue([{ id: 'h1', name: 'tier' }]),
-      create: jest.fn().mockResolvedValue({ id: 'h1', name: 'tier' }),
-      setOverride: jest.fn().mockResolvedValue({}),
-      setFallbacks: jest.fn().mockResolvedValue([]),
-      clearFallbacks: jest.fn().mockResolvedValue(undefined),
-      delete: jest.fn().mockResolvedValue(undefined),
-    } as never,
     virtualModels: {
       list: jest.fn().mockResolvedValue([VIRTUAL_ROW]),
       listViews: jest.fn().mockResolvedValue([VIRTUAL_VIEW]),
@@ -483,7 +475,6 @@ describe('MCP tools', () => {
       (deps.tiers.getTiers as jest.Mock).mockResolvedValue([
         { tier: 'default', override_route: null, fallback_routes: [] },
       ]);
-      (deps.headerTiers.list as jest.Mock).mockResolvedValue([]);
       (deps.virtualModels.list as jest.Mock).mockResolvedValue([
         {
           ...VIRTUAL_ROW,
@@ -520,7 +511,7 @@ describe('MCP tools', () => {
       expect(blocked.error).toBe(true);
     });
 
-    it('scans tier, header-tier, and specificity fallbacks for the disabled provider', async () => {
+    it('scans tier and specificity fallbacks for the disabled provider', async () => {
       const deps = makeDeps();
       (deps.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, priority: 1, label: 'work' },
@@ -539,9 +530,6 @@ describe('MCP tools', () => {
           fallback_routes: [],
         },
         { tier: 'team', override_route: null, fallback_routes: [matching] },
-      ]);
-      (deps.headerTiers.list as jest.Mock).mockResolvedValue([
-        { id: 'h1', name: 'hdr', override_route: null, fallback_routes: [matching] },
       ]);
       (deps.specificity.getAssignments as jest.Mock).mockResolvedValue([
         // No provider field → matched by model id.
@@ -645,15 +633,15 @@ describe('MCP tools', () => {
       const tools = registerAll(deps);
       const got = await call(tools, 'thinker_routing_params_get', {
         agent: 'demo',
-        tier: 'deep',
+        tier: 'default',
         model: 'gpt-5',
       });
       expect(got.data).toEqual({ tier: 'default', params: [] });
-      expect(deps.routeModelParams.get).toHaveBeenCalledWith('agent-1', 'deep', 'gpt-5', TENANT);
+      expect(deps.routeModelParams.get).toHaveBeenCalledWith('agent-1', 'default', 'gpt-5', TENANT);
 
       const set = await call(tools, 'thinker_routing_params_set', {
         agent: 'demo',
-        tier: 'deep',
+        tier: 'default',
         model: 'gpt-5',
         set: { 'reasoning.effort': 'high' },
         unset: ['temperature'],
@@ -661,7 +649,7 @@ describe('MCP tools', () => {
       expect(set.error).toBe(false);
       expect(deps.routeModelParams.update).toHaveBeenCalledWith(
         'agent-1',
-        'deep',
+        'default',
         'gpt-5',
         { set: { 'reasoning.effort': 'high' }, unset: ['temperature'] },
         TENANT,
@@ -1059,61 +1047,7 @@ describe('MCP tools', () => {
       ).toBeFalsy();
     });
 
-    it('manages custom tiers, including rollback', async () => {
-      const deps = makeDeps();
-      const tools = registerAll(deps);
-      expect(
-        (await call(tools, 'thinker_routing_custom_list', { agent: 'demo' })).error,
-      ).toBeFalsy();
-      expect(
-        (
-          await call(tools, 'thinker_routing_custom_create', {
-            agent: 'demo',
-            name: 'tier',
-            header_key: 'x',
-            header_value: 'y',
-            badge_color: 'indigo',
-            model: 'gpt-4o',
-            provider: 'openai',
-            fallbacks: ['gpt-4o'],
-          })
-        ).error,
-      ).toBeFalsy();
-      expect(
-        (await call(tools, 'thinker_routing_custom_delete', { agent: 'demo', id: 'h1' })).error,
-      ).toBeFalsy();
-
-      (deps.headerTiers.setOverride as jest.Mock).mockRejectedValueOnce(new Error('nope'));
-      expect(
-        (
-          await call(tools, 'thinker_routing_custom_create', {
-            agent: 'demo',
-            name: 'tier2',
-            header_key: 'x',
-            header_value: 'y',
-            badge_color: 'indigo',
-            model: 'gpt-4o',
-            provider: 'openai',
-          })
-        ).error,
-      ).toBe(true);
-
-      // Fallbacks without a primary route are rejected.
-      expect(
-        (
-          await call(tools, 'thinker_routing_custom_create', {
-            agent: 'demo',
-            name: 'tier3',
-            header_key: 'x',
-            header_value: 'y',
-            badge_color: 'indigo',
-            fallbacks: ['gpt-4o'],
-          })
-        ).error,
-      ).toBe(true);
-    });
-
-    it('configures the default route, a custom tier, and toggles', async () => {
+    it('configures the default route and toggles', async () => {
       const deps = makeDeps();
       const tools = registerAll(deps);
       expect(
@@ -1131,29 +1065,18 @@ describe('MCP tools', () => {
             agent: 'demo',
             models: ['gpt-4o', 'gpt-4o'],
             provider: 'openai',
-            tier: 'test',
             auth_type: 'api_key',
             key_label: 'default',
           })
         ).error,
       ).toBeFalsy();
-      // Default tier with a fallback (set branch) and a custom tier with none.
+      // Default tier with a fallback (set branch).
       expect(
         (
           await call(tools, 'thinker_agent_configure', {
             agent: 'demo',
             models: ['gpt-4o', 'gpt-4o'],
             provider: 'openai',
-          })
-        ).error,
-      ).toBeFalsy();
-      expect(
-        (
-          await call(tools, 'thinker_agent_configure', {
-            agent: 'demo',
-            models: ['gpt-4o'],
-            provider: 'openai',
-            tier: 'test',
           })
         ).error,
       ).toBeFalsy();
@@ -1168,10 +1091,6 @@ describe('MCP tools', () => {
 
       // Nothing to configure.
       expect((await call(tools, 'thinker_agent_configure', { agent: 'demo' })).error).toBe(true);
-      // tier without a route.
-      expect(
-        (await call(tools, 'thinker_agent_configure', { agent: 'demo', tier: 'x' })).error,
-      ).toBe(true);
       // Unknown model without force.
       expect(
         (
@@ -1240,32 +1159,6 @@ describe('MCP tools', () => {
         'subscription',
         undefined,
       );
-    });
-
-    it('rejects tier-only config and rolls back a failed new custom tier', async () => {
-      const tools = registerAll(makeDeps());
-      // tier with another toggle set reaches the "tier needs models" guard.
-      expect(
-        (
-          await call(tools, 'thinker_agent_configure', {
-            agent: 'demo',
-            tier: 'x',
-            recording: true,
-          })
-        ).error,
-      ).toBe(true);
-
-      const deps = makeDeps();
-      (deps.headerTiers.list as jest.Mock).mockResolvedValueOnce([]);
-      (deps.headerTiers.setOverride as jest.Mock).mockRejectedValueOnce(new Error('boom'));
-      const res = await call(registerAll(deps), 'thinker_agent_configure', {
-        agent: 'demo',
-        models: ['gpt-4o'],
-        provider: 'openai',
-        tier: 'new',
-      });
-      expect(res.error).toBe(true);
-      expect(deps.headerTiers.delete).toHaveBeenCalledWith('agent-1', 'h1');
     });
 
     it('runs an end-to-end route test across surfaces', async () => {
@@ -1390,80 +1283,6 @@ describe('MCP tools', () => {
           as: 'codex',
         });
         expect(res.data).toMatchObject({ surface: 'responses', reply: 'RESP' });
-      } finally {
-        global.fetch = originalFetch;
-      }
-    });
-
-    it('sends the header rule the custom tier stores, not a fixed header name', async () => {
-      const originalFetch = global.fetch;
-      const fetchMock = jest
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ model: 'gpt-4o', choices: [{ message: { content: 'OK' } }] }),
-            { status: 200 },
-          ),
-        );
-      global.fetch = fetchMock;
-      try {
-        const deps = makeDeps();
-        (deps.headerTiers.list as jest.Mock).mockResolvedValue([
-          // e.g. created by the CLI or the dashboard with its own header key
-          {
-            id: 'h1',
-            name: 'Deep',
-            header_key: 'x-team-route',
-            header_value: 'deep-v2',
-            enabled: true,
-          },
-        ]);
-        const res = await call(registerAll(deps), 'thinker_routing_test', {
-          agent: 'demo',
-          as: 'openclaw',
-          tier: 'deep',
-        });
-        expect(res.error).toBeFalsy();
-        expect(res.data).toMatchObject({ tier: 'deep', tier_header: 'x-team-route: deep-v2' });
-        const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
-        expect(headers['x-team-route']).toBe('deep-v2');
-        expect(Object.keys(headers).filter((h) => h.endsWith('-tier'))).toEqual([]);
-      } finally {
-        global.fetch = originalFetch;
-      }
-    });
-
-    it('refuses to test an unknown or disabled custom tier without calling the gateway', async () => {
-      const originalFetch = global.fetch;
-      const fetchMock = jest.fn();
-      global.fetch = fetchMock;
-      try {
-        const deps = makeDeps();
-        (deps.headerTiers.list as jest.Mock).mockResolvedValue([
-          {
-            id: 'h1',
-            name: 'deep',
-            header_key: 'x-thinker-tier',
-            header_value: 'deep',
-            enabled: false,
-          },
-        ]);
-        const tools = registerAll(deps);
-        const unknown = await call(tools, 'thinker_routing_test', {
-          agent: 'demo',
-          as: 'openclaw',
-          tier: 'nope',
-        });
-        expect(unknown.error).toBe(true);
-        expect(JSON.stringify(unknown)).toContain('Custom tier \\"nope\\" not found');
-        const disabled = await call(tools, 'thinker_routing_test', {
-          agent: 'demo',
-          as: 'openclaw',
-          tier: 'deep',
-        });
-        expect(disabled.error).toBe(true);
-        expect(JSON.stringify(disabled)).toContain('is disabled');
-        expect(fetchMock).not.toHaveBeenCalled();
       } finally {
         global.fetch = originalFetch;
       }

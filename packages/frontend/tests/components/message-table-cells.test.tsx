@@ -307,7 +307,6 @@ describe('ModelCell', () => {
     const row = baseRow({
       virtual_model_id: 'vm-1',
       virtual_model_name: 'deepseek/flash',
-      header_tier_name: 'Ignored',
       routing_tier: 'default',
     });
     const { container } = render(
@@ -321,40 +320,7 @@ describe('ModelCell', () => {
     expect(badge).not.toBeNull();
     expect(badge!.textContent).toBe('deepseek/flash');
     expect(badge!.getAttribute('title')).toBe('Virtual model: deepseek/flash');
-    expect(container.querySelector('.tier-badge--custom')).toBeNull();
     expect(container.querySelector('.tier-badge--default')).toBeNull();
-  });
-
-  it('renders header tier badge when header_tier_name is set', () => {
-    const row = baseRow({
-      header_tier_name: 'My Custom Tier',
-      header_tier_color: 'rose',
-    });
-    const { container } = render(
-      <table>
-        <tbody>
-          <tr>{ModelCell(row)}</tr>
-        </tbody>
-      </table>,
-    );
-    const badge = container.querySelector('.tier-badge--custom');
-    expect(badge).not.toBeNull();
-    expect(badge!.textContent).toBe('My Custom Tier');
-    expect(badge!.className).toContain('tier-color--rose');
-  });
-
-  it('uses indigo as default header tier color', () => {
-    const row = baseRow({ header_tier_name: 'Tier A' });
-    const { container } = render(
-      <table>
-        <tbody>
-          <tr>{ModelCell(row)}</tr>
-        </tbody>
-      </table>,
-    );
-    const badge = container.querySelector('.tier-badge--custom');
-    expect(badge).not.toBeNull();
-    expect(badge!.className).toContain('tier-color--indigo');
   });
 
   it('renders a custom row with just the model text and the provider name in the tooltip', () => {

@@ -15,8 +15,7 @@ interface Props {
 
 /**
  * Copyable example for a virtual model: the harness's base URL and key with
- * `model: "<name>"`. Reuses {@link FrameworkSnippets}, as the header-tier
- * snippet modal does, with the model swapped in.
+ * `model: "<name>"`. Reuses {@link FrameworkSnippets} with the model swapped in.
  */
 export default function VirtualModelSnippetModal(props: Props) {
   const { data: keyData } = useResource(() => getAgentKey(props.agentName), [props.agentName]);

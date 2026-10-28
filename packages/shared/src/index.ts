@@ -118,7 +118,6 @@ export type {
   ProviderParamSpecCatalog,
 } from './provider-params-spec';
 export {
-  modelParamsScopeForHeaderTier,
   modelParamsScopeForRouting,
   modelParamsScopeForSpecificity,
   modelParamsScopeForTier,

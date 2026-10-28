@@ -1,7 +1,6 @@
 import {
   modelParamsScopeForTier,
   modelParamsScopeForSpecificity,
-  modelParamsScopeForHeaderTier,
   modelParamsScopeForRouting,
   modelParamsScopeForVirtualModel,
 } from '../src/model-params-scope';
@@ -24,24 +23,8 @@ describe('modelParamsScopeForSpecificity', () => {
   });
 });
 
-describe('modelParamsScopeForHeaderTier', () => {
-  it('prefixes the header tier id', () => {
-    expect(modelParamsScopeForHeaderTier('abc-123')).toBe('header:abc-123');
-  });
-});
-
 describe('modelParamsScopeForRouting', () => {
-  it('prefers the header tier when present', () => {
-    expect(
-      modelParamsScopeForRouting({
-        tier: 'standard',
-        specificityCategory: 'coding',
-        headerTierId: 'h1',
-      }),
-    ).toBe('header:h1');
-  });
-
-  it('falls back to specificity when no header tier', () => {
+  it('uses specificity when present', () => {
     expect(
       modelParamsScopeForRouting({
         tier: 'standard',
@@ -50,7 +33,7 @@ describe('modelParamsScopeForRouting', () => {
     ).toBe('specificity:trading');
   });
 
-  it('falls back to the complexity tier when neither header nor specificity is set', () => {
+  it('falls back to the complexity tier when no specificity is set', () => {
     expect(modelParamsScopeForRouting({ tier: 'simple' })).toBe('tier:simple');
   });
 });

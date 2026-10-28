@@ -12,12 +12,6 @@ const ptBR: Catalog<typeof en> = {
   fallbacksUpdateFailed: 'Não foi possível atualizar os fallbacks',
   pinnedToKey: 'Fixado na chave "{{ label }}"',
   keyPinCleared: 'Chave fixada removida',
-  updateTierFailed: 'Não foi possível atualizar o nível',
-  toggleTierFailed: 'Não foi possível ativar ou desativar o nível',
-  deleteTierFailed: 'Não foi possível excluir o nível',
-  manageCustomRouting: 'Gerenciar roteamento personalizado',
-  createCustomTier: 'Criar nível personalizado',
-  howRoutingWorks: 'Como o roteamento funciona',
   defaultSubtitle: 'Escolha um modelo e até 5 fallbacks como seu roteamento padrão.',
   reset: 'Redefinir',
   addModel: '+ Adicionar modelo',
@@ -64,25 +58,12 @@ const ptBR: Catalog<typeof en> = {
     keyCount: '{{ count }} chaves ({{ auth }})',
     defaultKey: 'Padrão',
     connections: (n: number) => `${n} ${n !== 1 ? 'conexões' : 'conexão'}`,
-    resetAll: 'Voltar tudo para automático',
-    setupInstructions: 'Instruções de configuração',
   },
   defaultTier: {
     title: 'Roteamento padrão',
     routeByComplexity: 'Rotear por complexidade',
     complexitySubtitle:
       'Analisa a complexidade de cada requisição na hora e a envia para o nível correspondente.',
-  },
-  headerTiers: {
-    title: 'Roteamento personalizado',
-    subtitle:
-      'Atribua requisições a níveis com base nos headers HTTP. O roteamento personalizado é avaliado antes de qualquer outro método de roteamento.',
-    loadFailed: 'Não foi possível carregar os níveis personalizados',
-    manageDesc: 'Ative ou desative níveis. Crie níveis novos ou edite-os direto no card.',
-    createNew: 'Criar nível novo',
-    emptyTitle: 'Nenhum nível personalizado ativo',
-    emptyDesc:
-      'Crie ou ative níveis personalizados para enviar as requisições correspondentes aos modelos que você escolher.',
   },
   specificity: {
     title: 'Roteamento por tarefa',
@@ -147,6 +128,7 @@ const ptBR: Catalog<typeof en> = {
     trading: { label: 'Trading', desc: 'Analisar mercados, fazer operações, acompanhar posições.' },
   },
   tierCard: {
+    virtualModelLabel: 'Modelo virtual:',
     resetTitle: 'Redefinir o nível?',
     resetBody: 'Isso remove o modelo escolhido e todos os modelos de fallback deste nível.',
   },
@@ -172,24 +154,6 @@ const ptBR: Catalog<typeof en> = {
     label: 'Camadas de roteamento',
     default: 'Padrão',
     specificity: 'Por tarefa',
-    custom: 'Personalizado',
-  },
-  pipeline: {
-    customName: 'Roteamento personalizado',
-    customDesc:
-      'Se um header da requisição corresponder à regra de um nível personalizado, ela vai para o modelo correspondente.',
-    specificityName: 'Roteamento por tarefa',
-    specificityDesc:
-      'O Thinker analisa a consulta semanticamente e, se ela corresponder a um nível por tarefa ativo (programação, geração de imagens…), envia para o modelo correspondente.',
-    defaultName: 'Roteamento padrão:',
-    complexity: 'complexidade',
-    regular: 'normal',
-    complexityDesc:
-      'O Thinker analisa a consulta semanticamente, avalia a complexidade e a atribui a um nível que vai de “simples” a “raciocínio”.',
-    regularDesc: 'As demais requisições vão para o modelo padrão e seus fallbacks.',
-    summary:
-      'O roteamento permite que o Thinker intercepte as consultas na hora e as redirecione para o modelo correspondente.',
-    current: 'Assim está a sua configuração atual:',
   },
   instructions: {
     deactivate: 'Desativar roteamento',
@@ -212,16 +176,6 @@ const ptBR: Catalog<typeof en> = {
     pickingFor: 'Escolhendo uma chave para',
     choose: 'Escolha uma chave do {{ provider }}',
   },
-  headerTierCard: {
-    sendHeader: 'Enviar este header',
-    editTier: 'Editar nível',
-  },
-  snippet: {
-    title: 'Envie o header “{{ name }}”',
-    noModel: 'nenhum modelo atribuído (usa o roteamento padrão)',
-    descBefore: 'Adicione este header a qualquer requisição e ela será roteada para',
-    descAfter: '.',
-  },
   responseMode: {
     title: 'Modo de resposta',
     streamMode: 'Modo stream',
@@ -237,71 +191,6 @@ const ptBR: Catalog<typeof en> = {
         : 'O modo stream não está disponível porque estes modelos não suportam streaming. Troque-os para ativar o modo stream.',
     primary: 'Principal',
     fallbackN: 'Fallback {{ n }}',
-  },
-  headerTierModal: {
-    editTitle: 'Editar nível personalizado',
-    editDesc:
-      'Atualize a regra de header, o nome ou a cor deste nível. O modelo e os fallbacks são gerenciados no card.',
-    createDesc:
-      'O roteamento personalizado identifica requisições pelos headers e atribui modelos específicos a elas.',
-    saving: 'Salvando…',
-    creating: 'Criando…',
-    create: 'Criar nível',
-    createFailed: 'Não foi possível criar o nível',
-    seenCount: 'visto {{ count }}×',
-    nameRequired: 'O nome é obrigatório',
-    nameTooLong: 'O nome deve ter no máximo {{ max }} caracteres',
-    nameTaken: 'Já existe um nível com este nome',
-    keyRequired: 'A chave do header é obrigatória',
-    keyInvalid: 'A chave do header só pode ter letras minúsculas, dígitos e hífens',
-    keyReserved: 'Este header é removido por segurança e não pode ser usado como regra',
-    valueRequired: 'O valor do header é obrigatório',
-    valueTooLong: 'O valor do header deve ter no máximo {{ max }} caracteres',
-    valueQuotes: 'O valor do header não pode ter aspas nem barras invertidas',
-    valueTaken: 'Outro nível já usa esta chave e este valor de header',
-    tierName: 'Nome do nível',
-    tierNamePlaceholder: 'Meu nível personalizado',
-    headerKey: 'Chave do header',
-    headerValue: 'Valor do header',
-    useCustomHeader: 'Usar "{{ value }}" como header personalizado',
-    useCustomValue: 'Usar "{{ value }}" como valor personalizado',
-    badgeColor: 'Cor do selo',
-    incompatible: (n: number) =>
-      n === 1
-        ? 'Este modelo não suporta streaming. Troque-o para ativar o modo stream.'
-        : 'Estes modelos não suportam streaming. Troque-os para ativar o modo stream.',
-    warmupLabel: 'Aquecimento do stream (segundos)',
-    warmupPlaceholder: 'Herdar',
-    warmupHelp:
-      'Opcional. Quanto tempo uma requisição em stream espera pelo primeiro token antes do failover. Deixe em branco para usar a configuração da conexão ou o padrão.',
-    confirmDelete: 'Excluir o nível "{{ name }}"?',
-    deleteTier: 'Excluir nível',
-  },
-  colors: {
-    slate: 'ardósia',
-    gray: 'cinza',
-    zinc: 'zinco',
-    stone: 'pedra',
-    red: 'vermelho',
-    orange: 'laranja',
-    amber: 'âmbar',
-    yellow: 'amarelo',
-    lime: 'lima',
-    green: 'verde',
-    emerald: 'esmeralda',
-    teal: 'verde-azulado',
-    cyan: 'ciano',
-    sky: 'céu',
-    blue: 'azul',
-    indigo: 'índigo',
-    violet: 'violeta',
-    purple: 'roxo',
-    fuchsia: 'fúcsia',
-    pink: 'rosa',
-    rose: 'rosé',
-    coral: 'coral',
-    brown: 'marrom',
-    navy: 'azul-marinho',
   },
 };
 

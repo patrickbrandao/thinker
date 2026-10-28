@@ -160,10 +160,6 @@ export class MessagesQueryDto {
   specificity_category?: SpecificityCategory;
 
   @IsOptional()
-  @IsString()
-  header_tier_id?: string;
-
-  @IsOptional()
   @IsBoolean()
   @Transform(({ value }) => value === true || value === 'true' || value === '1')
   include_total?: boolean;

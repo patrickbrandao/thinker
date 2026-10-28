@@ -33,7 +33,6 @@ const WHEN_SET_FIELDS = [
   'error_message',
   'error_origin',
   'fallback_from_model',
-  'header_tier_name',
   'custom_provider_name',
 ] as const;
 

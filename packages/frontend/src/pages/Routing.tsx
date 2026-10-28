@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import { Layers, RefreshCw, Settings } from 'lucide-react';
+import { Plus, RefreshCw, Settings } from 'lucide-react';
 import RoutingModals from '../components/RoutingModals.js';
-import { buildPipelineHelp } from '../components/RoutingPipelineCard.js';
 import RoutingTabs from '../components/RoutingTabs.js';
 import ResponseModeModal from '../components/ResponseModeModal.js';
 import { toast } from '../services/toast-store.js';
@@ -16,21 +15,13 @@ import { agentPlatform, agentCategory } from '../services/agent-platform-store.j
 import { useAgentName } from '../services/routing.js';
 import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
-import { Button, Modal, cx } from '../components/ui.js';
+import { Button, cx } from '../components/ui.js';
 import RoutingDefaultTierSection from './RoutingDefaultTierSection.js';
 import RoutingSpecificitySection from './RoutingSpecificitySection.js';
-import RoutingHeaderTiersSection from './RoutingHeaderTiersSection.js';
 import RoutingVirtualModelsSection from './RoutingVirtualModelsSection.js';
 import RoutingTierCard from './RoutingTierCard.js';
-import HeaderTierCard from '../components/HeaderTierCard.js';
-import { RoutingLoadingSkeleton, ActiveProviderIcons, RoutingFooter } from './RoutingPanels.js';
+import { RoutingLoadingSkeleton, ActiveProviderIcons } from './RoutingPanels.js';
 import { useRoutingActions } from './RoutingActions.js';
-import {
-  listHeaderTiers,
-  overrideHeaderTier,
-  toggleHeaderTier,
-  type HeaderTier,
-} from '../services/api/header-tiers.js';
 import {
   getTierAssignments,
   setTierResponseMode,
@@ -105,10 +96,6 @@ export default function Routing() {
     () => getSpecificityAssignments(agentName),
     [agentName],
   );
-  const headerTiers = useResource(
-    () => listHeaderTiers(agentName).catch(() => [] as HeaderTier[]),
-    [agentName],
-  );
   const complexityStatus = useResource(() => getComplexityStatus(agentName), [agentName]);
   const [togglingComplexity, setTogglingComplexity] = useState(false);
   const [changingDefaultResponseMode, setChangingDefaultResponseMode] = useState(false);
@@ -141,14 +128,14 @@ export default function Routing() {
   const legacySpecificityVisible = hasSpecificityConfig || legacySpecificityAgent === agentName;
   const isCleanAgent = !legacyComplexityVisible && !legacySpecificityVisible;
 
-  // For the unified (no-tabs) view: capture openers from HeaderTiersSection
-  // so the header button, dashed add-card, and card edit buttons can trigger modals.
-  const headerTierOpener = useRef<(() => void) | undefined>(undefined);
-  const headerTierCreator = useRef<(() => void) | undefined>(undefined);
-  const headerTierEditor = useRef<((tier: HeaderTier) => void) | undefined>(undefined);
+  // Opener of the virtual model create modal, for the toolbar button.
+  const virtualModelCreator = useRef<(() => void) | undefined>(undefined);
+  const setVirtualModelCreator = useCallback((open: () => void) => {
+    virtualModelCreator.current = open;
+  }, []);
 
   // Per-route model params, fetched once and threaded down. Scope separates
-  // default/complexity tiers, task-specific tiers, and custom header tiers so
+  // default/complexity tiers, task-specific tiers, and virtual models so
   // the same model can have different values in different routing surfaces.
   const modelParams = useResource(
     () => listModelParams(agentName).catch(() => [] as AgentModelParamsRow[]),
@@ -211,7 +198,6 @@ export default function Routing() {
       tiers.reload(),
       models.reload(),
       specificityAssignments.reload(),
-      headerTiers.reload(),
       enabledProviders.reload(),
     ]);
   };
@@ -223,7 +209,6 @@ export default function Routing() {
   const [showProviderModal, setShowProviderModal] = useState(
     () => !!locationState?.openProviders || !!customProviderPrefill || !!providerDeepLink,
   );
-  const [helpOpen, setHelpOpen] = useState(false);
   const [responseModeModalOpen, setResponseModeModalOpen] = useState(false);
   const [instructionModal, setInstructionModal] = useState<'enable' | 'disable' | null>(null);
   const [instructionProvider, setInstructionProvider] = useState<string | null>(null);
@@ -352,8 +337,6 @@ export default function Routing() {
     }
   };
 
-  const hasCustomTiersEnabled = headerTiers.data?.some((tier) => tier.enabled) ?? false;
-
   const handleOverride: typeof actions.handleOverride = async (...args) => {
     setDropdownTier(null);
     return actions.handleOverride(...args);
@@ -406,7 +389,6 @@ export default function Routing() {
   const isEnabled = enabledConnectedProviders.some((p) => p.is_active);
   const activeProviders = enabledConnectedProviders.filter((p) => p.is_active);
   const hasProviders = activeProviders.length > 0;
-  const hasOverrides = tiers.data?.some((tier) => tier.override_route !== null) ?? false;
   const modelList = models.data ?? [];
   const customProviderList = customProviders.data ?? [];
 
@@ -488,150 +470,56 @@ export default function Routing() {
     }
   };
 
-  const mutateHeaderTiers = headerTiers.setData;
-  const pipelineHelp = buildPipelineHelp(
-    hasAnySpecificityActive,
-    hasCustomTiersEnabled,
-    complexityEnabled,
-  );
-  const headerTierList = headerTiers.data ?? [];
   const name = displayName ?? agentName;
 
-  const renderUnified = () => (
+  const virtualModels = (leading?: ReactNode) => (
     <ReadOnlyRegion readOnly={!canManage}>
-      {/* ── Unified view for clean agents (no tabs) ──────── */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-dim">{t('routing.defaultSubtitle')}</span>
-        {headerTierList.length > 0 ? (
-          <Button
-            size="sm"
-            className="routing-section__cta"
-            onClick={() => headerTierOpener.current?.()}
-          >
-            {t('routing.manageCustomRouting')}
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            className="routing-section__cta"
-            onClick={() => headerTierCreator.current?.()}
-          >
-            {t('routing.createCustomTier')}
-          </Button>
-        )}
-      </div>
-      <div
-        className={cx(
-          'grid grid-cols-1 gap-3 md:grid-cols-2',
-          hasCustomTiersEnabled && 'xl:grid-cols-3',
-        )}
-      >
-        <RoutingTierCard
-          stage={DEFAULT_STAGE}
-          tier={actions.getTier('default')}
-          models={modelList}
-          customProviders={customProviderList}
-          activeProviders={activeProviders}
-          tiersLoading={tiers.loading}
-          changingTier={actions.changingTier}
-          resettingTier={actions.resettingTier}
-          resettingAll={actions.resettingAll}
-          addingFallback={actions.addingFallback}
-          agentName={agentName}
-          onDropdownOpen={(tierId) => setDropdownTier(tierId)}
-          onOverride={handleOverride}
-          onPinKey={actions.handlePinKey}
-          onReset={actions.handleReset}
-          onFallbackUpdate={actions.handleFallbackUpdate}
-          onAddFallback={(tierId) => setFallbackPickerTier(tierId)}
-          getFallbacksFor={actions.getFallbacksFor}
-          connectedProviders={enabledConnectedProviders}
-          getModelParams={getModelParamsFor}
-          setModelParams={setModelParamsFor}
-        />
-        {headerTierList
-          .filter((tier) => tier.enabled)
-          .map((tier) => (
-            <HeaderTierCard
-              key={tier.id}
-              agentName={agentName}
-              tier={tier}
-              models={modelList}
-              customProviders={customProviderList}
-              connectedProviders={enabledConnectedProviders}
-              onOverride={async (m, p, a, label) => {
-                try {
-                  await overrideHeaderTier(agentName, tier.id, m, p, a, label);
-                  await headerTiers.reload();
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : t('routing.updateTierFailed'));
-                }
-              }}
-              onFallbacksUpdate={(_fallbacks, updatedRoutes) => {
-                if (updatedRoutes === undefined) {
-                  void headerTiers.reload();
-                  return;
-                }
-                mutateHeaderTiers((prev) =>
-                  prev?.map((row) =>
-                    row.id === tier.id ? { ...row, fallback_routes: updatedRoutes } : row,
-                  ),
-                );
-              }}
-              onEdit={() => headerTierEditor.current?.(tier)}
-              onDisable={async () => {
-                try {
-                  await toggleHeaderTier(agentName, tier.id, false);
-                  await headerTiers.reload();
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : t('routing.toggleTierFailed'));
-                }
-              }}
-              getModelParams={getModelParamsFor}
-              setModelParams={setModelParamsFor}
-            />
-          ))}
-        {/* Dashed add-card */}
-        <button
-          type="button"
-          className="routing-unified-add-card flex min-h-40 flex-col items-center justify-center gap-2 rounded-surface border border-dashed border-line-strong bg-transparent text-sm text-muted transition-colors hover:border-accent hover:text-ink"
-          onClick={() => headerTierCreator.current?.()}
-        >
-          <Layers className="size-5" aria-hidden="true" />
-          <span>{t('routing.createCustomTier')}</span>
-        </button>
-      </div>
-      {/* Headless section for modals only */}
-      <RoutingHeaderTiersSection
+      <RoutingVirtualModelsSection
         agentName={agentName}
         models={modelList}
         customProviders={customProviderList}
         connectedProviders={enabledConnectedProviders}
-        externalTiers={headerTiers.data}
-        externalRefetch={() => void headerTiers.reload()}
-        externalMutate={mutateHeaderTiers}
-        headless
-        onOpenRef={(opener) => {
-          headerTierOpener.current = opener;
-        }}
-        onCreateRef={(opener) => {
-          headerTierCreator.current = opener;
-        }}
-        onEditRef={(opener) => {
-          headerTierEditor.current = opener;
-        }}
+        leading={leading}
+        onCreateRef={setVirtualModelCreator}
         getModelParams={getModelParamsFor}
         setModelParams={setModelParamsFor}
       />
     </ReadOnlyRegion>
   );
 
+  // Unified view for clean agents (no tabs): the `auto` card leads the grid
+  // of virtual models.
+  const renderUnified = () =>
+    virtualModels(
+      <RoutingTierCard
+        stage={DEFAULT_STAGE}
+        tier={actions.getTier('default')}
+        models={modelList}
+        customProviders={customProviderList}
+        activeProviders={activeProviders}
+        tiersLoading={tiers.loading}
+        changingTier={actions.changingTier}
+        resettingTier={actions.resettingTier}
+        resettingAll={actions.resettingAll}
+        addingFallback={actions.addingFallback}
+        agentName={agentName}
+        onDropdownOpen={(tierId) => setDropdownTier(tierId)}
+        onOverride={handleOverride}
+        onPinKey={actions.handlePinKey}
+        onReset={actions.handleReset}
+        onFallbackUpdate={actions.handleFallbackUpdate}
+        onAddFallback={(tierId) => setFallbackPickerTier(tierId)}
+        getFallbacksFor={actions.getFallbacksFor}
+        connectedProviders={enabledConnectedProviders}
+        getModelParams={getModelParamsFor}
+        setModelParams={setModelParamsFor}
+      />,
+    );
+
   const renderTabs = () => (
     <RoutingTabs
       specificityEnabled={hasAnySpecificityActive}
-      customEnabled={hasCustomTiersEnabled}
       showSpecificity={legacySpecificityVisible}
-      pipelineHelp={pipelineHelp}
     >
       {{
         default: (
@@ -718,22 +606,6 @@ export default function Routing() {
             />
           </ReadOnlyRegion>
         ),
-        custom: (
-          <ReadOnlyRegion readOnly={!canManage}>
-            <RoutingHeaderTiersSection
-              agentName={agentName}
-              models={modelList}
-              customProviders={customProviderList}
-              connectedProviders={enabledConnectedProviders}
-              externalTiers={headerTiers.data}
-              externalRefetch={() => void headerTiers.reload()}
-              externalMutate={mutateHeaderTiers}
-              embedded
-              getModelParams={getModelParamsFor}
-              setModelParams={setModelParamsFor}
-            />
-          </ReadOnlyRegion>
-        ),
       }}
     </RoutingTabs>
   );
@@ -759,6 +631,15 @@ export default function Routing() {
                 />
               ) : null}
               <div className="ml-auto flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="routing-create-virtual-model"
+                  onClick={() => virtualModelCreator.current?.()}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  {t('models.section.create')}
+                </Button>
                 {isEnabled ? (
                   <Button
                     variant="ghost"
@@ -805,40 +686,14 @@ export default function Routing() {
             </div>
           </ReadOnlyRegion>
 
-          {isCleanAgent ? renderUnified() : renderTabs()}
-
-          <ReadOnlyRegion readOnly={!canManage}>
-            <RoutingVirtualModelsSection
-              agentName={agentName}
-              models={modelList}
-              customProviders={customProviderList}
-              connectedProviders={enabledConnectedProviders}
-              getModelParams={getModelParamsFor}
-              setModelParams={setModelParamsFor}
-            />
-
-            <RoutingFooter
-              hasOverrides={hasOverrides}
-              resettingAll={actions.resettingAll}
-              resettingTier={actions.resettingTier}
-              onResetAll={actions.handleResetAll}
-              onShowInstructions={() => setInstructionModal('enable')}
-              onShowHowRoutingWorks={() => setHelpOpen(true)}
-            />
-          </ReadOnlyRegion>
-
-          <Modal
-            open={helpOpen && !!pipelineHelp}
-            title={t('routing.howRoutingWorks')}
-            onClose={() => setHelpOpen(false)}
-          >
-            {pipelineHelp}
-            <div className="actions">
-              <Button size="sm" onClick={() => setHelpOpen(false)}>
-                {t('routing.page.gotIt')}
-              </Button>
-            </div>
-          </Modal>
+          {isCleanAgent ? (
+            renderUnified()
+          ) : (
+            <>
+              {renderTabs()}
+              {virtualModels()}
+            </>
+          )}
         </>
       )}
 

@@ -25,9 +25,6 @@ vi.mock('../../src/services/api.js', () => ({
   listModelParams: () => Promise.resolve([]),
   modelParamsKey: (s: string, p: string, a: string, m: string) => `${s}::${p}::${m}::${a}`,
 }));
-vi.mock('../../src/services/api/header-tiers.js', () => ({
-  listHeaderTiers: () => Promise.resolve([]),
-}));
 vi.mock('../../src/services/api/virtual-models.js', () => ({
   listVirtualModels: () => Promise.resolve([]),
 }));
@@ -86,25 +83,22 @@ describe('Routing in pt-BR', () => {
       expect(document.title).toBe('Roteamento de Demo - Thinker');
     });
     expect(screen.getByText('Modo de resposta: Buffered')).toBeDefined();
-    expect(
-      screen.getByText('Escolha um modelo e até 5 fallbacks como seu roteamento padrão.'),
-    ).toBeDefined();
-    expect(screen.getAllByText('Criar nível personalizado').length).toBeGreaterThan(0);
-    expect(screen.getByText('Padrão')).toBeDefined();
+    expect(screen.getByText('Criar modelo virtual')).toBeDefined();
+    expect(screen.getByText('Modelo virtual:')).toBeDefined();
     expect(screen.getByText('+ Adicionar modelo')).toBeDefined();
     expect(screen.getByText('1 conexão')).toBeDefined();
-    expect(screen.getByText('Instruções de configuração')).toBeDefined();
+    expect(screen.queryByText('Criar nível personalizado')).toBeNull();
+    expect(screen.queryByText('Instruções de configuração')).toBeNull();
   });
 
   it('renders the routing tabs in Portuguese', () => {
     render(
-      <RoutingTabs specificityEnabled={false} customEnabled={false}>
-        {{ default: <div />, specificity: <div />, custom: <div /> }}
+      <RoutingTabs specificityEnabled={false}>
+        {{ default: <div />, specificity: <div /> }}
       </RoutingTabs>,
     );
     expect(screen.getByRole('tablist', { name: 'Camadas de roteamento' })).toBeDefined();
     expect(screen.getByRole('tab', { name: /Por tarefa/ })).toBeDefined();
-    expect(screen.getByRole('tab', { name: /Personalizado/ })).toBeDefined();
   });
 
   it('formats prices and warm-up errors for pt-BR', () => {
