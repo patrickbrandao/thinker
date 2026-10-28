@@ -41,6 +41,7 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatStatus: (s: string) => s,
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,
   formatTime: (t: string) => t,
+  formatDateTime: (t: string) => t,
 }));
 
 vi.mock('../../src/services/routing-utils.js', () => ({
@@ -208,14 +209,14 @@ describe('Overview - trend badges and status display', () => {
     const { container } = renderOverview();
     await vi.waitFor(() => {
       // Binary status: a provider rate limit is just a "Failed" pill now.
-      const badge = container.querySelector('.status-badge--error');
+      const badge = container.querySelector('.status-shape[title^="Failed"]');
       expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(badge!.getAttribute('title')).toMatch(/^Failed/);
     });
     expect(container.textContent).not.toContain('rate_limited');
     // A provider rate limit is a plain error: it must not link to the Thinker
     // spend-limits page (that page is for the user's own software limits).
-    expect(container.querySelector('.status-badge--error')!.tagName).not.toBe('A');
+    expect(container.querySelector('.status-shape[title^="Failed"]')!.tagName).not.toBe('A');
     expect(container.querySelector('a[href$="/limits"]')).toBeNull();
   });
 
@@ -273,7 +274,7 @@ describe('Overview - trend badges and status display', () => {
       // The message cell shows the first 8 characters of the row id.
       expect(container.textContent).toContain('msg-from');
       expect(container.textContent).not.toContain('msg-1234');
-      expect(container.querySelector('.status-badge--ok')).not.toBeNull();
+      expect(container.querySelector('.status-shape[title="Success"]')).not.toBeNull();
     });
   });
 });

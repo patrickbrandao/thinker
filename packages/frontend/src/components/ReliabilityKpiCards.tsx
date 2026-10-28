@@ -55,6 +55,7 @@ function Tile({
   link: string | null;
   title?: string;
   showMore?: boolean;
+  /** Alert color; set only when the value needs attention (above zero). */
   tone?: 'warn' | 'danger';
   onNavigate: (to: string) => void;
 }) {
@@ -168,7 +169,7 @@ export default function ReliabilityKpiCards({
         link={fallbackLink}
         title={scopeTitle(t('overview.kpi.subjectRecoveredByFallback'))}
         showMore={showMore}
-        tone="warn"
+        tone={recovered > 0 ? 'warn' : undefined}
         onNavigate={navigate}
       />
       <Tile
@@ -183,7 +184,7 @@ export default function ReliabilityKpiCards({
         link={requestsLink('&status=failed')}
         title={scopeTitle(t('overview.kpi.subjectFailed'))}
         showMore={showMore}
-        tone="danger"
+        tone={stats.errors_remaining.value > 0 ? 'danger' : undefined}
         onNavigate={navigate}
       />
     </div>

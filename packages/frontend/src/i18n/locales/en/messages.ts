@@ -120,6 +120,8 @@ export default {
     pending: 'Pending',
     cancelled: 'Cancelled',
     success: 'Success',
+    successFallback: 'Succeeded after a fallback',
+    attemptsTitle: '{{ attempts }} attempt(s), {{ recovery }} recovery (fallback)',
     failed: 'Failed',
     limitReached: 'Thinker usage limit reached - open your limits',
     errorDescriptor: {

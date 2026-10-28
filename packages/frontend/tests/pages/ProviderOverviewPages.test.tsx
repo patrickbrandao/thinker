@@ -788,8 +788,8 @@ describe('GlobalOverview (analytics)', () => {
     expect(screen.getAllByText('OpenAI').length).toBeGreaterThan(0);
     // The shared MessageTable renders a binary status: the ok row is "Success"
     // and the non-ok rows (retry + error) both render "Failed".
-    expect(screen.getByText('Success')).toBeDefined();
-    expect(screen.getAllByText('Failed').length).toBe(2);
+    expect(screen.getByRole('img', { name: 'Success' })).toBeDefined();
+    expect(screen.getAllByRole('img', { name: /^Failed/ }).length).toBe(2);
     // custom provider name resolves asynchronously
     await waitFor(() => expect(screen.getAllByText('Custom Provider').length).toBeGreaterThan(0));
     // model usage + provider connection rows render

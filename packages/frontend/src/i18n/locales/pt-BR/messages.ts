@@ -126,6 +126,8 @@ const ptBR: Catalog<typeof en> = {
     pending: 'Pendente',
     cancelled: 'Cancelada',
     success: 'Sucesso',
+    successFallback: 'Sucesso após fallback',
+    attemptsTitle: '{{ attempts }} tentativa(s), {{ recovery }} de recuperação (fallback)',
     failed: 'Falhou',
     limitReached: 'Limite de uso do Thinker atingido - abra seus limites',
     errorDescriptor: {

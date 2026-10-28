@@ -18,6 +18,7 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatStatus: (s: string) => s,
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,
   formatTime: (t: string) => t,
+  formatDateTime: (t: string) => t,
   formatDuration: (ms: number) => `${ms}ms`,
   formatErrorMessage: (s: string) => s,
   customProviderColor: () => '#6366f1',
@@ -111,18 +112,17 @@ describe('MessageTable', () => {
         <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
       );
       const headers = container.querySelectorAll('th');
-      expect(headers.length).toBe(10);
+      expect(headers.length).toBe(9);
       // Identity first (status, when, what), then mechanics.
       expect(headers[0]!.textContent).toContain('Status');
       expect(headers[1]!.textContent).toContain('Date');
       expect(headers[2]!.textContent).toContain('Model');
-      expect(headers[3]!.textContent).toContain('Attempts');
-      expect(headers[4]!.textContent).toContain('Recovery attempts');
-      expect(headers[5]!.textContent).toContain('Request');
-      expect(headers[6]!.textContent).toContain('Cost');
-      expect(headers[7]!.textContent).toContain('Tokens');
-      expect(headers[8]!.textContent).toContain('Cache');
-      expect(headers[9]!.textContent).toContain('Latency');
+      expect(headers[3]!.textContent).toBe('Attempts');
+      expect(headers[4]!.textContent).toContain('Request');
+      expect(headers[5]!.textContent).toContain('Cost');
+      expect(headers[6]!.textContent).toContain('Tokens');
+      expect(headers[7]!.textContent).toContain('Cache');
+      expect(headers[8]!.textContent).toContain('Latency');
     });
 
     it('renders detailed column headers with tooltips', () => {
@@ -135,16 +135,15 @@ describe('MessageTable', () => {
         />,
       );
       const headers = container.querySelectorAll('th');
-      expect(headers.length).toBe(12);
+      expect(headers.length).toBe(11);
       expect(headers[0]!.textContent).toContain('Status');
       expect(headers[1]!.textContent).toContain('Date');
       expect(headers[2]!.textContent).toContain('Model');
-      expect(headers[3]!.textContent).toContain('Attempts');
-      expect(headers[4]!.textContent).toContain('Recovery attempts');
-      expect(headers[5]!.textContent).toContain('Request');
-      expect(headers[7]!.textContent).toContain('Total Tokens');
-      expect(headers[10]!.textContent).toContain('Cache');
-      expect(headers[11]!.textContent).toContain('Latency');
+      expect(headers[3]!.textContent).toBe('Attempts');
+      expect(headers[4]!.textContent).toContain('Request');
+      expect(headers[6]!.textContent).toContain('Total Tokens');
+      expect(headers[9]!.textContent).toContain('Cache');
+      expect(headers[10]!.textContent).toContain('Latency');
       // Tooltips should be present for token columns
       const tooltips = container.querySelectorAll('[data-testid="info-tooltip"]');
       expect(tooltips.length).toBeGreaterThanOrEqual(3);
@@ -154,7 +153,7 @@ describe('MessageTable', () => {
       const { container } = render(
         <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
       );
-      const tokensHeader = container.querySelectorAll('th')[7]!; // 'totalTokens' is at index 7 in COMPACT_COLUMNS (after recovery)
+      const tokensHeader = container.querySelectorAll('th')[6]!; // 'totalTokens' is at index 6 in COMPACT_COLUMNS
       expect(tokensHeader.textContent).toBe('Tokens');
       expect(tokensHeader.querySelector('[data-testid="info-tooltip"]')).toBeNull();
     });
@@ -480,29 +479,30 @@ describe('MessageTable', () => {
   });
 
   describe('recovery column', () => {
-    it('renders fallback icon with text label when fallback_from_model is set', () => {
+    it('renders attempts / recovery attempts when fallback_from_model is set', () => {
       const { container } = render(
         <MessageTable
-          items={[makeRow({ fallback_from_model: 'gpt-4o' })]}
-          columns={['recovery']}
+          items={[makeRow({ fallback_from_model: 'gpt-4o', attempt_count: 2, recovery_count: 1 })]}
+          columns={['attempts']}
           agentName="agent-1"
         />,
       );
-      const badge = container.querySelector('[title="Fallback"]') as HTMLElement;
-      expect(badge).not.toBeNull();
-      expect(badge.textContent).toContain('fallback');
+      expect(container.querySelector('td')!.textContent).toBe('2 / 1');
     });
 
-    it('renders dash when no fallback applies', () => {
+    it('renders zero recovery attempts when no fallback applies', () => {
       const { container } = render(
-        <MessageTable items={[makeRow()]} columns={['recovery']} agentName="agent-1" />,
+        <MessageTable items={[makeRow()]} columns={['attempts']} agentName="agent-1" />,
       );
-      expect(container.querySelector('td')!.textContent).toContain('\u2014');
+      expect(container.querySelector('td')!.textContent).toBe('1 / 0');
     });
   });
 
   describe('status column', () => {
-    it('renders success status badge', () => {
+    const shape = (container: HTMLElement) =>
+      container.querySelector('.status-shape') as HTMLElement | null;
+
+    it('renders success as a shape titled Success', () => {
       const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'ok' })]}
@@ -510,10 +510,10 @@ describe('MessageTable', () => {
           agentName="agent-1"
         />,
       );
-      expect(container.querySelector('.status-badge--ok')).not.toBeNull();
+      expect(shape(container)!.getAttribute('title')).toBe('Success');
     });
 
-    it('renders rate_limited as a plain "Failed" status with no limits link', () => {
+    it('renders rate_limited as a failure with no limits link', () => {
       const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'rate_limited', error_origin: 'provider' })]}
@@ -521,16 +521,12 @@ describe('MessageTable', () => {
           agentName="my-agent"
         />,
       );
-      // A provider rate limit is just a failure — it must not link to the
-      // Thinker spend-limits page, and shows the binary Failed pill.
       expect(container.querySelector('a')).toBeNull();
-      expect(container.querySelector('.status-badge--error')!.textContent).toContain('Failed');
+      expect(shape(container)!.getAttribute('title')).toBe('Failed: Provider');
       expect(container.textContent).not.toContain('rate_limited');
     });
 
-    it('renders a plain Failed badge for an error row (no status-cell tooltip)', () => {
-      // The status-cell hover tooltip was removed — error detail now lives in the
-      // expanded accordion, so the status cell is just the binary Failed pill.
+    it('renders an error row as a failure shape with no text', () => {
       const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'error', error_message: 'timeout' })]}
@@ -538,15 +534,11 @@ describe('MessageTable', () => {
           agentName="agent-1"
         />,
       );
-      expect(container.querySelector('.status-badge-tooltip')).toBeNull();
-      const badge = container.querySelector('.status-badge--error');
-      expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(shape(container)!.getAttribute('title')).toBe('Failed');
+      expect(container.querySelector('td')!.textContent).toBe('');
     });
 
-    it('renders a fallback_error row as a plain "Failed" pill (no status SVG)', () => {
-      // fallback_error is no longer a distinct status — it's just a failure, and
-      // the fallback itself is surfaced in the Trigger column, not here.
+    it('renders a fallback_error row as a failure', () => {
       const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'fallback_error', error_origin: 'provider' })]}
@@ -554,10 +546,7 @@ describe('MessageTable', () => {
           agentName="agent-1"
         />,
       );
-      expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
-      const badge = container.querySelector('.status-badge--error');
-      expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(shape(container)!.getAttribute('title')).toBe('Failed: Provider');
     });
   });
 
@@ -732,10 +721,10 @@ describe('MessageTable', () => {
         />,
       );
 
-      const compactBadge = compact.querySelector('.status-badge--error');
-      const detailedBadge = detailed.querySelector('.status-badge--error');
-      expect(compactBadge).not.toBeNull();
-      expect(compactBadge!.textContent).toBe(detailedBadge!.textContent);
+      const compactShape = compact.querySelector('.status-shape');
+      const detailedShape = detailed.querySelector('.status-shape');
+      expect(compactShape).not.toBeNull();
+      expect(compactShape!.getAttribute('title')).toBe(detailedShape!.getAttribute('title'));
     });
 
     it('supports custom column subsets for future pages', () => {

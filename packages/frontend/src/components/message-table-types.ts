@@ -33,6 +33,8 @@ export interface MessageRow {
   duration_ms?: number | null;
   feedback_rating?: string | null;
   attempt_count?: number;
+  /** Attempts served by a fallback route. */
+  recovery_count?: number;
 }
 
 export function routingTierLabel(tier: string | null | undefined): string | undefined {
@@ -52,18 +54,16 @@ export type MessageColumnKey =
   | 'duration'
   | 'status'
   | 'attempts'
-  | 'recovery'
   | 'agent';
 
 // Reading order: identity first (status, when, who, what), THEN the
-// mechanics (attempts, recovery attempts), then payload and usage. The global
+// mechanics (attempts / recovery attempts), then payload and usage. The global
 // Requests page inserts the harness column before 'model'.
 export const COMPACT_COLUMNS: MessageColumnKey[] = [
   'status',
   'date',
   'model',
   'attempts',
-  'recovery',
   'message',
   'cost',
   'totalTokens',
@@ -76,7 +76,6 @@ export const DETAILED_COLUMNS: MessageColumnKey[] = [
   'date',
   'model',
   'attempts',
-  'recovery',
   'message',
   'cost',
   'totalTokens',

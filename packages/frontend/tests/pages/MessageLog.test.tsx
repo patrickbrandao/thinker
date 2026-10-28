@@ -201,6 +201,7 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatErrorOrigin: (o: string | null | undefined) => o ?? null,
   formatErrorClass: (c: string | null | undefined) => c ?? null,
   formatTime: (t: string) => t,
+  formatDateTime: (t: string) => t,
   formatDuration: (ms: number) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`),
   formatErrorMessage: (s: string) => s,
   customProviderColor: vi.fn(() => '#6366f1'),
@@ -912,9 +913,9 @@ describe('MessageLog', () => {
       mockGetMessages.mockResolvedValue(dataWithError);
       const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
-        const badge = container.querySelector('.status-badge--error');
+        const badge = container.querySelector('.status-shape[title^="Failed"]');
         expect(badge).not.toBeNull();
-        expect(badge!.textContent).toContain('Failed');
+        expect(badge!.getAttribute('title')).toMatch(/^Failed/);
       });
       expect(container.querySelector('.status-badge-tooltip')).toBeNull();
     });
@@ -1419,9 +1420,9 @@ describe('MessageLog', () => {
     const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       // Fallback is now shown in the Recovery column, not a Model-cell tier badge.
-      const badge = container.querySelector('[title="Fallback"]');
+      const badge = container.querySelector('[title="Succeeded after a fallback"]');
       expect(badge).not.toBeNull();
-      expect(badge!.getAttribute('title')).toBe('Fallback');
+      expect(badge!.getAttribute('title')).toBe('Succeeded after a fallback');
     });
   });
 
@@ -1453,9 +1454,9 @@ describe('MessageLog', () => {
     const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
-      const badge = container.querySelector('.status-badge--error');
+      const badge = container.querySelector('.status-shape[title^="Failed"]');
       expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(badge!.getAttribute('title')).toMatch(/^Failed/);
     });
   });
 
@@ -1512,15 +1513,15 @@ describe('MessageLog', () => {
     mockGetMessages.mockResolvedValue(dataWithChain);
     const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
-      const badge = container.querySelector('[title="Fallback"]');
+      const badge = container.querySelector('[title="Succeeded after a fallback"]');
       expect(badge).not.toBeNull();
-      expect(badge!.getAttribute('title')).toBe('Fallback');
+      expect(badge!.getAttribute('title')).toBe('Succeeded after a fallback');
     });
     // The badge lives on the recovered row, and there's exactly one (the failed
     // original carries no fallback_from_model, so no Recovery badge).
-    expect(container.querySelectorAll('[title="Fallback"]').length).toBe(1);
+    expect(container.querySelectorAll('[title="Succeeded after a fallback"]').length).toBe(1);
     const successRow = container.querySelector('#msg-success-1')!;
-    expect(successRow.querySelector('[title="Fallback"]')).not.toBeNull();
+    expect(successRow.querySelector('[title="Succeeded after a fallback"]')).not.toBeNull();
   });
 
   describe('Tier filter', () => {

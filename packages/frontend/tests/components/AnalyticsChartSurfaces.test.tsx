@@ -364,6 +364,25 @@ describe('analytics chart surface components', () => {
     expect(screen.getAllByText('-50%').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('colors the fallback and failed KPI values only when they are above zero', () => {
+    const valueOf = (label: string) =>
+      screen.getByText(label).closest('.stat-tile')!.querySelector('.stat-value')!;
+    const stats = (saves: number, errors: number) => ({
+      success_rate: { value: 1, previous: 1 },
+      fallback_saves: { value: saves, previous: 0 },
+      total_requests: { value: 10, previous: 0 },
+      errors_remaining: { value: errors, previous: 0 },
+    });
+    const { unmount } = render(<ReliabilityKpiCards stats={stats(0, 0)} />);
+    expect(valueOf('Recovered by Fallback').className).toContain('text-ink');
+    expect(valueOf('Failed requests').className).toContain('text-ink');
+    unmount();
+
+    render(<ReliabilityKpiCards stats={stats(2, 1)} />);
+    expect(valueOf('Recovered by Fallback').className).toContain('text-warn');
+    expect(valueOf('Failed requests').className).toContain('text-danger');
+  });
+
   it('deep-links the recovered KPI cards when an agent scope is given', () => {
     const base = {
       success_rate: { value: 0.8, previous: 0.7 },

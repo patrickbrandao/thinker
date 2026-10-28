@@ -42,7 +42,7 @@ describe('MessageTable status labels', () => {
       error_http_status: 402,
     });
 
-    const link = screen.getByText('Failed') as HTMLAnchorElement;
+    const link = screen.getByRole('link');
     expect(link.getAttribute('href')).toBe('/harnesses/demo-agent/limits');
     expect(screen.queryByText('Upgrade plan')).toBeNull();
   });
@@ -54,8 +54,10 @@ describe('MessageTable status labels', () => {
       error_http_status: null,
     });
 
-    const link = screen.getByText('Failed') as HTMLAnchorElement;
+    const link = screen.getByRole('link');
     expect(link.getAttribute('href')).toBe('/harnesses/demo-agent/limits');
-    expect(link.getAttribute('title')).toBe('Thinker usage limit reached - open your limits');
+    expect(screen.getByRole('img').getAttribute('title')).toBe(
+      'Thinker usage limit reached - open your limits',
+    );
   });
 });

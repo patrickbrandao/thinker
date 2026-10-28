@@ -563,6 +563,11 @@ export class MessagesQueryService {
       .addSelect('COALESCE(SUM(at.cache_read_tokens), 0)', 'cache_read_tokens')
       .addSelect('COALESCE(SUM(at.cache_creation_tokens), 0)', 'cache_creation_tokens')
       .addSelect('COUNT(at.id)::int', 'attempt_count')
+      // Attempts served by a fallback route (recovery attempts).
+      .addSelect(
+        'COUNT(at.id) FILTER (WHERE at.fallback_from_model IS NOT NULL)::int',
+        'recovery_count',
+      )
       .groupBy('r.id');
     if (params.cost_min !== undefined) {
       qb.having(`COALESCE(SUM(${safeCost}), 0) >= :requestCostMin`, {
@@ -617,7 +622,11 @@ export class MessagesQueryService {
       .addSelect('at.cache_creation_tokens', 'cache_creation_tokens')
       .addSelect('at.duration_ms', 'duration_ms')
       .addSelect('NULL', 'api_mode')
-      .addSelect('1', 'attempt_count');
+      .addSelect('1', 'attempt_count')
+      .addSelect(
+        'CASE WHEN at.fallback_from_model IS NOT NULL THEN 1 ELSE 0 END',
+        'recovery_count',
+      );
     this.applyCursor(legacyDataQb, params.cursor);
 
     const readRows = async (runner?: QueryRunner) => {

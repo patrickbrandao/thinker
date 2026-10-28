@@ -6,8 +6,8 @@ import {
   ModelCell,
   AgentCell,
   StatusCell,
+  statusShape,
   AttemptsCell,
-  RecoveryCell,
 } from '../../src/components/message-table-cells';
 import { fireEvent } from '@testing-library/react';
 import type { MessageRow } from '../../src/components/message-table-types';
@@ -26,6 +26,7 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatStatus: (s: string) =>
     ({ ok: 'Success', error: 'Failed', rate_limited: 'Failed', fallback_error: 'Handled' })[s] ?? s,
   formatTime: (t: string) => t,
+  formatDateTime: (t: string) => t,
   formatDuration: (ms: number) => `${ms}ms`,
   formatErrorMessage: (s: string) => s,
   customProviderColor: () => '#6366f1',
@@ -102,52 +103,21 @@ describe('AttemptsCell', () => {
     );
   }
 
-  it('renders just the attempt count (no icons) when fallback_from_model is set', () => {
-    const { container } = renderCell(baseRow({ fallback_from_model: 'gpt-4o', attempt_count: 2 }));
-    expect(container.querySelector('td')!.textContent).toContain('2');
-    // Icons live in RecoveryCell
-    expect(container.querySelector('[title="Fallback"]')).toBeNull();
-  });
-
-  it('renders only the count with no badges when no fallback applies', () => {
-    const { container } = renderCell(baseRow({ attempt_count: 1 }));
-    expect(container.querySelector('[title]')).toBeNull();
-    expect(container.querySelector('td')!.textContent).toContain('1');
-  });
-});
-
-describe('RecoveryCell', () => {
-  function renderCell(row: MessageRow) {
-    return render(
-      <table>
-        <tbody>
-          <tr>{RecoveryCell(row)}</tr>
-        </tbody>
-      </table>,
+  it('renders attempts and recovery attempts separated by a slash', () => {
+    const { container } = renderCell(
+      baseRow({ fallback_from_model: 'gpt-4o', attempt_count: 3, recovery_count: 2 }),
     );
-  }
-
-  it('renders a dash when no fallback applies', () => {
-    const { container } = renderCell(baseRow());
-    expect(container.querySelector('td')!.textContent).toContain('\u2014');
-    expect(container.querySelector('[title]')).toBeNull();
+    expect(container.querySelector('td')!.textContent).toBe('3 / 2');
   });
 
-  it('renders fallback badge with icon and text when fallback_from_model is set', () => {
-    const { container } = renderCell(baseRow({ fallback_from_model: 'gpt-4o' }));
-    const badge = container.querySelector('[title="Fallback"]') as HTMLElement;
-    expect(badge).not.toBeNull();
-    expect(badge.className).toContain('trigger-badge--fallback');
-    expect(badge.textContent).toContain('fallback');
+  it('renders zero recovery attempts when no fallback applies', () => {
+    const { container } = renderCell(baseRow({ attempt_count: 1 }));
+    expect(container.querySelector('td')!.textContent).toBe('1 / 0');
   });
 
-  it('ignores legacy autofix flags on the row', () => {
-    const { container } = renderCell({
-      ...baseRow(),
-      autofix_applied: true,
-    } as MessageRow & { autofix_applied: boolean });
-    expect(container.querySelector('td')!.textContent).toContain('\u2014');
-    expect(container.textContent).not.toMatch(/autofix/i);
+  it('counts one recovery attempt for a fallback row without recovery_count', () => {
+    const { container } = renderCell(baseRow({ fallback_from_model: 'gpt-4o', attempt_count: 2 }));
+    expect(container.querySelector('td')!.textContent).toBe('2 / 1');
   });
 });
 
@@ -177,7 +147,7 @@ describe('AgentCell', () => {
   });
 });
 
-describe('StatusCell merged pill', () => {
+describe('StatusCell shape', () => {
   function renderCell(row: MessageRow) {
     return render(
       <table>
@@ -188,117 +158,54 @@ describe('StatusCell merged pill', () => {
     );
   }
 
-  function onlyBadge(container: HTMLElement) {
-    const badges = container.querySelectorAll('.status-badge');
-    // Exactly ONE pill per cell — the whole point of the merge.
-    expect(badges.length).toBe(1);
-    return badges[0]!;
-  }
-
-  it('renders a provider error as a plain "Failed" pill with the cause as title', () => {
-    const { container } = renderCell(
-      baseRow({ status: 'error', error_message: 'boom', error_origin: 'provider' }),
-    );
-    const badge = onlyBadge(container);
-    expect(badge.textContent).toContain('Failed');
-    expect(badge.getAttribute('title')).toBe('Provider');
-    expect(badge.className).toContain('status-badge--error');
-  });
-
-  it('carries a transport error cause in the pill title', () => {
-    const { container } = renderCell(
-      baseRow({ status: 'error', error_message: 'net', error_origin: 'transport' }),
-    );
-    const badge = onlyBadge(container);
-    expect(badge.textContent).toContain('Failed');
-    expect(badge.getAttribute('title')).toBe('Transport');
-  });
-
-  it('titles a malformed caller body "Bad request", not "Provider"', () => {
-    const { container } = renderCell(
-      baseRow({
-        status: 'error',
-        error_message: '[🦚 Thinker M300] `messages` array is required.',
-        error_origin: 'request',
-        error_class: 'invalid_request',
-      }),
-    );
-    const badge = onlyBadge(container);
-    expect(badge.textContent).toContain('Failed');
-    expect(badge.getAttribute('title')).toBe('Bad request');
-    // `request` is not a policy origin, so no limits link is rendered.
-    expect(container.querySelector('a')).toBeNull();
-  });
-
-  it('renders a provider rate limit as plain "Failed" with no limits link', () => {
-    const { container } = renderCell(
-      baseRow({ status: 'rate_limited', error_message: 'rl', error_origin: 'provider' }),
-    );
-    expect(container.querySelector('a')).toBeNull();
-    expect(onlyBadge(container).getAttribute('title')).toBe('Provider');
-  });
-
-  it('renders a non-ok fallback_error row as a plain "Failed" pill', () => {
-    // fallback_error is no longer a distinct status pill — anything that isn't
-    // `ok` is a failure, and the fallback itself is surfaced in the Trigger column.
-    const { container } = renderCell(
-      baseRow({ status: 'fallback_error', error_message: 'overloaded', error_origin: 'provider' }),
-    );
-    const badge = onlyBadge(container);
-    expect(badge.textContent).toContain('Failed');
-    expect(badge.getAttribute('title')).toBe('Provider');
-    expect(badge.className).toContain('status-badge--error');
-  });
-
-  it('renders a successful row as a single "Success" pill (no descriptor)', () => {
-    const { container } = renderCell(baseRow({ status: 'ok' }));
-    const badge = onlyBadge(container);
-    expect(badge.textContent!.trim()).toBe('Success');
-    expect(container.querySelector('a')).toBeNull();
-  });
+  const shapeOf = (container: HTMLElement) => {
+    const shapes = container.querySelectorAll('.status-shape');
+    expect(shapes.length).toBe(1);
+    return shapes[0] as HTMLElement;
+  };
 
   it.each([
-    ['pending', 'Pending'],
-    ['cancelled', 'Cancelled'],
-  ])('renders %s as a neutral outcome', (status, label) => {
-    const { container } = renderCell(baseRow({ status }));
-    const badge = onlyBadge(container);
-    expect(badge.textContent!.trim()).toBe(label);
-    expect(badge.className).toContain('status-badge--neutral');
-    expect(badge.className).not.toContain('status-badge--error');
-  });
+    [{ status: 'ok' }, 'success', 'Success'],
+    [{ status: 'ok', fallback_from_model: 'gpt-4o' }, 'fallback', 'Succeeded after a fallback'],
+    [{ status: 'error', error_origin: 'provider' }, 'failed', 'Failed: Provider'],
+    [{ status: 'rate_limited', error_origin: 'provider' }, 'failed', 'Failed: Provider'],
+    [{ status: 'fallback_error', error_origin: 'transport' }, 'failed', 'Failed: Transport'],
+    [{ status: 'error', error_origin: 'request' }, 'failed', 'Failed: Bad request'],
+    [{ status: 'pending' }, 'pending', 'Pending'],
+    [{ status: 'cancelled' }, 'cancelled', 'Cancelled'],
+  ] as Array<[Partial<MessageRow>, string, string]>)(
+    'renders %o as the %s shape titled %s',
+    (row, shape, label) => {
+      const { container } = renderCell(baseRow(row));
+      expect(statusShape(baseRow(row))).toBe(shape);
+      const icon = shapeOf(container);
+      expect(icon.getAttribute('title')).toBe(label);
+      expect(icon.getAttribute('aria-label')).toBe(label);
+      expect(icon.textContent).toBe('');
+      expect(container.querySelector('a')).toBeNull();
+    },
+  );
 
-  it("merges a Thinker limit into one red 'Failed' pill linking to its agent's limits", () => {
-    const { container } = renderCell(
-      baseRow({
-        agent_name: 'billing-bot',
-        status: 'error',
-        error_message: 'Usage limit exceeded',
-        error_origin: 'policy',
-        error_class: 'limit_exceeded',
-      }),
-    );
+  it("links a Thinker limit to its agent's limits page", () => {
+    const row = baseRow({
+      agent_name: 'billing-bot',
+      status: 'error',
+      error_origin: 'policy',
+      error_class: 'limit_exceeded',
+    });
+    const { container } = renderCell(row);
+    expect(statusShape(row)).toBe('limit');
     const link = container.querySelector('a');
-    expect(link).not.toBeNull();
     expect(link!.getAttribute('href')).toContain('/harnesses/billing-bot/limits');
-    expect(link!.textContent).toContain('Failed');
-    expect(link!.className).toContain('status-badge--error');
-    expect(container.querySelectorAll('a').length).toBe(1);
+    expect(shapeOf(container).getAttribute('title')).toMatch(/limit/i);
   });
 
-  it('renders a Thinker limit with no agent as the pill without a link', () => {
+  it('renders a Thinker limit with no agent without a link', () => {
     const { container } = renderCell(
-      baseRow({
-        agent_name: null,
-        status: 'error',
-        error_message: 'Usage limit exceeded',
-        error_origin: 'policy',
-        error_class: 'limit_exceeded',
-      }),
+      baseRow({ agent_name: null, status: 'error', error_origin: 'policy' }),
     );
     expect(container.querySelector('a')).toBeNull();
-    expect(onlyBadge(container).textContent).toContain('Failed');
-    expect(onlyBadge(container).getAttribute('title')).toBe('Custom limit');
+    shapeOf(container);
   });
 });
 
