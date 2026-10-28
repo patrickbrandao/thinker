@@ -54,21 +54,22 @@ export THINKER_API_KEY="thk_SUA_CHAVE"
 
 ## OpenCode
 
-Em `~/.config/opencode/opencode.json`:
+Em `~/.config/opencode/opencode.json`, no formato do OpenCode 2 (`providers`, `package`, `settings`; o formato antigo, com `provider`, `npm` e `options`, era do OpenCode 1). A configuração proposta no dashboard já traz o `auto` e os modelos virtuais ativos do harness:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
+  "providers": {
     "thinker": {
-      "npm": "@ai-sdk/openai-compatible",
+      "package": "aisdk:@ai-sdk/openai-compatible",
       "name": "Thinker",
-      "options": {
+      "settings": {
         "baseURL": "http://localhost:2099/v1",
         "apiKey": "thk_SUA_CHAVE"
       },
       "models": {
-        "auto": { "name": "Thinker Auto" }
+        "auto": { "name": "Thinker Auto" },
+        "rapido": { "name": "Thinker rapido" }
       }
     }
   },
@@ -137,7 +138,7 @@ Um [modelo virtual](provedores-e-roteamento.md#modelos-virtuais) é um nome que 
 | --- | --- |
 | Claude Code | `"model"` em `~/.claude/settings.json`, ou `/model <nome>` na sessão. |
 | Codex | `model` em `~/.codex/config.toml`. |
-| OpenCode | A chave `model` (`thinker/<nome>`) e uma entrada em `models` do provedor. |
+| OpenCode | A chave `model` (`thinker/<nome>`) e uma entrada em `providers.thinker.models` (a configuração do dashboard já inclui todos). |
 | OpenClaw | `agents.defaults.model.primary` (`thinker/<nome>`) e uma entrada em `models`. |
 | Hermes | `default` em `config.yaml`. |
 | Nanobot | `agents.defaults.model` em `~/.nanobot/config.json`. |

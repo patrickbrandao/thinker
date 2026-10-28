@@ -173,7 +173,7 @@ export default {
     intro: 'Virtual models on this harness can be used as the model too:',
     claudeCode: 'Switch with {{ a }}, or set {{ b }} in {{ c }}.',
     codex: 'Set {{ a }} in {{ b }}, or run {{ c }}.',
-    opencode: 'Add each name under {{ a }} and select {{ b }}.',
+    opencode: 'The config above already lists them under {{ a }}; select {{ b }}.',
     hermes:
       '{{ a }} reads the model list from {{ b }}, so they appear there next to {{ c }}. You can also set {{ d }}.',
     openclaw: 'Use one as the Model ID instead of {{ a }}, so the model reads {{ b }}.',

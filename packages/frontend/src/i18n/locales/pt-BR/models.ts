@@ -178,7 +178,7 @@ const ptBR: Catalog<typeof en> = {
     intro: 'Os modelos virtuais deste harness também podem ser usados como modelo:',
     claudeCode: 'Troque com {{ a }} ou defina {{ b }} em {{ c }}.',
     codex: 'Defina {{ a }} em {{ b }} ou rode {{ c }}.',
-    opencode: 'Adicione cada nome em {{ a }} e selecione {{ b }}.',
+    opencode: 'A configuração acima já os lista em {{ a }}; selecione {{ b }}.',
     hermes:
       '{{ a }} lê a lista de modelos de {{ b }}, então eles aparecem lá ao lado de {{ c }}. Você também pode definir {{ d }}.',
     openclaw: 'Use um deles como Model ID em vez de {{ a }}, para que o modelo fique {{ b }}.',
