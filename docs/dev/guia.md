@@ -328,6 +328,16 @@ Toda entrega sai por `scripts/ship.sh "<mensagem no formato Conventional Commits
 
 **Publicação:** depois de enviar a tag, o `ship.sh` constrói amd64 e arm64 pelo Docker local, com a conta do Docker Hub em que ele está logado (`tmsoftbrasil`) e o builder local `desktop-linux`, publica o manifesto multi-arquitetura com as tags `X.Y.Z`, `X.Y`, `latest` e `sha-<curto>` e cria a release no GitHub com as notas. Não existe workflow de publicação na CI. Ninguém roda `docker login` nem manipula credenciais: o mantenedor mantém a sessão local logada. A CLI (`thinker-cli`) pode ser carimbada com `npm run set-version --workspace=packages/cli`.
 
+### Colocar em produção
+
+Colocar o serviço em produção envolve três passos, nesta ordem:
+
+1. publicar no GitHub: integrar na `main` e criar a release marcada como latest (`ship.sh`);
+2. publicar no Docker Hub a tag `tmsoftbrasil/thinker:latest` (`ship.sh`);
+3. aplicar no servidor `api.tmsoft.com.br`: backup do banco, atualização do contêiner e verificação.
+
+Os detalhes (acesso, comandos, verificação e como reverter) estão em `docs/dev/producao.local.md`. É um arquivo só local, ignorado pelo git (`*.local.md`), e não sai do computador do mantenedor.
+
 O histórico até a 0.1.2 está em `packages/thinker/CHANGELOG.md` (gerado pelo Changesets, aposentado depois da 0.1.4). Daqui em diante, as notas ficam só em `docs/releases/`.
 
 ## Fluxo de trabalho: merge e agentes
