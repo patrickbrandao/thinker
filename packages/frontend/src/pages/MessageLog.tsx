@@ -825,11 +825,7 @@ export default function MessageLog() {
             : t('messages.log.metaDescription')
         }
       />
-      <div className="page-head">
-        <div className="min-w-0">
-          <h1>{t('messages.log.title')}</h1>
-          <p className="sub">{t('messages.log.subtitle')}</p>
-        </div>
+      <div className="page-head justify-end">
         <div className="page-actions w-full lg:w-auto lg:justify-end">
           {!showEmptyState ? (
             <>

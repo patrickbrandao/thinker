@@ -482,14 +482,6 @@
         "shell.css"
       ]
     },
-    "collapse-label": {
-      "classes": [
-        "collapse-label"
-      ],
-      "files": [
-        "shell.css"
-      ]
-    },
     "count": {
       "classes": [
         "count"
@@ -501,6 +493,14 @@
     "crumb-current": {
       "classes": [
         "crumb-current"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "crumb-title": {
+      "classes": [
+        "crumb-title"
       ],
       "files": [
         "shell.css"
@@ -550,14 +550,6 @@
     "dh": {
       "classes": [
         "dh"
-      ],
-      "files": [
-        "shell.css"
-      ]
-    },
-    "docs-label": {
-      "classes": [
-        "docs-label"
       ],
       "files": [
         "shell.css"
@@ -1043,14 +1035,6 @@
     "logo-light": {
       "classes": [
         "logo-light"
-      ],
-      "files": [
-        "shell.css"
-      ]
-    },
-    "logo-mark": {
-      "classes": [
-        "logo-mark"
       ],
       "files": [
         "shell.css"
@@ -1722,9 +1706,9 @@
         "shell.css"
       ]
     },
-    "topbar-docs": {
+    "topbar-version": {
       "classes": [
-        "topbar-docs"
+        "topbar-version"
       ],
       "files": [
         "shell.css"
@@ -1757,14 +1741,6 @@
     "user-trigger": {
       "classes": [
         "user-trigger"
-      ],
-      "files": [
-        "shell.css"
-      ]
-    },
-    "version-tag": {
-      "classes": [
-        "version-tag"
       ],
       "files": [
         "shell.css"
@@ -1870,7 +1846,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 939
+      "line": 935
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -1879,7 +1855,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 939
+      "line": 935
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -1888,7 +1864,7 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 951
+      "line": 944
     }
   ],
   "ghostRules": [
@@ -1899,8 +1875,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 935,
-      "losesTo": "shell.css:939"
+      "line": 928,
+      "losesTo": "shell.css:935"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -1909,8 +1885,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 935,
-      "losesTo": "shell.css:939"
+      "line": 928,
+      "losesTo": "shell.css:935"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -1919,8 +1895,8 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 947,
-      "losesTo": "shell.css:951"
+      "line": 940,
+      "losesTo": "shell.css:944"
     }
   ],
   "componentSheets": {
@@ -1936,8 +1912,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 191,
-    "classes": 200,
+    "blocks": 188,
+    "classes": 197,
     "canonicalRules": 3,
     "ghostRules": 3
   }

@@ -157,8 +157,6 @@ describe('Overview in pt-BR', () => {
 
   it('renders the global overview in Portuguese', async () => {
     renderAt(<GlobalOverview />);
-    expect(await screen.findByText('Visão geral')).toBeDefined();
-    expect(screen.getByText('Todos os seus harnesses e provedores')).toBeDefined();
     await waitFor(() => expect(screen.getByText('Requisições recentes')).toBeDefined());
     expect(screen.getByText('Conexões de provedor')).toBeDefined();
     expect(screen.getByText('Nome da conexão')).toBeDefined();

@@ -462,7 +462,6 @@ describe('Playground page', () => {
 
   it('renders the header and seeds two default columns from connected providers', async () => {
     const { getByText } = render(<Playground />);
-    expect(getByText('Playground')).toBeDefined();
     // pickDefaults runs against the real store → two columns appear.
     await waitFor(() => {
       expect(document.querySelectorAll('[data-testid^="col-"]').length).toBeGreaterThanOrEqual(2);

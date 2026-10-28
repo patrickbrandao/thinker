@@ -47,6 +47,7 @@ export default function Topbar({
   const docsUrl = pathname.startsWith('/providers') ? THINKER_PROVIDERS_DOCS_URL : THINKER_DOCS_URL;
   const dark = effectiveTheme() === 'dark';
   const platformIcon = agentPlatformIcon();
+  const version = __THINKER_VERSION__;
 
   return (
     <header className="topbar">
@@ -96,14 +97,28 @@ export default function Topbar({
             {connection.label ? <span className="badge">{connection.label}</span> : null}
           </>
         ) : section ? (
-          <span className="crumb-current">{navLabel(section)}</span>
+          <span className="crumb-title">
+            <section.icon aria-hidden="true" />
+            <span className="crumb-current">{navLabel(section)}</span>
+          </span>
         ) : null}
       </nav>
 
       <div className="topbar-actions">
-        <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="topbar-docs">
+        {version ? (
+          <span className="topbar-version" title={t('nav.version', { version })}>
+            v{version}
+          </span>
+        ) : null}
+        <a
+          href={docsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="icon-btn"
+          aria-label={t('nav.docs')}
+          title={t('nav.docs')}
+        >
           <BookOpen aria-hidden="true" />
-          <span className="docs-label">{t('nav.docs')}</span>
         </a>
         <IconButton label={t('shell.topbar.search')} onClick={onOpenSearch}>
           <Search />

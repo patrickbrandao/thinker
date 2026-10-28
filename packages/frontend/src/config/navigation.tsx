@@ -1,5 +1,10 @@
 import {
   Bot,
+  Settings,
+  ShieldCheck,
+  Terminal,
+  Unplug,
+  Users,
   CreditCard,
   FlaskConical,
   HardDrive,
@@ -70,13 +75,25 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
   );
 }
 
-/** The menu item the current path belongs to, for the topbar trail. */
+/**
+ * Pages reached from the user menu. Not in the sidebar, but the topbar shows
+ * their title and icon like a menu item's.
+ */
+export const USER_MENU_PAGES: NavItem[] = [
+  { key: 'account', to: '/account', label: 'nav.accountPreferences', icon: Settings },
+  { key: 'organization', to: '/organization', label: 'nav.organization', icon: Users },
+  { key: 'adminUsers', to: '/admin/users', label: 'nav.users', icon: ShieldCheck },
+  { key: 'mcp', to: '/integrations/mcp', label: 'nav.mcpServer', icon: Unplug },
+  { key: 'cli', to: '/integrations/cli', label: 'nav.cli', icon: Terminal },
+];
+
+/** The menu item the current path belongs to, for the topbar title. */
 export function activeNavItem(pathname: string): NavItem | undefined {
   for (const group of NAVIGATION) {
     const hit = group.items.find((item) => isNavActive(item, pathname));
     if (hit) return hit;
   }
-  return undefined;
+  return USER_MENU_PAGES.find((item) => isNavActive(item, pathname));
 }
 
 export const navLabel = (item: NavItem): string => t(item.label);

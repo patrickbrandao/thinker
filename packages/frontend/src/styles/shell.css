@@ -60,14 +60,13 @@
   .sidebar-brand img {
     height: 22px;
   }
-  .sidebar-brand .logo-mark {
-    display: none;
-    width: 26px;
-    height: 26px;
-    flex-shrink: 0;
+  .sidebar-brand .logo-word {
+    display: flex;
+    align-items: center;
+    min-width: 0;
   }
-  .app.is-collapsed .sidebar-brand .logo-mark {
-    display: block;
+  .sidebar-brand .collapse-btn {
+    margin-left: auto;
   }
   .sidebar-nav {
     flex: 1;
@@ -195,19 +194,18 @@
     flex-shrink: 0;
   }
   .collapse-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    width: 30px;
     height: 30px;
-    padding: 0 10px;
+    padding: 0;
     border: 0;
     border-radius: var(--radius-control);
     background: transparent;
     color: var(--text-faint);
-    font: inherit;
-    font-size: 12px;
     cursor: pointer;
-    white-space: nowrap;
+    flex-shrink: 0;
   }
   .collapse-btn:hover {
     background: var(--surface-2);
@@ -232,12 +230,6 @@
     flex-shrink: 0;
     text-transform: uppercase;
   }
-  .version-tag {
-    padding: 0 10px;
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
 
   /* Collapsed sidebar: icons only */
   .app.is-collapsed .nav-label,
@@ -245,13 +237,23 @@
   .app.is-collapsed .nav-action,
   .app.is-collapsed .user-text,
   .app.is-collapsed .user-trigger > svg,
-  .app.is-collapsed .collapse-label,
-  .app.is-collapsed .version-tag,
   .app.is-collapsed .sidebar-brand .logo-word {
     display: none;
   }
+  /* Collapsed, the toggle stands where the logo was, sized like a nav item. */
+  .app.is-collapsed .sidebar-brand {
+    padding: 0 8px;
+  }
+  .app.is-collapsed .sidebar-brand .collapse-btn {
+    width: 100%;
+    height: 34px;
+    margin-left: 0;
+  }
+  .app.is-collapsed .sidebar-brand .collapse-btn svg {
+    width: 17px;
+    height: 17px;
+  }
   .app.is-collapsed .nav-item,
-  .app.is-collapsed .collapse-btn,
   .app.is-collapsed .user-trigger {
     justify-content: center;
     padding: 0;
@@ -263,10 +265,6 @@
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--border);
-  }
-  .app.is-collapsed .sidebar-brand {
-    justify-content: center;
-    padding: 0;
   }
 
   /* Topbar */
@@ -314,26 +312,23 @@
     gap: 2px;
     margin-left: auto;
   }
-  .topbar-docs {
+  .topbar-version {
+    margin-right: 6px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .crumbs .crumb-title {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 10px;
-    margin-right: 4px;
-    border-radius: var(--radius-control);
+    gap: 8px;
+    min-width: 0;
+  }
+  .crumbs .crumb-title svg {
+    width: 16px;
+    height: 16px;
     color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
-  }
-  .topbar-docs:hover {
-    background: var(--surface-2);
-    color: var(--text);
-    text-decoration: none;
-  }
-  .topbar-docs svg {
-    width: 15px;
-    height: 15px;
   }
   .mobile-only {
     display: none;
@@ -929,17 +924,15 @@
     .app.is-collapsed .nav-group-label,
     .app.is-collapsed .nav-action,
     .app.is-collapsed .user-text,
-    .app.is-collapsed .user-trigger > svg,
-    .app.is-collapsed .version-tag,
-    .app.is-collapsed .sidebar-brand .logo-word {
+    .app.is-collapsed .user-trigger > svg {
       display: revert;
+    }
+    .app.is-collapsed .sidebar-brand .logo-word {
+      display: flex;
     }
     .app.is-collapsed .nav-action,
     .app.is-collapsed .user-trigger > svg {
       display: inline-flex;
-    }
-    .app.is-collapsed .sidebar-brand .logo-mark {
-      display: none;
     }
     .app.is-collapsed .nav-item,
     .app.is-collapsed .user-trigger {
@@ -951,7 +944,6 @@
       padding: 6px 8px;
     }
     .app.is-collapsed .sidebar-brand {
-      justify-content: flex-start;
       padding: 0 14px;
     }
     .app.is-collapsed .nav-group + .nav-group {
@@ -974,9 +966,6 @@
     }
     .page {
       padding: 16px;
-    }
-    .topbar-docs .docs-label {
-      display: none;
     }
   }
 }

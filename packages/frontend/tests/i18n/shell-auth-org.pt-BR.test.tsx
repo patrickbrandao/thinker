@@ -159,7 +159,7 @@ describe('shell, auth and organization screens in pt-BR', () => {
     );
     expect(screen.getByRole('button', { name: 'Procurar (⌘K)' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Abrir menu de navegação' })).toBeTruthy();
-    expect(screen.getByText('Documentação')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Documentação' })).toBeTruthy();
   });
 
   it('renders the command palette in Portuguese', () => {

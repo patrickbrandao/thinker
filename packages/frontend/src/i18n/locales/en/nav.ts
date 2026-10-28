@@ -21,6 +21,8 @@ export default {
   sectionOrganization: 'ORGANIZATION',
   membersSettings: 'Members & settings',
   users: 'Users',
+  organization: 'Organization',
+  cli: 'CLI',
   userFallback: 'User',
   harnessActions: 'Harness actions',
   settings: 'Settings',

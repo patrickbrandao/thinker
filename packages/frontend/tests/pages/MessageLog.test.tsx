@@ -357,18 +357,6 @@ describe('MessageLog', () => {
     messagePing.set(0);
   });
 
-  it('renders Requests heading', () => {
-    mockGetMessages.mockResolvedValue(messagesData);
-    render(<MessageLog />);
-    expect(screen.getByText('Requests')).toBeDefined();
-  });
-
-  it('renders breadcrumb subtitle', () => {
-    mockGetMessages.mockResolvedValue(messagesData);
-    render(<MessageLog />);
-    expect(screen.getByText(/Full log of requests from your app/)).toBeDefined();
-  });
-
   it('shows loading skeleton while fetching', () => {
     mockGetMessages.mockReturnValue(new Promise(() => {}));
     const { container } = render(<MessageLog />);
@@ -1395,7 +1383,7 @@ describe('MessageLog', () => {
     mockGetMessages.mockResolvedValue(messagesData);
     render(<MessageLog />);
     // Meta is mocked as null, just ensure it renders without error
-    expect(screen.getByText('Requests')).toBeDefined();
+    expect(document.body.textContent).toContain('All statuses');
   });
 
   it('renders routing tier badge when present', async () => {

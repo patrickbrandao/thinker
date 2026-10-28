@@ -184,11 +184,6 @@ describe('Workspace', () => {
     mockGetGlobalProviders.mockResolvedValue({ providers: [{ provider: 'openai' }] });
   });
 
-  it('renders My Harnesses heading', async () => {
-    render(() => <Workspace />);
-    expect(screen.getByText('My Harnesses')).toBeDefined();
-  });
-
   it('renders Connect Harness button', () => {
     render(() => <Workspace />);
     const buttons = screen.getAllByText('Connect Harness');
@@ -284,11 +279,6 @@ describe('Workspace', () => {
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
     expect(document.body.textContent).toContain('Name your harness to start tracking');
-  });
-
-  it('shows breadcrumb text', () => {
-    const { container } = render(() => <Workspace />);
-    expect(document.body.textContent).toContain('View and manage all your connected harnesses');
   });
 
   it('shows connect button in empty state', async () => {

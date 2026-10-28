@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Workflow } from 'lucide-react';
 import FlowCanvas from '../components/flow/FlowCanvas.jsx';
 import { Switch, Tabs } from '../components/ui.jsx';
 import { getTopology, type TopologyRange } from '../services/api/console.js';
@@ -61,14 +60,7 @@ export default function Topology() {
     <div className="stage">
       <title>{`${t('nav.topology')} | Thinker`}</title>
       <div className="stage-head">
-        <Workflow size={18} className="text-muted" aria-hidden="true" />
-        <div>
-          <h1>{t('nav.topology')}</h1>
-          <div className="sub">
-            {t('shell.flow.subtitle')}{' '}
-            <span className="hidden xl:inline">{t('shell.flow.hint')}</span>
-          </div>
-        </div>
+        <span className="sub hidden md:inline">{t('shell.flow.hint')}</span>
         <div className="stage-actions items-center">
           <label className="flex items-center gap-2 text-xs text-muted">
             <Switch

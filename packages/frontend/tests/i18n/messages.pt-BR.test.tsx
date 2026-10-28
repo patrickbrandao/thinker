@@ -99,8 +99,6 @@ describe('Request log in pt-BR', () => {
   it('renders the page, filters, headers and rows in Portuguese', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
     const { container } = render(<MessageLog />);
-    expect(screen.getByRole('heading', { name: 'Requisições' })).toBeDefined();
-    expect(container.textContent).toContain('Log completo das requisições do seu app');
     expect(container.textContent).toContain('Todos os status');
     expect(container.textContent).toContain('Últimos 7 dias');
     expect(container.querySelector('[aria-label="Filtro de conexão"]')).not.toBeNull();
@@ -116,9 +114,9 @@ describe('Request log in pt-BR', () => {
   it('switches back to English live', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
     const { container } = render(<KeyedMessageLog />);
-    expect(screen.getByRole('heading', { name: 'Requisições' })).toBeDefined();
+    expect(container.textContent).toContain('Todos os status');
     act(() => setLocale('en', { persist: false }));
-    expect(screen.getByRole('heading', { name: 'Requests' })).toBeDefined();
+    expect(container.textContent).toContain('All statuses');
     await vi.waitFor(() => expect(container.textContent).toContain('1 total'));
   });
 

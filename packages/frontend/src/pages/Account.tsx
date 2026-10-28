@@ -90,12 +90,6 @@ export default function Account() {
         <ChevronLeft aria-hidden="true" />
         {t('common.back')}
       </Button>
-      <div className="page-head">
-        <div>
-          <h1>{t('account.title')}</h1>
-          <div className="sub">{t('account.subtitle')}</div>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-4">
         <Panel title={t('account.profile.title')}>

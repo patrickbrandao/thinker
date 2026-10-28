@@ -510,12 +510,6 @@ export default function Playground({ onBestModelChange, embedded }: PlaygroundPr
         <>
           <title>{t('playground.pageTitle')}</title>
           <meta name="description" content={t('playground.metaDescription')} />
-          <div className="page-head mb-0">
-            <div>
-              <h1>{t('playground.title')}</h1>
-              <p className="sub">{t('playground.subtitle')}</p>
-            </div>
-          </div>
         </>
       ) : null}
 

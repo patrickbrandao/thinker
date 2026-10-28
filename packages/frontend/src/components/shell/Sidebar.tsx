@@ -3,11 +3,7 @@ import { Link, useLocation } from 'react-router';
 import { PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
 import { NAVIGATION, isNavActive, navLabel } from '../../config/navigation.js';
 import { roleCan } from '../../services/session-store.js';
-import {
-  THINKER_LOGO_URL,
-  THINKER_LOGO_DARK_URL,
-  THINKER_MARK_URL,
-} from '../../services/thinker-links.js';
+import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../../services/thinker-links.js';
 import { t } from '../../i18n/index.js';
 import { cx } from '../ui.jsx';
 import AddAgentModal from '../AddAgentModal.jsx';
@@ -15,7 +11,8 @@ import UserMenu from './UserMenu.jsx';
 
 /**
  * Left navigation: icon + label per item, collapsible to icons only. The
- * user menu and the collapse toggle sit at the bottom.
+ * collapse toggle sits
+ * right of the logo and the user menu at the bottom.
  */
 export default function Sidebar({
   collapsed,
@@ -28,17 +25,26 @@ export default function Sidebar({
 }) {
   const { pathname } = useLocation();
   const [addOpen, setAddOpen] = useState(false);
-  const version = __THINKER_VERSION__;
 
   return (
     <aside className="sidebar" aria-label={t('nav.navigation')}>
-      <Link to="/overview" className="sidebar-brand" onClick={onNavigate}>
-        <img src={THINKER_MARK_URL} alt="" className="logo-mark" />
-        <span className="logo-word">
+      <div className="sidebar-brand">
+        <Link to="/overview" className="logo-word" onClick={onNavigate}>
           <img src={THINKER_LOGO_URL} alt="Thinker" className="logo-light" />
           <img src={THINKER_LOGO_DARK_URL} alt="" className="logo-dark" />
-        </span>
-      </Link>
+        </Link>
+        {/* Collapsed, the toggle takes the logo's place. */}
+        <button
+          type="button"
+          className="collapse-btn desktop-only"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
+          title={collapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
+          aria-pressed={collapsed}
+        >
+          {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </button>
+      </div>
 
       <nav className="sidebar-nav" id="agent-navigation">
         {NAVIGATION.map((group) => (
@@ -80,22 +86,6 @@ export default function Sidebar({
 
       <div className="sidebar-foot">
         <UserMenu />
-        <button
-          type="button"
-          className="collapse-btn desktop-only"
-          onClick={onToggleCollapsed}
-          aria-label={collapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
-          title={collapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
-          aria-pressed={collapsed}
-        >
-          {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-          <span className="collapse-label">{t('shell.sidebar.collapse')}</span>
-        </button>
-        {version ? (
-          <div className="version-tag" aria-label={t('nav.version', { version })}>
-            v{version}
-          </div>
-        ) : null}
       </div>
 
       <AddAgentModal open={addOpen} onClose={() => setAddOpen(false)} />

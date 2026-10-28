@@ -784,8 +784,6 @@ describe('GlobalOverview (analytics)', () => {
     const { container } = renderPage(<GlobalOverview />, '/');
 
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
-    expect(screen.getByText('Overview')).toBeDefined();
-    expect(screen.getByText('All your harnesses and providers')).toBeDefined();
     expect(screen.getAllByText('Demo Agent').length).toBeGreaterThan(0);
     expect(screen.getAllByText('OpenAI').length).toBeGreaterThan(0);
     // The shared MessageTable renders a binary status: the ok row is "Success"

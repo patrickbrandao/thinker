@@ -64,9 +64,9 @@ describe('Account', () => {
     mockChangePassword.mockResolvedValue({ data: {}, error: null });
   });
 
-  it('renders Account Preferences heading', () => {
+  it('renders the profile panel', () => {
     render(<Account />);
-    expect(screen.getByText('Account Preferences')).toBeDefined();
+    expect(screen.getByText('Profile information')).toBeDefined();
   });
 
   it('shows display name input with user name', () => {
