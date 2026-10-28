@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
+import { clientIpLogFields } from '../utils/client-ip';
 
 const logger = new Logger('RateLimit');
 
@@ -27,8 +28,9 @@ export function createRateLimitReachedHandler(name: string) {
     _next: NextFunction,
     options: RateLimitResponseOptions,
   ): void => {
-    const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
-    logger.warn(`Rate limit reached on ${name}: ${req.method} ${req.originalUrl} ip=${ip}`);
+    logger.warn(
+      `Rate limit reached on ${name}: ${req.method} ${req.originalUrl} ${clientIpLogFields(req)}`,
+    );
     res.status(options.statusCode).send(options.message);
   };
 }

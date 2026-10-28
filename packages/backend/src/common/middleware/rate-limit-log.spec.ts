@@ -18,7 +18,7 @@ describe('createRateLimitReachedHandler', () => {
     const req = {
       method: 'POST',
       originalUrl: '/api/auth/sign-in',
-      ip: '203.0.113.5',
+      socket: { remoteAddress: '45.80.10.20' },
     } as unknown as Request;
     const res = makeRes();
     const message = { error: 'Too many login attempts. Try again later.' };
@@ -32,10 +32,10 @@ describe('createRateLimitReachedHandler', () => {
     expect(line).toContain('sign-in');
     expect(line).toContain('POST');
     expect(line).toContain('/api/auth/sign-in');
-    expect(line).toContain('203.0.113.5');
+    expect(line).toContain('client_ip=45.80.10.20 client_ip_source=tcp peer_ip=45.80.10.20');
   });
 
-  it('falls back to socket.remoteAddress when req.ip is absent', () => {
+  it('uses the TCP peer when no proxy is in front', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const handler = createRateLimitReachedHandler('sign-up');
     const req = {
@@ -52,7 +52,7 @@ describe('createRateLimitReachedHandler', () => {
     expect(warn.mock.calls[0][0] as string).toContain('198.51.100.9');
   });
 
-  it("uses 'unknown' when neither req.ip nor a socket is available", () => {
+  it("uses 'unknown' when no socket is available", () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const handler = createRateLimitReachedHandler('verify-email');
     const req = { method: 'POST', originalUrl: '/api/auth/verify-email' } as unknown as Request;

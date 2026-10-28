@@ -28,7 +28,8 @@ import { ModelDiscoveryService } from '../../model-discovery/model-discovery.ser
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
 import { resolveModelCapabilityMetadata } from '../../model-discovery/model-capabilities';
-import { classifyCaller, clientIpOf } from './caller-classifier';
+import { classifyCaller } from './caller-classifier';
+import { clientIpInfo } from '../../common/utils/client-ip';
 import { sanitizeRequestHeaders } from './request-headers';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
@@ -275,9 +276,13 @@ export class ProxyController {
     const { sessionKey } = sessionScope;
     const traceId = this.extractTraceId(req);
     const requestId = randomUUID();
-    const clientIp = clientIpOf(req.ip ?? req.socket?.remoteAddress);
-    const classified = classifyCaller(req.headers);
-    const callerAttribution = clientIp ? { ...classified, clientIp } : classified;
+    const { clientIp, source: clientIpSource, peerIp } = clientIpInfo(req);
+    const callerAttribution = {
+      ...classifyCaller(req.headers),
+      clientIp,
+      clientIpSource,
+      peerIp,
+    };
     const requestHeaders = sanitizeRequestHeaders(req.headers);
     const isStream = body.stream === true;
     let routingBody = body;

@@ -86,41 +86,34 @@ describe('httpErrorLogger', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('ua=custom-ua/2.0');
   });
 
-  it('uses x-forwarded-for when present', () => {
+  it('logs the resolved client, its source and the TCP peer', () => {
     const req = mockReq({
-      headers: { 'user-agent': 'ua', 'x-forwarded-for': '1.2.3.4' },
+      socket: { remoteAddress: '172.18.0.5' },
+      headersDistinct: { 'x-forwarded-for': ['6.6.6.6, 45.80.10.20'] },
     });
     const res = mockRes(400);
-    const next = jest.fn();
 
-    httpErrorLogger(req, res, next);
+    httpErrorLogger(req, res, jest.fn());
     (res as unknown as EventEmitter).emit('finish');
 
-    expect(warnSpy.mock.calls[0][0]).toContain('ip=1.2.3.4');
+    expect(warnSpy.mock.calls[0][0]).toContain(
+      'client_ip=45.80.10.20 client_ip_source=x-forwarded-for peer_ip=172.18.0.5',
+    );
   });
 
-  it('uses first entry when x-forwarded-for is an array', () => {
+  it('ignores X-Forwarded-For from an untrusted peer', () => {
     const req = mockReq({
-      headers: { 'user-agent': 'ua', 'x-forwarded-for': ['5.6.7.8', '9.0.1.2'] },
+      socket: { remoteAddress: '45.80.10.20' },
+      headersDistinct: { 'x-forwarded-for': ['6.6.6.6'] },
     });
     const res = mockRes(400);
-    const next = jest.fn();
 
-    httpErrorLogger(req, res, next);
+    httpErrorLogger(req, res, jest.fn());
     (res as unknown as EventEmitter).emit('finish');
 
-    expect(warnSpy.mock.calls[0][0]).toContain('ip=5.6.7.8');
-  });
-
-  it('falls back to req.ip when no x-forwarded-for', () => {
-    const req = mockReq({ ip: '10.0.0.1' });
-    const res = mockRes(400);
-    const next = jest.fn();
-
-    httpErrorLogger(req, res, next);
-    (res as unknown as EventEmitter).emit('finish');
-
-    expect(warnSpy.mock.calls[0][0]).toContain('ip=10.0.0.1');
+    expect(warnSpy.mock.calls[0][0]).toContain(
+      'client_ip=45.80.10.20 client_ip_source=tcp peer_ip=45.80.10.20',
+    );
   });
 
   it('handles missing user-agent header', () => {
@@ -263,33 +256,18 @@ describe('httpErrorLogger', () => {
     expect(logMessage).not.toMatch(/[\x00-\x1f\x7f]/);
   });
 
-  it('strips control characters from forwarded IP', () => {
+  it('never logs a forwarded value that is not an IP literal', () => {
     const req = mockReq({
-      headers: { 'user-agent': 'ua', 'x-forwarded-for': '1.2.3.4\x0d\x0a' },
+      socket: { remoteAddress: '172.18.0.5' },
+      headersDistinct: { 'x-forwarded-for': ['1.2.3.4\x0d\x0a evil'] },
     });
     const res = mockRes(400);
-    const next = jest.fn();
 
-    httpErrorLogger(req, res, next);
+    httpErrorLogger(req, res, jest.fn());
     (res as unknown as EventEmitter).emit('finish');
 
     const logMessage = warnSpy.mock.calls[0][0] as string;
-    expect(logMessage).toContain('ip=1.2.3.4');
-    expect(logMessage).not.toMatch(/[\x00-\x1f\x7f]/);
-  });
-
-  it('strips control characters from array x-forwarded-for', () => {
-    const req = mockReq({
-      headers: { 'user-agent': 'ua', 'x-forwarded-for': ['5.6\x007.8', '9.0.1.2'] },
-    });
-    const res = mockRes(400);
-    const next = jest.fn();
-
-    httpErrorLogger(req, res, next);
-    (res as unknown as EventEmitter).emit('finish');
-
-    const logMessage = warnSpy.mock.calls[0][0] as string;
-    expect(logMessage).toContain('ip=5.67.8');
+    expect(logMessage).toContain('client_ip=172.18.0.5 client_ip_source=tcp');
     expect(logMessage).not.toMatch(/[\x00-\x1f\x7f]/);
   });
 });

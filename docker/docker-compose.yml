@@ -32,8 +32,8 @@
 #   - The app port binds to 127.0.0.1 by default. To expose on the LAN,
 #     set HOST_BIND_ADDRESS=0.0.0.0 and update BETTER_AUTH_URL in .env to
 #     match the host you reach it on.
-#   - Behind a reverse proxy, set TRUST_PROXY in .env to the proxy's address
-#     (see .env.example), so clients cannot spoof X-Forwarded-For.
+#   - Behind a reverse proxy, set TRUSTED_PROXIES in .env to the proxy's
+#     address (see .env.example), so clients cannot spoof X-Forwarded-For.
 
 # Pin the Compose project name so containers, networks, and volumes have
 # stable, predictable names (thinker-*, thinker_*) regardless of the install
@@ -76,13 +76,12 @@ services:
       # OAuth callback and session cookie follow the request host, so set this
       # when the same instance answers on more than one domain.
       - BETTER_AUTH_ALLOWED_HOSTS=${BETTER_AUTH_ALLOWED_HOSTS:-}
-      # Which peers may set X-Forwarded-For / X-Forwarded-Proto (Express
-      # "trust proxy"). The backend's own default trusts every private range,
-      # which inside Docker lets a client on a private network spoof its IP
-      # and get a fresh per-IP rate-limit bucket. Compose trusts only
-      # loopback; set your reverse proxy's address or CIDR in .env when you
-      # run one in front of Thinker (see .env.example).
-      - TRUST_PROXY=${TRUST_PROXY:-loopback}
+      # Reverse proxies whose X-Forwarded-For / X-Real-IP are honored. Empty
+      # trusts the private and reserved ranges; clients reaching the published
+      # port arrive through the bridge gateway (a private address), so set the
+      # proxy's exact address in .env whenever one runs in front of Thinker
+      # (see .env.example).
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
       - MCP_ENABLED=${MCP_ENABLED:-}
       # Defaults to the host-installed Ollama. Override in .env if your
       # Ollama runs elsewhere (e.g. on another host on your LAN).

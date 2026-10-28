@@ -108,7 +108,7 @@ jobs:
             .services.thinker.image == "tmsoftbrasil/thinker:ci" and
             .services.thinker.ports[0].host_ip == "0.0.0.0" and
             .services.thinker.ports[0].published == "28080" and
-            .services.thinker.environment.TRUST_PROXY == "loopback" and
+            .services.thinker.environment.TRUSTED_PROXIES == "" and
             .services.thinker.environment.THINKER_RECORDING_RETENTION_DAYS == "42" and
             .services.thinker.environment.THINKER_RECORDING_S3_BUCKET == "recordings" and
             .services.thinker.environment.THINKER_RECORDING_S3_ENDPOINT == "http://minio:9000" and

@@ -1,3 +1,4 @@
+import { clientIpLogFields } from '../../common/utils/client-ip';
 import {
   CanActivate,
   ExecutionContext,
@@ -170,7 +171,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
 
     if (authHeader === undefined && apiKeyHeader === undefined) {
       if (await this.handleDevLoopback(request, isDevLoopback)) return true;
-      this.logger.warn(`Request without auth from ${request.ip}`);
+      this.logger.warn(`Request without auth from ${clientIpLogFields(request)}`);
       throw new UnauthorizedException('Authorization header required');
     }
 
@@ -192,7 +193,9 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       apiKeyHeader !== undefined &&
       !sameKey(bearerToken, apiKeyHeader)
     ) {
-      this.logger.warn(`Rejected request with conflicting agent key headers from ${request.ip}`);
+      this.logger.warn(
+        `Rejected request with conflicting agent key headers from ${clientIpLogFields(request)}`,
+      );
       throw new UnauthorizedException(CONFLICTING_API_KEY_HEADERS);
     }
 

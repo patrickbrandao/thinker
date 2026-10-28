@@ -31,7 +31,7 @@ O passo a passo, inclusive para quem dependia do antigo fallback para `BETTER_AU
 | `PORT` | `2099` | Porta do servidor; no compose, também a porta publicada. |
 | `HOST_PORT` | `PORT` | Só a porta do lado do host. |
 | `HOST_BIND_ADDRESS` | `127.0.0.1` | Interface onde o compose publica a porta. `0.0.0.0` expõe na rede. |
-| `TRUST_PROXY` | `loopback` (compose) | Quem pode definir `X-Forwarded-For`/`-Proto`: endereço, CIDR ou número de saltos. |
+| `TRUSTED_PROXIES` | vazio (faixas privadas) | Proxies reversos cujos `X-Forwarded-For`/`X-Real-IP` são aceitos: IPs ou CIDRs IPv4/IPv6 separados por vírgula. Vazio confia nas faixas privadas e reservadas; com valor, só nos prefixos listados. Uma entrada inválida impede o boot. Veja [proxy reverso](instalacao-docker.md#proxy-reverso-com-https). |
 | `THINKER_DISABLE_HSTS` | vazio | `1` silencia o aviso de que o servidor está em HTTP puro. |
 | `THINKER_CORS_ORIGINS` | vazio | Origens de navegador extras que podem chamar o gateway (separadas por vírgula). O dashboard é de mesma origem e não precisa. |
 | `MCP_ENABLED` | ligado | `false` desliga o servidor MCP remoto (`/api/v1/mcp`). O MCP exige `BETTER_AUTH_URL` em HTTPS (ou localhost) e se desliga sozinho em HTTP de LAN. |

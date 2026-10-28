@@ -15,6 +15,11 @@ import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, MCP_SCOPES } from './mcp-scopes';
 import { DEFAULT_PORT } from '../common/constants/server.constants';
 import { decideUserCreation, isSignupValveOpen } from './signup-policy';
 import { pinSessionTimeZoneToUtc } from '../common/utils/utc-clock';
+import {
+  CLIENT_IP_HEADER,
+  CLIENT_IP_SOURCE_HEADER,
+  PEER_IP_HEADER,
+} from '../common/utils/client-ip';
 
 const port = process.env['PORT'] ?? String(DEFAULT_PORT);
 const isDev = (process.env['NODE_ENV'] ?? '') !== 'production';
@@ -234,7 +239,13 @@ const pluginAuth = betterAuth({
   // Better Auth tables, so a fresh database always logged a false "schema
   // mismatch". The same check runs after the migration instead
   // (auth/better-auth-schema.ts).
-  advanced: { database: { validateSchema: false } },
+  advanced: {
+    database: { validateSchema: false },
+    // clientIpMiddleware resolves the address behind the trusted proxies and
+    // stamps it here (overwriting anything a client sent), so sessions and
+    // Better Auth's rate limiter never read a forgeable X-Forwarded-For.
+    ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+  },
   plugins: buildPlugins(),
   session: {
     // Validate sessions from a signed cookie instead of the database. The two
@@ -243,6 +254,12 @@ const pluginAuth = betterAuth({
     // every SessionGuard cache miss, before any page can load. A revoked
     // session stays valid for at most maxAge; sign-out clears the cookie.
     cookieCache: { enabled: true, maxAge: 5 * 60 },
+    // Audit next to `ipAddress` (the resolved client): how it was resolved and
+    // the TCP peer (the reverse proxy) that delivered the sign-in.
+    additionalFields: {
+      ipAddressSource: { type: 'string', required: false, input: false },
+      peerIpAddress: { type: 'string', required: false, input: false },
+    },
   },
   hooks: {
     // Rejects `/sign-up/email` before the endpoint runs. The database hook
@@ -254,6 +271,21 @@ const pluginAuth = betterAuth({
     }),
   },
   databaseHooks: {
+    session: {
+      create: {
+        before: async (session, ctx) => {
+          const header = (name: string) =>
+            ctx?.headers?.get(name) ?? ctx?.request?.headers.get(name);
+          return {
+            data: {
+              ...session,
+              ipAddressSource: header(CLIENT_IP_SOURCE_HEADER) ?? null,
+              peerIpAddress: header(PEER_IP_HEADER) ?? null,
+            },
+          };
+        },
+      },
+    },
     user: {
       create: {
         // Every user creation path (email/password, social, plugins) goes
