@@ -1,14 +1,16 @@
-import { createSignal, For, Show, type JSX } from 'solid-js';
+import { Fragment, useState, type MouseEvent, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { MessageRow, MessageColumnKey } from './message-table-types.js';
-import MessageDetails from './MessageDetails.jsx';
-import { columnHeader, renderCell } from './message-table-cells.jsx';
+import MessageDetails from './MessageDetails.js';
+import { columnHeader, renderCell, type CellRenderContext } from './message-table-cells.js';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 export interface MessageTableProps {
   items: MessageRow[];
   columns: MessageColumnKey[];
   agentName?: string;
-  customProviderName: (model: string) => string | undefined;
+  customProviderName?: (model: string) => string | undefined;
   agentPlatformLookup?: (
     name: string,
   ) => { platform: string | null; category: string | null } | undefined;
@@ -23,146 +25,118 @@ export interface MessageTableProps {
   selectedRowId?: string | null;
 }
 
-function ChevronIcon(): JSX.Element {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
+const noCustomName = () => undefined;
+
+function cellContext(props: MessageTableProps): CellRenderContext {
+  return {
+    agentName: props.agentName,
+    customProviderName: props.customProviderName ?? noCustomName,
+    agentPlatformLookup: props.agentPlatformLookup,
+    onFallbackErrorClick: props.onFallbackErrorClick,
+    onTriggerClick: props.onTriggerClick,
+  };
 }
 
-function ExpandableRow(props: {
+function renderCells(columns: MessageColumnKey[], item: MessageRow, ctx: CellRenderContext) {
+  return columns.map((col) => <Fragment key={col}>{renderCell(col, item, ctx)}</Fragment>);
+}
+
+function ExpandableRow({
+  item,
+  tableProps,
+  rowId,
+}: {
   item: MessageRow;
-  columns: MessageColumnKey[];
   tableProps: MessageTableProps;
   rowId?: string;
-}): JSX.Element {
-  const [expanded, setExpanded] = createSignal(false);
-  const colSpan = () => props.columns.length + 1;
-  const ctx = {
-    agentName: props.tableProps.agentName,
-    customProviderName: props.tableProps.customProviderName,
-    agentPlatformLookup: props.tableProps.agentPlatformLookup,
-    onFallbackErrorClick: props.tableProps.onFallbackErrorClick,
-    onTriggerClick: props.tableProps.onTriggerClick,
-  };
+}): ReactNode {
+  const [expanded, setExpanded] = useState(false);
+  const useDrawer = !!tableProps.onRowSelect;
+  const selected = useDrawer && tableProps.selectedRowId === item.id;
+  const toggleLabel = expanded
+    ? t('messages.table.collapseDetails')
+    : t('messages.table.expandDetails');
 
-  const useDrawer = () => !!props.tableProps.onRowSelect;
-
-  const handleRowClick = (e: MouseEvent) => {
+  const handleRowClick = (e: MouseEvent<HTMLTableRowElement>) => {
     const target = e.target as HTMLElement;
     if (target.closest('button, a, [role="button"]')) return;
-    if (useDrawer()) {
-      props.tableProps.onRowSelect!(props.item.id);
-    } else {
-      setExpanded(!expanded());
-    }
+    if (useDrawer) tableProps.onRowSelect!(item.id);
+    else setExpanded((v) => !v);
   };
 
   return (
     <>
       <tr
-        id={props.rowId}
-        class={`msg-row--clickable${expanded() ? ' msg-row--expanded' : ''}${useDrawer() && props.tableProps.selectedRowId === props.item.id ? ' msg-row--selected' : ''}`}
+        id={rowId}
+        className={cx(
+          'msg-row--clickable cursor-pointer',
+          expanded && 'msg-row--expanded',
+          selected && 'msg-row--selected is-selected',
+        )}
         onClick={handleRowClick}
       >
-        <For each={props.columns}>{(col) => renderCell(col, props.item, ctx)}</For>
-        <Show when={!useDrawer()}>
-          <td class="msg-detail__chevron-cell">
+        {renderCells(tableProps.columns, item, cellContext(tableProps))}
+        {!useDrawer ? (
+          <td className="msg-detail__chevron-cell w-8 text-right">
             <button
-              class={`msg-detail__chevron-btn${expanded() ? ' msg-detail__chevron-btn--open' : ''}`}
+              type="button"
+              className={cx(
+                'msg-detail__chevron-btn icon-btn',
+                expanded && 'msg-detail__chevron-btn--open',
+              )}
               onClick={(e) => {
                 e.stopPropagation();
-                setExpanded(!expanded());
+                setExpanded((v) => !v);
               }}
-              aria-expanded={expanded()}
-              aria-label={
-                expanded() ? t('messages.table.collapseDetails') : t('messages.table.expandDetails')
-              }
-              title={
-                expanded() ? t('messages.table.collapseDetails') : t('messages.table.expandDetails')
-              }
+              aria-expanded={expanded}
+              aria-label={toggleLabel}
+              title={toggleLabel}
             >
-              <ChevronIcon />
+              <ChevronDown
+                aria-hidden="true"
+                className={cx('size-3.5 transition-transform', expanded && 'rotate-180')}
+              />
             </button>
           </td>
-        </Show>
+        ) : null}
       </tr>
-      <Show when={expanded() && !useDrawer()}>
-        <tr class="msg-detail__row">
-          <td colspan={colSpan()} class="msg-detail__cell">
-            <MessageDetails messageId={props.item.id} />
+      {expanded && !useDrawer ? (
+        <tr className="msg-detail__row">
+          <td colSpan={tableProps.columns.length + 1} className="msg-detail__cell bg-sunken">
+            <MessageDetails messageId={item.id} />
           </td>
         </tr>
-      </Show>
+      ) : null}
     </>
   );
 }
 
-function PlainRow(props: {
-  item: MessageRow;
-  columns: MessageColumnKey[];
-  tableProps: MessageTableProps;
-  rowId?: string;
-}): JSX.Element {
-  const ctx = {
-    agentName: props.tableProps.agentName,
-    customProviderName: props.tableProps.customProviderName,
-    agentPlatformLookup: props.tableProps.agentPlatformLookup,
-    onFallbackErrorClick: props.tableProps.onFallbackErrorClick,
-    onTriggerClick: props.tableProps.onTriggerClick,
-  };
+export default function MessageTable(props: MessageTableProps) {
+  const ctx = cellContext(props);
+  const rowId = (item: MessageRow) =>
+    props.rowIdPrefix ? `${props.rowIdPrefix}${item.id}` : undefined;
   return (
-    <tr id={props.rowId}>
-      <For each={props.columns}>{(col) => renderCell(col, props.item, ctx)}</For>
-    </tr>
-  );
-}
-
-export default function MessageTable(props: MessageTableProps): JSX.Element {
-  return (
-    <table class="data-table">
+    <table className="data data-table">
       <thead>
         <tr>
-          <For each={props.columns}>
-            {(col) => <th data-col={col}>{columnHeader(col, props.showHeaderTooltips)}</th>}
-          </For>
-          <Show when={props.expandable}>
-            <th class="msg-detail__chevron-th" />
-          </Show>
+          {props.columns.map((col) => (
+            <th key={col} data-col={col}>
+              {columnHeader(col, props.showHeaderTooltips)}
+            </th>
+          ))}
+          {props.expandable ? <th className="msg-detail__chevron-th" /> : null}
         </tr>
       </thead>
       <tbody>
-        <For each={props.items}>
-          {(item) =>
-            props.expandable ? (
-              <ExpandableRow
-                item={item}
-                columns={props.columns}
-                tableProps={props}
-                rowId={props.rowIdPrefix ? `${props.rowIdPrefix}${item.id}` : undefined}
-              />
-            ) : (
-              <PlainRow
-                item={item}
-                columns={props.columns}
-                tableProps={props}
-                rowId={props.rowIdPrefix ? `${props.rowIdPrefix}${item.id}` : undefined}
-              />
-            )
-          }
-        </For>
+        {props.items.map((item) =>
+          props.expandable ? (
+            <ExpandableRow key={item.id} item={item} tableProps={props} rowId={rowId(item)} />
+          ) : (
+            <tr key={item.id} id={rowId(item)}>
+              {renderCells(props.columns, item, ctx)}
+            </tr>
+          ),
+        )}
       </tbody>
     </table>
   );

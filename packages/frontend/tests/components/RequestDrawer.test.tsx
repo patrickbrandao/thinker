@@ -1,5 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
+// MarkdownContent belongs to the playground area; render its text plainly.
+vi.mock('../../src/components/playground/MarkdownContent.js', () => ({
+  default: (props: { text: string; class?: string }) => (
+    <div className={props.class}>{props.text}</div>
+  ),
+}));
 
 const mockGetMessageDetails = vi.fn();
 
@@ -110,9 +117,9 @@ describe('RequestDrawer', () => {
   it('renders request attempts, metadata, tabs, and close interactions', async () => {
     mockGetMessageDetails.mockResolvedValue({ message: fullMessage });
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <RequestDrawer messageId="request-1234567890" onClose={onClose} />
-    ));
+    const { container } = render(
+      <RequestDrawer messageId="request-1234567890" onClose={onClose} />,
+    );
 
     await waitFor(() => expect(screen.getByText('Request request-1234')).toBeDefined());
     expect(mockGetMessageDetails).toHaveBeenCalledWith('request-1234567890');
@@ -169,9 +176,7 @@ describe('RequestDrawer', () => {
       input_tokens: 0,
       output_tokens: 0,
     });
-    const { container } = render(() => (
-      <RequestDrawer messageId={`single-${type}`} onClose={vi.fn()} />
-    ));
+    const { container } = render(<RequestDrawer messageId={`single-${type}`} onClose={vi.fn()} />);
     await waitFor(() => expect(container.querySelector('.attempt-item')).not.toBeNull());
     expect(container.querySelector('.drawer-kv:nth-child(2)')?.textContent).toContain(type);
   });
@@ -180,7 +185,7 @@ describe('RequestDrawer', () => {
     mockGetMessageDetails.mockResolvedValue({
       message: { ...fullMessage, virtual_model_id: 'vm-1', virtual_model_name: 'deepseek/flash' },
     });
-    const { container } = render(() => <RequestDrawer messageId="vm" onClose={vi.fn()} />);
+    const { container } = render(<RequestDrawer messageId="vm" onClose={vi.fn()} />);
     await waitFor(() =>
       expect(container.querySelector('.drawer__meta-row .tier-badge--virtual')).not.toBeNull(),
     );
@@ -194,7 +199,7 @@ describe('RequestDrawer', () => {
     mockGetMessageDetails.mockResolvedValue({
       message: { ...fullMessage, attempts: [], virtual_model_name: 'deepseek/flash' },
     });
-    const { container } = render(() => <RequestDrawer messageId="m301" onClose={vi.fn()} />);
+    const { container } = render(<RequestDrawer messageId="m301" onClose={vi.fn()} />);
     await waitFor(() =>
       expect(container.querySelector('.drawer__meta-row .tier-badge--virtual')).not.toBeNull(),
     );
@@ -202,7 +207,7 @@ describe('RequestDrawer', () => {
 
   it('omits the virtual model when none was used', async () => {
     mockGetMessageDetails.mockResolvedValue({ message: fullMessage });
-    const { container } = render(() => <RequestDrawer messageId="plain" onClose={vi.fn()} />);
+    const { container } = render(<RequestDrawer messageId="plain" onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByText('Request request-1234')).toBeDefined());
     expect(container.querySelector('.tier-badge--virtual')).toBeNull();
     expect(screen.queryByText('Virtual model')).toBeNull();
@@ -219,9 +224,7 @@ describe('RequestDrawer', () => {
         auth_type: null,
       },
     });
-    const { container } = render(() => (
-      <RequestDrawer messageId="zero-attempt" onClose={vi.fn()} />
-    ));
+    const { container } = render(<RequestDrawer messageId="zero-attempt" onClose={vi.fn()} />);
 
     await waitFor(() =>
       expect(
@@ -265,9 +268,7 @@ describe('RequestDrawer', () => {
         ),
       },
     });
-    const { container } = render(() => (
-      <RequestDrawer messageId="recorded-request" onClose={vi.fn()} />
-    ));
+    const { container } = render(<RequestDrawer messageId="recorded-request" onClose={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText('Messages')).toBeDefined());
     expect(screen.getByText('Tools')).toBeDefined();
@@ -314,9 +315,9 @@ describe('RequestDrawer', () => {
         ],
       },
     });
-    const { container } = render(() => (
-      <RequestDrawer messageId={`request-${status}`} onClose={vi.fn()} />
-    ));
+    const { container } = render(
+      <RequestDrawer messageId={`request-${status}`} onClose={vi.fn()} />,
+    );
 
     await waitFor(() => expect(screen.getAllByText(label).length).toBeGreaterThan(0));
     expect(screen.getAllByText(code).length).toBeGreaterThan(0);
@@ -341,7 +342,7 @@ describe('RequestDrawer', () => {
         ],
       },
     });
-    render(() => <RequestDrawer messageId="request-failed-empty" onClose={vi.fn()} />);
+    render(<RequestDrawer messageId="request-failed-empty" onClose={vi.fn()} />);
 
     await waitFor(() =>
       expect(screen.getByText('Request failed without an error message.')).toBeDefined(),
@@ -350,14 +351,12 @@ describe('RequestDrawer', () => {
 
   it('shows loading state while an open request is unresolved and stays closed for null', () => {
     mockGetMessageDetails.mockReturnValue(new Promise(() => {}));
-    const { container, unmount } = render(() => (
-      <RequestDrawer messageId="pending" onClose={vi.fn()} />
-    ));
+    const { container, unmount } = render(<RequestDrawer messageId="pending" onClose={vi.fn()} />);
     expect(screen.getByText('Loading...')).toBeDefined();
     expect(container.querySelector('.drawer--open')).not.toBeNull();
     unmount();
 
-    const closed = render(() => <RequestDrawer messageId={null} onClose={vi.fn()} />);
+    const closed = render(<RequestDrawer messageId={null} onClose={vi.fn()} />);
     expect(closed.container.querySelector('.drawer--open')).toBeNull();
     expect(screen.queryByText('Loading...')).toBeNull();
   });
@@ -396,7 +395,7 @@ describe('RequestDrawer', () => {
         ],
       },
     });
-    const { container } = render(() => <RequestDrawer messageId="fb-chain" onClose={vi.fn()} />);
+    const { container } = render(<RequestDrawer messageId="fb-chain" onClose={vi.fn()} />);
     await waitFor(() => expect(container.querySelectorAll('.attempt-item').length).toBe(2));
 
     // Sidebar shows binary HTTP-code tags: red 401 on the failure, green 200

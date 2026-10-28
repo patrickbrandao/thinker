@@ -1,11 +1,11 @@
-import { render, screen } from '@solidjs/testing-library';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import MessageTable from '../../src/components/MessageTable';
 import type { MessageRow } from '../../src/components/message-table-types';
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class} title={props.title}>
+vi.mock('react-router', () => ({
+  Link: (props: any) => (
+    <a href={props.to} className={props.className} title={props.title}>
       {props.children}
     </a>
   ),
@@ -24,13 +24,13 @@ const baseRow: MessageRow = {
 };
 
 function renderStatus(row: Partial<MessageRow>) {
-  render(() => (
+  render(
     <MessageTable
       items={[{ ...baseRow, ...row }]}
       columns={['status']}
       customProviderName={() => undefined}
-    />
-  ));
+    />,
+  );
 }
 
 describe('MessageTable status labels', () => {

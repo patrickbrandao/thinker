@@ -1,0 +1,79 @@
+/*
+ * highlight.js token colors on the design tokens. The tokens switch with the
+ * theme (.dark on <html>), so one set of rules stays legible in both.
+ */
+
+.hljs {
+  color: var(--text);
+}
+
+/* Keywords: from, import, def, class, return, const, let, await, export */
+.hljs-keyword,
+.hljs-meta {
+  color: var(--port-2);
+  font-weight: 500;
+}
+
+/* Strings: "hello", 'world', `template` */
+.hljs-string,
+.hljs-template-tag,
+.hljs-symbol {
+  color: var(--accent-soft);
+}
+
+/* Functions, classes and section headers */
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section {
+  color: var(--info);
+}
+
+.hljs-section {
+  font-weight: 600;
+}
+
+/* Numbers, booleans, null, regex */
+.hljs-number,
+.hljs-literal,
+.hljs-regexp {
+  color: var(--warn);
+}
+
+/* Built-in types and objects */
+.hljs-built_in,
+.hljs-type {
+  color: var(--port-5);
+}
+
+/* Object properties and attributes */
+.hljs-attr,
+.hljs-property {
+  color: var(--info);
+}
+
+/* Comments */
+.hljs-comment {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* Variables, parameters */
+.hljs-variable,
+.hljs-params {
+  color: var(--text);
+}
+
+/* Punctuation, operators */
+.hljs-punctuation,
+.hljs-operator {
+  color: var(--text-muted);
+}
+
+/* Diff */
+.hljs-deletion {
+  color: var(--danger);
+}
+
+.hljs-addition {
+  color: var(--ok);
+}

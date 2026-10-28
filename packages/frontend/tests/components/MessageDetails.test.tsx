@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { THINKER_ERRORS_DOCS_BASE } from 'thinker-shared';
 
 const mockGetMessageDetails = vi.fn();
@@ -27,9 +27,9 @@ vi.mock('../../src/services/model-display.js', () => ({
   },
 }));
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class} style={props.style}>
+vi.mock('react-router', () => ({
+  Link: (props: any) => (
+    <a href={props.to} className={props.className} style={props.style}>
       {props.children}
     </a>
   ),
@@ -72,14 +72,14 @@ describe('MessageDetails', () => {
 
   it('shows loading state initially', () => {
     mockGetMessageDetails.mockReturnValue(new Promise(() => {}));
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     expect(container.querySelector('.msg-detail__spinner')).not.toBeNull();
     expect(container.textContent).toContain('Loading details');
   });
 
   it('displays trace ID in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Trace');
       expect(container.textContent).toContain('trace-abc123');
@@ -88,7 +88,7 @@ describe('MessageDetails', () => {
 
   it('displays description in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Description');
       expect(container.textContent).toContain('Test description');
@@ -105,7 +105,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(errorResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       // The redesign renders the error message inside `.msg-detail__error-inline`
       // (an icon + the message span) within the error/recovery row.
@@ -129,7 +129,7 @@ describe('MessageDetails', () => {
       },
     });
 
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
 
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request limit reached');
@@ -150,7 +150,7 @@ describe('MessageDetails', () => {
         superseded: false,
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Origin');
       expect(container.textContent).toContain('Thinker · Setup');
@@ -172,7 +172,7 @@ describe('MessageDetails', () => {
         error_class: 'no_provider_key',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('M100');
     });
@@ -195,7 +195,7 @@ describe('MessageDetails', () => {
         error_class: 'server_error',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => expect(container.textContent).toContain('Overloaded'));
     expect(container.querySelector('.msg-detail__error-code')).toBeNull();
   });
@@ -211,7 +211,7 @@ describe('MessageDetails', () => {
         error_class: 'invalid_request',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Thinker · Bad request');
     });
@@ -232,7 +232,7 @@ describe('MessageDetails', () => {
         superseded: true,
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Overloaded');
       expect(container.textContent).toContain('A fallback was triggered after this error.');
@@ -256,7 +256,7 @@ describe('MessageDetails', () => {
         superseded: true,
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Overloaded');
       expect(container.textContent).toContain('A fallback was triggered after this error.');
@@ -276,7 +276,7 @@ describe('MessageDetails', () => {
         fallback_index: 1,
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('A fallback was triggered after this error.');
     });
@@ -294,7 +294,7 @@ describe('MessageDetails', () => {
         fallback_index: 0,
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Still failing');
     });
@@ -316,7 +316,7 @@ describe('MessageDetails', () => {
         autofix_role: 'original',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Bad request');
     });
@@ -329,7 +329,7 @@ describe('MessageDetails', () => {
       message: { ...detailsResponse.message, error_message: null },
     };
     mockGetMessageDetails.mockResolvedValue(summaryResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request');
       expect(container.textContent).toContain('Provider');
@@ -360,7 +360,7 @@ describe('MessageDetails', () => {
       },
     });
 
-    const { container } = render(() => <MessageDetails messageId="request-1" />);
+    const { container } = render(<MessageDetails messageId="request-1" />);
 
     await screen.findByRole('table', { name: 'Provider attempts' });
     const rows = container.querySelectorAll('table[aria-label="Provider attempts"] tbody tr');
@@ -371,7 +371,7 @@ describe('MessageDetails', () => {
 
   it('shows error state on API failure', async () => {
     mockGetMessageDetails.mockImplementation(() => Promise.reject(new Error('Network error')));
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       const errorEl = container.querySelector('.msg-detail__error');
       expect(errorEl).not.toBeNull();
@@ -380,7 +380,7 @@ describe('MessageDetails', () => {
 
   it('shows service type in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Service');
       expect(container.textContent).toContain('agent');
@@ -389,15 +389,15 @@ describe('MessageDetails', () => {
 
   it('calls API with correct message ID', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    render(() => <MessageDetails messageId="custom-id-xyz" />);
+    render(<MessageDetails messageId="custom-id-xyz" />);
     await vi.waitFor(() => {
-      expect(mockGetMessageDetails).toHaveBeenCalledWith('custom-id-xyz', expect.anything());
+      expect(mockGetMessageDetails).toHaveBeenCalledWith('custom-id-xyz');
     });
   });
 
   it('displays message ID, model, and provider in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('ID');
       expect(container.textContent).toContain('msg-1');
@@ -420,7 +420,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(fallbackResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       // A successful request reached via fallback renders the fallback
       // trigger card (`.recovery-card--fallback`) with the attempt number.
@@ -433,7 +433,7 @@ describe('MessageDetails', () => {
 
   it('hides fallback banner when no fallback', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.querySelector('.recovery-card--fallback')).toBeNull();
     });
@@ -441,7 +441,7 @@ describe('MessageDetails', () => {
 
   it('shows provider name derived from model', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Provider');
       expect(container.textContent).toContain('OpenAI');
@@ -450,7 +450,7 @@ describe('MessageDetails', () => {
 
   it('shows session key in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Session');
       expect(container.textContent).toContain('sess-001');
@@ -459,7 +459,7 @@ describe('MessageDetails', () => {
 
   it('displays routing and auth metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Routing');
       expect(container.textContent).toContain('standard');
@@ -479,7 +479,7 @@ describe('MessageDetails', () => {
         virtual_model_name: 'deepseek/flash',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       const items = [...container.querySelectorAll('.msg-detail__meta-item')].map(
         (el) => el.textContent,
@@ -492,7 +492,7 @@ describe('MessageDetails', () => {
 
   it('omits the virtual model field when none was used', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => expect(container.textContent).toContain('Routing'));
     expect(container.textContent).not.toContain('Virtual model');
   });
@@ -506,7 +506,7 @@ describe('MessageDetails', () => {
         routing_reason: 'direct',
       },
     });
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Routing');
       expect(container.textContent).toContain('DIRECT');
@@ -528,7 +528,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(withAttribution);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('App');
       expect(container.textContent).toContain('OpenClaw');
@@ -539,7 +539,7 @@ describe('MessageDetails', () => {
 
   it('hides App and SDK fields when caller_attribution is null', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request');
     });
@@ -563,7 +563,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(withHeaders);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request Headers');
     });
@@ -602,7 +602,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(withHeaders);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request Headers');
     });
@@ -613,7 +613,7 @@ describe('MessageDetails', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
 
     // Expand.
-    toggle.click();
+    fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('curl/8.14.1');
     expect(container.textContent).toContain('x-custom-foo');
@@ -625,7 +625,7 @@ describe('MessageDetails', () => {
     expect(container.querySelector(`#${controlsId}`)).not.toBeNull();
 
     // Collapse again.
-    toggle.click();
+    fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(container.textContent).not.toContain('curl/8.14.1');
   });
@@ -639,14 +639,14 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(withHeaders);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request Headers');
     });
     const toggle = container.querySelector(
       '.msg-detail__section-title--toggle',
     ) as HTMLButtonElement;
-    toggle.click();
+    fireEvent.click(toggle);
     const tables = container.querySelectorAll('table.msg-detail__table');
     // First table after expanding is Request Headers.
     const headersTable = tables[0]!;
@@ -665,7 +665,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(withHeaders);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request Headers');
     });
@@ -674,7 +674,7 @@ describe('MessageDetails', () => {
     const toggle = container.querySelector(
       '.msg-detail__section-title--toggle',
     ) as HTMLButtonElement;
-    toggle.click();
+    fireEvent.click(toggle);
     expect(chevron.classList.contains('msg-detail__chevron--open')).toBe(true);
   });
 
@@ -684,7 +684,7 @@ describe('MessageDetails', () => {
       message: { ...detailsResponse.message, request_headers: null },
     };
     mockGetMessageDetails.mockResolvedValue(noHeaders);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request');
     });
@@ -697,7 +697,7 @@ describe('MessageDetails', () => {
       message: { ...detailsResponse.message, request_headers: {} },
     };
     mockGetMessageDetails.mockResolvedValue(empty);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Request');
     });
@@ -710,7 +710,7 @@ describe('MessageDetails', () => {
       message: { ...detailsResponse.message, model: null },
     };
     mockGetMessageDetails.mockResolvedValue(noModelResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       // With model=null, inferProviderName isn't called and `Provider` MetaField
       // renders nothing (value is null).
@@ -730,7 +730,7 @@ describe('MessageDetails', () => {
       },
     };
     mockGetMessageDetails.mockResolvedValue(fallbackNoIndexResponse);
-    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+    const { container } = render(<MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
       const banner = container.querySelector('.recovery-card--fallback');
       expect(banner).not.toBeNull();
@@ -753,7 +753,7 @@ describe('MessageDetails', () => {
 
     it('is hidden when the message was not routed by specificity', async () => {
       mockGetMessageDetails.mockResolvedValue(detailsResponse);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Routing');
       });
@@ -762,7 +762,7 @@ describe('MessageDetails', () => {
 
     it('shows the button when specificity_category is set', async () => {
       mockGetMessageDetails.mockResolvedValue(specificityResponse);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         const btn = container.querySelector('.msg-detail__miscat-btn') as HTMLButtonElement;
         expect(btn).not.toBeNull();
@@ -776,7 +776,7 @@ describe('MessageDetails', () => {
         message: { ...specificityResponse.message, specificity_miscategorized: true },
       };
       mockGetMessageDetails.mockResolvedValue(flagged);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         const btn = container.querySelector('.msg-detail__miscat-btn') as HTMLButtonElement;
         expect(btn).not.toBeNull();
@@ -788,13 +788,13 @@ describe('MessageDetails', () => {
     it('calls flag API on first click and reveals undo state', async () => {
       mockGetMessageDetails.mockResolvedValue(specificityResponse);
       mockFlagMiscategorized.mockResolvedValue(undefined);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const btn = await vi.waitFor(() => {
         const b = container.querySelector('.msg-detail__miscat-btn') as HTMLButtonElement;
         expect(b).not.toBeNull();
         return b;
       });
-      btn.click();
+      fireEvent.click(btn);
       await vi.waitFor(() => {
         expect(mockFlagMiscategorized).toHaveBeenCalledWith('msg-1');
         expect(btn.getAttribute('aria-pressed')).toBe('true');
@@ -808,13 +808,13 @@ describe('MessageDetails', () => {
       };
       mockGetMessageDetails.mockResolvedValue(flagged);
       mockClearMiscategorized.mockResolvedValue(undefined);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const btn = await vi.waitFor(() => {
         const b = container.querySelector('.msg-detail__miscat-btn') as HTMLButtonElement;
         expect(b).not.toBeNull();
         return b;
       });
-      btn.click();
+      fireEvent.click(btn);
       await vi.waitFor(() => {
         expect(mockClearMiscategorized).toHaveBeenCalledWith('msg-1');
         expect(btn.getAttribute('aria-pressed')).toBe('false');
@@ -829,7 +829,7 @@ describe('MessageDetails', () => {
           resolveFlag = resolve;
         }),
       );
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const btn = await vi.waitFor(() => {
         const b = container.querySelector('.msg-detail__miscat-btn') as HTMLButtonElement;
         expect(b).not.toBeNull();
@@ -839,12 +839,12 @@ describe('MessageDetails', () => {
       // subsequent clicks while the flag request is pending. Yielding to the
       // microtask queue between clicks lets the `setBusy(true)` write settle
       // so the second click's `if (busy()) return` guard fires.
-      btn.click();
+      fireEvent.click(btn);
       await Promise.resolve();
       await Promise.resolve();
-      btn.click();
+      fireEvent.click(btn);
       await Promise.resolve();
-      btn.click();
+      fireEvent.click(btn);
       resolveFlag!();
       await vi.waitFor(() => {
         expect(mockFlagMiscategorized).toHaveBeenCalledTimes(1);
@@ -862,7 +862,7 @@ describe('MessageDetails', () => {
       // exactly as it did before the column existed, so nothing breaks for
       // historical data captured before the migration ran.
       mockGetMessageDetails.mockResolvedValue(detailsResponse);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Request');
       });
@@ -875,7 +875,7 @@ describe('MessageDetails', () => {
         message: { ...detailsResponse.message, request_params: null },
       };
       mockGetMessageDetails.mockResolvedValue(nullParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Request');
       });
@@ -888,7 +888,7 @@ describe('MessageDetails', () => {
         message: { ...detailsResponse.message, request_params: {} },
       };
       mockGetMessageDetails.mockResolvedValue(emptyParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Request');
       });
@@ -904,7 +904,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(withParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Model Parameters');
       });
@@ -925,7 +925,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(withParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -933,7 +933,7 @@ describe('MessageDetails', () => {
         expect(b).toBeDefined();
         return b!;
       });
-      titleButton.click();
+      fireEvent.click(titleButton);
       await vi.waitFor(() => {
         const valueCell = container.querySelector('.msg-detail__param-value');
         expect(valueCell).not.toBeNull();
@@ -953,7 +953,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(withParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -963,7 +963,7 @@ describe('MessageDetails', () => {
       });
       const chevron = titleButton.querySelector('.msg-detail__chevron')!;
       expect(chevron.classList.contains('msg-detail__chevron--open')).toBe(false);
-      titleButton.click();
+      fireEvent.click(titleButton);
       expect(chevron.classList.contains('msg-detail__chevron--open')).toBe(true);
     });
 
@@ -976,7 +976,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(withParams);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Model Parameters');
       });
@@ -1008,7 +1008,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(withBoth);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Model Parameters');
         expect(container.textContent).toContain('Request Headers');
@@ -1036,7 +1036,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(futureMultiKey);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -1046,7 +1046,7 @@ describe('MessageDetails', () => {
       });
       // Three keys → count badge shows 3.
       expect(titleButton.textContent).toContain('3');
-      titleButton.click();
+      fireEvent.click(titleButton);
       // Scope the key-extraction to the Model Parameters table specifically;
       // the Request Headers section also uses `.msg-detail__table` and would
       // dilute a global selector. The wrapper id starts with
@@ -1079,7 +1079,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(primitives);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -1087,7 +1087,7 @@ describe('MessageDetails', () => {
         expect(b).toBeDefined();
         return b!;
       });
-      titleButton.click();
+      fireEvent.click(titleButton);
       await vi.waitFor(() => {
         const cells = Array.from(
           container.querySelectorAll<HTMLTableCellElement>('.msg-detail__param-value'),
@@ -1109,7 +1109,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(nullValue);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -1117,7 +1117,7 @@ describe('MessageDetails', () => {
         expect(b).toBeDefined();
         return b!;
       });
-      titleButton.click();
+      fireEvent.click(titleButton);
       await vi.waitFor(() => {
         const valueCell = container.querySelector('.msg-detail__param-value');
         expect(valueCell).not.toBeNull();
@@ -1139,7 +1139,7 @@ describe('MessageDetails', () => {
         },
       };
       mockGetMessageDetails.mockResolvedValue(undefValue);
-      const { container } = render(() => <MessageDetails messageId="msg-1" />);
+      const { container } = render(<MessageDetails messageId="msg-1" />);
       const titleButton = await vi.waitFor(() => {
         const b = Array.from(
           container.querySelectorAll<HTMLButtonElement>('.msg-detail__section-title--toggle'),
@@ -1147,7 +1147,7 @@ describe('MessageDetails', () => {
         expect(b).toBeDefined();
         return b!;
       });
-      titleButton.click();
+      fireEvent.click(titleButton);
       await vi.waitFor(() => {
         const valueCell = container.querySelector('.msg-detail__param-value');
         expect(valueCell).not.toBeNull();

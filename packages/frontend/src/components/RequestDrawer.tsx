@@ -1,23 +1,16 @@
-import {
-  createSignal,
-  createResource,
-  createMemo,
-  createEffect,
-  Show,
-  For,
-  onCleanup,
-  type Component,
-} from 'solid-js';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ArrowRight, X } from 'lucide-react';
 import { getMessageDetails, type AttemptRecording } from '../services/api/messages.js';
 import { isFailedStatus, isSuccessStatus } from 'thinker-shared';
-import { formatParamValue } from './MessageDetailsSections.jsx';
-import { providerIcon } from './ProviderIcon.jsx';
-import { FallbackIcon } from './message-table-cells.jsx';
+import { formatParamValue } from './MessageDetailsSections.js';
+import { providerIcon } from './ProviderIcon.js';
+import { FallbackIcon } from './message-table-cells.js';
 import { authBadgeFor } from './AuthBadge.js';
-import RequestMessages, { type RecordingView } from './RequestMessages.jsx';
+import RequestMessages, { type RecordingView } from './RequestMessages.js';
+import { useResource } from '../lib/use-resource.js';
 import { intlLocale, t } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
-import '../styles/request-drawer.css';
+import { IconButton, Tabs, cx } from './ui.js';
 
 export interface RequestDrawerProps {
   messageId: string | null;
@@ -86,15 +79,15 @@ function attemptCode(att: { status: string; error_http_status?: number }): strin
 }
 
 function requestStatusClass(status: string): string {
-  if (isSuccessStatus(status)) return 'drawer-status--success';
-  if (status === 'pending' || status === 'cancelled') return 'drawer-status--neutral';
-  return 'drawer-status--error';
+  if (isSuccessStatus(status)) return 'drawer-status--success badge is-ok';
+  if (status === 'pending' || status === 'cancelled') return 'drawer-status--neutral badge';
+  return 'drawer-status--error badge is-danger';
 }
 
 function attemptStatusClass(status: string): string {
-  if (isSuccessStatus(status)) return 'attempt-code--ok';
-  if (status === 'pending' || status === 'cancelled') return 'attempt-code--neutral';
-  return 'attempt-code--error';
+  if (isSuccessStatus(status)) return 'attempt-code--ok badge mono is-ok';
+  if (status === 'pending' || status === 'cancelled') return 'attempt-code--neutral badge mono';
+  return 'attempt-code--error badge mono is-danger';
 }
 
 function attemptErrorMessage(
@@ -109,6 +102,7 @@ function attemptErrorMessage(
   return t('messages.drawer.noErrorMessage');
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- the details payload is loosely typed */
 function inferType(att: any, index: number): Attempt['type'] {
   if (att.fallback_from_model || att.fallback_index) return 'fallback';
   // For backend summary attempts (no fallback fields), use position:
@@ -189,571 +183,382 @@ function buildAttempts(msg: any): Attempt[] {
   ];
 }
 
-const RequestDrawer: Component<RequestDrawerProps> = (props) => {
-  const [selectedAttempt, setSelectedAttempt] = createSignal(0);
-  const [tab, setTab] = createSignal<AttemptTab>('details');
-  const open = () => props.messageId !== null;
-
-  const [data] = createResource(
-    () => (props.messageId ? props.messageId : false),
-    (id) => getMessageDetails(id as string),
+function Kv({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="drawer-kv grid grid-cols-[minmax(96px,140px)_1fr] items-baseline gap-3 border-b border-line py-1.5 text-xs">
+      <span className="drawer-kv__key text-muted">{label}</span>
+      <span className="min-w-0 break-words text-ink">{children}</span>
+    </div>
   );
+}
 
-  const m = () => {
-    const raw = data();
-    if (!raw) return null;
-    return (raw as any).message ?? raw;
-  };
+function FallbackBadge() {
+  return (
+    <div className="mb-2">
+      <span className="trigger-badge trigger-badge--fallback badge is-info">
+        <FallbackIcon />
+        {t('messages.table.fallbackBadge')}
+      </span>
+    </div>
+  );
+}
 
-  const attempts = createMemo(() => {
-    const msg = m();
-    if (!msg) return [];
-    return buildAttempts(msg);
+function ContextCard({ tone, children }: { tone: 'fallback' | 'error'; children: ReactNode }) {
+  return (
+    <div
+      className={cx(
+        `drawer-context-card drawer-context-card--${tone} mt-3 rounded-control border border-line p-3`,
+        tone === 'error' ? 'bg-danger-tint' : 'bg-info-tint',
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function AttemptDetails({ att, attempts }: { att: Attempt; attempts: Attempt[] }) {
+  const next = attempts[att.index];
+  return (
+    <div className="drawer-metadata">
+      <Kv label={t('messages.drawer.kv.status')}>
+        <span className="inline-flex items-center gap-1.5">
+          {statusLabel(att.status)}
+          <span className={cx('attempt-code', attemptStatusClass(att.status))}>
+            {attemptCode(att)}
+          </span>
+        </span>
+      </Kv>
+      <Kv label={t('messages.drawer.kv.type')}>
+        <span className="capitalize">
+          {att.type === 'fallback'
+            ? t('messages.drawer.type.fallback')
+            : t('messages.drawer.type.initial')}
+        </span>
+      </Kv>
+      <Kv label={t('messages.drawer.kv.provider')}>
+        <span className="inline-flex items-center gap-1.5">
+          {providerIcon(att.provider, 14)}
+          {att.provider ?? '-'}
+        </span>
+      </Kv>
+      {att.auth_type ? <Kv label={t('messages.drawer.kv.auth')}>{att.auth_type}</Kv> : null}
+      <Kv label={t('messages.drawer.kv.model')}>{att.model ?? '-'}</Kv>
+      {att.model_id && att.model_id !== att.model ? (
+        <Kv label={t('messages.drawer.kv.modelId')}>{att.model_id}</Kv>
+      ) : null}
+      {att.trace_id ? <Kv label={t('messages.drawer.kv.traceId')}>{att.trace_id}</Kv> : null}
+      {att.virtual_model_name ? (
+        <Kv label={t('messages.drawer.kv.virtualModel')}>
+          <span className="tier-badge tier-badge--virtual badge is-accent">
+            {att.virtual_model_name}
+          </span>
+        </Kv>
+      ) : null}
+      {att.routing_tier ? (
+        <Kv label={t('messages.drawer.kv.routingTier')}>{att.routing_tier}</Kv>
+      ) : null}
+      {att.routing_reason ? (
+        <Kv label={t('messages.drawer.kv.reason')}>{att.routing_reason}</Kv>
+      ) : null}
+      {att.service_type ? (
+        <Kv label={t('messages.drawer.kv.serviceType')}>{att.service_type}</Kv>
+      ) : null}
+      {att.session_key ? <Kv label={t('messages.drawer.kv.session')}>{att.session_key}</Kv> : null}
+      {att.duration_ms != null ? (
+        // i18n-ignore
+        <Kv label={t('messages.drawer.kv.duration')}>{att.duration_ms}ms</Kv>
+      ) : null}
+      {att.cost != null ? <Kv label={t('messages.drawer.kv.cost')}>{usd(att.cost, 4)}</Kv> : null}
+      <Kv label={t('messages.drawer.kv.inputTokens')}>
+        {att.input_tokens?.toLocaleString(intlLocale())}
+      </Kv>
+      <Kv label={t('messages.drawer.kv.outputTokens')}>
+        {att.output_tokens?.toLocaleString(intlLocale())}
+      </Kv>
+
+      {/* The attempt's story, in reading order:
+          1. ORIGIN cards (why this attempt exists) — before the error;
+          2. the ERROR card (what happened here);
+          3. CONSEQUENCE cards (what this failure triggered next) — after it.
+          Cumulative by design: the error card is never replaced by a context card. */}
+
+      {/* Origin: this attempt IS the fallback recovery */}
+      {att.fallback_from_model ? (
+        <ContextCard tone="fallback">
+          <FallbackBadge />
+          <div className="text-sm text-ink">
+            {isSuccessStatus(att.status)
+              ? t('messages.drawer.fallbackRecovered')
+              : t('messages.drawer.fallbackFailed')}{' '}
+            {t('messages.drawer.fellBackFrom', { model: att.fallback_from_model ?? '' })}
+          </div>
+        </ContextCard>
+      ) : null}
+
+      {/* Error block if this attempt failed — never hidden by the context cards */}
+      {att.error_message ? (
+        <ContextCard tone="error">
+          <div className="eyebrow mb-2">{t('messages.drawer.error')}</div>
+          <div className="mb-2 whitespace-pre-wrap font-mono text-sm text-danger [overflow-wrap:anywhere]">
+            {att.error_message}
+          </div>
+          {att.error_origin || att.error_class || att.error_http_status ? (
+            <table className="error-recovery-row__meta-table text-xs text-ink">
+              <tbody>
+                {att.error_origin ? (
+                  <tr>
+                    <td className="error-recovery-row__meta-label py-0.5 pr-3 text-muted">
+                      {t('messages.drawer.origin')}
+                    </td>
+                    <td>{att.error_origin}</td>
+                  </tr>
+                ) : null}
+                {att.error_class ? (
+                  <tr>
+                    <td className="error-recovery-row__meta-label py-0.5 pr-3 text-muted">
+                      {t('messages.drawer.errorType')}
+                    </td>
+                    <td>{att.error_class}</td>
+                  </tr>
+                ) : null}
+                {att.error_http_status ? (
+                  <tr>
+                    <td className="error-recovery-row__meta-label py-0.5 pr-3 text-muted">
+                      {t('messages.drawer.httpStatus')}
+                    </td>
+                    <td>{att.error_http_status}</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          ) : null}
+        </ContextCard>
+      ) : null}
+
+      {/* Consequence: this failed attempt was recovered by a LATER fallback attempt */}
+      {isFailedStatus(att.status) && next?.fallback_from_model ? (
+        <ContextCard tone="fallback">
+          <FallbackBadge />
+          <div className="text-sm text-ink">
+            {t('messages.drawer.attemptFailed')}{' '}
+            {isSuccessStatus(next.status)
+              ? t('messages.drawer.recoveredBy', { model: next.model ?? '', n: att.index + 1 })
+              : t('messages.drawer.continuedWith', { model: next.model ?? '', n: att.index + 1 })}
+          </div>
+        </ContextCard>
+      ) : null}
+    </div>
+  );
+}
+
+function KvList({ entries, mono }: { entries: Array<[string, unknown]>; mono?: boolean }) {
+  return (
+    <div className="drawer-metadata">
+      {entries.map(([key, val]) => (
+        <Kv key={key} label={key}>
+          <span className={cx('break-all', mono && 'font-mono')}>
+            {mono ? formatParamValue(val) : String(val)}
+          </span>
+        </Kv>
+      ))}
+    </div>
+  );
+}
+
+const sortedEntries = (obj: Record<string, unknown>) =>
+  Object.entries(obj).sort(([a], [b]) => a.localeCompare(b));
+
+export default function RequestDrawer({ messageId, onClose }: RequestDrawerProps) {
+  const [selectedAttempt, setSelectedAttempt] = useState(0);
+  const [tab, setTab] = useState<AttemptTab>('details');
+  const open = messageId !== null;
+
+  const { data } = useResource(() => getMessageDetails(messageId as string), [messageId], {
+    enabled: !!messageId,
   });
 
-  const currentAttempt = () => attempts()[selectedAttempt()] ?? null;
+  const m = useMemo(() => {
+    if (!data) return null;
+    return ((data as any).message ?? data) as any;
+  }, [data]);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  const visibleTabs = createMemo(() => {
-    const att = currentAttempt();
-    const tabs: Array<{ value: AttemptTab; label: string }> = [
-      { value: 'details', label: t('messages.drawer.tabs.details') },
-    ];
-    if (att?.recording) {
-      tabs.push({ value: 'messages', label: t('messages.drawer.tabs.messages') });
-      tabs.push({ value: 'tools', label: t('messages.drawer.tabs.tools') });
-      tabs.push({ value: 'raw', label: t('messages.drawer.tabs.raw') });
-    }
-    if (att?.request_headers && Object.keys(att.request_headers).length > 0) {
-      tabs.push({ value: 'headers', label: t('messages.drawer.tabs.headers') });
-    }
-    if (att?.request_params && Object.keys(att.request_params).length > 0) {
-      tabs.push({ value: 'params', label: t('messages.drawer.tabs.params') });
-    }
-    return tabs;
-  });
+  const attempts = useMemo(() => (m ? buildAttempts(m) : []), [m]);
+  const currentAttempt = attempts[selectedAttempt] ?? null;
 
-  const recordingView = createMemo((): RecordingView => {
-    const current = tab();
-    if (current === 'tools') return 'tools';
-    if (current === 'raw') return 'raw';
-    return 'messages';
-  });
+  const visibleTabs: Array<{ key: AttemptTab; label: string }> = [
+    { key: 'details', label: t('messages.drawer.tabs.details') },
+  ];
+  if (currentAttempt?.recording) {
+    visibleTabs.push({ key: 'messages', label: t('messages.drawer.tabs.messages') });
+    visibleTabs.push({ key: 'tools', label: t('messages.drawer.tabs.tools') });
+    visibleTabs.push({ key: 'raw', label: t('messages.drawer.tabs.raw') });
+  }
+  if (currentAttempt?.request_headers && Object.keys(currentAttempt.request_headers).length > 0) {
+    visibleTabs.push({ key: 'headers', label: t('messages.drawer.tabs.headers') });
+  }
+  if (currentAttempt?.request_params && Object.keys(currentAttempt.request_params).length > 0) {
+    visibleTabs.push({ key: 'params', label: t('messages.drawer.tabs.params') });
+  }
+  // A tab that disappears (another attempt has no recording) falls back to the first.
+  const activeTab = visibleTabs.some((x) => x.key === tab) ? tab : visibleTabs[0]!.key;
+  const recordingView: RecordingView =
+    activeTab === 'tools' ? 'tools' : activeTab === 'raw' ? 'raw' : 'messages';
+  const isRecordingTab = activeTab === 'messages' || activeTab === 'tools' || activeTab === 'raw';
 
-  // Reset attempt + tab when message changes
-  createEffect(() => {
-    if (props.messageId) {
+  // Reset attempt + tab when the message changes
+  useEffect(() => {
+    if (messageId) {
       setSelectedAttempt(0);
       setTab('details');
     }
-  });
-
-  // Reset tab if current tab disappears
-  createEffect(() => {
-    const tabs = visibleTabs();
-    if (tabs.length > 0 && !tabs.some((x) => x.value === tab())) {
-      setTab(tabs[0]!.value);
-    }
-  });
+  }, [messageId]);
 
   // Close on Escape
-  if (typeof document !== 'undefined') {
+  useEffect(() => {
+    if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open()) props.onClose();
+      if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
-    onCleanup(() => document.removeEventListener('keydown', handler));
-  }
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
 
-  const requestStatus = () => m()?.status ?? 'error';
+  if (!open) return null;
 
-  const headerProvider = () => currentAttempt()?.provider ?? m()?.provider;
-  const headerAuthType = () => currentAttempt()?.auth_type ?? m()?.auth_type;
-  const headerModel = () => currentAttempt()?.model ?? m()?.model ?? m()?.model_id;
+  const requestStatus: string = m?.status ?? 'error';
+  const headerProvider: string | undefined = currentAttempt?.provider ?? m?.provider;
+  const headerAuthType: string | undefined = currentAttempt?.auth_type ?? m?.auth_type;
+  const headerModel: string | undefined = currentAttempt?.model ?? m?.model ?? m?.model_id;
 
   return (
-    <>
-      <div class="drawer" classList={{ 'drawer--open': open() }}>
-        <Show when={m()}>
-          {(msg) => (
-            <>
-              {/* ── Request header (full width) ── */}
-              <div class="drawer__header">
-                <div class="drawer__title-row">
-                  <h3 class="drawer__title">
-                    {t('messages.drawer.title', { id: msg().id?.slice(0, 12) ?? '' })}
-                  </h3>
-                  <button
-                    class="drawer__close"
-                    onClick={props.onClose}
-                    aria-label={t('messages.drawer.close')}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div class="drawer__meta-row">
-                  <span class={`drawer-status ${requestStatusClass(requestStatus())}`}>
-                    {statusLabel(requestStatus())}
+    <aside
+      className="drawer drawer--open w-[min(880px,100vw)]"
+      aria-label={m ? t('messages.drawer.title', { id: m.id?.slice(0, 12) ?? '' }) : undefined}
+    >
+      {m ? (
+        <>
+          {/* Request header (full width) */}
+          <div className="dh drawer__header flex-col items-stretch gap-2">
+            <div className="drawer__title-row flex items-center justify-between gap-3">
+              <h3 className="drawer__title truncate font-mono text-sm font-semibold text-ink">
+                {t('messages.drawer.title', { id: m.id?.slice(0, 12) ?? '' })}
+              </h3>
+              <IconButton label={t('messages.drawer.close')} onClick={onClose}>
+                <X />
+              </IconButton>
+            </div>
+            <div className="drawer__meta-row flex flex-wrap items-center gap-1.5 text-xs text-muted">
+              <span className={cx('drawer-status', requestStatusClass(requestStatus))}>
+                {statusLabel(requestStatus)}
+              </span>
+              {headerProvider ? (
+                <>
+                  <span className="drawer__meta-sep text-faint">{'·'}</span>
+                  <span className="drawer__meta-text inline-flex items-center gap-1 text-dim">
+                    <span className="relative inline-flex size-3.5 shrink-0">
+                      {providerIcon(headerProvider, 14)}
+                      {authBadgeFor(headerAuthType, 8)}
+                    </span>
+                    {headerModel}
                   </span>
-                  <Show when={headerProvider()}>
-                    <span class="drawer__meta-sep">{'\u00b7'}</span>
-                    <span
-                      class="drawer__meta-text"
-                      style="display: inline-flex; align-items: center; gap: 4px;"
-                    >
-                      <span style="display: inline-flex; position: relative; flex-shrink: 0; width: 14px; height: 14px;">
-                        {providerIcon(headerProvider(), 14)}
-                        {authBadgeFor(headerAuthType(), 8)}
-                      </span>
-                      {headerModel()}
-                    </span>
-                  </Show>
-                  <Show when={msg().virtual_model_name}>
-                    <span
-                      class="tier-badge tier-badge--virtual"
-                      title={t('messages.table.virtualModel', {
-                        name: msg().virtual_model_name,
-                      })}
-                    >
-                      {msg().virtual_model_name}
-                    </span>
-                  </Show>
-                  <Show when={msg().timestamp}>
-                    <span class="drawer__meta-sep">{'\u00b7'}</span>
-                    <span class="drawer__meta-text">{fmtDate(msg().timestamp)}</span>
-                  </Show>
-                </div>
-              </div>
-
-              <div class="drawer__split">
-                {/* Attempts sidebar — hidden when no attempts */}
-                <Show when={attempts().length > 0}>
-                  <div class="drawer__sidebar">
-                    <div class="drawer__sidebar-title">{t('messages.drawer.attempts')}</div>
-                    <For each={attempts()}>
-                      {(att, idx) => (
-                        <button
-                          class="attempt-item"
-                          classList={{ 'attempt-item--active': selectedAttempt() === idx() }}
-                          onClick={() => {
-                            setSelectedAttempt(idx());
-                            setTab('details');
-                          }}
-                        >
-                          <span class="attempt-item__num">{att.index}</span>
-                          <span class="attempt-item__icon">
-                            {att.type === 'fallback' ? (
-                              <FallbackIcon />
-                            ) : (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path d="M5 12h14" />
-                                <path d="m12 5 7 7-7 7" />
-                              </svg>
-                            )}
-                          </span>
-                          <span class="attempt-item__model">
-                            {att.model ?? t('messages.drawer.noProvider')}
-                          </span>
-                          <span class={`attempt-code ${attemptStatusClass(att.status)}`}>
-                            {attemptCode(att)}
-                          </span>
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-
-                {/* Attempt content */}
-                <div class="drawer__content">
-                  <Show
-                    when={currentAttempt()}
-                    fallback={
-                      <>
-                        <div class="panel__tabs drawer__tabs-full" role="tablist">
-                          <For each={visibleTabs()}>
-                            {(item) => (
-                              <button
-                                class="panel__tab"
-                                classList={{ 'panel__tab--active': tab() === item.value }}
-                                role="tab"
-                                onClick={() => setTab(item.value)}
-                              >
-                                {item.label}
-                              </button>
-                            )}
-                          </For>
-                        </div>
-                        <div class="drawer__body">
-                          <Show when={tab() === 'details'}>
-                            <div style="color: hsl(var(--muted-foreground));">
-                              {t('messages.drawer.rejected')}
-                            </div>
-                          </Show>
-                        </div>
-                      </>
-                    }
-                  >
-                    {(att) => (
-                      <>
-                        {/* Tabs */}
-                        <div class="panel__tabs drawer__tabs-full" role="tablist">
-                          <For each={visibleTabs()}>
-                            {(item) => (
-                              <button
-                                class="panel__tab"
-                                classList={{ 'panel__tab--active': tab() === item.value }}
-                                role="tab"
-                                onClick={() => setTab(item.value)}
-                              >
-                                {item.label}
-                              </button>
-                            )}
-                          </For>
-                        </div>
-
-                        <Show when={tab() === 'messages' || tab() === 'tools' || tab() === 'raw'}>
-                          <div class="drawer__messages-pane">
-                            <RequestMessages
-                              recording={att().recording ?? null}
-                              view={recordingView()}
-                            />
-                          </div>
-                        </Show>
-
-                        <Show when={tab() !== 'messages' && tab() !== 'tools' && tab() !== 'raw'}>
-                          <div class="drawer__body">
-                            {/* Details tab */}
-                            <Show when={tab() === 'details'}>
-                              <div class="drawer-metadata">
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">
-                                    {t('messages.drawer.kv.status')}
-                                  </span>
-                                  <span style="display: inline-flex; align-items: center; gap: 6px;">
-                                    {statusLabel(att().status)}
-                                    <span
-                                      class={`attempt-code ${attemptStatusClass(att().status)}`}
-                                    >
-                                      {attemptCode(att())}
-                                    </span>
-                                  </span>
-                                </div>
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">{t('messages.drawer.kv.type')}</span>
-                                  <span style="text-transform: capitalize;">
-                                    {att().type === 'fallback'
-                                      ? t('messages.drawer.type.fallback')
-                                      : t('messages.drawer.type.initial')}
-                                  </span>
-                                </div>
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">
-                                    {t('messages.drawer.kv.provider')}
-                                  </span>
-                                  <span style="display: inline-flex; align-items: center; gap: 6px;">
-                                    {providerIcon(att().provider, 14)}
-                                    {att().provider ?? '-'}
-                                  </span>
-                                </div>
-                                <Show when={att().auth_type}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.auth')}
-                                    </span>
-                                    <span>{att().auth_type}</span>
-                                  </div>
-                                </Show>
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">
-                                    {t('messages.drawer.kv.model')}
-                                  </span>
-                                  <span>{att().model ?? '-'}</span>
-                                </div>
-                                <Show when={att().model_id && att().model_id !== att().model}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.modelId')}
-                                    </span>
-                                    <span>{att().model_id}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().trace_id}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.traceId')}
-                                    </span>
-                                    <span>{att().trace_id}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().virtual_model_name}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.virtualModel')}
-                                    </span>
-                                    <span>
-                                      <span class="tier-badge tier-badge--virtual">
-                                        {att().virtual_model_name}
-                                      </span>
-                                    </span>
-                                  </div>
-                                </Show>
-                                <Show when={att().routing_tier}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.routingTier')}
-                                    </span>
-                                    <span>{att().routing_tier}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().routing_reason}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.reason')}
-                                    </span>
-                                    <span>{att().routing_reason}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().service_type}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.serviceType')}
-                                    </span>
-                                    <span>{att().service_type}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().session_key}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.session')}
-                                    </span>
-                                    <span>{att().session_key}</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().duration_ms != null}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.duration')}
-                                    </span>
-                                    {/* i18n-ignore */}
-                                    <span>{att().duration_ms}ms</span>
-                                  </div>
-                                </Show>
-                                <Show when={att().cost != null}>
-                                  <div class="drawer-kv">
-                                    <span class="drawer-kv__key">
-                                      {t('messages.drawer.kv.cost')}
-                                    </span>
-                                    <span>{usd(att().cost ?? 0, 4)}</span>
-                                  </div>
-                                </Show>
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">
-                                    {t('messages.drawer.kv.inputTokens')}
-                                  </span>
-                                  <span>{att().input_tokens?.toLocaleString(intlLocale())}</span>
-                                </div>
-                                <div class="drawer-kv">
-                                  <span class="drawer-kv__key">
-                                    {t('messages.drawer.kv.outputTokens')}
-                                  </span>
-                                  <span>{att().output_tokens?.toLocaleString(intlLocale())}</span>
-                                </div>
-
-                                {/* ── The attempt's story, in reading order ──────
-                                  1. ORIGIN cards (why this attempt exists) —
-                                     before the error;
-                                  2. the ERROR card (what happened here);
-                                  3. CONSEQUENCE cards (what this failure
-                                     triggered next) — after the error.
-                                  Cumulative by design: the error card is never
-                                  replaced by a context card. ── */}
-
-                                {/* Origin: this attempt IS the fallback recovery */}
-                                <Show when={att().fallback_from_model}>
-                                  <div class="drawer-context-card drawer-context-card--fallback">
-                                    <div style="margin-bottom: 8px;">
-                                      <span class="trigger-badge trigger-badge--fallback">
-                                        <FallbackIcon />
-                                        {t('messages.table.fallbackBadge')}
-                                      </span>
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground));">
-                                      {isSuccessStatus(att().status)
-                                        ? t('messages.drawer.fallbackRecovered')
-                                        : t('messages.drawer.fallbackFailed')}{' '}
-                                      {t('messages.drawer.fellBackFrom', {
-                                        model: att().fallback_from_model ?? '',
-                                      })}
-                                    </div>
-                                  </div>
-                                </Show>
-
-                                {/* Error block if this attempt failed — never hidden
-                                  by the context cards around it */}
-                                <Show when={att().error_message}>
-                                  <div class="drawer-context-card drawer-context-card--error">
-                                    <div style="font-size: var(--font-size-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: hsl(var(--foreground));">
-                                      {t('messages.drawer.error')}
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: hsl(var(--destructive)); font-family: var(--font-mono, monospace); overflow-wrap: anywhere; white-space: pre-wrap; margin-bottom: 8px;">
-                                      {att().error_message}
-                                    </div>
-                                    <Show
-                                      when={
-                                        att().error_origin ||
-                                        att().error_class ||
-                                        att().error_http_status
-                                      }
-                                    >
-                                      <table
-                                        class="error-recovery-row__meta-table"
-                                        style="--meta-table-border: hsl(var(--destructive) / 0.25);"
-                                      >
-                                        <tbody>
-                                          <Show when={att().error_origin}>
-                                            <tr>
-                                              <td class="error-recovery-row__meta-label">
-                                                {t('messages.drawer.origin')}
-                                              </td>
-                                              <td>{att().error_origin}</td>
-                                            </tr>
-                                          </Show>
-                                          <Show when={att().error_class}>
-                                            <tr>
-                                              <td class="error-recovery-row__meta-label">
-                                                {t('messages.drawer.errorType')}
-                                              </td>
-                                              <td>{att().error_class}</td>
-                                            </tr>
-                                          </Show>
-                                          <Show when={att().error_http_status}>
-                                            <tr>
-                                              <td class="error-recovery-row__meta-label">
-                                                {t('messages.drawer.httpStatus')}
-                                              </td>
-                                              <td>{att().error_http_status}</td>
-                                            </tr>
-                                          </Show>
-                                        </tbody>
-                                      </table>
-                                    </Show>
-                                  </div>
-                                </Show>
-
-                                {/* Consequence: this failed attempt was recovered by
-                                  a LATER fallback attempt */}
-                                <Show
-                                  when={
-                                    isFailedStatus(att().status) &&
-                                    attempts().length > att().index &&
-                                    attempts()[att().index]?.fallback_from_model
-                                  }
-                                >
-                                  <div class="drawer-context-card drawer-context-card--fallback">
-                                    <div style="margin-bottom: 8px;">
-                                      <span class="trigger-badge trigger-badge--fallback">
-                                        <FallbackIcon />
-                                        {t('messages.table.fallbackBadge')}
-                                      </span>
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: hsl(var(--foreground));">
-                                      {t('messages.drawer.attemptFailed')}{' '}
-                                      {isSuccessStatus(attempts()[att().index]?.status)
-                                        ? t('messages.drawer.recoveredBy', {
-                                            model: attempts()[att().index]?.model ?? '',
-                                            n: att().index + 1,
-                                          })
-                                        : t('messages.drawer.continuedWith', {
-                                            model: attempts()[att().index]?.model ?? '',
-                                            n: att().index + 1,
-                                          })}
-                                    </div>
-                                  </div>
-                                </Show>
-                              </div>
-                            </Show>
-
-                            {/* Headers tab */}
-                            <Show when={tab() === 'headers' && att().request_headers}>
-                              <div class="drawer-metadata">
-                                <For
-                                  each={Object.entries(att().request_headers!).sort(([a], [b]) =>
-                                    a.localeCompare(b),
-                                  )}
-                                >
-                                  {([key, val]) => (
-                                    <div class="drawer-kv">
-                                      <span class="drawer-kv__key">{key}</span>
-                                      <span style="word-break: break-all;">{String(val)}</span>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                            </Show>
-
-                            {/* Params tab */}
-                            <Show when={tab() === 'params' && att().request_params}>
-                              <div class="drawer-metadata">
-                                <For
-                                  each={Object.entries(att().request_params!).sort(([a], [b]) =>
-                                    a.localeCompare(b),
-                                  )}
-                                >
-                                  {([key, val]) => (
-                                    <div class="drawer-kv">
-                                      <span class="drawer-kv__key">{key}</span>
-                                      <span style="word-break: break-all; font-family: var(--font-mono, monospace); font-size: var(--font-size-xs);">
-                                        {formatParamValue(val)}
-                                      </span>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                            </Show>
-                          </div>
-                        </Show>
-                      </>
-                    )}
-                  </Show>
-                </div>
-              </div>
-            </>
-          )}
-        </Show>
-
-        <Show when={!m() && open()}>
-          <div
-            class="drawer__body"
-            style="display: flex; align-items: center; justify-content: center; height: 200px; color: hsl(var(--muted-foreground));"
-          >
-            {t('messages.drawer.loading')}
+                </>
+              ) : null}
+              {m.virtual_model_name ? (
+                <span
+                  className="tier-badge tier-badge--virtual badge is-accent"
+                  title={t('messages.table.virtualModel', { name: m.virtual_model_name })}
+                >
+                  {m.virtual_model_name}
+                </span>
+              ) : null}
+              {m.timestamp ? (
+                <>
+                  <span className="drawer__meta-sep text-faint">{'·'}</span>
+                  <span className="drawer__meta-text">{fmtDate(m.timestamp)}</span>
+                </>
+              ) : null}
+            </div>
           </div>
-        </Show>
-      </div>
-    </>
-  );
-};
 
-export default RequestDrawer;
+          <div className="drawer__split flex min-h-0 flex-1 flex-col sm:flex-row">
+            {/* Attempts sidebar — hidden when no attempts */}
+            {attempts.length > 0 ? (
+              <div className="drawer__sidebar shrink-0 overflow-y-auto border-b border-line p-2 sm:w-52 sm:border-b-0 sm:border-r">
+                <div className="drawer__sidebar-title eyebrow px-1.5 pb-1.5">
+                  {t('messages.drawer.attempts')}
+                </div>
+                {attempts.map((att, idx) => (
+                  <button
+                    key={att.id ?? idx}
+                    type="button"
+                    className={cx(
+                      'attempt-item flex w-full cursor-pointer items-center gap-1.5 rounded-control border-0 bg-transparent px-1.5 py-1.5 text-left text-xs text-dim hover:bg-s2',
+                      selectedAttempt === idx && 'attempt-item--active bg-accent-tint text-ink',
+                    )}
+                    aria-pressed={selectedAttempt === idx}
+                    onClick={() => {
+                      setSelectedAttempt(idx);
+                      setTab('details');
+                    }}
+                  >
+                    <span className="attempt-item__num font-mono text-faint">{att.index}</span>
+                    <span className="attempt-item__icon inline-flex text-muted">
+                      {att.type === 'fallback' ? (
+                        <FallbackIcon />
+                      ) : (
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      )}
+                    </span>
+                    <span className="attempt-item__model min-w-0 flex-1 truncate">
+                      {att.model ?? t('messages.drawer.noProvider')}
+                    </span>
+                    <span className={cx('attempt-code', attemptStatusClass(att.status))}>
+                      {attemptCode(att)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Attempt content */}
+            <div className="drawer__content flex min-h-0 min-w-0 flex-1 flex-col">
+              <Tabs
+                className="drawer__tabs-full mb-0 shrink-0 px-3"
+                items={visibleTabs}
+                value={activeTab}
+                onChange={setTab}
+              />
+              {currentAttempt && isRecordingTab ? (
+                <div className="drawer__messages-pane min-h-0 flex-1 overflow-hidden">
+                  <RequestMessages
+                    recording={currentAttempt.recording ?? null}
+                    view={recordingView}
+                  />
+                </div>
+              ) : (
+                <div className="db drawer__body">
+                  {!currentAttempt ? (
+                    activeTab === 'details' ? (
+                      <div className="text-sm text-muted">{t('messages.drawer.rejected')}</div>
+                    ) : null
+                  ) : activeTab === 'details' ? (
+                    <AttemptDetails att={currentAttempt} attempts={attempts} />
+                  ) : activeTab === 'headers' && currentAttempt.request_headers ? (
+                    <KvList entries={sortedEntries(currentAttempt.request_headers)} />
+                  ) : activeTab === 'params' && currentAttempt.request_params ? (
+                    <KvList entries={sortedEntries(currentAttempt.request_params)} mono />
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="db drawer__body flex h-[200px] items-center justify-center text-sm text-muted">
+          {t('messages.drawer.loading')}
+        </div>
+      )}
+    </aside>
+  );
+}

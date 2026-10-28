@@ -1,17 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
-import { resetLocaleForTests, setLocale } from '../../src/i18n';
+import { act, render, screen } from '@testing-library/react';
+import { resetLocaleForTests, setLocale, useLocale } from '../../src/i18n';
 
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', () => ({
   useParams: () => ({ agentName: 'test-agent' }),
-  useSearchParams: () => [{}, vi.fn()],
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
   useNavigate: () => vi.fn(),
-  A: (props: any) => <a href={props.href}>{props.children}</a>,
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: (props: any) => <meta name={props.name ?? ''} content={props.content ?? ''} />,
+  Link: (props: any) => <a href={props.to}>{props.children}</a>,
 }));
 
 const mockGetMessages = vi.fn();
@@ -33,13 +28,16 @@ vi.mock('../../src/services/api/messages.js', () => ({
   getMessageDetails: (...args: unknown[]) => mockGetMessageDetails(...args),
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  pingCount: () => 0,
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  agentPing: () => 0,
-  routingPing: () => 0,
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return {
+    pingCount: signal(0),
+    messagePing: signal(0),
+    analyticsPing: signal(0),
+    agentPing: signal(0),
+    routingPing: signal(0),
+  };
+});
 
 vi.mock('../../src/services/model-display.js', () => ({
   getModelDisplayName: (slug: string) => slug,
@@ -51,7 +49,9 @@ vi.mock('../../src/components/Select.jsx', () => ({
   default: (props: any) => (
     <select data-testid="select">
       {props.options?.map((o: any) => (
-        <option value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   ),
@@ -62,6 +62,12 @@ vi.mock('../../src/components/MultiSelect.jsx', () => ({
 
 import MessageLog from '../../src/pages/MessageLog';
 import RequestDrawer from '../../src/components/RequestDrawer';
+
+/** The app remounts its routes on a language change (keyed router); mirror that. */
+function KeyedMessageLog() {
+  const locale = useLocale();
+  return <MessageLog key={locale} />;
+}
 
 const messagesData = {
   items: [
@@ -92,7 +98,7 @@ describe('Request log in pt-BR', () => {
 
   it('renders the page, filters, headers and rows in Portuguese', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     expect(screen.getByRole('heading', { name: 'Requisições' })).toBeDefined();
     expect(container.textContent).toContain('Log completo das requisições do seu app');
     expect(container.textContent).toContain('Todos os status');
@@ -109,9 +115,9 @@ describe('Request log in pt-BR', () => {
 
   it('switches back to English live', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<KeyedMessageLog />);
     expect(screen.getByRole('heading', { name: 'Requisições' })).toBeDefined();
-    setLocale('en', { persist: false });
+    act(() => setLocale('en', { persist: false }));
     expect(screen.getByRole('heading', { name: 'Requests' })).toBeDefined();
     await vi.waitFor(() => expect(container.textContent).toContain('1 total'));
   });
@@ -139,9 +145,9 @@ describe('Request log in pt-BR', () => {
         ],
       },
     });
-    const { container } = render(() => (
-      <RequestDrawer messageId="request-1234567890" onClose={() => {}} />
-    ));
+    const { container } = render(
+      <RequestDrawer messageId="request-1234567890" onClose={() => {}} />,
+    );
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Requisição request-1234');
     });

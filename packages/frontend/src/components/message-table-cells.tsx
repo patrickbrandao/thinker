@@ -1,7 +1,7 @@
-import { createMemo, Show, type JSX } from 'solid-js';
-import { A } from '@solidjs/router';
+import type { CSSProperties, ReactNode } from 'react';
+import { Link } from 'react-router';
 import { routingTierLabel, type MessageRow, type MessageColumnKey } from './message-table-types.js';
-import InfoTooltip from './InfoTooltip.jsx';
+import InfoTooltip from './InfoTooltip.js';
 import {
   formatCost,
   formatNumber,
@@ -18,16 +18,52 @@ import {
 } from '../services/routing-utils.js';
 import { PROVIDERS } from '../services/providers.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { providerIcon, customProviderLogo } from './ProviderIcon.jsx';
+import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
 import { platformIcon, isSuccessStatus } from 'thinker-shared';
 import { tMaybe, t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
-const MONO = 'font-family: var(--font-mono);';
-const MONO_XS =
-  'font-family: var(--font-mono); font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));';
+const MONO = 'font-mono';
+const MONO_XS = 'font-mono text-xs text-muted';
+const DASH = '—';
 
-export function HeartbeatIcon(): JSX.Element {
+/** Header-tier color names (thinker-shared TIER_COLORS) mapped onto the category tokens. */
+const TIER_COLOR_TOKENS: Record<string, string> = {
+  slate: '--port-12',
+  gray: '--port-12',
+  zinc: '--port-12',
+  stone: '--port-12',
+  red: '--danger',
+  orange: '--port-9',
+  amber: '--port-4',
+  yellow: '--port-4',
+  lime: '--port-6',
+  green: '--port-6',
+  emerald: '--port-11',
+  teal: '--port-3',
+  cyan: '--port-7',
+  sky: '--port-7',
+  blue: '--port-1',
+  indigo: '--port-10',
+  violet: '--port-2',
+  purple: '--port-8',
+  fuchsia: '--port-8',
+  pink: '--port-5',
+  rose: '--port-5',
+};
+
+/** Inline style that points `--tier` at the token for a header-tier color. */
+export function tierColorStyle(color: string | null | undefined): CSSProperties {
+  const token = TIER_COLOR_TOKENS[color ?? 'indigo'] ?? '--port-10';
+  return { '--tier': `var(${token})` } as CSSProperties;
+}
+
+/** Classes that paint a badge from the `--tier` custom property. */
+export const TIER_COLOR_CLASS =
+  'bg-[color-mix(in_srgb,var(--tier)_14%,transparent)] text-[var(--tier)]';
+
+export function HeartbeatIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -36,9 +72,9 @@ export function HeartbeatIcon(): JSX.Element {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -46,9 +82,9 @@ export function HeartbeatIcon(): JSX.Element {
   );
 }
 
-export function FallbackIcon(): JSX.Element {
+export function FallbackIcon() {
   return (
-    <span class="fallback-icon">
+    <span className="fallback-icon inline-flex shrink-0 items-center">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="12"
@@ -71,70 +107,62 @@ const headerLabel = (key: MessageColumnKey, tooltips?: boolean): string =>
 const tooltipText = (key: MessageColumnKey): string | undefined =>
   tMaybe(`messages.table.tooltip.${key}`);
 
-export function columnHeader(key: MessageColumnKey, tooltips?: boolean): JSX.Element {
-  const hasTip = tooltipText(key) !== undefined;
-  return hasTip && (tooltips || key !== 'totalTokens') ? (
-    <>
+export function columnHeader(key: MessageColumnKey, tooltips?: boolean): ReactNode {
+  const tip = tooltipText(key);
+  return tip !== undefined && (tooltips || key !== 'totalTokens') ? (
+    <span className="inline-flex items-center gap-1">
       {headerLabel(key, tooltips)}
-      <InfoTooltip text={tooltipText(key)!} />
-    </>
+      <InfoTooltip text={tip} />
+    </span>
   ) : (
-    <>{headerLabel(key, tooltips)}</>
+    headerLabel(key, tooltips)
   );
 }
 
-export function DateCell(item: MessageRow): JSX.Element {
-  return <td style={`white-space: nowrap; width: 1%; ${MONO_XS}`}>{formatTime(item.timestamp)}</td>;
+export function DateCell(item: MessageRow) {
+  return <td className={cx('w-[1%] whitespace-nowrap', MONO_XS)}>{formatTime(item.timestamp)}</td>;
 }
 
-export function MessageCell(item: MessageRow): JSX.Element {
+export function MessageCell(item: MessageRow) {
   return (
-    <td style={MONO_XS}>
+    <td className={MONO_XS}>
       {item.id.slice(0, 8)}
       {item.routing_reason === 'heartbeat' && (
         <span
           title={t('messages.table.heartbeat')}
-          style="display: inline-flex; align-items: center; margin-left: 4px; color: hsl(var(--muted-foreground)); opacity: 0.7;"
+          className="ml-1 inline-flex items-center align-middle text-faint"
         >
-          {<HeartbeatIcon />}
+          <HeartbeatIcon />
         </span>
       )}
     </td>
   );
 }
 
-export function CostCell(item: MessageRow): JSX.Element {
+export function CostCell(item: MessageRow) {
   // Subscription rows with a non-zero cost are per-request subscriptions
   // like OpenCode Go (docs-attributed $/request). Flat-fee subscriptions
   // (Claude Max, ChatGPT Plus, GLM Coding, Copilot) report $0 and keep the
   // "Included in subscription" treatment.
   const isPerRequestSubscription =
     item.auth_type === 'subscription' && item.cost != null && item.cost > 0;
-  return (
-    <td style={MONO}>
-      <Show
-        when={item.auth_type === 'subscription' && !isPerRequestSubscription}
-        fallback={
-          <span
-            title={
-              isPerRequestSubscription
-                ? t('messages.table.perRequestCost', { amount: usd(Number(item.cost!), 6) })
-                : item.cost != null && Number(item.cost) > 0 && Number(item.cost) < 0.01
-                  ? usd(Number(item.cost), 6)
-                  : undefined
-            }
-          >
-            {item.cost != null ? (formatCost(item.cost) ?? '\u2014') : '\u2014'}
-          </span>
-        }
-      >
-        <span
-          style="color: hsl(var(--muted-foreground));"
-          title={t('messages.table.includedInSubscription')}
-        >
+  if (item.auth_type === 'subscription' && !isPerRequestSubscription) {
+    return (
+      <td className={MONO}>
+        <span className="text-muted" title={t('messages.table.includedInSubscription')}>
           {usd(0, 2)}
         </span>
-      </Show>
+      </td>
+    );
+  }
+  const title = isPerRequestSubscription
+    ? t('messages.table.perRequestCost', { amount: usd(Number(item.cost!), 6) })
+    : item.cost != null && Number(item.cost) > 0 && Number(item.cost) < 0.01
+      ? usd(Number(item.cost), 6)
+      : undefined;
+  return (
+    <td className={MONO}>
+      <span title={title}>{item.cost != null ? (formatCost(item.cost) ?? DASH) : DASH}</span>
     </td>
   );
 }
@@ -151,7 +179,7 @@ function resolveMessageProvider(item: MessageRow): string | undefined {
     const resolved = resolveProviderId(item.provider);
     if (resolved) return resolved;
   }
-  if (item.model) return inferProviderFromModel(item.model);
+  if (item.model) return inferProviderFromModel(item.model) ?? undefined;
   return undefined;
 }
 
@@ -163,7 +191,80 @@ function resolveMessageProviderName(item: MessageRow): string | undefined {
   );
 }
 
-export function ModelCell(item: MessageRow): JSX.Element {
+function CustomProviderAvatar({ item }: { item: MessageRow }) {
+  const customName = item.custom_provider_name ?? undefined;
+  const logo = customProviderLogo(customName ?? '', 16, undefined, item.model ?? undefined);
+  if (logo) return <>{logo}</>;
+  const letter = (customName ?? stripCustomPrefix(item.model!)).charAt(0).toUpperCase();
+  return (
+    <span
+      className="provider-card__logo-letter inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--avatar)] text-[9px] font-semibold text-on-accent"
+      title={customName}
+      // Per-provider identity color (data-derived, not a theme color).
+      style={{ '--avatar': customProviderColor(customName ?? '') } as CSSProperties}
+    >
+      {letter}
+    </span>
+  );
+}
+
+function ModelTierBadge({ item }: { item: MessageRow }) {
+  if (item.virtual_model_name) {
+    return (
+      <span
+        className="tier-badge tier-badge--virtual badge is-accent"
+        title={t('messages.table.virtualModel', { name: item.virtual_model_name })}
+      >
+        {item.virtual_model_name}
+      </span>
+    );
+  }
+  if (item.header_tier_name) {
+    const color = item.header_tier_color ?? 'indigo';
+    return (
+      <span
+        className={cx(
+          'tier-badge tier-badge--custom badge',
+          `tier-color--${color}`,
+          TIER_COLOR_CLASS,
+        )}
+        style={tierColorStyle(color)}
+        title={item.header_tier_name}
+      >
+        {item.header_tier_name}
+      </span>
+    );
+  }
+  if (item.specificity_category) {
+    return (
+      <span className="tier-badge tier-badge--specificity badge is-info">
+        {item.specificity_category.replace(/_/g, ' ')}
+      </span>
+    );
+  }
+  if (item.routing_tier && item.routing_tier !== 'fallback') {
+    const hint =
+      item.routing_tier === 'direct'
+        ? t('messages.table.directTier')
+        : item.routing_tier === 'default'
+          ? t('messages.table.defaultTier')
+          : undefined;
+    return (
+      <span
+        className={cx(
+          `tier-badge tier-badge--${item.routing_tier} badge`,
+          item.routing_tier === 'direct' && 'is-outline',
+        )}
+        title={hint}
+      >
+        {routingTierLabel(item.routing_tier)}
+      </span>
+    );
+  }
+  return null;
+}
+
+export function ModelCell(item: MessageRow) {
   const provId = resolveMessageProvider(item);
   const provName = resolveMessageProviderName(item);
   // Custom providers are identified by either the literal 'custom' (from
@@ -173,43 +274,18 @@ export function ModelCell(item: MessageRow): JSX.Element {
   // pre-resolved from the backend as `custom_provider_name` (null when the
   // provider was deleted).
   const isCustomProvider = provId === 'custom' || provId?.startsWith('custom:') === true;
+  const label = `${provName ?? provId} (${authLabel(item.auth_type)})`;
   return (
-    <td style={MONO_XS}>
-      <span style="display: inline-flex; align-items: center; gap: 4px;">
+    <td className={MONO_XS}>
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
         {item.model && isCustomProvider ? (
-          (() => {
-            const customName = item.custom_provider_name ?? undefined;
-            const logo = customProviderLogo(
-              customName ?? '',
-              16,
-              undefined,
-              item.model ?? undefined,
-            );
-            if (logo) return logo;
-            const letter = (customName ?? stripCustomPrefix(item.model!)).charAt(0).toUpperCase();
-            return (
-              <span
-                class="provider-card__logo-letter"
-                title={customName}
-                style={{
-                  background: customProviderColor(customName ?? ''),
-                  width: '16px',
-                  height: '16px',
-                  'font-size': '9px',
-                  'flex-shrink': '0',
-                  'border-radius': '50%',
-                }}
-              >
-                {letter}
-              </span>
-            );
-          })()
+          <CustomProviderAvatar item={item} />
         ) : provId ? (
           <span
             role="img"
-            aria-label={`${provName ?? provId} (${authLabel(item.auth_type)})`}
-            title={`${provName ?? provId} (${authLabel(item.auth_type)})`}
-            style="display: inline-flex; flex-shrink: 0; position: relative; color: hsl(var(--foreground)); width: 14px; height: 14px;"
+            aria-label={label}
+            title={label}
+            className="relative inline-flex size-3.5 shrink-0 text-ink"
           >
             {providerIcon(provId, 14)}
             {authBadgeFor(item.auth_type, 8)}
@@ -219,72 +295,39 @@ export function ModelCell(item: MessageRow): JSX.Element {
           ? item.model.startsWith('custom:')
             ? stripCustomPrefix(item.model)
             : getModelDisplayName(item.model)
-          : '\u2014'}
-        {item.virtual_model_name ? (
-          <span
-            class="tier-badge tier-badge--virtual"
-            title={t('messages.table.virtualModel', { name: item.virtual_model_name })}
-          >
-            {item.virtual_model_name}
-          </span>
-        ) : item.header_tier_name ? (
-          <span
-            class={`tier-badge tier-badge--custom tier-color--${item.header_tier_color ?? 'indigo'}`}
-            title={item.header_tier_name}
-          >
-            {item.header_tier_name}
-          </span>
-        ) : item.specificity_category ? (
-          <span class="tier-badge tier-badge--specificity">
-            {item.specificity_category.replace(/_/g, ' ')}
-          </span>
-        ) : item.routing_tier && item.routing_tier !== 'fallback' ? (
-          <span class="tier-badge-tooltip">
-            <span class={`tier-badge tier-badge--${item.routing_tier}`}>
-              {routingTierLabel(item.routing_tier)}
-            </span>
-            {(item.routing_tier === 'direct' || item.routing_tier === 'default') && (
-              <span class="tier-badge-tooltip__bubble">
-                {item.routing_tier === 'direct'
-                  ? t('messages.table.directTier')
-                  : t('messages.table.defaultTier')}
-              </span>
-            )}
-          </span>
-        ) : null}
+          : DASH}
+        <ModelTierBadge item={item} />
       </span>
     </td>
   );
 }
 
-export function TokenCell(value: number | null): JSX.Element {
-  return <td style={`width: 130px; ${MONO}`}>{value != null ? formatNumber(value) : '\u2014'}</td>;
+export function TokenCell(value: number | null) {
+  return <td className={cx('w-[130px]', MONO)}>{value != null ? formatNumber(value) : DASH}</td>;
 }
 
-export function SmallTokenCell(value: number | null): JSX.Element {
-  return (
-    <td style={`width: 102px; ${MONO_XS}`}>{value != null ? formatNumber(value) : '\u2014'}</td>
-  );
+export function SmallTokenCell(value: number | null) {
+  return <td className={cx('w-[102px]', MONO_XS)}>{value != null ? formatNumber(value) : DASH}</td>;
 }
 
-export function CacheCell(item: MessageRow): JSX.Element {
+export function CacheCell(item: MessageRow) {
   const has = (item.cache_read_tokens ?? 0) > 0 || (item.cache_creation_tokens ?? 0) > 0;
   return (
-    <td style={`width: 192px; ${MONO_XS}`}>
+    <td className={cx('w-[192px] whitespace-nowrap', MONO_XS)}>
       {has
         ? t('messages.table.cache', {
             read: formatNumber(item.cache_read_tokens ?? 0),
             write: formatNumber(item.cache_creation_tokens ?? 0),
           })
-        : '\u2014'}
+        : DASH}
     </td>
   );
 }
 
-export function DurationCell(item: MessageRow): JSX.Element {
+export function DurationCell(item: MessageRow) {
   return (
-    <td style={MONO_XS}>
-      {item.duration_ms != null ? formatDuration(item.duration_ms) : '\u2014'}
+    <td className={cx('whitespace-nowrap', MONO_XS)}>
+      {item.duration_ms != null ? formatDuration(item.duration_ms) : DASH}
     </td>
   );
 }
@@ -294,50 +337,36 @@ export function AgentCell(
   platformLookup?: (
     name: string,
   ) => { platform: string | null; category: string | null } | undefined,
-): JSX.Element {
-  const icon = () => {
-    const info = item.agent_name && platformLookup ? platformLookup(item.agent_name) : undefined;
-    return info?.platform ? platformIcon(info.platform, info.category) : undefined;
-  };
+) {
+  const info = item.agent_name && platformLookup ? platformLookup(item.agent_name) : undefined;
+  const icon = info?.platform ? platformIcon(info.platform, info.category) : undefined;
   return (
-    <td style="white-space: nowrap; font-weight: 500; font-size: var(--font-size-xs);">
-      <span style="display: inline-flex; align-items: center; gap: 5px;">
-        <Show when={icon()}>
-          {(src) => (
-            <img
-              src={src()}
-              alt=""
-              width="14"
-              height="14"
-              class="platform-icon"
-              style="flex-shrink: 0;"
-            />
-          )}
-        </Show>
-        {item.agent_name ?? '\u2014'}
+    <td className="whitespace-nowrap text-xs font-medium text-ink">
+      <span className="inline-flex items-center gap-1.5">
+        {icon ? (
+          <img src={icon} alt="" width="14" height="14" className="platform-icon shrink-0" />
+        ) : null}
+        {item.agent_name ?? DASH}
       </span>
     </td>
   );
 }
 
-export function AttemptsCell(item: MessageRow): JSX.Element {
-  return <td style={MONO_XS}>{item.attempt_count ?? 1}</td>;
+export function AttemptsCell(item: MessageRow) {
+  return <td className={MONO_XS}>{item.attempt_count ?? 1}</td>;
 }
 
-export function RecoveryCell(item: MessageRow): JSX.Element {
-  if (!item.fallback_from_model) return <td style={MONO_XS}>{'\u2014'}</td>;
+export function RecoveryCell(item: MessageRow) {
+  if (!item.fallback_from_model) return <td className={MONO_XS}>{DASH}</td>;
 
   return (
     <td>
-      <span style="display: inline-flex; align-items: center; gap: 4px;">
-        <span
-          class="trigger-badge trigger-badge--fallback"
-          title={t('messages.table.fallback')}
-          style="padding: 1px 3px;"
-        >
-          <FallbackIcon />
-          {t('messages.table.fallbackBadge')}
-        </span>
+      <span
+        className="trigger-badge trigger-badge--fallback badge is-info"
+        title={t('messages.table.fallback')}
+      >
+        <FallbackIcon />
+        {t('messages.table.fallbackBadge')}
       </span>
     </td>
   );
@@ -362,11 +391,10 @@ function describeStatusPill(item: MessageRow): {
   cls: string;
   limitAgent: string | null;
 } {
-  const isSuccess = isSuccessStatus(item.status);
-  if (isSuccess) {
+  if (isSuccessStatus(item.status)) {
     return {
       label: t('messages.table.success'),
-      cls: 'status-badge status-badge--ok',
+      cls: 'status-badge status-badge--ok badge is-ok',
       limitAgent: null,
     };
   }
@@ -374,7 +402,7 @@ function describeStatusPill(item: MessageRow): {
     return {
       label:
         item.status === 'pending' ? t('messages.table.pending') : t('messages.table.cancelled'),
-      cls: 'status-badge status-badge--neutral',
+      cls: 'status-badge status-badge--neutral badge',
       limitAgent: null,
     };
   }
@@ -384,37 +412,36 @@ function describeStatusPill(item: MessageRow): {
   return {
     label: t('messages.table.failed'),
     title: statusErrorDescriptor(item) ?? undefined,
-    cls: 'status-badge status-badge--error',
+    cls: 'status-badge status-badge--error badge is-danger',
     limitAgent: item.error_origin === 'policy' ? item.agent_name : null,
   };
 }
 
-export function StatusCell(item: MessageRow, _agentName: string | undefined): JSX.Element {
-  // Read inside a memo so the pill follows the active language.
-  const pill = createMemo(() => describeStatusPill(item));
+export function StatusCell(item: MessageRow, _agentName: string | undefined) {
+  const pill = describeStatusPill(item);
 
   // A Thinker software limit is one red pill linking to its agent's limits page.
-  if (pill().limitAgent) {
+  if (pill.limitAgent) {
     return (
       <td>
-        <A
-          class={pill().cls}
-          href={`/harnesses/${encodeURIComponent(pill().limitAgent!)}/limits`}
+        <Link
+          className={cx(pill.cls, 'no-underline hover:underline')}
+          to={`/harnesses/${encodeURIComponent(pill.limitAgent)}/limits`}
           title={t('messages.table.limitReached')}
         >
-          {pill().label}
-        </A>
+          {pill.label}
+        </Link>
       </td>
     );
   }
 
-  const badge = (
-    <span class={pill().cls} title={pill().title}>
-      {pill().label}
-    </span>
+  return (
+    <td>
+      <span className={pill.cls} title={pill.title}>
+        {pill.label}
+      </span>
+    </td>
   );
-
-  return <td>{badge}</td>;
 }
 
 export interface CellRenderContext {
@@ -427,11 +454,7 @@ export interface CellRenderContext {
   onTriggerClick?: (id: string) => void;
 }
 
-export function renderCell(
-  key: MessageColumnKey,
-  item: MessageRow,
-  ctx: CellRenderContext,
-): JSX.Element {
+export function renderCell(key: MessageColumnKey, item: MessageRow, ctx: CellRenderContext) {
   switch (key) {
     case 'date':
       return DateCell(item);

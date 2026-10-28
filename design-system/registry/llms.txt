@@ -96,7 +96,7 @@
 --z-toast: 8000
 --z-tooltip: 9999
 
-## Blocks (272 BEM blocks, 1414 classes)
+## Blocks (228 BEM blocks, 1249 classes)
 account-back-btn (agents.css): account-back-btn
 account-modal (agents.css): account-modal account-modal--standalone account-modal__inner
 account-security-error (agents.css): account-security-error
@@ -116,8 +116,6 @@ api-key-display (wizard.css): api-key-display__code api-key-display__prefix api-
 app-body (layout.css): app-body
 app-layout (theme.css): app-layout
 app-shell (layout.css): app-shell
-attempt-code (request-drawer.css): attempt-code attempt-code--error attempt-code--neutral attempt-code--ok
-attempt-item (request-drawer.css): attempt-item attempt-item--active attempt-item__empty attempt-item__icon attempt-item__model attempt-item__num
 auth-card (auth.css): auth-card
 auth-divider (auth.css): auth-divider auth-divider__text
 auth-footer (auth.css): auth-footer auth-footer__link
@@ -134,33 +132,22 @@ btn (controls.css, layout.css, limits.css, modals.css, routing-providers.css, ro
 cards-grid (layout.css, theme.css, wizard.css): cards-grid
 chart-card (cards.css, theme.css): chart-card chart-card__body chart-card__controls chart-card__filter-btn chart-card__filter-btn--active chart-card__filters chart-card__header chart-card__label chart-card__stat chart-card__stat--active chart-card__stat--clickable chart-card__subtitle chart-card__subtitle-title chart-card__value chart-card__value-row
 chart-tooltip (charts.css, theme.css): chart-tooltip
-class_ (syntax-highlight.css): class_
 complexity-empty (routing.css): complexity-empty complexity-empty__desc complexity-empty__title
 confirm-modal (limits.css): confirm-modal__confirm-row confirm-modal__footer confirm-modal__warning
 connection-delete-confirmation (routing-providers.css): connection-delete-confirmation connection-delete-confirmation__copy connection-delete-confirmation__footer connection-delete-confirmation__label connection-delete-confirmation__title connection-delete-confirmation__warning
 connection-label-cell (routing-providers.css): connection-label-cell connection-label-cell__edit
 connections-panel (routing-providers.css): connections-panel connections-panel--collapsed connections-panel__body connections-panel__chevron connections-panel__toggle connections-panel__viewport
 container (layout.css, routing.css, theme.css): container--full container--lg container--md container--sm
-conv-outline-row (request-drawer.css): conv-outline-row conv-outline-row--active conv-outline-row__badge conv-outline-row__badge--assistant conv-outline-row__badge--system conv-outline-row__badge--tool conv-outline-row__badge--unknown conv-outline-row__badge--user conv-outline-row__num conv-outline-row__preview conv-outline-row__tokens
-conv-rail (request-drawer.css): conv-rail conv-rail__empty conv-rail__list conv-rail__role-pill conv-rail__role-pill--assistant conv-rail__role-pill--off conv-rail__role-pill--system conv-rail__role-pill--tool conv-rail__role-pill--unknown conv-rail__role-pill--user conv-rail__roles conv-rail__search conv-rail__search-wrap
-conv-resize-handle (request-drawer.css): conv-resize-handle
-conv-split (request-drawer.css): conv-split
-conv-turns (request-drawer.css): conv-turns
 copilot-device-login (routing-providers.css): copilot-device-login__code copilot-device-login__code-box copilot-device-login__code-row copilot-device-login__copy-btn copilot-device-login__open-btn copilot-device-login__waiting
 count-link (theme.css): count-link
 custom-provider-item (routing-providers.css): custom-provider-item custom-provider-item__delete custom-provider-item__icon custom-provider-item__info custom-provider-item__meta custom-provider-item__name
 custom-provider-model-row (routing-providers.css): custom-provider-model-row custom-provider-model-row__name custom-provider-model-row__price custom-provider-model-row__remove
 custom-provider-models (routing-providers.css): custom-provider-models custom-provider-models__column custom-provider-models__column--name custom-provider-models__column--price custom-provider-models__column-spacer custom-provider-models__columns custom-provider-models__label
 custom-select (custom-select.css, routing-providers.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
-dark (agent-type-select.css, agents.css, analytics-overview.css, auth.css, controls.css, data.css, modals.css, model-filter.css, overview.css, platform-icons.css, request-drawer.css, routing-deprecation.css, routing-providers.css, routing.css, syntax-highlight.css, tokens.css, welcome.css, wizard.css): dark
+dark (agent-type-select.css, agents.css, analytics-overview.css, auth.css, controls.css, data.css, modals.css, overview.css, platform-icons.css, routing-deprecation.css, routing-providers.css, routing.css, tokens.css, welcome.css, wizard.css): dark
 data-table (data.css, feedback.css, theme.css): data-table data-table__sortable
 data-table-scroll (data.css): data-table-scroll
 demo-dashboard (overview.css): demo-dashboard
-drawer (request-drawer.css): drawer drawer--open drawer__badge drawer__badge--fallback drawer__body drawer__close drawer__content drawer__content-empty drawer__header drawer__messages-pane drawer__meta-row drawer__meta-sep drawer__meta-text drawer__sidebar drawer__sidebar-title drawer__split drawer__tabs-full drawer__title drawer__title-row
-drawer-context-card (request-drawer.css): drawer-context-card drawer-context-card--error drawer-context-card--fallback
-drawer-kv (request-drawer.css): drawer-kv drawer-kv__key
-drawer-metadata (request-drawer.css): drawer-metadata
-drawer-status (request-drawer.css): drawer-status drawer-status--error drawer-status--neutral drawer-status--success
 duplicate-agent (agents.css): duplicate-agent__badge duplicate-agent__list duplicate-agent__section duplicate-agent__section-header
 empty-state (data.css, theme.css): empty-state empty-state__img empty-state__img-wrapper empty-state__title
 error-class-card (analytics-overview.css): error-class-card error-class-card__bar error-class-card__bar-wrap error-class-card__count error-class-card__empty error-class-card__label error-class-card__list error-class-card__row error-class-card__title
@@ -175,7 +162,6 @@ feedback-modal (feedback.css): feedback-modal feedback-modal__footer feedback-mo
 feedback-tag (feedback.css): feedback-tag feedback-tag--selected
 framework-snippets (wizard.css): framework-snippets__block framework-snippets__connection framework-snippets__field framework-snippets__label framework-snippets__toggle-row framework-snippets__value
 free-tag (theme.css): free-tag
-function_ (syntax-highlight.css): function_
 header (controls.css, theme.css): header header__avatar header__avatar-btn header__breadcrumb-current header__breadcrumb-icon header__breadcrumb-label header__breadcrumb-link header__breadcrumb-provider-icon header__docs-link header__dropdown header__dropdown-divider header__dropdown-email header__dropdown-header header__dropdown-item header__dropdown-item--danger header__dropdown-name header__gear header__gear-btn header__left header__logo header__logo-img header__logo-img--dark header__logo-img--light header__right header__separator
 header-combo (routing-header-tiers.css): header-combo header-combo--invalid header-combo__error header-combo__input header-combo__menu header-combo__option header-combo__option--free header-combo__option--hover header-combo__option-group header-combo__option-label header-combo__option-row header-combo__option-sublabel
 header-controls (layout.css, theme.css): header-controls
@@ -183,34 +169,9 @@ header-tier-card (routing-header-tiers.css): header-tier-card__actions header-ti
 header-tier-manage (routing-header-tiers.css): header-tier-manage__create-btn header-tier-manage__footer
 header-tier-manage-modal (routing-header-tiers.css): header-tier-manage-modal
 header-tier-modal (routing-header-tiers.css): header-tier-modal header-tier-modal__back header-tier-modal__close header-tier-modal__delete-btn header-tier-modal__error header-tier-modal__footer header-tier-modal__footer-right header-tier-modal__swatch header-tier-modal__swatch--active header-tier-modal__swatch--amber header-tier-modal__swatch--blue header-tier-modal__swatch--brown header-tier-modal__swatch--coral header-tier-modal__swatch--cyan header-tier-modal__swatch--emerald header-tier-modal__swatch--fuchsia header-tier-modal__swatch--gray header-tier-modal__swatch--green header-tier-modal__swatch--indigo header-tier-modal__swatch--lime header-tier-modal__swatch--navy header-tier-modal__swatch--orange header-tier-modal__swatch--pink header-tier-modal__swatch--purple header-tier-modal__swatch--red header-tier-modal__swatch--rose header-tier-modal__swatch--sky header-tier-modal__swatch--slate header-tier-modal__swatch--stone header-tier-modal__swatch--teal header-tier-modal__swatch--violet header-tier-modal__swatch--yellow header-tier-modal__swatch--zinc header-tier-modal__swatches
-hljs (syntax-highlight.css): hljs
-hljs-addition (syntax-highlight.css): hljs-addition
-hljs-attr (request-drawer.css, syntax-highlight.css): hljs-attr
-hljs-built_in (syntax-highlight.css): hljs-built_in
-hljs-comment (syntax-highlight.css): hljs-comment
-hljs-deletion (syntax-highlight.css): hljs-deletion
-hljs-keyword (syntax-highlight.css): hljs-keyword
-hljs-literal (request-drawer.css, syntax-highlight.css): hljs-literal
-hljs-meta (syntax-highlight.css): hljs-meta
-hljs-number (request-drawer.css, syntax-highlight.css): hljs-number
-hljs-operator (syntax-highlight.css): hljs-operator
-hljs-params (syntax-highlight.css): hljs-params
-hljs-property (syntax-highlight.css): hljs-property
-hljs-punctuation (syntax-highlight.css): hljs-punctuation
-hljs-regexp (syntax-highlight.css): hljs-regexp
-hljs-section (syntax-highlight.css): hljs-section
-hljs-string (request-drawer.css, syntax-highlight.css): hljs-string
-hljs-symbol (syntax-highlight.css): hljs-symbol
-hljs-template-tag (syntax-highlight.css): hljs-template-tag
-hljs-title (syntax-highlight.css): hljs-title
-hljs-type (syntax-highlight.css): hljs-type
-hljs-variable (syntax-highlight.css): hljs-variable
 info-tooltip (tooltip.css): info-tooltip info-tooltip__bubble info-tooltip__icon
 integration-grid (wizard.css): integration-grid
 integration-panel (wizard.css): integration-panel__desc integration-panel__header integration-panel__tabs
-json-block (request-drawer.css): json-block json-block__size-notice
-json-block-wrap (request-drawer.css): json-block-wrap
-language-json (request-drawer.css): language-json
 limit-block-toggle (limits.css): limit-block-toggle limit-block-toggle__label
 limit-modal (limits.css): limit-modal__row
 limit-type-icon (limits.css): limit-type-icon
@@ -234,7 +195,6 @@ modal-terminal (agents.css, wizard.css): modal-terminal modal-terminal__body mod
 model-bar (data.css, theme.css): model-bar model-bar__fill model-bar__name model-bar__pct model-bar__track
 model-capability-badge (routing.css): model-capability-badge model-capability-badge--icon-only model-capability-badge--unknown model-capability-badge__icon
 model-capability-badges (routing.css): model-capability-badges model-capability-badges--compact model-capability-badges--empty
-model-filter (model-filter.css): model-filter model-filter__clear-all model-filter__combobox model-filter__dropdown model-filter__dropdown-group model-filter__dropdown-item model-filter__dropdown-item--highlighted model-filter__dropdown-item-name model-filter__dropdown-item-type model-filter__dropdown-label model-filter__empty model-filter__empty-hint model-filter__empty-title model-filter__input-wrapper model-filter__provider-icon model-filter__provider-icon--mono model-filter__row model-filter__search model-filter__search-icon model-filter__summary model-filter__tag model-filter__tag--provider model-filter__tag-remove model-filter__tag-type model-filter__tag-value model-filter__tags
 model-modality-badges (routing-modal.css): model-modality-badges
 model-params (params-card.css, routing.css): model-params__body model-params__default-hint model-params__dialog model-params__empty model-params__field model-params__footer model-params__footer-actions model-params__group model-params__group-card model-params__group-header model-params__help model-params__help-tooltip model-params__label-hint model-params__label-title model-params__number model-params__number--slider model-params__param-key model-params__reset model-params__row model-params__row--disabled model-params__row-control model-params__row-text model-params__separator model-params__slider model-params__slider-bound model-params__slider-bounds model-params__slider-control model-params__slider-field model-params__slider-field--disabled model-params__slider-tick model-params__slider-track-bg model-params__slider-track-wrapper model-params__status model-params__toggle
 model-params-modal (routing.css): model-params-modal model-params-modal--empty
@@ -254,7 +214,7 @@ overview-stat-card (analytics-overview.css): overview-stat-card overview-stat-ca
 overview-stats (analytics-overview.css): overview-stats overview-stats--3 overview-stats--5
 page-header (analytics-overview.css, layout.css, theme.css): page-header page-header--wrap page-header__intro page-header__subtitle page-header__title
 pagination (data.css): pagination pagination__btn pagination__controls pagination__summary
-panel (analytics-overview.css, cards.css, charts.css, limits.css, request-drawer.css, routing-providers.css, routing-tabs.css, theme.css, welcome.css, wizard.css): panel panel--disabled panel__header panel__tab panel__tab--active panel__tab-icon panel__tabs panel__title
+panel (analytics-overview.css, cards.css, charts.css, limits.css, routing-providers.css, routing-tabs.css, theme.css, welcome.css, wizard.css): panel panel--disabled panel__header panel__tab panel__tab--active panel__tab-icon panel__tabs panel__title
 platform-icon (platform-icons.css): platform-icon
 provider-auth-badge (routing.css): provider-auth-badge provider-auth-badge--key provider-auth-badge--local provider-auth-badge--overlay provider-auth-badge--sub
 provider-card (notifications.css, routing-providers.css): provider-card provider-card__actions provider-card__body provider-card__dropdown provider-card__dropdown-item provider-card__dropdown-item--danger provider-card__email provider-card__header provider-card__key provider-card__label provider-card__logo provider-card__logo-letter provider-card__menu provider-card__menu-btn provider-card__meta provider-card__name
@@ -272,10 +232,6 @@ recovery-card-row (data.css): recovery-card-row
 recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none
 rel-chart (reliability-card.css): rel-chart__legend rel-chart__legend-dot rel-chart__legend-item
 rel-col (theme.css): rel-col
-request-message (request-drawer.css): request-message request-message--active request-message__body request-message__body--capped request-message__chevron request-message__chevron--open request-message__content request-message__footer request-message__header request-message__index request-message__meta-code request-message__preview request-message__role request-message__role--assistant request-message__role--system request-message__role--tool request-message__role--unknown request-message__role--user request-message__uncap
-request-messages (request-drawer.css): request-messages request-messages__empty request-messages__empty--sm request-messages__empty-icon request-messages__format request-messages__raw request-messages__scroll-area request-messages__tool-call request-messages__tool-call-head request-messages__tool-calls request-messages__tool-icon request-messages__tool-id request-messages__tool-name request-messages__toolbar request-messages__tools request-messages__tools-page request-messages__view--active request-messages__views
-request-tool (request-drawer.css): request-tool request-tool--available request-tool__description request-tool__head request-tool__type
-request-tools-section (request-drawer.css): request-tools-section request-tools-section__count request-tools-section__title
 response-mode-btn (routing.css): response-mode-btn response-mode-btn__icon
 response-mode-modal (routing.css): response-mode-modal response-mode-modal__blocker response-mode-modal__blocker-list response-mode-modal__blocker-meta response-mode-modal__blocker-model response-mode-modal__blocker-row response-mode-modal__blocker-text response-mode-modal__body response-mode-modal__desc response-mode-modal__field-header response-mode-modal__field-title
 routing-action (routing.css): routing-action routing-action--danger
@@ -376,7 +332,7 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
-## Canonical rules — same selector+property declared twice with different values; the winner renders (47)
+## Canonical rules — same selector+property declared twice with different values; the winner renders (43)
 .view-more-link { color: hsl(var(--foreground)) }  ← analytics-overview.css:183
 .custom-select__option--top > svg { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
 .custom-select__option--top > img { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
@@ -387,10 +343,6 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .setup-modal__next:hover { opacity: 0.85 }  ← overview.css:55
 .tier-badge--fallback { background: hsl(38 92% 50% / 0.15) }  ← overview.css:105
 .tier-badge--fallback { color: hsl(38 92% 40%) }  ← overview.css:106
-.request-tool { border: 1px solid hsl(36 80% 50% / 0.24) }  ← request-drawer.css:910
-.request-tool { border-radius: var(--radius-sm) }  ← request-drawer.css:911
-.request-tool { background: hsl(36 80% 50% / 0.04) }  ← request-drawer.css:912
-.hljs-attr { color: hsl(var(--chart-4)) }  ← syntax-highlight.css:41
 .summary-card { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px }  ← theme.css:196
 .trend--up { color: hsl(var(--success)) }  ← theme.css:237
 .trend--up { background: hsl(var(--success) / 0.1) }  ← theme.css:238
@@ -427,7 +379,7 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .welcome__route-test-heading { gap: 10px }  ← welcome.css:897
 .welcome__text-link { padding: 6px 0 }  ← welcome.css:1090
 
-## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (47)
+## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (43)
 .summary-card { box-shadow: var(--card-shadow) }  at cards.css:7 loses to theme.css:196
 .trend--up { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:237
 .trend--down { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:242
@@ -466,10 +418,6 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .setup-modal__next { color: hsl(var(--primary-foreground)) }  at modals.css:101 loses to overview.css:46
 .setup-modal__next { background: hsl(var(--primary)) }  at modals.css:102 loses to overview.css:45
 .setup-modal__next:hover { opacity: 0.9 }  at modals.css:110 loses to overview.css:55
-.request-tool { border: 1px solid hsl(var(--border)) }  at request-drawer.css:662 loses to request-drawer.css:910
-.request-tool { border-radius: var(--radius) }  at request-drawer.css:663 loses to request-drawer.css:911
-.request-tool { background: hsl(var(--card)) }  at request-drawer.css:664 loses to request-drawer.css:912
-.hljs-attr { color: hsl(187 60% 38%) }  at request-drawer.css:1090 loses to syntax-highlight.css:41
 .welcome__progress-header span { letter-spacing: 0.09em }  at welcome.css:548 loses to welcome.css:554
 .welcome__text-link:focus-visible { outline: 3px solid hsl(var(--ring)) }  at welcome.css:726 loses to welcome.css:860
 .welcome__text-link:focus-visible { outline-offset: 2px }  at welcome.css:727 loses to welcome.css:861
@@ -477,12 +425,10 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .welcome__route-test-heading { gap: 14px }  at welcome.css:870 loses to welcome.css:897
 .welcome__text-link { padding: 0 }  at welcome.css:1079 loses to welcome.css:1090
 
-## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (15)
+## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (12)
 analytics-overview.css ← components/ReliabilityKpiCards.tsx, pages/GlobalOverview.tsx
-model-filter.css ← pages/MessageLog.tsx
-overview.css ← pages/GlobalOverview.tsx, pages/MessageLog.tsx, pages/Overview.tsx
+overview.css ← pages/GlobalOverview.tsx, pages/Overview.tsx
 reliability-card.css ← components/ReliabilityChart.tsx
-request-drawer.css ← components/RequestDrawer.tsx
 routing-deprecation.css ← components/RoutingDeprecationNotice.tsx
 routing-header-tiers.css ← pages/RoutingHeaderTiersSection.tsx, pages/RoutingVirtualModelsSection.tsx
 routing-modal.css ← pages/Welcome.tsx
@@ -490,13 +436,14 @@ routing-providers.css ← pages/Welcome.tsx
 routing-specificity.css ← pages/RoutingSpecificitySection.tsx
 routing-virtual-models.css ← pages/RoutingVirtualModelsSection.tsx
 routing-tabs.css ← (via @import)
-routing.css ← pages/GlobalOverview.tsx, pages/MessageLog.tsx, pages/Overview.tsx, pages/Routing.tsx, pages/Welcome.tsx
-syntax-highlight.css ← services/syntax-highlight.ts
+routing.css ← pages/GlobalOverview.tsx, pages/Overview.tsx, pages/Routing.tsx, pages/Welcome.tsx
 welcome.css ← pages/Welcome.tsx
 
-## Orphan stylesheets — in src/styles but imported nowhere (5)
+## Orphan stylesheets — in src/styles but imported nowhere (7)
 agent-chart-tooltip.css
 connection-detail.css
 filter-select.css
+model-filter.css
 organization.css
 playground.css
+request-drawer.css

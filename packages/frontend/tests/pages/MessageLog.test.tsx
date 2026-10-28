@@ -1,51 +1,71 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
-let mockAgentName = 'test-agent';
-let mockSearchParams: Record<string, string | undefined> = {};
-let mockSearchAgentAccessor: (() => string | undefined) | null = null;
-let mockSearchModelAccessor: (() => string | undefined) | null = null;
-const mockSetSearchParams = vi.fn();
+let mockAgentName: string | undefined = 'test-agent';
 const mockNavigate = vi.fn();
-const pingBox = vi.hoisted(() => ({ read: (): number => 0, set: (_value: number) => {} }));
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: mockAgentName }),
-  useSearchParams: () => [
-    {
-      get agent() {
-        return mockSearchAgentAccessor ? mockSearchAgentAccessor() : mockSearchParams.agent;
-      },
-      get status() {
-        return mockSearchParams.status;
-      },
-      get request() {
-        return mockSearchParams.request;
-      },
-      get range() {
-        return mockSearchParams.range;
-      },
-      get trigger() {
-        return mockSearchParams.trigger;
-      },
-      get model() {
-        return mockSearchModelAccessor ? mockSearchModelAccessor() : mockSearchParams.model;
-      },
-    },
-    mockSetSearchParams,
-  ],
-  useNavigate: () => mockNavigate,
-  A: (props: any) => (
-    <a href={props.href} style={props.style} class={props.class}>
-      {props.children}
-    </a>
-  ),
-}));
 
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: (props: any) => <meta name={props.name ?? ''} content={props.content ?? ''} />,
-}));
+// The URL query lives in a tiny store so a test can change it after mount the
+// way a navigation would; setSearchParams applies the page's updater to it and
+// records which keys each write changed.
+const routerState = vi.hoisted(() => {
+  let params: Record<string, string | undefined> = {};
+  const listeners = new Set<() => void>();
+  return {
+    get: () => params,
+    set(next: Record<string, string | undefined>) {
+      params = next;
+      for (const listener of [...listeners]) listener();
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+});
+const toSearch = (params: Record<string, string | undefined>) =>
+  new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => entry[1] != null),
+  );
+const setSearch = (params: Record<string, string | undefined>) => routerState.set(params);
+const paramWrites: Array<{ patch: Record<string, string | undefined>; options: unknown }> = [];
+const mockSetSearchParams = vi.fn(
+  (
+    next: URLSearchParams | Record<string, string> | ((prev: URLSearchParams) => URLSearchParams),
+    options?: unknown,
+  ) => {
+    const before = Object.fromEntries(toSearch(routerState.get()).entries());
+    const resolved =
+      typeof next === 'function' ? next(toSearch(routerState.get())) : new URLSearchParams(next);
+    const after = Object.fromEntries(resolved.entries());
+    const patch: Record<string, string | undefined> = {};
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (before[key] !== after[key]) patch[key] = after[key];
+    }
+    paramWrites.push({ patch, options });
+    routerState.set(after);
+  },
+);
+const wroteKey = (key: string) => paramWrites.some((write) => key in write.patch);
+
+vi.mock('react-router', async () => {
+  const React = await import('react');
+  return {
+    useParams: () => ({ agentName: mockAgentName }),
+    useSearchParams: () => {
+      const params = React.useSyncExternalStore(routerState.subscribe, routerState.get);
+      const search = React.useMemo(() => toSearch(params), [params]);
+      return [search, mockSetSearchParams];
+    },
+    useNavigate: () => mockNavigate,
+    Link: (props: any) => (
+      <a href={props.to} style={props.style} className={props.className}>
+        {props.children}
+      </a>
+    ),
+  };
+});
 
 const mockGetMessages = vi.fn();
 const mockGetMessageCount = vi.fn();
@@ -149,19 +169,24 @@ vi.mock('../../src/components/MultiSelect.jsx', () => ({
     >
       <option value="">{props.placeholder}</option>
       {props.options?.map((o: any) => (
-        <option value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   ),
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  pingCount: () => 0,
-  messagePing: () => pingBox.read(),
-  analyticsPing: () => 0,
-  agentPing: () => 0,
-  routingPing: () => 0,
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return {
+    pingCount: signal(0),
+    messagePing: signal(0),
+    analyticsPing: signal(0),
+    agentPing: signal(0),
+    routingPing: signal(0),
+  };
+});
 
 vi.mock('../../src/services/model-display.js', () => ({
   getModelDisplayName: (slug: string) => slug.replace(/^custom:[^/]+\//, ''),
@@ -230,7 +255,9 @@ vi.mock('../../src/components/Select.jsx', () => ({
       onChange={(e: any) => props.onChange(e.target.value)}
     >
       {props.options?.map((o: any) => (
-        <option value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   ),
@@ -242,21 +269,17 @@ vi.mock('../../src/components/ErrorState.jsx', () => ({
 
 vi.mock('../../src/components/Pagination.jsx', () => ({
   default: (props: any) => {
-    const total = props.totalItems();
+    const total = props.totalItems;
     return total > props.pageSize ? (
       <div data-testid="pagination">
         <button
           data-testid="pagination-prev"
           onClick={props.onPrevious}
-          disabled={props.currentPage() <= 1}
+          disabled={props.currentPage <= 1}
         >
           Previous
         </button>
-        <button
-          data-testid="pagination-next"
-          onClick={props.onNext}
-          disabled={!props.hasNextPage()}
-        >
+        <button data-testid="pagination-next" onClick={props.onNext} disabled={!props.hasNextPage}>
           Next
         </button>
       </div>
@@ -265,6 +288,7 @@ vi.mock('../../src/components/Pagination.jsx', () => ({
 }));
 
 import MessageLog from '../../src/pages/MessageLog';
+import { messagePing } from '../../src/services/sse';
 
 const messagesData = {
   items: [
@@ -320,9 +344,8 @@ describe('MessageLog', () => {
     vi.clearAllMocks();
     localStorage.clear();
     mockAgentName = 'test-agent';
-    mockSearchParams = {};
-    mockSearchAgentAccessor = null;
-    mockSearchModelAccessor = null;
+    setSearch({});
+    paramWrites.length = 0;
     mockGetAgents.mockResolvedValue({
       agents: [{ agent_name: 'agent-alpha' }, { agent_name: 'agent-beta' }],
     });
@@ -331,33 +354,31 @@ describe('MessageLog', () => {
     mockGetCustomProviders.mockResolvedValue([]);
     mockGetSpecificityAssignments.mockResolvedValue([]);
     mockGetRoutingStatus.mockResolvedValue({ enabled: false });
-    const [ping, setPing] = createSignal(0);
-    pingBox.read = ping;
-    pingBox.set = setPing;
+    messagePing.set(0);
   });
 
   it('renders Requests heading', () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
     expect(screen.getByText('Requests')).toBeDefined();
   });
 
   it('renders breadcrumb subtitle', () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
     expect(screen.getByText(/Full log of requests from your app/)).toBeDefined();
   });
 
   it('shows loading skeleton while fetching', () => {
     mockGetMessages.mockReturnValue(new Promise(() => {}));
-    const { container } = render(() => <MessageLog />);
-    const skeletons = container.querySelectorAll('.skeleton');
+    const { container } = render(<MessageLog />);
+    const skeletons = container.querySelectorAll('.skel');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('shows message items after data loads', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
       expect(container.textContent).toContain('msg-8765');
@@ -368,7 +389,7 @@ describe('MessageLog', () => {
 
   it('shows total count', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('2 total');
     });
@@ -376,7 +397,7 @@ describe('MessageLog', () => {
 
   it('shows table headers', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Date');
       expect(container.textContent).toContain('Cost');
@@ -390,7 +411,7 @@ describe('MessageLog', () => {
 
   it('shows formatted costs', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('$0.01');
       expect(container.textContent).toContain('$0.02');
@@ -404,7 +425,7 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('No requests yet');
     });
@@ -412,7 +433,7 @@ describe('MessageLog', () => {
 
   it("shows 'no messages match' when filters return 0 results", async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
       expect(selects.length).toBeGreaterThanOrEqual(1);
@@ -436,7 +457,7 @@ describe('MessageLog', () => {
 
   it('does not show waiting banner when filters return 0 results', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
       expect(selects.length).toBeGreaterThanOrEqual(1);
@@ -457,7 +478,7 @@ describe('MessageLog', () => {
 
   it('shows filter controls when data exists', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
       expect(selects.length).toBeGreaterThanOrEqual(1);
@@ -466,7 +487,7 @@ describe('MessageLog', () => {
 
   it('lists every connection in the filter, inactive ones included', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const ms = connectionMultiselect(container);
       expect(ms).not.toBeNull();
@@ -480,7 +501,7 @@ describe('MessageLog', () => {
 
   it('sends the selected connection ids to the API', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() =>
       expect(connectionMultiselect(container)?.textContent).toContain('OpenAI · Default'),
     );
@@ -493,15 +514,15 @@ describe('MessageLog', () => {
         expect.objectContaining({ connections: 'conn-openai-1' }),
       );
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith(
-      { connections: 'conn-openai-1' },
-      { replace: true },
-    );
+    expect(paramWrites).toContainEqual({
+      patch: { connections: 'conn-openai-1' },
+      options: { replace: true },
+    });
   });
 
   it('shows the loading skeleton when filters change', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
     });
@@ -513,32 +534,32 @@ describe('MessageLog', () => {
     });
 
     await vi.waitFor(() => {
-      expect(container.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+      expect(container.querySelectorAll('.skel').length).toBeGreaterThan(0);
     });
     expect(container.textContent).not.toContain('msg-1234');
   });
 
   it('keeps showing data during a background ping refetch instead of skeletons', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
     });
 
     // A background SSE ping refetches the same query and never resolves.
     mockGetMessages.mockReturnValue(new Promise(() => {}));
-    pingBox.set(1);
+    act(() => messagePing.set(1));
     await vi.waitFor(() => expect(mockGetMessages).toHaveBeenCalledTimes(2));
 
     expect(container.textContent).toContain('msg-1234');
-    expect(container.querySelectorAll('.skeleton').length).toBe(0);
+    expect(container.querySelectorAll('.skel').length).toBe(0);
   });
 
   it('no longer offers the cost range inputs', async () => {
     // Removed: filtering by an absolute dollar threshold requires already
     // knowing the cost distribution you are trying to discover.
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
     });
@@ -547,7 +568,7 @@ describe('MessageLog', () => {
 
   it('offers Cancelled as its own status, distinct from Failed', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
     });
@@ -564,7 +585,10 @@ describe('MessageLog', () => {
         expect.objectContaining({ status: 'cancelled' }),
       );
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ status: 'cancelled' }, { replace: true });
+    expect(paramWrites).toContainEqual({
+      patch: { status: 'cancelled' },
+      options: { replace: true },
+    });
 
     mockGetMessages.mockClear();
     await fireEvent.change(status, { target: { value: 'failed' } });
@@ -574,21 +598,20 @@ describe('MessageLog', () => {
   });
 
   it('follows ?model= when navigation changes it after mount', async () => {
-    const [searchModel, setSearchModel] = createSignal<string | undefined>('gpt-4o');
-    mockSearchModelAccessor = searchModel;
+    setSearch({ model: 'gpt-4o' });
     mockGetMessageFilterOptions.mockResolvedValue({
       providers: ['openai'],
       models: ['gpt-4o', 'claude-3.5-sonnet'],
     });
     mockGetMessages.mockResolvedValue(messagesData);
 
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('msg-1234');
     });
 
     mockGetMessages.mockClear();
-    setSearchModel('claude-3.5-sonnet');
+    act(() => setSearch({ ...routerState.get(), model: 'claude-3.5-sonnet' }));
     await vi.waitFor(() => {
       const sent = mockGetMessages.mock.calls.map((call) => (call[0] as any)?.model);
       expect(sent).toContain('claude-3.5-sonnet');
@@ -601,7 +624,7 @@ describe('MessageLog', () => {
       models: ['gpt-4o', 'claude-3.5-sonnet'],
     });
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const filter = container.querySelector(
         '[data-testid="multiselect"][aria-label="Model filter"]',
@@ -617,11 +640,13 @@ describe('MessageLog', () => {
       models: ['gpt-4o', 'claude-3.5-sonnet'],
     });
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
+      // Wait for the option itself: a <select> ignores a value it has no option for.
       expect(
-        container.querySelector('[data-testid="multiselect"][aria-label="Model filter"]'),
-      ).toBeTruthy();
+        container.querySelector('[data-testid="multiselect"][aria-label="Model filter"]')
+          ?.textContent,
+      ).toContain('gpt-4o');
     });
 
     const filter = container.querySelector(
@@ -637,7 +662,7 @@ describe('MessageLog', () => {
 
   it('shows cache tokens when present', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Read: 500 / Write: 100');
     });
@@ -645,7 +670,7 @@ describe('MessageLog', () => {
 
   it('shows dash for null cache tokens', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const rows = container.querySelectorAll('tbody tr');
       expect(rows.length).toBe(2);
@@ -659,7 +684,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithZeroCache);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       // Zero cache tokens should show dash, not "Read: 0 / Write: 0"
       expect(container.textContent).not.toContain('Read: 0 / Write: 0');
@@ -668,7 +693,7 @@ describe('MessageLog', () => {
 
   it('shows formatted duration', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('1.2s');
     });
@@ -681,7 +706,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithNullDuration);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('claude-3.5-sonnet');
     });
@@ -694,7 +719,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithMsDuration);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('423ms');
     });
@@ -702,7 +727,7 @@ describe('MessageLog', () => {
 
   it('calls getMessages on mount', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalled();
     });
@@ -710,7 +735,7 @@ describe('MessageLog', () => {
 
   it('filters messages by failed status and writes the URL param', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
       expect(selects.length).toBeGreaterThanOrEqual(3);
@@ -726,12 +751,12 @@ describe('MessageLog', () => {
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ status: 'failed' }, { replace: true });
+    expect(paramWrites).toContainEqual({ patch: { status: 'failed' }, options: { replace: true } });
   });
 
   it('filters messages by period range', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(selectWithOption(container, 'All time')).toBeDefined();
     });
@@ -747,20 +772,20 @@ describe('MessageLog', () => {
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ range: '7d' }));
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ range: '7d' }, { replace: true });
+    expect(paramWrites).toContainEqual({ patch: { range: '7d' }, options: { replace: true } });
   });
 
   it('honours a long-range deep link as is, with no plan clamp', async () => {
-    mockSearchParams = { range: '365d' };
+    setSearch({ range: '365d' });
     mockGetMessages.mockResolvedValue(messagesData);
 
-    render(() => <MessageLog />);
+    render(<MessageLog />);
 
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ range: '365d' }));
     });
     expect(mockGetMessages).not.toHaveBeenCalledWith(expect.objectContaining({ range: '7d' }));
-    expect(mockSetSearchParams).not.toHaveBeenCalledWith({ range: '7d' }, { replace: true });
+    expect(paramWrites).not.toContainEqual({ patch: { range: '7d' }, options: { replace: true } });
   });
 
   it('filters messages by attempt status (plain select, URL-synced)', async () => {
@@ -769,7 +794,7 @@ describe('MessageLog', () => {
     // spans it. The connection cards in GlobalOverview and ConnectionDetail
     // deep-link here with ?attempts=, and would otherwise land unfiltered.
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(selectWithOption(container, 'All attempt statuses')).toBeDefined();
     });
@@ -784,12 +809,15 @@ describe('MessageLog', () => {
         expect.objectContaining({ attempts: 'has_failed' }),
       );
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ attempts: 'has_failed' }, { replace: true });
+    expect(paramWrites).toContainEqual({
+      patch: { attempts: 'has_failed' },
+      options: { replace: true },
+    });
   });
 
   it('filters messages by recovery reading (plain select, URL-synced)', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(selectWithOption(container, 'All attempts')).toBeDefined();
     });
@@ -807,13 +835,16 @@ describe('MessageLog', () => {
         expect.objectContaining({ trigger: 'fallback' }),
       );
     });
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: 'fallback' }, { replace: true });
+    expect(paramWrites).toContainEqual({
+      patch: { trigger: 'fallback' },
+      options: { replace: true },
+    });
   });
 
   it('reads an old ?trigger=autofix,fallback deep link as the fallback filter', async () => {
-    mockSearchParams = { trigger: 'autofix,fallback' };
+    setSearch({ trigger: 'autofix,fallback' });
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
 
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(
@@ -821,16 +852,24 @@ describe('MessageLog', () => {
       );
     });
     // The URL is rewritten to the filter actually applied.
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: 'fallback' }, { replace: true });
+    expect(paramWrites).toContainEqual({
+      patch: { trigger: 'fallback' },
+      options: { replace: true },
+    });
   });
 
   it('strips a stale ?trigger=autofix deep link instead of keeping it in the URL', async () => {
-    mockSearchParams = { trigger: 'autofix' };
+    setSearch({ trigger: 'autofix' });
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
 
     await vi.waitFor(() => {
-      expect(mockSetSearchParams).toHaveBeenCalledWith({ trigger: undefined }, { replace: true });
+      expect(
+        paramWrites.some(
+          (w) =>
+            'trigger' in w.patch && w.patch.trigger === undefined && (w.options as any)?.replace,
+        ),
+      ).toBe(true);
     });
     expect(mockGetMessages).not.toHaveBeenCalledWith(
       expect.objectContaining({ trigger: expect.anything() }),
@@ -838,25 +877,22 @@ describe('MessageLog', () => {
   });
 
   it('leaves a current ?trigger=fallback deep link alone', async () => {
-    mockSearchParams = { trigger: 'fallback' };
+    setSearch({ trigger: 'fallback' });
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
 
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(
         expect.objectContaining({ trigger: 'fallback' }),
       );
     });
-    expect(mockSetSearchParams).not.toHaveBeenCalledWith(
-      expect.objectContaining({ trigger: expect.anything() }),
-      expect.anything(),
-    );
+    expect(wroteKey('trigger')).toBe(false);
   });
 
   it('seeds the status filter from the status search param', async () => {
-    mockSearchParams = { status: 'failed' };
+    setSearch({ status: 'failed' });
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
 
     await vi.waitFor(() => {
       expect(mockGetMessages).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
@@ -886,7 +922,7 @@ describe('MessageLog', () => {
         ],
       };
       mockGetMessages.mockResolvedValue(dataWithError);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const badge = container.querySelector('.status-badge--error');
         expect(badge).not.toBeNull();
@@ -900,7 +936,7 @@ describe('MessageLog', () => {
     it('loads rows without a total and counts independently', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
       mockGetMessageCount.mockResolvedValue({ ...messagesData, total_count: 120 });
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
 
       await vi.waitFor(() => {
         expect(mockGetMessages).toHaveBeenCalledWith(
@@ -920,7 +956,7 @@ describe('MessageLog', () => {
     it('shows pagination when total_count exceeds page size', async () => {
       const bigData = { ...messagesData, total_count: 120, next_cursor: 'cursor-2' };
       mockGetMessages.mockResolvedValue(bigData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelector('[data-testid="pagination"]')).not.toBeNull();
       });
@@ -928,7 +964,7 @@ describe('MessageLog', () => {
 
     it('hides pagination when total_count is within page size', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('2 total');
         expect(container.querySelector('[data-testid="pagination"]')).toBeNull();
@@ -938,7 +974,7 @@ describe('MessageLog', () => {
     it('Next calls getMessages with cursor after navigating', async () => {
       const bigData = { ...messagesData, total_count: 120, next_cursor: 'cursor-for-page-2' };
       mockGetMessages.mockResolvedValue(bigData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelector('[data-testid="pagination-next"]')).not.toBeNull();
       });
@@ -947,7 +983,7 @@ describe('MessageLog', () => {
       const nextBtn = container.querySelector(
         '[data-testid="pagination-next"]',
       ) as HTMLButtonElement;
-      nextBtn.click();
+      fireEvent.click(nextBtn);
       await vi.waitFor(() => {
         expect(mockGetMessages).toHaveBeenCalledWith(
           expect.objectContaining({ cursor: 'cursor-for-page-2' }),
@@ -963,7 +999,7 @@ describe('MessageLog', () => {
         next_cursor: 'cursor-for-page-2',
       };
       mockGetMessages.mockResolvedValue(firstPage);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('51 total');
       });
@@ -977,7 +1013,7 @@ describe('MessageLog', () => {
       const nextBtn = container.querySelector(
         '[data-testid="pagination-next"]',
       ) as HTMLButtonElement;
-      nextBtn.click();
+      fireEvent.click(nextBtn);
 
       await vi.waitFor(() => {
         expect(container.textContent).toContain('52 total');
@@ -987,7 +1023,7 @@ describe('MessageLog', () => {
 
   it('does not send an origin param by default — no origin is hidden', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
     await vi.waitFor(() => expect(mockGetMessages).toHaveBeenCalled());
 
     const query = mockGetMessages.mock.calls[0][0] as Record<string, string>;
@@ -996,7 +1032,7 @@ describe('MessageLog', () => {
 
   it('narrows the log to Thinker-authored failures via the origin filter', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => expect(mockGetMessages).toHaveBeenCalled());
 
     const originSelect = selectWithOption(container, 'All origins');
@@ -1010,7 +1046,7 @@ describe('MessageLog', () => {
 
   it('clears all filters when Clear filters button is clicked', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
       expect(selects.length).toBeGreaterThanOrEqual(1);
@@ -1032,7 +1068,7 @@ describe('MessageLog', () => {
       expect(container.textContent).toContain('No requests match your filters');
     });
     // Click Clear filters
-    const clearBtn = container.querySelector('.btn--outline')!;
+    const clearBtn = container.querySelector('.message-log__clear-btn')!;
     fireEvent.click(clearBtn);
     // Filters should be cleared (API re-called)
     await vi.waitFor(() => {
@@ -1047,7 +1083,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithTier);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const badge = container.querySelector('.tier-badge');
       expect(badge).not.toBeNull();
@@ -1064,7 +1100,7 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     // The setup-close button in our mock will call onClose
     const closeBtn = container.querySelector('[data-testid="setup-close"]');
     if (closeBtn) {
@@ -1082,12 +1118,12 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Connect provider');
       expect(container.textContent).toContain('Connect a provider to start routing LLM calls');
       expect(container.textContent).not.toContain('Enable routing');
-      const btn = container.querySelector('.empty-state button.btn--primary');
+      const btn = container.querySelector('.empty button.btn');
       expect(btn).not.toBeNull();
     });
   });
@@ -1100,11 +1136,11 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Connect provider');
     });
-    const btn = container.querySelector('.empty-state button.btn--primary') as HTMLButtonElement;
+    const btn = container.querySelector('.empty button.btn') as HTMLButtonElement;
     fireEvent.click(btn);
     expect(mockNavigate).toHaveBeenCalledWith('/harnesses/test-agent/routing', {
       state: { openProviders: true },
@@ -1119,10 +1155,10 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.querySelector('.waiting-banner')).not.toBeNull();
-      expect(container.querySelector('.empty-state')).toBeNull();
+      expect(container.querySelector('.empty')).toBeNull();
       expect(container.textContent).toContain('0 total');
     });
   });
@@ -1134,7 +1170,7 @@ describe('MessageLog', () => {
       total_count: 0,
       providers: [],
     });
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Set up harness');
       expect(container.textContent).not.toContain('Enable routing');
@@ -1173,7 +1209,7 @@ describe('MessageLog', () => {
 
     it('renders custom provider icon in message rows', async () => {
       mockGetMessages.mockResolvedValue(customMessagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const img = container.querySelector('img[alt="Cohere"]');
         expect(img).not.toBeNull();
@@ -1182,7 +1218,7 @@ describe('MessageLog', () => {
 
     it('strips custom prefix from model name display', async () => {
       mockGetMessages.mockResolvedValue(customMessagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('my-llama');
         expect(container.textContent).not.toContain('custom:abc-123/');
@@ -1191,7 +1227,7 @@ describe('MessageLog', () => {
 
     it('labels the connection filter option with the custom provider name', async () => {
       mockGetMessages.mockResolvedValue(customMessagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(connectionMultiselect(container)?.textContent).toContain('Cohere · Default');
       });
@@ -1204,7 +1240,7 @@ describe('MessageLog', () => {
         provider_labels: {},
       };
       mockGetMessages.mockResolvedValue(deletedProvider);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('my-llama');
         expect(container.textContent).not.toContain('custom:abc-123/');
@@ -1219,7 +1255,7 @@ describe('MessageLog', () => {
       mockAgentName = undefined;
       mockGetAgents.mockResolvedValue({ agents: [{ agent_name: 'agent-alpha' }] });
       mockGetMessages.mockResolvedValue(customMessagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelector('img[alt="Cohere"]')).not.toBeNull();
         expect(container.textContent).not.toContain('custom:abc-123/');
@@ -1230,7 +1266,7 @@ describe('MessageLog', () => {
   describe('clear filters', () => {
     it('clears all filters when clear button is clicked', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
         expect(selects.length).toBeGreaterThanOrEqual(1);
@@ -1273,7 +1309,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithSub);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('$0.00');
       expect(container.querySelector('[title="Included in subscription"]')).not.toBeNull();
@@ -1287,7 +1323,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithPerRequestSub);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       // Per-request subscriptions (OpenCode Go) carry real costs — don't hide them.
       expect(container.textContent).toContain('$0.01');
@@ -1302,7 +1338,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithCost);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('$0.05');
     });
@@ -1315,7 +1351,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithProvider);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       // providerIcon returns an inline SVG for known providers
       const providerSpan = container.querySelector('[role="img"]');
@@ -1332,7 +1368,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithSub);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const badge = container.querySelector('.provider-auth-badge--sub');
       expect(badge).not.toBeNull();
@@ -1346,7 +1382,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithApiKey);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const badge = container.querySelector('.provider-auth-badge--key');
       expect(badge).not.toBeNull();
@@ -1357,7 +1393,7 @@ describe('MessageLog', () => {
 
   it('renders meta description tag', () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    render(() => <MessageLog />);
+    render(<MessageLog />);
     // Meta is mocked as null, just ensure it renders without error
     expect(screen.getByText('Requests')).toBeDefined();
   });
@@ -1369,7 +1405,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithTier);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const badge = container.querySelector('.tier-badge');
       expect(badge).not.toBeNull();
@@ -1379,7 +1415,7 @@ describe('MessageLog', () => {
 
   it('renders setup modal', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.querySelector('[data-testid="setup-modal"]')).not.toBeNull();
     });
@@ -1392,7 +1428,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithFallback);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       // Fallback is now shown in the Recovery column, not a Model-cell tier badge.
       const badge = container.querySelector('[title="Fallback"]');
@@ -1403,7 +1439,7 @@ describe('MessageLog', () => {
 
   it('does not render fallback badge when fallback_from_model is absent', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.textContent).toContain('gpt-4o');
       const badge = container.querySelector('.tier-badge--fallback');
@@ -1426,7 +1462,7 @@ describe('MessageLog', () => {
       total_count: 1,
     };
     mockGetMessages.mockResolvedValue(dataWithFailure);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
       const badge = container.querySelector('.status-badge--error');
@@ -1437,7 +1473,7 @@ describe('MessageLog', () => {
 
   it('assigns row IDs for scroll targeting', async () => {
     mockGetMessages.mockResolvedValue(messagesData);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const row = container.querySelector('#msg-msg-12345678');
       expect(row).not.toBeNull();
@@ -1486,7 +1522,7 @@ describe('MessageLog', () => {
       providers: ['deepseek', 'gemini'],
     };
     mockGetMessages.mockResolvedValue(dataWithChain);
-    const { container } = render(() => <MessageLog />);
+    const { container } = render(<MessageLog />);
     await vi.waitFor(() => {
       const badge = container.querySelector('[title="Fallback"]');
       expect(badge).not.toBeNull();
@@ -1502,7 +1538,7 @@ describe('MessageLog', () => {
   describe('Tier filter', () => {
     it('renders a Tier select with Playground among the options', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
         expect(selects.length).toBeGreaterThanOrEqual(2);
@@ -1527,7 +1563,7 @@ describe('MessageLog', () => {
         ],
       });
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const tierSelect = selectWithOption(container, 'All tiers');
         expect(tierSelect.textContent).toContain('Coding');
@@ -1543,7 +1579,7 @@ describe('MessageLog', () => {
 
     it('sends routing_tier in the query when a tier is selected', async () => {
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
           2,
@@ -1563,11 +1599,13 @@ describe('MessageLog', () => {
       mockGetMessages.mockResolvedValue(messagesData);
       mockGetSpecificityAssignments.mockResolvedValue([{ category: 'coding', is_active: true }]);
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
           2,
         );
+        // A <select> ignores a value it has no option for, so wait for the option.
+        expect(selectWithOption(container, 'All tiers').textContent).toContain('Coding');
       });
 
       const tierSelect = selectWithOption(container, 'All tiers');
@@ -1590,7 +1628,7 @@ describe('MessageLog', () => {
         header_tiers: [{ name: 'Premium', ids: ['ht-premium-a', 'ht-premium-b'] }],
       });
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
 
       await vi.waitFor(() => {
         const tierSelect = selectWithOption(container, 'All tiers');
@@ -1613,11 +1651,13 @@ describe('MessageLog', () => {
         header_tiers: [{ name: 'Premium', ids: ['ht-premium'] }],
       });
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
           2,
         );
+        // A <select> ignores a value it has no option for, so wait for the option.
+        expect(selectWithOption(container, 'All tiers').textContent).toContain('Premium');
       });
 
       const tierSelect = selectWithOption(container, 'All tiers');
@@ -1640,7 +1680,7 @@ describe('MessageLog', () => {
         header_tiers: [{ name: 'Premium', ids: ['ht-alpha', 'ht-beta'] }],
       });
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(selectWithOption(container, 'All tiers').textContent).toContain('Premium');
       });
@@ -1661,7 +1701,7 @@ describe('MessageLog', () => {
     it('renders agent filter dropdown in global mode (no agentName)', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
         // agent filter is the first select in global mode
@@ -1673,7 +1713,7 @@ describe('MessageLog', () => {
     it('populates agent filter with sorted agent names from getAgents()', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
         expect(selects[0].textContent).toContain('agent-alpha');
@@ -1684,7 +1724,7 @@ describe('MessageLog', () => {
     it('requests system agents so the reserved Playground agent appears in the filter', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      render(() => <MessageLog />);
+      render(<MessageLog />);
       await vi.waitFor(() => {
         expect(mockGetAgents).toHaveBeenCalledWith(true);
       });
@@ -1692,9 +1732,9 @@ describe('MessageLog', () => {
 
     it('seeds the agent filter from the ?agent= search param (View more redirect)', async () => {
       mockAgentName = '';
-      mockSearchParams = { agent: 'agent-beta' };
+      setSearch({ agent: 'agent-beta' });
       mockGetMessages.mockResolvedValue(messagesData);
-      render(() => <MessageLog />);
+      render(<MessageLog />);
       await vi.waitFor(() => {
         const lastCall = mockGetMessages.mock.calls.at(-1)![0] as Record<string, string>;
         expect(lastCall.agent_name).toBe('agent-beta');
@@ -1703,9 +1743,9 @@ describe('MessageLog', () => {
 
     it('ignores the ?agent= search param in agent-scoped mode (route param wins)', async () => {
       // mockAgentName is "test-agent" from beforeEach
-      mockSearchParams = { agent: 'agent-beta' };
+      setSearch({ agent: 'agent-beta' });
       mockGetMessages.mockResolvedValue(messagesData);
-      render(() => <MessageLog />);
+      render(<MessageLog />);
       await vi.waitFor(() => {
         const lastCall = mockGetMessages.mock.calls.at(-1)![0] as Record<string, string>;
         expect(lastCall.agent_name).toBe('test-agent');
@@ -1715,7 +1755,7 @@ describe('MessageLog', () => {
     it('does NOT render agent filter dropdown in agent-scoped mode', async () => {
       // mockAgentName is "test-agent" from beforeEach
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
         // In agent mode, no harness select renders; the first Select is the
@@ -1728,7 +1768,7 @@ describe('MessageLog', () => {
     it('passes agent_name query param when an agent is selected', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       // Wait for agentList to resolve so the options are populated
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
@@ -1756,7 +1796,7 @@ describe('MessageLog', () => {
         header_tiers: [{ name: 'Premium', ids: ['ht-premium'] }],
       });
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
           '[data-testid="select"]',
@@ -1780,9 +1820,9 @@ describe('MessageLog', () => {
 
     it('pre-seeds the agent filter from the ?agent= query param (View more deep-link)', async () => {
       mockAgentName = '';
-      mockSearchParams = { agent: 'agent-beta' };
+      setSearch({ agent: 'agent-beta' });
       mockGetMessages.mockResolvedValue(messagesData);
-      render(() => <MessageLog />);
+      render(<MessageLog />);
       await vi.waitFor(() => {
         const calls = mockGetMessages.mock.calls;
         const lastQ = calls[calls.length - 1]?.[0] ?? {};
@@ -1792,11 +1832,9 @@ describe('MessageLog', () => {
 
     it('updates the agent filter when the ?agent= query param changes', async () => {
       mockAgentName = '';
-      const [searchAgent, setSearchAgent] = createSignal<string | undefined>();
-      mockSearchAgentAccessor = searchAgent;
       mockGetMessages.mockResolvedValue(messagesData);
 
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
           '[data-testid="select"]',
@@ -1805,7 +1843,7 @@ describe('MessageLog', () => {
       });
 
       mockGetMessages.mockClear();
-      setSearchAgent('agent-beta');
+      act(() => setSearch({ ...routerState.get(), agent: 'agent-beta' }));
 
       await vi.waitFor(() => {
         const calls = mockGetMessages.mock.calls;
@@ -1821,7 +1859,7 @@ describe('MessageLog', () => {
     it("omits agent_name query param when 'All harnesses' is selected", async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       // Wait for agentList to resolve so the options are populated
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
@@ -1851,7 +1889,7 @@ describe('MessageLog', () => {
     it('includes agentFilter in hasActiveFilters so filtered-empty state appears', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       // Wait for agentList to resolve before interacting with the filter
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
@@ -1877,7 +1915,7 @@ describe('MessageLog', () => {
     it('clears agentFilter when Clear filters is clicked', async () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       // Wait for agentList to resolve before interacting with the filter
       await vi.waitFor(() => {
         const agentSelect = container.querySelectorAll(
@@ -1900,7 +1938,7 @@ describe('MessageLog', () => {
       });
       // Clear filters — restores data
       mockGetMessages.mockResolvedValue(messagesData);
-      const clearBtn = container.querySelector('.btn--outline') as HTMLButtonElement;
+      const clearBtn = container.querySelector('.message-log__clear-btn') as HTMLButtonElement;
       fireEvent.click(clearBtn);
       await vi.waitFor(() => {
         const calls = mockGetMessages.mock.calls;
@@ -1919,7 +1957,7 @@ describe('MessageLog', () => {
         throw new Error('network error');
       });
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container, unmount } = render(() => <MessageLog />);
+      const { container, unmount } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(mockGetAgents).toHaveBeenCalled();
         const selects = container.querySelectorAll('[data-testid="select"]');
@@ -1936,7 +1974,7 @@ describe('MessageLog', () => {
       mockAgentName = '';
       const bigData = { ...messagesData, total_count: 120, next_cursor: 'cursor-2' };
       mockGetMessages.mockResolvedValue(bigData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.querySelector('[data-testid="pagination-next"]')).not.toBeNull();
       });
@@ -1945,7 +1983,7 @@ describe('MessageLog', () => {
         '[data-testid="pagination-next"]',
       ) as HTMLButtonElement;
       mockGetMessages.mockResolvedValue({ ...bigData, next_cursor: null });
-      nextBtn.click();
+      fireEvent.click(nextBtn);
       await vi.waitFor(() => {
         expect(mockGetMessages).toHaveBeenCalledWith(
           expect.objectContaining({ cursor: 'cursor-2' }),
@@ -1971,7 +2009,7 @@ describe('MessageLog', () => {
       // not just that the component receives the columns array.
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('gpt-4o');
       });
@@ -1984,7 +2022,7 @@ describe('MessageLog', () => {
       // mockAgentName is "test-agent" from beforeEach — agent-scoped mode.
       // columns() returns DETAILED_COLUMNS unchanged (no 'agent' key).
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('gpt-4o');
       });
@@ -2005,7 +2043,7 @@ describe('MessageLog', () => {
         ],
       };
       mockGetMessages.mockResolvedValue(globalMessagesData);
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('alpha-bot');
         expect(container.textContent).toContain('beta-bot');
@@ -2027,7 +2065,7 @@ describe('MessageLog', () => {
         ...messagesData,
         items: [{ ...messagesData.items[0], agent_name: 'alpha-bot' }],
       });
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('alpha-bot');
         expect(container.querySelector('td img[src="/icons/openclaw.svg"]')).not.toBeNull();
@@ -2039,16 +2077,16 @@ describe('MessageLog', () => {
     it("renders 'Requests - Thinker' title without agent prefix in global mode", () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
-      const title = container.querySelector('title');
+      const { container } = render(<MessageLog />);
+      const title = document.querySelector('title');
       expect(title?.textContent).toBe('Requests - Thinker');
     });
 
     it('renders agent-scoped title in agent mode', () => {
       // mockAgentName is "test-agent" from beforeEach
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
-      const title = container.querySelector('title');
+      const { container } = render(<MessageLog />);
+      const title = document.querySelector('title');
       expect(title?.textContent).toContain('test-agent');
       expect(title?.textContent).toContain('Requests - Thinker');
     });
@@ -2056,8 +2094,8 @@ describe('MessageLog', () => {
     it("does not render 'undefined' in the title in global mode", () => {
       mockAgentName = '';
       mockGetMessages.mockResolvedValue(messagesData);
-      const { container } = render(() => <MessageLog />);
-      const title = container.querySelector('title');
+      const { container } = render(<MessageLog />);
+      const title = document.querySelector('title');
       expect(title?.textContent).not.toContain('undefined');
     });
 
@@ -2069,7 +2107,7 @@ describe('MessageLog', () => {
         total_count: 0,
         providers: [],
       });
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         // Setup modal must not be rendered when there is no agentName
         expect(container.querySelector('[data-testid="setup-modal"]')).toBeNull();
@@ -2084,7 +2122,7 @@ describe('MessageLog', () => {
         total_count: 0,
         providers: [],
       });
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('No requests yet');
         // Global empty state guides to /harnesses, not set-up-agent modal
@@ -2104,7 +2142,7 @@ describe('MessageLog', () => {
         total_count: 0,
         providers: [],
       });
-      const { container } = render(() => <MessageLog />);
+      const { container } = render(<MessageLog />);
       await vi.waitFor(() => {
         expect(container.textContent).toContain('No requests yet');
       });
@@ -2119,13 +2157,13 @@ describe('MessageLog', () => {
 
   describe('drawer deep-link (?request=)', () => {
     it('opens the side panel for the request named in the URL', async () => {
-      mockSearchParams = { request: 'msg-deeplink-1' };
-      render(() => <MessageLog />);
+      setSearch({ request: 'msg-deeplink-1' });
+      render(<MessageLog />);
       await vi.waitFor(() => {
         const drawer = screen.getByTestId('request-drawer');
         expect(drawer.getAttribute('data-message-id')).toBe('msg-deeplink-1');
       });
-      mockSearchParams = {};
+      setSearch({});
     });
   });
 });
