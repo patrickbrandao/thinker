@@ -126,6 +126,8 @@ export default {
     addFallback: '+ Add fallback ({{ count }}/{{ max }})',
     noModelsHint:
       'Optional. Without models, requests for this name fail with M301 unless Continue on Default is on.',
+    active: 'Active',
+    activeDesc: 'List it in /v1/models and route requests that send this name.',
     continueOnDefault: 'Continue on Default',
     continueDesc:
       "When every model of this chain is unavailable or fails, continue with the Default tier's models.",
@@ -138,14 +140,7 @@ export default {
   vmCard: {
     inactive: 'Inactive',
     showExample: 'Show a copyable example',
-    active: 'Active',
-    hideTitle: 'Hide from /v1/models and stop matching requests',
-    listTitle: 'List in /v1/models and match requests',
-    continueOnDefault: 'Continue on Default',
-    continueTitle: "When the chain runs out, continue with the Default tier's chain",
-    stream: 'Stream',
-    streamOnTitle: 'Responses are streamed token by token',
-    streamOffTitle: 'Responses are returned as a single payload',
+    showExampleFor: 'Show how to use {{ name }}',
     copyExample: 'Copy example',
     edit: 'Edit virtual model',
     moveUp: 'Move up',
@@ -184,8 +179,6 @@ export default {
   },
   section: {
     loadFailed: 'Failed to load virtual models',
-    isActive: '"{{ name }}" is active',
-    isInactive: '"{{ name }}" is inactive',
     deleted: 'Deleted "{{ name }}"',
     created: 'Created "{{ name }}"',
     create: 'Create virtual model',

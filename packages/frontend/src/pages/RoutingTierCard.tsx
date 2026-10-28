@@ -15,6 +15,8 @@ import { customProviderColor, formatPerRequestCost } from '../services/formatter
 import FallbackList from '../components/FallbackList.js';
 import ModelParamsAffordance from '../components/ModelParamsAffordance.jsx';
 import RouteKeyChip from '../components/RouteKeyChip.js';
+import VirtualModelTitle from '../components/VirtualModelTitle.js';
+import VirtualModelSnippetModal from '../components/VirtualModelSnippetModal.js';
 import { Button, Modal, Skel, cx } from '../components/ui.js';
 import { setFallbacks as setFallbacksApi } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
@@ -165,6 +167,7 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
   const hasFallbacks = (tier?.fallback_routes ?? []).length > 0;
   const hasCustomizations = isManual || hasFallbacks;
   const [confirmReset, setConfirmReset] = useState(false);
+  const [showExample, setShowExample] = useState(false);
   const [primaryDragging, setPrimaryDragging] = useState(false);
   const [fallbackDragging, setFallbackDragging] = useState<number | null>(null);
   const [primaryDropTarget, setPrimaryDropTarget] = useState(false);
@@ -491,12 +494,7 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
       <div className="routing-card__header flex min-h-7 items-center justify-between gap-2">
         <span className="routing-card__tier flex items-center gap-1.5 text-sm font-semibold text-ink">
           {stageId === 'default' ? (
-            <>
-              {t('routing.tierCard.virtualModelLabel')}
-              <code className="routing-card__auto rounded-control border border-accent bg-accent-tint px-1.5 py-px font-mono font-bold text-accent">
-                auto
-              </code>
-            </>
+            <VirtualModelTitle name="auto" onShowExample={() => setShowExample(true)} />
           ) : (
             stageLabel(props.stage)
           )}
@@ -599,6 +597,13 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
           </Button>
         </div>
       </Modal>
+      {showExample ? (
+        <VirtualModelSnippetModal
+          agentName={props.agentName}
+          virtualModel={{ name: 'auto', enabled: true }}
+          onClose={() => setShowExample(false)}
+        />
+      ) : null}
     </div>
   );
 }

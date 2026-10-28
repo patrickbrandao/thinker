@@ -97,6 +97,8 @@ export interface RouteChainCardProps {
   titleExtra?: ReactNode;
   /** Rendered before the name, e.g. a drag handle. */
   titleLeading?: ReactNode;
+  /** Replaces the plain name in the title. */
+  titleContent?: ReactNode;
   /** Rendered under the header, before the primary chip. */
   details?: ReactNode;
   /**
@@ -328,7 +330,9 @@ export default function RouteChainCard(props: RouteChainCardProps) {
       <div className="routing-card__header flex min-h-7 items-center justify-between gap-2">
         <span className="routing-card__tier header-tier-card__title flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink">
           {props.titleLeading}
-          <span className="header-tier-card__name truncate">{props.chain.name}</span>
+          {props.titleContent ?? (
+            <span className="header-tier-card__name truncate">{props.chain.name}</span>
+          )}
           {props.titleExtra}
           <div ref={menuRef} className="header-tier-card__kebab relative">
             <button
