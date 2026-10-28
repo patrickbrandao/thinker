@@ -1854,8 +1854,67 @@
     }
   ],
   "migrationMap": {},
-  "canonicalRules": [],
-  "ghostRules": [],
+  "canonicalRules": [
+    {
+      "selector": ".app.is-collapsed .nav-action",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "display",
+      "value": "inline-flex",
+      "file": "shell.css",
+      "line": 939
+    },
+    {
+      "selector": ".app.is-collapsed .user-trigger > svg",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "display",
+      "value": "inline-flex",
+      "file": "shell.css",
+      "line": 939
+    },
+    {
+      "selector": ".app.is-collapsed .user-trigger",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "padding",
+      "value": "6px 8px",
+      "file": "shell.css",
+      "line": 951
+    }
+  ],
+  "ghostRules": [
+    {
+      "selector": ".app.is-collapsed .nav-action",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "display",
+      "value": "revert",
+      "file": "shell.css",
+      "line": 935,
+      "losesTo": "shell.css:939"
+    },
+    {
+      "selector": ".app.is-collapsed .user-trigger > svg",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "display",
+      "value": "revert",
+      "file": "shell.css",
+      "line": 935,
+      "losesTo": "shell.css:939"
+    },
+    {
+      "selector": ".app.is-collapsed .user-trigger",
+      "media": "(max-width: 900px)",
+      "layer": "components",
+      "prop": "padding",
+      "value": "0 10px",
+      "file": "shell.css",
+      "line": 947,
+      "losesTo": "shell.css:951"
+    }
+  ],
   "componentSheets": {
     "canvas.css": [
       "pages/Topology.tsx"
@@ -1871,7 +1930,7 @@
     "darkOverrides": 50,
     "blocks": 190,
     "classes": 199,
-    "canonicalRules": 0,
-    "ghostRules": 0
+    "canonicalRules": 3,
+    "ghostRules": 3
   }
 }

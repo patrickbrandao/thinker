@@ -307,11 +307,13 @@ export default function Workspace() {
               </div>
             </Link>
             {canEdit ? (
-              <ActionMenu
-                className="agent-card__menu absolute right-2 top-2"
-                ariaLabel={t('harnesses.workspace.actionsFor', { name: agent.agent_name })}
-                items={harnessActionItems(agent.agent_name)}
-              />
+              <div className="absolute right-2 top-2">
+                <ActionMenu
+                  className="agent-card__menu"
+                  ariaLabel={t('harnesses.workspace.actionsFor', { name: agent.agent_name })}
+                  items={harnessActionItems(agent.agent_name)}
+                />
+              </div>
             ) : null}
           </div>
         );

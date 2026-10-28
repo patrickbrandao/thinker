@@ -287,9 +287,15 @@ Tabs: src/components/ui.tsx
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
-## Canonical rules — same selector+property declared twice with different values; the winner renders (0)
+## Canonical rules — same selector+property declared twice with different values; the winner renders (3)
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:939  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:939  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:951  [@media (max-width: 900px)]
 
-## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (0)
+## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (3)
+.app.is-collapsed .nav-action { display: revert }  at shell.css:935 loses to shell.css:939
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:935 loses to shell.css:939
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:947 loses to shell.css:951
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

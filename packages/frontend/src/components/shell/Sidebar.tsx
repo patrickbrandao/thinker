@@ -33,14 +33,11 @@ export default function Sidebar({
   return (
     <aside className="sidebar" aria-label={t('nav.navigation')}>
       <Link to="/overview" className="sidebar-brand" onClick={onNavigate}>
-        {collapsed ? (
-          <img src={THINKER_MARK_URL} alt="Thinker" className="logo-mark" />
-        ) : (
-          <span className="logo-word">
-            <img src={THINKER_LOGO_URL} alt="Thinker" className="logo-light" />
-            <img src={THINKER_LOGO_DARK_URL} alt="" className="logo-dark" />
-          </span>
-        )}
+        <img src={THINKER_MARK_URL} alt="" className="logo-mark" />
+        <span className="logo-word">
+          <img src={THINKER_LOGO_URL} alt="Thinker" className="logo-light" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" className="logo-dark" />
+        </span>
       </Link>
 
       <nav className="sidebar-nav" id="agent-navigation">

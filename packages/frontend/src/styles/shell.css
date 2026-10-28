@@ -61,9 +61,13 @@
     height: 22px;
   }
   .sidebar-brand .logo-mark {
+    display: none;
     width: 26px;
     height: 26px;
     flex-shrink: 0;
+  }
+  .app.is-collapsed .sidebar-brand .logo-mark {
+    display: block;
   }
   .sidebar-nav {
     flex: 1;
@@ -920,11 +924,40 @@
       transform: none;
       box-shadow: var(--shadow-float);
     }
+    /* The phone drawer always shows labels, whatever the desktop choice. */
     .app.is-collapsed .nav-label,
     .app.is-collapsed .nav-group-label,
+    .app.is-collapsed .nav-action,
     .app.is-collapsed .user-text,
+    .app.is-collapsed .user-trigger > svg,
+    .app.is-collapsed .version-tag,
     .app.is-collapsed .sidebar-brand .logo-word {
-      display: initial;
+      display: revert;
+    }
+    .app.is-collapsed .nav-action,
+    .app.is-collapsed .user-trigger > svg {
+      display: inline-flex;
+    }
+    .app.is-collapsed .sidebar-brand .logo-mark {
+      display: none;
+    }
+    .app.is-collapsed .nav-item,
+    .app.is-collapsed .user-trigger {
+      justify-content: flex-start;
+      padding: 0 10px;
+    }
+    .app.is-collapsed .user-trigger {
+      height: auto;
+      padding: 6px 8px;
+    }
+    .app.is-collapsed .sidebar-brand {
+      justify-content: flex-start;
+      padding: 0 14px;
+    }
+    .app.is-collapsed .nav-group + .nav-group {
+      margin-top: 14px;
+      padding-top: 0;
+      border-top: 0;
     }
     .mobile-only {
       display: inline-flex;
