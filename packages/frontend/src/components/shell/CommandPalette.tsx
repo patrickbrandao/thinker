@@ -14,7 +14,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Tags,
   Terminal,
   User,
 } from 'lucide-react';
@@ -45,7 +44,6 @@ const RESULT_ICONS: Record<SearchResultType, ReactNode> = {
   connection: <Plug />,
   custom_provider: <KeyRound />,
   virtual_model: <Sparkles />,
-  header_tier: <Tags />,
   model: <Box />,
   member: <User />,
 };
@@ -56,7 +54,7 @@ const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 /**
  * ⌘K palette: jump to any page, run a few shell actions, and search the
  * organization's configuration (harnesses, connections, custom providers,
- * virtual models, header tiers, models, members) by name or description.
+ * virtual models, models, members) by name or description.
  */
 export default function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();

@@ -23,7 +23,6 @@ import {
   TEST_USER_ID,
 } from './helpers';
 import { CustomProvider } from '../src/entities/custom-provider.entity';
-import { HeaderTier } from '../src/entities/header-tier.entity';
 import { PlaygroundRun } from '../src/entities/playground-run.entity';
 
 let app: INestApplication;
@@ -36,7 +35,6 @@ const B_AGENT_NAME = 'b-agent';
 const A_MESSAGE_ID = randomUUID();
 const A_RUN_ID = randomUUID();
 const A_CUSTOM_PROVIDER_ID = 'cp-isolation-a';
-const A_HEADER_TIER_ID = 'ht-isolation-a';
 let aRuleId: string;
 let aProviderConnectionId: string;
 let bAgentId: string;
@@ -108,23 +106,6 @@ beforeAll(async () => {
     api_kind: 'openai',
     models: [{ model_name: 'a-model' }],
     created_at: now,
-  });
-
-  // A header tier.
-  await ds.getRepository(HeaderTier).insert({
-    id: A_HEADER_TIER_ID,
-    tenant_id: TEST_TENANT_ID,
-    agent_id: TEST_AGENT_ID,
-    name: 'a-fast-lane',
-    header_key: 'x-thinker-tier',
-    header_value: 'fast',
-    badge_color: 'indigo',
-    sort_order: 0,
-    enabled: true,
-    override_route: null,
-    fallback_routes: null,
-    output_modality: 'text',
-    response_mode: 'buffered',
   });
 
   // A playground run, attached to tenant A's reserved Playground agent.
@@ -275,7 +256,7 @@ describe('Notifications — user B cannot read or mutate tenant A rules', () => 
 });
 
 /* ------------------------------------------------------------------ */
-/*  Routing: tiers / providers / custom providers / header tiers       */
+/*  Routing: tiers / providers / custom providers                      */
 /* ------------------------------------------------------------------ */
 describe('Routing — user B cannot reach tenant A routing config', () => {
   it('tiers endpoints on A agent → 404', async () => {
@@ -311,41 +292,15 @@ describe('Routing — user B cannot reach tenant A routing config', () => {
     expect(row).toHaveLength(1);
   });
 
-  it('header tiers on A agent → 404; A header tier id unreachable via B agent', async () => {
-    await asB(api().get('/api/v1/routing/test-agent/header-tiers')).expect(404);
-    await asB(
-      api().patch(`/api/v1/routing/${B_AGENT_NAME}/header-tiers/${A_HEADER_TIER_ID}/toggle`),
-    )
-      .send({ enabled: false })
-      .expect(404);
-    await asB(
-      api().delete(`/api/v1/routing/${B_AGENT_NAME}/header-tiers/${A_HEADER_TIER_ID}`),
-    ).expect(404);
-    const row = await ds.query(`SELECT id FROM header_tiers WHERE id = $1`, [A_HEADER_TIER_ID]);
-    expect(row).toHaveLength(1);
-  });
-
   it('stream warm-up overrides (#244): owner sets and validates, B gets 404', async () => {
-    const tierPath = `/api/v1/routing/test-agent/header-tiers/${A_HEADER_TIER_ID}/stream-warmup`;
-    const tier = await asA(api().patch(tierPath)).send({ stream_warmup_ms: 30_000 }).expect(200);
-    expect(tier.body.stream_warmup_ms).toBe(30_000);
-    await asA(api().patch(tierPath)).send({ stream_warmup_ms: 999 }).expect(400);
-    await asA(api().patch(tierPath)).send({ stream_warmup_ms: 600_001 }).expect(400);
-    await asA(api().patch(tierPath)).send({ stream_warmup_ms: null }).expect(200);
-
     const connPath = `/api/v1/providers/connections/${aProviderConnectionId}/stream-warmup`;
+    await asA(api().patch(connPath)).send({ stream_warmup_ms: 999 }).expect(400);
+    await asA(api().patch(connPath)).send({ stream_warmup_ms: 600_001 }).expect(400);
     const conn = await asA(api().patch(connPath))
       .send({ stream_warmup_ms: 120_000 })
       .expect(200);
     expect(conn.body).toEqual({ id: aProviderConnectionId, stream_warmup_ms: 120_000 });
 
-    await asB(
-      api().patch(
-        `/api/v1/routing/${B_AGENT_NAME}/header-tiers/${A_HEADER_TIER_ID}/stream-warmup`,
-      ),
-    )
-      .send({ stream_warmup_ms: 5_000 })
-      .expect(404);
     await asB(api().patch(connPath)).send({ stream_warmup_ms: 5_000 }).expect(404);
     const [row] = await ds.query(`SELECT stream_warmup_ms FROM tenant_providers WHERE id = $1`, [
       aProviderConnectionId,

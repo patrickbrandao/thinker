@@ -16,7 +16,6 @@ import { TenantProvider } from '../entities/tenant-provider.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
-import { HeaderTier } from '../entities/header-tier.entity';
 import { VirtualModel } from '../entities/virtual-model.entity';
 import { AgentModelParams } from '../entities/agent-model-params.entity';
 import { ReasoningContentCacheEntry } from '../entities/reasoning-content-cache-entry.entity';
@@ -94,7 +93,6 @@ import { SecretReencryptionService } from './secret-reencryption.service';
       TierAssignment,
       CustomProvider,
       SpecificityAssignment,
-      HeaderTier,
       VirtualModel,
       AgentModelParams,
       ReasoningContentCacheEntry,

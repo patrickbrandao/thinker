@@ -35,7 +35,6 @@ import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.s
 import { ResolveAgentService } from '../src/routing/routing-core/resolve-agent.service';
 import { ProviderService } from '../src/routing/routing-core/provider.service';
 import { TierService } from '../src/routing/routing-core/tier.service';
-import { HeaderTierService } from '../src/routing/header-tiers/header-tier.service';
 import { VirtualModelService } from '../src/routing/virtual-models/virtual-model.service';
 import { RouteModelParamsService } from '../src/routing/model-params/route-model-params.service';
 import type { McpOperator } from '../src/mcp/mcp-auth';
@@ -90,7 +89,6 @@ function routingStatus(): Promise<Record<string, unknown>> {
     resolveAgent: app.get(ResolveAgentService),
     providers: app.get(ProviderService),
     tiers: app.get(TierService),
-    headerTiers: app.get(HeaderTierService),
     virtualModels: app.get(VirtualModelService),
     routeModelParams: app.get(RouteModelParamsService),
     pricingSync: { getAll: () => new Map([['gpt-4o', {}]]) },

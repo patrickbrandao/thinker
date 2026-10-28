@@ -9,8 +9,7 @@ import type { ModelRoute, OutputModality, ResponseMode } from 'thinker-shared';
 @Entity('virtual_models')
 @Index(['agent_id', 'sort_order'])
 // The unique (agent_id, LOWER(name)) index and the agents(id) ON DELETE
-// CASCADE foreign key are declared in the AddVirtualModels migration, as for
-// header_tiers. Don't re-declare the index here with a case-sensitive
+// CASCADE foreign key are declared in the AddVirtualModels migration. Don't re-declare the index here with a case-sensitive
 // collation: schema sync would drop the migration's index in dev.
 export class VirtualModel {
   @PrimaryColumn('varchar')

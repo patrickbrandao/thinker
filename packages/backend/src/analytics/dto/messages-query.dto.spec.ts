@@ -162,12 +162,6 @@ describe('MessagesQueryDto', () => {
     expect(flat.join('\n')).toMatch(/specificity_category must be one of/);
   });
 
-  it('accepts custom header tier ids', async () => {
-    const dto = plainToInstance(MessagesQueryDto, { header_tier_id: 'ht-premium' });
-    const errors = await validate(dto);
-    expect(errors).toHaveLength(0);
-  });
-
   it('accepts each known origin filter including the thinker shorthand', async () => {
     for (const origin of ['provider', 'transport', 'config', 'policy', 'internal', 'thinker']) {
       const dto = plainToInstance(MessagesQueryDto, { origin });

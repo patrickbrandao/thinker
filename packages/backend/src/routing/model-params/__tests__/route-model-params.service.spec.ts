@@ -44,7 +44,6 @@ const FALLBACK = { provider: 'anthropic', authType: 'subscription', model: 'clau
 function setup(
   overrides: {
     tiers?: unknown[];
-    headerTiers?: unknown[];
     virtualModels?: unknown[];
     catalog?: unknown[];
     saved?: Record<string, unknown> | null;
@@ -61,15 +60,6 @@ function setup(
         },
       ],
     ),
-  };
-  const headerTiers = {
-    list: jest
-      .fn()
-      .mockResolvedValue(
-        overrides.headerTiers ?? [
-          { id: 'h1', name: 'Deep', override_route: FALLBACK, fallback_routes: [PRIMARY] },
-        ],
-      ),
   };
   const virtualModels = {
     list: jest.fn().mockResolvedValue(
@@ -102,13 +92,12 @@ function setup(
   };
   const service = new RouteModelParamsService(
     tiers as never,
-    headerTiers as never,
     virtualModels as never,
     modelParams as never,
     specs as never,
     discovery as never,
   );
-  return { service, tiers, headerTiers, virtualModels, modelParams, specs, discovery };
+  return { service, tiers, virtualModels, modelParams, specs, discovery };
 }
 
 describe('RouteModelParamsService.get', () => {
@@ -152,18 +141,9 @@ describe('RouteModelParamsService.get', () => {
     expect(view.models).toEqual(['gpt-5']);
   });
 
-  it('addresses a custom tier by name, case-insensitively, under its header scope', async () => {
-    const { service, modelParams } = setup();
-    const view = await service.get(AGENT, 'deep', 'gpt-5');
-    expect(view.tier).toBe('Deep');
-    expect(view.route).toEqual(PRIMARY);
-    expect(view.models).toEqual(['claude-sonnet', 'gpt-5']);
-    expect(modelParams.get).toHaveBeenCalledWith(AGENT, 'header:h1', 'openai', 'api_key', 'gpt-5');
-  });
-
   it('returns an empty param list for a model with no configurable params', async () => {
     const { service } = setup();
-    const view = await service.get(AGENT, 'Deep');
+    const view = await service.get(AGENT, 'default', 'claude-sonnet');
     expect(view.route).toEqual(FALLBACK);
     expect(view.params).toEqual([]);
   });
@@ -171,7 +151,7 @@ describe('RouteModelParamsService.get', () => {
   it('rejects an unknown tier and lists the available ones', async () => {
     const { service } = setup();
     await expect(service.get(AGENT, 'nope')).rejects.toThrow(NotFoundException);
-    await expect(service.get(AGENT, 'nope')).rejects.toThrow(/Available tiers: default, Deep/);
+    await expect(service.get(AGENT, 'nope')).rejects.toThrow(/Available tiers: default$/);
   });
 
   it('rejects a missing default tier row as an unknown tier', async () => {
@@ -346,7 +326,7 @@ describe('RouteModelParamsService.update', () => {
   it('says so when the model has no configurable params at all', async () => {
     const { service } = setup();
     await expect(
-      service.update(AGENT, 'Deep', undefined, { set: { temperature: 1 } }),
+      service.update(AGENT, 'default', 'claude-sonnet', { set: { temperature: 1 } }),
     ).rejects.toThrow(/claude-sonnet has no configurable params/);
   });
 
@@ -419,11 +399,9 @@ describe('RouteModelParamsService with a virtual model target', () => {
     );
   });
 
-  it('writes under the virtual:<id> scope, never the tier of the same name', async () => {
-    const { service, modelParams, headerTiers } = setup({
-      headerTiers: [
-        { id: 'h1', name: 'DeepSeek/Flash', override_route: PRIMARY, fallback_routes: null },
-      ],
+  it('writes under the virtual:<id> scope, never a tier scope', async () => {
+    const { service, modelParams } = setup({
+      tiers: [{ tier: 'default', override_route: FALLBACK, fallback_routes: null }],
     });
     const view = await service.update(AGENT, { virtual: 'deepseek/flash' }, undefined, {
       set: { 'reasoning.effort': 'low' },
@@ -436,7 +414,6 @@ describe('RouteModelParamsService with a virtual model target', () => {
       'gpt-5',
       { reasoning: { effort: 'low' } },
     );
-    expect(headerTiers.list).not.toHaveBeenCalled();
     expect(view.virtual).toBe('DeepSeek/Flash');
   });
 
@@ -464,14 +441,14 @@ describe('RouteModelParamsService with a virtual model target', () => {
 
   it('still accepts an explicit tier target object', async () => {
     const { service, modelParams } = setup();
-    const view = await service.get(AGENT, { tier: 'deep' });
-    expect(view.tier).toBe('Deep');
+    const view = await service.get(AGENT, { tier: 'default' });
+    expect(view.tier).toBe('default');
     expect(modelParams.get).toHaveBeenCalledWith(
       AGENT,
-      'header:h1',
-      'anthropic',
-      'subscription',
-      'claude-sonnet',
+      'tier:default',
+      'openai',
+      'api_key',
+      'gpt-5',
     );
   });
 });

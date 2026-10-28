@@ -59,9 +59,6 @@ export const COMMANDS: Record<string, Handler> = {
   'routing test': routing.routingTest,
   'routing fallbacks get': routing.routingFallbacksGet,
   'routing fallbacks clear': routing.routingFallbacksClear,
-  'routing custom list': routing.routingCustom.list,
-  'routing custom create': routing.routingCustom.create,
-  'routing custom delete': routing.routingCustom.delete,
   'routing virtual list': routing.routingVirtual.list,
   'routing virtual create': routing.routingVirtual.create,
   'routing virtual update': routing.routingVirtual.update,
@@ -102,9 +99,8 @@ Agents
   thinker agent list [--include-playground]
   thinker agent platforms
   thinker agent create --name <name> --platform <p> [--category <${CATEGORY_CATALOG.join('|')}>] [--key-file <path>] [--if-absent]
-  thinker agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--tier <custom>] [--recording true|false] [--force]
-    (--models is the full chain: first = route, rest = fallbacks, one entry clears fallbacks;
-     default route unless --tier names a custom tier, upserted on "x-thinker-tier: <name>";
+  thinker agent configure <name> --models <primary,fb1,fb2> --provider <p> [--auth-type <a>] [--key-label <l>] [--recording true|false] [--force]
+    (--models is the full chain of the default route: first = route, rest = fallbacks, one entry clears fallbacks;
      models are checked against the agent's discovered set — --force writes them anyway)
   thinker agent env <name> [--export]                   (dotenv/shell lines: KEY + URL; append to .env or eval)
   thinker agent setup <name> [--reveal]                 (platform setup instructions, same content as the dashboard)
@@ -133,15 +129,12 @@ Models
   thinker models <agent> [--provider <p>] [--cost] [--capabilities] (like /v1/models: bare ids; flags opt into metadata)
   thinker model prices [--provider <p>]                (install-wide price list — no agent needed)
 
-Routing readouts, custom tiers and virtual models (default-route writes go through thinker agent configure; params set writes model params)
-  thinker routing status <agent>                      (default route, custom tiers, virtual models, recording)
-  thinker routing test <agent> [prompt...] [--tier <t>] [--model <m>] [--as <platform>]
+Routing readouts and virtual models (default-route writes go through thinker agent configure; params set writes model params)
+  thinker routing status <agent>                      (default route, virtual models, recording)
+  thinker routing test <agent> [prompt...] [--model <m>] [--as <platform>]
     (one real request through the surface the agent's platform uses — anthropic-family via /v1/messages;
      --model may name a virtual model: the output then shows virtual_model and routing_reason)
   thinker routing fallbacks get|clear <agent> [--yes]
-  thinker routing custom list <agent>
-  thinker routing custom create <agent> --name <n> --model <m> --provider <p> [--auth-type <a>] [--fallbacks <m1,m2>] [--header-key <k>] [--header-value <v>] [--force]
-  thinker routing custom delete <agent> <name> --yes
   thinker routing virtual list <agent>
   thinker routing virtual create <agent> --name <n> [--model <m>] [--provider <p>] [--auth-type <a>] [--key-label <l>] [--fallback <m> ...] [--continue-on-default] [--response-mode buffered|stream]
   thinker routing virtual update <agent> <name> [--name <new>] [--model <m> [--provider <p>] [--auth-type <a>] [--key-label <l>]] [--fallback <m> ... | --clear-fallbacks] [--clear-model] [--[no-]continue-on-default] [--response-mode <r>]

@@ -5,7 +5,6 @@ import type { TenantProvider } from '../../../entities/tenant-provider.entity';
 import type { TierAssignment } from '../../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
 import type { Agent } from '../../../entities/agent.entity';
-import type { HeaderTier } from '../../../entities/header-tier.entity';
 import type { AgentEnabledProvider } from '../../../entities/agent-enabled-provider.entity';
 import type { VirtualModel } from '../../../entities/virtual-model.entity';
 import type { RoutingCacheService } from '../routing-cache.service';
@@ -124,7 +123,6 @@ function build(setup: Setup = {}) {
   const providerRepo = memoryRepo<TenantProvider>(providers);
   const tierRepo = memoryRepo<Partial<TierAssignment>>(setup.tiers ?? []);
   const specRepo = memoryRepo<Partial<SpecificityAssignment>>([]);
-  const headerRepo = memoryRepo<Partial<HeaderTier>>([]);
   const vmRepo = memoryRepo<VirtualModel>(setup.virtualModels ?? []);
   const agents = [
     { id: 'agent-a', name: 'a', tenant_id: TENANT },
@@ -146,7 +144,6 @@ function build(setup: Setup = {}) {
     tierRepo as unknown as Repository<TierAssignment>,
     specRepo as unknown as Repository<SpecificityAssignment>,
     agentRepoFor(agents) as unknown as Repository<Agent>,
-    headerRepo as unknown as Repository<HeaderTier>,
     { getByModel: jest.fn().mockReturnValue(undefined) } as unknown as ModelPricingCacheService,
     routingCache as unknown as RoutingCacheService,
     enabledRepo as unknown as Repository<AgentEnabledProvider>,

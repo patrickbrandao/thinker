@@ -12,32 +12,19 @@ import {
   requireYes,
 } from '../args';
 import { ApiClient } from '../client';
-import { assertModelsDiscovered } from './model-check';
 import { CLI_USER_AGENT } from '../version';
 
 const URL_ONLY = { strings: ['url'] } as const;
 
 /**
  * The CLI exposes only the routing surfaces Thinker keeps long-term:
- * the DEFAULT route (one model + fallbacks), CUSTOM header-triggered tiers
- * and VIRTUAL models (public names a harness sends as `model`). The
+ * the DEFAULT route (one model + fallbacks) and VIRTUAL models (public names a harness sends as `model`). The
  * deprecated complexity tiers (simple/standard/complex/reasoning) are
  * deliberately absent.
  */
 
 function agentPath(agent: string, suffix: string): string {
   return `/routing/${encodeURIComponent(agent)}${suffix}`;
-}
-
-function parseModelsList(raw: string): string[] {
-  const models = raw
-    .split(',')
-    .map((m) => m.trim())
-    .filter(Boolean);
-  if (models.length === 0) {
-    throw new CliError('missing_flag', '--fallbacks must be a comma-separated list of model ids');
-  }
-  return models;
 }
 
 interface TierAssignmentRow {
@@ -57,19 +44,9 @@ interface VirtualModelListRow {
   shadows?: unknown;
 }
 
-interface HeaderTierListRow {
-  name?: string;
-  header_key?: string;
-  header_value?: string;
-  enabled?: boolean;
-  override_route?: unknown;
-  fallback_routes?: unknown;
-}
-
 /**
  * The composite readback for everything `agent configure` writes: default
- * route + fallbacks, custom tiers with their triggers and routes, virtual
- * models with their chains, and the recording toggle. (The backend's /status endpoint only reports the
+ * route + fallbacks, virtual models with their chains, and the recording toggle. (The backend's /status endpoint only reports the
  * deprecated complexity-routing flag, so this composes the real config.)
  */
 export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
@@ -77,9 +54,8 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
 
-  const [tiers, customTiers, virtualModels, recording] = await Promise.all([
+  const [tiers, virtualModels, recording] = await Promise.all([
     client.request('GET', agentPath(agent, '/tiers')),
-    client.request('GET', agentPath(agent, '/header-tiers')),
     client.request('GET', agentPath(agent, '/virtual-models')),
     client.request('GET', agentPath(agent, '/recording')),
   ]);
@@ -87,16 +63,6 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
   const defaultTier = (Array.isArray(tiers) ? tiers : [])
     .filter((t): t is TierAssignmentRow => typeof t === 'object' && t !== null)
     .find((t) => t.tier === 'default');
-
-  const custom = (Array.isArray(customTiers) ? customTiers : [])
-    .filter((t): t is HeaderTierListRow => typeof t === 'object' && t !== null)
-    .map((t) => ({
-      name: t.name,
-      trigger: `${t.header_key}: ${t.header_value}`,
-      enabled: t.enabled,
-      route: t.override_route ?? null,
-      fallbacks: t.fallback_routes ?? [],
-    }));
 
   const virtual = (Array.isArray(virtualModels) ? virtualModels : [])
     .filter((v): v is VirtualModelListRow => typeof v === 'object' && v !== null)
@@ -126,7 +92,6 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
       route: defaultTier?.override_route ?? null,
       fallbacks: defaultTier?.fallback_routes ?? [],
     },
-    custom_tiers: custom,
     virtual_models: virtual,
     // `default` is what model "auto" routes to; these say whether requests
     // naming a virtual model route even when it is empty.
@@ -150,145 +115,6 @@ export async function routingFallbacksClear(io: CliIo, argv: string[]): Promise<
   const { client } = clientFromFlags(io, args);
   printJson(io, await client.request('DELETE', agentPath(agent, '/tiers/default/fallbacks')));
 }
-
-interface HeaderTierRow {
-  id?: string;
-  name?: string;
-}
-
-async function findCustomTier(
-  client: ApiClient,
-  agent: string,
-  nameOrId: string,
-): Promise<{ id: string; name: string }> {
-  const rows = (await client.request('GET', agentPath(agent, '/header-tiers'))) as unknown;
-  const list = (Array.isArray(rows) ? rows : []).filter(
-    (t): t is HeaderTierRow => typeof t === 'object' && t !== null,
-  );
-  const needle = nameOrId.toLowerCase();
-  const hit = list.find(
-    (t) => t.id === nameOrId || (typeof t.name === 'string' && t.name.toLowerCase() === needle),
-  );
-  if (!hit?.id) {
-    throw new CliError(
-      'not_found',
-      `No custom tier "${nameOrId}" on agent "${agent}"`,
-      'See thinker routing custom list',
-      404,
-    );
-  }
-  return { id: hit.id, name: typeof hit.name === 'string' ? hit.name : hit.id };
-}
-
-export const routingCustom = {
-  list: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
-    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
-    const { client } = clientFromFlags(io, args);
-    printJson(io, await client.request('GET', agentPath(agent, '/header-tiers')));
-  },
-
-  /**
-   * Create a custom tier and route it in one command. The tier triggers on
-   * `<header-key>: <header-value>` (defaults: x-thinker-tier: <name>), so a
-   * caller opts in per request with a single header.
-   *
-   * Models are validated against the agent's discovered set — the same gate
-   * `agent configure` applies, so the two ways of writing a route cannot
-   * disagree — and the check runs BEFORE the tier is created so a typo does
-   * not leave an unrouted tier behind. --force skips it.
-   */
-  create: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, {
-      strings: [
-        'url',
-        'name',
-        'model',
-        'provider',
-        'auth-type',
-        'fallbacks',
-        'header-key',
-        'header-value',
-      ],
-      booleans: ['force'],
-      maxPositionals: 1,
-    });
-    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
-    const name = requireString(args, 'name');
-    const model = requireString(args, 'model');
-    const provider = requireString(args, 'provider');
-    const fallbackModels = args.strings['fallbacks']
-      ? parseModelsList(args.strings['fallbacks'])
-      : [];
-    const { client } = clientFromFlags(io, args);
-    const normalized = await assertModelsDiscovered(
-      client,
-      agent,
-      [model, ...fallbackModels],
-      Boolean(args.booleans['force']),
-      provider,
-      args.strings['auth-type'] ?? 'api_key',
-    );
-    const routeModel = normalized[0];
-    const normalizedFallbacks = normalized.slice(1);
-
-    const tier = (await client.request('POST', agentPath(agent, '/header-tiers'), {
-      body: {
-        name,
-        header_key: args.strings['header-key'] ?? 'x-thinker-tier',
-        header_value: args.strings['header-value'] ?? name,
-        badge_color: 'indigo',
-      },
-    })) as { id: string };
-
-    const route = { model: routeModel, provider, authType: args.strings['auth-type'] ?? 'api_key' };
-    let routeResult: unknown;
-    let fallbacks: unknown;
-    try {
-      routeResult = await client.request(
-        'PUT',
-        agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/override`),
-        { body: route },
-      );
-      if (normalizedFallbacks.length > 0) {
-        fallbacks = await client.request(
-          'PUT',
-          agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/fallbacks`),
-          { body: { models: normalizedFallbacks } },
-        );
-      }
-    } catch (error) {
-      // Roll back the tier so a failed route-write does not leave an enabled,
-      // unrouted tier behind. Best-effort: surface the original error.
-      await client
-        .request('DELETE', agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}`))
-        .catch(() => undefined);
-      throw error;
-    }
-    printJson(io, {
-      agent,
-      tier,
-      route: routeResult,
-      ...(fallbacks !== undefined ? { fallbacks } : {}),
-    });
-  },
-
-  delete: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 2 });
-    const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
-    const nameOrId = requirePositional(args, 1, '<tier-name-or-id>');
-    const { client } = clientFromFlags(io, args);
-    const tier = await findCustomTier(client, agent, nameOrId);
-    requireYes(args, `delete custom tier "${tier.name}" of "${agent}"`);
-    printJson(
-      io,
-      await client.request(
-        'DELETE',
-        agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}`),
-      ),
-    );
-  },
-};
 
 interface VirtualModelRow {
   id?: string;
@@ -672,7 +498,7 @@ function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): bo
  * real failures so a broken route can never look like an answer.
  */
 export async function routingTest(io: CliIo, argv: string[]): Promise<number | void> {
-  const args = parseArgs(argv, { strings: ['url', 'tier', 'model', 'as'] });
+  const args = parseArgs(argv, { strings: ['url', 'model', 'as'] });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const prompt = args.positionals.slice(1).join(' ').trim() || 'Reply with exactly: OK';
 
@@ -740,7 +566,6 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
         // gateway's caller_attribution. Same value ApiClient sends.
         'User-Agent': CLI_USER_AGENT,
         ...(surface === 'messages' ? { 'anthropic-version': '2023-06-01' } : {}),
-        ...(args.strings['tier'] ? { 'x-thinker-tier': args.strings['tier'] } : {}),
       },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
@@ -812,7 +637,6 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
     surface,
     ...(platform ? { platform } : {}),
     requested_model: (requestBody as { model: string }).model,
-    ...(args.strings['tier'] ? { tier: args.strings['tier'] } : {}),
     ...(routingReason ? { routing_reason: routingReason } : {}),
     ...(virtualModel ? { virtual_model: virtualModel } : {}),
     served_model: result.servedModel,
@@ -848,7 +672,7 @@ export const routingRecording = toggleCommand('recording');
 /**
  * Where the params of the selected route live: `--tier` (a tier name, the
  * default tier when omitted) or `--virtual` (a virtual model name). The two
- * are exclusive: a custom tier and a virtual model may share a name.
+ * are exclusive: a tier and a virtual model may share a name.
  */
 function paramsRequest(
   agent: string,
@@ -860,7 +684,7 @@ function paramsRequest(
     throw new CliError(
       'invalid_flag',
       'Pass --tier or --virtual, not both',
-      '--tier names a tier (default or a custom tier), --virtual a virtual model',
+      '--tier names a tier (default), --virtual a virtual model',
     );
   }
   if (virtual !== undefined) {
@@ -897,11 +721,11 @@ function parseParamAssignment(raw: string): [string, unknown] {
 
 /**
  * Model params of one routed model, addressed as tier + model: `--tier` is
- * `default` (the default) or a custom tier's name, or `--virtual` names a
+ * `default` (the default), or `--virtual` names a
  * virtual model instead; `--model` defaults to the primary and may name one
  * of its fallbacks. Saved params override the values the calling app sends,
- * on requests Thinker routes (`model: "auto"`, a virtual model name, or a
- * matching custom-tier header); a request naming a model skips them.
+ * on requests Thinker routes (`model: "auto"` or a virtual model name); a
+ * request naming a model skips them.
  */
 export const routingParams = {
   get: async (io: CliIo, argv: string[]): Promise<void> => {

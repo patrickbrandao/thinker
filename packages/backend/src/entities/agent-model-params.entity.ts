@@ -7,8 +7,8 @@ import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
  * `tier_assignments.param_defaults` / `specificity_assignments.param_defaults`
  * blobs: params now travel with the scoped route identity (`scope_key`,
  * `provider`, `model`, `auth_type`). The same model can be configured
- * differently in the default/complexity tiers, task-specific tiers, and
- * custom header tiers.
+ * differently in the default/complexity tiers, task-specific tiers and
+ * virtual models.
  *
  * `keyLabel` is intentionally NOT part of the unique key — provider API
  * knobs like `thinking` don't differ by which API key is used. If a future

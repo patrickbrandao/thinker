@@ -71,7 +71,7 @@ export interface RouteChain {
 export interface RouteChainCardProps {
   agentName: string;
   chain: RouteChain;
-  /** Modifier class on the card root, e.g. `routing-card--header-tier`. */
+  /** Modifier class on the card root, e.g. `routing-card--virtual-model`. */
   cardClass: string;
   /** Extra classes toggled on the card root. */
   classList?: Record<string, boolean>;
@@ -103,8 +103,7 @@ export interface RouteChainCardProps {
    * Per-route params getter, threaded from the routing page boundary. When
    * present, the primary chip and every fallback row render a
    * `<ModelParamsAffordance>` for their own `(provider, authType, model)`
-   * tuple. Closes the gap where the custom (header-tier) routing surface
-   * had no params support at all.
+   * tuple.
    */
   getModelParams?: (
     scope: string,

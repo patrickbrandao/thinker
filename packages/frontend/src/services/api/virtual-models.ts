@@ -9,7 +9,7 @@ import type {
 
 /**
  * Admin API for virtual models (ADR 0004): `/api/v1/routing/:agent/virtual-models`.
- * Same shape as the header-tier client, plus `continue_on_default` and the
+ * Chain fields plus `continue_on_default` and the
  * `shadows` / `context_length` values the backend computes on read.
  */
 export type VirtualModel = VirtualModelView;
@@ -89,7 +89,7 @@ export function reorderVirtualModels(agentName: string, ids: string[]) {
   });
 }
 
-/** Same body as the header-tier override: a structured `route` wins when present. */
+/** A structured `route` wins when present. */
 export function setVirtualModelOverride(
   agentName: string,
   id: string,

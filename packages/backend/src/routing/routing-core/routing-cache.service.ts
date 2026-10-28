@@ -3,7 +3,6 @@ import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
-import { HeaderTier } from '../../entities/header-tier.entity';
 import { VirtualModel } from '../../entities/virtual-model.entity';
 import { AgentModelParams } from '../../entities/agent-model-params.entity';
 
@@ -52,7 +51,6 @@ export class RoutingCacheService {
   private readonly customProviders = new Map<string, CachedEntry<CustomProvider[]>>();
   private readonly providerKeys = new Map<string, CachedEntry<CachedProviderKey[]>>();
   private readonly specificity = new Map<string, CachedEntry<SpecificityAssignment[]>>();
-  private readonly headerTiers = new Map<string, CachedEntry<HeaderTier[]>>();
   private readonly virtualModels = new Map<string, CachedEntry<VirtualModel[]>>();
   private readonly modelParams = new Map<string, CachedEntry<AgentModelParams[]>>();
 
@@ -138,14 +136,6 @@ export class RoutingCacheService {
     setWithEviction(this.specificity, agentId, data);
   }
 
-  getHeaderTiers(agentId: string): HeaderTier[] | null {
-    return getOrExpire(this.headerTiers, agentId) ?? null;
-  }
-
-  setHeaderTiers(agentId: string, data: HeaderTier[]): void {
-    setWithEviction(this.headerTiers, agentId, data);
-  }
-
   getVirtualModels(agentId: string): VirtualModel[] | null {
     return getOrExpire(this.virtualModels, agentId) ?? null;
   }
@@ -188,7 +178,6 @@ export class RoutingCacheService {
   invalidateAgent(agentId: string): void {
     this.tiers.delete(agentId);
     this.specificity.delete(agentId);
-    this.headerTiers.delete(agentId);
     // Virtual models read the default tier's chain (continue_on_default), and
     // every tier write funnels through here, so they drop together.
     this.virtualModels.delete(agentId);

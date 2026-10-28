@@ -15,6 +15,7 @@ import { TenantProviders1792500000000 } from '../src/database/migrations/1792500
 import { TenantScopedConfigs1792600000000 } from '../src/database/migrations/1792600000000-TenantScopedConfigs';
 import { DropUserScopeFromRouting1792700000000 } from '../src/database/migrations/1792700000000-DropUserScopeFromRouting';
 import { AddRequestsAndProviderAttempts1801000000000 } from '../src/database/migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { DropHeaderTiers1804100000000 } from '../src/database/migrations/1804100000000-DropHeaderTiers';
 import { resolveE2eDatabaseUrl } from './e2e-db-guard';
 
 const USER = 'mig-user-1';
@@ -67,6 +68,9 @@ describe('Tenant-canonical scoping migrations — data backfill (e2e)', () => {
     await ds.initialize();
     await ds.runMigrations({ transaction: 'each' });
 
+    // header_tiers is dropped by a later migration; restore it so the older
+    // tenant migrations below can revert and re-apply against it.
+    await runDown(ds, new DropHeaderTiers1804100000000());
     await runDown(ds, new AddRequestsAndProviderAttempts1801000000000());
 
     // Revert the four tenant migrations, newest first → pre-tenant schema

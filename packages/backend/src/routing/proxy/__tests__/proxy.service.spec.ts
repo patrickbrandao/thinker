@@ -86,12 +86,7 @@ describe('ProxyService — orchestration', () => {
   let resolveService: jest.Mocked<
     Pick<
       ResolveService,
-      | 'resolve'
-      | 'resolveLazy'
-      | 'resolveForTier'
-      | 'resolveHeaderTier'
-      | 'resolveVirtualModel'
-      | 'pinRouteKeyLabel'
+      'resolve' | 'resolveLazy' | 'resolveForTier' | 'resolveVirtualModel' | 'pinRouteKeyLabel'
     >
   >;
   let providerKeyService: jest.Mocked<
@@ -147,7 +142,6 @@ describe('ProxyService — orchestration', () => {
         );
       }),
       resolveForTier: jest.fn(),
-      resolveHeaderTier: jest.fn().mockResolvedValue(null),
       resolveVirtualModel: jest.fn().mockResolvedValue(null),
       // Default: no connection pin configured — the route passes through.
       // Tests that exercise pinning override this per case.
@@ -1127,36 +1121,7 @@ describe('ProxyService — orchestration', () => {
       expect(result.meta.thinker_error_code).toBeUndefined();
     });
 
-    // A header rule is an override the operator configured on purpose; the
-    // `model` field is mandatory in every OpenAI SDK, so it cannot outrank it.
-    it('lets a matching header tier outrank the explicit model', async () => {
-      modelDiscovery.getModelsForAgent.mockResolvedValue([
-        discoveredModel({ id: 'gpt-4o-mini', provider: 'openai', authType: 'api_key' }),
-      ]);
-      resolveService.resolveHeaderTier.mockResolvedValue({
-        tier: 'standard',
-        route: route('openai', 'api_key', 'gpt-5.4-nano'),
-        fallback_routes: null,
-        confidence: 1,
-        score: 0,
-        reason: 'header-match',
-        header_tier_id: 'ht-1',
-        header_tier_name: 'Groceries',
-      });
-
-      await svc.proxyRequest(
-        baseOpts({
-          body: { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }] },
-          headers: { 'x-thinker-tag': 'groceries' },
-        }),
-      );
-
-      expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: 'openai', model: 'gpt-5.4-nano' }),
-      );
-    });
-
-    it('routes the explicit model when no header tier matches', async () => {
+    it('routes the explicit model named in the body', async () => {
       modelDiscovery.getModelsForAgent.mockResolvedValue([
         discoveredModel({ id: 'gpt-4o-mini', provider: 'openai', authType: 'api_key' }),
       ]);
@@ -1164,11 +1129,9 @@ describe('ProxyService — orchestration', () => {
       await svc.proxyRequest(
         baseOpts({
           body: { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }] },
-          headers: { 'x-thinker-tag': 'unmatched' },
         }),
       );
 
-      expect(resolveService.resolveHeaderTier).toHaveBeenCalled();
       expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'openai', model: 'gpt-4o-mini' }),
       );
@@ -2831,30 +2794,17 @@ describe('ProxyService — orchestration', () => {
     const named = (model: string, extra: Record<string, unknown> = {}) =>
       baseOpts({ body: { model, messages: [{ role: 'user', content: 'hi' }] }, ...extra });
 
-    it('routes a matching virtual model ahead of a matching header tier', async () => {
+    it('routes a matching virtual model ahead of the explicit model', async () => {
       resolveService.resolveVirtualModel.mockResolvedValue(virtualResolved());
-      resolveService.resolveHeaderTier.mockResolvedValue({
-        tier: 'standard',
-        route: route('anthropic', 'api_key', 'claude-opus-4-6'),
-        fallback_routes: null,
-        confidence: 1,
-        score: 0,
-        reason: 'header-match',
-        header_tier_id: 'ht-1',
-        header_tier_name: 'Deep',
-      });
       fallbackService.tryForwardToProvider.mockResolvedValue(ok());
 
-      const result = await svc.proxyRequest(
-        named('deepseek/flash', { headers: { 'x-thinker-tier': 'deep' } }),
-      );
+      const result = await svc.proxyRequest(named('deepseek/flash'));
 
       expect(resolveService.resolveVirtualModel).toHaveBeenCalledWith(
         'agent-1',
         'tenant-1',
         'deepseek/flash',
       );
-      expect(resolveService.resolveHeaderTier).not.toHaveBeenCalled();
       expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'openai', model: 'gpt-4o' }),
       );
@@ -2865,47 +2815,22 @@ describe('ProxyService — orchestration', () => {
         virtual_model_id: 'vm-1',
         virtual_model_name: 'DeepSeek/Flash',
       });
-      expect(result.meta.header_tier_id).toBeUndefined();
     });
 
-    it('falls through to the header tier, then to the explicit model, when no virtual matches', async () => {
+    it('falls through to the explicit model when no virtual matches', async () => {
       modelDiscovery.getModelsForAgent.mockResolvedValue([
         discoveredModel({ id: 'gpt-4o-mini', provider: 'openai', authType: 'api_key' }),
       ]);
       fallbackService.tryForwardToProvider.mockResolvedValue(ok());
 
-      const result = await svc.proxyRequest(
-        named('gpt-4o-mini', { headers: { 'x-thinker-tier': 'nothing' } }),
-      );
+      const result = await svc.proxyRequest(named('gpt-4o-mini'));
 
       expect(resolveService.resolveVirtualModel).toHaveBeenCalled();
-      expect(resolveService.resolveHeaderTier).toHaveBeenCalled();
       expect(result.meta.tier).toBe('direct');
       expect(result.meta.virtual_model_id).toBeUndefined();
     });
 
-    it('applies a header tier to auto without consulting virtual models', async () => {
-      resolveService.resolveHeaderTier.mockResolvedValue({
-        tier: 'standard',
-        route: route('anthropic', 'api_key', 'claude-opus-4-6'),
-        fallback_routes: null,
-        confidence: 1,
-        score: 0,
-        reason: 'header-match',
-        header_tier_id: 'ht-1',
-      });
-      fallbackService.tryForwardToProvider.mockResolvedValue(ok());
-
-      const result = await svc.proxyRequest(
-        named('auto', { headers: { 'x-thinker-tier': 'deep' } }),
-      );
-
-      expect(resolveService.resolveVirtualModel).not.toHaveBeenCalled();
-      expect(resolveService.resolve).not.toHaveBeenCalled();
-      expect(result.meta.reason).toBe('header-match');
-    });
-
-    it('sends an auto heartbeat to the simple tier even with a header tier header', async () => {
+    it('sends an auto heartbeat to the simple tier', async () => {
       resolveService.resolveForTier.mockResolvedValue({
         tier: 'simple',
         route: route('openai', 'api_key', 'gpt-4o-mini'),
@@ -2919,11 +2844,9 @@ describe('ProxyService — orchestration', () => {
       await svc.proxyRequest(
         baseOpts({
           body: { messages: [{ role: 'user', content: 'HEARTBEAT_OK' }] },
-          headers: { 'x-thinker-tier': 'deep' },
         }),
       );
 
-      expect(resolveService.resolveHeaderTier).not.toHaveBeenCalled();
       expect(resolveService.resolveForTier).toHaveBeenCalledWith('agent-1', 'tenant-1', 'simple');
     });
 

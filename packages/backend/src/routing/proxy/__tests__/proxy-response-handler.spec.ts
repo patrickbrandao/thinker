@@ -211,7 +211,7 @@ describe('proxy-response-handler', () => {
     it('forwards meta.reason so single-shot upstream errors keep routing_reason', async () => {
       const { res } = mockResponse();
       const recorder = mockRecorder();
-      const meta = makeMeta({ reason: 'header-match' });
+      const meta = makeMeta({ reason: 'specificity' });
       const metaHeaders = buildMetaHeaders(meta);
 
       await handleProviderError(
@@ -229,7 +229,7 @@ describe('proxy-response-handler', () => {
         testCtx,
         500,
         'oops',
-        expect.objectContaining({ reason: 'header-match' }),
+        expect.objectContaining({ reason: 'specificity' }),
       );
     });
 
@@ -3139,7 +3139,7 @@ describe('proxy-response-handler', () => {
       const meta = makeMeta({
         fallbackFromModel: 'claude-sonnet-4',
         primaryProvider: 'anthropic',
-        reason: 'header-match',
+        reason: 'specificity',
       });
       const failedFallbacks: FailedFallback[] = [
         { model: 'x', provider: 'y', fallbackIndex: 0, status: 500, errorBody: '' },
@@ -3150,7 +3150,7 @@ describe('proxy-response-handler', () => {
         'standard',
         'claude-sonnet-4',
         failedFallbacks,
-        expect.objectContaining({ reason: 'header-match' }),
+        expect.objectContaining({ reason: 'specificity' }),
       );
     });
 

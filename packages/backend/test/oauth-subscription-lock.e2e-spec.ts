@@ -23,7 +23,6 @@ import { TenantProvider } from '../src/entities/tenant-provider.entity';
 import { TierAssignment } from '../src/entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../src/entities/specificity-assignment.entity';
 import { Agent } from '../src/entities/agent.entity';
-import { HeaderTier } from '../src/entities/header-tier.entity';
 import { AgentEnabledProvider } from '../src/entities/agent-enabled-provider.entity';
 import type { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
 import type { ModelPricingCacheService } from '../src/model-prices/model-pricing-cache.service';
@@ -57,7 +56,6 @@ describe('withSubscriptionCredentialLock — real Postgres (e2e)', () => {
       dataSource.getRepository(TierAssignment),
       dataSource.getRepository(SpecificityAssignment),
       dataSource.getRepository(Agent),
-      dataSource.getRepository(HeaderTier),
       { getByModel: jest.fn() } as unknown as ModelPricingCacheService,
       routingCache,
       dataSource.getRepository(AgentEnabledProvider),

@@ -10,7 +10,6 @@ import { TenantProvider } from '../../../entities/tenant-provider.entity';
 import { TierAssignment } from '../../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
 import { Agent } from '../../../entities/agent.entity';
-import { HeaderTier } from '../../../entities/header-tier.entity';
 import { AgentEnabledProvider } from '../../../entities/agent-enabled-provider.entity';
 import type { Repository } from 'typeorm';
 import type { RoutingCacheService } from '../routing-cache.service';
@@ -67,7 +66,6 @@ function makeHarness(row: LockRow | null) {
     makeRepo() as unknown as Repository<TierAssignment>,
     makeRepo() as unknown as Repository<SpecificityAssignment>,
     makeRepo() as unknown as Repository<Agent>,
-    makeRepo() as unknown as Repository<HeaderTier>,
     { getByModel: jest.fn() } as unknown as ModelPricingCacheService,
     routingCache as unknown as RoutingCacheService,
     makeRepo() as unknown as Repository<AgentEnabledProvider>,

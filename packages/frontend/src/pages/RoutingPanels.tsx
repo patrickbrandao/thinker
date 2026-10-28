@@ -4,7 +4,7 @@ import { providerIcon, customProviderLogo } from '../components/ProviderIcon.js'
 import { customProviderColor } from '../services/formatters.js';
 import { authBadgeFor, authLabel } from '../components/AuthBadge.js';
 import type { RoutingProvider, CustomProviderData } from '../services/api.js';
-import { Button, Skel } from '../components/ui.js';
+import { Skel } from '../components/ui.js';
 import { t } from '../i18n/index.js';
 
 /** Skeleton placeholder rendered while routing data is loading. */
@@ -129,56 +129,6 @@ export function ActiveProviderIcons({
         })}
       </span>
       <span>{t('routing.panels.connections', activeProviders.length)}</span>
-    </div>
-  );
-}
-
-export interface RoutingFooterProps {
-  hasOverrides: boolean;
-  resettingAll: boolean;
-  resettingTier: string | null;
-  onResetAll: () => void;
-  onShowInstructions: () => void;
-  onShowHowRoutingWorks?: () => void;
-}
-
-/** Footer bar with reset-all and setup instructions buttons. */
-export function RoutingFooter(props: RoutingFooterProps) {
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-      {props.hasOverrides ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => props.onResetAll()}
-          disabled={props.resettingAll || props.resettingTier !== null}
-          aria-label={t('routing.panels.resetAll')}
-        >
-          {props.resettingAll ? (
-            <span className="spinner" aria-hidden="true" />
-          ) : (
-            t('routing.panels.resetAll')
-          )}
-        </Button>
-      ) : null}
-      <div className="flex-1" />
-      {props.onShowHowRoutingWorks ? (
-        <>
-          <button
-            type="button"
-            className="link-action"
-            onClick={() => props.onShowHowRoutingWorks?.()}
-          >
-            {t('routing.howRoutingWorks')}
-          </button>
-          <span className="text-faint" aria-hidden="true">
-            |
-          </span>
-        </>
-      ) : null}
-      <button type="button" className="link-action" onClick={() => props.onShowInstructions()}>
-        {t('routing.panels.setupInstructions')}
-      </button>
     </div>
   );
 }

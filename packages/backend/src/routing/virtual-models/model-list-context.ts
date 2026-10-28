@@ -79,9 +79,8 @@ export interface AutoContextInput {
  * - Complexity routing off: the Default tier's chain (legacy auto-assigned
  *   route included).
  * - Complexity routing on: the minimum across every destination `auto` can
- *   reach without a header: the simple, standard, complex, reasoning and
- *   default slots, plus the active specificity assignments. Header tiers stay
- *   out, since they need a header.
+ *   reach: the simple, standard, complex, reasoning and default slots, plus
+ *   the active specificity assignments.
  * Null (omitted) when a window is unknown or nothing can serve the request.
  * Context-aware routing (#134) moves a too-large request past routes it
  * overflows, but only when another route fits, so the floor stays the size

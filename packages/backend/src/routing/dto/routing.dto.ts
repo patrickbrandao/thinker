@@ -258,7 +258,7 @@ export class SetResponseModeDto {
 }
 
 /**
- * Body for setting a header tier's or a connection's stream warm-up override.
+ * Body for setting a connection's stream warm-up override.
  * The field is required: an integer in ms within the bounds, or null to clear.
  */
 export class SetStreamWarmupDto {
@@ -282,4 +282,47 @@ export class UpdateRecordingDto {
 export class UpdateModelListingDto {
   @IsIn(MODEL_LISTING_MODES)
   mode!: ModelListingMode;
+}
+
+/** Body for pinning a routing point (e.g. a virtual model) to one model route. */
+export class OverrideBody {
+  @IsString()
+  @IsNotEmpty()
+  model!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  provider?: string;
+
+  @IsOptional()
+  @IsIn(AUTH_TYPES)
+  authType?: 'api_key' | 'subscription' | 'local';
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(MAX_PROVIDER_KEY_LABEL_LENGTH)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  providerKeyLabel?: string;
+
+  // Validate the nested route shape so a malformed payload can't bypass the
+  // legacy field validators above by being smuggled in through `route`.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ModelRouteDto)
+  route?: ModelRouteDto;
+}
+
+export class FallbacksBody {
+  @IsArray()
+  @IsString({ each: true })
+  models!: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => ModelRouteDto)
+  routes?: ModelRouteDto[];
 }

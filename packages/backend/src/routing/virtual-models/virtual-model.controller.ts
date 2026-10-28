@@ -11,8 +11,12 @@ import {
 } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
 import { ResolveAgentService } from '../routing-core/resolve-agent.service';
-import { SetResponseModeDto, responseModeFromDto } from '../dto/routing.dto';
-import { FallbacksBody, OverrideBody } from '../header-tiers/header-tier.controller';
+import {
+  FallbacksBody,
+  OverrideBody,
+  SetResponseModeDto,
+  responseModeFromDto,
+} from '../dto/routing.dto';
 import { VirtualModelService } from './virtual-model.service';
 import {
   CreateVirtualModelDto,
@@ -23,8 +27,7 @@ import {
 import { MinRole } from '../../common/decorators/roles.decorator';
 
 /**
- * Admin API for virtual models (ADR 0004), in parity with
- * `header-tiers`. The agent is resolved inside the caller's tenant first, and
+ * Admin API for virtual models (ADR 0004). The agent is resolved inside the caller's tenant first, and
  * the service scopes every row to that agent, so another agent's or tenant's
  * id is a 404.
  */

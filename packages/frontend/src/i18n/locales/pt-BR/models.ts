@@ -188,18 +188,12 @@ const ptBR: Catalog<typeof en> = {
     default: 'Use um deles como nome do modelo em vez de {{ a }}.',
   },
   section: {
-    title: 'Modelos virtuais',
-    subtitle:
-      'Nomes de modelo que este harness pode enviar no campo "model", cada um com o próprio modelo e fallbacks. Não precisa de header: eles aparecem em /v1/models e têm prioridade sobre os níveis personalizados.',
     loadFailed: 'Não foi possível carregar os modelos virtuais',
     isActive: '"{{ name }}" está ativo',
     isInactive: '"{{ name }}" está inativo',
     deleted: '"{{ name }}" excluído',
     created: '"{{ name }}" criado',
     create: 'Criar modelo virtual',
-    emptyTitle: 'Nenhum modelo virtual ainda',
-    emptyDesc:
-      'Crie um nome como {{ example }} e escolha os modelos dele. Clientes que só escolhem um modelo, como o Claude Code ou um seletor de /v1/models, poderão usá-lo.',
     reorder: 'Reordenar {{ name }}. Arraste ou use as setas do teclado.',
     dragToReorder: 'Arraste para reordenar',
   },

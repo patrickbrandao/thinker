@@ -59,10 +59,9 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 ### Ordem de resolução
 
 1. Modelo virtual ativo cujo nome é igual ao `model` (veja [Modelos virtuais](#modelos-virtuais)).
-2. Tier customizado por cabeçalho, se alguma regra casar. Um heartbeat `auto` pula este passo e vai direto ao tier `simple`.
-3. `model` explícito no corpo da requisição (`auto` pede o roteamento do Thinker).
-4. Pontuação de complexidade (se ligada) e atribuição de tier.
-5. Resolução do provedor e do modelo, e encaminhamento.
+2. `model` explícito no corpo da requisição (`auto` pede o roteamento do Thinker). Um heartbeat `auto` vai direto ao tier `simple`.
+3. Pontuação de complexidade (se ligada) e atribuição de tier.
+4. Resolução do provedor e do modelo, e encaminhamento.
 
 ### `model` explícito
 
@@ -76,15 +75,11 @@ Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, respo
 - Se **todas** as tentativas falham, o cliente recebe o erro do provedor da última tentativa. Isso é um erro do provedor, não um código `M###`.
 - Deixe `PROVIDER_TIMEOUT_MS` abaixo do timeout do cliente para o fallback ter tempo de rodar.
 
-**Warm-up do streaming.** A espera pelo primeiro trecho de uma resposta em streaming pode ser ajustada por tier customizado (modal do tier) e por conexão de provedor (botão de gerenciar na página da conexão; para provedores customizados, no formulário de edição), no campo opcional "Stream warm-up (seconds)", de 1 a 600 segundos. Vale o mais específico: o valor do tier por cabeçalho, depois o da conexão que atende a tentativa, depois `THINKER_LOCAL_STREAM_WARMUP_MS` (padrão 60 s) para runners locais e, por fim, `STREAM_WARMUP_MS` (padrão 15 s). Campo vazio herda o próximo nível. Na API, o campo é `stream_warmup_ms` em milissegundos (1000 a 600000; `null` limpa): `PATCH /api/v1/routing/:agente/header-tiers/:id/stream-warmup`, `PATCH /api/v1/providers/connections/:id/stream-warmup` e `PUT /api/v1/routing/:agente/custom-providers/:id`. Só administradores da organização alteram esses valores.
-
-## Tiers customizados por cabeçalho
-
-Além dos tiers padrão, você pode criar tiers que se ativam por um cabeçalho da requisição (por exemplo `x-thinker-tier: premium`), cada um com modelo principal e fallbacks. Quando uma regra casa, ela tem prioridade sobre o `model` do corpo e sobre a complexidade, mas perde para um [modelo virtual](#modelos-virtuais) com o mesmo nome do `model`. O dashboard e a CLI (`thinker routing`) criam e editam essas regras.
+**Warm-up do streaming.** A espera pelo primeiro trecho de uma resposta em streaming pode ser ajustada por conexão de provedor (botão de gerenciar na página da conexão; para provedores customizados, no formulário de edição), no campo opcional "Stream warm-up (seconds)", de 1 a 600 segundos. Vale o mais específico: o valor da conexão que atende a tentativa, depois `THINKER_LOCAL_STREAM_WARMUP_MS` (padrão 60 s) para runners locais e, por fim, `STREAM_WARMUP_MS` (padrão 15 s). Campo vazio herda o próximo nível. Na API, o campo é `stream_warmup_ms` em milissegundos (1000 a 600000; `null` limpa): `PATCH /api/v1/providers/connections/:id/stream-warmup` e `PUT /api/v1/routing/:agente/custom-providers/:id`. Só administradores da organização alteram esses valores.
 
 ## Modelos virtuais
 
-Um **modelo virtual** é um nome público que você cria em um harness, com uma cadeia própria de modelos. O harness manda esse nome no campo `model`, e o Thinker roteia pela cadeia, sem cabeçalho. Serve para harnesses que escolhem o modelo pelo nome e não deixam enviar cabeçalhos (Claude Code, seletores de modelo de editores), e para dar fallback a um nome que o cliente não deixa trocar.
+Um **modelo virtual** é um nome público que você cria em um harness, com uma cadeia própria de modelos. O harness manda esse nome no campo `model`, e o Thinker roteia pela cadeia, sem cabeçalho. Serve para harnesses que escolhem o modelo pelo nome (Claude Code, seletores de modelo de editores) e para dar fallback a um nome que o cliente não deixa trocar. Na página **Roteamento** do harness, a cadeia `auto` aparece como o card "Modelo virtual: `auto`", na mesma grade dos modelos virtuais, e o botão **Criar modelo virtual** fica na barra de ações, à esquerda de **Atualizar modelos**.
 
 Um harness pode ter quantos virtuais quiser. Eles aparecem em `GET /v1/models` logo depois de `auto` e valem em `/v1/chat/completions`, `/v1/responses` e `/v1/messages`.
 
@@ -137,12 +132,11 @@ O modo de resposta do virtual vale para a cadeia inteira, inclusive a parte do D
 Para cada requisição, o Thinker aplica nesta ordem a primeira regra que casa:
 
 1. **Modelo virtual ativo** com o nome igual ao `model`.
-2. **Tier por cabeçalho**, se algum casar.
-3. **`auto`** (roteamento do Thinker) ou **ID explícito** do modelo. Um ID desconhecido responde `M302`.
+2. **`auto`** (roteamento do Thinker) ou **ID explícito** do modelo. Um ID desconhecido responde `M302`.
 
-Logo, quem manda o cabeçalho de um tier e `model: "deepseek"` recebe o virtual `deepseek`. O passo 1 não roda quando `model` falta ou é `auto`.
+O passo 1 não roda quando `model` falta ou é `auto`.
 
-Um virtual **desativado** é invisível: não aparece em `/v1/models`, não casa com pedidos e não sombreia nada. O pedido segue para os passos 2 e 3, e o ID real volta a resolver ou o pedido recebe `M302`.
+Um virtual **desativado** é invisível: não aparece em `/v1/models`, não casa com pedidos e não sombreia nada. O pedido segue para o passo 2, e o ID real volta a resolver ou o pedido recebe `M302`.
 
 ### Sem rota: M301
 
@@ -181,7 +175,7 @@ Toda resposta roteada pelo Thinker informa o que foi decidido. Os cabeçalhos va
 | `X-Thinker-Tier` | Tier que atendeu: `simple`, `standard`, `complex`, `reasoning` ou `default`. Um tier customizado e uma regra de especificidade aparecem como `standard`, um modelo virtual como `default` e um ID explícito como `direct`, porque nenhum deles é um slot de complexidade. |
 | `X-Thinker-Model` | Modelo escolhido pela rota (`thinker` nas respostas de erro do próprio Thinker). |
 | `X-Thinker-Provider` | Provedor da rota (`thinker` nas respostas de erro do próprio Thinker). |
-| `X-Thinker-Confidence` | Confiança da decisão, de 0 a 1. É `1` para tiers por cabeçalho, virtuais e IDs explícitos. |
+| `X-Thinker-Confidence` | Confiança da decisão, de 0 a 1. É `1` para virtuais e IDs explícitos. |
 | `X-Thinker-Reason` | Motivo da decisão (tabela abaixo). |
 | `X-Thinker-Virtual-Model` | Nome do virtual, com a grafia cadastrada. Só aparece quando um virtual atendeu. |
 | `X-Thinker-Output-Modality` | Modalidade de saída da rota (`text` por padrão). |
@@ -197,7 +191,6 @@ Valores de `X-Thinker-Reason`:
 | Valor | Quando |
 | --- | --- |
 | `virtual-model` | O `model` casou com um modelo virtual ativo. |
-| `header-match` | Uma regra de tier customizado por cabeçalho casou. |
 | `specificity` | Uma atribuição de especificidade decidiu. |
 | `scored` | O roteamento por complexidade pontuou o pedido. |
 | `tool_detected`, `large_context`, `formal_logic_override`, `short_message` | A pontuação foi ajustada por ferramentas, contexto grande, lógica formal ou mensagem curta. |

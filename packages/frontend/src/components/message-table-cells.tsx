@@ -28,41 +28,6 @@ const MONO = 'font-mono';
 const MONO_XS = 'font-mono text-xs text-muted';
 const DASH = '—';
 
-/** Header-tier color names (thinker-shared TIER_COLORS) mapped onto the category tokens. */
-const TIER_COLOR_TOKENS: Record<string, string> = {
-  slate: '--port-12',
-  gray: '--port-12',
-  zinc: '--port-12',
-  stone: '--port-12',
-  red: '--danger',
-  orange: '--port-9',
-  amber: '--port-4',
-  yellow: '--port-4',
-  lime: '--port-6',
-  green: '--port-6',
-  emerald: '--port-11',
-  teal: '--port-3',
-  cyan: '--port-7',
-  sky: '--port-7',
-  blue: '--port-1',
-  indigo: '--port-10',
-  violet: '--port-2',
-  purple: '--port-8',
-  fuchsia: '--port-8',
-  pink: '--port-5',
-  rose: '--port-5',
-};
-
-/** Inline style that points `--tier` at the token for a header-tier color. */
-export function tierColorStyle(color: string | null | undefined): CSSProperties {
-  const token = TIER_COLOR_TOKENS[color ?? 'indigo'] ?? '--port-10';
-  return { '--tier': `var(${token})` } as CSSProperties;
-}
-
-/** Classes that paint a badge from the `--tier` custom property. */
-export const TIER_COLOR_CLASS =
-  'bg-[color-mix(in_srgb,var(--tier)_14%,transparent)] text-[var(--tier)]';
-
 export function HeartbeatIcon() {
   return (
     <svg
@@ -216,22 +181,6 @@ function ModelTierBadge({ item }: { item: MessageRow }) {
         title={t('messages.table.virtualModel', { name: item.virtual_model_name })}
       >
         {item.virtual_model_name}
-      </span>
-    );
-  }
-  if (item.header_tier_name) {
-    const color = item.header_tier_color ?? 'indigo';
-    return (
-      <span
-        className={cx(
-          'tier-badge tier-badge--custom badge',
-          `tier-color--${color}`,
-          TIER_COLOR_CLASS,
-        )}
-        style={tierColorStyle(color)}
-        title={item.header_tier_name}
-      >
-        {item.header_tier_name}
       </span>
     );
   }

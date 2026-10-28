@@ -82,9 +82,8 @@ function parseResponsesSurface(parsed: Record<string, unknown>): SurfaceResult {
 }
 
 /**
- * `tier` and `virtual` are separate selectors (ADR 0004, section 9): a custom
- * tier and a virtual model may share a name, so neither may stand in for the
- * other.
+ * `tier` and `virtual` are separate selectors (ADR 0004, section 9): a tier
+ * and a virtual model may share a name, so neither may stand in for the other.
  */
 function paramsTarget(tier?: string, virtual?: string): string | RouteParamsTarget | undefined {
   if (tier !== undefined && virtual !== undefined) {
@@ -102,10 +101,8 @@ function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): bo
 
 /**
  * Routing tools: readiness, default-tier fallbacks, per-agent recording
- * switch, the custom (header) tier lifecycle and the virtual models. "Custom
- * tier" is the CLI's name for a header tier — a rule that overrides the route
- * when a request carries a matching header. A virtual model is a public name
- * the harness sends as `model` (see virtual-models.tools.ts).
+ * switch and the virtual models. A virtual model is a public name the harness
+ * sends as `model` (see virtual-models.tools.ts).
  */
 export function registerRoutingTools(
   server: McpServer,
@@ -232,8 +229,8 @@ export function registerRoutingTools(
       title: 'Get model params',
       description:
         'List the params a routed model accepts (type, allowed values, description) with their saved ' +
-        'values, e.g. reasoning.effort or temperature. Address the route by tier ("default" or a ' +
-        'custom tier name) or by virtual (a virtual model name), not both; model defaults to the ' +
+        'values, e.g. reasoning.effort or temperature. Address the route by tier ("default") ' +
+        'or by virtual (a virtual model name), not both; model defaults to the ' +
         'primary and may name one of its fallbacks. Routes a virtual model borrows from the ' +
         'Default chain use the default tier params. current: null means the provider default applies.',
       inputSchema: z.object({
@@ -261,8 +258,8 @@ export function registerRoutingTools(
         title: 'Set model params',
         description:
           'Set or unset params on a routed model. Saved params override the values the caller sends ' +
-          'on routed requests (model "auto", a virtual model name, or a matching custom-tier ' +
-          'header); a request naming a concrete model skips them. Address the route by tier or by ' +
+          'on routed requests (model "auto" or a virtual model name); ' +
+          'a request naming a concrete model skips them. Address the route by tier or by ' +
           'virtual, not both. ' +
           'set maps a param path to its value ({"reasoning.effort": "high"}); unset lists paths to ' +
           'remove. Other saved params are kept. Read thinker_routing_params_get first for valid paths.',
@@ -327,23 +324,6 @@ export function registerRoutingTools(
         ),
     );
 
-  server.registerTool(
-    'thinker_routing_custom_list',
-    {
-      title: 'List custom tiers',
-      description: 'List a harness’s header-triggered custom tiers.',
-      inputSchema: z.object({ agent: z.string().min(1) }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ agent: agentName }) =>
-      result(
-        (async () => {
-          const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-          return { custom_tiers: await deps.headerTiers.list(agent.id) };
-        })(),
-      ),
-  );
-
   if (canWrite)
     server.registerTool(
       'thinker_routing_test',
@@ -356,7 +336,6 @@ export function registerRoutingTools(
         inputSchema: z.object({
           agent: z.string().min(1),
           prompt: z.string().min(1).optional(),
-          tier: z.string().min(1).optional(),
           model: z
             .string()
             .min(1)
@@ -365,7 +344,7 @@ export function registerRoutingTools(
           as: z.string().min(1).optional().describe('Force a platform surface (e.g. claude-code).'),
         }),
       },
-      async ({ agent: agentName, prompt, tier, model, as: platformOverride }) =>
+      async ({ agent: agentName, prompt, model, as: platformOverride }) =>
         result(
           (async () => {
             const info = await deps.lifecycle.findAgentInfo(operator.tenantId, agentName);
@@ -383,29 +362,6 @@ export function registerRoutingTools(
                 : undefined) ?? 'chat_completions';
             const key = await deps.apiKeys.getKeyForAgent(operator.tenantId, info.agent_name);
             if (!key.fullKey) throw new Error('No active key for this agent');
-
-            // Send the header rule the tier actually stores. A tier created by
-            // the dashboard, the CLI or another harness may use any header key,
-            // so a hard-coded name would miss it and the test would silently
-            // exercise the default route instead.
-            let tierHeader: { key: string; value: string } | undefined;
-            if (tier) {
-              const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-              const tiers = await deps.headerTiers.list(agent.id);
-              const wanted = tier.toLowerCase();
-              const hit = tiers.find((t) => t.name.toLowerCase() === wanted);
-              if (!hit) {
-                const names = tiers.map((t) => t.name).join(', ');
-                throw new Error(
-                  `Custom tier "${tier}" not found for "${agentName}"` +
-                    (names ? ` (custom tiers: ${names})` : ' (it has no custom tiers)'),
-                );
-              }
-              if (!hit.enabled) {
-                throw new Error(`Custom tier "${hit.name}" is disabled; enable it first`);
-              }
-              tierHeader = { key: hit.header_key, value: hit.header_value };
-            }
 
             const endpoint =
               surface === 'messages'
@@ -438,7 +394,6 @@ export function registerRoutingTools(
                   Authorization: `Bearer ${key.fullKey}`,
                   'Content-Type': 'application/json',
                   ...(surface === 'messages' ? { 'anthropic-version': '2023-06-01' } : {}),
-                  ...(tierHeader ? { [tierHeader.key]: tierHeader.value } : {}),
                 },
                 body: JSON.stringify(body),
                 signal: controller.signal,
@@ -486,8 +441,6 @@ export function registerRoutingTools(
               surface,
               ...(platform ? { platform } : {}),
               requested_model: requestedModel,
-              ...(tier ? { tier } : {}),
-              ...(tierHeader ? { tier_header: `${tierHeader.key}: ${tierHeader.value}` } : {}),
               ...(routingReason ? { routing_reason: routingReason } : {}),
               ...(virtualModel ? { virtual_model: virtualModel } : {}),
               served_model: surfaceResult.servedModel,
@@ -505,32 +458,18 @@ export function registerRoutingTools(
       {
         title: 'Configure an agent',
         description:
-          'Set the default route and fallback chain (or a custom header tier), and/or toggle recording. `models` is the full chain: first is the route, the rest are fallbacks.',
+          'Set the default route and fallback chain, and/or toggle recording. `models` is the full chain: first is the route, the rest are fallbacks.',
         inputSchema: z.object({
           agent: z.string().min(1),
           models: z.array(z.string().min(1)).min(1).max(6).optional(),
           provider: z.string().min(1).optional(),
           auth_type: z.enum(AUTH_TYPES).optional(),
           key_label: z.string().min(1).max(50).optional(),
-          tier: z
-            .string()
-            .min(1)
-            .optional()
-            .describe('Upsert this custom header tier instead of the default route.'),
           recording: z.boolean().optional(),
           force: z.boolean().optional().describe('Skip the discovered-model check.'),
         }),
       },
-      async ({
-        agent: agentName,
-        models,
-        provider,
-        auth_type,
-        key_label,
-        tier,
-        recording,
-        force,
-      }) =>
+      async ({ agent: agentName, models, provider, auth_type, key_label, recording, force }) =>
         result(
           (async () => {
             const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
@@ -543,8 +482,6 @@ export function registerRoutingTools(
             if (!wantsRoute && recording === undefined) {
               throw new Error('Nothing to configure — pass models + provider and/or recording');
             }
-            if (tier !== undefined && !wantsRoute)
-              throw new Error('tier needs models and provider');
 
             if (wantsRoute) {
               if (!models || models.length === 0 || !provider) {
@@ -585,62 +522,20 @@ export function registerRoutingTools(
               // is never stored as a metered api_key route.
               const authType =
                 auth_type ?? (primaryRoute.ok ? primaryRoute.route.authType : 'api_key');
-              if (tier) {
-                const list = await deps.headerTiers.list(agent.id);
-                const hit = list.find((t) => t.name.toLowerCase() === tier.toLowerCase());
-                const target =
-                  hit ??
-                  (await deps.headerTiers.create(agent.id, agent.tenant_id, {
-                    name: tier,
-                    header_key: 'x-thinker-tier',
-                    header_value: tier,
-                    badge_color: 'indigo' as never,
-                  }));
-                output['tier'] = { id: target.id, name: target.name, created: !hit };
-                try {
-                  output['route'] = await deps.headerTiers.setOverride(
-                    agent.id,
-                    agent.tenant_id,
-                    target.id,
-                    primary,
-                    provider,
-                    authType,
-                    key_label ?? null,
-                  );
-                  output['fallbacks'] = await setOrClear(
-                    () =>
-                      deps.headerTiers.setFallbacks(
-                        agent.id,
-                        agent.tenant_id,
-                        target.id,
-                        fallbacks,
-                      ),
-                    () => deps.headerTiers.clearFallbacks(agent.id, target.id),
-                    fallbacks,
-                  );
-                } catch (error) {
-                  // The tier was created by this call; drop it so a failed
-                  // route/fallback write does not leave an enabled empty tier.
-                  if (!hit)
-                    await deps.headerTiers.delete(agent.id, target.id).catch(() => undefined);
-                  throw error;
-                }
-              } else {
-                output['route'] = await deps.tiers.setOverride(
-                  agent.id,
-                  agent.tenant_id,
-                  'default',
-                  primary,
-                  provider,
-                  authType,
-                  key_label,
-                );
-                output['fallbacks'] = await setOrClear(
-                  () => deps.tiers.setFallbacks(agent.id, agent.tenant_id, 'default', fallbacks),
-                  () => deps.tiers.clearFallbacks(agent.id, 'default'),
-                  fallbacks,
-                );
-              }
+              output['route'] = await deps.tiers.setOverride(
+                agent.id,
+                agent.tenant_id,
+                'default',
+                primary,
+                provider,
+                authType,
+                key_label,
+              );
+              output['fallbacks'] = await setOrClear(
+                () => deps.tiers.setFallbacks(agent.id, agent.tenant_id, 'default', fallbacks),
+                () => deps.tiers.clearFallbacks(agent.id, 'default'),
+                fallbacks,
+              );
             }
             if (recording !== undefined) {
               await deps.agentRepo.update(agent.id, { record_messages: recording });
@@ -648,98 +543,6 @@ export function registerRoutingTools(
               output['recording'] = { enabled: recording };
             }
             return output;
-          })(),
-        ),
-    );
-
-  if (canWrite)
-    server.registerTool(
-      'thinker_routing_custom_create',
-      {
-        title: 'Create a custom tier',
-        description:
-          'Create a header-triggered custom tier, optionally with a route override and fallbacks.',
-        inputSchema: z.object({
-          agent: z.string().min(1),
-          name: z.string().min(1),
-          header_key: z.string().min(1),
-          header_value: z.string().min(1),
-          badge_color: z.string().min(1),
-          model: z.string().min(1).optional(),
-          provider: z.string().min(1).optional(),
-          auth_type: z.enum(AUTH_TYPES).optional(),
-          fallbacks: z.array(z.string().min(1)).max(5).optional(),
-        }),
-      },
-      async ({
-        agent: agentName,
-        name,
-        header_key,
-        header_value,
-        badge_color,
-        model,
-        provider,
-        auth_type,
-        fallbacks,
-      }) =>
-        result(
-          (async () => {
-            const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-            if (fallbacks && fallbacks.length > 0 && !model) {
-              // Fallbacks without a primary route leave matching requests
-              // unroutable, so reject instead of persisting a broken tier.
-              throw new Error('fallbacks require a model (the primary route)');
-            }
-            const tier = await deps.headerTiers.create(agent.id, agent.tenant_id, {
-              name,
-              header_key,
-              header_value,
-              badge_color: badge_color as never,
-            });
-            // The tier create, its override, and its fallbacks are separate
-            // writes. If a later step fails, delete the tier so a rejected
-            // custom tier is not left behind.
-            try {
-              if (model) {
-                await deps.headerTiers.setOverride(
-                  agent.id,
-                  agent.tenant_id,
-                  tier.id,
-                  model,
-                  provider,
-                  auth_type,
-                );
-              }
-              if (fallbacks && fallbacks.length > 0) {
-                await deps.headerTiers.setFallbacks(agent.id, agent.tenant_id, tier.id, fallbacks);
-              }
-            } catch (error) {
-              await deps.headerTiers.delete(agent.id, tier.id).catch(() => undefined);
-              throw error;
-            }
-            return {
-              tier: await deps.headerTiers
-                .list(agent.id)
-                .then((t) => t.find((x) => x.id === tier.id)),
-            };
-          })(),
-        ),
-    );
-
-  if (canWrite)
-    server.registerTool(
-      'thinker_routing_custom_delete',
-      {
-        title: 'Delete a custom tier',
-        description: 'Delete a header-triggered custom tier by id.',
-        inputSchema: z.object({ agent: z.string().min(1), id: z.string().min(1) }),
-      },
-      async ({ agent: agentName, id }) =>
-        result(
-          (async () => {
-            const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
-            await deps.headerTiers.delete(agent.id, id);
-            return { ok: true };
           })(),
         ),
     );

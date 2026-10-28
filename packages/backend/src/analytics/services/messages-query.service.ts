@@ -32,7 +32,6 @@ import { computeCutoff, sqlCastFloat, sqlSanitizeCost } from '../../common/utils
 import { inferProviderFromModel } from '../../common/utils/provider-inference';
 import { TtlCache } from '../../common/utils/ttl-cache';
 import { ThinkerRequest } from '../../entities/request.entity';
-import { HeaderTier } from '../../entities/header-tier.entity';
 
 // The Messages-log "failed"/"errors" filters and every "messages" KPI count
 // share one definition of an error status (see query-helpers.sqlCountMessages).
@@ -133,7 +132,6 @@ interface MessageQueryParams extends MessageFilterParams {
   error_class?: string;
   routing_tier?: string;
   specificity_category?: string;
-  header_tier_id?: string;
   include_total?: boolean;
   /** Allow a recent exact total to be reused instead of forcing a fresh first-page count. */
   cache_total?: boolean;
@@ -187,37 +185,13 @@ function connectionAttemptPredicate(
   );
 }
 
-/** A custom (header) tier as the Requests Tier filter offers it. */
-export interface HeaderTierFilterOption {
-  name: string;
-  /** Every tier id the option covers — same name on several harnesses. */
-  ids: string[];
-}
-
-/**
- * One Tier-filter option can cover the same custom tier defined on several
- * harnesses, so `header_tier_id` accepts a comma-separated list of ids. A
- * single id (what older clients send) parses to a one-element list.
- */
-function parseHeaderTierIds(value: string): string[] {
-  return [
-    ...new Set(
-      value
-        .split(',')
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
-
 /** Filter metadata for a caller that opted out of computing it. */
 function emptyFilterOptions(): {
   providers: string[];
   provider_labels: Record<string, string>;
-  header_tiers: HeaderTierFilterOption[];
   models: string[];
 } {
-  return { providers: [], provider_labels: {}, header_tiers: [], models: [] };
+  return { providers: [], provider_labels: {}, models: [] };
 }
 
 @Injectable()
@@ -249,9 +223,6 @@ export class MessagesQueryService {
     @Optional()
     @InjectDataSource()
     private readonly dataSource?: DataSource,
-    @Optional()
-    @InjectRepository(HeaderTier)
-    private readonly headerTierRepo?: Repository<HeaderTier>,
   ) {}
 
   async getMessages(params: MessageQueryParams) {
@@ -316,7 +287,6 @@ export class MessagesQueryService {
       total_count_exact: includeTotal,
       providers: filterOptions.providers,
       provider_labels: filterOptions.provider_labels,
-      header_tiers: filterOptions.header_tiers,
       models: filterOptions.models,
     };
   }
@@ -423,13 +393,6 @@ export class MessagesQueryService {
     if (params.specificity_category) {
       attemptPredicates.push('filtered_attempt.specificity_category = :requestSpecificity');
       attemptParameters['requestSpecificity'] = params.specificity_category;
-    }
-    const requestHeaderTierIds = params.header_tier_id
-      ? parseHeaderTierIds(params.header_tier_id)
-      : [];
-    if (requestHeaderTierIds.length) {
-      attemptPredicates.push('filtered_attempt.header_tier_id IN (:...requestHeaderTiers)');
-      attemptParameters['requestHeaderTiers'] = requestHeaderTierIds;
     }
     if (params.triggers?.length) {
       // Several recovery-attempt kinds OR together (a multiselect facet). When
@@ -593,9 +556,6 @@ export class MessagesQueryService {
       .addSelect(picked('at.fallback_from_model'), 'fallback_from_model')
       .addSelect(picked('at.fallback_index'), 'fallback_index')
       .addSelect('r.feedback_rating', 'feedback_rating')
-      .addSelect(picked('at.header_tier_id'), 'header_tier_id')
-      .addSelect(picked('at.header_tier_name'), 'header_tier_name')
-      .addSelect(picked('at.header_tier_color'), 'header_tier_color')
       .addSelect(picked('at.virtual_model_id'), 'virtual_model_id')
       .addSelect(picked('at.virtual_model_name'), 'virtual_model_name')
       .addSelect(picked('at.provider_key_label'), 'provider_key_label')
@@ -718,7 +678,6 @@ export class MessagesQueryService {
       total_count_exact: includeTotal,
       providers: filterOptions.providers,
       provider_labels: filterOptions.provider_labels,
-      header_tiers: filterOptions.header_tiers,
       models: filterOptions.models,
     };
   }
@@ -790,14 +749,14 @@ export class MessagesQueryService {
   async getMessageFilterOptions(params: MessageFilterParams): Promise<{
     providers: string[];
     provider_labels: Record<string, string>;
-    header_tiers: HeaderTierFilterOption[];
     models: string[];
   }> {
     params = await this.withAgentScope(params);
-    const [distinctRows, headerTiers] = await Promise.all([
-      this.getDistinctModels(params.tenantId, params.range, params.agentScope),
-      this.getHeaderTierOptions(params.tenantId, params.agentScope),
-    ]);
+    const distinctRows = await this.getDistinctModels(
+      params.tenantId,
+      params.range,
+      params.agentScope,
+    );
     const providers = this.deriveProviders(distinctRows.models, distinctRows.providers);
     const providerLabels = await this.resolveCustomProviderLabels(providers, params.tenantId);
     // The distinct-model scan already ran to derive providers, so the Model
@@ -810,46 +769,8 @@ export class MessagesQueryService {
     return {
       providers,
       provider_labels: providerLabels,
-      header_tiers: headerTiers,
       models,
     };
-  }
-
-  /**
-   * Custom (header) tiers the Tier filter can offer. The Requests log spans the
-   * whole tenant unless a harness is picked, so with no `agent_name` this lists
-   * every harness's tiers — otherwise the filter would be empty exactly where
-   * the log shows every harness's requests. Same-named tiers on different
-   * harnesses collapse into one option carrying all their ids, because there
-   * "Premium" can only mean "any harness's Premium tier".
-   *
-   * Disabled tiers stay listed: requests routed through them before they were
-   * turned off are still in the log.
-   */
-  private async getHeaderTierOptions(
-    tenantId: string | null,
-    agentScope?: AgentScope,
-  ): Promise<HeaderTierFilterOption[]> {
-    if (!tenantId || !this.headerTierRepo) return [];
-    const qb = this.headerTierRepo
-      .createQueryBuilder('ht')
-      .select('ht.id', 'id')
-      .addSelect('ht.name', 'name')
-      .where('ht.tenant_id = :headerTierTenant', { headerTierTenant: tenantId })
-      .orderBy('LOWER(ht.name)', 'ASC');
-    if (agentScope) {
-      if (agentScope.agentId && agentScope.tenantId === tenantId)
-        qb.andWhere('ht.agent_id = :headerTierAgentId', { headerTierAgentId: agentScope.agentId });
-      else qb.andWhere('1 = 0');
-    }
-    const rows = await qb.getRawMany<{ id: string; name: string }>();
-    const byName = new Map<string, HeaderTierFilterOption>();
-    for (const row of rows) {
-      const existing = byName.get(row.name.toLowerCase());
-      if (existing) existing.ids.push(row.id);
-      else byName.set(row.name.toLowerCase(), { name: row.name, ids: [row.id] });
-    }
-    return [...byName.values()];
   }
 
   /**
@@ -889,7 +810,6 @@ export class MessagesQueryService {
     error_class?: string;
     routing_tier?: string;
     specificity_category?: string;
-    header_tier_id?: string;
   }): Promise<SelectQueryBuilder<AgentMessage>> {
     const cutoff = params.range ? computeCutoff(rangeToInterval(params.range)) : undefined;
     const qb = this.turnRepo.createQueryBuilder('at');
@@ -940,13 +860,6 @@ export class MessagesQueryService {
     if (params.specificity_category) {
       qb.andWhere('at.specificity_category = :specificityFilter', {
         specificityFilter: params.specificity_category,
-      });
-    }
-
-    const headerTierIds = params.header_tier_id ? parseHeaderTierIds(params.header_tier_id) : [];
-    if (headerTierIds.length) {
-      qb.andWhere('at.header_tier_id IN (:...headerTierFilter)', {
-        headerTierFilter: headerTierIds,
       });
     }
 
@@ -1199,7 +1112,6 @@ export class MessagesQueryService {
     error_class?: string;
     routing_tier?: string;
     specificity_category?: string;
-    header_tier_id?: string;
     exclude_playground?: boolean;
     exclude_direct?: boolean;
   }): string {
@@ -1222,7 +1134,6 @@ export class MessagesQueryService {
       params.error_class ?? '',
       params.routing_tier ?? '',
       params.specificity_category ?? '',
-      params.header_tier_id ?? '',
       params.exclude_playground ? 'exclude-playground' : '',
       params.exclude_direct ? 'exclude-direct' : '',
     ].join(':');

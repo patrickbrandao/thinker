@@ -51,15 +51,6 @@ vi.mock('../../src/services/api.js', () => ({
   // Re-export types only — no runtime impact
 }));
 
-const mockListHeaderTiers = vi.fn();
-const mockOverrideHeaderTier = vi.fn();
-const mockToggleHeaderTier = vi.fn();
-vi.mock('../../src/services/api/header-tiers.js', () => ({
-  listHeaderTiers: (...args: unknown[]) => mockListHeaderTiers(...args),
-  overrideHeaderTier: (...args: unknown[]) => mockOverrideHeaderTier(...args),
-  toggleHeaderTier: (...args: unknown[]) => mockToggleHeaderTier(...args),
-}));
-
 // The virtual models section has its own tests; here it only needs to render.
 const mockListVirtualModels = vi.fn().mockResolvedValue([]);
 vi.mock('../../src/services/api/virtual-models.js', () => ({
@@ -130,21 +121,15 @@ vi.mock('../../src/components/RoutingTabs.js', () => ({
     const children = props.children as {
       default: ReactNode;
       specificity: ReactNode;
-      custom: ReactNode;
     };
     return (
       <div data-testid="routing-tabs">
         <div data-testid="tab-header-right">{props.headerRight as ReactNode}</div>
         <div data-testid="tab-default">{children.default}</div>
         <div data-testid="tab-specificity">{children.specificity}</div>
-        <div data-testid="tab-custom">{children.custom}</div>
       </div>
     );
   },
-}));
-
-vi.mock('../../src/components/RoutingPipelineCard.js', () => ({
-  buildPipelineHelp: () => <div data-testid="pipeline-help-content">Help content</div>,
 }));
 
 let lastModalsProps: Record<string, unknown> | null = null;
@@ -455,19 +440,7 @@ vi.mock('../../src/pages/RoutingSpecificitySection.js', () => ({
   ),
 }));
 
-vi.mock('../../src/pages/RoutingHeaderTiersSection.js', () => ({
-  default: (props: Record<string, unknown>) => {
-    // In the clean (no-tabs) view the parent renders the cards itself and drives
-    // modals through these openers. Hand it dummies so the unified view's header
-    // button, dashed add-card, and card edit buttons have something to call.
-    (props.onOpenRef as ((opener: () => void) => void) | undefined)?.(() => {});
-    (props.onCreateRef as ((opener: () => void) => void) | undefined)?.(() => {});
-    (props.onEditRef as ((opener: (tier: unknown) => void) => void) | undefined)?.(() => {});
-    return <div data-testid="custom-section" />;
-  },
-}));
-
-// The unified clean-agent view renders RoutingTierCard + HeaderTierCard directly
+// The unified clean-agent view renders RoutingTierCard directly
 // (the legacy tabbed path delegates to the section components instead, so these
 // are only exercised here). Mock them to surface their callbacks as buttons.
 vi.mock('../../src/pages/RoutingTierCard.js', () => ({
@@ -479,60 +452,6 @@ vi.mock('../../src/pages/RoutingTierCard.js', () => ({
           onClick={() => (props.onDropdownOpen as (id: string) => void)('default')}
         >
           open
-        </button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../../src/components/HeaderTierCard.js', () => ({
-  default: (props: Record<string, unknown>) => {
-    const tier = props.tier as { id: string; name: string };
-    return (
-      <div data-testid={`clean-card-${tier.id}`}>
-        <button
-          data-testid={`clean-override-${tier.id}`}
-          onClick={() =>
-            (props.onOverride as (m: string, p: string, a?: string, l?: string) => void)(
-              'gpt-4o',
-              'openai',
-              'api_key',
-              'Work',
-            )
-          }
-        >
-          override
-        </button>
-        <button
-          data-testid={`clean-fb-routes-${tier.id}`}
-          onClick={() =>
-            (props.onFallbacksUpdate as (f: string[], r: unknown) => void)(
-              ['fb1'],
-              [{ provider: 'openai', authType: 'api_key', model: 'fb1' }],
-            )
-          }
-        >
-          fb-routes
-        </button>
-        <button
-          data-testid={`clean-fb-noroutes-${tier.id}`}
-          onClick={() =>
-            (props.onFallbacksUpdate as (f: string[], r?: unknown) => void)(['fb1'], undefined)
-          }
-        >
-          fb-noroutes
-        </button>
-        <button
-          data-testid={`clean-edit-${tier.id}`}
-          onClick={() => (props.onEdit as () => void)()}
-        >
-          edit
-        </button>
-        <button
-          data-testid={`clean-disable-${tier.id}`}
-          onClick={() => (props.onDisable as () => void)()}
-        >
-          disable
         </button>
       </div>
     );
@@ -569,27 +488,6 @@ vi.mock('../../src/components/ResponseModeModal.js', () => ({
 vi.mock('../../src/pages/RoutingPanels.js', () => ({
   RoutingLoadingSkeleton: () => <div data-testid="loading-skeleton" />,
   ActiveProviderIcons: () => <div data-testid="active-providers" />,
-  RoutingFooter: (props: Record<string, unknown>) => {
-    return (
-      <div data-testid="routing-footer">
-        <button data-testid="reset-all" onClick={() => (props.onResetAll as () => void)()}>
-          reset
-        </button>
-        <button
-          data-testid="show-instructions"
-          onClick={() => (props.onShowInstructions as () => void)()}
-        >
-          instructions
-        </button>
-        <button
-          data-testid="show-how-routing-works"
-          onClick={() => (props.onShowHowRoutingWorks as () => void)?.()}
-        >
-          how-routing-works
-        </button>
-      </div>
-    );
-  },
 }));
 
 const mockActionGetTier = vi.fn();
@@ -654,9 +552,6 @@ beforeEach(() => {
   mockGetCustomProviders.mockResolvedValue([]);
   mockGetEnabledProviders.mockResolvedValue({ enabled: ['p1'] });
   mockGetSpecificityAssignments.mockResolvedValue([]);
-  mockListHeaderTiers.mockResolvedValue([]);
-  mockOverrideHeaderTier.mockResolvedValue(undefined);
-  mockToggleHeaderTier.mockResolvedValue(undefined);
   mockGetComplexityStatus.mockResolvedValue({ enabled: true });
   mockGetPricingHealth.mockResolvedValue({ model_count: 100, last_fetched_at: '2025-01-01' });
   mockToggleComplexity.mockResolvedValue({ enabled: false });
@@ -683,12 +578,14 @@ describe('Routing page', () => {
     expect(container.querySelector('h1')).toBeNull();
   });
 
-  it('renders the virtual models section apart from the custom tiers', async () => {
-    renderRouting();
+  it('renders the virtual models section and the create button in the toolbar', async () => {
+    const { container } = renderRouting();
     await waitFor(() => {
-      expect(screen.getByText('Virtual models')).toBeDefined();
+      expect(mockListVirtualModels).toHaveBeenCalledWith('demo');
     });
-    expect(mockListVirtualModels).toHaveBeenCalledWith('demo');
+    const create = container.querySelector('.routing-create-virtual-model') as HTMLButtonElement;
+    expect(create.textContent).toContain('Create virtual model');
+    expect(screen.queryByText('Create custom tier')).toBeNull();
   });
 
   it('renders the empty providers state when no providers are connected', async () => {
@@ -699,12 +596,11 @@ describe('Routing page', () => {
     });
   });
 
-  it('renders all three section tabs when providers are connected', async () => {
+  it('renders the section tabs when providers are connected', async () => {
     renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
       expect(screen.getByTestId('spec-section')).toBeDefined();
-      expect(screen.getByTestId('custom-section')).toBeDefined();
     });
   });
 
@@ -1360,24 +1256,6 @@ describe('Routing page', () => {
     resolveProviderRefresh([baseProvider]);
   });
 
-  it('closes the instruction modal via onInstructionClose', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('show-instructions')).toBeDefined();
-    });
-    // Open the instruction modal first via the footer.
-    fireEvent.click(screen.getByTestId('show-instructions'));
-    await waitFor(() => {
-      expect(lastModalsProps?.instructionModal).toBe('enable');
-    });
-    // Close it — both instructionModal and instructionProvider reset to null.
-    fireEvent.click(screen.getByTestId('modal-trigger-instruction-close'));
-    await waitFor(() => {
-      expect(lastModalsProps?.instructionModal).toBeNull();
-      expect(lastModalsProps?.instructionProvider).toBeNull();
-    });
-  });
-
   it('closes the fallback picker via onFallbackPickerClose', async () => {
     renderRouting();
     await waitFor(() => {
@@ -1392,30 +1270,6 @@ describe('Routing page', () => {
     fireEvent.click(screen.getByTestId('modal-trigger-fallback-close'));
     await waitFor(() => {
       expect(lastModalsProps?.fallbackPickerTier).toBeNull();
-    });
-  });
-
-  it('triggers ResetAll via the footer', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('reset-all')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('reset-all'));
-    // Footer's onResetAll is wired to actions.handleResetAll.
-    await waitFor(() => {
-      expect(mockActionHandleResetAll).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('opens the instructions modal via the footer', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('show-instructions')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('show-instructions'));
-    // Footer's onShowInstructions sets instructionModal to 'enable'.
-    await waitFor(() => {
-      expect(lastModalsProps?.instructionModal).toBe('enable');
     });
   });
 
@@ -1814,39 +1668,6 @@ describe('Routing page', () => {
     });
   });
 
-  it('opens the help modal and closes it via Got it button (lines 665-705)', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('show-how-routing-works'));
-    await waitFor(() => {
-      expect(screen.getByText('How routing works')).toBeDefined();
-      expect(screen.getByText('Got it')).toBeDefined();
-      expect(screen.getByTestId('pipeline-help-content')).toBeDefined();
-    });
-    fireEvent.click(screen.getByText('Got it'));
-    await waitFor(() => {
-      expect(screen.queryByText('Got it')).toBeNull();
-    });
-  });
-
-  it('closes the help modal by clicking the overlay', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('show-how-routing-works'));
-    await waitFor(() => {
-      expect(screen.getByText('How routing works')).toBeDefined();
-    });
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
-    await waitFor(() => {
-      expect(screen.queryByText('Got it')).toBeNull();
-    });
-  });
-
   it('fires onResponseModeChange on the ResponseModeModal which calls handleDefaultResponseModeChange', async () => {
     const { container } = renderRouting();
     await waitFor(() => {
@@ -1864,22 +1685,6 @@ describe('Routing page', () => {
       expect(calls.length).toBeGreaterThan(0);
       expect(calls[0][0]).toBe('demo');
       expect(calls[0][2]).toBe('stream');
-    });
-  });
-
-  it('closes the help modal via Escape key', async () => {
-    renderRouting();
-    await waitFor(() => {
-      expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
-    });
-    fireEvent.click(screen.getByTestId('show-how-routing-works'));
-    await waitFor(() => {
-      expect(screen.getByText('How routing works')).toBeDefined();
-    });
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
-    await waitFor(() => {
-      expect(screen.queryByText('Got it')).toBeNull();
     });
   });
 
@@ -1965,144 +1770,31 @@ describe('Routing page', () => {
   describe('clean agent unified view', () => {
     // A "clean" agent has never configured complexity or task-specific routing,
     // so the gate renders the unified (no-tabs) view instead of RoutingTabs.
-    const cleanTier = {
-      id: 'ht-1',
-      agent_id: 'a',
-      name: 'Premium',
-      header_key: 'x-tier',
-      header_value: 'premium',
-      badge_color: 'indigo',
-      sort_order: 0,
-      enabled: true,
-      override_route: null,
-      fallback_routes: null,
-      created_at: '2025-01-01',
-      updated_at: '2025-01-01',
-    };
-
     beforeEach(() => {
-      // No complexity, no tier overrides, no specificity → isCleanAgent() is true.
       mockGetComplexityStatus.mockResolvedValue({ enabled: false });
       mockGetTierAssignments.mockResolvedValue([]);
       mockGetSpecificityAssignments.mockResolvedValue([]);
     });
 
-    it('renders the unified view (no tabs) with a Create custom tier CTA when no header tiers exist', async () => {
-      mockListHeaderTiers.mockResolvedValue([]);
+    it('renders the auto card in the virtual models grid, without tabs or footer', async () => {
       const { container } = renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('tier-card')).toBeDefined();
       });
-      // The legacy tabbed surface is not rendered for a clean agent.
       expect(screen.queryByTestId('routing-tabs')).toBeNull();
-      const headerCta = container.querySelector('.routing-section__cta') as HTMLButtonElement;
-      expect(headerCta.textContent).toContain('Create custom tier');
-      fireEvent.click(headerCta); // headerTierCreator?.()
-      // The dashed add-card is an alternate create affordance.
-      const addCard = container.querySelector('.routing-unified-add-card') as HTMLButtonElement;
-      fireEvent.click(addCard); // headerTierCreator?.()
+      expect(
+        container.querySelector('.virtual-model-list [data-testid="tier-card"]'),
+      ).not.toBeNull();
+      expect(screen.queryByText('Reset all to auto')).toBeNull();
+      expect(screen.queryByText('How routing works')).toBeNull();
+      expect(screen.queryByText('Setup instructions')).toBeNull();
     });
 
-    it('renders a Manage custom routing CTA and active header tier cards when tiers exist', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      const { container } = renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-card-ht-1')).toBeDefined();
-      });
-      const headerCta = container.querySelector('.routing-section__cta') as HTMLButtonElement;
-      expect(headerCta.textContent).toContain('Manage custom routing');
-      fireEvent.click(headerCta); // headerTierOpener?.()
-    });
-
-    it('overrides a header tier from a unified-view card', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
+    it('opens the dropdown picker from the auto card', async () => {
       renderRouting();
+      fireEvent.click(await screen.findByTestId('tier-card-dropdown'));
       await waitFor(() => {
-        expect(screen.getByTestId('clean-override-ht-1')).toBeDefined();
-      });
-      fireEvent.click(screen.getByTestId('clean-override-ht-1'));
-      await waitFor(() => {
-        expect(mockOverrideHeaderTier).toHaveBeenCalledWith(
-          'demo',
-          'ht-1',
-          'gpt-4o',
-          'openai',
-          'api_key',
-          'Work',
-        );
-      });
-    });
-
-    it('toasts when a unified-view card override fails', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      mockOverrideHeaderTier.mockRejectedValue(new Error('override boom'));
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-override-ht-1')).toBeDefined();
-      });
-      fireEvent.click(screen.getByTestId('clean-override-ht-1'));
-      await waitFor(() => {
-        expect(mockToastError).toHaveBeenCalledWith('override boom');
-      });
-    });
-
-    it('refetches header tiers when a unified-view card clears fallbacks (no routes)', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-fb-noroutes-ht-1')).toBeDefined();
-      });
-      mockListHeaderTiers.mockClear();
-      fireEvent.click(screen.getByTestId('clean-fb-noroutes-ht-1'));
-      await waitFor(() => {
-        expect(mockListHeaderTiers).toHaveBeenCalled();
-      });
-    });
-
-    it('optimistically mutates (no refetch) when a unified-view card updates fallback routes', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-fb-routes-ht-1')).toBeDefined();
-      });
-      mockListHeaderTiers.mockClear();
-      fireEvent.click(screen.getByTestId('clean-fb-routes-ht-1'));
-      await new Promise((r) => setTimeout(r, 10));
-      expect(mockListHeaderTiers).not.toHaveBeenCalled();
-    });
-
-    it('triggers the edit opener from a unified-view card', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-edit-ht-1')).toBeDefined();
-      });
-      // headerTierEditor?.(tier) — wired to the headless section opener.
-      fireEvent.click(screen.getByTestId('clean-edit-ht-1'));
-    });
-
-    it('disables a header tier from a unified-view card', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-disable-ht-1')).toBeDefined();
-      });
-      fireEvent.click(screen.getByTestId('clean-disable-ht-1'));
-      await waitFor(() => {
-        expect(mockToggleHeaderTier).toHaveBeenCalledWith('demo', 'ht-1', false);
-      });
-    });
-
-    it('toasts when disabling a unified-view header tier fails', async () => {
-      mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      mockToggleHeaderTier.mockRejectedValue(new Error('disable boom'));
-      renderRouting();
-      await waitFor(() => {
-        expect(screen.getByTestId('clean-disable-ht-1')).toBeDefined();
-      });
-      fireEvent.click(screen.getByTestId('clean-disable-ht-1'));
-      await waitFor(() => {
-        expect(mockToastError).toHaveBeenCalledWith('disable boom');
+        expect(lastModalsProps?.dropdownTier).toBe('default');
       });
     });
   });

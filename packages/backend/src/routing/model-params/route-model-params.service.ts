@@ -3,7 +3,6 @@ import {
   deleteProviderParamValue,
   getProviderParamValue,
   isProviderParamPath,
-  modelParamsScopeForHeaderTier,
   modelParamsScopeForTier,
   modelParamsScopeForVirtualModel,
   setProviderParamValue,
@@ -15,15 +14,10 @@ import {
   type RequestParamDefaults,
 } from 'thinker-shared';
 import { TierService } from '../routing-core/tier.service';
-import { HeaderTierService } from '../header-tiers/header-tier.service';
 import { VirtualModelService } from '../virtual-models/virtual-model.service';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
-import {
-  effectiveRoute,
-  readFallbackRoutes,
-  readOverrideRoute,
-} from '../routing-core/route-helpers';
+import { effectiveRoute, readFallbackRoutes } from '../routing-core/route-helpers';
 import { normalizeProviderModel } from '../../common/utils/anthropic-model-id';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
@@ -43,8 +37,8 @@ export interface RouteModelParamView extends ModelParamDefinition {
 }
 
 /**
- * Which route family the params belong to. A tier (`default` or a custom
- * tier's name) and a virtual model are separate selectors: the two live in
+ * Which route family the params belong to. A tier (`default`) and a virtual
+ * model are separate selectors: the two live in
  * different tables with no shared name uniqueness, so one name may denote
  * both on the same agent (ADR 0004, section 9).
  */
@@ -158,8 +152,8 @@ function connectionKey(route: ModelRoute): string {
 }
 
 /**
- * Model params addressed the way people name a route: a tier (`default` or a
- * custom tier's name) or a virtual model, plus one of the models it routes
+ * Model params addressed the way people name a route: the `default` tier or
+ * a virtual model, plus one of the models it routes
  * to. Resolves that to the stored (scope, provider, authType, model)
  * identity, so the CLI and MCP never handle scope keys or ids. The dashboard
  * keeps using the scope-keyed endpoints; both write the same rows.
@@ -168,7 +162,6 @@ function connectionKey(route: ModelRoute): string {
 export class RouteModelParamsService {
   constructor(
     private readonly tiers: TierService,
-    private readonly headerTiers: HeaderTierService,
     private readonly virtualModels: VirtualModelService,
     private readonly modelParams: AgentModelParamsService,
     private readonly specs: ProviderParamSpecService,
@@ -355,19 +348,7 @@ export class RouteModelParamsService {
         };
       }
     }
-    const custom = await this.headerTiers.list(agentId);
-    const match = custom.find((t) => t.name.toLowerCase() === tier.toLowerCase());
-    if (!match || tier.toLowerCase() === DEFAULT_TIER_NAME) {
-      const names = [DEFAULT_TIER_NAME, ...custom.map((t) => t.name)];
-      throw new NotFoundException(`Tier "${tier}" not found. Available tiers: ${names.join(', ')}`);
-    }
-    return {
-      kind: 'tier',
-      name: match.name,
-      scope: modelParamsScopeForHeaderTier(match.id),
-      primary: readOverrideRoute(match),
-      fallbacks: readFallbackRoutes(match) ?? [],
-    };
+    throw new NotFoundException(`Tier "${tier}" not found. Available tiers: ${DEFAULT_TIER_NAME}`);
   }
 
   /**

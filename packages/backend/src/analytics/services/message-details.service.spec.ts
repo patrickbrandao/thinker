@@ -64,9 +64,6 @@ describe('MessageDetailsService', () => {
     request_headers: null,
     request_params: null,
     caller_attribution: null,
-    header_tier_id: null,
-    header_tier_name: null,
-    header_tier_color: null,
     specificity_category: null,
     specificity_miscategorized: false,
   };
@@ -151,9 +148,6 @@ describe('MessageDetailsService', () => {
       request_headers: null,
       request_params: null,
       caller_attribution: null,
-      header_tier_id: null,
-      header_tier_name: null,
-      header_tier_color: null,
       virtual_model_id: null,
       virtual_model_name: null,
     });

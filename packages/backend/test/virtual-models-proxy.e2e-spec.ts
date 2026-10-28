@@ -1,9 +1,8 @@
 /**
- * Virtual models in the proxy (ADR 0004, PR 2): precedence over header tiers,
- * chain resolution with "continue on Default", M301, observability headers,
+ * Virtual models in the proxy (ADR 0004, PR 2): precedence over `auto` and
+ * explicit models, chain resolution with "continue on Default", M301, observability headers,
  * `agent_messages.virtual_model_*`, per-route params scopes, and the
- * unchanged behavior of `auto`, header tiers, heartbeats and the resolve
- * endpoint.
+ * unchanged behavior of `auto` and heartbeats.
  *
  * Drives real requests through the whole proxy stack. The upstream providers
  * are built-in OpenAI and Anthropic connections whose hosts are answered by a
@@ -40,11 +39,6 @@ const openai = (model: string, keyLabel?: string): ModelRoute =>
   keyLabel
     ? { provider: 'openai', authType: 'api_key', model, keyLabel }
     : { provider: 'openai', authType: 'api_key', model };
-const anthropic = (model: string): ModelRoute => ({
-  provider: 'anthropic',
-  authType: 'api_key',
-  model,
-});
 
 const PRIMARY = openai('gpt-4o');
 const FALLBACK = openai('gpt-4o-mini');
@@ -187,8 +181,6 @@ interface Row {
   fallback_index: number | null;
   virtual_model_id: string | null;
   virtual_model_name: string | null;
-  header_tier_id: string | null;
-  header_tier_name: string | null;
   request_params: Record<string, unknown> | null;
 }
 
@@ -199,7 +191,7 @@ async function rowsAfter(count: number): Promise<Row[]> {
   do {
     rows = await ds.query(
       `SELECT model, status, superseded, routing_reason, routing_tier, error_code, fallback_index,
-              virtual_model_id, virtual_model_name, header_tier_id, header_tier_name, request_params
+              virtual_model_id, virtual_model_name, request_params
          FROM agent_messages WHERE agent_id = $1 ORDER BY attempt_number NULLS FIRST, timestamp`,
       [TEST_AGENT_ID],
     );
@@ -309,11 +301,6 @@ beforeAll(async () => {
   await ds.query(`UPDATE agents SET complexity_routing_enabled = false WHERE id = $1`, [
     TEST_AGENT_ID,
   ]);
-  await ds.query(
-    `INSERT INTO header_tiers (id, tenant_id, agent_id, name, header_key, header_value, badge_color, override_route)
-     VALUES ('vmp-ht-deep', $1, $2, 'Deep', 'x-thinker-tier', 'deep', 'indigo', $3::jsonb)`,
-    [TEST_TENANT_ID, TEST_AGENT_ID, JSON.stringify(anthropic('claude-sonnet-4-5'))],
-  );
 
   originalFetch = global.fetch;
   global.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
@@ -410,42 +397,24 @@ describe('a virtual model on the three proxy endpoints', () => {
         routing_reason: 'virtual-model',
         virtual_model_id: id,
         virtual_model_name: 'deepseek/flash',
-        header_tier_id: null,
-        header_tier_name: null,
       });
     },
   );
 });
 
-describe('precedence: virtual model > header tier > auto / explicit', () => {
-  it('a virtual model wins over a matching header tier', async () => {
+describe('precedence: virtual model > auto / explicit', () => {
+  it('a virtual model is routed by its own chain', async () => {
     await createVirtual('deepseek/flash');
 
-    const res = await send('/v1/chat/completions', 'deepseek/flash', {
-      headers: { 'x-thinker-tier': 'deep' },
-    }).expect(200);
+    const res = await send('/v1/chat/completions', 'deepseek/flash').expect(200);
 
     expect(res.headers['x-thinker-reason']).toBe('virtual-model');
     expect(upstream.map((c) => c.host)).toEqual(['api.openai.com']);
     const rows = await rowsAfter(1);
-    expect(rows[0]).toMatchObject({ header_tier_id: null, virtual_model_name: 'deepseek/flash' });
+    expect(rows[0]).toMatchObject({ virtual_model_name: 'deepseek/flash' });
   });
 
-  it.each(['auto', 'openai/gpt-4.1'])('a header tier still wins over model %s', async (model) => {
-    await createVirtual('deepseek/flash');
-
-    const res = await send('/v1/chat/completions', model, {
-      headers: { 'x-thinker-tier': 'deep' },
-    }).expect(200);
-
-    expect(res.headers['x-thinker-reason']).toBe('header-match');
-    expect(res.headers['x-thinker-virtual-model']).toBeUndefined();
-    expect(upstreamModels()).toEqual(['claude-sonnet-4-5']);
-    const rows = await rowsAfter(1);
-    expect(rows[0]).toMatchObject({ header_tier_id: 'vmp-ht-deep', virtual_model_id: null });
-  });
-
-  it('auto without headers keeps routing to the Default tier', async () => {
+  it('auto keeps routing to the Default tier', async () => {
     await createVirtual('deepseek/flash');
 
     const res = await send('/v1/chat/completions', 'auto').expect(200);
@@ -506,7 +475,6 @@ describe('M301 and continue_on_default', () => {
         routing_reason: 'virtual_model_unavailable',
         virtual_model_id: id,
         virtual_model_name: 'broken',
-        header_tier_id: null,
       });
     },
   );
@@ -693,25 +661,13 @@ describe('per-route params scope', () => {
 });
 
 describe('unchanged behaviors', () => {
-  it('a heartbeat with a header tier header still goes to the simple tier', async () => {
+  it('a heartbeat still goes to the simple tier', async () => {
     const res = await send('/v1/chat/completions', 'auto', {
-      headers: { 'x-thinker-tier': 'deep' },
       extra: { messages: [{ role: 'user', content: 'HEARTBEAT_OK' }] },
     }).expect(200);
 
     expect(res.headers['x-thinker-tier']).toBe('simple');
     expect(res.headers['x-thinker-reason']).toBe('heartbeat');
     expect(upstreamModels()).toEqual(['gpt-4o-mini']);
-  });
-
-  it('POST /api/v1/routing/resolve does not apply header tiers', async () => {
-    const res = await asHarness(api().post('/api/v1/routing/resolve'))
-      .set('x-thinker-tier', 'deep')
-      .send({ messages: [{ role: 'user', content: 'hello' }] })
-      .expect(200);
-
-    expect(res.body.reason).not.toBe('header-match');
-    expect(res.body.header_tier_id).toBeUndefined();
-    expect(res.body.route).toMatchObject({ provider: 'openai', model: 'gpt-4.1' });
   });
 });

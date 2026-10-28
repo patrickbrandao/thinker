@@ -12,7 +12,6 @@ import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.enti
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
 import { Agent } from '../../entities/agent.entity';
-import { HeaderTier } from '../../entities/header-tier.entity';
 import { VirtualModel } from '../../entities/virtual-model.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
@@ -63,7 +62,7 @@ const SUBSCRIPTION_REFRESH_IDLE_TIMEOUT = '20s';
 interface ProviderRouteReference {
   agentId: string;
   agentName: string;
-  surface: 'tier' | 'specificity' | 'header' | 'virtual model';
+  surface: 'tier' | 'specificity' | 'virtual model';
   name: string;
   model: string;
   position: string;
@@ -93,8 +92,6 @@ export class ProviderService {
     private readonly specificityRepo: Repository<SpecificityAssignment>,
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
-    @InjectRepository(HeaderTier)
-    private readonly headerTierRepo: Repository<HeaderTier>,
     private readonly pricingCache: ModelPricingCacheService,
     private readonly routingCache: RoutingCacheService,
     @InjectRepository(AgentEnabledProvider)
@@ -1011,23 +1008,6 @@ export class ProviderService {
       if (match) return match;
     }
 
-    const headerTiers = await this.headerTierRepo.find({
-      where: { agent_id: In(agentIds), enabled: true },
-    });
-    for (const tier of headerTiers) {
-      if (tier.enabled === false) continue;
-      const match = this.findProviderRouteReferenceInRoutes(
-        tier.agent_id,
-        agentName(tier.agent_id),
-        'header',
-        tier.name,
-        tier.override_route,
-        tier.fallback_routes,
-        providerRowsForAgent(tier.agent_id),
-      );
-      if (match) return match;
-    }
-
     // Virtual models (ADR 0004): enabled and disabled rows both count, since a
     // disabled row keeps its chain and would come back with a dangling route.
     // Routes a virtual inherits from Default are not stored on the row and are
@@ -1348,32 +1328,6 @@ export class ProviderService {
       }
     }
     if (specsToSave.length > 0) await this.specificityRepo.save(specsToSave);
-
-    // Custom (header) tiers carry the same ModelRoute shape. They were
-    // omitted here originally, so disconnecting one account out of several
-    // (or renaming a key) left header-tier routes pinned to a label that no
-    // longer exists — the account chip then renders blank. Relabel them too.
-    const headerTiers = await this.headerTierRepo.find({ where: { tenant_id: tenantId } });
-    const headerTiersToSave: HeaderTier[] = [];
-    for (const h of headerTiers) {
-      let mutated = false;
-      if (routeMatchesKey(h.override_route)) {
-        h.override_route = replaceKeyLabel(h.override_route!);
-        mutated = true;
-      }
-      if (h.fallback_routes && h.fallback_routes.some(routeMatchesKey)) {
-        h.fallback_routes = h.fallback_routes.map((r) =>
-          routeMatchesKey(r) ? replaceKeyLabel(r) : r,
-        );
-        mutated = true;
-      }
-      if (mutated) {
-        h.updated_at = now;
-        headerTiersToSave.push(h);
-        mutatedAgentIds.add(h.agent_id);
-      }
-    }
-    if (headerTiersToSave.length > 0) await this.headerTierRepo.save(headerTiersToSave);
 
     // Virtual models (ADR 0004) pin keys the same way. Without this a virtual
     // pinned to a renamed key would fall back to the provider's first key and

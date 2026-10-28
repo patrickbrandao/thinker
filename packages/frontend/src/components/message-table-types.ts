@@ -9,9 +9,6 @@ export interface MessageRow {
   routing_tier?: string;
   routing_reason?: string;
   specificity_category?: string;
-  header_tier_id?: string;
-  header_tier_name?: string;
-  header_tier_color?: string;
   /** Virtual model (ADR 0004) the request was sent to, as named at the time. */
   virtual_model_id?: string | null;
   virtual_model_name?: string | null;

@@ -1,10 +1,9 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import VirtualModelCard from '../components/VirtualModelCard.js';
 import VirtualModelSnippetModal from '../components/VirtualModelSnippetModal.js';
-import RichText from '../components/RichText.js';
-import { Button, cx } from '../components/ui.js';
+import { cx } from '../components/ui.js';
 import {
   deleteVirtualModel,
   listVirtualModels,
@@ -37,6 +36,10 @@ export interface RoutingVirtualModelsSectionProps {
   models: AvailableModel[];
   customProviders: CustomProviderData[];
   connectedProviders: RoutingProvider[];
+  /** Card rendered first in the grid (the `auto` chain). */
+  leading?: ReactNode;
+  /** Receives the opener of the create modal, for a button outside the section. */
+  onCreateRef?: (open: () => void) => void;
   getModelParams?: (
     scope: string,
     provider: string,
@@ -65,9 +68,9 @@ export function moveId(ids: readonly string[], from: number, to: number): string
 
 /**
  * "Virtual models" on a harness's Routing page (ADR 0004): model names the
- * harness can send in `model`, each with its own chain. Kept apart from the
- * custom (header) tiers, which match on headers instead. Cards are keyed by
- * id, so a reload or a reorder moves them instead of remounting them.
+ * harness can send in `model`, each with its own chain, laid out in the same
+ * grid as the `auto` card. Cards are keyed by id, so a reload or a reorder
+ * moves them instead of remounting them.
  */
 export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsSectionProps) {
   const dataRef = useRef<VirtualModel[] | undefined>(undefined);
@@ -92,6 +95,11 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
   const [armedId, setArmedId] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const { onCreateRef } = props;
+
+  useEffect(() => {
+    onCreateRef?.(() => setModal('new'));
+  }, [onCreateRef]);
 
   const replace = (saved: VirtualModel) =>
     mutate((prev) => prev?.map((v) => (v.id === saved.id ? saved : v)));
@@ -211,24 +219,15 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
     setArmedId(null);
   };
 
-  const createButton = (
-    <Button size="sm" className="routing-section__cta" onClick={() => setModal('new')}>
-      {t('models.section.create')}
-    </Button>
-  );
-
   return (
-    <section className="routing-section routing-section--virtual-models flex flex-col gap-4">
-      <div className="routing-section__header flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-ink">{t('models.section.title')}</h2>
-          <p className="mt-0.5 text-sm text-dim">{t('models.section.subtitle')}</p>
-        </div>
-        {items.length > 0 ? createButton : null}
-      </div>
-
-      {items.length > 0 ? (
-        <div ref={listRef} className="routing-cards virtual-model-list grid gap-3" role="list">
+    <section className="routing-section routing-section--virtual-models">
+      {props.leading || items.length > 0 ? (
+        <div
+          ref={listRef}
+          className="routing-cards virtual-model-list grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
+          role="list"
+        >
+          {props.leading ? <div role="listitem">{props.leading}</div> : null}
           {items.map((vm, index) => (
             <div
               key={vm.id}
@@ -317,17 +316,6 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
               />
             </div>
           ))}
-        </div>
-      ) : !list.loading ? (
-        <div className="routing-section__empty flex flex-col items-center gap-2 rounded-surface border border-dashed border-line px-4 py-8 text-center">
-          <div className="text-sm font-semibold text-ink">{t('models.section.emptyTitle')}</div>
-          <div className="max-w-md text-sm text-muted">
-            <RichText
-              text={t('models.section.emptyDesc')}
-              parts={{ example: <code className="font-mono text-ink">deepseek/flash</code> }}
-            />
-          </div>
-          <div className="mt-2">{createButton}</div>
         </div>
       ) : null}
 

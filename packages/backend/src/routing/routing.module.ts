@@ -9,7 +9,6 @@ import { ProxyModule } from './proxy/proxy.module';
 import { OAuthModule } from './oauth/oauth.module';
 import { CustomProviderModule } from './custom-provider/custom-provider.module';
 import { ResolveModule } from './resolve/resolve.module';
-import { HeaderTiersModule } from './header-tiers/header-tiers.module';
 import { VirtualModelsModule } from './virtual-models/virtual-models.module';
 import { ProviderController } from './provider.controller';
 import { TierController } from './tier.controller';
@@ -28,7 +27,6 @@ import { AgentMessage } from '../entities/agent-message.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
-import { HeaderTier } from '../entities/header-tier.entity';
 
 @Module({
   imports: [
@@ -40,7 +38,6 @@ import { HeaderTier } from '../entities/header-tier.entity';
       Tenant,
       TierAssignment,
       SpecificityAssignment,
-      HeaderTier,
     ]),
     RoutingCoreModule,
     ModelPricesModule,
@@ -51,7 +48,6 @@ import { HeaderTier } from '../entities/header-tier.entity';
     OAuthModule,
     CustomProviderModule,
     ResolveModule,
-    HeaderTiersModule,
     VirtualModelsModule,
     RouteModelParamsModule,
   ],

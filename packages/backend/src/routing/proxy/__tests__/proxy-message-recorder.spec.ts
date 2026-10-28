@@ -656,10 +656,10 @@ describe('ProxyMessageRecorder', () => {
 
     it('persists routing_reason when passed via opts (parity with non-fallback success)', async () => {
       await recorder.recordFallbackSuccess(ctx, 'gpt-4o', 'standard', {
-        reason: 'header-match',
+        reason: 'specificity',
         usage: { prompt_tokens: 1, completion_tokens: 1 },
       });
-      expect(insertMock.mock.calls[0][0].routing_reason).toBe('header-match');
+      expect(insertMock.mock.calls[0][0].routing_reason).toBe('specificity');
     });
 
     it('writes null routing_reason when reason is omitted', async () => {
@@ -774,9 +774,9 @@ describe('ProxyMessageRecorder', () => {
     it('persists routing_reason when passed via opts', async () => {
       await recorder.recordProviderError(ctx, 500, 'oops', {
         model: 'gpt-4o',
-        reason: 'header-match',
+        reason: 'specificity',
       });
-      expect(insertMock.mock.calls[0][0].routing_reason).toBe('header-match');
+      expect(insertMock.mock.calls[0][0].routing_reason).toBe('specificity');
     });
 
     it('writes null routing_reason when reason is omitted', async () => {
@@ -838,9 +838,6 @@ describe('ProxyMessageRecorder', () => {
         routing: {
           tier: 'standard',
           specificityCategory: 'coding',
-          headerTierId: 'header-tier-1',
-          headerTierName: 'Program Weeks',
-          headerTierColor: 'indigo',
         },
       });
 
@@ -850,9 +847,6 @@ describe('ProxyMessageRecorder', () => {
         auth_type: null,
         routing_tier: 'standard',
         specificity_category: 'coding',
-        header_tier_id: 'header-tier-1',
-        header_tier_name: 'Program Weeks',
-        header_tier_color: 'indigo',
       });
     });
 
@@ -872,8 +866,6 @@ describe('ProxyMessageRecorder', () => {
         error_class: 'no_provider',
         provider: null,
         routing_tier: null,
-        header_tier_id: null,
-        header_tier_name: null,
         virtual_model_id: 'vm-1',
         virtual_model_name: 'DeepSeek/Flash',
       });
@@ -1085,7 +1077,6 @@ describe('ProxyMessageRecorder', () => {
           routing_reason: 'virtual-model',
           virtual_model_id: 'vm-1',
           virtual_model_name: 'DeepSeek/Flash',
-          header_tier_id: null,
         });
       }
     });
@@ -1398,11 +1389,11 @@ describe('ProxyMessageRecorder', () => {
         { model: 'm2', provider: 'openai', status: 502, errorBody: 'oops', fallbackIndex: 1 },
       ];
       await recorder.recordFailedFallbacks(ctx, 'standard', 'primary-model', failures, {
-        reason: 'header-match',
+        reason: 'specificity',
       });
       const rows = insertMock.mock.calls[0][0] as Array<{ routing_reason: string }>;
-      expect(rows[0].routing_reason).toBe('header-match');
-      expect(rows[1].routing_reason).toBe('header-match');
+      expect(rows[0].routing_reason).toBe('specificity');
+      expect(rows[1].routing_reason).toBe('specificity');
     });
   });
 
@@ -1534,9 +1525,9 @@ describe('ProxyMessageRecorder', () => {
         'upstream error',
         '2025-01-01T00:00:00.000Z',
         undefined,
-        { reason: 'header-match' },
+        { reason: 'specificity' },
       );
-      expect(insertMock.mock.calls[0][0].routing_reason).toBe('header-match');
+      expect(insertMock.mock.calls[0][0].routing_reason).toBe('specificity');
     });
 
     it('records a plain superseded primary failure', async () => {

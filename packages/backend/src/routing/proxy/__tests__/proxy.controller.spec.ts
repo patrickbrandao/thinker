@@ -1433,9 +1433,6 @@ describe('ProxyController', () => {
         provider_key_label: 'Work',
         tenantProviderId: 'tenant-provider-1',
         request_params: { reasoning_effort: 'medium' },
-        header_tier_id: 'header-tier-1',
-        header_tier_name: 'Premium',
-        header_tier_color: 'indigo',
       },
     });
     (providerClient as Record<string, jest.Mock>).collectChatGptSseResponse = jest
@@ -1467,9 +1464,6 @@ describe('ProxyController', () => {
         provider_key_label: 'Work',
         tenant_provider_id: 'tenant-provider-1',
         request_params: { reasoning_effort: 'medium' },
-        header_tier_id: 'header-tier-1',
-        header_tier_name: 'Premium',
-        header_tier_color: 'indigo',
       }),
     );
     expect(res.status).toHaveBeenCalledWith(400);
@@ -1502,17 +1496,14 @@ describe('ProxyController', () => {
         });
     };
 
-    it('keeps the tier and header tier the request was routed through', async () => {
+    it('keeps the tier the request was routed through', async () => {
       failAfterRouting({
         tier: 'standard',
         model: 'gpt-5.3-codex',
         provider: 'openai',
         confidence: 0.8,
-        reason: 'header-match',
+        reason: 'specificity',
         specificity_category: 'coding',
-        header_tier_id: 'header-tier-1',
-        header_tier_name: 'Program Weeks',
-        header_tier_color: 'indigo',
       });
       const thinkerSpy = jest.spyOn(recorder, 'recordThinkerBlockedRequest');
 
@@ -1528,9 +1519,6 @@ describe('ProxyController', () => {
           routing: {
             tier: 'standard',
             specificityCategory: 'coding',
-            headerTierId: 'header-tier-1',
-            headerTierName: 'Program Weeks',
-            headerTierColor: 'indigo',
           },
         }),
       );
@@ -1540,9 +1528,6 @@ describe('ProxyController', () => {
           provider: null,
           routing_tier: 'standard',
           specificity_category: 'coding',
-          header_tier_id: 'header-tier-1',
-          header_tier_name: 'Program Weeks',
-          header_tier_color: 'indigo',
         }),
       );
     });

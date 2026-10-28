@@ -21,7 +21,6 @@ import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.s
 import { ResolveAgentService } from '../src/routing/routing-core/resolve-agent.service';
 import { ProviderService } from '../src/routing/routing-core/provider.service';
 import { TierService } from '../src/routing/routing-core/tier.service';
-import { HeaderTierService } from '../src/routing/header-tiers/header-tier.service';
 import { VirtualModelService } from '../src/routing/virtual-models/virtual-model.service';
 import { RouteModelParamsService } from '../src/routing/model-params/route-model-params.service';
 import type { McpOperator } from '../src/mcp/mcp-auth';
@@ -87,7 +86,6 @@ function tools(op = operator()): Map<string, Handler> {
     resolveAgent: app.get(ResolveAgentService),
     providers: app.get(ProviderService),
     tiers: app.get(TierService),
-    headerTiers: app.get(HeaderTierService),
     virtualModels: app.get(VirtualModelService),
     routeModelParams: app.get(RouteModelParamsService),
     pricingSync: { getAll: () => new Map([['gpt-4o', {}]]) },
@@ -130,17 +128,6 @@ beforeAll(async () => {
      VALUES ('vm-mcp-default', $1, 'default', $2::jsonb, now())
      ON CONFLICT (agent_id, tier) DO UPDATE SET override_route = EXCLUDED.override_route`,
     [TEST_AGENT_ID, JSON.stringify({ provider: 'openai', authType: 'api_key', model: 'gpt-4o' })],
-  );
-  // A custom tier with the same name as a virtual model created below: the
-  // `virtual` selector must never write to it.
-  await ds.query(
-    `INSERT INTO header_tiers (id, tenant_id, agent_id, name, header_key, header_value, badge_color, override_route)
-     VALUES ('vm-mcp-ht', $1, $2, 'Deep', 'x-thinker-tier', 'deep', 'indigo', $3::jsonb)`,
-    [
-      TEST_TENANT_ID,
-      TEST_AGENT_ID,
-      JSON.stringify({ provider: 'deepseek', authType: 'api_key', model: 'deepseek-chat' }),
-    ],
   );
   await ds.query(
     `INSERT INTO tenants (id, name, owner_user_id, organization_name, is_active, created_at, updated_at)
@@ -331,7 +318,7 @@ describe('MCP virtual model tools', () => {
     }
   });
 
-  it('sets params under virtual:<id>, apart from the custom tier of the same name', async () => {
+  it('sets params under virtual:<id>, never a tier scope', async () => {
     const set = await call('thinker_routing_params_set', {
       agent: 'test-agent',
       virtual: 'deep',
@@ -352,9 +339,6 @@ describe('MCP virtual model tools', () => {
     expect(rows).toEqual([
       { scope_key: `virtual:${deepId}`, model_name: 'gpt-4o-mini', params: { temperature: 0.3 } },
     ]);
-
-    const tier = await call('thinker_routing_params_get', { agent: 'test-agent', tier: 'deep' });
-    expect(tier.data).toMatchObject({ tier: 'Deep', route: { model: 'deepseek-chat' } });
 
     const both = await call('thinker_routing_params_get', {
       agent: 'test-agent',

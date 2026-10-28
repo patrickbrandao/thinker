@@ -1,13 +1,7 @@
 import { fetchJson } from './core.js';
 
 export type SearchResultType =
-  | 'harness'
-  | 'connection'
-  | 'custom_provider'
-  | 'virtual_model'
-  | 'header_tier'
-  | 'model'
-  | 'member';
+  'harness' | 'connection' | 'custom_provider' | 'virtual_model' | 'model' | 'member';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -55,7 +49,7 @@ export interface Topology {
   hubs: Array<
     Usage & {
       id: string;
-      kind: 'auto' | 'virtual' | 'header';
+      kind: 'auto' | 'virtual';
       agentId: string;
       agentName: string;
       name: string;

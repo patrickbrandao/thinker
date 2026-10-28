@@ -55,9 +55,6 @@ export interface MessageDetailResponse {
     feedback_details: string | null;
     request_headers: Record<string, string> | null;
     request_params: { [key: string]: unknown } | null;
-    header_tier_id: string | null;
-    header_tier_name: string | null;
-    header_tier_color: string | null;
     /** Virtual model (ADR 0004) the request was sent to, as named at the time. */
     virtual_model_id?: string | null;
     virtual_model_name?: string | null;
@@ -116,7 +113,6 @@ export interface MessageListParams extends Record<string, string | undefined> {
   trigger?: string;
   routing_tier?: string;
   specificity_category?: string;
-  header_tier_id?: string;
   include_total?: string;
   cache_total?: string;
   include_filter_options?: string;
