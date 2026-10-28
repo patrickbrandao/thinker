@@ -85,12 +85,6 @@ export default function McpServer() {
     <div className="page">
       <title>{t('common.pageTitle', { page: t('harnesses.mcp.title') })}</title>
       <meta name="description" content={t('harnesses.mcp.metaDescription')} />
-      <div className="page-head">
-        <div>
-          <h1>{t('harnesses.mcp.title')}</h1>
-          <div className="sub">{t('harnesses.mcp.subtitle')}</div>
-        </div>
-      </div>
 
       {enabled === false ? (
         <Panel title={t('harnesses.mcp.unavailableTitle')}>

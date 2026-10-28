@@ -23,6 +23,8 @@ const ptBR: Catalog<typeof en> = {
   sectionOrganization: 'ORGANIZAÇÃO',
   membersSettings: 'Membros e configurações',
   users: 'Usuários',
+  organization: 'Organização',
+  cli: 'CLI',
   userFallback: 'Usuário',
   harnessActions: 'Ações do harness',
   settings: 'Configurações',

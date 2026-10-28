@@ -29,12 +29,6 @@ export default function Cli() {
     <div className="page">
       <title>{t('common.pageTitle', { page: 'CLI' })}</title>
       <meta name="description" content={t('harnesses.cli.metaDescription')} />
-      <div className="page-head">
-        <div>
-          <h1>CLI</h1>
-          <div className="sub">{t('harnesses.cli.subtitle')}</div>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 lg:grid-cols-2">

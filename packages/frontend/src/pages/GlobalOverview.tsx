@@ -977,19 +977,15 @@ export default function GlobalOverview() {
       <title>{t('overview.pageTitle')}</title>
       <AddAgentModal open={addAgentOpen} onClose={dismissAddAgent} />
 
-      <div className="page-head">
-        <div>
-          <h1>{t('overview.title')}</h1>
-          <p className="sub">{t('overview.subtitle')}</p>
-        </div>
-        {!hasNoAgents || !hasNoProviders ? (
+      {!hasNoAgents || !hasNoProviders ? (
+        <div className="page-head justify-end">
           <div className="page-actions">
             <div className="w-44">
               <Select value={chartRange} onChange={setChartRange} options={rangeOptions()} />
             </div>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-4">
         {hasNoAgents && hasNoProviders ? (

@@ -155,15 +155,6 @@ export default function Organization() {
     <div className="page">
       <title>{t('common.pageTitle', { page: t('org.page.title') })}</title>
       <meta name="description" content={t('org.page.metaDescription')} />
-      <div className="page-head">
-        <div>
-          <h1>{org?.name ?? t('org.page.title')}</h1>
-          <div className="sub">
-            {t('org.page.subtitle')}
-            {role ? <> {t('org.yourRole', { role: roleLabel(role) })}.</> : null}
-          </div>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-4">
         <Panel title={t('org.page.general')}>

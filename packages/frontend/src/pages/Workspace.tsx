@@ -325,11 +325,7 @@ export default function Workspace() {
     <div className="page">
       <title>{t('common.pageTitle', { page: t('harnesses.workspace.title') })}</title>
       <meta name="description" content={t('harnesses.workspace.metaDescription')} />
-      <div className="page-head">
-        <div>
-          <h1>{t('harnesses.workspace.title')}</h1>
-          <p className="sub">{t('harnesses.workspace.subtitle')}</p>
-        </div>
+      <div className="page-head justify-end">
         <div className="page-actions">
           {viewToggle}
           {canEdit ? (

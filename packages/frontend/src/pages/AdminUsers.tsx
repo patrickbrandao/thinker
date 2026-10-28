@@ -103,13 +103,6 @@ export default function AdminUsers() {
         <ErrorState title={t('org.users.notAvailable')} message={t('org.users.adminsOnly')} />
       ) : (
         <>
-          <div className="page-head">
-            <div>
-              <h1>{t('org.users.title')}</h1>
-              <div className="sub">{t('org.users.subtitle')}</div>
-            </div>
-          </div>
-
           <div className="flex flex-col gap-4">
             <Panel title={t('org.users.create')} bodyClassName="flex flex-col gap-4">
               <form

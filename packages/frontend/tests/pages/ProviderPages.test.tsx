@@ -297,7 +297,6 @@ describe('provider pages', () => {
     renderPage(<Subscriptions />);
 
     await waitFor(() => {
-      expect(screen.getByText('Subscriptions')).toBeDefined();
       expect(screen.getByText('My subscription connections')).toBeDefined();
       expect(screen.getByText('ChatGPT')).toBeDefined();
     });
@@ -439,7 +438,6 @@ describe('provider pages', () => {
     renderPage(<Byok />);
 
     await waitFor(() => {
-      expect(screen.getByText('Usage-based')).toBeDefined();
       expect(screen.getByText('My usage-based connections')).toBeDefined();
       expect(screen.getByText('Custom Gateway')).toBeDefined();
       expect(screen.getByText('Inactive')).toBeDefined();
@@ -462,7 +460,6 @@ describe('provider pages', () => {
     renderPage(<LocalProviders />);
 
     await waitFor(() => {
-      expect(screen.getByText('Local')).toBeDefined();
       expect(screen.getByText('My local connections')).toBeDefined();
       expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
     });
@@ -483,7 +480,7 @@ describe('provider pages', () => {
     renderPage(<Subscriptions />, '/providers?keep=1');
 
     await waitFor(() => {
-      expect(screen.getByText('Subscriptions')).toBeDefined();
+      expect(screen.getByText('My subscription connections')).toBeDefined();
     });
     // No deep-link → the effect must not touch the params or open the modal.
     expect(screen.getByTestId('where').textContent).toBe('?keep=1');
@@ -761,7 +758,7 @@ describe('provider pages', () => {
   it('disables the list-view Connect button when no agent exists', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     renderPage(<Subscriptions />);
-    await waitFor(() => expect(screen.getByText('Subscriptions')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('My subscription connections')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
 

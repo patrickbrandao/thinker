@@ -67,7 +67,6 @@ describe('harness screens in pt-BR', () => {
   it('renders the empty harness list in Portuguese', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     render(() => <Workspace />);
-    expect(screen.getByText('Meus harnesses')).toBeDefined();
     expect(await screen.findByText('Nenhum harness ainda')).toBeDefined();
     expect(screen.getByText('Conectar seu primeiro harness')).toBeDefined();
   });

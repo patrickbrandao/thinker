@@ -108,7 +108,6 @@ describe('provider pages in pt-BR', () => {
   it('renders the usage-based page in Portuguese', async () => {
     renderInRouter(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeTruthy());
-    expect(screen.getByText('Por uso')).toBeTruthy();
     expect(screen.getByText('Minhas conexões por uso')).toBeTruthy();
     expect(screen.getByText('Provedores por uso compatíveis')).toBeTruthy();
     expect(screen.getByText('Custo total de API (30d)')).toBeTruthy();

@@ -519,20 +519,16 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
   return (
     <div className="page wide">
       <title>{copy.title}</title>
-      <div className="page-head">
-        <div>
-          <h1>{copy.heading}</h1>
-          <p className="sub">{copy.subtitle}</p>
-        </div>
-        {copy.customAddLabel && canManage ? (
+      {copy.customAddLabel && canManage ? (
+        <div className="page-head justify-end">
           <div className="page-actions">
             <Button variant="ghost" size="sm" onClick={() => setShowCustomModal(true)}>
               <Shapes size={14} aria-hidden="true" />
               {copy.customAddLabel}
             </Button>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {connectedRows.length > 0 ? (
         <>
