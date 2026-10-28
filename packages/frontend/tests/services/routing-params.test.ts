@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseCustomProviderParams, parseProviderDeepLink } from '../../src/services/routing-params';
+import {
+  parseCustomProviderParams,
+  parseProviderDeepLink,
+} from '../../src/services/routing-params';
 
 describe('parseCustomProviderParams', () => {
   it('returns null when provider param is missing', () => {

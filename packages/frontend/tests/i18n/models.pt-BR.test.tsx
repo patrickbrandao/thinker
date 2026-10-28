@@ -65,7 +65,7 @@ describe('model screens in pt-BR', () => {
 
   // VirtualModelModal belongs to the routing area and is still a Solid
   // component; enable this case once it is ported to React.
-  it.skip('renders the virtual model modal in Portuguese', async () => {
+  it('renders the virtual model modal in Portuguese', async () => {
     render(
       <VirtualModelModal
         agentName="demo"

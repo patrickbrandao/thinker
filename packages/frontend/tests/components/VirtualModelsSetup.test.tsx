@@ -21,6 +21,8 @@ import VirtualModelsHint, {
 } from '../../src/components/VirtualModelsHint';
 import SetupStepAddProvider from '../../src/components/SetupStepAddProvider';
 import FrameworkSnippets from '../../src/components/FrameworkSnippets';
+import VirtualModelSnippetModal from '../../src/components/VirtualModelSnippetModal';
+import type { VirtualModel } from '../../src/services/api/virtual-models';
 import { getSnippetForToolkit, withSnippetModel } from '../../src/services/framework-snippets';
 
 const base = { apiKey: null, keyPrefix: null, baseUrl: 'http://localhost:2099/v1' };
@@ -196,7 +198,36 @@ describe('SetupStepAddProvider with virtual models', () => {
 });
 
 describe('VirtualModelSnippetModal', () => {
-  // VirtualModelSnippetModal belongs to the routing area and is not ported to
-  // React in this worktree; its case comes back when it is.
-  it.todo('shows the harness key, base URL and the model, and closes');
+  const vm: VirtualModel = {
+    id: 'vm-1',
+    agent_id: 'agent-1',
+    name: 'deepseek/flash',
+    sort_order: 0,
+    enabled: false,
+    override_route: null,
+    fallback_routes: null,
+    continue_on_default: false,
+    response_mode: 'buffered',
+    output_modality: 'text',
+    created_at: '',
+    updated_at: '',
+    shadows: [],
+    context_length: null,
+  };
+
+  it('shows the harness key, base URL and the model, and closes', async () => {
+    mockGetAgentKey.mockResolvedValue({ apiKey: 'thk_test', keyPrefix: 'thk_te' });
+    const onClose = vi.fn();
+    render(<VirtualModelSnippetModal agentName="demo" virtualModel={vm} onClose={onClose} />);
+    expect(screen.getByText('Use “deepseek/flash”')).toBeTruthy();
+    expect(screen.getByText(/This virtual model is inactive/)).toBeTruthy();
+    await waitFor(() => expect(document.body.textContent).toContain('thk_test'));
+    expect(mockGetAgentKey).toHaveBeenCalledWith('demo');
+    expect(document.body.querySelector('code.hljs')!.textContent).toContain('"deepseek/flash"');
+    expect(document.body.textContent).toContain('/v1');
+    fireEvent.click(screen.getByText('Done'));
+    fireEvent.click(screen.getByLabelText('Close'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
 });

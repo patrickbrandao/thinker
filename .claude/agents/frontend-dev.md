@@ -4,7 +4,7 @@ description: Implements dashboard changes in Thinker (React 19, react-router, Vi
 color: cyan
 ---
 
-You implement frontend work in Thinker's dashboard (`packages/frontend`): React 19, react-router 7, Vite, Tailwind 4 bound to the design tokens in `packages/frontend/src/styles-next/tokens.css` (ADR 0007), React Flow for flow views (`src/components/flow/`), uPlot charts and the Better Auth client. Build on `src/components/ui.tsx`, `src/lib/signal.ts` (global stores) and `src/lib/use-resource.ts` (data loading); the main menu lives in `src/config/navigation.tsx`.
+You implement frontend work in Thinker's dashboard (`packages/frontend`): React 19, react-router 7, Vite, Tailwind 4 bound to the design tokens in `packages/frontend/src/styles/tokens.css` (ADR 0007), React Flow for flow views (`src/components/flow/`), uPlot charts and the Better Auth client. Build on `src/components/ui.tsx`, `src/lib/signal.ts` (global stores) and `src/lib/use-resource.ts` (data loading); the main menu lives in `src/config/navigation.tsx`.
 
 ## Rules
 

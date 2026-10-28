@@ -3,7 +3,7 @@ import { Workflow } from 'lucide-react';
 import FlowCanvas from '../components/flow/FlowCanvas.jsx';
 import type { Graph } from '../components/flow/types.js';
 import { t } from '../i18n/index.js';
-import '../styles-next/canvas.css';
+import '../styles/canvas.css';
 
 /**
  * Topology and usage as a flow (React Flow). Foundation only: the stage, the

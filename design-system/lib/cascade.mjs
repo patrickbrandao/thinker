@@ -6,7 +6,7 @@
 // stylesheet). Declarations that can never win against an identical selector
 // are the ghost rules.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, basename } from 'node:path';
 import { parseCss } from './parse-css.mjs';
 
@@ -73,7 +73,11 @@ function visit(path, ctx, layerPrefix = '') {
       importLayer = qualifyLayer(layerPrefix, name);
       registerGlobalLayer(ctx, importLayer);
     }
-    visit(resolve(dirname(path), event.specifier), ctx, importLayer);
+    const target = resolve(dirname(path), event.specifier);
+    // A bare specifier with no such file next to the importer is a package
+    // (`tailwindcss`, `@xyflow/react/...`): third-party, not design-system source.
+    if (!event.specifier.startsWith('.') && !existsSync(target)) continue;
+    visit(target, ctx, importLayer);
   }
   ctx.order.push(path);
   for (const rule of rules) {

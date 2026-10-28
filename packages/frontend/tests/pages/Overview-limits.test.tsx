@@ -35,16 +35,6 @@ vi.mock('../../src/services/sse.js', async () => {
   };
 });
 
-// MessageTable belongs to the Requests area and has its own suite: stub it and
-// assert the rows the page hands it.
-const messageTableProps = vi.hoisted(() => ({ last: null as any }));
-vi.mock('../../src/components/MessageTable.jsx', () => ({
-  default: (props: any) => {
-    messageTableProps.last = props;
-    return <div data-testid="message-table" />;
-  },
-}));
-
 vi.mock('../../src/services/formatters.js', () => ({
   formatCost: (v: number) => `$${v.toFixed(2)}`,
   formatNumber: (v: number) => String(v),
@@ -172,7 +162,6 @@ describe('Overview - trend badges and status display', () => {
     localStorage.clear();
     localStorage.setItem('thinker_global_group', 'provider');
     mockGetOverviewDetails.mockResolvedValue({});
-    messageTableProps.last = null;
   });
 
   it('does not render trend badge when trend_pct is 0', async () => {
@@ -194,9 +183,7 @@ describe('Overview - trend badges and status display', () => {
     expect(trendBadges.length).toBe(0);
   });
 
-  it('hands a provider rate_limited row to the table as a plain row', async () => {
-    // Rendering it as a binary "Failed" pill (no limits-page link) is the
-    // MessageTable suite's business; the page passes the row through as is.
+  it('renders a provider rate_limited row as a plain error, not a limits-page link', async () => {
     const rateLimitedData = {
       ...overviewData,
       recent_activity: [
@@ -220,15 +207,19 @@ describe('Overview - trend badges and status display', () => {
     });
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({
-        id: 'msg-ratelimit1',
-        status: 'rate_limited',
-      });
+      // Binary status: a provider rate limit is just a "Failed" pill now.
+      const badge = container.querySelector('.status-badge--error');
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toContain('Failed');
     });
     expect(container.textContent).not.toContain('rate_limited');
+    // A provider rate limit is a plain error: it must not link to the Thinker
+    // spend-limits page (that page is for the user's own software limits).
+    expect(container.querySelector('.status-badge--error')!.tagName).not.toBe('A');
+    expect(container.querySelector('a[href$="/limits"]')).toBeNull();
   });
 
-  it('hands the routing tier to the recent requests table', async () => {
+  it('renders routing tier badge when routing_tier is set', async () => {
     const routedData = {
       ...overviewData,
       recent_activity: [
@@ -243,9 +234,11 @@ describe('Overview - trend badges and status display', () => {
       recent_activity: routedData.recent_activity,
       cost_by_model: [],
     });
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({ routing_tier: 'complex' });
+      const tierBadge = container.querySelector('.tier-badge--complex');
+      expect(tierBadge).not.toBeNull();
+      expect(tierBadge?.textContent).toBe('complex');
     });
   });
 
@@ -275,10 +268,12 @@ describe('Overview - trend badges and status display', () => {
       recent_activity: [{ ...overviewData.recent_activity[0], id: 'msg-from-details' }],
       cost_by_model: [],
     });
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]?.id).toBe('msg-from-details');
-      expect(messageTableProps.last?.items?.[0]?.status).toBe('ok');
+      // The message cell shows the first 8 characters of the row id.
+      expect(container.textContent).toContain('msg-from');
+      expect(container.textContent).not.toContain('msg-1234');
+      expect(container.querySelector('.status-badge--ok')).not.toBeNull();
     });
   });
 });

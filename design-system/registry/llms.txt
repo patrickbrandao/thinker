@@ -1,346 +1,296 @@
 # Thinker dashboard design-system registry (GENERATED — do not edit)
-# Regenerate: npm run design:registry — source: packages/frontend/src/styles, entry theme.css
+# Regenerate: npm run design:registry — source: packages/frontend/src/styles, entry index.css
 #
 # Rules for any UI change: use these tokens (never raw hex/hsl/px sizes),
 # reuse an existing block before inventing one, and when a canonical rule
 # exists for a selector, edit THAT rule — never add a competing one.
 
-## Tokens (79 on :root, 38 dark overrides)
+## Tokens (58 on :root, 50 dark overrides)
 ### chart
---bar-input: 178 75% 34% | dark: 178 70% 40%
---bar-output: 178 55% 72% | dark: 178 50% 70%
---bar-output-axis: 178 55% 48% | dark: 178 50% 55%
---chart-1: 178 75% 44% | dark: 178 70% 50%
---chart-2: 197 37% 24% | dark: 197 50% 55%
---chart-3: 167 70% 48% | dark: 167 70% 55%
---chart-4: 349 52% 61% | dark: 349 52% 65%
---chart-5: 43 96% 56% | dark: 43 96% 65%
+--chart-1: #2563eb | dark: #3b82f6
+--chart-2: #0d9488 | dark: #2dd4bf
+--chart-3: #d97706 | dark: #fbbf24
+--chart-4: #7c3aed | dark: #a78bfa
+--chart-5: #db2777 | dark: #f472b6
+--chart-6: #65a30d | dark: #a3e635
+--chart-other: #9ca3af | dark: #6b7280
 ### color
---accent: 40 33% 93% | dark: 0 0% 15%
---accent-foreground: 222.2 47.4% 11.2% | dark: 0 0% 93%
---background: 45 49% 97% | dark: 0 0% 9%
---border: 36 25% 88% | dark: 0 0% 18%
---card: 44 60% 99% | dark: 0 0% 11%
---card-foreground: 222.2 84% 4.9% | dark: 0 0% 93%
---destructive: 0 84.2% 60.2% | dark: 0 80% 62%
---destructive-foreground: 45 30% 97% | dark: 0 0% 93%
---foreground: 222.2 84% 4.9% | dark: 0 0% 93%
---input: 36 25% 88% | dark: 0 0% 18%
---muted: 40 33% 93% | dark: 0 0% 15%
---muted-foreground: 215 13% 34% | dark: 0 0% 55%
---popover: 44 60% 99% | dark: 0 0% 11%
---popover-foreground: 222.2 84% 4.9% | dark: 0 0% 93%
---primary: 222.2 47.4% 11.2% | dark: 0 0% 93%
---primary-foreground: 45 30% 97% | dark: 0 0% 9%
---ring: 222.2 84% 4.9% | dark: 0 0% 60%
---secondary: 40 33% 93% | dark: 0 0% 15%
---secondary-foreground: 222.2 47.4% 11.2% | dark: 0 0% 93%
---success: 178 75% 44% | dark: 178 70% 50%
---success-foreground: 0 0% 100%
---warning: 38 92% 50%
+--accent: #2563eb | dark: #3b82f6
+--accent-deep: #1e40af | dark: #1e3a8a
+--accent-hover: #1d4ed8 | dark: #60a5fa
+--accent-soft: #1d4ed8 | dark: #7cb0fb
+--accent-tint: rgb(37 99 235 / 0.1) | dark: rgb(59 130 246 / 0.14)
+--bg: #f7f8fa | dark: #0f1115
+--bg-chrome: #f3f4f6 | dark: #0b0d11
+--bg-elev: #ffffff | dark: #161920
+--bg-sunken: #eef0f3 | dark: #0b0d10
+--border: #e3e6eb | dark: #242934
+--border-strong: #cdd2da | dark: #343b48
+--danger: #dc2626 | dark: #f87171
+--danger-tint: rgb(220 38 38 / 0.1) | dark: rgb(248 113 113 / 0.12)
+--info: #0e7490 | dark: #22d3ee
+--info-tint: rgb(14 116 144 / 0.1) | dark: rgb(34 211 238 / 0.12)
+--ok: #15803d | dark: #4ade80
+--ok-tint: rgb(21 128 61 / 0.1) | dark: rgb(74 222 128 / 0.12)
+--on-accent: #ffffff
+--overlay: rgb(15 23 42 / 0.4) | dark: rgb(0 0 0 / 0.6)
+--port-1: #2563eb | dark: #3b82f6
+--port-10: #4f46e5 | dark: #818cf8
+--port-11: #059669 | dark: #34d399
+--port-12: #64748b | dark: #94a3b8
+--port-2: #7c3aed | dark: #a78bfa
+--port-3: #0d9488 | dark: #2dd4bf
+--port-4: #d97706 | dark: #fbbf24
+--port-5: #db2777 | dark: #f472b6
+--port-6: #65a30d | dark: #a3e635
+--port-7: #0891b2 | dark: #22d3ee
+--port-8: #9333ea | dark: #c084fc
+--port-9: #ea580c | dark: #fb923c
+--ring: rgb(17 24 39 / 0.18) | dark: rgb(243 244 246 / 0.2)
+--ring-accent: rgb(37 99 235 / 0.35) | dark: rgb(59 130 246 / 0.45)
+--surface-2: #f4f5f7 | dark: #1b1f27
+--surface-3: #eceef2 | dark: #222730
+--surface-4: #e3e6eb | dark: #2a303b
+--text: #111827 | dark: #f3f4f6
+--text-dim: #374151 | dark: #d1d5db
+--text-faint: #9ca3af | dark: #6b7280
+--text-muted: #6b7280 | dark: #9ca3af
+--topbar-height: 52px
+--warn: #b45309 | dark: #fbbf24
+--warn-tint: rgb(180 83 9 / 0.12) | dark: rgb(251 191 36 / 0.12)
 ### font
---font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif
---font-heading: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, system-ui, sans-serif
---font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace
---font-size-2xl: 1.875rem
---font-size-2xs: 0.6875rem
---font-size-3xl: 2.25rem
---font-size-3xs: 0.625rem
---font-size-4xl: 3rem
---font-size-base: 0.9375rem
---font-size-lg: 1.125rem
---font-size-md: 1rem
---font-size-sm: 0.875rem
---font-size-xl: 1.5rem
---font-size-xs: 0.75rem
---tooltip-font-size: var(--font-size-sm)
-### gap
---gap-2xl: 48px
---gap-lg: 24px
---gap-md: 16px
---gap-sm: 8px
---gap-xl: 32px
---gap-xs: 4px
+--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace
+--font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif
 ### layout
---header-height: 48px
---sidebar-width: 230px
+--sidebar-width: 240px
 ### radius
---radius: 0.5rem
---radius-pill: 9999px
---radius-sm: 0.375rem
+--radius-control: 6px
+--radius-node: 12px
+--radius-surface: 8px
 ### shadow
---card-shadow: rgba(0, 0, 0, 0.06) 0px 0px 0px 1px, rgba(0, 0, 0, 0.03) 0px 2px 6px 0px
---card-shadow-hover: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.06) 0px 3px 8px 0px
---shadow-lg: 0 8px 28px rgb(0 0 0 / 0.18)
---shadow-md: 0 4px 12px rgb(0 0 0 / 0.08)
---shadow-ring: 0 0 0 1px rgb(0 0 0 / 0.08)
---shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06)
+--shadow-float: 0 12px 32px -8px rgb(15 23 42 / 0.18), 0 2px 6px rgb(15 23 42 / 0.06) | dark: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4)
 ### sidebar
---sidebar-accent: 40 28% 93% | dark: 0 0% 14%
---sidebar-accent-foreground: 240 5.9% 10% | dark: 0 0% 93%
---sidebar-background: 43 38% 95% | dark: 0 0% 7%
---sidebar-border: 36 20% 89% | dark: 0 0% 18%
---sidebar-foreground: 240 5.3% 26.1% | dark: 0 0% 93%
---sidebar-primary: 240 5.9% 10% | dark: 0 0% 93%
---sidebar-primary-foreground: 45 30% 97% | dark: 0 0% 9%
---sidebar-ring: 217.2 91.2% 59.8% | dark: 0 0% 60%
-### transition
---transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1)
---transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1)
-### z-index
---z-dropdown: 100
---z-modal: 1000
---z-overlay: 900
---z-raised: 10
---z-sticky: 200
---z-toast: 8000
---z-tooltip: 9999
+--sidebar-width-collapsed: 60px
 
-## Blocks (155 BEM blocks, 622 classes)
-account-back-btn (agents.css): account-back-btn
-account-modal (agents.css): account-modal account-modal--standalone account-modal__inner
-account-security-error (agents.css): account-security-error
-account-security-footer (agents.css): account-security-footer
-action-menu (action-menu.css): action-menu action-menu--open action-menu__dropdown action-menu__item action-menu__item--danger action-menu__trigger
-active (controls.css, theme.css): active
-add-agent-toggles (modals.css): add-agent-toggles add-agent-toggles__header
-agent-card (action-menu.css, agents.css): agent-card agent-card--skeleton agent-card__chart agent-card__menu agent-card__name agent-card__platform-icon agent-card__stat agent-card__stat-label agent-card__stat-value agent-card__stats agent-card__top
-agent-card-wrap (action-menu.css, agents.css): agent-card-wrap
-agent-filter-select (theme.css): agent-filter-select__trigger
-agent-type-select (agent-type-select.css): agent-type-select agent-type-select__caret agent-type-select__column agent-type-select__dropdown agent-type-select__dropdown--inline agent-type-select__group-label agent-type-select__groups agent-type-select__option agent-type-select__option--selected agent-type-select__option-icon agent-type-select__trigger agent-type-select__trigger--open agent-type-select__trigger-icon agent-type-select__trigger-label
-agent-type-select-row (agent-type-select.css): agent-type-select-row
-agents-grid (agents.css): agents-grid
-api-key-display (wizard.css): api-key-display__code api-key-display__prefix api-key-display__value api-key-display__warning
-app-body (layout.css): app-body
-app-layout (theme.css): app-layout
-app-shell (layout.css): app-shell
-auth-card (auth.css): auth-card
-auth-divider (auth.css): auth-divider auth-divider__text
-auth-footer (auth.css): auth-footer auth-footer__link
-auth-form (auth.css): auth-form auth-form__actions auth-form__error auth-form__error-link auth-form__forgot auth-form__hint auth-form__input auth-form__label auth-form__link-btn auth-form__notice auth-form__notice-link auth-form__submit auth-form__submit--secondary auth-form__success
-auth-header (auth.css): auth-header auth-header__subtitle auth-header__title
-auth-last-used (auth.css): auth-last-used
-auth-layout (auth.css): auth-layout
-auth-logo (auth.css): auth-logo auth-logo__img auth-logo__img--dark auth-logo__img--light auth-logo__link
-auth-social-btn (auth.css): auth-social-btn auth-social-btn--discord auth-social-btn--github auth-social-btn--google auth-social-btn__icon
-auth-social-group (auth.css): auth-social-group
-auth-terms (auth.css): auth-terms auth-terms__link
-breadcrumb (layout.css, theme.css): breadcrumb
-btn (controls.css, layout.css, limits.css, modals.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
-cards-grid (layout.css, theme.css, wizard.css): cards-grid
-chart-card (cards.css, theme.css): chart-card chart-card__body chart-card__controls chart-card__filter-btn chart-card__filter-btn--active chart-card__filters chart-card__header chart-card__label chart-card__stat chart-card__stat--active chart-card__stat--clickable chart-card__subtitle chart-card__subtitle-title chart-card__value chart-card__value-row
-chart-tooltip (charts.css, theme.css): chart-tooltip
-confirm-modal (limits.css): confirm-modal__confirm-row confirm-modal__footer confirm-modal__warning
-container (layout.css, theme.css): container--full container--lg container--md container--sm
-count-link (theme.css): count-link
-custom-select (custom-select.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
-dark (agent-type-select.css, agents.css, auth.css, controls.css, data.css, modals.css, platform-icons.css, tokens.css, wizard.css): dark
-data-table (data.css, feedback.css, theme.css): data-table data-table__sortable
-data-table-scroll (data.css): data-table-scroll
-duplicate-agent (agents.css): duplicate-agent__badge duplicate-agent__list duplicate-agent__section duplicate-agent__section-header
-empty-state (data.css, theme.css): empty-state empty-state__img empty-state__img-wrapper empty-state__title
-error-recovery-row (data.css): error-recovery-row error-recovery-row--solo error-recovery-row__arrow error-recovery-row__arrow-down error-recovery-row__arrow-right error-recovery-row__card error-recovery-row__card--fallback error-recovery-row__card-text error-recovery-row__card-title error-recovery-row__error error-recovery-row__error--full error-recovery-row__meta-hint error-recovery-row__meta-label error-recovery-row__meta-table error-recovery-row__meta-value error-recovery-row__title
-expandable-card (charts.css, theme.css): expandable-card expandable-card__btn expandable-card__content expandable-card__fade
-fallback-icon (data.css): fallback-icon
-feed-item (data.css, theme.css): feed-item feed-item__body feed-item__desc feed-item__icon feed-item__meta feed-item__status feed-item__sub feed-item__time
-feedback-btn (feedback.css): feedback-btn feedback-btn--active-dislike feedback-btn--active-like
-feedback-cell (feedback.css): feedback-cell
-feedback-modal (feedback.css): feedback-modal feedback-modal__footer feedback-modal__tags feedback-modal__textarea
-feedback-tag (feedback.css): feedback-tag feedback-tag--selected
-framework-snippets (wizard.css): framework-snippets__block framework-snippets__connection framework-snippets__field framework-snippets__label framework-snippets__toggle-row framework-snippets__value
-free-tag (theme.css): free-tag
-header (controls.css, theme.css): header header__avatar header__avatar-btn header__breadcrumb-current header__breadcrumb-icon header__breadcrumb-label header__breadcrumb-link header__breadcrumb-provider-icon header__docs-link header__dropdown header__dropdown-divider header__dropdown-email header__dropdown-header header__dropdown-item header__dropdown-item--danger header__dropdown-name header__gear header__gear-btn header__left header__logo header__logo-img header__logo-img--dark header__logo-img--light header__right header__separator
-header-controls (layout.css, theme.css): header-controls
-info-tooltip (tooltip.css): info-tooltip info-tooltip__bubble info-tooltip__icon
-integration-grid (wizard.css): integration-grid
-integration-panel (wizard.css): integration-panel__desc integration-panel__header integration-panel__tabs
-limit-block-toggle (limits.css): limit-block-toggle limit-block-toggle__label
-limit-modal (limits.css): limit-modal__row
-limit-type-icon (limits.css): limit-type-icon
-limit-type-icons (limits.css): limit-type-icons
-limit-warn-tag (limits.css): limit-warn-tag
-limits-provider-hint (limits.css): limits-provider-hint
-limits-routing-cta (limits.css): limits-routing-cta
-limits-warning-banner (limits.css): limits-warning-banner
-main-content (layout.css, theme.css): main-content main-content--full
-masked-key (notifications.css): masked-key masked-key__edit masked-key__value
-mobile-nav-backdrop (theme.css): mobile-nav-backdrop
-mobile-nav-toggle (theme.css): mobile-nav-toggle
-modal (modals.css, theme.css): modal modal__body modal__close modal__footer modal__header modal__title
-modal-back-btn (modals.css): modal-back-btn
-modal-backdrop (modals.css, theme.css): modal-backdrop
-modal-card (limits.css, modals.css, notifications.css): modal-card modal-card__back-link modal-card__cta modal-card__desc modal-card__field-error modal-card__field-hint modal-card__field-label modal-card__field-link modal-card__footer modal-card__footer--split modal-card__input modal-card__input--error modal-card__input--lg modal-card__note modal-card__privacy modal-card__title
-modal-key-box (wizard.css): modal-key-box modal-key-box__copy modal-key-box__header modal-key-box__label modal-key-box__value modal-key-box__warning
-modal-overlay (modals.css): modal-overlay
-modal-stepper (modals.css): modal-stepper modal-stepper__circle modal-stepper__label modal-stepper__line modal-stepper__step modal-stepper__step--active modal-stepper__step--done
-modal-terminal (agents.css, wizard.css): modal-terminal modal-terminal__body modal-terminal__code modal-terminal__copy modal-terminal__copy--disabled modal-terminal__dot modal-terminal__dot--green modal-terminal__dot--red modal-terminal__dot--yellow modal-terminal__dots modal-terminal__header modal-terminal__line--comment modal-terminal__prompt modal-terminal__tab modal-terminal__tab--active modal-terminal__tab-sep modal-terminal__tabs
-model-bar (data.css, theme.css): model-bar model-bar__fill model-bar__name model-bar__pct model-bar__track
-model-params (params-card.css): model-params__group model-params__group-card model-params__group-header model-params__label-hint model-params__label-title model-params__row model-params__row-control model-params__row-text model-params__separator
-msg-detail (data.css): msg-detail msg-detail__cell msg-detail__chevron msg-detail__chevron--open msg-detail__chevron-btn msg-detail__chevron-btn--open msg-detail__chevron-cell msg-detail__chevron-th msg-detail__count msg-detail__count-badge msg-detail__error msg-detail__error-box msg-detail__error-code msg-detail__error-inline msg-detail__eye-btn msg-detail__fallback-banner msg-detail__loader msg-detail__log-body msg-detail__meta msg-detail__meta-item msg-detail__meta-label msg-detail__miscat-btn msg-detail__mono msg-detail__mono-xs msg-detail__param-value msg-detail__row msg-detail__section msg-detail__section-row msg-detail__section-title msg-detail__section-title--inline msg-detail__section-title--toggle msg-detail__severity-dot msg-detail__spinner msg-detail__summary msg-detail__summary-item msg-detail__table
-msg-row (data.css): msg-row--clickable msg-row--expanded msg-row--selected
-not-found (layout.css): not-found not-found__code not-found__link not-found__text not-found__title
-notif-hint (notifications.css): notif-hint
-notif-table (notifications.css): notif-table notif-table--flush notif-table__actions notif-table__mono notif-table__period notif-table__row--disabled
-notification-modal (notifications.css): notification-modal__select
-notification-rule (notifications.css): notification-rule__delete notification-rule__edit
-notification-toggle (notifications.css): notification-toggle notification-toggle__slider
-overview (agents.css): overview__platform-icon
-page-header (layout.css, theme.css): page-header page-header--wrap page-header__intro
-pagination (data.css): pagination pagination__btn pagination__controls pagination__summary
-panel (cards.css, charts.css, limits.css, theme.css, wizard.css): panel panel--disabled panel__header panel__tab panel__tab--active panel__tab-icon panel__tabs panel__title
-platform-icon (platform-icons.css): platform-icon
-provider-card (notifications.css): provider-card provider-card__actions provider-card__body provider-card__dropdown provider-card__dropdown-item provider-card__dropdown-item--danger provider-card__email provider-card__header provider-card__key provider-card__label provider-card__logo provider-card__menu provider-card__menu-btn provider-card__meta provider-card__name
-provider-modal-option (notifications.css): provider-modal-option provider-modal-option--active provider-modal-option__logo
-provider-modal-picker (notifications.css): provider-modal-picker
-provider-setup (notifications.css): provider-setup__subtitle provider-setup__title
-provider-setup-card (notifications.css): provider-setup-card provider-setup-card__desc provider-setup-card__logo provider-setup-card__name
-provider-setup-grid (notifications.css): provider-setup-grid
-recovery-card (data.css): recovery-card recovery-card--fallback recovery-card__branding recovery-card__phrase recovery-card__title
-recovery-card-row (data.css): recovery-card-row
-recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none
-rel-col (theme.css): rel-col
-rule-menu (limits.css): rule-menu__btn rule-menu__dropdown rule-menu__item rule-menu__item--danger
-security-event (data.css, theme.css): security-event security-event__badge security-event__desc security-event__dot security-event__dot--critical security-event__dot--info security-event__dot--warning security-event__time
-select (controls.css, theme.css): select
-settings-card (agents.css, controls.css, notifications.css): settings-card settings-card--danger settings-card--disabled settings-card__body settings-card__control settings-card__control--end settings-card__copy-btn settings-card__desc settings-card__footer settings-card__id-row settings-card__id-value settings-card__input settings-card__key-actions settings-card__key-row settings-card__key-value settings-card__label settings-card__label-desc settings-card__label-desc--meta settings-card__label-title settings-card__row
-settings-section (agents.css, controls.css): settings-section__title settings-section__title--danger
-settings-switch (agents.css): settings-switch settings-switch--on settings-switch__thumb settings-switch__track
-setup-agents-card (wizard.css): setup-agents-card setup-agents-card__title
-setup-agents-coming-soon (wizard.css): setup-agents-coming-soon setup-agents-coming-soon__text
-setup-change-type-link (wizard.css): setup-change-type-link
-setup-checklist (wizard.css): setup-checklist setup-checklist__item
-setup-cli-block (wizard.css): setup-cli-block setup-cli-block__actions
-setup-info-grid (wizard.css): setup-info-grid setup-info-grid__card setup-info-grid__label setup-info-grid__value
-setup-method (wizard.css): setup-method setup-method--recommended setup-method__actions setup-method__badge setup-method__body setup-method__chevron setup-method__chevron--open setup-method__code setup-method__header setup-method__hint
-setup-method-tabs (wizard.css): setup-method-tabs
-setup-modal (modals.css): setup-modal setup-modal__header setup-modal__nav setup-modal__next setup-modal__platform-icon setup-modal__title-text
-setup-model-hint (wizard.css): setup-model-hint__code
-setup-onboard-fields (wizard.css): setup-onboard-fields setup-onboard-fields__eye setup-onboard-fields__label setup-onboard-fields__row setup-onboard-fields__value
-setup-segment (wizard.css): setup-segment setup-segment--full setup-segment__btn setup-segment__btn--active
-setup-step (wizard.css): setup-step__desc setup-step__heading
-setup-steps (controls.css): setup-steps setup-steps__content setup-steps__divider setup-steps__number setup-steps__step
-setup-virtual-models (wizard.css): setup-virtual-models setup-virtual-models__names
-sidebar (controls.css, theme.css): sidebar sidebar--mobile-open sidebar__badge sidebar__feedback sidebar__feedback-hint sidebar__feedback-title sidebar__footer sidebar__link sidebar__link--disabled sidebar__link-row sidebar__logo sidebar__logo-dot sidebar__section-add sidebar__section-label
-skeleton (skeleton.css): skeleton skeleton--rect skeleton--text
-skill-dot (data.css): skill-dot skill-dot--active
-skip-link (layout.css): skip-link
-spinner (skeleton.css): spinner
-sr-only (skeleton.css): sr-only
-status-badge (data.css, theme.css): status-badge status-badge--error status-badge--fallback_error status-badge--neutral status-badge--ok status-badge--rate_limited status-badge--retry
-status-badge-tooltip (data.css): status-badge-tooltip status-badge-tooltip__bubble
-summary-card (cards.css, theme.css): summary-card summary-card__label summary-card__subtitle summary-card__value
-theme-picker (agents.css): theme-picker theme-picker__option theme-picker__option--active
-theme-toggle (layout.css, theme.css): theme-toggle theme-toggle__icon
-tier-badge (data.css): tier-badge tier-badge--complex tier-badge--custom tier-badge--default tier-badge--direct tier-badge--fallback tier-badge--playground tier-badge--reasoning tier-badge--simple tier-badge--specificity tier-badge--standard tier-badge--virtual
-tier-badge-tooltip (data.css): tier-badge-tooltip tier-badge-tooltip__bubble
-tier-color (data.css): tier-color--amber tier-color--blue tier-color--brown tier-color--coral tier-color--cyan tier-color--emerald tier-color--fuchsia tier-color--gray tier-color--green tier-color--indigo tier-color--lime tier-color--navy tier-color--orange tier-color--pink tier-color--purple tier-color--red tier-color--rose tier-color--sky tier-color--slate tier-color--stone tier-color--teal tier-color--violet tier-color--yellow tier-color--zinc
-toast (controls.css, toast.css): toast toast--error toast--success toast--warning toast__dismiss toast__icon toast__message
-toast-container (toast.css): toast-container
-toggle-panel (data.css): toggle-panel toggle-panel--open toggle-panel__header
-toolkit-api-toggle (wizard.css): toolkit-api-toggle toolkit-api-toggle__btn toolkit-api-toggle__btn--active
-toolkit-lang-toggle (wizard.css): toolkit-lang-toggle toolkit-lang-toggle__btn toolkit-lang-toggle__btn--active
-trend (cards.css, theme.css): trend trend--down trend--down-good trend--neutral trend--up trend--up-bad
-trigger-badge (data.css): trigger-badge
-two-col (data.css, theme.css): two-col
-u-cursor-x (charts.css): u-cursor-x
-u-cursor-y (charts.css): u-cursor-y
-u-legend (charts.css, theme.css): u-legend
-u-marker (charts.css, theme.css): u-marker
-u-series (charts.css, theme.css): u-series
-u-value (charts.css, theme.css): u-value
-u-wrap (cards.css, charts.css, theme.css): u-wrap
-version-indicator (version-indicator.css): version-indicator
-view-more-link (cards.css): view-more-link
-workspace-table (agents.css): workspace-table__actions workspace-table__icon workspace-table__name
+## Blocks (190 BEM blocks, 199 classes)
+actions (shell.css): actions
+alert-row (shell.css): alert-row
+alert-title (shell.css): alert-title
+alerts (shell.css): alerts
+alerts-foot (shell.css): alerts-foot
+alerts-head (shell.css): alerts-head
+alerts-list (shell.css): alerts-list
+app (shell.css): app
+app-content (shell.css): app-content
+app-main (shell.css): app-main
+app-scroll (shell.css): app-scroll
+auth-card (shell.css): auth-card
+auth-logo (shell.css): auth-logo
+auth-shell (shell.css): auth-shell
+avatar (shell.css): avatar
+badge (base.css): badge
+banner (shell.css): banner
+btn (base.css): btn
+btn-block (base.css): btn-block
+btn-danger (base.css): btn-danger
+btn-ghost (base.css): btn-ghost
+btn-lg (base.css): btn-lg
+btn-quiet (base.css): btn-quiet
+btn-sm (base.css): btn-sm
+card (base.css): card
+card-grid (shell.css): card-grid
+check (base.css): check
+class_ (syntax-highlight.css): class_
+code (base.css): code
+collapse-btn (shell.css): collapse-btn
+collapse-label (shell.css): collapse-label
+count (shell.css): count
+crumb-current (shell.css): crumb-current
+crumbs (shell.css): crumbs
+dark (shell.css, tokens.css): dark
+data (base.css): data
+db (shell.css): db
+desktop-only (shell.css): desktop-only
+dh (shell.css): dh
+docs-label (shell.css): docs-label
+dot (base.css): dot
+drawer (shell.css): drawer
+edge-error (canvas.css): edge-error
+edge-live (canvas.css): edge-live
+edge-saving (canvas.css): edge-saving
+empty (base.css): empty
+eyebrow (base.css): eyebrow
+field (base.css, shell.css): field
+flow-node (canvas.css): flow-node
+form-error (shell.css): form-error
+form-notice (shell.css): form-notice
+function_ (syntax-highlight.css): function_
+gate (shell.css): gate
+hint (base.css): hint
+hljs (syntax-highlight.css): hljs
+hljs-addition (syntax-highlight.css): hljs-addition
+hljs-attr (syntax-highlight.css): hljs-attr
+hljs-built_in (syntax-highlight.css): hljs-built_in
+hljs-comment (syntax-highlight.css): hljs-comment
+hljs-deletion (syntax-highlight.css): hljs-deletion
+hljs-keyword (syntax-highlight.css): hljs-keyword
+hljs-literal (syntax-highlight.css): hljs-literal
+hljs-meta (syntax-highlight.css): hljs-meta
+hljs-number (syntax-highlight.css): hljs-number
+hljs-operator (syntax-highlight.css): hljs-operator
+hljs-params (syntax-highlight.css): hljs-params
+hljs-property (syntax-highlight.css): hljs-property
+hljs-punctuation (syntax-highlight.css): hljs-punctuation
+hljs-regexp (syntax-highlight.css): hljs-regexp
+hljs-section (syntax-highlight.css): hljs-section
+hljs-string (syntax-highlight.css): hljs-string
+hljs-symbol (syntax-highlight.css): hljs-symbol
+hljs-template-tag (syntax-highlight.css): hljs-template-tag
+hljs-title (syntax-highlight.css): hljs-title
+hljs-type (syntax-highlight.css): hljs-type
+hljs-variable (syntax-highlight.css): hljs-variable
+icon-btn (base.css): icon-btn
+is-accent (base.css): is-accent
+is-active (shell.css): is-active
+is-collapsed (shell.css): is-collapsed
+is-danger (base.css, shell.css): is-danger
+is-error (shell.css): is-error
+is-info (base.css, shell.css): is-info
+is-mobile-open (shell.css): is-mobile-open
+is-off (base.css): is-off
+is-ok (base.css): is-ok
+is-outline (base.css): is-outline
+is-pulse (base.css): is-pulse
+is-selected (base.css, canvas.css): is-selected
+is-success (shell.css): is-success
+is-unseen (shell.css): is-unseen
+is-warn (base.css, shell.css): is-warn
+is-warning (shell.css): is-warning
+kbd (base.css): kbd
+kv (shell.css): kv
+label (base.css): label
+link-action (base.css): link-action
+logo-dark (shell.css): logo-dark
+logo-light (shell.css): logo-light
+logo-mark (shell.css): logo-mark
+logo-word (shell.css): logo-word
+menu (shell.css): menu
+menu-card (shell.css): menu-card
+menu-heading (shell.css): menu-heading
+menu-item (shell.css): menu-item
+menu-meta (shell.css): menu-meta
+menu-sep (shell.css): menu-sep
+mobile-backdrop (shell.css): mobile-backdrop
+mobile-only (shell.css): mobile-only
+modal (shell.css): modal
+modal-body (shell.css): modal-body
+modal-head (shell.css): modal-head
+mono (base.css): mono
+narrow (shell.css): narrow
+nav-action (shell.css): nav-action
+nav-group (shell.css): nav-group
+nav-group-label (shell.css): nav-group-label
+nav-item (shell.css): nav-item
+nav-label (shell.css): nav-label
+nav-row (shell.css): nav-row
+node-count (canvas.css): node-count
+node-entry (canvas.css): node-entry
+node-group (canvas.css): node-group
+node-hub (canvas.css): node-hub
+node-kind (canvas.css): node-kind
+node-metric (canvas.css): node-metric
+node-sub (canvas.css): node-sub
+node-title (canvas.css): node-title
+notice (shell.css): notice
+num (base.css): num
+overlay (shell.css): overlay
+page (shell.css): page
+page-actions (shell.css): page-actions
+page-head (shell.css): page-head
+palette (shell.css): palette
+palette-foot (shell.css): palette-foot
+palette-group (shell.css): palette-group
+palette-input (shell.css): palette-input
+palette-item (shell.css): palette-item
+palette-list (shell.css): palette-list
+palette-sub (shell.css): palette-sub
+panel (base.css): panel
+panel-body (base.css): panel-body
+panel-head (base.css): panel-head
+panel-hint (base.css): panel-hint
+react-flow (canvas.css): react-flow react-flow__attribution react-flow__controls react-flow__controls-button react-flow__edge-path react-flow__edge-text react-flow__edge-textbg react-flow__handle react-flow__minimap react-flow__node
+row-actions (base.css): row-actions
+row-sub (base.css): row-sub
+row-title (base.css): row-title
+search-bar (shell.css): search-bar
+sec (shell.css): sec
+segmented (base.css): segmented
+selected (canvas.css): selected
+sidebar (shell.css): sidebar
+sidebar-brand (shell.css): sidebar-brand
+sidebar-foot (shell.css): sidebar-foot
+sidebar-nav (shell.css): sidebar-nav
+skel (base.css): skel
+skip-link (shell.css): skip-link
+spinner (base.css): spinner
+stage (canvas.css): stage
+stage-actions (canvas.css): stage-actions
+stage-head (canvas.css): stage-head
+stage-hint (canvas.css): stage-hint
+stage-legend (canvas.css): stage-legend
+stage-wrap (canvas.css): stage-wrap
+stat-label (shell.css): stat-label
+stat-tile (shell.css): stat-tile
+stat-tiles (shell.css): stat-tiles
+stat-value (shell.css): stat-value
+status (base.css): status
+sub (canvas.css, shell.css): sub
+switch (base.css): switch
+tab (shell.css): tab
+table-wrap (base.css): table-wrap
+tabs (shell.css): tabs
+toast (shell.css): toast
+toast-close (shell.css): toast-close
+toast-msg (shell.css): toast-msg
+toasts (shell.css): toasts
+topbar (shell.css): topbar
+topbar-actions (shell.css): topbar-actions
+topbar-docs (shell.css): topbar-docs
+user-name (shell.css): user-name
+user-org (shell.css): user-org
+user-text (shell.css): user-text
+user-trigger (shell.css): user-trigger
+version-tag (shell.css): version-tag
+well (base.css): well
+wide (shell.css): wide
 
-## Primitives (0)
-(none yet — phase 2 builds them in src/components/ui/)
+## Primitives (18)
+Avatar: src/components/ui.tsx
+Badge: src/components/ui.tsx
+Button: src/components/ui.tsx
+ButtonLink: src/components/ui.tsx
+EmptyState: src/components/ui.tsx
+Field: src/components/ui.tsx
+IconButton: src/components/ui.tsx
+Kbd: src/components/ui.tsx
+Menu: src/components/ui.tsx
+MenuHeading: src/components/ui.tsx
+MenuItem: src/components/ui.tsx
+MenuSeparator: src/components/ui.tsx
+Modal: src/components/ui.tsx
+Panel: src/components/ui.tsx
+Skel: src/components/ui.tsx
+Status: src/components/ui.tsx
+Switch: src/components/ui.tsx
+Tabs: src/components/ui.tsx
 
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
-## Canonical rules — same selector+property declared twice with different values; the winner renders (29)
-.custom-select__option--top > svg { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
-.custom-select__option--top > img { margin-top: calc((18px - 14px) / 2) }  ← custom-select.css:142
-.summary-card { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px }  ← theme.css:196
-.trend--up { color: hsl(var(--success)) }  ← theme.css:237
-.trend--up { background: hsl(var(--success) / 0.1) }  ← theme.css:238
-.trend--down { color: hsl(var(--destructive)) }  ← theme.css:242
-.trend--down { background: hsl(var(--destructive) / 0.1) }  ← theme.css:243
-.panel { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px }  ← theme.css:268
-.chart-card { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px }  ← theme.css:284
-.chart-card__header { align-items: flex-end }  ← theme.css:290
-.chart-card__value-row { align-items: baseline }  ← theme.css:322
-.feed-item { align-items: center }  ← theme.css:586
-.feed-item { gap: var(--gap-md) }  ← theme.css:587
-.feed-item { padding: 10px 0 }  ← theme.css:588
-.sidebar { padding: var(--gap-lg) 0 0 0 }  ← theme.css:784
-.theme-toggle { padding: 6px 12px }  ← theme.css:938
-.theme-toggle { width: 100% }  ← theme.css:947
-.chart-tooltip { font-size: var(--font-size-xs) }  ← theme.css:1024
-.expandable-card__fade { height: 64px }  ← theme.css:1055
-.expandable-card__fade { background: linear-gradient(transparent, hsl(var(--card)) 70%) }  ← theme.css:1056
-.expandable-card__fade { padding-bottom: 12px }  ← theme.css:1061
-.modal { box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px,
-    0 25px 50px -12px rgb(0 0 0 / 0.25) }  ← theme.css:1112
-.modal__close { width: 2rem }  ← theme.css:1137
-.modal__close { height: 2rem }  ← theme.css:1138
-.toast { align-items: flex-start }  ← toast.css:16
-.toast { gap: var(--gap-sm) }  ← toast.css:17
-.toast { padding: 12px var(--gap-md) }  ← toast.css:18
-.toast { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1),
-    0 2px 4px -2px rgb(0 0 0 / 0.1) }  ← toast.css:22
-.toast { animation: toastSlideIn 200ms ease-out }  ← toast.css:26
+## Canonical rules — same selector+property declared twice with different values; the winner renders (0)
 
-## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (29)
-.summary-card { box-shadow: var(--card-shadow) }  at cards.css:7 loses to theme.css:196
-.trend--up { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:237
-.trend--down { color: hsl(var(--muted-foreground)) }  at cards.css:48 loses to theme.css:242
-.trend--up { background: hsl(var(--muted)) }  at cards.css:49 loses to theme.css:238
-.trend--down { background: hsl(var(--muted)) }  at cards.css:49 loses to theme.css:243
-.panel { box-shadow: var(--card-shadow) }  at cards.css:59 loses to theme.css:268
-.chart-card { box-shadow: var(--card-shadow) }  at cards.css:86 loses to theme.css:284
-.chart-card__header { align-items: stretch }  at cards.css:92 loses to theme.css:290
-.chart-card__value-row { align-items: center }  at cards.css:160 loses to theme.css:322
-.chart-tooltip { font-size: var(--tooltip-font-size) }  at charts.css:78 loses to theme.css:1024
-.expandable-card__fade { height: 80px }  at charts.css:110 loses to theme.css:1055
-.expandable-card__fade { background: linear-gradient(transparent, hsl(var(--card)) 60%) }  at charts.css:111 loses to theme.css:1056
-.expandable-card__fade { padding-bottom: 16px }  at charts.css:116 loses to theme.css:1061
-.toast { align-items: center }  at controls.css:124 loses to toast.css:16
-.toast { gap: 10px }  at controls.css:125 loses to toast.css:17
-.toast { padding: 12px 16px }  at controls.css:126 loses to toast.css:18
-.toast { box-shadow: 0 4px 16px rgb(0 0 0 / 0.15) }  at controls.css:129 loses to toast.css:22
-.toast { animation: toast-in 200ms ease-out }  at controls.css:132 loses to toast.css:26
-.sidebar { padding: var(--gap-md) 0 }  at controls.css:213 loses to theme.css:784
-.custom-select__option--top > svg { margin-top: calc((18px - 13px) / 2) }  at custom-select.css:137 loses to custom-select.css:142
-.custom-select__option--top > img { margin-top: calc((18px - 13px) / 2) }  at custom-select.css:137 loses to custom-select.css:142
-.feed-item { align-items: flex-start }  at data.css:472 loses to theme.css:586
-.feed-item { gap: 12px }  at data.css:473 loses to theme.css:587
-.feed-item { padding: 12px 0 }  at data.css:474 loses to theme.css:588
-.theme-toggle { width: 2rem }  at layout.css:141 loses to theme.css:947
-.theme-toggle { padding: 0 }  at layout.css:149 loses to theme.css:938
-.modal { box-shadow: var(--card-shadow),
-    0 25px 50px -12px rgb(0 0 0 / 0.25) }  at modals.css:22 loses to theme.css:1112
-.modal__close { width: 32px }  at modals.css:47 loses to theme.css:1137
-.modal__close { height: 32px }  at modals.css:48 loses to theme.css:1138
+## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (0)
 
-## Orphan stylesheets — in src/styles but imported nowhere (19)
-agent-chart-tooltip.css
-analytics-overview.css
-connection-detail.css
-filter-select.css
-model-filter.css
-organization.css
-overview.css
-playground.css
-reliability-card.css
-request-drawer.css
-routing-deprecation.css
-routing-header-tiers.css
-routing-modal.css
-routing-providers.css
-routing-specificity.css
-routing-tabs.css
-routing-virtual-models.css
-routing.css
-welcome.css
+## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
+canvas.css ← pages/Topology.tsx
+syntax-highlight.css ← services/syntax-highlight.ts

@@ -94,8 +94,8 @@ export default function OpenClawSetup({ apiKey, keyPrefix, baseUrl }: Props) {
                 onToggle={() => setWizKeyRevealed((v) => !v)}
               />
             </OnboardField>
-            {/* i18n-ignore: labels mirror the openclaw onboard prompts */}
             <OnboardField
+              // i18n-ignore: labels mirror the openclaw onboard prompts
               label="Endpoint compatibility"
               value="OpenAI Chat Completions-compatible"
             />

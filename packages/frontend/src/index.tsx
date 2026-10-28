@@ -16,7 +16,7 @@ import { cleanUpStoredHeaders } from './services/playground-request-headers.js';
 import { removeLegacyStorageKeys } from './services/legacy-storage.js';
 import { watchSystemTheme } from './lib/theme.js';
 import { useLocale } from './i18n/index.js';
-import './styles-next/index.css';
+import './styles/index.css';
 
 clearReloadFlag();
 // Wipe Playground header values saved in plain text by older builds, even if

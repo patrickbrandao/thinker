@@ -114,30 +114,6 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   getErrorBreakdown: () => Promise.resolve({ by_class: {}, by_origin: {} }),
 }));
 
-// MessageTable belongs to the Requests area and has its own suite: stub it to
-// the rows the page hands it, clickable like the real drawer-mode rows.
-const messageTableProps = vi.hoisted(() => ({ last: null as any }));
-vi.mock('../../src/components/MessageTable.jsx', () => ({
-  default: (props: any) => {
-    messageTableProps.last = props;
-    return (
-      <table data-testid="message-table">
-        <tbody>
-          {props.items.map((item: any) => (
-            <tr
-              key={item.id}
-              className="msg-row--clickable"
-              onClick={() => props.onRowSelect?.(item.id)}
-            >
-              <td>{item.id}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  },
-}));
-
 vi.mock('../../src/components/MultiAgentTokenChart.jsx', () => ({
   AGENT_COLORS: ['#111111', '#222222', '#333333'],
   default: (props: any) => (
@@ -277,7 +253,6 @@ describe('Overview', () => {
     localStorage.setItem('thinker_global_group', 'provider');
     sessionStorage.clear();
     analyticsPing.set(0);
-    messageTableProps.last = null;
     mockIsRecentlyCreated.mockReturnValue(false);
     mockIsSetupPending.mockReturnValue(false);
     mockLocationState = null;
@@ -750,9 +725,9 @@ describe('Overview', () => {
   });
 
   describe('status cell', () => {
-    it('hands a failed row to the recent requests table', async () => {
-      // How a failed row renders (binary Failed pill, no hover tooltip) is the
-      // MessageTable suite's business; the page passes the row through as is.
+    it('renders a failed row as a Failed badge with no hover tooltip', async () => {
+      // The status-cell hover tooltip was removed: error detail lives in the
+      // Requests drawer now, so the cell is just the binary Failed pill.
       const dataWithError = {
         ...overviewData,
         recent_activity: [
@@ -772,14 +747,13 @@ describe('Overview', () => {
         ],
       };
       mockGetOverview.mockResolvedValue(dataWithError);
-      renderOverview();
+      const { container } = renderOverview();
       await vi.waitFor(() => {
-        expect(messageTableProps.last?.items?.[0]).toMatchObject({
-          id: 'msg-err12345',
-          status: 'error',
-          error_origin: 'provider',
-        });
+        const badge = container.querySelector('.status-badge--error');
+        expect(badge).not.toBeNull();
+        expect(badge!.textContent).toContain('Failed');
       });
+      expect(container.querySelector('.status-badge-tooltip')).toBeNull();
     });
   });
 
@@ -816,14 +790,12 @@ describe('Overview', () => {
       ],
     };
 
-    it('hands the resolved custom provider name to the recent requests table', async () => {
+    it('renders custom provider icon in recent messages', async () => {
       mockGetOverview.mockResolvedValue(customOverview);
-      renderOverview();
+      const { container } = renderOverview();
       await vi.waitFor(() => {
-        expect(messageTableProps.last?.items?.[0]).toMatchObject({
-          model: 'custom:abc-123/my-llama',
-          custom_provider_name: 'Cohere',
-        });
+        const img = container.querySelector('img[alt="Cohere"]');
+        expect(img).not.toBeNull();
       });
     });
 
@@ -840,10 +812,9 @@ describe('Overview', () => {
       mockGetOverview.mockResolvedValue(customOverview);
       const { container } = renderOverview();
       await vi.waitFor(() => {
-        const panels = container.querySelectorAll('.panel');
-        const costPanel = Array.from(panels).find((p) => p.textContent?.includes('Model usage'));
-        // The recent-requests icon is MessageTable's (stubbed here).
-        expect(costPanel?.querySelector('img[alt="Cohere"]')).not.toBeNull();
+        const imgs = container.querySelectorAll('img[alt="Cohere"]');
+        // At least one in recent messages and one in cost by model
+        expect(imgs.length).toBeGreaterThanOrEqual(2);
       });
     });
 
@@ -1215,7 +1186,7 @@ describe('Overview', () => {
     });
   });
 
-  it('hands flat-fee subscription rows (cost null) to the recent requests table', async () => {
+  it('shows $0.00 cost for flat-fee subscription messages (cost null) in recent activity', async () => {
     const dataWithSub = {
       ...overviewData,
       recent_activity: [
@@ -1223,16 +1194,15 @@ describe('Overview', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(dataWithSub);
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({
-        auth_type: 'subscription',
-        cost: null,
-      });
+      const subCost = container.querySelector('[title="Included in subscription"]');
+      expect(subCost).not.toBeNull();
+      expect(subCost!.textContent).toBe('$0.00');
     });
   });
 
-  it('hands per-request subscription costs (e.g. OpenCode Go) to the table', async () => {
+  it('renders the per-request cost for subscriptions (e.g. OpenCode Go)', async () => {
     const dataWithPerRequestSub = {
       ...overviewData,
       recent_activity: [
@@ -1240,24 +1210,24 @@ describe('Overview', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(dataWithPerRequestSub);
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({
-        auth_type: 'subscription',
-        cost: 0.013636,
-      });
+      // Per-request subscription rows should show the real cost, not $0.00.
+      expect(container.textContent).toContain('$0.01');
+      const tooltip = container.querySelector('[title^="Per-request subscription cost:"]');
+      expect(tooltip).not.toBeNull();
     });
   });
 
-  it('hands non-subscription costs to the recent requests table', async () => {
+  it('shows formatCost for non-subscription messages with cost in recent activity', async () => {
     const dataWithCost = {
       ...overviewData,
       recent_activity: [{ ...overviewData.recent_activity[0], auth_type: null, cost: 0.05 }],
     };
     mockGetOverview.mockResolvedValue(dataWithCost);
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({ auth_type: null, cost: 0.05 });
+      expect(container.textContent).toContain('$0.05');
     });
   });
 
@@ -1294,7 +1264,7 @@ describe('Overview', () => {
     });
   });
 
-  it('hands fallback rows (fallback_from_model) to the recent requests table', async () => {
+  it('renders fallback badge in recent activity when fallback_from_model is present', async () => {
     const dataWithFallback = {
       ...overviewData,
       recent_activity: [
@@ -1302,12 +1272,12 @@ describe('Overview', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(dataWithFallback);
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({
-        fallback_from_model: 'gpt-4o',
-        fallback_index: 0,
-      });
+      // Fallback is surfaced in the Recovery column, not a Model-cell badge.
+      const badge = container.querySelector('.trigger-badge--fallback');
+      expect(badge).not.toBeNull();
+      expect(badge!.getAttribute('title')).toBe('Fallback');
     });
   });
 
@@ -1321,7 +1291,7 @@ describe('Overview', () => {
     });
   });
 
-  it('hands non-ok rows (fallback_error) to the recent requests table', async () => {
+  it('renders a non-ok recent-activity row as a binary Failed status', async () => {
     const dataWithFailure = {
       ...overviewData,
       recent_activity: [
@@ -1335,12 +1305,14 @@ describe('Overview', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(dataWithFailure);
-    renderOverview();
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(messageTableProps.last?.items?.[0]).toMatchObject({
-        status: 'fallback_error',
-        model: 'gemini-flash',
-      });
+      // Status is binary: any non-ok row is "Failed" (with an origin
+      // descriptor); fallback_error is no longer its own pill.
+      expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
+      const badge = container.querySelector('.status-badge--error');
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toContain('Failed');
     });
   });
 

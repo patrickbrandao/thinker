@@ -1,6 +1,6 @@
 /**
  * Console primitives (skill: components.md). Pages build on these and on the
- * classes in styles-next/base.css and shell.css; colors only from tokens.
+ * classes in styles/base.css and shell.css; colors only from tokens.
  */
 import {
   useCallback,

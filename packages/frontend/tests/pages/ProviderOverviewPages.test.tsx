@@ -772,8 +772,7 @@ afterEach(() => {
   cleanup();
 });
 
-// TODO(react-port): re-enable once GlobalOverview is ported
-describe.skip('GlobalOverview (analytics)', () => {
+describe('GlobalOverview (analytics)', () => {
   // Lazy so this file imports cleanly while GlobalOverview is still Solid.
   let GlobalOverview: ComponentType = () => null;
   beforeAll(async () => {

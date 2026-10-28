@@ -14,7 +14,7 @@ function escapeHtml(s: string): string {
 
 // marked's fenced-code renderer. Supported languages get highlighted with the
 // slim hljs core; everything else (and unlabelled blocks) is escaped to plain
-// text. Both paths keep the `hljs` class so styles/syntax-highlight.css applies.
+// text. Both paths keep the `hljs` class so src/styles/syntax-highlight.css applies.
 function renderCodeBlock({ text, lang }: Tokens.Code): string {
   if (lang && isSupported(lang)) {
     return `<pre><code class="hljs language-${lang}">${highlight(text, lang)}</code></pre>`;

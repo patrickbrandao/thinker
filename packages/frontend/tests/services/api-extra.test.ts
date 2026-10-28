@@ -143,7 +143,14 @@ describe('api/routing', () => {
   });
 
   it('createCustomProvider POSTs with name, base_url, and models', async () => {
-    const payload = { id: 'cp-new', name: 'My LLM', base_url: 'http://localhost:8080/v1', has_api_key: false, models: [], created_at: '2025-01-01' };
+    const payload = {
+      id: 'cp-new',
+      name: 'My LLM',
+      base_url: 'http://localhost:8080/v1',
+      has_api_key: false,
+      models: [],
+      created_at: '2025-01-01',
+    };
     mockOk(payload);
     const out = await createCustomProvider('demo-agent', {
       name: 'My LLM',
@@ -162,7 +169,14 @@ describe('api/routing', () => {
   });
 
   it('updateCustomProvider PUTs updated fields for an existing provider', async () => {
-    const payload = { id: 'cp-1', name: 'Updated', base_url: 'http://new:8080/v1', has_api_key: true, models: [], created_at: '2025-01-01' };
+    const payload = {
+      id: 'cp-1',
+      name: 'Updated',
+      base_url: 'http://new:8080/v1',
+      has_api_key: true,
+      models: [],
+      created_at: '2025-01-01',
+    };
     mockOk(payload);
     const out = await updateCustomProvider('demo-agent', 'cp-1', {
       name: 'Updated',

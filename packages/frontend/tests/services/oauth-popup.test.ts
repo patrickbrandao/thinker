@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { monitorOAuthPopup } from "../../src/services/oauth-popup.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { monitorOAuthPopup } from '../../src/services/oauth-popup.js';
 
-describe("monitorOAuthPopup", () => {
+describe('monitorOAuthPopup', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -10,14 +10,14 @@ describe("monitorOAuthPopup", () => {
     vi.useRealTimers();
   });
 
-  it("cleans up after bcTimeout fires without resolution", () => {
-    const removeListenerSpy = vi.spyOn(window, "removeEventListener");
+  it('cleans up after bcTimeout fires without resolution', () => {
+    const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
 
     const popup = {
       closed: true,
       close: vi.fn(),
       get location(): Location {
-        throw new DOMException("cross-origin");
+        throw new DOMException('cross-origin');
       },
     } as unknown as Window;
 
@@ -33,10 +33,7 @@ describe("monitorOAuthPopup", () => {
     vi.advanceTimersByTime(30_000);
 
     // fullCleanup should have been called — removeEventListener is evidence
-    expect(removeListenerSpy).toHaveBeenCalledWith(
-      "message",
-      expect.any(Function),
-    );
+    expect(removeListenerSpy).toHaveBeenCalledWith('message', expect.any(Function));
 
     // Popup closed without a result — onFailure should be called to unblock UI
     expect(onSuccess).not.toHaveBeenCalled();
@@ -45,14 +42,14 @@ describe("monitorOAuthPopup", () => {
     removeListenerSpy.mockRestore();
   });
 
-  it("does not run bcTimeout cleanup if handled before timeout fires", () => {
-    const removeListenerSpy = vi.spyOn(window, "removeEventListener");
+  it('does not run bcTimeout cleanup if handled before timeout fires', () => {
+    const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
 
     const popup = {
       closed: true,
       close: vi.fn(),
       get location(): Location {
-        throw new DOMException("cross-origin");
+        throw new DOMException('cross-origin');
       },
     } as unknown as Window;
 
@@ -65,9 +62,7 @@ describe("monitorOAuthPopup", () => {
     vi.advanceTimersByTime(300);
 
     // Simulate postMessage arriving before the 5-minute timeout
-    window.dispatchEvent(
-      new MessageEvent("message", { data: { type: "thinker-oauth-success" } }),
-    );
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'thinker-oauth-success' } }));
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
 
@@ -83,12 +78,12 @@ describe("monitorOAuthPopup", () => {
     removeListenerSpy.mockRestore();
   });
 
-  it("ignores non-oauth messages", () => {
+  it('ignores non-oauth messages', () => {
     const popup = {
       closed: false,
       close: vi.fn(),
       get location(): Location {
-        throw new DOMException("cross-origin");
+        throw new DOMException('cross-origin');
       },
     } as unknown as Window;
 
@@ -98,9 +93,7 @@ describe("monitorOAuthPopup", () => {
     monitorOAuthPopup(popup, { onSuccess, onFailure });
 
     // Send a non-OAuth message
-    window.dispatchEvent(
-      new MessageEvent("message", { data: { type: "unrelated-event" } }),
-    );
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'unrelated-event' } }));
 
     vi.advanceTimersByTime(300);
 
@@ -108,7 +101,7 @@ describe("monitorOAuthPopup", () => {
     expect(onFailure).not.toHaveBeenCalled();
 
     // Send a non-object message
-    window.dispatchEvent(new MessageEvent("message", { data: "string-data" }));
+    window.dispatchEvent(new MessageEvent('message', { data: 'string-data' }));
 
     vi.advanceTimersByTime(300);
 
@@ -116,7 +109,7 @@ describe("monitorOAuthPopup", () => {
     expect(onFailure).not.toHaveBeenCalled();
 
     // null data — !!null short-circuits isOAuthMessage to false
-    window.dispatchEvent(new MessageEvent("message", { data: null }));
+    window.dispatchEvent(new MessageEvent('message', { data: null }));
 
     vi.advanceTimersByTime(300);
 
@@ -124,7 +117,7 @@ describe("monitorOAuthPopup", () => {
     expect(onFailure).not.toHaveBeenCalled();
 
     // Empty object — typeof === 'object' but 'type' not in data
-    window.dispatchEvent(new MessageEvent("message", { data: {} }));
+    window.dispatchEvent(new MessageEvent('message', { data: {} }));
 
     vi.advanceTimersByTime(300);
 
@@ -132,7 +125,7 @@ describe("monitorOAuthPopup", () => {
     expect(onFailure).not.toHaveBeenCalled();
 
     // undefined data — !!undefined short-circuits isOAuthMessage to false
-    window.dispatchEvent(new MessageEvent("message", { data: undefined }));
+    window.dispatchEvent(new MessageEvent('message', { data: undefined }));
 
     vi.advanceTimersByTime(300);
 
@@ -140,8 +133,8 @@ describe("monitorOAuthPopup", () => {
     expect(onFailure).not.toHaveBeenCalled();
   });
 
-  it("recognizes custom provider done paths during URL polling", () => {
-    let href = "https://auth.x.ai/oauth2/authorize";
+  it('recognizes custom provider done paths during URL polling', () => {
+    let href = 'https://auth.x.ai/oauth2/authorize';
     const popup = {
       closed: false,
       close: vi.fn(),
@@ -155,23 +148,23 @@ describe("monitorOAuthPopup", () => {
     const onSuccess = vi.fn();
     const onFailure = vi.fn();
 
-    monitorOAuthPopup(popup, { onSuccess, onFailure }, "/oauth/xai/done");
+    monitorOAuthPopup(popup, { onSuccess, onFailure }, '/oauth/xai/done');
 
-    href = "http://127.0.0.1:38284/api/v1/oauth/xai/done?ok=1";
+    href = 'http://127.0.0.1:38284/api/v1/oauth/xai/done?ok=1';
     vi.advanceTimersByTime(300);
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(onFailure).not.toHaveBeenCalled();
   });
 
-  it("returns a disposer that stops polling and listeners without firing callbacks", () => {
-    const removeListenerSpy = vi.spyOn(window, "removeEventListener");
+  it('returns a disposer that stops polling and listeners without firing callbacks', () => {
+    const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
 
     const popup = {
       closed: false,
       close: vi.fn(),
       get location(): Location {
-        throw new DOMException("cross-origin");
+        throw new DOMException('cross-origin');
       },
     } as unknown as Window;
 
@@ -183,12 +176,10 @@ describe("monitorOAuthPopup", () => {
     dispose();
 
     // The message listener is removed as part of teardown.
-    expect(removeListenerSpy).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(removeListenerSpy).toHaveBeenCalledWith('message', expect.any(Function));
 
     // A late OAuth message and further polling ticks must be ignored.
-    window.dispatchEvent(
-      new MessageEvent("message", { data: { type: "thinker-oauth-success" } }),
-    );
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'thinker-oauth-success' } }));
     vi.advanceTimersByTime(5_000);
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onFailure).not.toHaveBeenCalled();

@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import { Fragment, type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
@@ -89,11 +87,6 @@ vi.mock('../../src/services/api.js', () => ({
 import Byok from '../../src/pages/providers/Byok';
 import CustomProviderForm from '../../src/components/CustomProviderForm';
 
-const noConnectionsPromptIsSolid = readFileSync(
-  resolve(__dirname, '../../src/components/NoConnectionsPrompt.tsx'),
-  'utf8',
-).includes('solid-js');
-
 /** The app remounts its tree on a language change; mirror that here. */
 function RemountOnLocale({ children }: { children: ReactNode }) {
   const locale = useLocale();
@@ -144,17 +137,12 @@ describe('provider pages in pt-BR', () => {
     expect(screen.getByRole('button', { name: 'Conectar' })).toBeTruthy();
   });
 
-  // Blocked until NoConnectionsPrompt is ported to React (another area); the
-  // case turns itself back on once the component no longer imports solid-js.
-  it.skipIf(noConnectionsPromptIsSolid)(
-    'renders the no-connections prompt in Portuguese',
-    async () => {
-      const { default: NoConnectionsPrompt } =
-        await import('../../src/components/NoConnectionsPrompt');
-      renderInRouter(<NoConnectionsPrompt />);
-      expect(screen.getByText('Nenhum provedor conectado')).toBeTruthy();
-      expect(screen.getByText('Assinaturas')).toBeTruthy();
-      expect(screen.getAllByText('Conectar provedor')).toHaveLength(3);
-    },
-  );
+  it('renders the no-connections prompt in Portuguese', async () => {
+    const { default: NoConnectionsPrompt } =
+      await import('../../src/components/NoConnectionsPrompt');
+    renderInRouter(<NoConnectionsPrompt />);
+    expect(screen.getByText('Nenhum provedor conectado')).toBeTruthy();
+    expect(screen.getByText('Assinaturas')).toBeTruthy();
+    expect(screen.getAllByText('Conectar provedor')).toHaveLength(3);
+  });
 });
