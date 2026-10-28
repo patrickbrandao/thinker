@@ -1,4 +1,3 @@
-import type { Component } from 'solid-js';
 import type {
   AuthType,
   AvailableModel,
@@ -22,18 +21,25 @@ interface Props {
  * `tierId` convention (the underlying modal was designed for routing tiers) so
  * callers work with a clean `(model, provider, authType)` callback.
  */
-const PlaygroundModelPicker: Component<Props> = (props) => (
-  <ModelPickerModal
-    tierId={`playground:${props.columnId}`}
-    models={props.models}
-    tiers={[]}
-    customProviders={props.customProviders}
-    connectedProviders={props.connectedProviders}
-    onSelect={(_tierId, model, provider, authType) =>
-      props.onSelect(props.columnId, model, provider, authType)
-    }
-    onClose={props.onClose}
-  />
-);
-
-export default PlaygroundModelPicker;
+export default function PlaygroundModelPicker({
+  columnId,
+  models,
+  customProviders,
+  connectedProviders,
+  onSelect,
+  onClose,
+}: Props) {
+  return (
+    <ModelPickerModal
+      tierId={`playground:${columnId}`}
+      models={models}
+      tiers={[]}
+      customProviders={customProviders}
+      connectedProviders={connectedProviders}
+      onSelect={(_tierId: string, model: string, provider: string, authType?: AuthType) =>
+        onSelect(columnId, model, provider, authType)
+      }
+      onClose={onClose}
+    />
+  );
+}

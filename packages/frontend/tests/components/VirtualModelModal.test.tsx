@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@solidjs/testing-library';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
@@ -67,7 +67,7 @@ const existing: VirtualModel = {
 function renderModal(extra: Record<string, unknown> = {}) {
   const onSaved = vi.fn();
   const onClose = vi.fn();
-  const utils = render(() => (
+  const utils = render(
     <VirtualModelModal
       agentName="demo"
       existing={[existing]}
@@ -77,8 +77,8 @@ function renderModal(extra: Record<string, unknown> = {}) {
       onClose={onClose}
       onSaved={onSaved}
       {...extra}
-    />
-  ));
+    />,
+  );
   const nameInput = () => screen.getByLabelText('Name') as HTMLInputElement;
   const type = (value: string) => fireEvent.input(nameInput(), { target: { value } });
   return { ...utils, onSaved, onClose, nameInput, type };

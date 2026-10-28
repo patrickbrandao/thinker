@@ -1,13 +1,11 @@
-import { createResource, createSignal, Show, type Component, createEffect } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import {
-  duplicateAgent,
-  getDuplicatePreview,
-  type DuplicateAgentPreview,
-} from '../services/api.js';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { duplicateAgent, getDuplicatePreview } from '../services/api.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { toast } from '../services/toast-store.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { Button, Modal, Skel } from './ui.js';
 
 interface Props {
   open: boolean;
@@ -16,75 +14,70 @@ interface Props {
   onDuplicated?: () => void;
 }
 
-const DuplicateAgentModal: Component<Props> = (props) => {
+export default function DuplicateAgentModal({ open, sourceName, onClose, onDuplicated }: Props) {
   const navigate = useNavigate();
-  const [name, setName] = createSignal('');
-  const [submitting, setSubmitting] = createSignal(false);
-  const [nameTouched, setNameTouched] = createSignal(false);
-  let cancelledInFlight = false;
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
+  const cancelledInFlight = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [preview] = createResource<DuplicateAgentPreview | null, { open: boolean; source: string }>(
-    () => ({ open: props.open, source: props.sourceName }),
-    async ({ open, source }) => {
-      if (!open || !source) return null;
-      return (await getDuplicatePreview(source)) ?? null;
-    },
-  );
+  const { data: preview } = useResource(async () => {
+    if (!open || !sourceName) return null;
+    return (await getDuplicatePreview(sourceName)) ?? null;
+  }, [open, sourceName]);
 
-  createEffect(() => {
-    const p = preview();
-    if (p?.suggested_name && !nameTouched()) {
-      setName(p.suggested_name);
-    }
-  });
+  useEffect(() => {
+    if (preview?.suggested_name && !nameTouched) setName(preview.suggested_name);
+  }, [preview, nameTouched]);
 
-  createEffect(() => {
-    if (!props.open) {
+  useEffect(() => {
+    if (!open) {
       setName('');
       setNameTouched(false);
       setSubmitting(false);
       // Deliberately don't reset `cancelledInFlight` here — it must stay true
       // until the in-flight fetch returns so handleDuplicate can honor the
       // cancel. handleDuplicate resets it when starting a new request.
+      return;
     }
-  });
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
 
   const requestClose = () => {
-    if (submitting()) cancelledInFlight = true;
-    props.onClose();
+    if (submitting) cancelledInFlight.current = true;
+    onClose();
   };
 
-  const totalCopied = () => {
-    const c = preview()?.copied;
-    if (!c) return 0;
-    return c.providers + c.tierAssignments + c.specificityAssignments + c.modelParams;
-  };
-
-  const handleNameInput = (value: string) => {
-    setNameTouched(true);
-    setName(value);
-  };
+  const copied = open ? preview?.copied : undefined;
+  const totalCopied = copied
+    ? copied.providers + copied.tierAssignments + copied.specificityAssignments + copied.modelParams
+    : 0;
 
   const handleDuplicate = async () => {
-    const newName = name().trim();
-    if (!newName || submitting()) return;
-    cancelledInFlight = false;
+    const newName = name.trim();
+    if (!newName || submitting) return;
+    cancelledInFlight.current = false;
     setSubmitting(true);
     try {
-      const result = await duplicateAgent(props.sourceName, newName);
+      const result = await duplicateAgent(sourceName, newName);
       if (!result) return;
-      if (cancelledInFlight) {
+      if (cancelledInFlight.current) {
         // User closed the modal before the request finished. The agent was still
         // created on the server, so refresh the parent list but skip the toast
         // and navigation the user implicitly opted out of.
-        props.onDuplicated?.();
+        onDuplicated?.();
         return;
       }
       const slug = result.agent.name;
       markAgentCreated(slug);
-      toast.success(t('harnesses.duplicateModal.done', { source: props.sourceName, target: slug }));
-      props.onClose();
-      props.onDuplicated?.();
+      toast.success(t('harnesses.duplicateModal.done', { source: sourceName, target: slug }));
+      onClose();
+      onDuplicated?.();
       navigate(`/harnesses/${encodeURIComponent(slug)}`, {
         state: { newApiKey: result.apiKey },
       });
@@ -95,114 +88,89 @@ const DuplicateAgentModal: Component<Props> = (props) => {
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) handleDuplicate();
-    if (e.key === 'Escape') requestClose();
-  };
+  const sectionHead = 'mb-2 flex items-center gap-2 text-xs font-semibold text-muted';
+  const listClass = 'duplicate-agent__list m-0 flex list-none flex-col gap-1 p-0 text-sm text-dim';
 
   return (
-    <Show when={props.open}>
-      <div
-        class="modal-overlay"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) requestClose();
+    <Modal
+      open={open}
+      onClose={requestClose}
+      title={t('harnesses.duplicateModal.title', { name: sourceName })}
+    >
+      <p className="mb-4 text-sm text-muted">{t('harnesses.duplicateModal.desc')}</p>
+
+      <label className="label" htmlFor="duplicate-agent-name">
+        {t('harnesses.duplicateModal.newName')}
+      </label>
+      <input
+        ref={inputRef}
+        id="duplicate-agent-name"
+        className="field"
+        type="text"
+        placeholder={
+          preview?.suggested_name ||
+          t('harnesses.duplicateModal.copyPlaceholder', { name: sourceName })
+        }
+        value={name}
+        onChange={(e) => {
+          setNameTouched(true);
+          setName(e.currentTarget.value);
         }}
-      >
-        <div
-          class="modal-card"
-          style="max-width: 520px;"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="duplicate-agent-title"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={handleKeyDown}
-        >
-          <h2 class="modal-card__title" id="duplicate-agent-title">
-            {t('harnesses.duplicateModal.title', { name: props.sourceName })}
-          </h2>
-          <p class="modal-card__desc">{t('harnesses.duplicateModal.desc')}</p>
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void handleDuplicate();
+        }}
+        disabled={submitting}
+      />
 
-          <label class="modal-card__field-label" for="duplicate-agent-name">
-            {t('harnesses.duplicateModal.newName')}
-          </label>
-          <input
-            ref={(el) =>
-              requestAnimationFrame(() => {
-                el.focus();
-                el.select();
-              })
-            }
-            id="duplicate-agent-name"
-            class="modal-card__input modal-card__input--lg"
-            type="text"
-            placeholder={
-              preview()?.suggested_name ??
-              t('harnesses.duplicateModal.copyPlaceholder', { name: props.sourceName })
-            }
-            value={name()}
-            onInput={(e) => handleNameInput(e.currentTarget.value)}
-            disabled={submitting()}
-          />
-
-          <div class="duplicate-agent__section">
-            <div class="duplicate-agent__section-header">
-              {t('harnesses.duplicateModal.copied')}
-              <Show when={preview()}>
-                <span class="duplicate-agent__badge">{totalCopied()}</span>
-              </Show>
-            </div>
-            <Show
-              when={preview()}
-              fallback={<div class="skeleton skeleton--rect" style="width: 100%; height: 80px;" />}
-            >
-              <ul class="duplicate-agent__list">
-                <li>
-                  <strong>{preview()!.copied.providers}</strong>{' '}
-                  {t('harnesses.duplicateModal.providers', preview()!.copied.providers)}
-                </li>
-                <li>
-                  <strong>{preview()!.copied.tierAssignments}</strong>{' '}
-                  {t('harnesses.duplicateModal.tiers', preview()!.copied.tierAssignments)}
-                </li>
-                <li>
-                  <strong>{preview()!.copied.specificityAssignments}</strong>{' '}
-                  {t(
-                    'harnesses.duplicateModal.specificity',
-                    preview()!.copied.specificityAssignments,
-                  )}
-                </li>
-              </ul>
-            </Show>
-          </div>
-
-          <div class="duplicate-agent__section">
-            <div class="duplicate-agent__section-header">
-              {t('harnesses.duplicateModal.notCopied')}
-            </div>
-            <ul class="duplicate-agent__list">
-              <li>{t('harnesses.duplicateModal.requests')}</li>
-              <li>{t('harnesses.duplicateModal.logs')}</li>
-              <li>{t('harnesses.duplicateModal.notificationRules')}</li>
-            </ul>
-          </div>
-
-          <div class="modal-card__footer">
-            <button class="btn btn--ghost btn--sm" onClick={requestClose} type="button">
-              {t('common.cancel')}
-            </button>
-            <button
-              class="btn btn--primary btn--sm"
-              onClick={handleDuplicate}
-              disabled={!name().trim() || submitting()}
-              type="button"
-            >
-              {submitting() ? <span class="spinner" /> : t('harnesses.duplicateModal.submit')}
-            </button>
-          </div>
+      <div className="duplicate-agent__section well mt-4">
+        <div className={`duplicate-agent__section-header ${sectionHead}`}>
+          {t('harnesses.duplicateModal.copied')}
+          {copied ? <span className="badge">{totalCopied}</span> : null}
         </div>
+        {copied ? (
+          <ul className={listClass}>
+            <li>
+              <strong className="text-ink">{copied.providers}</strong>{' '}
+              {t('harnesses.duplicateModal.providers', copied.providers)}
+            </li>
+            <li>
+              <strong className="text-ink">{copied.tierAssignments}</strong>{' '}
+              {t('harnesses.duplicateModal.tiers', copied.tierAssignments)}
+            </li>
+            <li>
+              <strong className="text-ink">{copied.specificityAssignments}</strong>{' '}
+              {t('harnesses.duplicateModal.specificity', copied.specificityAssignments)}
+            </li>
+          </ul>
+        ) : (
+          <Skel width="100%" height={64} />
+        )}
       </div>
-    </Show>
-  );
-};
 
-export default DuplicateAgentModal;
+      <div className="duplicate-agent__section well mt-3">
+        <div className={`duplicate-agent__section-header ${sectionHead}`}>
+          {t('harnesses.duplicateModal.notCopied')}
+        </div>
+        <ul className={listClass}>
+          <li>{t('harnesses.duplicateModal.requests')}</li>
+          <li>{t('harnesses.duplicateModal.logs')}</li>
+          <li>{t('harnesses.duplicateModal.notificationRules')}</li>
+        </ul>
+      </div>
+
+      <div className="actions">
+        <Button variant="ghost" size="sm" onClick={requestClose}>
+          {t('common.cancel')}
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => void handleDuplicate()}
+          disabled={!name.trim()}
+          busy={submitting}
+        >
+          {submitting ? null : t('harnesses.duplicateModal.submit')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}

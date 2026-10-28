@@ -1,24 +1,46 @@
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockSetSearchParams = vi.fn();
-let mockSearchParams: Record<string, string | undefined> = {};
 const mockGetGlobalProviders = vi.fn();
 const mockGetAgents = vi.fn();
 const mockGetAgentProviders = vi.fn();
 const mockGetCustomProviders = vi.fn();
+const mockGetPlaygroundAgent = vi.fn();
 const mockProviderSelectModal = vi.fn();
 
 const mockNavigate = vi.fn();
-vi.mock('@solidjs/router', () => ({
-  useSearchParams: () => [mockSearchParams, mockSetSearchParams],
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<typeof import('react-router')>()),
   useNavigate: () => mockNavigate,
-  Navigate: (props: { href: string }) => <div data-testid="navigate" data-href={props.href} />,
 }));
 
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children as string}</title>,
+vi.mock('../../src/services/api/playground.js', () => ({
+  getPlaygroundAgent: (...args: unknown[]) => mockGetPlaygroundAgent(...args),
 }));
+
+function Where() {
+  const { search } = useLocation();
+  return <div data-testid="where">{search}</div>;
+}
+
+const renderPage = (node: ReactNode, path = '/providers') =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path="/providers"
+          element={
+            <>
+              {node}
+              <Where />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
 
 vi.mock('../../src/components/ProviderSelectModal.jsx', () => ({
   default: (props: Record<string, unknown>) => {
@@ -116,13 +138,12 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   getPerProviderReliability: () => Promise.resolve([]),
 }));
 
-// SSE ping signals drive the usage resource's source; stub them to no-op
-// accessors so the page mounts without a live EventSource under jsdom.
-vi.mock('../../src/services/sse.js', () => ({
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  routingPing: () => 0,
-}));
+// SSE ping signals drive the usage resource's deps; stub them with idle
+// signals so the page mounts without a live EventSource under jsdom.
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { messagePing: signal(0), analyticsPing: signal(0), routingPing: signal(0) };
+});
 
 const mockRenameProviderKey = vi.fn();
 vi.mock('../../src/services/api/routing.js', () => ({
@@ -206,7 +227,8 @@ const globalProvidersResponse = {
 describe('provider pages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSearchParams = {};
+    // No Playground agent unless a case provides one.
+    mockGetPlaygroundAgent.mockRejectedValue(new Error('no playground'));
     mockRenameProviderKey.mockResolvedValue(undefined);
     mockGetGlobalProviders.mockResolvedValue(globalProvidersResponse);
     // The usage endpoint returns the per-(provider, auth_type) stats that the
@@ -260,7 +282,7 @@ describe('provider pages', () => {
     // The bug this pins: OpenAI subscription at 92.2% was displayed as ~83%
     // because the list read a provider-level rate blending in the api_key
     // connection's failures. Rows must read their (provider, auth_type) grain.
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     await waitFor(() => expect(screen.getByText('ChatGPT')).toBeDefined());
 
     // 119 / 129 = 92.2%, the subscription connection's own rate.
@@ -272,7 +294,7 @@ describe('provider pages', () => {
   });
 
   it('renders the subscriptions page and opens the connect modal', async () => {
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => {
       expect(screen.getByText('Subscriptions')).toBeDefined();
@@ -320,7 +342,7 @@ describe('provider pages', () => {
       ],
     });
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => expect(screen.getByText('Old Claude')).toBeDefined());
     expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0);
@@ -330,7 +352,7 @@ describe('provider pages', () => {
   });
 
   it('keeps a provider closed to new subscriptions out of the catalog until connected', async () => {
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     // Anthropic has no connection in the fixture, so it only shows once the catalog renders.
     await waitFor(() => expect(screen.getByText('Anthropic')).toBeDefined());
     expect(screen.queryByText('Google')).toBeNull();
@@ -356,7 +378,7 @@ describe('provider pages', () => {
       ],
     });
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => expect(screen.getByText('Old Google')).toBeDefined());
     // Listed once, in the connections table only.
@@ -383,7 +405,7 @@ describe('provider pages', () => {
       ],
     });
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => expect(screen.getByText('Work Google')).toBeDefined());
     // Once in the connections table, once in the catalog.
@@ -393,7 +415,7 @@ describe('provider pages', () => {
   });
 
   it('deep-links the connect modal to a specific provider when added from its row', async () => {
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     // Each supported-provider row carries its own "Connect" button; clicking it
     // opens straight into that provider's connection form (deep link) rather
@@ -414,7 +436,7 @@ describe('provider pages', () => {
   });
 
   it('renders the BYOK (usage-based) page with custom provider connections', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
 
     await waitFor(() => {
       expect(screen.getByText('Usage-based')).toBeDefined();
@@ -430,14 +452,14 @@ describe('provider pages', () => {
     // resource catch returns [] and the row shows zeroed usage (0 tokens).
     mockGetProviderUsage.mockRejectedValue(new Error('usage down'));
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => expect(screen.getByText('ChatGPT')).toBeDefined());
     await waitFor(() => expect(screen.getByText(/0 tokens/)).toBeDefined());
   });
 
   it('renders the local providers page', async () => {
-    render(() => <LocalProviders />);
+    renderPage(<LocalProviders />);
 
     await waitFor(() => {
       expect(screen.getByText('Local')).toBeDefined();
@@ -447,32 +469,47 @@ describe('provider pages', () => {
   });
 
   it('auto-opens the modal from add=true and clears the query param', async () => {
-    mockSearchParams = { add: 'true' };
-    render(() => <LocalProviders />);
+    renderPage(<LocalProviders />, '/providers?add=true&keep=1');
 
     await waitFor(() => {
-      // The deep-link handling lives in a createEffect (not the render body), and
-      // clears the param with replace so a refresh/back-nav can't re-trigger it.
-      expect(mockSetSearchParams).toHaveBeenCalledWith({ add: undefined }, { replace: true });
+      // The deep-link handling lives in an effect (not the render body), and
+      // clears the param so a refresh/back-nav can't re-trigger it.
+      expect(screen.getByTestId('where').textContent).toBe('?keep=1');
       expect(screen.getByRole('dialog', { name: 'provider modal' })).toBeDefined();
     });
   });
 
   it('does not auto-open the modal without the add=true deep-link', async () => {
-    mockSearchParams = {};
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />, '/providers?keep=1');
 
     await waitFor(() => {
       expect(screen.getByText('Subscriptions')).toBeDefined();
     });
-    // No deep-link → the effect must not clear the param or open the modal.
-    expect(mockSetSearchParams).not.toHaveBeenCalled();
+    // No deep-link → the effect must not touch the params or open the modal.
+    expect(screen.getByTestId('where').textContent).toBe('?keep=1');
     expect(screen.queryByRole('dialog', { name: 'provider modal' })).toBeNull();
+  });
+
+  it('keeps Connect enabled with no harness by falling back to the Playground agent', async () => {
+    mockGetAgents.mockResolvedValue({ agents: [] });
+    mockGetPlaygroundAgent.mockResolvedValue({ name: 'playground' });
+    renderPage(<Byok />);
+
+    await waitFor(() => {
+      expect((screen.getAllByText('Connect')[0] as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(screen.getAllByText('Connect')[0]!);
+    await waitFor(() => {
+      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+        expect.objectContaining({ agentName: 'playground' }),
+      );
+    });
+    expect(mockGetAgentProviders).toHaveBeenCalledWith('playground');
   });
 
   it('disables Add buttons when no agent exists for the modal context', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
-    render(() => <Byok />);
+    renderPage(<Byok />);
 
     await waitFor(() => {
       const addButton = screen.getAllByText('Connect')[0] as HTMLButtonElement;
@@ -486,7 +523,7 @@ describe('provider pages', () => {
     mockGetAgentProviders.mockRejectedValue(new Error('agent providers failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom providers failed'));
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
 
     await waitFor(() => {
       expect(screen.getByText('Supported subscription providers')).toBeDefined();
@@ -496,11 +533,10 @@ describe('provider pages', () => {
   });
 
   it('opens the modal with empty lists when modal context fetches fail', async () => {
-    mockSearchParams = { add: 'true' };
     mockGetAgentProviders.mockRejectedValue(new Error('agent providers failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom providers failed'));
 
-    render(() => <Byok />);
+    renderPage(<Byok />, '/providers?add=true');
 
     await waitFor(() => {
       expect(mockProviderSelectModal).toHaveBeenCalledWith(
@@ -514,7 +550,7 @@ describe('provider pages', () => {
   });
 
   it('navigates to the connection detail via row click, keyboard, and View details', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     // The custom:cp-1 connection (label "Production") is inactive but has usage,
     // so it renders as a connected row.
     await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
@@ -541,7 +577,7 @@ describe('provider pages', () => {
   });
 
   it('ignores keyboard events bubbling up from a child element of the row', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
 
     // Dispatch the keydown from a descendant (the provider name span) so that
@@ -552,7 +588,7 @@ describe('provider pages', () => {
   });
 
   it('renames a connection inline and refetches on success', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitForConnectedAgent();
 
     // Enter rename mode via the per-row edit button.
@@ -560,7 +596,7 @@ describe('provider pages', () => {
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
 
     // Edit the value, then save via the Save button.
-    fireEvent.input(input, { target: { value: 'Renamed key' } });
+    fireEvent.change(input, { target: { value: 'Renamed key' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -578,12 +614,12 @@ describe('provider pages', () => {
   });
 
   it('saves a rename when pressing Enter in the input', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitForConnectedAgent();
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'Via enter' } });
+    fireEvent.change(input, { target: { value: 'Via enter' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
     await waitFor(() => {
@@ -598,12 +634,12 @@ describe('provider pages', () => {
   });
 
   it('shows a validation error when the new name is empty', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitForConnectedAgent();
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
-    fireEvent.input(input, { target: { value: '   ' } });
+    fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(screen.getByText('Name cannot be empty')).toBeDefined());
@@ -611,7 +647,7 @@ describe('provider pages', () => {
   });
 
   it('cancels the rename without calling the API when the name is unchanged', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
@@ -624,7 +660,7 @@ describe('provider pages', () => {
   });
 
   it('cancels the rename via the Cancel button and via Escape', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
 
     // Cancel button path.
@@ -643,12 +679,12 @@ describe('provider pages', () => {
 
   it('surfaces the API error message when a rename fails', async () => {
     mockRenameProviderKey.mockRejectedValue(new Error('Name already taken'));
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitForConnectedAgent();
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'Clashing name' } });
+    fireEvent.change(input, { target: { value: 'Clashing name' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(screen.getByText('Name already taken')).toBeDefined());
@@ -658,12 +694,12 @@ describe('provider pages', () => {
 
   it('falls back to a generic message when a rename rejects without a message', async () => {
     mockRenameProviderKey.mockRejectedValue({});
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitForConnectedAgent();
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'Another name' } });
+    fireEvent.change(input, { target: { value: 'Another name' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(screen.getByText('Failed to rename')).toBeDefined());
@@ -674,12 +710,12 @@ describe('provider pages', () => {
     // before touching the API.
     mockGetAgents.mockResolvedValue({ agents: [] });
     // A connection still renders because it has usage, even without an agent.
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('Rename Production'));
     const input = (await screen.findByDisplayValue('Production')) as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'No agent name' } });
+    fireEvent.change(input, { target: { value: 'No agent name' } });
     fireEvent.click(screen.getByText('Save'));
 
     // No API call and the input stays open (no toast, no rename).
@@ -688,7 +724,7 @@ describe('provider pages', () => {
   });
 
   it('renders the list view with active-connection counts and opens the connect modal', async () => {
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     await waitForConnectedAgent('ChatGPT');
 
     // Switch from the default grid view to the list view.
@@ -724,7 +760,7 @@ describe('provider pages', () => {
 
   it('disables the list-view Connect button when no agent exists', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     await waitFor(() => expect(screen.getByText('Subscriptions')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
@@ -755,7 +791,7 @@ describe('provider pages', () => {
       model_counts: {},
     });
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     await waitFor(() => expect(screen.getByText('Plan A')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
@@ -763,7 +799,7 @@ describe('provider pages', () => {
   });
 
   it('labels local providers as "Connected" in the list view', async () => {
-    render(() => <LocalProviders />);
+    renderPage(<LocalProviders />);
     await waitFor(() => expect(screen.getByText('My local connections')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
@@ -772,7 +808,7 @@ describe('provider pages', () => {
   });
 
   it('opens and closes the custom provider modal on the BYOK page', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Add custom provider')).toBeDefined());
 
     // Wait for agent to load so the modal can render (guarded by firstAgentName()).
@@ -795,7 +831,7 @@ describe('provider pages', () => {
     );
 
     // Close via Escape key.
-    const overlay = document.querySelector('.modal-overlay') as HTMLElement;
+    const overlay = document.querySelector('.overlay') as HTMLElement;
     fireEvent.keyDown(overlay, { key: 'Escape' });
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Add custom provider' })).toBeNull(),
@@ -806,7 +842,7 @@ describe('provider pages', () => {
   });
 
   it('closes the custom modal via overlay click', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() =>
       expect(
         (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
@@ -818,16 +854,16 @@ describe('provider pages', () => {
       expect(screen.getByRole('dialog', { name: 'Add custom provider' })).toBeDefined(),
     );
 
-    // Click the overlay itself (target === currentTarget).
-    const overlay = document.querySelector('.modal-overlay') as HTMLElement;
-    fireEvent.click(overlay);
+    // Press on the backdrop itself (target === currentTarget).
+    const overlay = document.querySelector('.overlay') as HTMLElement;
+    fireEvent.mouseDown(overlay);
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Add custom provider' })).toBeNull(),
     );
   });
 
   it('closes the custom modal when the form fires onCreated', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() =>
       expect(
         (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
@@ -844,7 +880,7 @@ describe('provider pages', () => {
   });
 
   it('closes the custom modal when the form fires onBack', async () => {
-    render(() => <Byok />);
+    renderPage(<Byok />);
     await waitFor(() =>
       expect(
         (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
@@ -893,7 +929,7 @@ describe('provider pages', () => {
       ],
     });
 
-    render(() => <Subscriptions />);
+    renderPage(<Subscriptions />);
     await waitFor(() => expect(screen.getByText('Sparkly')).toBeDefined());
     // The stubbed Sparkline reports its data length (4 points).
     await waitFor(() => {
@@ -928,7 +964,7 @@ describe('provider pages', () => {
   it('leaves the connections list uncapped at six connections', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(6));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = render(() => <Byok />);
+    const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Key 6')).toBeDefined());
 
     expect(container.querySelector('.connections-panel--collapsed')).toBeNull();
@@ -938,7 +974,7 @@ describe('provider pages', () => {
   it('caps the connections list past six and names how many there are', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(9));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = render(() => <Byok />);
+    const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Key 9')).toBeDefined());
 
     expect(container.querySelector('.connections-panel--collapsed')).not.toBeNull();
@@ -952,7 +988,7 @@ describe('provider pages', () => {
   it('expands the connections list and collapses it again', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = render(() => <Byok />);
+    const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
 
     const toggle = screen.getByText('Show all 8 connections').closest('button')!;
@@ -978,7 +1014,7 @@ describe('provider pages', () => {
   it('brings the bottom fade back after expanding and collapsing again', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = render(() => <Byok />);
+    const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
 
     const body = container.querySelector('.connections-panel__body') as HTMLElement;
@@ -1000,7 +1036,7 @@ describe('provider pages', () => {
   it('drops the bottom fade once the capped list is scrolled to the end', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = render(() => <Byok />);
+    const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
 
     const body = container.querySelector('.connections-panel__body') as HTMLElement;

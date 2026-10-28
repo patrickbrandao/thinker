@@ -20,15 +20,15 @@ import { buildRegistry, buildLlmsTxt } from './lib/emit.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = join(root, 'packages/frontend/src/styles');
-const uiDir = join(root, 'packages/frontend/src/components/ui');
+const uiFile = join(root, 'packages/frontend/src/components/ui.tsx');
 const registryDir = join(root, 'design-system/registry');
 
+/** The React primitives exported by src/components/ui.tsx (capitalized exports). */
 function listPrimitives() {
-  if (!existsSync(uiDir)) return [];
-  return readdirSync(uiDir)
-    .filter((f) => /^[A-Z][\w]*\.tsx$/.test(f))
-    .sort()
-    .map((f) => ({ name: f.replace(/\.tsx$/, ''), file: `src/components/ui/${f}` }));
+  if (!existsSync(uiFile)) return [];
+  const source = readFileSync(uiFile, 'utf8');
+  const names = [...source.matchAll(/^export (?:function|const) ([A-Z]\w*)/gm)].map((m) => m[1]);
+  return [...new Set(names)].sort().map((name) => ({ name, file: 'src/components/ui.tsx' }));
 }
 
 function readMigrationMap() {
@@ -39,7 +39,7 @@ function readMigrationMap() {
 
 /**
  * Stylesheets imported directly by components (Vite loads them per chunk,
- * after the global theme.css tree). Returns { files: sorted absolute paths,
+ * after the global index.css tree). Returns { files: sorted absolute paths,
  * importers: cssBasename → [component paths] }.
  */
 function scanComponentImports() {
@@ -70,7 +70,7 @@ function scanComponentImports() {
 function generate() {
   const { files: componentFiles, importers } = scanComponentImports();
   const { order, rules, missing, entryTreeSize } = loadCascade(
-    join(stylesDir, 'theme.css'),
+    join(stylesDir, 'index.css'),
     componentFiles,
   );
   const imported = new Set(order.map((p) => basename(p)));

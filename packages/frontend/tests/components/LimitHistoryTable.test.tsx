@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
 import LimitHistoryTable from '../../src/components/LimitHistoryTable';
 import type { NotificationLog } from '../../src/services/api/notifications';
 
@@ -21,23 +21,23 @@ const makeLogs = (overrides?: Partial<NotificationLog>[]): NotificationLog[] =>
 
 describe('LimitHistoryTable', () => {
   it('renders panel with History title', () => {
-    render(() => <LimitHistoryTable logs={makeLogs()} loading={false} />);
-    expect(q('.panel__title')!.textContent).toBe('History');
+    render(<LimitHistoryTable logs={makeLogs()} loading={false} />);
+    expect(q('.panel-head h2')!.textContent).toBe('History');
   });
 
   it('renders skeleton rows when loading', () => {
-    render(() => <LimitHistoryTable logs={undefined} loading={true} />);
-    const skeletons = qa('.skeleton');
+    render(<LimitHistoryTable logs={undefined} loading={true} />);
+    const skeletons = qa('.skel');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('renders empty state when no logs', () => {
-    render(() => <LimitHistoryTable logs={[]} loading={false} />);
-    expect(q('.empty-state__title')!.textContent).toBe('No alerts triggered yet');
+    render(<LimitHistoryTable logs={[]} loading={false} />);
+    expect(q('.empty h3')!.textContent).toBe('No alerts triggered yet');
   });
 
   it('renders log rows with formatted values', () => {
-    render(() => <LimitHistoryTable logs={makeLogs()} loading={false} />);
+    render(<LimitHistoryTable logs={makeLogs()} loading={false} />);
     const rows = qa('tbody tr');
     expect(rows.length).toBe(1);
     const cells = rows[0].querySelectorAll('td');
@@ -46,29 +46,26 @@ describe('LimitHistoryTable', () => {
   });
 
   it('formats cost values with dollar sign', () => {
-    render(() => (
+    render(
       <LimitHistoryTable
         logs={makeLogs([{ metric_type: 'cost', actual_value: 12.5, threshold_value: 10 }])}
         loading={false}
-      />
-    ));
+      />,
+    );
     const cells = qa('tbody tr td');
     expect(cells[1].textContent).toContain('$12.50');
     expect(cells[2].textContent).toContain('$10.00');
   });
 
   it('renders multiple rows in order', () => {
-    const logs = makeLogs([
-      { actual_value: 100000 },
-      { actual_value: 200000 },
-    ]);
-    render(() => <LimitHistoryTable logs={logs} loading={false} />);
+    const logs = makeLogs([{ actual_value: 100000 }, { actual_value: 200000 }]);
+    render(<LimitHistoryTable logs={logs} loading={false} />);
     const rows = qa('tbody tr');
     expect(rows.length).toBe(2);
   });
 
   it('renders table headers', () => {
-    render(() => <LimitHistoryTable logs={makeLogs()} loading={false} />);
+    render(<LimitHistoryTable logs={makeLogs()} loading={false} />);
     const headers = qa('thead th');
     expect(headers[0].textContent).toBe('Date');
     expect(headers[1].textContent).toBe('Usage');
@@ -77,12 +74,9 @@ describe('LimitHistoryTable', () => {
   });
 
   it('normalizes UTC timestamps for local display', () => {
-    render(() => (
-      <LimitHistoryTable
-        logs={makeLogs([{ sent_at: '2026-03-29 12:00:00' }])}
-        loading={false}
-      />
-    ));
+    render(
+      <LimitHistoryTable logs={makeLogs([{ sent_at: '2026-03-29 12:00:00' }])} loading={false} />,
+    );
     const dateCell = qa('tbody tr td')[0];
     // Should not contain raw "12:00:00" — it should be formatted by toLocaleDateString
     expect(dateCell.textContent).not.toContain('12:00:00');

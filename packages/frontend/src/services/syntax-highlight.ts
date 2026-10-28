@@ -1,6 +1,6 @@
-// The `.hljs` token styles that pair with this highlighter. Co-locating the CSS
-// with the service (instead of the global theme) loads it only into the chunks
-// that actually render highlighted code (CodeBlock, MarkdownContent, etc.).
+// The `.hljs` token styles that pair with this highlighter, on the design
+// tokens. Co-locating the CSS with the service (instead of the global theme)
+// loads it only into the chunks that render highlighted code.
 import '../styles/syntax-highlight.css';
 import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';

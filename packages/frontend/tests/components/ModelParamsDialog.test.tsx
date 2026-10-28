@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@solidjs/testing-library';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import type { ProviderParamSpec, RequestParamDefaults } from 'thinker-shared';
-
-vi.mock('solid-js/web', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('solid-js/web')>();
-  return { ...mod, Portal: (props: any) => props.children };
-});
 
 import ModelParamsDialog from '../../src/components/ModelParamsDialog';
 
@@ -149,12 +144,12 @@ describe('ModelParamsDialog', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders nothing when closed', () => {
-    render(() => <ModelParamsDialog {...baseProps} open={false} />);
-    expect(q('.modal-overlay')).toBeNull();
+    render(<ModelParamsDialog {...baseProps} open={false} />);
+    expect(q('.overlay')).toBeNull();
   });
 
   it('shows the empty state with no request link when no parameter specs are published', () => {
-    render(() => <ModelParamsDialog {...baseProps} specs={[]} slotLabel="gpt-4o" />);
+    render(<ModelParamsDialog {...baseProps} specs={[]} slotLabel="gpt-4o" />);
 
     expect(screen.getByText('No parameter controls are available for gpt-4o.')).toBeTruthy();
     expect(screen.getByText('This model has no configurable parameters.')).toBeTruthy();
@@ -164,20 +159,20 @@ describe('ModelParamsDialog', () => {
   });
 
   it('shows no request link alongside published parameter controls', () => {
-    render(() => <ModelParamsDialog {...baseProps} />);
+    render(<ModelParamsDialog {...baseProps} />);
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
     expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('starts on the spec default when no override is configured', () => {
-    render(() => <ModelParamsDialog {...baseProps} />);
+    render(<ModelParamsDialog {...baseProps} />);
     const toggle = q('.model-params__toggle') as HTMLButtonElement;
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
     expect(q('.provider-toggle__switch--on')).not.toBeNull();
   });
 
   it('explains that set values override the client and unset ones pass through', () => {
-    render(() => <ModelParamsDialog {...baseProps} slotLabel="GPT-5 Nano" />);
+    render(<ModelParamsDialog {...baseProps} slotLabel="GPT-5 Nano" />);
     expect(
       screen.getByText(
         "Values you set override the client's request for GPT-5 Nano; unset ones keep the client's value. Requests that name a model instead of auto skip them.",
@@ -186,29 +181,29 @@ describe('ModelParamsDialog', () => {
   });
 
   it('shows loading description while specs are being fetched', () => {
-    render(() => <ModelParamsDialog {...baseProps} specs={[]} loading={true} slotLabel="gpt-4o" />);
+    render(<ModelParamsDialog {...baseProps} specs={[]} loading={true} slotLabel="gpt-4o" />);
     expect(screen.getByText('Loading parameters for gpt-4o…')).toBeTruthy();
   });
 
   it('reflects the configured override when present', () => {
-    render(() => <ModelParamsDialog {...baseProps} current={{ thinking: { type: 'disabled' } }} />);
+    render(<ModelParamsDialog {...baseProps} current={{ thinking: { type: 'disabled' } }} />);
     const toggle = q('.model-params__toggle') as HTMLButtonElement;
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     expect(q('.provider-toggle__switch--on')).toBeNull();
   });
 
   it('shows the human label and raw provider param path', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
     expect(screen.getAllByText('Max tokens').length).toBeGreaterThan(0);
     expect(screen.getByText('max_tokens')).toBeTruthy();
   });
 
   it('renders descriptions from the published parameter specs', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
 
     expect(screen.getByText('Controls sampling randomness.')).toBeTruthy();
     expect(
@@ -219,9 +214,9 @@ describe('ModelParamsDialog', () => {
   });
 
   it('renders derived select, slider, and number controls from specs', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
     expect(screen.getByLabelText('Thinking mode')).toBeTruthy();
     expect(screen.getByRole('slider', { name: 'Temperature' })).toBeTruthy();
     expect(screen.getByLabelText('Max tokens')).toBeTruthy();
@@ -229,15 +224,15 @@ describe('ModelParamsDialog', () => {
 
   it('lets adaptive-only enum params return to unset', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicAdaptiveSpecs}
         slotLabel="claude-fable-5"
         current={{ thinking: { type: 'adaptive', display: 'summarized' } }}
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(screen.getByLabelText('Thinking mode'));
     fireEvent.click(screen.getByRole('option', { name: 'None' }));
@@ -250,14 +245,14 @@ describe('ModelParamsDialog', () => {
 
   it('saves adaptive-only enum params after selecting adaptive from unset', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicAdaptiveSpecs}
         slotLabel="claude-fable-5"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(screen.getByLabelText('Thinking mode'));
     expect(screen.getByRole('option', { name: 'None' })).toBeTruthy();
@@ -272,9 +267,9 @@ describe('ModelParamsDialog', () => {
   });
 
   it('updates slider controls from keyboard input', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
 
     const slider = screen.getByRole('slider', { name: 'Temperature' }) as HTMLInputElement;
 
@@ -292,32 +287,32 @@ describe('ModelParamsDialog', () => {
   });
 
   it('updates slider value from native input event', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
 
     const slider = screen.getByRole('slider', { name: 'Temperature' }) as HTMLInputElement;
-    fireEvent.input(slider, { target: { value: '0.5' } });
+    fireEvent.change(slider, { target: { value: '0.5' } });
     expect(slider.value).toBe('0.5');
   });
 
   it('updates slider value when typing in the companion number input', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     const numberInput = screen.getByLabelText('Temperature value') as HTMLInputElement;
-    fireEvent.input(numberInput, { target: { value: '0,3' } });
-    fireEvent.input(numberInput, { target: { value: '' } });
-    fireEvent.input(numberInput, { target: { value: '.' } });
-    fireEvent.input(numberInput, { target: { value: 'abc' } });
-    fireEvent.input(numberInput, { target: { value: '0.6' } });
+    fireEvent.change(numberInput, { target: { value: '0,3' } });
+    fireEvent.change(numberInput, { target: { value: '' } });
+    fireEvent.change(numberInput, { target: { value: '.' } });
+    fireEvent.change(numberInput, { target: { value: 'abc' } });
+    fireEvent.change(numberInput, { target: { value: '0.6' } });
     fireEvent.blur(numberInput);
     fireEvent.click(screen.getByText('Save'));
 
@@ -326,17 +321,17 @@ describe('ModelParamsDialog', () => {
 
   it('snaps companion number input values to the slider step before saving', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     const numberInput = screen.getByLabelText('Temperature value') as HTMLInputElement;
-    fireEvent.input(numberInput, { target: { value: '0.36' } });
+    fireEvent.change(numberInput, { target: { value: '0.36' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ temperature: 0.4 }));
@@ -358,31 +353,31 @@ describe('ModelParamsDialog', () => {
         group: 'reasoning',
       },
     ];
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={integerSliderSpec}
         slotLabel="claude-sonnet-4-6"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     const numberInput = screen.getByLabelText('Thinking budget value') as HTMLInputElement;
-    fireEvent.input(numberInput, { target: { value: '8192.9' } });
+    fireEvent.change(numberInput, { target: { value: '8192.9' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ thinking: { budget_tokens: 8192 } }));
   });
 
   it('renders a tooltip explaining how to enable a blocked param (only-rule case)', () => {
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         current={{ thinking: { type: 'disabled' } }}
-      />
-    ));
+      />,
+    );
 
     const helps = document.querySelectorAll('.model-params__help');
     const messages = Array.from(helps).map((el) => el.getAttribute('aria-label'));
@@ -418,7 +413,7 @@ describe('ModelParamsDialog', () => {
         applicability: { only: { mode: ['low', 'medium', 'high'] } },
       },
     ];
-    render(() => <ModelParamsDialog {...baseProps} specs={specs} slotLabel="test" />);
+    render(<ModelParamsDialog {...baseProps} specs={specs} slotLabel="test" />);
 
     const messages = Array.from(document.querySelectorAll('.model-params__help')).map((el) =>
       el.getAttribute('aria-label'),
@@ -467,14 +462,14 @@ describe('ModelParamsDialog', () => {
         applicability: { except: { mode: { not: 'fast' } } },
       },
     ];
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={blockedSpecs}
         slotLabel="test"
         current={{ mode: 'slow' }}
-      />
-    ));
+      />,
+    );
 
     const messages = Array.from(document.querySelectorAll('.model-params__help')).map((el) =>
       el.getAttribute('aria-label'),
@@ -484,9 +479,9 @@ describe('ModelParamsDialog', () => {
   });
 
   it('shows the slider min and max bounds', () => {
-    render(() => (
-      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />
-    ));
+    render(
+      <ModelParamsDialog {...baseProps} specs={anthropicSpecs} slotLabel="claude-sonnet-4-6" />,
+    );
 
     const slider = screen.getByRole('slider', { name: 'Temperature' });
     const field = slider.closest('.model-params__slider-field') as HTMLElement;
@@ -497,16 +492,16 @@ describe('ModelParamsDialog', () => {
 
   it('stores integer number controls as parsed numeric values', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
-    fireEvent.input(screen.getByLabelText('Max tokens'), { target: { value: '2048.9' } });
+    fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '2048.9' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ max_tokens: 2048 }));
@@ -514,13 +509,13 @@ describe('ModelParamsDialog', () => {
 
   it('keeps a stored value even when the user picks the provider default', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         onSave={onSave}
         current={{ thinking: { type: 'disabled' } }}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(q('.model-params__toggle') as HTMLButtonElement);
     fireEvent.click(screen.getByText('Save'));
@@ -531,7 +526,7 @@ describe('ModelParamsDialog', () => {
   it('saves an explicit override when at least one value differs from the spec default', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
-    render(() => <ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
+    render(<ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
 
     fireEvent.click(q('.model-params__toggle') as HTMLButtonElement);
     fireEvent.click(screen.getByText('Save'));
@@ -542,14 +537,14 @@ describe('ModelParamsDialog', () => {
 
   it('keeps boolean toggle values as booleans', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={booleanSpecs}
         slotLabel="test-model"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(q('.model-params__toggle') as HTMLButtonElement);
     fireEvent.click(screen.getByText('Save'));
@@ -559,14 +554,14 @@ describe('ModelParamsDialog', () => {
 
   it('includes applicable nested sibling defaults when saving a nested override', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(screen.getByLabelText('Thinking mode'));
     fireEvent.click(screen.getByRole('option', { name: 'enabled' }));
@@ -580,14 +575,14 @@ describe('ModelParamsDialog', () => {
   });
 
   it('disables controls when model-param availability rules make them unavailable', () => {
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         current={{ thinking: { type: 'adaptive' } }}
-      />
-    ));
+      />,
+    );
     expect(screen.getByRole('slider', { name: 'Temperature' }).getAttribute('aria-disabled')).toBe(
       'true',
     );
@@ -595,15 +590,15 @@ describe('ModelParamsDialog', () => {
 
   it('disables and skips conflicted params when another param is configured', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         current={{ temperature: 0.2, top_p: 0.7 }}
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByRole('slider', { name: 'Top P' }).getAttribute('aria-disabled')).toBe(
       'true',
@@ -615,15 +610,15 @@ describe('ModelParamsDialog', () => {
 
   it('does not persist nested defaults when only stale inapplicable nested values differ', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(() => (
+    render(
       <ModelParamsDialog
         {...baseProps}
         specs={anthropicSpecs}
         slotLabel="claude-sonnet-4-6"
         current={{ thinking: { type: 'disabled', budget_tokens: 8192 } }}
         onSave={onSave}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(screen.getByText('Save'));
 
@@ -636,15 +631,15 @@ describe('ModelParamsDialog', () => {
       onSave: ReturnType<typeof vi.fn>,
       current: RequestParamDefaults | null = null,
     ) =>
-      render(() => (
+      render(
         <ModelParamsDialog
           {...baseProps}
           specs={[maxTokensSpec]}
           slotLabel="claude-sonnet-4-6"
           current={current}
           onSave={onSave}
-        />
-      ));
+        />,
+      );
 
     it('shows an unset field with the provider default as placeholder', () => {
       renderMaxTokens(vi.fn());
@@ -664,7 +659,7 @@ describe('ModelParamsDialog', () => {
     it('saves a value equal to the provider default once the user types it', async () => {
       const onSave = vi.fn().mockResolvedValue(undefined);
       renderMaxTokens(onSave);
-      fireEvent.input(screen.getByLabelText('Max tokens'), { target: { value: '4096' } });
+      fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '4096' } });
       expect(screen.getByRole('button', { name: 'Reset Max tokens' })).toBeTruthy();
       fireEvent.click(screen.getByText('Save'));
       await waitFor(() => expect(onSave).toHaveBeenCalledWith({ max_tokens: 4096 }));
@@ -679,7 +674,7 @@ describe('ModelParamsDialog', () => {
     it('unsets the param when the user clears the field', async () => {
       const onSave = vi.fn().mockResolvedValue(undefined);
       renderMaxTokens(onSave, { max_tokens: 8000 });
-      fireEvent.input(screen.getByLabelText('Max tokens'), { target: { value: '' } });
+      fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '' } });
       expect(screen.getByText(/Not set/)).toBeTruthy();
       fireEvent.click(screen.getByText('Save'));
       await waitFor(() => expect(onSave).toHaveBeenCalledWith(null));
@@ -696,24 +691,24 @@ describe('ModelParamsDialog', () => {
 
     it('leaves the slider text box empty until the user sets a value', async () => {
       const onSave = vi.fn().mockResolvedValue(undefined);
-      render(() => (
+      render(
         <ModelParamsDialog
           {...baseProps}
           specs={anthropicSpecs}
           slotLabel="claude-sonnet-4-6"
           onSave={onSave}
-        />
-      ));
+        />,
+      );
       const temperature = screen.getByLabelText('Temperature value') as HTMLInputElement;
       expect(temperature.disabled).toBe(false);
       expect(temperature.value).toBe('');
       expect(temperature.placeholder).toBe('1');
 
-      fireEvent.input(temperature, { target: { value: '0.4' } });
+      fireEvent.change(temperature, { target: { value: '0.4' } });
       fireEvent.blur(temperature);
       expect(temperature.value).toBe('0.4');
 
-      fireEvent.input(temperature, { target: { value: '' } });
+      fireEvent.change(temperature, { target: { value: '' } });
       fireEvent.blur(temperature);
       expect(temperature.value).toBe('');
       fireEvent.click(screen.getByText('Save'));
@@ -721,25 +716,25 @@ describe('ModelParamsDialog', () => {
     });
 
     it('labels nested siblings the proxy sends with a set root', () => {
-      render(() => (
+      render(
         <ModelParamsDialog
           {...baseProps}
           specs={anthropicSpecs}
           slotLabel="claude-sonnet-4-6"
           current={{ thinking: { type: 'enabled' } }}
-        />
-      ));
+        />,
+      );
       expect(screen.getByText(/Default sent with thinking/)).toBeTruthy();
     });
 
     it('shows "Not set" as placeholder when the spec has no default', () => {
-      render(() => (
+      render(
         <ModelParamsDialog
           {...baseProps}
           specs={[{ ...maxTokensSpec, default: undefined }]}
           slotLabel="claude-sonnet-4-6"
-        />
-      ));
+        />,
+      );
       expect((screen.getByLabelText('Max tokens') as HTMLInputElement).placeholder).toBe('Not set');
     });
   });
@@ -747,7 +742,7 @@ describe('ModelParamsDialog', () => {
   it('cancel button closes without persisting', () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(() => <ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
+    render(<ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
 
     fireEvent.click(screen.getByText('Cancel'));
     expect(onSave).not.toHaveBeenCalled();
@@ -756,15 +751,15 @@ describe('ModelParamsDialog', () => {
 
   it('Escape key closes the dialog', () => {
     const onClose = vi.fn();
-    render(() => <ModelParamsDialog {...baseProps} onClose={onClose} />);
-    fireEvent.keyDown(q('.modal-card')!, { key: 'Escape' });
+    render(<ModelParamsDialog {...baseProps} onClose={onClose} />);
+    fireEvent.keyDown(q('[role="dialog"]')!, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
 
   it('clicking the overlay closes the dialog', () => {
     const onClose = vi.fn();
-    render(() => <ModelParamsDialog {...baseProps} onClose={onClose} />);
-    fireEvent.click(q('.modal-overlay')!);
+    render(<ModelParamsDialog {...baseProps} onClose={onClose} />);
+    fireEvent.mouseDown(q('.overlay')!);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -777,10 +772,10 @@ describe('ModelParamsDialog', () => {
         }),
     );
     const onClose = vi.fn();
-    render(() => <ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
+    render(<ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
 
     fireEvent.click(screen.getByText('Save'));
-    fireEvent.click(q('.modal-overlay')!);
+    fireEvent.mouseDown(q('.overlay')!);
     expect(onClose).not.toHaveBeenCalled();
     resolveSave!();
     await waitFor(() => expect(onClose).toHaveBeenCalled());

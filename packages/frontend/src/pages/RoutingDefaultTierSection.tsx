@@ -1,4 +1,3 @@
-import { For, Show, type Component } from 'solid-js';
 import type {
   AuthType,
   AvailableModel,
@@ -8,27 +7,27 @@ import type {
   RoutingProvider,
   TierAssignment,
 } from '../services/api.js';
-import { DEFAULT_STAGE, STAGES } from '../services/providers.js';
-import OutputControls from '../components/OutputControls.js';
+import { DEFAULT_STAGE, STAGES, type StageDef } from '../services/providers.js';
 import RoutingDeprecationNotice from '../components/RoutingDeprecationNotice.js';
+import { cx } from '../components/ui.js';
 import RoutingTierCard from './RoutingTierCard.js';
 import { t } from '../i18n/index.js';
 
 export interface RoutingDefaultTierSectionProps {
-  agentName: () => string;
-  tier: () => TierAssignment | undefined;
-  models: () => AvailableModel[];
-  customProviders: () => CustomProviderData[];
-  activeProviders: () => RoutingProvider[];
-  connectedProviders: () => RoutingProvider[];
+  agentName: string;
+  tier: TierAssignment | undefined;
+  models: AvailableModel[];
+  customProviders: CustomProviderData[];
+  activeProviders: RoutingProvider[];
+  connectedProviders: RoutingProvider[];
   tiersLoading: boolean;
-  changingTier: () => string | null;
-  resettingTier: () => string | null;
-  resettingAll: () => boolean;
-  addingFallback: () => string | null;
+  changingTier: string | null;
+  resettingTier: string | null;
+  resettingAll: boolean;
+  addingFallback: string | null;
   onDropdownOpen: (tierId: string) => void;
   onOverride: (tierId: string, model: string, provider: string, authType?: AuthType) => void;
-  onPinKey: (
+  onPinKey?: (
     tierId: string,
     providerId: string,
     providerKeyLabel: string | null,
@@ -39,18 +38,18 @@ export interface RoutingDefaultTierSectionProps {
   onAddFallback: (tierId: string) => void;
   getFallbacksFor: (tierId: string) => string[];
   getTier: (tierId: string) => TierAssignment | undefined;
-  complexityEnabled: () => boolean;
-  togglingComplexity: () => boolean;
+  complexityEnabled: boolean;
+  togglingComplexity: boolean;
   onToggleComplexity: () => void;
   /**
-   * Gate for the deprecated "Route by complexity" toggle. When this returns
-   * false the toggle is hidden entirely and the section shows only the single
-   * default model + fallbacks. Hidden for agents that never enabled complexity
+   * Gate for the deprecated "Route by complexity" toggle. When false the
+   * toggle is hidden entirely and the section shows only the single default
+   * model + fallbacks. Hidden for agents that never enabled complexity
    * routing (see `legacyComplexityVisible` in Routing.tsx). Defaults to shown.
    */
-  showComplexityToggle?: () => boolean;
-  responseMode: () => ResponseMode;
-  changingResponseMode: () => boolean;
+  showComplexityToggle?: boolean;
+  responseMode: ResponseMode;
+  changingResponseMode: boolean;
   onResponseModeChange: (mode: ResponseMode) => void | Promise<void>;
   embedded?: boolean;
   /**
@@ -78,145 +77,101 @@ export interface RoutingDefaultTierSectionProps {
   ) => Promise<unknown>;
 }
 
-const RoutingDefaultTierSection: Component<RoutingDefaultTierSectionProps> = (props) => {
-  const defaultCard = () => (
-    <div
-      class="routing-cards"
-      classList={{
-        'routing-cards--wide': !props.embedded,
-        'routing-cards--centered': !!props.embedded,
-      }}
-    >
-      <RoutingTierCard
-        stage={DEFAULT_STAGE}
-        tier={props.tier}
-        models={props.models}
-        customProviders={props.customProviders}
-        activeProviders={props.activeProviders}
-        tiersLoading={props.tiersLoading}
-        changingTier={props.changingTier}
-        resettingTier={props.resettingTier}
-        resettingAll={props.resettingAll}
-        addingFallback={props.addingFallback}
-        agentName={props.agentName}
-        onDropdownOpen={props.onDropdownOpen}
-        onOverride={props.onOverride}
-        onPinKey={props.onPinKey}
-        onReset={props.onReset}
-        onFallbackUpdate={props.onFallbackUpdate}
-        onAddFallback={props.onAddFallback}
-        getFallbacksFor={props.getFallbacksFor}
-        connectedProviders={props.connectedProviders}
-        getModelParams={props.getModelParams}
-        setModelParams={props.setModelParams}
-      />
+export default function RoutingDefaultTierSection(props: RoutingDefaultTierSectionProps) {
+  const card = (stage: StageDef, tier: TierAssignment | undefined) => (
+    <RoutingTierCard
+      key={stage.id}
+      stage={stage}
+      tier={tier}
+      models={props.models}
+      customProviders={props.customProviders}
+      activeProviders={props.activeProviders}
+      tiersLoading={props.tiersLoading}
+      changingTier={props.changingTier}
+      resettingTier={props.resettingTier}
+      resettingAll={props.resettingAll}
+      addingFallback={props.addingFallback}
+      agentName={props.agentName}
+      onDropdownOpen={props.onDropdownOpen}
+      onOverride={props.onOverride}
+      onPinKey={props.onPinKey}
+      onReset={props.onReset}
+      onFallbackUpdate={props.onFallbackUpdate}
+      onAddFallback={props.onAddFallback}
+      getFallbacksFor={props.getFallbacksFor}
+      connectedProviders={props.connectedProviders}
+      getModelParams={props.getModelParams}
+      setModelParams={props.setModelParams}
+    />
+  );
+
+  const cards = props.complexityEnabled ? (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      {STAGES.map((stage) => card(stage, props.getTier(stage.id)))}
+    </div>
+  ) : (
+    <div className={cx('grid grid-cols-1', props.embedded && 'mx-auto w-full max-w-2xl')}>
+      {card(DEFAULT_STAGE, props.tier)}
     </div>
   );
 
-  const complexityCards = () => (
-    <div class="routing-cards">
-      <For each={STAGES}>
-        {(stage) => (
-          <RoutingTierCard
-            stage={stage}
-            tier={() => props.getTier(stage.id)}
-            models={props.models}
-            customProviders={props.customProviders}
-            activeProviders={props.activeProviders}
-            tiersLoading={props.tiersLoading}
-            changingTier={props.changingTier}
-            resettingTier={props.resettingTier}
-            resettingAll={props.resettingAll}
-            addingFallback={props.addingFallback}
-            agentName={props.agentName}
-            onDropdownOpen={props.onDropdownOpen}
-            onOverride={props.onOverride}
-            onPinKey={props.onPinKey}
-            onReset={props.onReset}
-            onFallbackUpdate={props.onFallbackUpdate}
-            onAddFallback={props.onAddFallback}
-            getFallbacksFor={props.getFallbacksFor}
-            connectedProviders={props.connectedProviders}
-            getModelParams={props.getModelParams}
-            setModelParams={props.setModelParams}
-          />
-        )}
-      </For>
-    </div>
-  );
+  const subtitle = props.complexityEnabled
+    ? t('routing.defaultTier.complexitySubtitle')
+    : t('routing.defaultSubtitle');
 
-  const switchButton = () => (
+  const showComplexityToggle = props.showComplexityToggle ?? true;
+  const controls = showComplexityToggle ? (
     <button
-      class="routing-switch"
-      classList={{ 'routing-switch--on': props.complexityEnabled() }}
-      disabled={props.togglingComplexity()}
+      type="button"
+      role="switch"
+      aria-checked={props.complexityEnabled}
+      className="flex shrink-0 items-center gap-2 text-sm text-dim disabled:opacity-50"
+      disabled={props.togglingComplexity}
       onClick={() => props.onToggleComplexity()}
     >
-      <span class="routing-switch__label">{t('routing.defaultTier.routeByComplexity')}</span>
-      <span class="routing-switch__track">
-        <span class="routing-switch__thumb" />
-      </span>
+      <span>{t('routing.defaultTier.routeByComplexity')}</span>
+      {/* Visual track only; the button above carries the switch semantics. */}
+      <span
+        className="switch pointer-events-none"
+        aria-hidden="true"
+        aria-checked={props.complexityEnabled}
+      />
     </button>
-  );
-
-  const subtitle = () =>
-    props.complexityEnabled()
-      ? t('routing.defaultTier.complexitySubtitle')
-      : t('routing.defaultSubtitle');
-
-  const showComplexityToggle = () => props.showComplexityToggle?.() ?? true;
-  const controls = () => (
-    <Show when={showComplexityToggle()}>
-      <div class="routing-section__controls">{switchButton()}</div>
-    </Show>
-  );
+  ) : null;
 
   // Deprecation banner: shown to legacy/invested agents (the only ones with the
   // toggle) while complexity routing is actually active.
-  const deprecationNotice = () => (
-    <Show when={showComplexityToggle() && props.complexityEnabled()}>
+  const deprecationNotice =
+    showComplexityToggle && props.complexityEnabled ? (
       <RoutingDeprecationNotice title={t('routing.deprecation.title')}>
         {t('routing.deprecation.body')}
       </RoutingDeprecationNotice>
-    </Show>
-  );
+    ) : null;
 
   if (props.embedded) {
     return (
-      <div>
-        {deprecationNotice()}
-        <div
-          class="routing-section__header routing-section__header--with-control"
-          style="margin-bottom: 16px;"
-        >
-          <span class="routing-section__subtitle">{subtitle()}</span>
-          {controls()}
+      <div className="flex flex-col gap-4">
+        {deprecationNotice}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-muted">{subtitle}</span>
+          {controls}
         </div>
-        <Show
-          when={props.complexityEnabled()}
-          fallback={<div class="routing-cards-backdrop">{defaultCard()}</div>}
-        >
-          {complexityCards()}
-        </Show>
+        {cards}
       </div>
     );
   }
 
   return (
-    <div class="routing-section">
-      {deprecationNotice()}
-      <div class="routing-section__header routing-section__header--with-control">
-        <div>
-          <span class="routing-section__title">{t('routing.defaultTier.title')}</span>
-          <span class="routing-section__subtitle">{subtitle()}</span>
+    <section className="flex flex-col gap-4">
+      {deprecationNotice}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-base font-semibold text-ink">{t('routing.defaultTier.title')}</h2>
+          <span className="text-sm text-muted">{subtitle}</span>
         </div>
-        {controls()}
+        {controls}
       </div>
-      <Show when={props.complexityEnabled()} fallback={defaultCard()}>
-        {complexityCards()}
-      </Show>
-    </div>
+      {cards}
+    </section>
   );
-};
-
-export default RoutingDefaultTierSection;
+}

@@ -1,9 +1,11 @@
-import { createSignal, For, Show, type Component } from 'solid-js';
+import { useState, type ReactNode } from 'react';
+import { BadgeCheck, ChevronDown, CircleAlert, SquarePen, Star, X } from 'lucide-react';
 import type { PlaygroundColumn as ColumnData } from '../../services/playground-store.js';
 import { formatCost, formatDuration, formatNumber } from '../../services/formatters.js';
 import { providerIcon } from '../ProviderIcon.jsx';
 import { resolveProviderId } from '../../services/routing-utils.js';
 import MarkdownContent from './MarkdownContent.jsx';
+import { Button, cx } from '../ui.jsx';
 import { t } from '../../i18n/index.js';
 
 interface Props {
@@ -19,255 +21,215 @@ interface Props {
   onMarkBest?: () => void;
 }
 
-const StarIcon: Component<{ filled: boolean }> = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    fill={props.filled ? 'currentColor' : 'none'}
-    stroke="currentColor"
-    stroke-width="2"
-    viewBox="0 0 24 24"
-  >
-    <path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01z" />
-  </svg>
-);
+const DASH = '—';
 
 function providerIdFor(column: ColumnData): string {
   return resolveProviderId(column.provider) ?? column.provider.toLowerCase();
 }
 
-const PlaygroundColumn: Component<Props> = (props) => {
-  const metricsDash = '—';
+function WinBadge({ title }: { title: string }) {
+  return (
+    <span className="playground-column__win-badge inline-flex text-ok" title={title}>
+      <BadgeCheck size={15} aria-hidden="true" />
+    </span>
+  );
+}
+
+function ResponseHeaders({ headers }: { headers: Record<string, string> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="playground-column__headers border-t border-line">
+      <button
+        type="button"
+        className="playground-column__headers-toggle flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-muted hover:text-ink"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span>{t('playground.column.responseHeaders')}</span>
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className={cx('transition-transform', open && 'rotate-180')}
+        />
+      </button>
+      {open ? (
+        <dl className="playground-column__headers-list grid max-h-48 grid-cols-[auto_1fr] gap-x-3 gap-y-1 overflow-auto px-3 pb-3 font-mono text-xs">
+          {Object.entries(headers).map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-muted">{k}</dt>
+              <dd className="break-all text-dim">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </div>
+  );
+}
+
+/** One model's answer: header (model, best star, remove), body, metrics. */
+export default function PlaygroundColumn({
+  column,
+  isCheapest,
+  isFastest,
+  isBest,
+  readOnly,
+  onRemove,
+  onChangeModel,
+  onRetry,
+  onMarkBest,
+}: Props) {
+  const name = column.displayName ?? '';
+  const isSuccess = column.status === 'success';
+  const titleInner = (
+    <span className="playground-column__title-left flex min-w-0 items-center gap-2">
+      <span className="playground-column__icon inline-flex shrink-0">
+        {providerIcon(providerIdFor(column), 18)}
+      </span>
+      <span className="playground-column__name truncate text-sm font-medium text-ink">
+        {column.displayName}
+      </span>
+    </span>
+  );
 
   return (
     <section
-      class="playground-column"
+      className="playground-column flex min-h-72 min-w-0 flex-col overflow-hidden rounded-surface border border-line bg-elev"
       role="region"
-      aria-label={t('playground.column.responseFrom', { name: props.column.displayName ?? '' })}
+      aria-label={t('playground.column.responseFrom', { name })}
     >
-      <header class="playground-column__header">
-        <Show
-          when={!props.readOnly}
-          fallback={
-            <div class="playground-column__title playground-column__title--readonly">
-              <span class="playground-column__title-left">
-                <span class="playground-column__icon">
-                  {providerIcon(providerIdFor(props.column), 18)}
-                </span>
-                <span class="playground-column__name">{props.column.displayName}</span>
-              </span>
-            </div>
-          }
-        >
+      <header className="flex items-center gap-1 border-b border-line px-2 py-1.5">
+        {readOnly ? (
+          <div className="playground-column__title playground-column__title--readonly flex min-w-0 flex-1 items-center px-1.5 py-1">
+            {titleInner}
+          </div>
+        ) : (
           <button
             type="button"
-            class="playground-column__title"
-            onClick={() => props.onChangeModel(props.column.id)}
+            className="playground-column__title group flex min-w-0 flex-1 items-center justify-between gap-2 rounded-control px-1.5 py-1 text-left hover:bg-s2"
+            onClick={() => onChangeModel(column.id)}
             title={t('playground.column.changeModel')}
           >
-            <span class="playground-column__title-left">
-              <span class="playground-column__icon">
-                {providerIcon(providerIdFor(props.column), 18)}
-              </span>
-              <span class="playground-column__name">{props.column.displayName}</span>
-            </span>
-            <span class="playground-column__edit-icon">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M5 21h14c1.1 0 2-.9 2-2v-7h-2v7H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2" />
-                <path d="M7 13v3c0 .55.45 1 1 1h3c.27 0 .52-.11.71-.29l9-9a.996.996 0 0 0 0-1.41l-3-3a.996.996 0 0 0-1.41 0l-9.01 8.99A1 1 0 0 0 7 13m10-7.59L18.59 7 17.5 8.09 15.91 6.5zm-8 8 5.5-5.5 1.59 1.59-5.5 5.5H9z" />
-              </svg>
-            </span>
+            {titleInner}
+            <SquarePen
+              size={14}
+              aria-hidden="true"
+              className="playground-column__edit-icon shrink-0 text-faint group-hover:text-muted"
+            />
           </button>
-        </Show>
-        <Show when={props.column.status === 'success' && props.onMarkBest}>
+        )}
+        {isSuccess && onMarkBest ? (
           <button
             type="button"
-            class="playground-column__best"
-            classList={{ 'playground-column__best--on': !!props.isBest }}
-            aria-pressed={!!props.isBest}
+            className={cx(
+              'playground-column__best icon-btn',
+              isBest && 'playground-column__best--on text-warn',
+            )}
+            aria-pressed={!!isBest}
             aria-label={
-              props.isBest
-                ? t('playground.column.unmarkBest', { name: props.column.displayName ?? '' })
-                : t('playground.column.markBestNamed', { name: props.column.displayName ?? '' })
+              isBest
+                ? t('playground.column.unmarkBest', { name })
+                : t('playground.column.markBestNamed', { name })
             }
-            title={props.isBest ? t('playground.column.yourBest') : t('playground.column.markBest')}
-            onClick={() => props.onMarkBest?.()}
+            title={isBest ? t('playground.column.yourBest') : t('playground.column.markBest')}
+            onClick={() => onMarkBest()}
           >
-            <StarIcon filled={!!props.isBest} />
+            <Star size={16} fill={isBest ? 'currentColor' : 'none'} aria-hidden="true" />
           </button>
-        </Show>
-        <Show when={props.column.status === 'success' && !props.onMarkBest && props.isBest}>
+        ) : null}
+        {isSuccess && !onMarkBest && isBest ? (
           <span
-            class="playground-column__best playground-column__best--on playground-column__best--static"
+            className="playground-column__best playground-column__best--on playground-column__best--static inline-flex px-1.5 text-warn"
             title={t('playground.column.yourBest')}
-            aria-label={t('playground.column.wasMarkedBest', {
-              name: props.column.displayName ?? '',
-            })}
+            aria-label={t('playground.column.wasMarkedBest', { name })}
           >
-            <StarIcon filled={true} />
+            <Star size={16} fill="currentColor" aria-hidden="true" />
           </span>
-        </Show>
-        <Show when={!props.readOnly}>
+        ) : null}
+        {!readOnly ? (
           <button
             type="button"
-            class="playground-column__remove"
-            aria-label={t('playground.column.remove', { name: props.column.displayName ?? '' })}
-            onClick={() => props.onRemove(props.column.id)}
+            className="playground-column__remove icon-btn"
+            aria-label={t('playground.column.remove', { name })}
+            onClick={() => onRemove(column.id)}
           >
-            ×
+            <X size={16} aria-hidden="true" />
           </button>
-        </Show>
+        ) : null}
       </header>
 
-      <div class="playground-column__body">
-        <Show when={props.column.status === 'idle'}>
-          <p class="playground-column__placeholder">{t('playground.column.placeholder')}</p>
-        </Show>
-        <Show when={props.column.status === 'loading' && !props.column.response}>
-          <div class="playground-column__skeleton" aria-hidden="true">
-            <div />
-            <div />
-            <div />
+      <div className="flex-1 overflow-auto p-3">
+        {column.status === 'idle' ? (
+          <p className="playground-column__placeholder text-sm text-faint">
+            {t('playground.column.placeholder')}
+          </p>
+        ) : null}
+        {column.status === 'loading' && !column.response ? (
+          <div className="playground-column__skeleton flex flex-col gap-2" aria-hidden="true">
+            <span className="skel" style={{ width: '90%', height: 12 }} />
+            <span className="skel" style={{ width: '75%', height: 12 }} />
+            <span className="skel" style={{ width: '60%', height: 12 }} />
           </div>
-        </Show>
-        <Show
-          when={
-            props.column.status === 'success' ||
-            (props.column.status === 'loading' && props.column.response)
-          }
-        >
-          <MarkdownContent class="playground-column__response" text={props.column.response ?? ''} />
-        </Show>
-        <Show when={props.column.status === 'error'}>
-          <div class="playground-column__error" role="alert">
-            <span class="playground-column__error-text">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M11 7h2v6h-2zm0 8h2v2h-2z" />
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M5 19V5h14v14z" />
-              </svg>
-              {props.column.error}
+        ) : null}
+        {isSuccess || (column.status === 'loading' && column.response) ? (
+          <MarkdownContent className="playground-column__response" text={column.response ?? ''} />
+        ) : null}
+        {column.status === 'error' ? (
+          <div
+            className="playground-column__error flex flex-col items-start gap-3 rounded-control bg-danger-tint p-3 text-sm text-danger"
+            role="alert"
+          >
+            <span className="flex items-start gap-2 break-words">
+              <CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+              {column.error}
             </span>
-            <Show when={!props.readOnly}>
-              <button
-                type="button"
-                class="btn btn--sm btn--primary"
-                onClick={() => props.onRetry(props.column.id)}
-              >
+            {!readOnly ? (
+              <Button size="sm" onClick={() => onRetry(column.id)}>
                 {t('common.retry')}
-              </button>
-            </Show>
+              </Button>
+            ) : null}
           </div>
-        </Show>
+        ) : null}
       </div>
 
-      <footer class="playground-column__metrics" aria-label={t('playground.column.metrics')}>
-        <div class="playground-column__metric">
-          <span class="playground-column__metric-label">{t('playground.column.cost')}</span>
-          <span class="playground-column__metric-value-row">
-            <span class="playground-column__metric-value">
-              {props.column.metrics?.cost != null
-                ? (formatCost(props.column.metrics.cost) ?? metricsDash)
-                : metricsDash}
-            </span>
-            <Show when={props.isCheapest && props.column.status === 'success'}>
-              <span class="playground-column__win-badge" title={t('playground.column.cheapest')}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M19 9.09V6c0-.55-.45-1-1-1h-3.09L12.7 2.79a.996.996 0 0 0-1.41 0L9.08 5H5.99c-.55 0-1 .45-1 1v3.09L2.78 11.3a.996.996 0 0 0 0 1.41l2.21 2.21v3.09c0 .55.45 1 1 1h3.09l2.21 2.21c.2.2.45.29.71.29s.51-.1.71-.29l2.21-2.21h3.09c.55 0 1-.45 1-1v-3.09l2.21-2.21a.996.996 0 0 0 0-1.41l-2.21-2.21Zm-8 6.33-2.71-2.71L9.7 11.3l1.29 1.29 3.29-3.29 1.41 1.41-4.71 4.71Z" />
-                </svg>
-              </span>
-            </Show>
+      <footer
+        className="playground-column__metrics grid grid-cols-3 divide-x divide-line border-t border-line"
+        aria-label={t('playground.column.metrics')}
+      >
+        <Metric label={t('playground.column.cost')}>
+          <span className="playground-column__metric-value">
+            {column.metrics?.cost != null ? (formatCost(column.metrics.cost) ?? DASH) : DASH}
           </span>
-        </div>
-        <div class="playground-column__metric">
-          <span class="playground-column__metric-label">{t('playground.column.output')}</span>
-          <span class="playground-column__metric-value">
-            {props.column.metrics ? formatNumber(props.column.metrics.outputTokens) : metricsDash}
+          {isCheapest && isSuccess ? <WinBadge title={t('playground.column.cheapest')} /> : null}
+        </Metric>
+        <Metric label={t('playground.column.output')}>
+          <span className="playground-column__metric-value">
+            {column.metrics ? formatNumber(column.metrics.outputTokens) : DASH}
           </span>
-        </div>
-        <div class="playground-column__metric">
-          <span class="playground-column__metric-label">{t('playground.column.duration')}</span>
-          <span class="playground-column__metric-value-row">
-            <span class="playground-column__metric-value">
-              {props.column.metrics ? formatDuration(props.column.metrics.durationMs) : metricsDash}
-            </span>
-            <Show when={props.isFastest && props.column.status === 'success'}>
-              <span class="playground-column__win-badge" title={t('playground.column.fastest')}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M19 9.09V6c0-.55-.45-1-1-1h-3.09L12.7 2.79a.996.996 0 0 0-1.41 0L9.08 5H5.99c-.55 0-1 .45-1 1v3.09L2.78 11.3a.996.996 0 0 0 0 1.41l2.21 2.21v3.09c0 .55.45 1 1 1h3.09l2.21 2.21c.2.2.45.29.71.29s.51-.1.71-.29l2.21-2.21h3.09c.55 0 1-.45 1-1v-3.09l2.21-2.21a.996.996 0 0 0 0-1.41l-2.21-2.21Zm-8 6.33-2.71-2.71L9.7 11.3l1.29 1.29 3.29-3.29 1.41 1.41-4.71 4.71Z" />
-                </svg>
-              </span>
-            </Show>
+        </Metric>
+        <Metric label={t('playground.column.duration')}>
+          <span className="playground-column__metric-value">
+            {column.metrics ? formatDuration(column.metrics.durationMs) : DASH}
           </span>
-        </div>
+          {isFastest && isSuccess ? <WinBadge title={t('playground.column.fastest')} /> : null}
+        </Metric>
       </footer>
 
-      <Show when={props.column.headers && Object.keys(props.column.headers).length > 0}>
-        {(() => {
-          const [open, setOpen] = createSignal(false);
-          return (
-            <div class="playground-column__headers">
-              <button
-                type="button"
-                class="playground-column__headers-toggle"
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open()}
-              >
-                <span>{t('playground.column.responseHeaders')}</span>
-                <svg
-                  class="playground-column__headers-caret"
-                  classList={{ 'playground-column__headers-caret--open': open() }}
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17.35 8H6.65c-.64 0-.99.76-.56 1.24l5.35 6.11c.3.34.83.34 1.13 0l5.35-6.11C18.34 8.76 18 8 17.36 8Z" />
-                </svg>
-              </button>
-              <Show when={open()}>
-                <dl class="playground-column__headers-list">
-                  <For each={Object.entries(props.column.headers ?? {})}>
-                    {([k, v]) => (
-                      <>
-                        <dt>{k}</dt>
-                        <dd>{v}</dd>
-                      </>
-                    )}
-                  </For>
-                </dl>
-              </Show>
-            </div>
-          );
-        })()}
-      </Show>
+      {column.headers && Object.keys(column.headers).length > 0 ? (
+        <ResponseHeaders headers={column.headers} />
+      ) : null}
     </section>
   );
-};
+}
 
-export default PlaygroundColumn;
+function Metric({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="playground-column__metric flex flex-col gap-0.5 px-3 py-2">
+      <span className="playground-column__metric-label text-[11px] font-medium uppercase tracking-wide text-muted">
+        {label}
+      </span>
+      <span className="flex items-center gap-1 font-mono text-xs text-ink tabular-nums">
+        {children}
+      </span>
+    </div>
+  );
+}

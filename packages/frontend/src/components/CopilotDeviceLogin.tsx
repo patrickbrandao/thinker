@@ -1,4 +1,5 @@
-import { createSignal, For, onCleanup, Show, type Component } from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, Copy, Trash2 } from 'lucide-react';
 import { MAX_KEYS_PER_PROVIDER } from 'thinker-shared';
 import { providerIcon } from './ProviderIcon.js';
 import {
@@ -10,18 +11,7 @@ import {
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
-
-function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    })
-    .catch(() => {
-      /* fallback: user-select: all still works */
-    });
-}
+import { Button, IconButton } from './ui.js';
 
 type Phase = 'idle' | 'loading' | 'awaiting' | 'success' | 'error';
 
@@ -38,70 +28,40 @@ interface Props {
 const SLOW_DOWN_INCREASE = 5;
 const MAX_POLL_ERRORS = 5;
 
-const CopilotDeviceLogin: Component<Props> = (props) => {
-  const [phase, setPhase] = createSignal<Phase>('idle');
-  const [userCode, setUserCode] = createSignal('');
-  const [verificationUri, setVerificationUri] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [busy, setBusy] = createSignal(false);
-  const [copied, setCopied] = createSignal(false);
-  let pollTimeout: ReturnType<typeof setTimeout> | undefined;
-  let cancelled = false;
+export default function CopilotDeviceLogin(props: Props) {
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [userCode, setUserCode] = useState('');
+  const [verificationUri, setVerificationUri] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const pollTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const copiedTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelled = useRef(false);
+  const latest = useRef(props);
+  latest.current = props;
 
-  const activeKeys = () => (props.activeKeys ?? []).slice().sort((a, b) => a.priority - b.priority);
-  const isMultiKey = () => activeKeys().length > 1;
-  const canAddAnother = () => activeKeys().length < MAX_KEYS_PER_PROVIDER;
-  const showConnectedState = () => props.connected && (phase() === 'idle' || phase() === 'error');
+  const activeKeys = (props.activeKeys ?? []).slice().sort((a, b) => a.priority - b.priority);
+  const isMultiKey = activeKeys.length > 1;
+  const canAddAnother = activeKeys.length < MAX_KEYS_PER_PROVIDER;
+  const idleOrError = phase === 'idle' || phase === 'error';
+  const showConnectedState = props.connected && idleOrError;
 
-  onCleanup(() => {
-    cancelled = true;
-    if (pollTimeout) clearTimeout(pollTimeout);
-  });
-
-  const startLogin = async () => {
-    setPhase('loading');
-    setError('');
-    cancelled = false;
-    try {
-      const result = await copilotDeviceCode(props.agentName);
-      setUserCode(result.user_code);
-      setVerificationUri(result.verification_uri);
-      setPhase('awaiting');
-      schedulePoll(result.device_code, Math.max(result.interval, 5));
-    } catch {
-      setError(t('providerSetup.copilot.failedStart'));
-      setPhase('error');
-    }
-  };
-
-  const schedulePoll = (code: string, delaySec: number, errorCount = 0) => {
-    if (cancelled) return;
-    pollTimeout = setTimeout(async () => {
-      if (cancelled) return;
-      try {
-        const result = await copilotPollToken(props.agentName, code);
-        if (cancelled) return;
-        const next = handlePollResult(result.status, delaySec);
-        if (next > 0) schedulePoll(code, next, 0);
-      } catch {
-        if (cancelled) return;
-        const nextErrors = errorCount + 1;
-        if (nextErrors >= MAX_POLL_ERRORS) {
-          setError(t('providerSetup.copilot.connectionLost'));
-          setPhase('error');
-        } else {
-          schedulePoll(code, delaySec, nextErrors);
-        }
-      }
-    }, delaySec * 1000);
-  };
+  useEffect(() => {
+    cancelled.current = false;
+    return () => {
+      cancelled.current = true;
+      if (pollTimeout.current) clearTimeout(pollTimeout.current);
+      clearTimeout(copiedTimeout.current);
+    };
+  }, []);
 
   /** Returns next delay (seconds), or 0 to stop. */
   const handlePollResult = (status: CopilotPollStatus, currentDelay: number): number => {
     if (status === 'complete') {
       setPhase('success');
       toast.success(t('providerSetup.copilot.connected'));
-      props.onConnected();
+      latest.current.onConnected();
       return 0;
     }
     if (status === 'expired') {
@@ -120,14 +80,68 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
     return currentDelay;
   };
 
-  const handleDisconnect = async () => {
+  const schedulePoll = (code: string, delaySec: number, errorCount = 0) => {
+    if (cancelled.current) return;
+    pollTimeout.current = setTimeout(async () => {
+      if (cancelled.current) return;
+      try {
+        const result = await copilotPollToken(latest.current.agentName, code);
+        if (cancelled.current) return;
+        const next = handlePollResult(result.status, delaySec);
+        if (next > 0) schedulePoll(code, next, 0);
+      } catch {
+        if (cancelled.current) return;
+        const nextErrors = errorCount + 1;
+        if (nextErrors >= MAX_POLL_ERRORS) {
+          setError(t('providerSetup.copilot.connectionLost'));
+          setPhase('error');
+        } else {
+          schedulePoll(code, delaySec, nextErrors);
+        }
+      }
+    }, delaySec * 1000);
+  };
+
+  const startLogin = async () => {
+    setPhase('loading');
+    setError('');
+    cancelled.current = false;
+    try {
+      const result = await copilotDeviceCode(props.agentName);
+      setUserCode(result.user_code);
+      setVerificationUri(result.verification_uri);
+      setPhase('awaiting');
+      schedulePoll(result.device_code, Math.max(result.interval, 5));
+    } catch {
+      setError(t('providerSetup.copilot.failedStart'));
+      setPhase('error');
+    }
+  };
+
+  const copyCode = () => {
+    navigator.clipboard
+      .writeText(userCode)
+      .then(() => {
+        setCopied(true);
+        clearTimeout(copiedTimeout.current);
+        copiedTimeout.current = setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        /* fallback: the code stays selectable */
+      });
+  };
+
+  const disconnect = async (label?: string) => {
     setBusy(true);
     try {
-      const result = await disconnectProvider(props.agentName, 'copilot', 'subscription');
+      const result = await (label
+        ? disconnectProvider(props.agentName, 'copilot', 'subscription', label)
+        : disconnectProvider(props.agentName, 'copilot', 'subscription'));
       if (result?.notifications?.length) {
         for (const msg of result.notifications) toast.error(msg);
       }
-      props.onDisconnected();
+      if (label) latest.current.onUpdated?.();
+      else latest.current.onDisconnected();
     } catch {
       /* error toast from fetchMutate */
     } finally {
@@ -135,230 +149,132 @@ const CopilotDeviceLogin: Component<Props> = (props) => {
     }
   };
 
-  const handleDeleteKey = async (label: string) => {
-    setBusy(true);
-    try {
-      const result = await disconnectProvider(props.agentName, 'copilot', 'subscription', label);
-      if (result?.notifications?.length) {
-        for (const msg of result.notifications) toast.error(msg);
-      }
-      props.onUpdated?.();
-    } catch {
-      /* error toast from fetchMutate */
-    } finally {
-      setBusy(false);
-    }
-  };
+  const errorBox = error ? <div className="form-error">{error}</div> : null;
 
   return (
-    <div class="provider-detail">
-      <button
-        class="modal-back-btn"
-        onClick={props.onBack}
-        aria-label={t('providerSetup.shared.backToProviders')}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="M14.71 7.29a.996.996 0 0 0-1.41 0l-4 4a.996.996 0 0 0 0 1.41l4 4c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41L11.43 12l3.29-3.29a.996.996 0 0 0 0-1.41Z" />
-        </svg>
-      </button>
-
-      <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 15px;">
-        <div>
-          <div class="routing-modal__title">{t('providerSetup.shared.connectProvider')}</div>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <IconButton label={t('providerSetup.shared.backToProviders')} onClick={props.onBack}>
+          <ChevronLeft size={16} aria-hidden="true" />
+        </IconButton>
+        <h2 className="text-base font-semibold text-ink">
+          {t('providerSetup.shared.connectProvider')}
+        </h2>
       </div>
 
-      <div class="provider-detail__header">
-        <span class="provider-detail__icon">{providerIcon('copilot', 28)}</span>
-        <div class="provider-detail__title-group">
-          <div class="provider-detail__name">GitHub Copilot</div>
-        </div>
+      <div className="flex items-center gap-3">
+        <span className="inline-flex size-8 items-center justify-center">
+          {providerIcon('copilot', 28)}
+        </span>
+        <div className="text-sm font-semibold text-ink">GitHub Copilot</div>
       </div>
 
       {/* Connected state */}
-      <Show when={showConnectedState()}>
-        <Show
-          when={isMultiKey()}
-          fallback={
-            <p class="provider-detail__hint" style="color: var(--success-color, #22c55e);">
-              {t('providerSetup.copilot.viaDeviceLogin')}
-            </p>
-          }
-        >
-          <div class="provider-detail__field">
-            <label class="provider-detail__label">{t('providerSetup.shared.accounts')}</label>
-            <ul
-              role="list"
-              aria-label={t('providerSetup.shared.accountsFor', { name: 'GitHub Copilot' })}
-              style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
-            >
-              <For each={activeKeys()}>
-                {(k) => (
-                  <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / 0.3);">
-                    <div style="flex: 1; min-width: 0;">
-                      <div style="font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        {k.label}
-                      </div>
-                      <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
+      {showConnectedState ? (
+        <>
+          {isMultiKey ? (
+            <div>
+              <span className="label">{t('providerSetup.shared.accounts')}</span>
+              <ul
+                role="list"
+                aria-label={t('providerSetup.shared.accountsFor', { name: 'GitHub Copilot' })}
+                className="flex flex-col gap-2"
+              >
+                {activeKeys.map((k) => (
+                  <li
+                    key={k.id}
+                    className="flex items-center gap-2 rounded-control border border-line bg-sunken px-2.5 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-ink">{k.label}</div>
+                      <div className="text-xs text-muted">
                         {t('providerSetup.copilot.viaSubscription')}
                       </div>
                     </div>
-                    <button
-                      class="provider-detail__disconnect-icon"
-                      disabled={busy()}
-                      onClick={() => handleDeleteKey(k.label)}
-                      aria-label={t('providerSetup.shared.deleteAccountNamed', { label: k.label })}
+                    <IconButton
+                      label={t('providerSetup.shared.deleteAccountNamed', { label: k.label })}
                       title={t('providerSetup.shared.deleteAccount')}
+                      className="shrink-0 hover:text-danger"
+                      disabled={busy}
+                      onClick={() => void disconnect(k.label)}
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                    </button>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </IconButton>
                   </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </Show>
-        <Show when={error()}>
-          <div class="provider-detail__error">{error()}</div>
-        </Show>
-        <Show when={canAddAnother()}>
-          <button
-            class="btn btn--primary provider-detail__action"
-            disabled={busy()}
-            onClick={startLogin}
-          >
-            <Show when={!busy()} fallback={<span class="spinner" />}>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-ok">{t('providerSetup.copilot.viaDeviceLogin')}</p>
+          )}
+          {errorBox}
+          {canAddAnother ? (
+            <Button block busy={busy} onClick={() => void startLogin()}>
               {t('providerSetup.shared.addAnotherKey')}
-            </Show>
-          </button>
-        </Show>
-        <button
-          class="btn btn--outline provider-detail__action provider-detail__disconnect"
-          disabled={busy()}
-          onClick={handleDisconnect}
-        >
-          <Show when={!busy()} fallback={<span class="spinner" />}>
+            </Button>
+          ) : null}
+          <Button variant="ghost" block busy={busy} onClick={() => void disconnect()}>
             {t('providerSetup.shared.disconnect')}
-          </Show>
-        </button>
-      </Show>
+          </Button>
+        </>
+      ) : null}
 
       {/* Idle / Error — show start button */}
-      <Show when={!props.connected && (phase() === 'idle' || phase() === 'error')}>
-        <p class="provider-detail__hint">{t('providerSetup.copilot.requires')}</p>
-        <Show when={error()}>
-          <div class="provider-detail__error">{error()}</div>
-        </Show>
-        <button class="btn btn--primary provider-detail__action" onClick={startLogin}>
-          {t('providerSetup.copilot.signIn')}
-        </button>
-      </Show>
+      {!props.connected && idleOrError ? (
+        <>
+          <p className="text-sm text-dim">{t('providerSetup.copilot.requires')}</p>
+          {errorBox}
+          <Button block onClick={() => void startLogin()}>
+            {t('providerSetup.copilot.signIn')}
+          </Button>
+        </>
+      ) : null}
 
       {/* Loading — fetching device code */}
-      <Show when={phase() === 'loading'}>
-        <div class="provider-detail__field" style="text-align: center; padding: 24px 0;">
-          <span class="spinner" />
+      {phase === 'loading' ? (
+        <div className="flex justify-center py-6">
+          <span className="spinner" aria-hidden="true" />
         </div>
-      </Show>
+      ) : null}
 
       {/* Awaiting — show code + URL */}
-      <Show when={phase() === 'awaiting'}>
-        <div class="copilot-device-login__code-box">
-          <p class="provider-detail__hint" style="margin-bottom: 12px;">
-            {t('providerSetup.copilot.copyCode')}
-          </p>
-          <div class="copilot-device-login__code-row">
+      {phase === 'awaiting' ? (
+        <div className="well flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-dim">{t('providerSetup.copilot.copyCode')}</p>
+          <div className="flex items-center gap-2">
             <div
-              class="copilot-device-login__code"
+              className="select-all font-mono text-2xl font-semibold tracking-widest text-ink"
               aria-label={t('providerSetup.copilot.deviceCode')}
             >
-              {userCode()}
+              {userCode}
             </div>
-            <button
-              class="copilot-device-login__copy-btn"
-              onClick={() => copyToClipboard(userCode(), setCopied)}
-              aria-label={copied() ? t('common.copied') : t('providerSetup.copilot.copyDeviceCode')}
-              title={copied() ? t('common.copied') : t('common.copy')}
+            <IconButton
+              label={copied ? t('common.copied') : t('providerSetup.copilot.copyDeviceCode')}
+              title={copied ? t('common.copied') : t('common.copy')}
+              className={copied ? 'text-ok' : undefined}
+              onClick={copyCode}
             >
-              <Show
-                when={copied()}
-                fallback={
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                  </svg>
-                }
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </Show>
-            </button>
+              {copied ? (
+                <Check size={16} aria-hidden="true" />
+              ) : (
+                <Copy size={16} aria-hidden="true" />
+              )}
+            </IconButton>
           </div>
-          <a
-            class="btn btn--primary copilot-device-login__open-btn"
-            href={verificationUri()}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a className="btn" href={verificationUri} target="_blank" rel="noopener noreferrer">
             {t('providerSetup.copilot.openGithub')}
           </a>
-          <p class="copilot-device-login__waiting">
-            <span class="spinner" style="width: 14px; height: 14px; margin-right: 8px;" />
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <span className="spinner" aria-hidden="true" />
             {t('providerSetup.copilot.waiting')}
           </p>
         </div>
-      </Show>
+      ) : null}
 
       {/* Success */}
-      <Show when={phase() === 'success'}>
-        <p class="provider-detail__hint" style="color: var(--success-color, #22c55e);">
-          {t('providerSetup.copilot.success')}
-        </p>
-      </Show>
+      {phase === 'success' ? (
+        <p className="text-sm text-ok">{t('providerSetup.copilot.success')}</p>
+      ) : null}
     </div>
   );
-};
-
-export default CopilotDeviceLogin;
+}

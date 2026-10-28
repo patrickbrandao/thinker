@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@solidjs/testing-library';
+import { render, screen, waitFor } from '@testing-library/react';
 
 /**
  * PRESERVATION SPEC — do not delete with the component.
@@ -41,7 +41,10 @@ vi.mock('../../src/services/api/analytics.js', () => ({
     !row.attempts || row.succeeded == null ? null : row.succeeded / row.attempts,
   getErrorBreakdown: (...args: unknown[]) => breakdown(...args),
 }));
-vi.mock('../../src/services/sse.js', () => ({ messagePing: () => 0 }));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { messagePing: signal(0) };
+});
 
 import ErrorClassCard from '../../src/components/ErrorClassCard';
 
@@ -65,7 +68,7 @@ describe('ErrorClassCard (unmounted, preserved for reintroduction)', () => {
       by_origin: {},
     });
 
-    render(() => <ErrorClassCard range="7d" />);
+    render(<ErrorClassCard range="7d" />);
 
     await waitFor(() => {
       expect(screen.getByText('Error classes by frequency')).toBeDefined();
@@ -79,7 +82,7 @@ describe('ErrorClassCard (unmounted, preserved for reintroduction)', () => {
   it('still renders its empty state when there are no errors', async () => {
     breakdown.mockResolvedValue({ by_class: {}, by_origin: {} });
 
-    render(() => <ErrorClassCard range="7d" />);
+    render(<ErrorClassCard range="7d" />);
 
     await waitFor(() => {
       expect(screen.getByText('No errors in this period')).toBeDefined();

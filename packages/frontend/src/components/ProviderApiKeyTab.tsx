@@ -1,4 +1,5 @@
-import { For, Show, type Component } from 'solid-js';
+import type { KeyboardEvent, MouseEvent } from 'react';
+import { ListPlus, Shapes } from 'lucide-react';
 import {
   CANONICAL_LOCAL_IDS,
   SHARED_PROVIDER_BY_ID_OR_ALIAS,
@@ -10,6 +11,7 @@ import type { ProviderDef } from '../services/providers.js';
 import type { CustomProviderPrefill } from '../services/routing-params.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { t } from '../i18n/index.js';
+import { Badge, cx } from './ui.js';
 
 const resolveCanonicalId = (name: string): string | null => {
   const shared =
@@ -33,124 +35,172 @@ interface Props {
   onEditCustom: (cp: CustomProviderData) => void;
 }
 
-const ProviderApiKeyTab: Component<Props> = (props) => {
-  const mergedProviders = (): ListItem[] => {
-    const customs = props.customProviders ?? [];
-    // Custom rows that resolve to a canonical local-LLM id belong in the
-    // Local tab now. Hide them here so there's no duplicate entry across
-    // tabs, and so the API Keys tab is strictly about BYOK providers.
-    const customItems: ListItem[] = customs
-      .filter((cp) => resolveCanonicalId(cp.name) === null)
-      .map((cp) => ({ kind: 'custom', cp }));
-    const standards: ListItem[] = props.apiKeyProviders.map((prov) => ({ kind: 'standard', prov }));
-    return [...standards, ...customItems].sort((a, b) => {
-      const nameA = a.kind === 'standard' ? a.prov.name : a.cp.name;
-      const nameB = b.kind === 'standard' ? b.prov.name : b.cp.name;
-      return nameA.localeCompare(nameB);
-    });
+/** Row look shared by the provider tabs; `provider-toggle*` are stable test hooks. */
+export const toggleRowClass =
+  'provider-toggle flex w-full cursor-pointer items-center gap-3 rounded-control border border-line bg-elev px-3 py-2.5 text-left hover:bg-s2 disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Brand-colored initial shown when a provider has no logo. */
+export function LetterBadge({ color, children }: { color: string; children: string }) {
+  return (
+    <span
+      className="provider-card__logo-letter inline-flex size-5 items-center justify-center rounded-control text-[10px] font-semibold text-white"
+      // The provider's brand color is data, not a theme token.
+      style={{ background: color }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Visual-only switch (the row itself is the control). */
+export function ToggleSwitch({
+  on,
+  onClick,
+}: {
+  on: boolean;
+  onClick?: (event: MouseEvent<HTMLSpanElement>) => void;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      aria-checked={on}
+      className={cx('switch provider-toggle__switch shrink-0', on && 'provider-toggle__switch--on')}
+      onClick={onClick}
+    />
+  );
+}
+
+/**
+ * "Add another key" action inside a row button. A real <button> cannot nest
+ * in a <button>, so it is a focusable span with button semantics.
+ */
+export function RowAddAction({
+  label,
+  tooltip,
+  onActivate,
+}: {
+  label: string;
+  tooltip: string;
+  onActivate: () => void;
+}) {
+  const activate = (event: MouseEvent | KeyboardEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    onActivate();
   };
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      className="provider-toggle__add-btn icon-btn"
+      aria-label={label}
+      title={tooltip}
+      onClick={activate}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') activate(event);
+      }}
+    >
+      <ListPlus aria-hidden="true" />
+    </span>
+  );
+}
+
+export default function ProviderApiKeyTab(props: Props) {
+  const customs = props.customProviders ?? [];
+  // Custom rows that resolve to a canonical local-LLM id belong in the
+  // Local tab now. Hide them here so there's no duplicate entry across
+  // tabs, and so the API Keys tab is strictly about BYOK providers.
+  const customItems: ListItem[] = customs
+    .filter((cp) => resolveCanonicalId(cp.name) === null)
+    .map((cp) => ({ kind: 'custom', cp }));
+  const standards: ListItem[] = props.apiKeyProviders.map((prov) => ({ kind: 'standard', prov }));
+  const merged = [...standards, ...customItems].sort((a, b) => {
+    const nameA = a.kind === 'standard' ? a.prov.name : a.cp.name;
+    const nameB = b.kind === 'standard' ? b.prov.name : b.cp.name;
+    return nameA.localeCompare(nameB);
+  });
 
   return (
     <>
-      <div class="provider-modal__tab-hint">{t('providerSetup.tabs.apiKeyHint')}</div>
-      <div class="provider-modal__list">
-        <For each={mergedProviders()}>
-          {(item) => {
-            if (item.kind === 'custom') {
-              const cp = item.cp;
-              return (
-                <button class="provider-toggle" onClick={() => props.onEditCustom(cp)}>
-                  <span class="provider-toggle__icon">
-                    {customProviderLogo(cp.name, 20, cp.base_url) ?? (
-                      <span
-                        class="provider-card__logo-letter"
-                        style={{ background: customProviderColor(cp.name) }}
-                      >
-                        {cp.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </span>
-                  <span class="provider-toggle__info">
-                    <span class="provider-toggle__name">
-                      {cp.name}
-                      <span class="provider-toggle__tag">{t('providerSetup.tabs.custom')}</span>
-                    </span>
-                  </span>
-                  <span class="provider-toggle__switch provider-toggle__switch--on">
-                    <span class="provider-toggle__switch-thumb" />
-                  </span>
-                </button>
-              );
-            }
-
-            const prov = item.prov;
-            const connected = () => props.isConnected(prov.id) || props.isNoKeyConnected(prov.id);
-
-            // localOnly tiles live under the Local tab now — the parent
-            // (ProviderSelectContent) filters them out of `apiKeyProviders`,
-            // so every standard tile here is an API-key provider.
-            const handleClick = () => props.onOpenDetail(prov.id, 'api_key');
-
+      <p className="provider-modal__tab-hint mb-3 text-sm text-muted">
+        {t('providerSetup.tabs.apiKeyHint')}
+      </p>
+      <div className="provider-modal__list flex flex-col gap-1.5">
+        {merged.map((item) => {
+          if (item.kind === 'custom') {
+            const cp = item.cp;
             return (
-              <button class="provider-toggle" onClick={handleClick}>
-                <span class="provider-toggle__icon">
-                  {providerIcon(prov.id, 20) ?? (
-                    <span class="provider-card__logo-letter" style={{ background: prov.color }}>
-                      {prov.initial}
-                    </span>
+              <button
+                key={`custom:${cp.id}`}
+                type="button"
+                className={toggleRowClass}
+                onClick={() => props.onEditCustom(cp)}
+              >
+                <span className="provider-toggle__icon inline-flex size-5 shrink-0 items-center justify-center">
+                  {customProviderLogo(cp.name, 20, cp.base_url) ?? (
+                    <LetterBadge color={customProviderColor(cp.name)}>
+                      {cp.name.charAt(0).toUpperCase()}
+                    </LetterBadge>
                   )}
                 </span>
-                <span class="provider-toggle__info">
-                  <span class="provider-toggle__name">{prov.name}</span>
-                </span>
-                <div class="provider-toggle__actions">
-                  <Show when={connected()}>
-                    <button
-                      class="provider-toggle__add-btn"
-                      type="button"
-                      aria-label={t('providerSetup.tabs.addAnotherKeyFor', { name: prov.name })}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        props.onAddKey(prov.id, 'api_key');
-                      }}
-                    >
-                      <span class="provider-toggle__add-tooltip">
-                        {t('providerSetup.shared.addAnotherKey')}
-                      </span>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path d="M4 11h11v2H4zm0-5h16v2H4zm0 10h8v2H4zm15-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" />
-                      </svg>
-                    </button>
-                  </Show>
-                  <span
-                    class="provider-toggle__switch"
-                    classList={{ 'provider-toggle__switch--on': connected() }}
-                  >
-                    <span class="provider-toggle__switch-thumb" />
+                <span className="provider-toggle__info min-w-0 flex-1">
+                  <span className="provider-toggle__name flex items-center gap-2 truncate text-sm font-medium text-ink">
+                    {cp.name}
+                    <Badge className="provider-toggle__tag">{t('providerSetup.tabs.custom')}</Badge>
                   </span>
-                </div>
+                </span>
+                <ToggleSwitch on />
               </button>
             );
-          }}
-        </For>
-        <div class="provider-modal__add-custom">
-          <button class="provider-modal__add-custom-chip" onClick={() => props.onOpenCustomForm()}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M8.46 11h7.08a1.755 1.755 0 0 0 1.43-2.77l-3.54-4.96c-.66-.92-2.19-.92-2.85 0L7.04 8.23A1.755 1.755 0 0 0 8.47 11ZM12 4.72 15.06 9H8.95l3.06-4.28ZM17.5 13c-2.48 0-4.5 2.02-4.5 4.5s2.02 4.5 4.5 4.5 4.5-2.02 4.5-4.5-2.02-4.5-4.5-4.5m0 7a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5M3.75 22h5.5c.96 0 1.75-.79 1.75-1.75v-5.5c0-.96-.79-1.75-1.75-1.75h-5.5C2.79 13 2 13.79 2 14.75v5.5c0 .96.79 1.75 1.75 1.75M4 15h5v5H4z" />
-            </svg>
+          }
+
+          const prov = item.prov;
+          const connected = props.isConnected(prov.id) || props.isNoKeyConnected(prov.id);
+
+          // localOnly tiles live under the Local tab now — the parent
+          // (ProviderSelectContent) filters them out of `apiKeyProviders`,
+          // so every standard tile here is an API-key provider.
+          return (
+            <button
+              key={prov.id}
+              type="button"
+              className={toggleRowClass}
+              onClick={() => props.onOpenDetail(prov.id, 'api_key')}
+            >
+              <span className="provider-toggle__icon inline-flex size-5 shrink-0 items-center justify-center">
+                {providerIcon(prov.id, 20) ?? (
+                  <LetterBadge color={prov.color}>{prov.initial}</LetterBadge>
+                )}
+              </span>
+              <span className="provider-toggle__info min-w-0 flex-1">
+                <span className="provider-toggle__name block truncate text-sm font-medium text-ink">
+                  {prov.name}
+                </span>
+              </span>
+              <span className="provider-toggle__actions flex shrink-0 items-center gap-2">
+                {connected ? (
+                  <RowAddAction
+                    label={t('providerSetup.tabs.addAnotherKeyFor', { name: prov.name })}
+                    tooltip={t('providerSetup.shared.addAnotherKey')}
+                    onActivate={() => props.onAddKey(prov.id, 'api_key')}
+                  />
+                ) : null}
+                <ToggleSwitch on={connected} />
+              </span>
+            </button>
+          );
+        })}
+        <div className="provider-modal__add-custom pt-2">
+          <button
+            type="button"
+            className="provider-modal__add-custom-chip btn btn-ghost btn-sm"
+            onClick={() => props.onOpenCustomForm()}
+          >
+            <Shapes aria-hidden="true" />
             {t('providerSetup.tabs.addCustomProvider')}
           </button>
         </div>
       </div>
     </>
   );
-};
-
-export default ProviderApiKeyTab;
+}

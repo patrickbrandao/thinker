@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor, screen } from '@solidjs/testing-library';
+import { render, waitFor, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { resetLocaleForTests } from '../../src/i18n';
 
 vi.mock('../../src/services/api.js', () => ({
@@ -33,7 +34,10 @@ vi.mock('../../src/services/api/virtual-models.js', () => ({
 vi.mock('../../src/services/toast-store.js', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
-vi.mock('../../src/services/agent-display-name.js', () => ({ agentDisplayName: () => 'Demo' }));
+vi.mock('../../src/services/agent-display-name.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { agentDisplayNameSignal: signal('Demo'), agentDisplayName: () => 'Demo' };
+});
 vi.mock('../../src/services/recent-agents.js', () => ({
   isRecentlyCreated: () => false,
   isSetupPending: () => false,
@@ -45,19 +49,18 @@ vi.mock('../../src/services/agent-platform-store.js', () => ({
 }));
 vi.mock('../../src/components/SetupModal.jsx', () => ({ default: () => null }));
 vi.mock('../../src/components/RoutingModals.js', () => ({ default: () => null }));
+// Components owned by other areas, not under test here.
+vi.mock('../../src/components/NoConnectionsPrompt.jsx', () => ({ default: () => null }));
+vi.mock('../../src/components/FrameworkSnippets.jsx', () => ({ default: () => null }));
+vi.mock('../../src/components/ModelCapabilityBadges.js', () => ({
+  default: () => null,
+  ModelModalityBadges: () => null,
+  CAPABILITY_LABELS: {},
+  CAPABILITY_ICONS: {},
+}));
 vi.mock('../../src/services/routing-params.js', () => ({
   parseCustomProviderParams: () => null,
   parseProviderDeepLink: () => null,
-}));
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <div data-testid="title">{props.children as string}</div>,
-  Meta: () => null,
-}));
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: 'demo' }),
-  useLocation: () => ({ state: undefined }),
-  useSearchParams: () => [{}, vi.fn()],
-  A: (props: { children: unknown }) => props.children,
 }));
 
 import Routing from '../../src/pages/Routing';
@@ -71,11 +74,17 @@ beforeEach(() => {
 
 describe('Routing in pt-BR', () => {
   it('renders the default routing view in Portuguese', async () => {
-    render(() => <Routing />);
+    render(
+      <MemoryRouter initialEntries={['/harnesses/demo/routing']}>
+        <Routing />
+      </MemoryRouter>,
+    );
     await waitFor(() => {
       expect(screen.getByText('Atualizar modelos')).toBeDefined();
     });
-    expect(screen.getByTestId('title').textContent).toBe('Roteamento de Demo - Thinker');
+    await waitFor(() => {
+      expect(document.title).toBe('Roteamento de Demo - Thinker');
+    });
     expect(screen.getByText('Modo de resposta: Buffered')).toBeDefined();
     expect(
       screen.getByText('Escolha um modelo e até 5 fallbacks como seu roteamento padrão.'),
@@ -88,11 +97,11 @@ describe('Routing in pt-BR', () => {
   });
 
   it('renders the routing tabs in Portuguese', () => {
-    render(() => (
-      <RoutingTabs specificityEnabled={() => false} customEnabled={() => false}>
+    render(
+      <RoutingTabs specificityEnabled={false} customEnabled={false}>
         {{ default: <div />, specificity: <div />, custom: <div /> }}
-      </RoutingTabs>
-    ));
+      </RoutingTabs>,
+    );
     expect(screen.getByRole('tablist', { name: 'Camadas de roteamento' })).toBeDefined();
     expect(screen.getByRole('tab', { name: /Por tarefa/ })).toBeDefined();
     expect(screen.getByRole('tab', { name: /Personalizado/ })).toBeDefined();
@@ -101,8 +110,6 @@ describe('Routing in pt-BR', () => {
   it('formats prices and warm-up errors for pt-BR', () => {
     expect(pricePerM(0)).toBe('Grátis');
     expect(pricePerM(0.0000025)).toMatch(/^US\$\s2,50$/);
-    expect(streamWarmupError()).toBe(
-      'Informe um valor entre 1 e 600 segundos ou deixe em branco.',
-    );
+    expect(streamWarmupError()).toBe('Informe um valor entre 1 e 600 segundos ou deixe em branco.');
   });
 });

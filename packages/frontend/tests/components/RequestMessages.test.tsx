@@ -1,6 +1,13 @@
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import RequestMessages from '../../src/components/RequestMessages';
+
+// MarkdownContent belongs to the playground area; render its text plainly.
+vi.mock('../../src/components/playground/MarkdownContent.js', () => ({
+  default: (props: { text: string; class?: string }) => (
+    <div className={props.class}>{props.text}</div>
+  ),
+}));
 
 const recording = {
   request_body: {
@@ -27,7 +34,7 @@ describe('RequestMessages', () => {
   afterEach(cleanup);
 
   it('renders the recorded conversation and response', () => {
-    const { getAllByText } = render(() => <RequestMessages recording={recording} />);
+    const { getAllByText } = render(<RequestMessages recording={recording} />);
     expect(getAllByText('What is the weather?')).toHaveLength(2);
     expect(getAllByText('Sunny.')).toHaveLength(2);
   });
@@ -56,9 +63,9 @@ describe('RequestMessages', () => {
         },
       },
     };
-    const { getAllByText, getByText } = render(() => (
-      <RequestMessages recording={calledRecording} view="tools" />
-    ));
+    const { getAllByText, getByText } = render(
+      <RequestMessages recording={calledRecording} view="tools" />,
+    );
     // 'weather' appears once in Called and once in Available
     expect(getAllByText('weather')).toHaveLength(2);
     expect(getByText('call-1')).toBeTruthy();
@@ -70,7 +77,7 @@ describe('RequestMessages', () => {
   });
 
   it('shows raw payloads when view is raw', () => {
-    const { getByText } = render(() => <RequestMessages recording={recording} view="raw" />);
+    const { getByText } = render(<RequestMessages recording={recording} view="raw" />);
     expect(getByText('Request')).toBeTruthy();
     expect(getByText('Response')).toBeTruthy();
   });
@@ -95,9 +102,7 @@ describe('RequestMessages', () => {
       response_body: null,
     };
 
-    const { getByText, getAllByText } = render(() => (
-      <RequestMessages recording={detailedRecording} />
-    ));
+    const { getByText, getAllByText } = render(<RequestMessages recording={detailedRecording} />);
 
     expect(getByText('developer')).toBeTruthy();
     expect(getAllByText('unknown')).toHaveLength(2);
@@ -119,21 +124,23 @@ describe('RequestMessages', () => {
       response_body: null,
     };
 
-    const { getByText } = render(() => <RequestMessages recording={emptyRecording} />);
+    const { getByText } = render(<RequestMessages recording={emptyRecording} />);
     expect(getByText('No conversation turns found.')).toBeTruthy();
     cleanup();
 
-    const { getByText: getText2 } = render(() => (
-      <RequestMessages recording={emptyRecording} view="tools" />
-    ));
+    const { getByText: getText2 } = render(
+      <RequestMessages recording={emptyRecording} view="tools" />,
+    );
     expect(getText2('No tools were called in this conversation.')).toBeTruthy();
   });
 
   it('explains when logs were off for the attempt', () => {
-    const { getByText } = render(() => <RequestMessages recording={null} />);
+    const { getByText } = render(<RequestMessages recording={null} />);
     expect(getByText('No logs for this attempt')).toBeTruthy();
     expect(
-      getByText('Logs were off when this attempt ran. Enable logs in Settings to inspect future requests.'),
+      getByText(
+        'Logs were off when this attempt ran. Enable logs in Settings to inspect future requests.',
+      ),
     ).toBeTruthy();
   });
 
@@ -161,7 +168,7 @@ describe('RequestMessages', () => {
         },
       },
     };
-    render(() => <RequestMessages recording={calledRecording} view="tools" />);
+    render(<RequestMessages recording={calledRecording} view="tools" />);
     const idEl = document.querySelector('.request-messages__tool-id')!;
     expect(idEl).toBeTruthy();
     fireEvent.mouseEnter(idEl);

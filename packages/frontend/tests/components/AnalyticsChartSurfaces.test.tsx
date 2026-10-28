@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 let capturedLifecycleOpts: any = null;
 let capturedChartOpts: any = null;
@@ -7,7 +7,7 @@ let capturedChartData: any = null;
 const mockGetErrorBreakdown = vi.fn();
 
 const routerNavigate = vi.hoisted(() => vi.fn());
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => routerNavigate,
 }));
 
@@ -34,6 +34,9 @@ vi.mock('uplot', () => ({
 }));
 
 vi.mock('../../src/services/theme.js', () => ({
+  // jsdom has no stylesheet: token lookups come back empty, so chart colors
+  // fall back to their var() reference.
+  getCssVar: () => '',
   getHsl: (name: string) => `hsl(var(${name}))`,
   getHslA: (name: string, alpha: number) => `hsla(var(${name}), ${alpha})`,
 }));
@@ -74,9 +77,10 @@ vi.mock('../../src/components/InfoTooltip.jsx', () => ({
   ),
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  messagePing: () => 0,
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { messagePing: signal(0) };
+});
 
 vi.mock('../../src/services/api/analytics.js', () => ({
   RECOVERED_REQUESTS_TOOLTIP: 'Successful requests that were recovered by fallback.',
@@ -101,16 +105,17 @@ beforeEach(() => {
 });
 
 const buildCapturedChart = () => {
-  const el = capturedLifecycleOpts.el();
+  const el = capturedLifecycleOpts.el.current;
   Object.defineProperty(el, 'clientWidth', { value: 800, configurable: true });
   capturedLifecycleOpts.buildChart();
 };
 
-// ProviderChartCard lazy-loads MultiAgentTokenChart (uPlot stays out of the
-// initial bundle), so its lifecycle hook is registered asynchronously. Wait for
+// The chart cards lazy-load their charts (uPlot stays out of the initial
+// bundle), so the lifecycle hook is registered asynchronously. Wait for
 // the lazy chart to mount before driving buildChart().
 const buildLazyChart = async () => {
-  await waitFor(() => expect(capturedLifecycleOpts).not.toBeNull());
+  // Wait for the committed render: its ref is attached to the chart host.
+  await waitFor(() => expect(capturedLifecycleOpts?.el.current).toBeTruthy());
   buildCapturedChart();
 };
 
@@ -123,7 +128,7 @@ describe('analytics chart surface components', () => {
       keys: ['fallback'],
       buckets: [{ bucket: '2026-06-04', counts: [3] }],
     };
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <UnifiedChartCard
         activeTab="recovered"
         onTabChange={onTabChange}
@@ -135,14 +140,14 @@ describe('analytics chart surface components', () => {
         tokensValue={100}
         tokensTrendPct={0}
         range="7d"
-      />
-    ));
+      />,
+    );
 
     expect(
       screen
         .getAllByText('Recovered requests')[0]!
         .closest('button')
-        ?.classList.contains('chart-card__stat--active'),
+        ?.classList.contains('is-active'),
     ).toBe(true);
     expect(screen.getByText('15')).toBeDefined();
     expect(screen.getByText('+20%')).toBeDefined();
@@ -170,7 +175,7 @@ describe('analytics chart surface components', () => {
     ['tokens', { agentTimeseries: { agents: ['openai'], timeseries: [{ hour: '1', openai: 3 }] } }],
   ] as const)('passes the %s series to the unified chart', async (activeTab, seriesProps) => {
     capturedLifecycleOpts = null;
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <UnifiedChartCard
         activeTab={activeTab}
         onTabChange={vi.fn()}
@@ -180,14 +185,14 @@ describe('analytics chart surface components', () => {
         tokensTrendPct={0}
         range="24h"
         {...seriesProps}
-      />
-    ));
+      />,
+    );
     await buildLazyChart();
     unmount();
   });
 
   it('renders the recovered empty state and hides the tab without a timeseries', () => {
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <UnifiedChartCard
         activeTab="recovered"
         onTabChange={vi.fn()}
@@ -199,13 +204,13 @@ describe('analytics chart surface components', () => {
         tokensValue={0}
         tokensTrendPct={0}
         range="24h"
-      />
-    ));
+      />,
+    );
     expect(screen.getByText('No recovered requests in this time range')).toBeDefined();
     unmount();
 
     // Without a timeseries the tab itself is not rendered.
-    const noTab = render(() => (
+    const noTab = render(
       <UnifiedChartCard
         activeTab="requests"
         onTabChange={vi.fn()}
@@ -214,15 +219,15 @@ describe('analytics chart surface components', () => {
         tokensValue={0}
         tokensTrendPct={0}
         range="24h"
-      />
-    ));
+      />,
+    );
     expect(screen.queryByText('Recovered requests')).toBeNull();
     noTab.unmount();
   });
 
   it('orders disposition series success → fallback → error (legend and stack)', async () => {
     // Backend delivers keys in an arbitrary order; the chart must normalize.
-    const { container, unmount } = render(() => (
+    const { container, unmount } = render(
       <ReliabilityChart
         timeseries={{
           range: '7d',
@@ -232,8 +237,8 @@ describe('analytics chart surface components', () => {
         }}
         range="7d"
         seriesMode="disposition"
-      />
-    ));
+      />,
+    );
 
     // Legend order is the fixed reading order.
     const legend = [...container.querySelectorAll('.rel-chart__legend-item')].map((e) =>
@@ -251,7 +256,7 @@ describe('analytics chart surface components', () => {
   });
 
   it('snaps the cursor and shows the hover tooltip on the disposition chart', () => {
-    const { container, unmount } = render(() => (
+    const { container, unmount } = render(
       <ReliabilityChart
         timeseries={{
           range: '7d',
@@ -261,8 +266,8 @@ describe('analytics chart surface components', () => {
         }}
         range="7d"
         seriesMode="disposition"
-      />
-    ));
+      />,
+    );
     buildCapturedChart();
 
     // Same snapped cursor as the Cost chart.
@@ -275,11 +280,13 @@ describe('analytics chart surface components', () => {
       ),
     ).toEqual([120, 9]);
 
-    capturedChartOpts.hooks.setCursor[0]({
-      cursor: { idx: 0 },
-      data: capturedChartData,
-      bbox: { width: 800 },
-      valToPos: () => 120,
+    act(() => {
+      capturedChartOpts.hooks.setCursor[0]({
+        cursor: { idx: 0 },
+        data: capturedChartData,
+        bbox: { width: 800 },
+        valToPos: () => 120,
+      });
     });
 
     // Rows keep the fixed legend order (NOT value-sorted), with a Total.
@@ -295,19 +302,21 @@ describe('analytics chart surface components', () => {
     expect(container.querySelector('.agent-chart-tooltip__total-value')?.textContent).toBe('8');
 
     // Cursor off the data hides it.
-    capturedChartOpts.hooks.setCursor[0]({ cursor: { idx: -1 } });
+    act(() => {
+      capturedChartOpts.hooks.setCursor[0]({ cursor: { idx: -1 } });
+    });
     expect(container.querySelector('.agent-chart-tooltip')).toBeNull();
     unmount();
   });
 
   it('handles an empty reliability series without creating a chart', () => {
-    render(() => (
+    render(
       <ReliabilityChart
         timeseries={{ range: '7d', by: 'metric', keys: ['total_attempts'], buckets: [] }}
         range="7d"
         seriesMode="attempts"
-      />
-    ));
+      />,
+    );
     expect(capturedLifecycleOpts.buildData()[0]).toHaveLength(0);
     expect(capturedLifecycleOpts.buildChart()).toBeNull();
   });
@@ -317,15 +326,15 @@ describe('analytics chart surface components', () => {
       success_rate: { value: 0.8, previous: 0.7 },
       errors_remaining: { value: 0, previous: 0 },
     };
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <ReliabilityKpiCards
         stats={{
           ...base,
           fallback_saves: { value: 3, previous: 0 },
           total_requests: { value: 100, previous: 0 },
         }}
-      />
-    ));
+      />,
+    );
     expect(screen.getByText('Success rate')).toBeDefined();
     expect(screen.getByText('80.0%')).toBeDefined();
     // Recovered share = 3 / 100.
@@ -337,21 +346,21 @@ describe('analytics chart surface components', () => {
     expect(document.body.textContent).not.toContain('Autofix');
     // Four cards use the base responsive grid; an inline grid-template-columns
     // would override the phone breakpoints.
-    const grid = screen.getByText('Success rate').closest('.overview-stats') as HTMLElement;
-    expect(grid.querySelectorAll('.overview-stat-card')).toHaveLength(4);
+    const grid = screen.getByText('Success rate').closest('.stat-tiles') as HTMLElement;
+    expect(grid.querySelectorAll('.stat-tile')).toHaveLength(4);
     expect(grid.style.gridTemplateColumns).toBe('');
     unmount();
 
     // Trends: previous window present → percentage badges.
-    render(() => (
+    render(
       <ReliabilityKpiCards
         stats={{
           ...base,
           fallback_saves: { value: 1, previous: 2 },
           total_requests: { value: 10, previous: 10 },
         }}
-      />
-    ));
+      />,
+    );
     expect(screen.getAllByText('-50%').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -360,7 +369,7 @@ describe('analytics chart surface components', () => {
       success_rate: { value: 0.8, previous: 0.7 },
       errors_remaining: { value: 0, previous: 0 },
     };
-    render(() => (
+    render(
       <ReliabilityKpiCards
         stats={{
           ...base,
@@ -369,23 +378,23 @@ describe('analytics chart surface components', () => {
         }}
         agentName="demo-agent"
         range="7d"
-      />
-    ));
-    fireEvent.click(screen.getByText('Failed requests').closest('.overview-stat-card')!);
+      />,
+    );
+    fireEvent.click(screen.getByText('Failed requests').closest('.stat-tile')!);
     expect(routerNavigate).toHaveBeenCalledWith(
       '/messages?agent=demo-agent&range=7d&status=failed',
     );
-    fireEvent.click(screen.getByText('Recovered by Fallback').closest('.overview-stat-card')!);
+    fireEvent.click(screen.getByText('Recovered by Fallback').closest('.stat-tile')!);
     expect(routerNavigate).toHaveBeenCalledWith(
       '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
     );
     routerNavigate.mockClear();
-    fireEvent.click(screen.getByText('Recovered requests').closest('.overview-stat-card')!);
+    fireEvent.click(screen.getByText('Recovered requests').closest('.stat-tile')!);
     expect(routerNavigate).toHaveBeenCalledWith(
       '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
     );
 
-    const failedCard = screen.getByText('Failed requests').closest('.overview-stat-card')!;
+    const failedCard = screen.getByText('Failed requests').closest('.stat-tile')!;
     expect(failedCard.getAttribute('role')).toBe('link');
     expect((failedCard as HTMLElement).tabIndex).toBe(0);
     fireEvent.keyDown(failedCard, { key: 'Enter' });
@@ -393,7 +402,7 @@ describe('analytics chart surface components', () => {
       '/messages?agent=demo-agent&range=7d&status=failed',
     );
 
-    const recoveredCard = screen.getByText('Recovered requests').closest('.overview-stat-card')!;
+    const recoveredCard = screen.getByText('Recovered requests').closest('.stat-tile')!;
     const tooltip = recoveredCard.querySelector('[data-testid="info-tooltip"]')!;
     const navigationCount = routerNavigate.mock.calls.length;
     fireEvent.keyDown(tooltip, { key: 'Enter' });
@@ -402,7 +411,7 @@ describe('analytics chart surface components', () => {
   });
 
   it('describes global KPI links as covering all harnesses', () => {
-    render(() => (
+    render(
       <ReliabilityKpiCards
         stats={{
           success_rate: { value: 0.8, previous: 0.7 },
@@ -410,15 +419,15 @@ describe('analytics chart surface components', () => {
           fallback_saves: { value: 3, previous: 0 },
           total_requests: { value: 100, previous: 0 },
         }}
-      />
-    ));
+      />,
+    );
 
     expect(
-      screen.getByText('Recovered requests').closest('.overview-stat-card')?.getAttribute('title'),
+      screen.getByText('Recovered requests').closest('.stat-tile')?.getAttribute('title'),
     ).toBe('View recovered requests across all harnesses');
-    expect(
-      screen.getByText('Failed requests').closest('.overview-stat-card')?.getAttribute('title'),
-    ).toBe('View failed requests across all harnesses');
+    expect(screen.getByText('Failed requests').closest('.stat-tile')?.getAttribute('title')).toBe(
+      'View failed requests across all harnesses',
+    );
   });
 
   it('renders and sorts error classes, then renders the empty state', async () => {
@@ -426,27 +435,27 @@ describe('analytics chart surface components', () => {
       by_class: { rate_limited: 2, timeout: 5, ignored: 0 },
       by_origin: {},
     });
-    const { container, unmount } = render(() => <ErrorClassCard range="7d" agentName="demo" />);
+    const { container, unmount } = render(<ErrorClassCard range="7d" agentName="demo" />);
     await waitFor(() => expect(screen.getByText('Timeout')).toBeDefined());
     expect(mockGetErrorBreakdown).toHaveBeenCalledWith('7d', 'demo');
     expect(container.querySelector('.error-class-card__label')?.textContent).toBe('Timeout');
     unmount();
 
     mockGetErrorBreakdown.mockResolvedValueOnce({ by_class: {}, by_origin: {} });
-    render(() => <ErrorClassCard range="24h" />);
+    render(<ErrorClassCard range="24h" />);
     await waitFor(() => expect(screen.getByText('No errors in this period')).toBeDefined());
   });
 
   it('renders the global overview skeleton placeholders', () => {
-    const { container } = render(() => <GlobalOverviewSkeleton />);
-    expect(container.querySelectorAll('.overview-stat-card')).toHaveLength(4);
-    expect(container.querySelectorAll('.skeleton').length).toBeGreaterThan(10);
+    const { container } = render(<GlobalOverviewSkeleton />);
+    expect(container.querySelectorAll('.stat-tile')).toHaveLength(4);
+    expect(container.querySelectorAll('.skel').length).toBeGreaterThan(10);
   });
 
   it('renders ProviderChartCard views and changes active view on click', async () => {
     const onViewChange = vi.fn();
 
-    render(() => (
+    render(
       <ProviderChartCard
         activeView="tokens"
         onViewChange={onViewChange}
@@ -471,8 +480,8 @@ describe('analytics chart surface components', () => {
           timeseries: [{ hour: '2026-06-04 10:00:00', openai: 4.56 }],
         }}
         colorMap={{ openai: '#111111' }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('Cost')).toBeDefined();
     expect(screen.getByText('Requests')).toBeDefined();
@@ -492,7 +501,7 @@ describe('analytics chart surface components', () => {
   });
 
   it('explains provider-attempt reliability and Thinker recovery', () => {
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <ProviderChartCard
         activeView="messages"
         onViewChange={vi.fn()}
@@ -503,15 +512,15 @@ describe('analytics chart surface components', () => {
         tokensValue={0}
         tokensTrendPct={0}
         range="24h"
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByTestId('info-tooltip').textContent).toBe(
       'Caller success: 95.0%. Provider-attempt success: 80.0%. The gap is recovery from fallbacks.',
     );
     unmount();
 
-    render(() => (
+    render(
       <ProviderChartCard
         activeView="messages"
         onViewChange={vi.fn()}
@@ -521,15 +530,15 @@ describe('analytics chart surface components', () => {
         tokensValue={0}
         tokensTrendPct={0}
         range="24h"
-      />
-    ));
+      />,
+    );
     expect(screen.getByTestId('info-tooltip').textContent).toBe('Provider-attempt success: 80.0%.');
   });
 
   it('renders ProviderChartCard message and cost chart branches', async () => {
     const onViewChange = vi.fn();
 
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <ProviderChartCard
         activeView="messages"
         onViewChange={onViewChange}
@@ -550,15 +559,15 @@ describe('analytics chart surface components', () => {
           timeseries: [{ hour: '2026-06-04 10:00:00', openai: 4.56 }],
         }}
         colorMap={{ openai: '#111111' }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('Requests')).toBeDefined();
     await buildLazyChart();
     unmount();
     capturedLifecycleOpts = null;
 
-    render(() => (
+    render(
       <ProviderChartCard
         activeView="cost"
         onViewChange={onViewChange}
@@ -576,15 +585,15 @@ describe('analytics chart surface components', () => {
           timeseries: [{ hour: '2026-06-04 10:00:00', openai: 4.56 }],
         }}
         colorMap={{ openai: '#111111' }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('Cost')).toBeDefined();
     await buildLazyChart();
   });
 
   it('renders ProviderChartCard empty states and hides cost when missing', () => {
-    const { unmount } = render(() => (
+    const { unmount } = render(
       <ProviderChartCard
         activeView="messages"
         onViewChange={vi.fn()}
@@ -596,14 +605,14 @@ describe('analytics chart surface components', () => {
         agentTimeseries={{ agents: [], timeseries: [] }}
         agentMessageTimeseries={{ agents: [], timeseries: [] }}
         agentCostTimeseries={{ agents: [], timeseries: [] }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('No request data for this time range')).toBeDefined();
     expect(screen.queryByText('Cost')).toBeNull();
     unmount();
 
-    const tokenEmpty = render(() => (
+    const tokenEmpty = render(
       <ProviderChartCard
         activeView="tokens"
         onViewChange={vi.fn()}
@@ -615,13 +624,13 @@ describe('analytics chart surface components', () => {
         agentTimeseries={{ agents: [], timeseries: [] }}
         agentMessageTimeseries={{ agents: [], timeseries: [] }}
         agentCostTimeseries={{ agents: [], timeseries: [] }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('No token data for this time range')).toBeDefined();
     tokenEmpty.unmount();
 
-    render(() => (
+    render(
       <ProviderChartCard
         activeView="cost"
         onViewChange={vi.fn()}
@@ -635,8 +644,8 @@ describe('analytics chart surface components', () => {
         agentTimeseries={{ agents: [], timeseries: [] }}
         agentMessageTimeseries={{ agents: [], timeseries: [] }}
         agentCostTimeseries={{ agents: [], timeseries: [] }}
-      />
-    ));
+      />,
+    );
 
     expect(screen.getByText('No cost data for this time range')).toBeDefined();
   });
@@ -644,25 +653,27 @@ describe('analytics chart surface components', () => {
   it('builds stacked data for the multi-agent token chart', () => {
     const hover = vi.fn();
 
-    render(() => (
+    render(
       <MultiAgentTokenChart
         agents={['openai', 'anthropic']}
         timeseries={[{ hour: '2026-06-04 10:00:00', openai: 10, anthropic: 5 }]}
         range="24h"
         colorMap={{ openai: '#111111', anthropic: '#222222' }}
         onHoverValues={hover}
-      />
-    ));
+      />,
+    );
 
     buildCapturedChart();
     expect(capturedChartData).toHaveLength(3);
     expect(capturedChartOpts.series).toHaveLength(3);
 
-    capturedChartOpts.hooks.setCursor[0]({
-      cursor: { idx: 0 },
-      data: capturedChartData,
-      bbox: { width: 800 },
-      valToPos: () => 120,
+    act(() => {
+      capturedChartOpts.hooks.setCursor[0]({
+        cursor: { idx: 0 },
+        data: capturedChartData,
+        bbox: { width: 800 },
+        valToPos: () => 120,
+      });
     });
     expect(hover).toHaveBeenCalledWith({ openai: 10, anthropic: 5 });
 
@@ -672,14 +683,14 @@ describe('analytics chart surface components', () => {
   });
 
   it('formats token y-axis values and snaps the cursor for token charts', () => {
-    render(() => (
+    render(
       <MultiAgentTokenChart
         agents={['openai']}
         timeseries={[{ hour: '2026-06-04 10:00:00', openai: 1234 }]}
         range="24h"
         colorMap={{ openai: '#111111' }}
-      />
-    ));
+      />,
+    );
 
     buildCapturedChart();
     // Token axis uses formatLegendTokens (mocked to String()).
@@ -696,7 +707,7 @@ describe('analytics chart surface components', () => {
   it('builds empty and cost multi-day chart states', () => {
     const hover = vi.fn();
 
-    const { container } = render(() => (
+    const { container } = render(
       <MultiAgentTokenChart
         agents={['openai']}
         timeseries={[]}
@@ -704,8 +715,8 @@ describe('analytics chart surface components', () => {
         colorMap={{ openai: '#111111' }}
         onHoverValues={hover}
         label="Cost"
-      />
-    ));
+      />,
+    );
 
     buildCapturedChart();
     expect(capturedChartData[1][0]).toBe(0);
@@ -718,7 +729,9 @@ describe('analytics chart surface components', () => {
       capturedChartOpts.cursor.move({ posToIdx: () => null, data: [[]], valToPos: () => 0 }, 42, 9),
     ).toEqual([42, 9]);
 
-    capturedChartOpts.hooks.setCursor[0]({ cursor: { idx: -1 } });
+    act(() => {
+      capturedChartOpts.hooks.setCursor[0]({ cursor: { idx: -1 } });
+    });
     expect(hover).toHaveBeenCalledWith(null);
 
     fireEvent.mouseLeave(container.firstElementChild!);
@@ -728,14 +741,14 @@ describe('analytics chart surface components', () => {
   it('falls back to a distinct per-index default color for each series (no colorMap)', () => {
     const hover = vi.fn();
 
-    render(() => (
+    render(
       <MultiAgentTokenChart
         agents={['openai', 'anthropic']}
         timeseries={[{ hour: '2026-06-04 10:00:00', openai: 10, anthropic: 5 }]}
         range="24h"
         onHoverValues={hover}
-      />
-    ));
+      />,
+    );
 
     buildCapturedChart();
     // Series are rendered in reverse agent order; each must get the default
@@ -746,24 +759,26 @@ describe('analytics chart surface components', () => {
     // A real per-series distinction: the two strokes differ.
     expect(strokes[0]).not.toBe(strokes[1]);
 
-    capturedChartOpts.hooks.setCursor[0]({
-      cursor: { idx: 0 },
-      data: capturedChartData,
-      bbox: { width: 800 },
-      valToPos: () => 700,
+    act(() => {
+      capturedChartOpts.hooks.setCursor[0]({
+        cursor: { idx: 0 },
+        data: capturedChartData,
+        bbox: { width: 800 },
+        valToPos: () => 700,
+      });
     });
     expect(hover).toHaveBeenCalledWith({ openai: 10, anthropic: 5 });
   });
 
   it('honors an explicit colorMap entry over the per-index fallback', () => {
-    render(() => (
+    render(
       <MultiAgentTokenChart
         agents={['openai', 'anthropic']}
         timeseries={[{ hour: '2026-06-04 10:00:00', openai: 10, anthropic: 5 }]}
         range="24h"
         colorMap={{ openai: '#abcdef' }}
-      />
-    ));
+      />,
+    );
 
     buildCapturedChart();
     // reversed order: anthropic (no map → AGENT_COLORS[1]), openai (mapped).

@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, type Accessor } from 'solid-js';
+import { useEffect, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -10,7 +10,7 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 /**
- * Trap Tab focus inside `container` while `open()` is true and restore focus
+ * Trap Tab focus inside `container` while `open` is true and restore focus
  * to the previously-focused element on close.
  *
  * `aria-modal="true"` tells screen readers a dialog traps focus, but keyboard
@@ -18,33 +18,25 @@ const FOCUSABLE_SELECTOR = [
  * imperatively at the first/last focusable element.
  */
 export function useFocusTrap(
-  open: Accessor<boolean>,
-  container: Accessor<HTMLElement | undefined>,
-  options?: { initialFocus?: () => HTMLElement | undefined },
-) {
-  let previouslyFocused: HTMLElement | null = null;
-
-  createEffect(() => {
-    if (!open()) return;
-    const root = container();
+  open: boolean,
+  container: RefObject<HTMLElement | null>,
+  options?: { initialFocus?: () => HTMLElement | null | undefined },
+): void {
+  const initialFocus = options?.initialFocus;
+  useEffect(() => {
+    if (!open) return;
+    const root = container.current;
     if (!root) return;
 
-    previouslyFocused = (document.activeElement as HTMLElement | null) ?? null;
+    const previouslyFocused = (document.activeElement as HTMLElement | null) ?? null;
 
-    // Move focus into the dialog on open. Prefer the caller-specified initial
-    // focus element, then the first focusable child, then the container itself
-    // with tabindex=-1 so the dialog still captures focus even if it has no
-    // focusable controls yet.
-    const initial = options?.initialFocus?.();
+    const initial = initialFocus?.();
     if (initial) {
       initial.focus();
     } else {
       const focusables = root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      if (focusables.length > 0) {
-        focusables[0]!.focus();
-      } else if (root.tabIndex >= 0 || root.hasAttribute('tabindex')) {
-        root.focus();
-      }
+      if (focusables.length > 0) focusables[0]!.focus();
+      else if (root.tabIndex >= 0 || root.hasAttribute('tabindex')) root.focus();
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -67,12 +59,11 @@ export function useFocusTrap(
     };
     root.addEventListener('keydown', onKeyDown);
 
-    onCleanup(() => {
+    return () => {
       root.removeEventListener('keydown', onKeyDown);
-      if (previouslyFocused && document.contains(previouslyFocused)) {
-        previouslyFocused.focus();
-      }
-      previouslyFocused = null;
-    });
-  });
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+    // initialFocus is read once per open, like the dialog's first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, container]);
 }

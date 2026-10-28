@@ -1,35 +1,22 @@
-import { A } from '@solidjs/router';
-import { Title } from '@solidjs/meta';
-import type { Component } from 'solid-js';
+import { Link } from 'react-router';
+import { ChevronLeft } from 'lucide-react';
 import { t } from '../i18n/index.js';
 
-const NotFound: Component = () => {
+export default function NotFound() {
   return (
     <>
-      <Title>{t('common.pageTitle', { page: t('auth.notFound.pageTitle') })}</Title>
-      <div class="not-found">
-        <span class="not-found__code">404</span>
-        <h1 class="not-found__title">{t('auth.notFound.title')}</h1>
-        <p class="not-found__text">{t('auth.notFound.text')}</p>
-        <A href="/" class="not-found__link">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          {t('auth.notFound.back')}
-        </A>
+      <title>{t('common.pageTitle', { page: t('auth.notFound.pageTitle') })}</title>
+      <div className="page narrow">
+        <div className="empty py-16">
+          <span className="font-mono text-5xl font-semibold text-faint">404</span>
+          <h1 className="text-ink">{t('auth.notFound.title')}</h1>
+          <p className="max-w-md text-sm">{t('auth.notFound.text')}</p>
+          <Link to="/" className="btn btn-ghost mt-2">
+            <ChevronLeft aria-hidden="true" />
+            {t('auth.notFound.back')}
+          </Link>
+        </div>
       </div>
     </>
   );
-};
-
-export default NotFound;
+}

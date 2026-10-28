@@ -1,10 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { render, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import HeaderComboBox, { type HeaderSuggestion } from '../../src/components/HeaderComboBox';
 
 const suggestions: HeaderSuggestion[] = [
-  { label: 'x-thinker-tier', value: 'x-thinker-tier', sublabel: '12× · premium · free', group: 'openai-js' },
+  {
+    label: 'x-thinker-tier',
+    value: 'x-thinker-tier',
+    sublabel: '12× · premium · free',
+    group: 'openai-js',
+  },
   { label: 'x-custom-foo', value: 'x-custom-foo', sublabel: '5× seen' },
 ];
 
@@ -15,10 +20,10 @@ function Harness(props: {
   errorMessage?: string;
   freeFormHint?: string;
 }) {
-  const [val, setVal] = createSignal(props.initial ?? '');
+  const [val, setVal] = useState(props.initial ?? '');
   return (
     <HeaderComboBox
-      value={val()}
+      value={val}
       onInput={(v) => {
         setVal(v);
         props.onInput?.(v);
@@ -34,7 +39,7 @@ function Harness(props: {
 
 describe('HeaderComboBox', () => {
   it('renders suggestions on focus and includes a sublabel when provided', () => {
-    const { container, getByPlaceholderText } = render(() => <Harness />);
+    const { container, getByPlaceholderText } = render(<Harness />);
     const input = getByPlaceholderText('enter header');
     fireEvent.focus(input);
     expect(container.textContent).toContain('x-thinker-tier');
@@ -43,16 +48,16 @@ describe('HeaderComboBox', () => {
   });
 
   it('filters suggestions by typed prefix (case-insensitive)', () => {
-    const { container, getByPlaceholderText } = render(() => <Harness />);
+    const { container, getByPlaceholderText } = render(<Harness />);
     const input = getByPlaceholderText('enter header') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'CUSTOM' } });
+    fireEvent.change(input, { target: { value: 'CUSTOM' } });
     expect(container.textContent).toContain('x-custom-foo');
     expect(container.textContent).not.toContain('x-thinker-tier');
   });
 
   it('selects a suggestion via mousedown and fires onInput', () => {
     const onInput = vi.fn();
-    const { container, getByPlaceholderText } = render(() => <Harness onInput={onInput} />);
+    const { container, getByPlaceholderText } = render(<Harness onInput={onInput} />);
     const input = getByPlaceholderText('enter header');
     fireEvent.focus(input);
     const first = container.querySelector('.header-combo__option') as HTMLElement;
@@ -62,7 +67,7 @@ describe('HeaderComboBox', () => {
 
   it('navigates with ArrowDown + Enter and selects the highlighted entry', () => {
     const onInput = vi.fn();
-    const { getByPlaceholderText } = render(() => <Harness onInput={onInput} />);
+    const { getByPlaceholderText } = render(<Harness onInput={onInput} />);
     const input = getByPlaceholderText('enter header');
     fireEvent.focus(input);
     fireEvent.keyDown(input, { key: 'ArrowDown' });
@@ -71,7 +76,7 @@ describe('HeaderComboBox', () => {
   });
 
   it('ArrowUp clamps at -1 and Escape closes the menu', () => {
-    const { container, getByPlaceholderText } = render(() => <Harness />);
+    const { container, getByPlaceholderText } = render(<Harness />);
     const input = getByPlaceholderText('enter header');
     fireEvent.focus(input);
     // ArrowUp when nothing selected shouldn't crash.
@@ -81,11 +86,11 @@ describe('HeaderComboBox', () => {
   });
 
   it('shows a pinned free-form option when the value does not match a suggestion', () => {
-    const { container, getByPlaceholderText } = render(() => (
-      <Harness freeFormHint='Use "x-new-header" as a custom header' />
-    ));
+    const { container, getByPlaceholderText } = render(
+      <Harness freeFormHint='Use "x-new-header" as a custom header' />,
+    );
     const input = getByPlaceholderText('enter header') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'x-new-header' } });
+    fireEvent.change(input, { target: { value: 'x-new-header' } });
     expect(container.textContent).toContain('Use "x-new-header" as a custom header');
     const free = container.querySelector('.header-combo__option--free') as HTMLElement;
     expect(free).not.toBeNull();
@@ -93,18 +98,16 @@ describe('HeaderComboBox', () => {
 
   it('commits a free-form value via mousedown on the pinned option', () => {
     const onInput = vi.fn();
-    const { container, getByPlaceholderText } = render(() => <Harness onInput={onInput} />);
+    const { container, getByPlaceholderText } = render(<Harness onInput={onInput} />);
     const input = getByPlaceholderText('enter header') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'x-new-header' } });
+    fireEvent.change(input, { target: { value: 'x-new-header' } });
     const free = container.querySelector('.header-combo__option--free') as HTMLElement;
     fireEvent.mouseDown(free);
     expect(onInput).toHaveBeenCalledWith('x-new-header');
   });
 
   it('renders the error message when invalid is true', () => {
-    const { container } = render(() => (
-      <Harness invalid errorMessage="bad header" />
-    ));
+    const { container } = render(<Harness invalid errorMessage="bad header" />);
     expect(container.textContent).toContain('bad header');
     expect(container.querySelector('.header-combo--invalid')).not.toBeNull();
   });

@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockNavigate = vi.fn();
 const mockSignInEmail = vi.fn().mockResolvedValue({});
 const mockCheckNeedsSetup = vi.fn();
 const mockCreateFirstAdmin = vi.fn();
 
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => mockNavigate,
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children as string}</title>,
-  Meta: () => null,
 }));
 
 vi.mock('../../src/services/auth-client.js', () => ({
@@ -53,7 +49,7 @@ describe('Setup page', () => {
   });
 
   async function renderSetup() {
-    const result = render(() => <Setup />);
+    const result = render(<Setup />);
     await waitFor(() => {
       expect(screen.queryByText('Welcome to Thinker')).toBeDefined();
     });
@@ -78,7 +74,7 @@ describe('Setup page', () => {
 
   it('redirects to /login when setup is already complete', async () => {
     mockCheckNeedsSetup.mockResolvedValue(false);
-    render(() => <Setup />);
+    render(<Setup />);
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true });
     });

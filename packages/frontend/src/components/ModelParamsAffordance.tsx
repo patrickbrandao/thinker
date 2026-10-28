@@ -1,12 +1,17 @@
-import { createResource, createSignal, lazy, Show, Suspense, type Component } from 'solid-js';
+import { lazy, Suspense, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { ProviderParamSpec } from 'thinker-shared';
 import type { AuthType, RequestParamDefaults } from '../services/api.js';
 import { getModelParamSpecs } from '../services/api/model-params.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 // Only mounted while the parameters dialog is open. Lazy-load it so the
 // Routing route doesn't ship the dialog up front.
 const ModelParamsDialog = lazy(() => import('./ModelParamsDialog.jsx'));
+
+const NO_SPECS: ProviderParamSpec[] = [];
 
 interface Props {
   agentName: string;
@@ -31,90 +36,61 @@ interface Props {
   disabled?: boolean;
 }
 
-const ModelParamsAffordance: Component<Props> = (props) => {
-  const [dialogOpen, setDialogOpen] = createSignal(false);
+export default function ModelParamsAffordance(props: Props) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { provider, authType, model, agentName } = props;
 
   // Fetch specs only while the dialog is open, so the Routing page never
   // downloads the whole catalog up front. The provider/model filtering that
   // used to run client-side now happens server-side via the by-model endpoint.
-  const [specs] = createResource(
+  const specs = useResource(
     () =>
-      dialogOpen() && props.provider && props.authType
-        ? { provider: props.provider, authType: props.authType, model: props.model }
-        : null,
-    (key) =>
-      getModelParamSpecs(props.agentName, key.provider, key.authType, key.model).catch(
+      getModelParamSpecs(agentName, provider!, authType!, model).catch(
         () => [] as ProviderParamSpec[],
       ),
+    [agentName, provider, authType, model],
+    { enabled: dialogOpen && !!provider && !!authType },
   );
 
-  const canOpen = () =>
-    props.provider !== undefined && props.authType !== undefined && props.authType !== 'local';
+  const canOpen = provider !== undefined && authType !== undefined && authType !== 'local';
+  if (!canOpen) return null;
 
-  const current = () => {
-    if (!props.provider || !props.authType) return null;
-    return props.getParams(props.scope, props.provider, props.authType, props.model);
-  };
-
-  const configured = () => current() !== null;
+  const current =
+    provider && authType ? props.getParams(props.scope, provider, authType, model) : null;
+  const configured = current !== null;
 
   return (
-    <Show when={canOpen()}>
+    <>
       <button
         type="button"
-        class="routing-card__chip-action"
-        classList={{
-          'routing-card__chip-action--configured': configured(),
-          'routing-card__chip-action--dialog-open': dialogOpen(),
-        }}
+        className={cx(
+          'routing-card__chip-action icon-btn size-6',
+          configured && 'routing-card__chip-action--configured text-accent',
+          dialogOpen && 'routing-card__chip-action--dialog-open',
+        )}
         onClick={(e) => {
           e.stopPropagation();
           setDialogOpen(true);
         }}
         disabled={props.disabled}
         aria-label={t('models.paramsAffordance.configureFor', { slot: props.slotLabel })}
+        title={t('models.paramsAffordance.parameters')}
       >
-        <span class="routing-tooltip">{t('models.paramsAffordance.parameters')}</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <line x1="4" y1="21" x2="4" y2="14" />
-          <line x1="4" y1="10" x2="4" y2="3" />
-          <line x1="12" y1="21" x2="12" y2="12" />
-          <line x1="12" y1="8" x2="12" y2="3" />
-          <line x1="20" y1="21" x2="20" y2="16" />
-          <line x1="20" y1="12" x2="20" y2="3" />
-          <line x1="1" y1="14" x2="7" y2="14" />
-          <line x1="9" y1="8" x2="15" y2="8" />
-          <line x1="17" y1="16" x2="23" y2="16" />
-        </svg>
+        <SlidersHorizontal aria-hidden="true" className="size-3" />
       </button>
-      <Show when={dialogOpen() && props.provider && props.authType}>
+      {dialogOpen && provider && authType ? (
         <Suspense fallback={null}>
           <ModelParamsDialog
-            open={dialogOpen()}
+            open={dialogOpen}
             slotLabel={props.slotLabel}
-            current={current()}
-            specs={specs() ?? []}
-            loading={specs.loading}
-            onSave={(next) =>
-              props.setParams(props.scope, props.provider!, props.authType!, props.model, next)
-            }
+            current={current}
+            specs={specs.data ?? NO_SPECS}
+            loading={specs.loading || specs.data === undefined}
+            onSave={(next) => props.setParams(props.scope, provider, authType, model, next)}
             onClose={() => setDialogOpen(false)}
           />
         </Suspense>
-      </Show>
-    </Show>
+      ) : null}
+    </>
   );
-};
-
-export default ModelParamsAffordance;
+}

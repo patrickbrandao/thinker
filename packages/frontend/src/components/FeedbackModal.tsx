@@ -1,5 +1,6 @@
-import { createSignal, For, Show, onMount, onCleanup, type JSX } from 'solid-js';
+import { useState } from 'react';
 import { t, tMaybe } from '../i18n/index.js';
+import { Button, Modal, cx } from './ui.js';
 
 export const FEEDBACK_TAGS = [
   'Not expected tier',
@@ -29,18 +30,18 @@ export interface FeedbackModalProps {
   onSubmit: (tags: string[], details: string) => void;
 }
 
-export default function FeedbackModal(props: FeedbackModalProps): JSX.Element {
-  const [selectedTags, setSelectedTags] = createSignal<string[]>([]);
-  const [details, setDetails] = createSignal('');
+export default function FeedbackModal({ open, onClose, onSubmit }: FeedbackModalProps) {
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [details, setDetails] = useState('');
 
   function toggleTag(tag: string) {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+      prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag],
     );
   }
 
   function handleSubmit() {
-    props.onSubmit(selectedTags(), details());
+    onSubmit(selectedTags, details);
     setSelectedTags([]);
     setDetails('');
   }
@@ -48,83 +49,42 @@ export default function FeedbackModal(props: FeedbackModalProps): JSX.Element {
   function handleClose() {
     setSelectedTags([]);
     setDetails('');
-    props.onClose();
+    onClose();
   }
-
-  function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && props.open) handleClose();
-  }
-
-  onMount(() => document.addEventListener('keydown', onKeyDown));
-  onCleanup(() => document.removeEventListener('keydown', onKeyDown));
 
   return (
-    <Show when={props.open}>
-      <div
-        class="modal-backdrop"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) handleClose();
-        }}
-      >
-        <div
-          class="modal feedback-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('ui.feedback.title')}
-        >
-          <div class="modal__header">
-            <span class="modal__title">{t('ui.feedback.title')}</span>
+    <Modal open={open} title={t('ui.feedback.title')} onClose={handleClose}>
+      <div className="feedback-modal__tags mb-3 flex flex-wrap gap-1.5">
+        {FEEDBACK_TAGS.map((tag) => {
+          const selected = selectedTags.includes(tag);
+          return (
             <button
-              class="modal__close"
-              onClick={handleClose}
-              aria-label={t('common.close')}
+              key={tag}
               type="button"
+              className={cx(
+                'feedback-tag btn btn-sm',
+                selected ? 'feedback-tag--selected' : 'btn-ghost',
+              )}
+              aria-pressed={selected}
+              onClick={() => toggleTag(tag)}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              {tagLabel(tag)}
             </button>
-          </div>
-          <div style="padding: 12px var(--gap-lg);">
-            <div class="feedback-modal__tags">
-              <For each={FEEDBACK_TAGS as unknown as string[]}>
-                {(tag) => (
-                  <button
-                    type="button"
-                    class={`feedback-tag${selectedTags().includes(tag) ? ' feedback-tag--selected' : ''}`}
-                    onClick={() => toggleTag(tag)}
-                  >
-                    {tagLabel(tag)}
-                  </button>
-                )}
-              </For>
-            </div>
-            <textarea
-              class="feedback-modal__textarea"
-              placeholder={t('ui.feedback.details')}
-              value={details()}
-              onInput={(e) => setDetails(e.currentTarget.value)}
-              maxLength={2000}
-            />
-            <div class="feedback-modal__footer">
-              <button type="button" class="btn btn--primary" onClick={handleSubmit}>
-                {t('ui.feedback.submit')}
-              </button>
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
-    </Show>
+      <textarea
+        className="feedback-modal__textarea field min-h-24 py-2"
+        placeholder={t('ui.feedback.details')}
+        value={details}
+        onChange={(e) => setDetails(e.currentTarget.value)}
+        maxLength={2000}
+      />
+      <div className="actions">
+        <Button className="feedback-modal__submit" onClick={handleSubmit}>
+          {t('ui.feedback.submit')}
+        </Button>
+      </div>
+    </Modal>
   );
 }

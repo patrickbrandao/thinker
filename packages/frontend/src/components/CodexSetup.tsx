@@ -1,8 +1,7 @@
-import { createSignal, Show, type Component } from 'solid-js';
+import { useState } from 'react';
 import { getCodexConfigSnippet, getCodexKeyExportSnippet } from 'thinker-shared';
-import CopyButton from './CopyButton.jsx';
-import CodeBlock from './CodeBlock.jsx';
 import RichText from './RichText.jsx';
+import { CHIP, RevealButton, SetupCard, SetupHint, SnippetBlock } from './setup-ui.jsx';
 import { t } from '../i18n/index.js';
 
 interface Props {
@@ -11,90 +10,39 @@ interface Props {
   baseUrl: string;
 }
 
-const EyeIcon: Component<{ open: boolean }> = (props) => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    aria-hidden="true"
-  >
-    <Show
-      when={props.open}
-      fallback={
-        <>
-          <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-          <circle cx="12" cy="12" r="3" />
-        </>
-      }
-    >
-      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
-      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
-      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
-      <path d="m2 2 20 20" />
-    </Show>
-  </svg>
-);
+const PLACEHOLDER_KEY = 'thk_YOUR_KEY';
 
-const CodexSetup: Component<Props> = (props) => {
-  const [keyRevealed, setKeyRevealed] = createSignal(false);
+export default function CodexSetup({ apiKey, keyPrefix, baseUrl }: Props) {
+  const [keyRevealed, setKeyRevealed] = useState(false);
 
-  const placeholderKey = 'thk_YOUR_KEY';
-  const hasFullKey = () => !!props.apiKey;
-  const masked = () => (props.keyPrefix ? `${props.keyPrefix}...` : placeholderKey);
-  const copyKey = () => props.apiKey ?? placeholderKey;
-  const visibleKey = () => {
-    if (!props.apiKey) return placeholderKey;
-    return keyRevealed() ? props.apiKey : masked();
-  };
-
-  const configCopy = () => getCodexConfigSnippet(props.baseUrl);
-  const configShown = () => getCodexConfigSnippet(props.baseUrl);
-  const keyExportCopy = () => getCodexKeyExportSnippet(copyKey());
-  const keyExportShown = () => getCodexKeyExportSnippet(visibleKey());
+  const masked = keyPrefix ? `${keyPrefix}...` : PLACEHOLDER_KEY;
+  const copyKey = apiKey ?? PLACEHOLDER_KEY;
+  const visibleKey = !apiKey ? PLACEHOLDER_KEY : keyRevealed ? apiKey : masked;
+  const config = getCodexConfigSnippet(baseUrl);
 
   return (
-    <div class="setup-agents-card">
-      <p class="setup-method__hint">
+    <SetupCard>
+      <SetupHint>
         <RichText
           text={t('harnesses.guides.codexConfig')}
-          parts={{ file: <code class="setup-model-hint__code">~/.codex/config.toml</code> }}
+          parts={{ file: <code className={CHIP}>~/.codex/config.toml</code> }}
         />
-      </p>
+      </SetupHint>
 
-      <div class="setup-cli-block">
-        <div class="setup-cli-block__actions">
-          <CopyButton text={configCopy()} />
-        </div>
-        <CodeBlock code={configShown()} language="toml" />
-      </div>
+      <SnippetBlock code={config} copyText={config} language="toml" />
 
-      <p class="setup-method__hint">{t('harnesses.guides.codexExport')}</p>
+      <SetupHint>{t('harnesses.guides.codexExport')}</SetupHint>
 
-      <div class="setup-cli-block">
-        <div class="setup-cli-block__actions">
-          <Show when={hasFullKey()}>
-            <button
-              class="modal-terminal__copy"
-              onClick={() => setKeyRevealed(!keyRevealed())}
-              aria-label={
-                keyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
-              }
-              title={keyRevealed() ? t('harnesses.key.hide') : t('harnesses.key.reveal')}
-            >
-              <EyeIcon open={keyRevealed()} />
-            </button>
-          </Show>
-          <CopyButton text={keyExportCopy()} />
-        </div>
-        <CodeBlock code={keyExportShown()} language="bash" />
-      </div>
-    </div>
+      <SnippetBlock
+        code={getCodexKeyExportSnippet(visibleKey)}
+        copyText={getCodexKeyExportSnippet(copyKey)}
+        language="bash"
+        reveal={
+          apiKey ? (
+            <RevealButton revealed={keyRevealed} onToggle={() => setKeyRevealed((v) => !v)} />
+          ) : null
+        }
+      />
+    </SetupCard>
   );
-};
-
-export default CodexSetup;
+}

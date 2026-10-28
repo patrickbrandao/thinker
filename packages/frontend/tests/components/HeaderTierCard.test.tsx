@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@solidjs/testing-library';
-
-vi.mock('solid-js/web', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('solid-js/web')>();
-  return { ...mod, Portal: (props: any) => props.children };
-});
+import { render, fireEvent, waitFor } from '@testing-library/react';
 
 const mockResetHeaderTier = vi.fn();
 const mockSetHeaderTierFallbacks = vi.fn();
@@ -294,7 +289,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('renders the tier name and the header rule', () => {
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -303,15 +298,15 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).toContain('Premium');
     expect(container.textContent).toContain('x-thinker-tier');
     expect(container.textContent).toContain('premium');
   });
 
   it('renders the override_route.model display label', () => {
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -320,8 +315,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('GPT-4o');
   });
 
@@ -348,7 +343,7 @@ describe('HeaderTierCard', () => {
       },
     ];
 
-    const { container, getByTestId } = render(() => (
+    const { baseElement: container, getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={streamTier}
@@ -357,8 +352,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     expect(container.querySelector('.routing-card__model-chip--skipped')).not.toBeNull();
     expect(container.querySelector('.routing-card__skipped-badge')?.textContent).toContain(
@@ -372,7 +367,7 @@ describe('HeaderTierCard', () => {
       ...baseTier,
       override_route: { provider: 'openai', authType: 'subscription', model: 'gpt-4o' } as const,
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierSub}
@@ -381,8 +376,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-subscription"]')).not.toBeNull();
     expect(container.textContent).toContain('Included in subscription');
   });
@@ -409,7 +404,11 @@ describe('HeaderTierCard', () => {
         priority: 1,
       },
     ];
-    const { container, getByRole, queryByTestId } = render(() => (
+    const {
+      baseElement: container,
+      getByRole,
+      queryByTestId,
+    } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierSub}
@@ -418,8 +417,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={providers}
         onOverride={onOverride}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     const chip = container.querySelector('.routing-card__key-chip') as HTMLButtonElement;
     expect(chip.textContent).toContain('Default');
@@ -456,7 +455,7 @@ describe('HeaderTierCard', () => {
         priority: 1,
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierSub}
@@ -465,8 +464,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={providers}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     expect(container.querySelector('.routing-card__key-chip')?.textContent).toContain('Personal');
   });
@@ -490,7 +489,7 @@ describe('HeaderTierCard', () => {
         cost_per_request: 0.013636,
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierSub}
@@ -499,14 +498,14 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).toContain('Included ($0.0136 quota/req)');
   });
 
   it('renders a + Add model button when override_route is null', () => {
     const tierEmpty = { ...baseTier, override_route: null };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierEmpty}
@@ -515,8 +514,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     const add = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('+ Add model'),
     );
@@ -525,7 +524,7 @@ describe('HeaderTierCard', () => {
 
   it('opens the picker in primary mode when + Add model is clicked', () => {
     const tierEmpty = { ...baseTier, override_route: null };
-    const { container, queryByTestId } = render(() => (
+    const { baseElement: container, queryByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierEmpty}
@@ -534,8 +533,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(queryByTestId('model-picker')).toBeNull();
     const add = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('+ Add model'),
@@ -546,7 +545,7 @@ describe('HeaderTierCard', () => {
 
   it('requires stream-capable models when the header tier is in stream mode', () => {
     const tierEmpty = { ...baseTier, override_route: null, response_mode: 'stream' as const };
-    const { container, getByTestId } = render(() => (
+    const { baseElement: container, getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierEmpty}
@@ -555,8 +554,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     const add = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('+ Add model'),
     ) as HTMLButtonElement;
@@ -567,7 +566,7 @@ describe('HeaderTierCard', () => {
   it('calls onOverride with the picked route when picker selects a primary model', async () => {
     const tierEmpty = { ...baseTier, override_route: null };
     const onOverride = vi.fn();
-    const { container, getByTestId } = render(() => (
+    const { baseElement: container, getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierEmpty}
@@ -576,8 +575,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={onOverride}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('+ Add model'),
@@ -591,7 +590,7 @@ describe('HeaderTierCard', () => {
 
   it('calls reset endpoint and onFallbacksUpdate([]) when Reset is clicked', async () => {
     const onFallbacksUpdate = vi.fn();
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -600,8 +599,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={onFallbacksUpdate}
-      />
-    ));
+      />,
+    );
     const resetBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Reset'),
     ) as HTMLButtonElement;
@@ -615,7 +614,7 @@ describe('HeaderTierCard', () => {
   it('opens the kebab menu and exposes Send / Edit / Disable', () => {
     const onEdit = vi.fn();
     const onDisable = vi.fn();
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -626,8 +625,8 @@ describe('HeaderTierCard', () => {
         onFallbacksUpdate={vi.fn()}
         onEdit={onEdit}
         onDisable={onDisable}
-      />
-    ));
+      />,
+    );
     const kebab = container.querySelector('.header-tier-card__icon-btn') as HTMLButtonElement;
     fireEvent.click(kebab);
     expect(container.querySelector('.header-tier-card__menu')).not.toBeNull();
@@ -636,7 +635,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('opens the snippet modal when Send this header is clicked', () => {
-    const { container, queryByTestId } = render(() => (
+    const { baseElement: container, queryByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -645,8 +644,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('.header-tier-card__icon-btn') as HTMLButtonElement);
     fireEvent.click(
       Array.from(container.querySelectorAll('.header-tier-card__menu-item')).find((b) =>
@@ -658,7 +657,7 @@ describe('HeaderTierCard', () => {
 
   it('invokes onEdit when Edit tier is clicked', () => {
     const onEdit = vi.fn();
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -668,8 +667,8 @@ describe('HeaderTierCard', () => {
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
         onEdit={onEdit}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('.header-tier-card__icon-btn') as HTMLButtonElement);
     fireEvent.click(
       Array.from(container.querySelectorAll('.header-tier-card__menu-item')).find((b) =>
@@ -681,7 +680,7 @@ describe('HeaderTierCard', () => {
 
   it('invokes onDisable when Disable is clicked', () => {
     const onDisable = vi.fn();
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -691,8 +690,8 @@ describe('HeaderTierCard', () => {
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
         onDisable={onDisable}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('.header-tier-card__icon-btn') as HTMLButtonElement);
     fireEvent.click(
       Array.from(container.querySelectorAll('.header-tier-card__menu-item')).find((b) =>
@@ -710,7 +709,7 @@ describe('HeaderTierCard', () => {
         { provider: 'anthropic', authType: 'api_key' as const, model: 'claude-haiku' },
       ],
     };
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierWithFallbacks}
@@ -719,14 +718,14 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(getByTestId('fb-count').textContent).toBe('2');
     expect(getByTestId('fb-routes-count').textContent).toBe('2');
   });
 
   it('forwards persistFallbacks to setHeaderTierFallbacks for this agent + tier id', async () => {
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -735,8 +734,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('fb-persist') as HTMLButtonElement);
     await waitFor(() => {
       // The mock stub passes "tier-id" — the closure uses this card's own
@@ -746,7 +745,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('forwards persistClearFallbacks to clearHeaderTierFallbacks', async () => {
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -755,8 +754,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('fb-clear') as HTMLButtonElement);
     await waitFor(() => {
       expect(mockClearHeaderTierFallbacks).toHaveBeenCalledWith('demo', 'ht-1');
@@ -764,7 +763,11 @@ describe('HeaderTierCard', () => {
   });
 
   it('opens the picker in fallback mode when FallbackList signals onAddFallback', () => {
-    const { container, getByTestId, queryByTestId } = render(() => (
+    const {
+      baseElement: container,
+      getByTestId,
+      queryByTestId,
+    } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -773,8 +776,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(queryByTestId('model-picker')).toBeNull();
     fireEvent.click(getByTestId('fb-add') as HTMLButtonElement);
     expect(queryByTestId('model-picker')).not.toBeNull();
@@ -788,7 +791,7 @@ describe('HeaderTierCard', () => {
       fallback_routes: [{ provider: 'openai', authType: 'api_key' as const, model: 'old' }],
     };
     const onFallbacksUpdate = vi.fn();
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierWithFallbacks}
@@ -797,8 +800,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={onFallbacksUpdate}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('fb-add') as HTMLButtonElement);
     fireEvent.click(getByTestId('picker-pick') as HTMLButtonElement);
     await waitFor(() => {
@@ -837,7 +840,7 @@ describe('HeaderTierCard', () => {
       },
     ];
     const onFallbacksUpdate = vi.fn();
-    const { getByTestId, queryByTestId } = render(() => (
+    const { getByTestId, queryByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -846,8 +849,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={providers}
         onOverride={vi.fn()}
         onFallbacksUpdate={onFallbacksUpdate}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(getByTestId('fb-add') as HTMLButtonElement);
     fireEvent.click(getByTestId('picker-pick') as HTMLButtonElement);
@@ -883,7 +886,11 @@ describe('HeaderTierCard', () => {
       },
     ];
     const onOverride = vi.fn();
-    const { container, getByTestId, queryByTestId } = render(() => (
+    const {
+      baseElement: container,
+      getByTestId,
+      queryByTestId,
+    } = render(
       <HeaderTierCard
         agentName="demo"
         tier={{ ...baseTier, override_route: null }}
@@ -892,8 +899,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={providers}
         onOverride={onOverride}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
@@ -914,7 +921,11 @@ describe('HeaderTierCard', () => {
   });
 
   it('closes the picker without action on its onClose', () => {
-    const { container, getByTestId, queryByTestId } = render(() => (
+    const {
+      baseElement: container,
+      getByTestId,
+      queryByTestId,
+    } = render(
       <HeaderTierCard
         agentName="demo"
         tier={{ ...baseTier, override_route: null }}
@@ -923,8 +934,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('+ Add model'),
@@ -935,7 +946,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('renders nothing for currentModel when override_route is null (no chip)', () => {
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={{ ...baseTier, override_route: null }}
@@ -944,8 +955,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__model-chip')).toBeNull();
   });
 
@@ -970,7 +981,7 @@ describe('HeaderTierCard', () => {
       },
       ...connectedProviders,
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierNoAuth}
@@ -979,13 +990,13 @@ describe('HeaderTierCard', () => {
         connectedProviders={subProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-subscription"]')).not.toBeNull();
   });
 
   it('opens picker via the chip-action change button without bubbling to the chip click', () => {
-    const { container, queryByTestId } = render(() => (
+    const { baseElement: container, queryByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -994,14 +1005,14 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('.routing-card__chip-action') as HTMLButtonElement);
     expect(queryByTestId('model-picker')).not.toBeNull();
   });
 
   it('opens picker when the chip body itself is clicked', () => {
-    const { container, queryByTestId } = render(() => (
+    const { baseElement: container, queryByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -1010,8 +1021,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(container.querySelector('.routing-card__model-chip') as HTMLElement);
     expect(queryByTestId('model-picker')).not.toBeNull();
   });
@@ -1036,7 +1047,7 @@ describe('HeaderTierCard', () => {
         created_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={customTier}
@@ -1045,8 +1056,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Custom branch renders a span styled as a logo letter — text "G".
     const chipText = container.querySelector('.routing-card__main')?.textContent;
     expect(chipText).toBe('groq-mixtral');
@@ -1063,7 +1074,7 @@ describe('HeaderTierCard', () => {
       ...baseTier,
       override_route: { provider: 'custom:unknown', authType: 'api_key' as const, model: 'x' },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={customTier}
@@ -1072,8 +1083,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     const overrideIcons = container.querySelectorAll('.routing-card__override-icon');
     const text = (overrideIcons[0].textContent ?? '').charAt(0).toUpperCase();
     expect(text).toBe('C');
@@ -1091,7 +1102,7 @@ describe('HeaderTierCard', () => {
         model: 'gpt-4o',
       },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierMissingProv}
@@ -1100,8 +1111,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // The chip still renders the model — meaning providerIdForModel resolved
     // (and effectiveAuth lookup followed) without crashing.
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('GPT-4o');
@@ -1140,7 +1151,7 @@ describe('HeaderTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierMissingProv}
@@ -1149,8 +1160,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={groqProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('GPT OSS 120B');
     expect(container.querySelector('[data-testid="provider-icon-groq"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="provider-icon-openrouter"]')).toBeNull();
@@ -1167,7 +1178,7 @@ describe('HeaderTierCard', () => {
         model: 'gpt-extra-new',
       },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierUnknownModel}
@@ -1176,8 +1187,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__main')).not.toBeNull();
   });
 
@@ -1200,7 +1211,7 @@ describe('HeaderTierCard', () => {
         // exercises line 31's `if (prefixId && PROVIDERS.find(...))` branch.
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierFallback}
@@ -1209,8 +1220,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__override-icon')).not.toBeNull();
   });
 
@@ -1231,7 +1242,7 @@ describe('HeaderTierCard', () => {
         display_name: 'Mistral Large',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierMistral}
@@ -1240,8 +1251,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('Mistral Large');
   });
 
@@ -1254,7 +1265,7 @@ describe('HeaderTierCard', () => {
         model: 'mystery-model',
       },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierUnknown}
@@ -1263,8 +1274,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={[]}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // No icon resolves: the override-icon is rendered only when providerId() exists.
     expect(container.querySelector('.routing-card__override-icon')).toBeNull();
   });
@@ -1297,7 +1308,7 @@ describe('HeaderTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierOllama}
@@ -1306,15 +1317,15 @@ describe('HeaderTierCard', () => {
         connectedProviders={ollamaProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-local"]')).not.toBeNull();
   });
 
   it('silently swallows fallback append errors when the picker fires in fallback mode', async () => {
     mockSetHeaderTierFallbacks.mockRejectedValueOnce(new Error('server boom'));
     const onFallbacksUpdate = vi.fn();
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -1323,8 +1334,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={onFallbacksUpdate}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('fb-add') as HTMLButtonElement);
     fireEvent.click(getByTestId('picker-pick') as HTMLButtonElement);
     await waitFor(() => {
@@ -1337,7 +1348,7 @@ describe('HeaderTierCard', () => {
   it('silently swallows reset errors and clears the loading state', async () => {
     mockResetHeaderTier.mockRejectedValueOnce(new Error('server boom'));
     const onFallbacksUpdate = vi.fn();
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={baseTier}
@@ -1346,8 +1357,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={onFallbacksUpdate}
-      />
-    ));
+      />,
+    );
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Reset'),
@@ -1380,7 +1391,7 @@ describe('HeaderTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierNoMatch}
@@ -1389,8 +1400,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={otherProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // No auth badge should appear for an unresolved auth.
     expect(container.querySelector('[data-testid="auth-api_key"]')).toBeNull();
     expect(container.querySelector('[data-testid="auth-subscription"]')).toBeNull();
@@ -1426,7 +1437,7 @@ describe('HeaderTierCard', () => {
         display_name: 'Llama 3',
       },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierLocal}
@@ -1435,8 +1446,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={localProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-local"]')).not.toBeNull();
   });
 
@@ -1465,7 +1476,7 @@ describe('HeaderTierCard', () => {
     const deepseekProviders = [
       { ...connectedProviders[0], provider: 'deepseek', authType: 'api_key' as const },
     ];
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierDeepseek}
@@ -1476,8 +1487,8 @@ describe('HeaderTierCard', () => {
         onFallbacksUpdate={vi.fn()}
         getModelParams={() => null}
         setModelParams={vi.fn().mockResolvedValue(undefined)}
-      />
-    ));
+      />,
+    );
     expect(
       container.querySelector('[aria-label="Configure model parameters for DeepSeek V4"]'),
     ).not.toBeNull();
@@ -1519,7 +1530,7 @@ describe('HeaderTierCard', () => {
     const deepseekProviders = [
       { ...connectedProviders[0], provider: 'deepseek', authType: 'api_key' as const },
     ];
-    const { container, getByRole } = render(() => (
+    const { baseElement: container, getByRole } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierDeepseek}
@@ -1530,8 +1541,8 @@ describe('HeaderTierCard', () => {
         onFallbacksUpdate={vi.fn()}
         getModelParams={() => null}
         setModelParams={setModelParams}
-      />
-    ));
+      />,
+    );
     const btn = container.querySelector(
       '[aria-label="Configure model parameters for DeepSeek V4"]',
     ) as HTMLButtonElement;
@@ -1559,7 +1570,7 @@ describe('HeaderTierCard', () => {
         model: '',
       },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierEmptyModel}
@@ -1568,8 +1579,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Empty model is falsy under <Show when={currentModel()}>, so the chip is
     // suppressed and the "+ Add model" affordance takes the fallback slot.
     expect(container.querySelector('.routing-card__model-chip')).toBeNull();
@@ -1585,7 +1596,7 @@ describe('HeaderTierCard', () => {
         model: 'gpt-4o',
       },
     };
-    const { container } = render(() => (
+    const { baseElement: container } = render(
       <HeaderTierCard
         agentName="demo"
         tier={tierNullProvider}
@@ -1594,8 +1605,8 @@ describe('HeaderTierCard', () => {
         connectedProviders={connectedProviders}
         onOverride={vi.fn()}
         onFallbacksUpdate={vi.fn()}
-      />
-    ));
+      />,
+    );
     // A null provider is falsy, so providerId() falls to providerIdForModel,
     // which resolves the openai prefix and renders the matching icon.
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('GPT-4o');

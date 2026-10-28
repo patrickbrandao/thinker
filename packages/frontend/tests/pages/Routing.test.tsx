@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor, screen } from '@solidjs/testing-library';
+import { render, fireEvent, waitFor, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation as useRouterLocation } from 'react-router';
+import type { ReactNode } from 'react';
 
 // ── API mocks ───────────────────────────────────────────────────────────────
 const mockGetTierAssignments = vi.fn();
@@ -75,9 +77,10 @@ vi.mock('../../src/services/toast-store.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/agent-display-name.js', () => ({
-  agentDisplayName: () => 'Demo',
-}));
+vi.mock('../../src/services/agent-display-name.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { agentDisplayNameSignal: signal('Demo'), agentDisplayName: () => 'Demo' };
+});
 
 const mockIsRecentlyCreated = vi.fn(() => false);
 const mockIsSetupPending = vi.fn(() => false);
@@ -97,9 +100,6 @@ let lastSetupModalProps: Record<string, unknown> | null = null;
 vi.mock('../../src/components/SetupModal.jsx', () => ({
   default: (props: Record<string, unknown>) => {
     lastSetupModalProps = props;
-    // Read every prop so the JSX-attribute lines in Routing.tsx count as covered.
-    const _read = [props.agentName, props.apiKey, props.agentPlatform, props.agentCategory];
-    void _read;
     return (
       <div data-testid="setup-modal" data-open={props.open ? 'true' : 'false'}>
         <button data-testid="setup-close" onClick={() => (props.onClose as () => void)?.()}>
@@ -113,57 +113,31 @@ vi.mock('../../src/components/SetupModal.jsx', () => ({
   },
 }));
 
+const mockParseCustomProviderParams = vi.fn((_params: unknown): unknown => null);
 vi.mock('../../src/services/routing-params.js', () => ({
-  parseCustomProviderParams: () => null,
+  parseCustomProviderParams: (params: unknown) => mockParseCustomProviderParams(params),
   parseProviderDeepLink: () => null,
 }));
 
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => (
-    <div data-testid="title">{props.children as string}</div>
-  ),
-  Meta: (props: { name: string; content: string }) => (
-    <meta name={props.name} content={props.content} />
-  ),
-}));
-
-// Router primitives
-const useParams = vi.fn();
-const useLocation = vi.fn();
-const setSearchParamsFn = vi.fn();
-const useSearchParams = vi.fn();
-vi.mock('@solidjs/router', () => ({
-  useParams: () => useParams(),
-  useLocation: () => useLocation(),
-  useSearchParams: () => useSearchParams(),
-  // NoConnectionsPrompt (the empty-providers state) renders <A> links to the
-  // provider pages. Provide a passthrough so it mounts in tests.
-  A: (props: any) => props.children,
+// The empty-providers state belongs to another area; only its copy matters here.
+vi.mock('../../src/components/NoConnectionsPrompt.jsx', () => ({
+  default: () => <div>No providers connected</div>,
 }));
 
 // Component / section mocks — keep them minimal so we exercise Routing.tsx logic.
 vi.mock('../../src/components/RoutingTabs.js', () => ({
   default: (props: Record<string, unknown>) => {
-    // Read every prop incl. the pipelineHelp accessor so its line counts.
-    const _read = [
-      props.specificityEnabled,
-      props.customEnabled,
-      (props.showSpecificity as () => unknown)?.(),
-      (props.pipelineHelp as () => unknown)?.(),
-    ];
-    void _read;
     const children = props.children as {
-      default: unknown;
-      specificity: unknown;
-      custom: unknown;
+      default: ReactNode;
+      specificity: ReactNode;
+      custom: ReactNode;
     };
     return (
       <div data-testid="routing-tabs">
-        {/* Render headerRight so lines 538-556 (response-mode-btn JSX) are covered */}
-        <div data-testid="tab-header-right">{props.headerRight as unknown as Element}</div>
-        <div data-testid="tab-default">{children.default as unknown as Element}</div>
-        <div data-testid="tab-specificity">{children.specificity as unknown as Element}</div>
-        <div data-testid="tab-custom">{children.custom as unknown as Element}</div>
+        <div data-testid="tab-header-right">{props.headerRight as ReactNode}</div>
+        <div data-testid="tab-default">{children.default}</div>
+        <div data-testid="tab-specificity">{children.specificity}</div>
+        <div data-testid="tab-custom">{children.custom}</div>
       </div>
     );
   },
@@ -177,25 +151,6 @@ let lastModalsProps: Record<string, unknown> | null = null;
 vi.mock('../../src/components/RoutingModals.js', () => ({
   default: (props: Record<string, unknown>) => {
     lastModalsProps = props;
-    // Eagerly read every prop so JSX-attribute lines in Routing.tsx count.
-    const _read = [
-      props.agentName,
-      props.dropdownTier,
-      props.specificityDropdown,
-      props.fallbackPickerTier,
-      props.showProviderModal,
-      props.customProviderPrefill,
-      props.providerDeepLink,
-      props.instructionModal,
-      props.instructionProvider,
-      props.models,
-      props.tiers,
-      props.specificityAssignments,
-      props.customProviders,
-      props.connectedProviders,
-      props.onProviderPoll,
-    ];
-    void _read;
     return (
       <div data-testid="modals">
         <button
@@ -313,36 +268,6 @@ vi.mock('../../src/components/RoutingModals.js', () => ({
 
 vi.mock('../../src/pages/RoutingDefaultTierSection.js', () => ({
   default: (props: Record<string, unknown>) => {
-    // Read every prop so JSX-attribute lines in Routing.tsx count as covered.
-    const _read = [
-      props.agentName,
-      props.tier,
-      props.models,
-      props.customProviders,
-      props.activeProviders,
-      props.connectedProviders,
-      props.tiersLoading,
-      props.changingTier,
-      props.resettingTier,
-      props.resettingAll,
-      props.addingFallback,
-      props.onOverride,
-      props.onPinKey,
-      props.onReset,
-      props.onFallbackUpdate,
-      props.onAddFallback,
-      props.getFallbacksFor,
-      props.getTier,
-      props.complexityEnabled,
-      props.togglingComplexity,
-      (props.showComplexityToggle as () => unknown)?.(),
-      props.responseMode,
-      props.changingResponseMode,
-      props.onResponseModeChange,
-      props.getModelParams,
-      props.setModelParams,
-    ];
-    void _read;
     return (
       <div data-testid="default-section">
         <button
@@ -422,8 +347,6 @@ vi.mock('../../src/pages/RoutingSpecificitySection.js', () => ({
       routes?: { provider: string; authType: string; model: string }[] | null,
     ) => void;
     onAddFallback: (cat: string) => void;
-    responseMode?: () => 'stream' | 'buffered';
-    changingResponseMode?: () => boolean;
     onResponseModeChange?: (mode: 'stream' | 'buffered') => void;
     onPinKey?: (cat: string, provider: string, label: string | null, authType?: string) => void;
     setModelParams?: (
@@ -441,7 +364,6 @@ vi.mock('../../src/pages/RoutingSpecificitySection.js', () => ({
     ) => { thinking?: { type: 'enabled' | 'disabled' } } | null;
   }) => (
     <div data-testid="spec-section">
-      {void [props.responseMode?.(), props.changingResponseMode?.()]}
       <button data-testid="spec-open" onClick={() => props.onDropdownOpen('coding')}>
         spec-open
       </button>
@@ -535,19 +457,6 @@ vi.mock('../../src/pages/RoutingSpecificitySection.js', () => ({
 
 vi.mock('../../src/pages/RoutingHeaderTiersSection.js', () => ({
   default: (props: Record<string, unknown>) => {
-    // Read props so models={props.models()} (line 330) is covered.
-    const _read = [
-      props.agentName,
-      props.models,
-      props.customProviders,
-      props.connectedProviders,
-      props.externalTiers,
-      props.externalRefetch,
-      props.externalMutate,
-      props.getModelParams,
-      props.setModelParams,
-    ];
-    void _read;
     // In the clean (no-tabs) view the parent renders the cards itself and drives
     // modals through these openers. Hand it dummies so the unified view's header
     // button, dashed add-card, and card edit buttons have something to call.
@@ -563,31 +472,6 @@ vi.mock('../../src/pages/RoutingHeaderTiersSection.js', () => ({
 // are only exercised here). Mock them to surface their callbacks as buttons.
 vi.mock('../../src/pages/RoutingTierCard.js', () => ({
   default: (props: Record<string, unknown>) => {
-    const _read = [
-      props.stage,
-      (props.tier as () => unknown)?.(),
-      (props.models as () => unknown)?.(),
-      (props.customProviders as () => unknown)?.(),
-      props.activeProviders,
-      props.tiersLoading,
-      props.changingTier,
-      props.resettingTier,
-      props.resettingAll,
-      props.addingFallback,
-      props.agentName,
-      props.getFallbacksFor,
-      props.connectedProviders,
-      props.getModelParams,
-      props.setModelParams,
-      // Read the member-expression callback props so Solid evaluates their
-      // getters (covers the onPinKey/onReset/onFallbackUpdate prop lines).
-      props.onOverride,
-      props.onPinKey,
-      props.onReset,
-      props.onFallbackUpdate,
-      props.onAddFallback,
-    ];
-    void _read;
     return (
       <div data-testid="tier-card">
         <button
@@ -604,15 +488,6 @@ vi.mock('../../src/pages/RoutingTierCard.js', () => ({
 vi.mock('../../src/components/HeaderTierCard.js', () => ({
   default: (props: Record<string, unknown>) => {
     const tier = props.tier as { id: string; name: string };
-    const _read = [
-      props.agentName,
-      props.models,
-      props.customProviders,
-      props.connectedProviders,
-      props.getModelParams,
-      props.setModelParams,
-    ];
-    void _read;
     return (
       <div data-testid={`clean-card-${tier.id}`}>
         <button
@@ -631,9 +506,10 @@ vi.mock('../../src/components/HeaderTierCard.js', () => ({
         <button
           data-testid={`clean-fb-routes-${tier.id}`}
           onClick={() =>
-            (props.onFallbacksUpdate as (f: string[], r: unknown) => void)(['fb1'], [
-              { provider: 'openai', authType: 'api_key', model: 'fb1' },
-            ])
+            (props.onFallbacksUpdate as (f: string[], r: unknown) => void)(
+              ['fb1'],
+              [{ provider: 'openai', authType: 'api_key', model: 'fb1' }],
+            )
           }
         >
           fb-routes
@@ -646,7 +522,10 @@ vi.mock('../../src/components/HeaderTierCard.js', () => ({
         >
           fb-noroutes
         </button>
-        <button data-testid={`clean-edit-${tier.id}`} onClick={() => (props.onEdit as () => void)()}>
+        <button
+          data-testid={`clean-edit-${tier.id}`}
+          onClick={() => (props.onEdit as () => void)()}
+        >
           edit
         </button>
         <button
@@ -662,14 +541,6 @@ vi.mock('../../src/components/HeaderTierCard.js', () => ({
 
 vi.mock('../../src/components/ResponseModeModal.js', () => ({
   default: (props: Record<string, unknown>) => {
-    // Read every prop so JSX attribute lines 711-723 are covered.
-    const _read = [
-      props.responseMode,
-      props.disabled,
-      props.tiers,
-      props.models,
-    ];
-    void _read;
     return (
       <div data-testid="response-mode-modal">
         <button
@@ -699,10 +570,6 @@ vi.mock('../../src/pages/RoutingPanels.js', () => ({
   RoutingLoadingSkeleton: () => <div data-testid="loading-skeleton" />,
   ActiveProviderIcons: () => <div data-testid="active-providers" />,
   RoutingFooter: (props: Record<string, unknown>) => {
-    // Read all props so JSX-attribute lines (hasOverrides, resettingAll,
-    // resettingTier) count as covered.
-    const _read = [props.hasOverrides, props.resettingAll, props.resettingTier];
-    void _read;
     return (
       <div data-testid="routing-footer">
         <button data-testid="reset-all" onClick={() => (props.onResetAll as () => void)()}>
@@ -732,11 +599,11 @@ const mockActionHandleReset = vi.fn();
 const mockActionHandleAddFallback = vi.fn();
 const mockActionHandleFallbackUpdate = vi.fn();
 vi.mock('../../src/pages/RoutingActions.js', () => ({
-  createRoutingActions: () => ({
-    changingTier: () => null,
-    resettingAll: () => false,
-    resettingTier: () => null,
-    addingFallback: () => null,
+  useRoutingActions: () => ({
+    changingTier: null,
+    resettingAll: false,
+    resettingTier: null,
+    addingFallback: null,
     getTier: (...args: unknown[]) => mockActionGetTier(...args),
     getFallbacksFor: () => [],
     handleOverride: (...args: unknown[]) => mockActionHandleOverride(...args),
@@ -748,6 +615,21 @@ vi.mock('../../src/pages/RoutingActions.js', () => ({
 }));
 
 import Routing from '../../src/pages/Routing';
+
+/** Prints the current search string so tests can see URL param changes. */
+function LocationProbe() {
+  const location = useRouterLocation();
+  return <div data-testid="location-search">{location.search}</div>;
+}
+
+function renderRouting(state?: unknown, search = '') {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: '/harnesses/demo/routing', search, state }]}>
+      <Routing />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+}
 
 const baseProvider = {
   id: 'p1',
@@ -765,9 +647,7 @@ beforeEach(() => {
   localStorage.clear();
   mockIsRecentlyCreated.mockReturnValue(false);
   mockIsSetupPending.mockReturnValue(false);
-  useParams.mockReturnValue({ agentName: 'demo' });
-  useLocation.mockReturnValue({ state: undefined });
-  useSearchParams.mockReturnValue([{}, setSearchParamsFn]);
+  mockParseCustomProviderParams.mockReturnValue(null);
   mockGetTierAssignments.mockResolvedValue([]);
   mockGetAvailableModels.mockResolvedValue([]);
   mockGetProviders.mockResolvedValue([baseProvider]);
@@ -796,7 +676,7 @@ describe('Routing page', () => {
     // The standalone routing description paragraph was removed when the page
     // moved under the agent-detail tabbed shell. The routing surface still
     // renders, and (as before) must not introduce its own <h1> page heading.
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
     });
@@ -804,7 +684,7 @@ describe('Routing page', () => {
   });
 
   it('renders the virtual models section apart from the custom tiers', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByText('Virtual models')).toBeDefined();
     });
@@ -813,14 +693,14 @@ describe('Routing page', () => {
 
   it('renders the empty providers state when no providers are connected', async () => {
     mockGetProviders.mockResolvedValue([]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByText('No providers connected')).toBeDefined();
     });
   });
 
   it('renders all three section tabs when providers are connected', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
       expect(screen.getByTestId('spec-section')).toBeDefined();
@@ -841,18 +721,18 @@ describe('Routing page', () => {
       },
     ]);
     mockGetEnabledProviders.mockResolvedValue({ enabled: ['p1'] });
-    render(() => <Routing />);
+    renderRouting();
 
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
     });
 
-    const pickerProviders = (lastModalsProps!.connectedProviders as () => (typeof baseProvider)[])();
+    const pickerProviders = lastModalsProps!.connectedProviders as (typeof baseProvider)[];
     expect(pickerProviders.map((provider) => provider.id)).toEqual(['p1']);
   });
 
   it('shows the Refresh models button when at least one provider is active', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByText('Refresh models')).toBeDefined();
     });
@@ -860,7 +740,7 @@ describe('Routing page', () => {
 
   it('invokes refreshModels when the Refresh button is clicked', async () => {
     mockRefreshModels.mockResolvedValue({ ok: true });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByText('Refresh models')).toBeDefined();
     });
@@ -873,7 +753,7 @@ describe('Routing page', () => {
 
   it('toasts an error when refresh fails', async () => {
     mockRefreshModels.mockRejectedValue(new Error('boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByText('Refresh models')).toBeDefined();
     });
@@ -885,7 +765,7 @@ describe('Routing page', () => {
 
   it('shows a pricing warning toast when model_count is 0', async () => {
     mockGetPricingHealth.mockResolvedValue({ model_count: 0, last_fetched_at: null });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith(
         'Model pricing data is unavailable. Model cost details may be incomplete.',
@@ -901,7 +781,7 @@ describe('Routing page', () => {
       last_fetched_at: null,
       sync_enabled: false,
     });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith(
         'Model pricing data is unavailable because catalog sync is turned off (THINKER_CATALOG_SYNC). Model cost details may be incomplete.',
@@ -915,7 +795,7 @@ describe('Routing page', () => {
       last_fetched_at: null,
       sync_enabled: true,
     });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith(
         'Model pricing data is unavailable. Model cost details may be incomplete.',
@@ -924,7 +804,7 @@ describe('Routing page', () => {
   });
 
   it('does not show a pricing warning when pricing data is loaded', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(mockGetPricingHealth).toHaveBeenCalled();
     });
@@ -932,7 +812,7 @@ describe('Routing page', () => {
   });
 
   it('toggles complexity and updates the resource on success', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('toggle-complexity')).toBeDefined();
     });
@@ -944,7 +824,7 @@ describe('Routing page', () => {
 
   it('toasts an error when complexity toggle fails', async () => {
     mockToggleComplexity.mockRejectedValue(new Error('boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('toggle-complexity')).toBeDefined();
     });
@@ -979,7 +859,7 @@ describe('Routing page', () => {
         updated_at: '2025-01-01',
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
     });
@@ -991,7 +871,7 @@ describe('Routing page', () => {
     mockGetTierAssignments.mockResolvedValue([
       { tier: 'simple', override_route: { model: 'm', provider: 'p' } },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-response-stream')).toBeDefined();
     });
@@ -1007,7 +887,7 @@ describe('Routing page', () => {
     mockGetTierAssignments.mockResolvedValue([
       { tier: 'simple', override_route: { model: 'm', provider: 'p' } },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-response-buffered')).toBeDefined();
     });
@@ -1024,7 +904,7 @@ describe('Routing page', () => {
       { tier: 'simple', override_route: { model: 'm', provider: 'p' } },
     ]);
     mockSetTierResponseMode.mockRejectedValue(new Error('response boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-response-stream')).toBeDefined();
     });
@@ -1043,7 +923,7 @@ describe('Routing page', () => {
     mockActionGetTier.mockImplementation((tier: string) =>
       tier === 'default' ? { tier: 'default', response_mode: 'stream' } : undefined,
     );
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('toggle-complexity')).toBeDefined();
     });
@@ -1069,7 +949,7 @@ describe('Routing page', () => {
         updated_at: '2025-01-01',
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-response-stream')).toBeDefined();
     });
@@ -1094,7 +974,7 @@ describe('Routing page', () => {
         updated_at: '2025-01-01',
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-response-buffered')).toBeDefined();
     });
@@ -1106,7 +986,7 @@ describe('Routing page', () => {
   });
 
   it('returns early when specificity response mode changes with no active assignments', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-response-stream')).toBeDefined();
     });
@@ -1129,7 +1009,7 @@ describe('Routing page', () => {
       },
     ]);
     mockSetSpecificityResponseMode.mockRejectedValue(new Error('specificity boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-response-stream')).toBeDefined();
     });
@@ -1140,7 +1020,7 @@ describe('Routing page', () => {
   });
 
   it('provides a lightweight onProviderPoll that only refetches providers', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-provider-poll')).toBeDefined();
     });
@@ -1152,7 +1032,7 @@ describe('Routing page', () => {
 
   it('calls overrideSpecificity when modals signal a specificity override', async () => {
     mockOverrideSpecificity.mockResolvedValue(undefined);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-spec-override')).toBeDefined();
     });
@@ -1171,7 +1051,7 @@ describe('Routing page', () => {
 
   it('toasts when specificity override fails', async () => {
     mockOverrideSpecificity.mockRejectedValue(new Error('boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-spec-override')).toBeDefined();
     });
@@ -1183,7 +1063,7 @@ describe('Routing page', () => {
 
   it('forwards specificity reset to resetSpecificity and refetches', async () => {
     mockResetSpecificity.mockResolvedValue(undefined);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-reset')).toBeDefined();
     });
@@ -1195,7 +1075,7 @@ describe('Routing page', () => {
 
   it('toasts when specificity reset fails', async () => {
     mockResetSpecificity.mockRejectedValue(new Error('boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-reset')).toBeDefined();
     });
@@ -1233,7 +1113,7 @@ describe('Routing page', () => {
         updated_at: '2025-01-01',
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-fb-update-add')).toBeDefined();
     });
@@ -1246,7 +1126,7 @@ describe('Routing page', () => {
   });
 
   it('returns early when spec onFallbackUpdate is called without routes', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-fb-update-add-no-routes')).toBeDefined();
     });
@@ -1271,7 +1151,7 @@ describe('Routing page', () => {
     it('calls overrideSpecificity with the new keyLabel and re-uses the existing model', async () => {
       mockGetSpecificityAssignments.mockResolvedValue([codingAssignment]);
       mockOverrideSpecificity.mockResolvedValue(undefined);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key')).toBeDefined();
       });
@@ -1292,7 +1172,7 @@ describe('Routing page', () => {
     it("emits 'Key pin cleared' when the label is null", async () => {
       mockGetSpecificityAssignments.mockResolvedValue([codingAssignment]);
       mockOverrideSpecificity.mockResolvedValue(undefined);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key-clear')).toBeDefined();
       });
@@ -1322,7 +1202,7 @@ describe('Routing page', () => {
       };
       mockGetSpecificityAssignments.mockResolvedValue([autoAssignment]);
       mockOverrideSpecificity.mockResolvedValue(undefined);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key')).toBeDefined();
       });
@@ -1333,7 +1213,7 @@ describe('Routing page', () => {
 
     it('does nothing when the category does not match an existing assignment', async () => {
       mockGetSpecificityAssignments.mockResolvedValue([codingAssignment]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key-missing-cat')).toBeDefined();
       });
@@ -1345,7 +1225,7 @@ describe('Routing page', () => {
 
     it('does nothing when the provider id is empty', async () => {
       mockGetSpecificityAssignments.mockResolvedValue([codingAssignment]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key-missing-provider')).toBeDefined();
       });
@@ -1357,7 +1237,7 @@ describe('Routing page', () => {
     it('swallows errors silently (toast handled upstream by fetchMutate)', async () => {
       mockGetSpecificityAssignments.mockResolvedValue([codingAssignment]);
       mockOverrideSpecificity.mockRejectedValue(new Error('boom'));
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('spec-pin-key')).toBeDefined();
       });
@@ -1384,7 +1264,7 @@ describe('Routing page', () => {
       },
     ]);
     mockSetSpecificityFallbacks.mockResolvedValue(undefined);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-add-spec-fallback-no-auth')).toBeDefined();
     });
@@ -1413,7 +1293,7 @@ describe('Routing page', () => {
       },
     ]);
     mockSetSpecificityFallbacks.mockResolvedValue(undefined);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-add-spec-fallback')).toBeDefined();
     });
@@ -1430,12 +1310,12 @@ describe('Routing page', () => {
 
   it('renders the loading skeleton while connectedProviders is loading', () => {
     mockGetProviders.mockReturnValue(new Promise(() => {})); // never resolves
-    render(() => <Routing />);
+    renderRouting();
     expect(screen.queryByTestId('loading-skeleton')).not.toBeNull();
   });
 
   it('calls refetchAll on provider update from the modals', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-provider-update')).toBeDefined();
     });
@@ -1447,28 +1327,26 @@ describe('Routing page', () => {
   });
 
   it('keeps the routing page mounted when model refresh completes after a selection', async () => {
-    let resolveProviderRefresh!: (providers: typeof baseProvider[]) => void;
-    mockGetProviders
-      .mockResolvedValueOnce([baseProvider])
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveProviderRefresh = resolve;
-          }),
-      );
+    let resolveProviderRefresh!: (providers: (typeof baseProvider)[]) => void;
+    mockGetProviders.mockResolvedValueOnce([baseProvider]).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveProviderRefresh = resolve;
+        }),
+    );
 
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-section')).toBeDefined();
     });
 
     fireEvent.click(screen.getByTestId('open-dropdown'));
     await waitFor(() => {
-      expect((lastModalsProps?.dropdownTier as () => string | null)()).toBe('simple');
+      expect(lastModalsProps?.dropdownTier).toBe('simple');
     });
     fireEvent.click(screen.getByTestId('modal-trigger-override'));
     await waitFor(() => {
-      expect((lastModalsProps?.dropdownTier as () => string | null)()).toBeNull();
+      expect(lastModalsProps?.dropdownTier).toBeNull();
     });
 
     fireEvent.click(screen.getByTestId('modal-trigger-provider-update'));
@@ -1483,42 +1361,42 @@ describe('Routing page', () => {
   });
 
   it('closes the instruction modal via onInstructionClose', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('show-instructions')).toBeDefined();
     });
     // Open the instruction modal first via the footer.
     fireEvent.click(screen.getByTestId('show-instructions'));
     await waitFor(() => {
-      expect((lastModalsProps?.instructionModal as () => string | null)()).toBe('enable');
+      expect(lastModalsProps?.instructionModal).toBe('enable');
     });
     // Close it — both instructionModal and instructionProvider reset to null.
     fireEvent.click(screen.getByTestId('modal-trigger-instruction-close'));
     await waitFor(() => {
-      expect((lastModalsProps?.instructionModal as () => string | null)()).toBeNull();
-      expect((lastModalsProps?.instructionProvider as () => string | null)()).toBeNull();
+      expect(lastModalsProps?.instructionModal).toBeNull();
+      expect(lastModalsProps?.instructionProvider).toBeNull();
     });
   });
 
   it('closes the fallback picker via onFallbackPickerClose', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-add-fallback')).toBeDefined();
     });
     // Open the fallback picker first by clicking the spec section button.
     fireEvent.click(screen.getByTestId('spec-add-fallback'));
     await waitFor(() => {
-      expect((lastModalsProps?.fallbackPickerTier as () => string | null)()).toBe('coding');
+      expect(lastModalsProps?.fallbackPickerTier).toBe('coding');
     });
     // Close it — fallbackPickerTier resets to null.
     fireEvent.click(screen.getByTestId('modal-trigger-fallback-close'));
     await waitFor(() => {
-      expect((lastModalsProps?.fallbackPickerTier as () => string | null)()).toBeNull();
+      expect(lastModalsProps?.fallbackPickerTier).toBeNull();
     });
   });
 
   it('triggers ResetAll via the footer', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('reset-all')).toBeDefined();
     });
@@ -1530,56 +1408,55 @@ describe('Routing page', () => {
   });
 
   it('opens the instructions modal via the footer', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('show-instructions')).toBeDefined();
     });
     fireEvent.click(screen.getByTestId('show-instructions'));
     // Footer's onShowInstructions sets instructionModal to 'enable'.
     await waitFor(() => {
-      expect((lastModalsProps?.instructionModal as () => string | null)()).toBe('enable');
+      expect(lastModalsProps?.instructionModal).toBe('enable');
     });
   });
 
   it('opens the dropdown picker from the default tier section', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('open-dropdown')).toBeDefined();
     });
     fireEvent.click(screen.getByTestId('open-dropdown'));
     // The default-section's onDropdownOpen('simple') flows through to setDropdownTier.
     await waitFor(() => {
-      expect((lastModalsProps?.dropdownTier as () => string | null)()).toBe('simple');
+      expect(lastModalsProps?.dropdownTier).toBe('simple');
     });
   });
 
   it('opens the specificity dropdown picker from the spec section', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-open')).toBeDefined();
     });
     fireEvent.click(screen.getByTestId('spec-open'));
     // spec-open triggers onDropdownOpen('coding') which sets specificityDropdown.
     await waitFor(() => {
-      expect((lastModalsProps?.specificityDropdown as () => string | null)()).toBe('coding');
+      expect(lastModalsProps?.specificityDropdown).toBe('coding');
     });
   });
 
   it('opens the spec fallback picker from the spec section', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-add-fallback')).toBeDefined();
     });
     fireEvent.click(screen.getByTestId('spec-add-fallback'));
     // spec-add-fallback triggers onAddFallback('coding') → setFallbackPickerTier.
     await waitFor(() => {
-      expect((lastModalsProps?.fallbackPickerTier as () => string | null)()).toBe('coding');
+      expect(lastModalsProps?.fallbackPickerTier).toBe('coding');
     });
   });
 
   it('auto-opens the provider modal when location.state.openProviders is set', async () => {
-    useLocation.mockReturnValue({ state: { openProviders: true } });
-    render(() => <Routing />);
+    renderRouting({ openProviders: true });
     await waitFor(() => {
       // The provider modal's prop reaches lastModalsProps when showProviderModal()=true
       expect(lastModalsProps).not.toBeNull();
@@ -1587,21 +1464,21 @@ describe('Routing page', () => {
   });
 
   it('clears the dropdown tier when the modals trigger an override', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('open-dropdown')).toBeDefined();
     });
     // Open dropdown first via the default-section open button.
     fireEvent.click(screen.getByTestId('open-dropdown'));
     await waitFor(() => {
-      expect((lastModalsProps?.dropdownTier as () => string | null)()).toBe('simple');
+      expect(lastModalsProps?.dropdownTier).toBe('simple');
     });
     // Then trigger an override — Routing.tsx wraps actions.handleOverride and
     // resets the dropdown tier in the same call.
     fireEvent.click(screen.getByTestId('modal-trigger-override'));
     await waitFor(() => {
       // dropdownTier signal cleared back to null.
-      expect((lastModalsProps?.dropdownTier as () => string | null)()).toBeNull();
+      expect(lastModalsProps?.dropdownTier).toBeNull();
       // actions.handleOverride was invoked with the args from the modal trigger.
       expect(mockActionHandleOverride).toHaveBeenCalledWith(
         'simple',
@@ -1613,7 +1490,7 @@ describe('Routing page', () => {
   });
 
   it('calls actions.handleAddFallback for non-specificity tiers when modals add a fallback', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-add-fallback')).toBeDefined();
     });
@@ -1647,7 +1524,7 @@ describe('Routing page', () => {
         updated_at: '2025-01-01',
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-add-spec-fallback')).toBeDefined();
     });
@@ -1670,7 +1547,7 @@ describe('Routing page', () => {
       },
     ]);
     mockSetSpecificityFallbacks.mockRejectedValue(new Error('boom'));
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-add-spec-fallback')).toBeDefined();
     });
@@ -1681,25 +1558,20 @@ describe('Routing page', () => {
   });
 
   it('clears prefill search params when closing the provider modal with prefill present', async () => {
-    // Re-mock the params parser for THIS test: returns truthy prefill so the
-    // close handler hits the setSearchParams branch (lines 169-176).
-    vi.resetModules();
-    vi.doMock('../../src/services/routing-params.js', () => ({
-      parseCustomProviderParams: () => ({ name: 'X', baseUrl: 'https://x' }),
-      parseProviderDeepLink: () => null,
-    }));
-    const { default: RoutingFresh } = await import('../../src/pages/Routing');
-    render(() => <RoutingFresh />);
+    // The params parser returns a truthy prefill for THIS test so the close
+    // handler hits the setSearchParams branch.
+    mockParseCustomProviderParams.mockReturnValue({ name: 'X', baseUrl: 'https://x' });
+    renderRouting(
+      undefined,
+      '?provider=custom&name=X&baseUrl=https%3A%2F%2Fx&apiKey=k&models=m&tab=1',
+    );
     await waitFor(() => {
       expect(lastModalsProps).not.toBeNull();
     });
+    expect(lastModalsProps?.showProviderModal).toBe(true);
     fireEvent.click(screen.getByTestId('modal-trigger-provider-close'));
-    expect(setSearchParamsFn).toHaveBeenCalledWith({
-      provider: undefined,
-      name: undefined,
-      baseUrl: undefined,
-      apiKey: undefined,
-      models: undefined,
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search').textContent).toBe('?tab=1');
     });
   });
 
@@ -1708,7 +1580,7 @@ describe('Routing page', () => {
     // getTier short-circuits before falling back to specificity.
     const generalist = { tier: 'simple', response_mode: 'buffered' as const };
     mockActionGetTier.mockReturnValue(generalist);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-get-tier')).toBeDefined();
     });
@@ -1735,7 +1607,7 @@ describe('Routing page', () => {
     ]);
     // No generalist tier matches 'coding'.
     mockActionGetTier.mockReturnValue(undefined);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('modal-trigger-get-tier-spec')).toBeDefined();
     });
@@ -1743,16 +1615,16 @@ describe('Routing page', () => {
     // find the 'coding' assignment in the array.
     await waitFor(() => {
       expect(mockGetSpecificityAssignments).toHaveBeenCalled();
-      const specs = (lastModalsProps?.specificityAssignments as () => unknown[])();
+      const specs = lastModalsProps?.specificityAssignments;
       expect(specs?.length).toBeGreaterThan(0);
     });
     fireEvent.click(screen.getByTestId('modal-trigger-get-tier-spec'));
     // actions.getTier was consulted first with the category id.
     expect(mockActionGetTier).toHaveBeenCalledWith('coding');
     // Outer getTier maps the specificity row's category to tier and returns it.
-    const result = (lastModalsProps?.getTier as (id: string) => Record<string, unknown> | undefined)(
-      'coding',
-    );
+    const result = (
+      lastModalsProps?.getTier as (id: string) => Record<string, unknown> | undefined
+    )('coding');
     expect(result).toBeDefined();
     expect(result?.tier).toBe('coding');
     expect(result?.category).toBe('coding');
@@ -1789,7 +1661,7 @@ describe('Routing page', () => {
       model: 'deepseek-v4',
       params: { thinking: { type: 'disabled' } },
     });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-persist-params')).toBeDefined();
     });
@@ -1825,7 +1697,7 @@ describe('Routing page', () => {
       },
     ]);
     mockDeleteModelParams.mockResolvedValue({ ok: true });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('default-saved-params')).toBeDefined();
     });
@@ -1848,7 +1720,7 @@ describe('Routing page', () => {
       model: 'deepseek-v4',
       params: { thinking: { type: 'disabled' } },
     });
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-persist-params')).toBeDefined();
     });
@@ -1871,7 +1743,7 @@ describe('Routing page', () => {
         params: saved,
       },
     ]);
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('spec-saved-params')).toBeDefined();
     });
@@ -1892,7 +1764,7 @@ describe('Routing page', () => {
   it('renders the response mode button in the routing toolbar', async () => {
     // The response-mode button moved out of the RoutingTabs header slot and now
     // sits in the toolbar row above the tabs (rendered once providers exist).
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(container.querySelector('.response-mode-btn')).not.toBeNull();
     });
@@ -1901,7 +1773,7 @@ describe('Routing page', () => {
   });
 
   it('opens the ResponseModeModal when clicking the response mode button', async () => {
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(container.querySelector('.response-mode-btn')).not.toBeNull();
     });
@@ -1912,7 +1784,7 @@ describe('Routing page', () => {
   });
 
   it('closes the ResponseModeModal via onClose', async () => {
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(container.querySelector('.response-mode-btn')).not.toBeNull();
     });
@@ -1927,7 +1799,7 @@ describe('Routing page', () => {
   });
 
   it('calls onReplace on the ResponseModeModal which closes it and opens dropdown', async () => {
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(container.querySelector('.response-mode-btn')).not.toBeNull();
     });
@@ -1943,7 +1815,7 @@ describe('Routing page', () => {
   });
 
   it('opens the help modal and closes it via Got it button (lines 665-705)', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
     });
@@ -1960,7 +1832,7 @@ describe('Routing page', () => {
   });
 
   it('closes the help modal by clicking the overlay', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
     });
@@ -1968,15 +1840,15 @@ describe('Routing page', () => {
     await waitFor(() => {
       expect(screen.getByText('How routing works')).toBeDefined();
     });
-    const overlay = document.querySelector('.modal-overlay') as HTMLElement;
-    fireEvent.click(overlay);
+    const overlay = document.querySelector('.overlay') as HTMLElement;
+    fireEvent.mouseDown(overlay);
     await waitFor(() => {
       expect(screen.queryByText('Got it')).toBeNull();
     });
   });
 
   it('fires onResponseModeChange on the ResponseModeModal which calls handleDefaultResponseModeChange', async () => {
-    const { container } = render(() => <Routing />);
+    const { container } = renderRouting();
     await waitFor(() => {
       expect(container.querySelector('.response-mode-btn')).not.toBeNull();
     });
@@ -1996,7 +1868,7 @@ describe('Routing page', () => {
   });
 
   it('closes the help modal via Escape key', async () => {
-    render(() => <Routing />);
+    renderRouting();
     await waitFor(() => {
       expect(screen.getByTestId('show-how-routing-works')).toBeDefined();
     });
@@ -2004,7 +1876,7 @@ describe('Routing page', () => {
     await waitFor(() => {
       expect(screen.getByText('How routing works')).toBeDefined();
     });
-    const overlay = document.querySelector('.modal-overlay') as HTMLElement;
+    const overlay = document.querySelector('.overlay') as HTMLElement;
     fireEvent.keyDown(overlay, { key: 'Escape' });
     await waitFor(() => {
       expect(screen.queryByText('Got it')).toBeNull();
@@ -2014,7 +1886,7 @@ describe('Routing page', () => {
   describe('setup modal', () => {
     it('opens the SetupModal for a freshly-created agent and wires its handlers', async () => {
       mockIsRecentlyCreated.mockReturnValue(true);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal')).toBeDefined();
       });
@@ -2026,7 +1898,7 @@ describe('Routing page', () => {
       fireEvent.click(screen.getByTestId('setup-done'));
       await waitFor(() => {
         expect(localStorage.getItem('setup_completed_demo')).toBe('1');
-        expect((lastSetupModalProps?.open as boolean)).toBe(false);
+        expect(lastSetupModalProps?.open as boolean).toBe(false);
       });
       expect(mockClearSetupPending).toHaveBeenCalledWith('demo');
       expect(screen.getByTestId('setup-modal').getAttribute('data-open')).toBe('false');
@@ -2037,7 +1909,7 @@ describe('Routing page', () => {
       // but the persistent pending flag is still set → modal must reopen.
       mockIsRecentlyCreated.mockReturnValue(false);
       mockIsSetupPending.mockReturnValue(true);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal').getAttribute('data-open')).toBe('true');
       });
@@ -2047,7 +1919,7 @@ describe('Routing page', () => {
     it('keeps the SetupModal closed when pending but already dismissed', async () => {
       mockIsSetupPending.mockReturnValue(true);
       localStorage.setItem('setup_dismissed_demo', '1');
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal')).toBeDefined();
       });
@@ -2057,7 +1929,7 @@ describe('Routing page', () => {
     it('keeps the SetupModal closed when pending but already completed', async () => {
       mockIsSetupPending.mockReturnValue(true);
       localStorage.setItem('setup_completed_demo', '1');
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal')).toBeDefined();
       });
@@ -2066,7 +1938,7 @@ describe('Routing page', () => {
 
     it('marks the agent dismissed, clears pending, and closes when onClose fires', async () => {
       mockIsRecentlyCreated.mockReturnValue(true);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal').getAttribute('data-open')).toBe('true');
       });
@@ -2082,7 +1954,7 @@ describe('Routing page', () => {
     it('keeps the SetupModal closed for an agent that is neither recent nor pending', async () => {
       mockIsRecentlyCreated.mockReturnValue(false);
       mockIsSetupPending.mockReturnValue(false);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('setup-modal')).toBeDefined();
       });
@@ -2117,7 +1989,7 @@ describe('Routing page', () => {
 
     it('renders the unified view (no tabs) with a Create custom tier CTA when no header tiers exist', async () => {
       mockListHeaderTiers.mockResolvedValue([]);
-      const { container } = render(() => <Routing />);
+      const { container } = renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('tier-card')).toBeDefined();
       });
@@ -2133,7 +2005,7 @@ describe('Routing page', () => {
 
     it('renders a Manage custom routing CTA and active header tier cards when tiers exist', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      const { container } = render(() => <Routing />);
+      const { container } = renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-card-ht-1')).toBeDefined();
       });
@@ -2144,7 +2016,7 @@ describe('Routing page', () => {
 
     it('overrides a header tier from a unified-view card', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-override-ht-1')).toBeDefined();
       });
@@ -2164,7 +2036,7 @@ describe('Routing page', () => {
     it('toasts when a unified-view card override fails', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
       mockOverrideHeaderTier.mockRejectedValue(new Error('override boom'));
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-override-ht-1')).toBeDefined();
       });
@@ -2176,7 +2048,7 @@ describe('Routing page', () => {
 
     it('refetches header tiers when a unified-view card clears fallbacks (no routes)', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-fb-noroutes-ht-1')).toBeDefined();
       });
@@ -2189,7 +2061,7 @@ describe('Routing page', () => {
 
     it('optimistically mutates (no refetch) when a unified-view card updates fallback routes', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-fb-routes-ht-1')).toBeDefined();
       });
@@ -2201,7 +2073,7 @@ describe('Routing page', () => {
 
     it('triggers the edit opener from a unified-view card', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-edit-ht-1')).toBeDefined();
       });
@@ -2211,7 +2083,7 @@ describe('Routing page', () => {
 
     it('disables a header tier from a unified-view card', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-disable-ht-1')).toBeDefined();
       });
@@ -2224,7 +2096,7 @@ describe('Routing page', () => {
     it('toasts when disabling a unified-view header tier fails', async () => {
       mockListHeaderTiers.mockResolvedValue([cleanTier]);
       mockToggleHeaderTier.mockRejectedValue(new Error('disable boom'));
-      render(() => <Routing />);
+      renderRouting();
       await waitFor(() => {
         expect(screen.getByTestId('clean-disable-ht-1')).toBeDefined();
       });

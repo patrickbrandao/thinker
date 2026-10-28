@@ -13,7 +13,7 @@ CSS does; a generator keeps it true.
 - `registry/llms.txt` — GENERATED. The same content in a compact text form for
   agent context.
 - `generate-registry.mjs` (+ `lib/`) — the generator. Dependency-free; parses
-  `src/styles` from the `theme.css` entry, follows `@import` depth-first, then
+  `src/styles` from the `index.css` entry, follows `@import` depth-first, then
   appends the component-imported sheets, and resolves the cascade (selector
   specificity, then source order) exactly like the browser.
 - `migration-map.json` — hand-kept. Legacy component → the primitive that
@@ -34,7 +34,7 @@ npm run design:registry:check    # exit 1 if registry/* is stale (pre-commit run
 - **Ghost rule** — a declaration that always loses to the canonical one. Dead
   weight, listed for the refactor project to delete.
 - **Component-loaded sheet** — a stylesheet imported by a component instead of
-  `theme.css`; it loads after the global styles.
+  `index.css`; it loads after the global styles.
 
 Related pieces of the machine: `scripts/check-design-tokens.mjs` (the diff
 check) and the `.claude/settings.json` PostToolUse hook that runs it.

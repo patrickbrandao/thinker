@@ -42,7 +42,7 @@ Mudanças de rumo posteriores entram como ADRs em [`docs/adr/`](adr/).
 
 ## 4. Stack e infraestrutura
 
-- Stack mantida (NestJS, TypeORM, Better Auth, SolidJS/Vite, npm workspaces + Turborepo, Node 24), **atualizada**:
+- Stack mantida (NestJS, TypeORM, Better Auth, SolidJS/Vite, npm workspaces + Turborepo, Node 24; o dashboard virou React 19 + Tailwind 4 na v0.5, [ADR 0007](adr/0007-console-react.md)), **atualizada**:
   PostgreSQL 16 → **18**; NestJS 11 → 12; TypeORM 0.3 → 1.x; Vite 6 → 8; TypeScript 5 → 7; Changesets 2 → 3; demais dependências nas versões atuais.
 - Ordem: limpeza/rebrand → CI e Docker verdes → **um PR por major**, PG 18 primeiro, cada um validado pelo QA Docker. Major sem suporte do ecossistema (ex.: TS 7 + decorators do Nest) é registrado e adiado.
 - Testes locais no **Docker Desktop** (contexto `desktop-linux`), um projeto Compose isolado por execução.
@@ -61,7 +61,7 @@ O **Principal** é a sessão do Claude Code guiada pelo [`CLAUDE.md`](../CLAUDE.
 | `qa-docker` | Sobe o stack no Docker local e roda smoke/e2e/contratos | Sonnet |
 | `reviewer` | Revisa PRs: bugs, segurança, isolamento entre organizações, vazamento de credenciais | herda (Opus) |
 | `backend-dev` | Implementação NestJS/TypeORM | herda |
-| `frontend-dev` | Implementação SolidJS/Vite | herda |
+| `frontend-dev` | Implementação React/Vite (SolidJS até a v0.4) | herda |
 | `providers` | Adaptadores de provedores, catálogos, preços, fluxos de assinatura | herda |
 | `architect` | Desenho de features grandes e ADRs | herda |
 | `devops` | CI, Dockerfile, multi-arch, Docker Hub, Changesets/release, templates de deploy | herda |

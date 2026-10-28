@@ -1,0 +1,63 @@
+export default {
+  sidebar: {
+    collapse: 'Collapse menu',
+    expand: 'Expand menu',
+  },
+  topbar: {
+    breadcrumb: 'Breadcrumb',
+    search: 'Search (⌘K)',
+    themeLight: 'Switch to light theme',
+    themeDark: 'Switch to dark theme',
+  },
+  user: {
+    organization: 'Organization',
+    role: 'Your role: {{ role }}',
+    instanceAdmin: 'instance admin',
+    manageOrganization: 'Organization and members',
+    viewOrganization: 'Organization details',
+    switchOrganization: 'Switch organization',
+    newOrganization: 'New organization',
+    administration: 'Administration',
+  },
+  alerts: {
+    title: 'Alerts',
+    labelUnseen: (count: number) => `Alerts, ${count} new`,
+    window: 'Last 24 hours',
+    markSeen: 'Mark all as seen',
+    empty: 'No failed requests in the last 24 hours.',
+    viewAll: 'View failed requests',
+    viewAllCount: (count: number) => `View all ${count} failed requests`,
+  },
+  palette: {
+    label: 'Command palette',
+    placeholder: 'Search pages, harnesses, providers, models…',
+    goTo: 'Go to',
+    actions: 'Actions',
+    toggleTheme: 'Toggle light/dark theme',
+    noResults: 'Nothing found.',
+    navigate: 'navigate',
+    open: 'open',
+    hint: 'Type at least 2 characters to search',
+    types: {
+      harness: 'Harnesses',
+      connection: 'Provider connections',
+      custom_provider: 'Custom providers',
+      virtual_model: 'Virtual models',
+      header_tier: 'Header tiers',
+      model: 'Models',
+      member: 'Members',
+    },
+  },
+  flow: {
+    subtitle: 'How traffic flows from your harnesses through routing to providers.',
+    preview: 'Preview',
+    emptyHint:
+      'The topology view is being prepared. Harnesses, routes and providers will appear here.',
+    kinds: {
+      entry: 'Harness',
+      hub: 'Route',
+      item: 'Provider',
+      group: 'Pool',
+    },
+  },
+};

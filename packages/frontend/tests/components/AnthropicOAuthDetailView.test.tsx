@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useState, type ComponentProps } from 'react';
 
 const mockStartAnthropicOAuth = vi.fn();
 const mockSubmitAnthropicOAuth = vi.fn();
@@ -46,25 +46,43 @@ const provDef: ProviderDef = {
   subscriptionAuthMode: 'popup_paste',
 };
 
+type ViewProps = ComponentProps<typeof AnthropicOAuthDetailView>;
+
+/** Holds busy / addKeyOpen state the way the parent does. */
+function Harness({
+  initialAddKeyOpen,
+  ...props
+}: Omit<ViewProps, 'busy' | 'setBusy' | 'addKeyOpen' | 'setAddKeyOpen'> & {
+  initialAddKeyOpen?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [addKeyOpen, setAddKeyOpen] = useState(initialAddKeyOpen ?? false);
+  return (
+    <AnthropicOAuthDetailView
+      {...props}
+      busy={busy}
+      setBusy={setBusy}
+      {...(initialAddKeyOpen !== undefined && { addKeyOpen, setAddKeyOpen })}
+    />
+  );
+}
+
 function renderView(connectedValue = false) {
-  const [busy, setBusy] = createSignal(false);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
-  const result = render(() => (
-    <AnthropicOAuthDetailView
+  const result = render(
+    <Harness
       provDef={provDef}
       provId="anthropic"
       agentName="test-agent"
-      connected={() => connectedValue}
-      selectedAuthType={() => 'subscription'}
-      busy={busy}
-      setBusy={setBusy}
+      connected={connectedValue}
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-    />
-  ));
+    />,
+  );
   return { ...result, onBack, onUpdate, onClose };
 }
 
@@ -134,7 +152,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockStartAnthropicOAuth).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: OAUTH_PAYLOAD } });
+    fireEvent.change(codeInput, { target: { value: OAUTH_PAYLOAD } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -152,7 +170,7 @@ describe('AnthropicOAuthDetailView', () => {
   it('rejects input that does not look like an authorization code', () => {
     renderView();
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'sk-ant-oat01-some-token' } });
+    fireEvent.change(codeInput, { target: { value: 'sk-ant-oat01-some-token' } });
     fireEvent.click(screen.getByText('Connect'));
 
     expect(screen.getByText(/doesn't look like an authorization code/)).toBeDefined();
@@ -167,7 +185,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'fresh-code#persisted-state' } });
+    fireEvent.change(codeInput, { target: { value: 'fresh-code#persisted-state' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -187,7 +205,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalledTimes(1));
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'code#whatever' } });
+    fireEvent.change(codeInput, { target: { value: 'code#whatever' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -207,7 +225,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'orphan-code#orphan-state' } });
+    fireEvent.change(codeInput, { target: { value: 'orphan-code#orphan-state' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -222,7 +240,7 @@ describe('AnthropicOAuthDetailView', () => {
   it('rejects payloads missing the state suffix', () => {
     renderView();
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'auth-code#' } });
+    fireEvent.change(codeInput, { target: { value: 'auth-code#' } });
     fireEvent.click(screen.getByText('Connect'));
 
     expect(screen.getByText(/doesn't look like an authorization code/)).toBeDefined();
@@ -239,7 +257,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockStartAnthropicOAuth).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'code#s1' } });
+    fireEvent.change(codeInput, { target: { value: 'code#s1' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -257,7 +275,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockStartAnthropicOAuth).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'code#s1' } });
+    fireEvent.change(codeInput, { target: { value: 'code#s1' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -290,7 +308,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalledTimes(1));
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'code#whatever' } });
+    fireEvent.change(codeInput, { target: { value: 'code#whatever' } });
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
@@ -310,7 +328,7 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalled());
 
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: 'code#s' } });
+    fireEvent.change(codeInput, { target: { value: 'code#s' } });
     fireEvent.keyDown(codeInput, { key: 'Enter' });
 
     await waitFor(() => expect(mockSubmitAnthropicOAuth).toHaveBeenCalled());
@@ -319,7 +337,7 @@ describe('AnthropicOAuthDetailView', () => {
   it('does not submit when the input is whitespace', () => {
     renderView();
     const codeInput = screen.getByLabelText('Anthropic authorization code');
-    fireEvent.input(codeInput, { target: { value: '   ' } });
+    fireEvent.change(codeInput, { target: { value: '   ' } });
     fireEvent.click(screen.getByText('Connect'));
     expect(mockSubmitAnthropicOAuth).not.toHaveBeenCalled();
   });
@@ -389,25 +407,22 @@ function makeKey(overrides: Partial<RoutingProvider> = {}): RoutingProvider {
 }
 
 function renderMultiKeyView(keys: RoutingProvider[]) {
-  const [busy, setBusy] = createSignal(false);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
-  const result = render(() => (
-    <AnthropicOAuthDetailView
+  const result = render(
+    <Harness
       provDef={provDef}
       provId="anthropic"
       agentName="test-agent"
-      connected={() => true}
-      selectedAuthType={() => 'subscription'}
-      busy={busy}
-      setBusy={setBusy}
+      connected
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-      activeKeys={() => keys}
-    />
-  ));
+      activeKeys={keys}
+    />,
+  );
   return { ...result, onBack, onUpdate, onClose };
 }
 
@@ -434,7 +449,7 @@ describe('AnthropicOAuthDetailView — multi-key', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old');
-    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.change(input, { target: { value: 'New' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -516,7 +531,7 @@ describe('AnthropicOAuthDetailView — multi-key', () => {
     fireEvent.click(renameButtons[0]);
 
     const input = screen.getByLabelText('Rename Old');
-    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.change(input, { target: { value: 'New' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -539,30 +554,25 @@ describe('AnthropicOAuthDetailView — multi-key', () => {
 });
 
 function renderViewWithAddKeyOpen() {
-  const [busy, setBusy] = createSignal(false);
-  const [addKeyOpen, setAddKeyOpen] = createSignal(true);
   const onBack = vi.fn();
   const onUpdate = vi.fn();
   const onClose = vi.fn();
   const keys = [makeKey()];
-  const result = render(() => (
-    <AnthropicOAuthDetailView
+  const result = render(
+    <Harness
       provDef={provDef}
       provId="anthropic"
       agentName="test-agent"
-      connected={() => true}
-      selectedAuthType={() => 'subscription'}
-      busy={busy}
-      setBusy={setBusy}
+      connected
+      selectedAuthType="subscription"
       onBack={onBack}
       onUpdate={onUpdate}
       onClose={onClose}
-      addKeyOpen={addKeyOpen}
-      setAddKeyOpen={setAddKeyOpen}
-      activeKeys={() => keys}
-    />
-  ));
-  return { ...result, onBack, onUpdate, onClose, setAddKeyOpen };
+      initialAddKeyOpen
+      activeKeys={keys}
+    />,
+  );
+  return { ...result, onBack, onUpdate, onClose };
 }
 
 describe('AnthropicOAuthDetailView — addKeyOpen effect', () => {
@@ -642,7 +652,7 @@ describe('AnthropicOAuthDetailView — addKeyOpen effect', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Anthropic authorization code')).toBeDefined();
     });
-    fireEvent.input(screen.getByLabelText('Anthropic authorization code'), {
+    fireEvent.change(screen.getByLabelText('Anthropic authorization code'), {
       target: { value: 'code#abc' },
     });
     fireEvent.click(screen.getByText('Cancel'));

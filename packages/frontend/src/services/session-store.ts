@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { signal } from '../lib/signal.js';
 import { applyUserLocale, t } from '../i18n/index.js';
 import { ApiError, BASE_URL } from './api/core.js';
 import { invalidateAll } from './api/cache.js';
@@ -22,8 +22,8 @@ import type { OrgRole } from './api/organizations.js';
  * The signed-in user's identity in the active organization (`GET /me`).
  * Loaded once by the app shell (MeGate) before any page renders.
  */
-const [me, setMe] = createSignal<MeResponse | null>(null);
-export { me, setMe };
+export const me = signal<MeResponse | null>(null);
+export const setMe = (value: MeResponse | null): void => me.set(value);
 
 export const currentRole = (): OrgRole | null => me()?.organization?.role ?? null;
 export const isInstanceAdmin = (): boolean => me()?.isInstanceAdmin === true;

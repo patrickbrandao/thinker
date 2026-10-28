@@ -1,17 +1,25 @@
-import { Meta, Title } from '@solidjs/meta';
-import { useLocation, useNavigate, useParams } from '@solidjs/router';
-import { createResource, createSignal, ErrorBoundary, Show, type Component } from 'solid-js';
-import CopyButton from '../components/CopyButton.jsx';
-import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
-import { roleCan } from '../services/session-store.js';
-import ErrorState from '../components/ErrorState.jsx';
-import AgentTypeGrid from '../components/AgentTypeGrid.jsx';
-import SetupStepAddProvider from '../components/SetupStepAddProvider.jsx';
-import { createActiveVirtualModelNames } from '../components/VirtualModelsHint.jsx';
-import SetupModal from '../components/SetupModal.jsx';
-import SettingsRecordingSection from './SettingsRecordingSection.jsx';
-import SettingsModelListingSection from './SettingsModelListingSection.jsx';
-import { agentDisplayName } from '../services/agent-display-name.js';
+import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router';
+import { Eye, EyeOff } from 'lucide-react';
+import {
+  type AgentCategory,
+  type AgentPlatform,
+  PLATFORMS_BY_CATEGORY,
+  platformIcon,
+} from 'thinker-shared';
+import CopyButton from '../components/CopyButton.js';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
+import ErrorState from '../components/ErrorState.js';
+import AgentTypeGrid from '../components/AgentTypeGrid.js';
+import SetupStepAddProvider from '../components/SetupStepAddProvider.js';
+import SetupModal from '../components/SetupModal.js';
+import RichText from '../components/RichText.js';
+import { Button, IconButton, Modal, Panel, Skel } from '../components/ui.js';
+import SettingsRecordingSection from './SettingsRecordingSection.js';
+import SettingsModelListingSection from './SettingsModelListingSection.js';
+import SettingsRow from './SettingsRow.js';
+import { me, roleCan } from '../services/session-store.js';
+import { agentDisplayNameSignal } from '../services/agent-display-name.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import {
   deleteAgent,
@@ -21,64 +29,92 @@ import {
   rotateAgentKey,
   updateAgent,
 } from '../services/api.js';
+import { listVirtualModels } from '../services/api/virtual-models.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { toast } from '../services/toast-store.js';
 import { setAgentPlatform } from '../services/agent-platform-store.js';
-import {
-  type AgentCategory,
-  type AgentPlatform,
-  PLATFORMS_BY_CATEGORY,
-  platformIcon,
-} from 'thinker-shared';
 import { categoryLabel, platformLabel } from '../services/agent-type-labels.js';
-import RichText from '../components/RichText.jsx';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 
-const Settings: Component = () => {
+/** Catches a render crash in the key/setup block and offers a retry. */
+class SectionBoundary extends Component<
+  { children: ReactNode; fallback: (error: unknown, reset: () => void) => ReactNode },
+  { error: unknown }
+> {
+  state: { error: unknown } = { error: null };
+  static getDerivedStateFromError(error: unknown) {
+    return { error: error ?? new Error('Unknown error') };
+  }
+  componentDidCatch(_error: unknown, _info: ErrorInfo) {
+    /* shown in the fallback */
+  }
+  reset = () => this.setState({ error: null });
+  render() {
+    return this.state.error
+      ? this.props.fallback(this.state.error, this.reset)
+      : this.props.children;
+  }
+}
+
+/** Harness Settings tab, rendered inside AgentDetail at /harnesses/:agentName/settings. */
+export default function Settings() {
   const params = useParams<{ agentName: string }>();
   const navigate = useNavigate();
-  const location = useLocation<{ newApiKey?: string }>();
-  const agentName = () => decodeURIComponent(params.agentName);
+  const location = useLocation();
+  const agentName = decodeURIComponent(params.agentName ?? '');
+  useSignal(me);
+  const displayName = useSignal(agentDisplayNameSignal) ?? agentName;
+  const canEdit = roleCan.editHarnesses();
 
-  const [name, setName] = createSignal(agentName());
-  const [saving, setSaving] = createSignal(false);
-  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
-  const [deleteConfirmName, setDeleteConfirmName] = createSignal('');
-  const [deleting, setDeleting] = createSignal(false);
-  const [rotating, setRotating] = createSignal(false);
-  const [rotatedKey, setRotatedKey] = createSignal<string | null>(
-    (location.state as { newApiKey?: string } | undefined)?.newApiKey ?? null,
+  const [name, setName] = useState(agentName);
+  const [saving, setSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [rotatedKey, setRotatedKey] = useState<string | null>(
+    (location.state as { newApiKey?: string } | null)?.newApiKey ?? null,
   );
-  const [showTypeModal, setShowTypeModal] = createSignal(false);
-  const [showSetupModal, setShowSetupModal] = createSignal(false);
-  const [modalCategory, setModalCategory] = createSignal<AgentCategory | null>(null);
-  const [modalPlatform, setModalPlatform] = createSignal<AgentPlatform | null>(null);
-  const [savingType, setSavingType] = createSignal(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [modalCategory, setModalCategory] = useState<AgentCategory | null>(null);
+  const [modalPlatform, setModalPlatform] = useState<AgentPlatform | null>(null);
+  const [savingType, setSavingType] = useState(false);
+  const [keyRevealed, setKeyRevealed] = useState(false);
 
-  const [agentInfo, { refetch: refetchInfo }] = createResource(() => agentName(), getAgentInfo);
-  const [apiKeyData, { refetch: refetchKey }] = createResource(() => agentName(), getAgentKey);
-  const virtualModels = createActiveVirtualModelNames(agentName);
+  const agentInfo = useResource(() => getAgentInfo(agentName), [agentName]);
+  const apiKeyData = useResource(() => getAgentKey(agentName), [agentName]);
+  // Enabled virtual models, shown in the setup snippets.
+  const virtualModelList = useResource(
+    () =>
+      listVirtualModels(agentName).catch(() => [] as Awaited<ReturnType<typeof listVirtualModels>>),
+    [agentName],
+  );
+  const virtualModels = (virtualModelList.data ?? []).filter((v) => v.enabled).map((v) => v.name);
 
-  const currentCategory = () => (agentInfo()?.agent_category as AgentCategory) ?? null;
-  const currentPlatform = () => (agentInfo()?.agent_platform as AgentPlatform) ?? null;
+  const currentCategory = (agentInfo.data?.agent_category as AgentCategory | undefined) ?? null;
+  const currentPlatform = (agentInfo.data?.agent_platform as AgentPlatform | undefined) ?? null;
+  const typeIcon = platformIcon(currentPlatform, currentCategory);
 
   const openTypeModal = () => {
-    setModalCategory(currentCategory());
-    setModalPlatform(currentPlatform());
+    setModalCategory(currentCategory);
+    setModalPlatform(currentPlatform);
     setShowTypeModal(true);
   };
 
   const handleSaveType = async () => {
-    if (!modalCategory() || !modalPlatform()) return;
+    if (!modalCategory || !modalPlatform) return;
     setSavingType(true);
     try {
-      await updateAgent(agentName(), {
-        agent_category: modalCategory()!,
-        agent_platform: modalPlatform()!,
+      await updateAgent(agentName, {
+        agent_category: modalCategory,
+        agent_platform: modalPlatform,
       });
-      setAgentPlatform(modalPlatform()!, modalCategory());
-      await refetchInfo();
-      await refetchKey();
+      setAgentPlatform(modalPlatform, modalCategory);
+      await agentInfo.reload();
+      await apiKeyData.reload();
       setShowTypeModal(false);
       setShowSetupModal(true);
     } catch {
@@ -88,44 +124,36 @@ const Settings: Component = () => {
     }
   };
 
-  const [keyRevealed, setKeyRevealed] = createSignal(false);
-  const keyData = () => (apiKeyData.error ? undefined : apiKeyData());
-  const fullKey = () => rotatedKey() ?? keyData()?.apiKey ?? null;
-
-  const displayedKey = () => {
-    const key = fullKey();
-    if (!key) return `${keyData()?.keyPrefix ?? '...'}...`;
-    return keyRevealed() ? key : `${keyData()?.keyPrefix ?? '...'}...`;
-  };
-
-  const baseUrl = () => {
-    return `${installOrigin()}/v1`;
-  };
+  const keyData = apiKeyData.error ? undefined : apiKeyData.data;
+  const fullKey = rotatedKey ?? keyData?.apiKey ?? null;
+  const maskedKey = `${keyData?.keyPrefix ?? '...'}...`;
+  const displayedKey = fullKey && keyRevealed ? fullKey : maskedKey;
+  const baseUrl = `${installOrigin()}/v1`;
 
   const handleDeleteAgent = async () => {
-    if (deleteConfirmName() !== agentName() || deleting()) return;
+    if (deleteConfirmName !== agentName || deleting) return;
     setDeleting(true);
     try {
-      await deleteAgent(agentName());
-      toast.success(t('harnesses.deleted', { name: agentName() }));
+      await deleteAgent(agentName);
+      toast.success(t('harnesses.deleted', { name: agentName }));
       navigate('/harnesses', { replace: true });
     } catch {
       setDeleting(false);
     }
   };
 
-  const nameChanged = () => name().trim() !== agentName() && name().trim() !== '';
+  const nameChanged = name.trim() !== agentName && name.trim() !== '';
 
   const handleSaveName = async () => {
-    if (!nameChanged()) return;
+    if (!nameChanged) return;
     setSaving(true);
     try {
-      const result = await renameAgent(agentName(), name().trim());
-      const slug = (result?.name as string) ?? name().trim();
+      const result = await renameAgent(agentName, name.trim());
+      const slug = (result?.name as string) ?? name.trim();
       markAgentCreated(slug);
       window.location.replace(`/harnesses/${encodeURIComponent(slug)}/settings`);
     } catch {
-      setName(agentName());
+      setName(agentName);
     } finally {
       setSaving(false);
     }
@@ -134,11 +162,11 @@ const Settings: Component = () => {
   const handleRotate = async () => {
     setRotating(true);
     try {
-      const result = await rotateAgentKey(agentName());
+      const result = await rotateAgentKey(agentName);
       setRotatedKey(result.apiKey);
       setKeyRevealed(true);
       toast.success(t('harnesses.settings.rotated'));
-      refetchKey();
+      void apiKeyData.reload();
     } catch {
       // error toast handled by fetchMutate
     } finally {
@@ -147,385 +175,272 @@ const Settings: Component = () => {
   };
 
   return (
-    <div class="container--sm">
-      <Title>
+    <div className="flex max-w-3xl flex-col gap-4">
+      <title>
         {t('common.pageTitle', {
-          page: t('harnesses.settings.pageTitle', { name: agentDisplayName() ?? agentName() }),
+          page: t('harnesses.settings.pageTitle', { name: displayName }),
         })}
-      </Title>
-      <Meta
+      </title>
+      <meta
         name="description"
-        content={t('harnesses.settings.metaDescription', {
-          name: agentDisplayName() ?? agentName(),
-        })}
+        content={t('harnesses.settings.metaDescription', { name: displayName })}
       />
-      <p style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); margin: 0 0 var(--gap-lg);">
-        {t('harnesses.settings.intro')}
-      </p>
+      <p className="text-sm text-muted">{t('harnesses.settings.intro')}</p>
 
-      <ReadOnlyRegion readOnly={!roleCan.editHarnesses()} notice={t('harnesses.settings.readOnly')}>
-        {/* -- Harness Name ------------------------------ */}
-        <div class="settings-card">
-          <div class="settings-card__row">
-            <div class="settings-card__label">
-              <span class="settings-card__label-title">{t('harnesses.settings.nameTitle')}</span>
-              <span class="settings-card__label-desc">{t('harnesses.settings.nameDesc')}</span>
-            </div>
-            <div class="settings-card__control">
+      <ReadOnlyRegion readOnly={!canEdit} notice={t('harnesses.settings.readOnly')}>
+        <div className="flex flex-col gap-4">
+          {/* -- Harness name ------------------------------ */}
+          <Panel>
+            <SettingsRow
+              title={t('harnesses.settings.nameTitle')}
+              description={t('harnesses.settings.nameDesc')}
+            >
               <input
-                class="settings-card__input"
+                className="field sm:w-60"
                 type="text"
                 aria-label={t('harnesses.settings.nameTitle')}
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
+                value={name}
+                onChange={(e) => setName(e.currentTarget.value)}
               />
-            </div>
-          </div>
-          <div class="settings-card__footer">
-            <button
-              class="btn btn--primary btn--sm"
-              onClick={handleSaveName}
-              disabled={saving() || !nameChanged()}
-            >
-              {saving() ? (
-                <>
-                  <span class="spinner" />
-                  <span class="sr-only">{t('common.saving')}</span>
-                </>
-              ) : (
-                t('common.save')
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* -- Harness Type (read-only + change modal) --- */}
-        <h2 class="settings-section__title">{t('harnesses.settings.typeTitle')}</h2>
-        <div class="settings-card">
-          <div class="settings-card__row">
-            <div class="settings-card__label">
-              <span
-                class="settings-card__label-title"
-                style="display: flex; align-items: center; gap: 6px;"
+              <Button
+                size="sm"
+                onClick={() => void handleSaveName()}
+                disabled={!nameChanged}
+                busy={saving}
               >
-                <Show when={platformIcon(currentPlatform(), currentCategory())}>
-                  <img
-                    src={platformIcon(currentPlatform(), currentCategory())}
-                    alt=""
-                    width="18"
-                    height="18"
-                    class="platform-icon settings-type__icon"
-                  />
-                </Show>
-                {currentPlatform()
-                  ? platformLabel(currentPlatform()!)
-                  : t('harnesses.settings.notSet')}
-              </span>
-              <span class="settings-card__label-desc">
-                {currentCategory() ? categoryLabel(currentCategory()!) : ''}
-              </span>
-            </div>
-            <div class="settings-card__control settings-card__control--end">
-              <button class="btn btn--outline btn--sm" onClick={openTypeModal}>
+                {saving ? <span className="sr-only">{t('common.saving')}</span> : t('common.save')}
+              </Button>
+            </SettingsRow>
+          </Panel>
+
+          {/* -- Harness type (read-only + change modal) --- */}
+          <Panel title={t('harnesses.settings.typeTitle')}>
+            <SettingsRow
+              title={
+                <>
+                  {typeIcon ? (
+                    <img
+                      src={typeIcon}
+                      alt=""
+                      width="18"
+                      height="18"
+                      className="platform-icon settings-type__icon shrink-0"
+                    />
+                  ) : null}
+                  {currentPlatform
+                    ? platformLabel(currentPlatform)
+                    : t('harnesses.settings.notSet')}
+                </>
+              }
+              description={currentCategory ? categoryLabel(currentCategory) : undefined}
+            >
+              <Button variant="ghost" size="sm" onClick={openTypeModal}>
                 {t('harnesses.settings.change')}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </SettingsRow>
+          </Panel>
 
-        {/* -- Message recording ------------------------- */}
-        <SettingsRecordingSection agentName={agentName} />
+          {/* -- Message recording ------------------------- */}
+          <SettingsRecordingSection agentName={agentName} />
 
-        {/* -- /v1/models listing ------------------------ */}
-        <SettingsModelListingSection agentName={agentName} />
+          {/* -- /v1/models listing ------------------------ */}
+          <SettingsModelListingSection agentName={agentName} />
 
-        {/* -- API Key ----------------------------------- */}
-        <ErrorBoundary
-          fallback={(err, reset) => (
-            <ErrorState
-              error={err}
-              title={t('common.somethingWentWrong')}
-              message={t('harnesses.settings.errorMessage')}
-              onRetry={reset}
-            />
-          )}
-        >
-          <h2 class="settings-section__title">{t('harnesses.settings.apiKeyTitle')}</h2>
-          <div class="settings-card">
-            <div class="settings-card__body">
-              <span class="settings-card__label-title">{t('harnesses.settings.apiKeyLabel')}</span>
-              <span class="settings-card__label-desc" style="font-size: 14px;">
-                {t('harnesses.settings.apiKeyDesc')}
-              </span>
-              <div class="settings-card__key-row">
-                <code class="settings-card__key-value">{displayedKey()}</code>
-                <div class="settings-card__key-actions">
-                  <Show when={fullKey()}>
-                    <button
-                      class="btn btn--ghost btn--sm"
-                      onClick={() => setKeyRevealed(!keyRevealed())}
-                      aria-label={
-                        keyRevealed() ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
-                      }
-                      title={
-                        keyRevealed()
-                          ? t('harnesses.key.hideShort')
-                          : t('harnesses.key.revealShort')
-                      }
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        aria-hidden="true"
-                      >
-                        <Show
-                          when={keyRevealed()}
-                          fallback={
-                            <>
-                              <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-                              <circle cx="12" cy="12" r="3" />
-                            </>
-                          }
-                        >
-                          <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
-                          <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
-                          <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
-                          <path d="m2 2 20 20" />
-                        </Show>
-                      </svg>
-                    </button>
-                  </Show>
-                  <Show when={fullKey()}>
-                    <CopyButton text={fullKey()!} />
-                  </Show>
-                </div>
-              </div>
-            </div>
-            <div class="settings-card__footer">
-              <button class="btn btn--outline btn--sm" onClick={handleRotate} disabled={rotating()}>
-                {rotating() ? (
-                  <>
-                    <span class="spinner" />
-                    <span class="sr-only">{t('harnesses.settings.rotating')}</span>
-                  </>
-                ) : (
-                  t('harnesses.settings.rotate')
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* -- Setup Instructions ---------------------- */}
-          <h2 class="settings-section__title">{t('harnesses.settings.setupTitle')}</h2>
-          <Show
-            when={!apiKeyData.loading}
-            fallback={<div class="skeleton skeleton--rect" style="width: 100%; height: 200px;" />}
-          >
-            <Show when={apiKeyData.error}>
-              <div style="background: hsl(var(--chart-5) / 0.1); border: 1px solid hsl(var(--chart-5) / 0.3); border-radius: var(--radius); padding: 10px 14px; margin-bottom: var(--gap-md); font-size: var(--font-size-sm);">
-                <RichText
-                  text={t('harnesses.settings.keyLoadError')}
-                  parts={{ rotate: <strong>{t('harnesses.settings.rotate')}</strong> }}
+          {/* -- API key and setup ------------------------- */}
+          <SectionBoundary
+            fallback={(err, reset) => (
+              <div className="panel">
+                <ErrorState
+                  error={err}
+                  title={t('common.somethingWentWrong')}
+                  message={t('harnesses.settings.errorMessage')}
+                  onRetry={reset}
                 />
               </div>
-            </Show>
-            <div class="settings-card" style="padding: var(--gap-lg);">
-              <SetupStepAddProvider
-                apiKey={rotatedKey() ?? keyData()?.apiKey ?? null}
-                keyPrefix={keyData()?.keyPrefix ?? null}
-                baseUrl={baseUrl()}
-                hideFullKey
-                platform={currentPlatform()}
-                virtualModels={virtualModels()}
+            )}
+          >
+            <Panel title={t('harnesses.settings.apiKeyTitle')}>
+              <SettingsRow
+                title={t('harnesses.settings.apiKeyLabel')}
+                description={t('harnesses.settings.apiKeyDesc')}
               />
-            </div>
-          </Show>
-        </ErrorBoundary>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-control border border-line bg-sunken px-3 py-2 font-mono text-xs text-ink">
+                  {displayedKey}
+                </code>
+                {fullKey ? (
+                  <>
+                    <IconButton
+                      label={
+                        keyRevealed ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
+                      }
+                      title={
+                        keyRevealed ? t('harnesses.key.hideShort') : t('harnesses.key.revealShort')
+                      }
+                      onClick={() => setKeyRevealed(!keyRevealed)}
+                    >
+                      {keyRevealed ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                    </IconButton>
+                    <CopyButton text={fullKey} />
+                  </>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleRotate()}
+                  busy={rotating}
+                >
+                  {rotating ? (
+                    <span className="sr-only">{t('harnesses.settings.rotating')}</span>
+                  ) : (
+                    t('harnesses.settings.rotate')
+                  )}
+                </Button>
+              </div>
+            </Panel>
 
-        {/* -- Danger Zone -------------------------------- */}
-        <h2 class="settings-section__title settings-section__title--danger">
-          {t('harnesses.settings.dangerTitle')}
-        </h2>
-        <div class="settings-card settings-card--danger">
-          <div class="settings-card__row">
-            <div class="settings-card__label">
-              <span class="settings-card__label-title">{t('harnesses.settings.deleteTitle')}</span>
-              <span class="settings-card__label-desc">{t('harnesses.settings.deleteDesc')}</span>
+            <Panel title={t('harnesses.settings.setupTitle')}>
+              {apiKeyData.loading && !apiKeyData.data && !apiKeyData.error ? (
+                <Skel width="100%" height={200} />
+              ) : (
+                <>
+                  {apiKeyData.error ? (
+                    <div className="notice is-warn mb-3" role="alert">
+                      <span>
+                        <RichText
+                          text={t('harnesses.settings.keyLoadError')}
+                          parts={{ rotate: <strong>{t('harnesses.settings.rotate')}</strong> }}
+                        />
+                      </span>
+                    </div>
+                  ) : null}
+                  <SetupStepAddProvider
+                    apiKey={fullKey}
+                    keyPrefix={keyData?.keyPrefix ?? null}
+                    baseUrl={baseUrl}
+                    hideFullKey
+                    platform={currentPlatform}
+                    virtualModels={virtualModels}
+                  />
+                </>
+              )}
+            </Panel>
+          </SectionBoundary>
+
+          {/* -- Danger zone -------------------------------- */}
+          <section className="panel border-danger">
+            <div className="panel-head">
+              <h2 className="text-danger">{t('harnesses.settings.dangerTitle')}</h2>
             </div>
-            <div class="settings-card__control">
-              <button
-                class="btn btn--danger btn--sm"
-                onClick={() => {
-                  setShowDeleteModal(true);
-                  setDeleteConfirmName('');
-                }}
+            <div className="panel-body">
+              <SettingsRow
+                title={t('harnesses.settings.deleteTitle')}
+                description={t('harnesses.settings.deleteDesc')}
               >
-                {t('harnesses.settings.deleteButton')}
-              </button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeleteModal(true);
+                    setDeleteConfirmName('');
+                  }}
+                >
+                  {t('harnesses.settings.deleteButton')}
+                </Button>
+              </SettingsRow>
             </div>
-          </div>
+          </section>
         </div>
       </ReadOnlyRegion>
 
-      {/* -- Delete Modal ------------------------------ */}
-      <Show when={showDeleteModal()}>
-        <div
-          class="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowDeleteModal(false);
-          }}
+      {/* -- Delete modal ------------------------------ */}
+      <Modal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title={t('harnesses.settings.deleteModalTitle', { name: agentName })}
+      >
+        <p className="mb-4 text-sm text-muted">
+          <RichText
+            text={t('harnesses.settings.deleteModalBody')}
+            parts={{ name: <strong className="text-ink">{agentName}</strong> }}
+          />
+        </p>
+        <label className="label" htmlFor="delete-confirm-input">
+          <RichText
+            text={t('harnesses.settings.deleteModalConfirm')}
+            parts={{ name: <strong className="text-ink">"{agentName}"</strong> }}
+          />
+        </label>
+        <input
+          id="delete-confirm-input"
+          className="field"
+          type="text"
+          value={deleteConfirmName}
+          onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowDeleteModal(false);
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void handleDeleteAgent();
+            }
           }}
-        >
-          <div
-            class="modal-card"
-            style="max-width: 440px;"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-agent-modal-title"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
-                e.preventDefault();
-                handleDeleteAgent();
-              }
-            }}
+          placeholder={agentName}
+        />
+        <div className="actions">
+          <Button
+            variant="danger"
+            size="sm"
+            block
+            disabled={deleteConfirmName !== agentName}
+            busy={deleting}
+            onClick={() => void handleDeleteAgent()}
           >
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gap-lg);">
-              <h3 id="delete-agent-modal-title" style="margin: 0; font-size: var(--font-size-lg);">
-                {t('harnesses.settings.deleteModalTitle', { name: agentName() })}
-              </h3>
-              <button
-                style="background: none; border: none; cursor: pointer; color: hsl(var(--muted-foreground)); padding: 4px;"
-                onClick={() => setShowDeleteModal(false)}
-                aria-label={t('common.close')}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </button>
-            </div>
-            <p style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: var(--gap-md);">
-              <RichText
-                text={t('harnesses.settings.deleteModalBody')}
-                parts={{
-                  name: <strong style="color: hsl(var(--foreground));">{agentName()}</strong>,
-                }}
-              />
-            </p>
-            <label
-              for="delete-confirm-input"
-              style="display: block; font-size: var(--font-size-sm); color: hsl(var(--foreground)); margin-bottom: var(--gap-sm);"
-            >
-              <RichText
-                text={t('harnesses.settings.deleteModalConfirm')}
-                parts={{ name: <strong>"{agentName()}"</strong> }}
-              />
-            </label>
-            <input
-              ref={(el) => setTimeout(() => el.focus(), 200)}
-              id="delete-confirm-input"
-              class="auth-form__input"
-              type="text"
-              value={deleteConfirmName()}
-              onInput={(e) => setDeleteConfirmName(e.currentTarget.value)}
-              placeholder={agentName()}
-              style="width: 100%; margin-bottom: var(--gap-lg);"
-            />
-            <button
-              class="btn btn--danger btn--sm"
-              style="width: 100%;"
-              disabled={deleteConfirmName() !== agentName() || deleting()}
-              onClick={handleDeleteAgent}
-            >
-              {deleting() ? (
-                <>
-                  <span class="spinner" />
-                  <span class="sr-only">{t('common.deleting')}</span>
-                </>
-              ) : (
-                t('harnesses.settings.deleteModalButton')
-              )}
-            </button>
-          </div>
+            {deleting ? (
+              <span className="sr-only">{t('common.deleting')}</span>
+            ) : (
+              t('harnesses.settings.deleteModalButton')
+            )}
+          </Button>
         </div>
-      </Show>
+      </Modal>
 
-      {/* -- Change Type Modal ----------------------- */}
-      <Show when={showTypeModal()}>
-        <div
-          class="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowTypeModal(false);
+      {/* -- Change type modal ----------------------- */}
+      <Modal
+        open={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        title={t('harnesses.settings.changeTypeTitle')}
+        wide
+      >
+        <p className="mb-4 text-sm text-muted">{t('harnesses.settings.changeTypeDesc')}</p>
+        <AgentTypeGrid
+          category={modalCategory}
+          platform={modalPlatform}
+          onCategoryChange={(c) => {
+            setModalCategory(c);
+            setModalPlatform(PLATFORMS_BY_CATEGORY[c][0] ?? null);
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowTypeModal(false);
-          }}
-        >
-          <div
-            class="modal-card"
-            style="max-width: 540px;"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="change-type-modal-title"
-            onClick={(e) => e.stopPropagation()}
+          onPlatformChange={setModalPlatform}
+          disabled={savingType}
+        />
+        <div className="actions">
+          <Button
+            size="sm"
+            onClick={() => void handleSaveType()}
+            disabled={!modalCategory || !modalPlatform}
+            busy={savingType}
           >
-            <h2 class="modal-card__title" id="change-type-modal-title">
-              {t('harnesses.settings.changeTypeTitle')}
-            </h2>
-            <p class="modal-card__desc">{t('harnesses.settings.changeTypeDesc')}</p>
-
-            <AgentTypeGrid
-              category={modalCategory()}
-              platform={modalPlatform()}
-              onCategoryChange={(c) => {
-                setModalCategory(c);
-                setModalPlatform(PLATFORMS_BY_CATEGORY[c][0] ?? null);
-              }}
-              onPlatformChange={setModalPlatform}
-              disabled={savingType()}
-            />
-
-            <div class="modal-card__footer">
-              <button
-                class="btn btn--primary btn--sm"
-                onClick={handleSaveType}
-                disabled={savingType() || !modalCategory() || !modalPlatform()}
-              >
-                {savingType() ? <span class="spinner" /> : t('common.save')}
-              </button>
-            </div>
-          </div>
+            {savingType ? null : t('common.save')}
+          </Button>
         </div>
-      </Show>
+      </Modal>
 
       <SetupModal
-        open={showSetupModal()}
-        agentName={agentName()}
-        agentPlatform={currentPlatform()}
-        agentCategory={currentCategory()}
+        open={showSetupModal}
+        agentName={agentName}
+        agentPlatform={currentPlatform}
+        agentCategory={currentCategory}
         onClose={() => setShowSetupModal(false)}
         onDone={() => setShowSetupModal(false)}
       />
     </div>
   );
-};
-
-export default Settings;
+}

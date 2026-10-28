@@ -1,6 +1,8 @@
-import { For, Show, type Component } from 'solid-js';
+import type { MouseEvent } from 'react';
+import { MoreVertical, TriangleAlert } from 'lucide-react';
 import AlertIcon from './AlertIcon.js';
 import LimitIcon from './LimitIcon.js';
+import { EmptyState, IconButton, Panel, Skel, cx } from './ui.js';
 import type { NotificationRule } from '../services/api.js';
 import { intlLocale, t, tMaybe } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
@@ -19,143 +21,124 @@ interface LimitRuleTableProps {
   rules: NotificationRule[] | undefined;
   loading: boolean;
   hasProvider: boolean;
-  onToggleMenu: (ruleId: string, e: MouseEvent) => void;
+  onToggleMenu: (ruleId: string, e: MouseEvent<HTMLButtonElement>) => void;
 }
 
 const hasEmailAction = (action: string) => action === 'notify' || action === 'both';
 const hasBlockAction = (action: string) => action === 'block' || action === 'both';
 
-const LimitRuleTable: Component<LimitRuleTableProps> = (props) => (
-  <div class="panel">
-    <div class="panel__title">{t('limits.table.title')}</div>
-    <Show
-      when={!props.loading}
-      fallback={
-        <table class="notif-table notif-table--flush">
-          <thead>
-            <tr>
-              <th>{t('limits.table.type')}</th>
-              <th>{t('limits.table.threshold')}</th>
-              <th>{t('limits.table.triggered')}</th>
-              <th style="text-align: right;">{t('limits.table.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={[1, 2, 3]}>
-              {() => (
-                <tr>
+function Head() {
+  return (
+    <thead>
+      <tr>
+        <th>{t('limits.table.type')}</th>
+        <th>{t('limits.table.threshold')}</th>
+        <th className="num">{t('limits.table.triggered')}</th>
+        <th className="text-right">{t('limits.table.actions')}</th>
+      </tr>
+    </thead>
+  );
+}
+
+export default function LimitRuleTable({
+  rules,
+  loading,
+  hasProvider,
+  onToggleMenu,
+}: LimitRuleTableProps) {
+  const list = rules ?? [];
+  return (
+    <Panel title={t('limits.table.title')} bodyClassName="p-0">
+      {loading ? (
+        <div className="overflow-x-auto">
+          <table className="data">
+            <Head />
+            <tbody>
+              {[1, 2, 3].map((i) => (
+                <tr key={i}>
                   <td>
-                    <div class="skeleton skeleton--text" style="width: 28px;" />
+                    <Skel width={28} height={12} />
                   </td>
                   <td>
-                    <div class="skeleton skeleton--text" style="width: 80px;" />
+                    <Skel width={80} height={12} />
                   </td>
-                  <td>
-                    <div class="skeleton skeleton--text" style="width: 20px;" />
+                  <td className="num">
+                    <Skel width={20} height={12} />
                   </td>
-                  <td style="text-align: right;">
-                    <div class="skeleton skeleton--text" style="width: 16px; margin-left: auto;" />
+                  <td className="text-right">
+                    <Skel width={16} height={12} />
                   </td>
                 </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      }
-    >
-      <Show
-        when={(props.rules ?? []).length > 0}
-        fallback={
-          <div class="empty-state">
-            <div class="empty-state__title">{t('limits.table.emptyTitle')}</div>
-            <p>{t('limits.table.emptyBody')}</p>
-          </div>
-        }
-      >
-        <table class="notif-table notif-table--flush">
-          <thead>
-            <tr>
-              <th>{t('limits.table.type')}</th>
-              <th>{t('limits.table.threshold')}</th>
-              <th>{t('limits.table.triggered')}</th>
-              <th style="text-align: right;">{t('limits.table.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={props.rules}>
-              {(rule) => (
-                <tr classList={{ 'notif-table__row--disabled': !rule.is_active }}>
-                  <td>
-                    <div class="limit-type-icons">
-                      <Show when={hasEmailAction(rule.action ?? 'notify')}>
-                        <span class="limit-type-icon" title={t('limits.table.emailAlert')}>
-                          <AlertIcon size={14} />
-                        </span>
-                      </Show>
-                      <Show when={hasBlockAction(rule.action ?? 'notify')}>
-                        <span class="limit-type-icon" title={t('limits.table.hardLimit')}>
-                          <LimitIcon size={14} />
-                        </span>
-                      </Show>
-                      <Show when={hasEmailAction(rule.action ?? 'notify') && !props.hasProvider}>
-                        <span class="limit-warn-tag">
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : list.length === 0 ? (
+        <EmptyState
+          title={t('limits.table.emptyTitle')}
+          description={t('limits.table.emptyBody')}
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data">
+            <Head />
+            <tbody>
+              {list.map((rule) => {
+                const action = rule.action ?? 'notify';
+                return (
+                  <tr key={rule.id} className={cx(!rule.is_active && 'is-off')}>
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        {hasEmailAction(action) ? (
+                          <span
+                            className="limit-type-icon inline-flex text-muted"
+                            title={t('limits.table.emailAlert')}
                           >
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                          </svg>
-                          {t('limits.table.noProvider')}
-                        </span>
-                      </Show>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="notif-table__mono">{formatThreshold(rule)}</span>{' '}
-                    <span class="notif-table__period">
-                      {(periodLabel(rule.period) ?? rule.period).toLowerCase()}
-                    </span>
-                  </td>
-                  <td class="notif-table__mono">{rule.trigger_count ?? 0}</td>
-                  <td>
-                    <div class="notif-table__actions">
-                      <button
-                        class="rule-menu__btn"
-                        onClick={(e) => props.onToggleMenu(rule.id, e)}
-                        aria-label={t('limits.table.ruleOptions')}
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          aria-hidden="true"
+                            <AlertIcon size={14} />
+                          </span>
+                        ) : null}
+                        {hasBlockAction(action) ? (
+                          <span
+                            className="limit-type-icon inline-flex text-muted"
+                            title={t('limits.table.hardLimit')}
+                          >
+                            <LimitIcon size={14} />
+                          </span>
+                        ) : null}
+                        {hasEmailAction(action) && !hasProvider ? (
+                          <span className="badge is-warn">
+                            <TriangleAlert className="size-3" aria-hidden="true" />
+                            {t('limits.table.noProvider')}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="font-mono text-ink">{formatThreshold(rule)}</span>{' '}
+                      <span className="text-muted">
+                        {(periodLabel(rule.period) ?? rule.period).toLowerCase()}
+                      </span>
+                    </td>
+                    <td className="num">{rule.trigger_count ?? 0}</td>
+                    <td>
+                      <div className="row-actions">
+                        <IconButton
+                          label={t('limits.table.ruleOptions')}
+                          onClick={(e) => onToggleMenu(rule.id, e)}
                         >
-                          <circle cx="12" cy="5" r="2" />
-                          <circle cx="12" cy="12" r="2" />
-                          <circle cx="12" cy="19" r="2" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </Show>
-    </Show>
-  </div>
-);
+                          <MoreVertical aria-hidden="true" />
+                        </IconButton>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 export { formatThreshold, periodLabel };
-export default LimitRuleTable;

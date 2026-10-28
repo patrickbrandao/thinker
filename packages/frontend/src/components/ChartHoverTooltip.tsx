@@ -1,6 +1,4 @@
-import { For, Show, type Component } from 'solid-js';
 import type uPlot from 'uplot';
-import '../styles/agent-chart-tooltip.css';
 import { t } from '../i18n/index.js';
 import { monthShort } from '../services/overview-format.js';
 
@@ -9,7 +7,8 @@ import { monthShort } from '../services/overview-format.js';
  * Requests by provider-harness via MultiAgentTokenChart, and Requests by
  * status / Recovered requests via ReliabilityChart). One implementation so the
  * hover reads the same everywhere: snapped cursor, date header, one row per
- * series (swatch, name, value), underlined Total.
+ * series (swatch, name, value), underlined Total. The `agent-chart-tooltip*`
+ * classes are stable hooks for tests; the look comes from the utilities.
  */
 
 export interface HoverEntry {
@@ -69,55 +68,56 @@ export interface ChartHoverTooltipProps {
   hostWidth: () => number;
 }
 
-const ChartHoverTooltip: Component<ChartHoverTooltipProps> = (props) => {
-  const visibleEntries = () => props.state.entries.filter((e) => e.value > 0);
-  const columns = () => {
-    const items = visibleEntries();
-    const cols: Array<typeof items> = [];
-    for (let i = 0; i < items.length; i += ROWS_PER_COL) {
-      cols.push(items.slice(i, i + ROWS_PER_COL));
-    }
-    return cols;
-  };
+export default function ChartHoverTooltip({ state, fmtVal, hostWidth }: ChartHoverTooltipProps) {
+  const visibleEntries = state.entries.filter((e) => e.value > 0);
+  if (!state.visible || visibleEntries.length === 0) return null;
+
+  const columns: HoverEntry[][] = [];
+  for (let i = 0; i < visibleEntries.length; i += ROWS_PER_COL) {
+    columns.push(visibleEntries.slice(i, i + ROWS_PER_COL));
+  }
 
   return (
-    <Show when={props.state.visible && visibleEntries().length > 0}>
-      <div
-        class="agent-chart-tooltip"
-        style={{
-          left: props.state.alignRight ? 'auto' : `${props.state.left + 2}px`,
-          right: props.state.alignRight ? `${props.hostWidth() - props.state.left + 2}px` : 'auto',
-          top: `${props.state.top}px`,
-        }}
-      >
-        <div class="agent-chart-tooltip__date">{props.state.date}</div>
-        <div class="agent-chart-tooltip__columns">
-          <For each={columns()}>
-            {(col) => (
-              <div class="agent-chart-tooltip__list">
-                <For each={col}>
-                  {(entry) => (
-                    <div class="agent-chart-tooltip__row">
-                      <span
-                        class="agent-chart-tooltip__swatch"
-                        style={{ background: entry.color }}
-                      />
-                      <span class="agent-chart-tooltip__name">{entry.label}</span>
-                      <span class="agent-chart-tooltip__value">{props.fmtVal(entry.value)}</span>
-                    </div>
-                  )}
-                </For>
-              </div>
-            )}
-          </For>
-        </div>
-        <div class="agent-chart-tooltip__total">
-          <span>{t('overview.chart.total')}</span>
-          <span class="agent-chart-tooltip__total-value">{props.fmtVal(props.state.total)}</span>
-        </div>
+    <div
+      className="agent-chart-tooltip pointer-events-none absolute z-20 min-w-44 rounded-surface border border-line bg-elev px-3.5 py-3 text-[13px] shadow-[var(--shadow-float)]"
+      style={{
+        left: state.alignRight ? 'auto' : state.left + 2,
+        right: state.alignRight ? hostWidth() - state.left + 2 : 'auto',
+        top: state.top,
+      }}
+    >
+      <div className="agent-chart-tooltip__date mb-2 border-b border-line pb-2 font-medium text-muted">
+        {state.date}
       </div>
-    </Show>
+      <div className="agent-chart-tooltip__columns flex gap-8">
+        {columns.map((col, ci) => (
+          <div key={ci} className="agent-chart-tooltip__list flex flex-col gap-1">
+            {col.map((entry, ri) => (
+              <div
+                key={`${ri}-${entry.label}`}
+                className="agent-chart-tooltip__row flex items-center gap-2"
+              >
+                <span
+                  className="agent-chart-tooltip__swatch size-2.5 shrink-0 rounded-sm"
+                  style={{ background: entry.color }}
+                />
+                <span className="agent-chart-tooltip__name min-w-0 flex-1 truncate text-ink">
+                  {entry.label}
+                </span>
+                <span className="agent-chart-tooltip__value shrink-0 text-right tabular-nums text-muted">
+                  {fmtVal(entry.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="agent-chart-tooltip__total mt-2 flex items-center justify-between border-t border-line pt-2 text-muted">
+        <span>{t('overview.chart.total')}</span>
+        <span className="agent-chart-tooltip__total-value font-bold tabular-nums text-ink">
+          {fmtVal(state.total)}
+        </span>
+      </div>
+    </div>
   );
-};
-
-export default ChartHoverTooltip;
+}

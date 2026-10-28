@@ -1,5 +1,12 @@
-import { Navigate, useLocation, useParams } from '@solidjs/router';
-import type { Component } from 'solid-js';
+import { Navigate, useLocation, useParams } from 'react-router';
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 /**
  * Redirects /harnesses/:agentName/messages → /messages?agent=<name> so the
@@ -7,15 +14,10 @@ import type { Component } from 'solid-js';
  * (e.g. via a Recent Requests "View more" link). Extra query params (like the
  * `?request=` drawer deep-link) are carried through.
  */
-const AgentMessagesRedirect: Component = () => {
+export default function AgentMessagesRedirect() {
   const params = useParams<{ agentName: string }>();
   const location = useLocation();
-  const target = () => {
-    const search = new URLSearchParams(location.search);
-    search.set('agent', decodeURIComponent(params.agentName));
-    return `/messages?${search.toString()}`;
-  };
-  return <Navigate href={target()} />;
-};
-
-export default AgentMessagesRedirect;
+  const search = new URLSearchParams(location.search);
+  search.set('agent', safeDecode(params.agentName ?? ''));
+  return <Navigate to={`/messages?${search.toString()}`} replace />;
+}

@@ -1,38 +1,39 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@solidjs/testing-library";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render } from '@testing-library/react';
 
 const mockNavigate = vi.fn();
 
-vi.mock("@solidjs/router", () => ({
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: "/overview", search: "" }),
+  useLocation: () => ({ pathname: '/overview', search: '' }),
 }));
 
-vi.mock("../../src/services/auth-client.js", () => ({
+vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => mockSessionData,
+    useSession: () => mockSessionData,
   },
 }));
 
 let mockSessionData: any = { data: null, isPending: false };
 
-import AuthGuard from "../../src/components/AuthGuard";
+import AuthGuard from '../../src/components/AuthGuard';
 
-describe("AuthGuard failure path", () => {
+describe('AuthGuard failure path', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSessionData = { data: null, isPending: false, refetch: async () => {} };
   });
 
-  it("navigates to login when session is not authenticated", async () => {
-    render(() => (
+  it('navigates to login when session is not authenticated', async () => {
+    render(
       <AuthGuard>
         <span>Protected content</span>
-      </AuthGuard>
-    ));
+      </AuthGuard>,
+    );
 
     await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/login?redirect=%2Foverview", { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/login?redirect=%2Foverview', { replace: true });
     });
   });
 });

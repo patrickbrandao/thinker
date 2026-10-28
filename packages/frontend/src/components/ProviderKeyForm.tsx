@@ -1,15 +1,5 @@
-import {
-  For,
-  Show,
-  createMemo,
-  createEffect,
-  createSignal,
-  on,
-  onMount,
-  type Component,
-  type Accessor,
-  type Setter,
-} from 'solid-js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ListPlus, Trash2 } from 'lucide-react';
 import { MAX_KEYS_PER_PROVIDER as SHARED_MAX_KEYS_PER_PROVIDER } from 'thinker-shared';
 import type { ProviderDef, SubscriptionEndpointRegion } from '../services/providers.js';
 import { validateApiKey, validateSubscriptionKey } from '../services/provider-utils.js';
@@ -29,10 +19,14 @@ import {
 import { suggestNextProviderKeyLabel } from '../services/provider-key-labels.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
+import { Button, cx } from './ui.js';
 
 export const MAX_KEYS_PER_PROVIDER = SHARED_MAX_KEYS_PER_PROVIDER;
 const MAX_LABEL_LENGTH = 50;
 const WORKSPACE_ID_PLACEHOLDER = '<workspace-id>';
+
+/** A state setter; React's `useState` setters fit it. */
+type SetValue<T> = (value: T) => void;
 
 function baseUrlPlaceholderMatches(
   placeholder: string | undefined,
@@ -55,17 +49,17 @@ export interface ProviderKeyFormProps {
   provDef: ProviderDef;
   provId: string;
   agentName: string;
-  isSubMode: Accessor<boolean>;
-  connected: Accessor<boolean>;
-  selectedAuthType: Accessor<AuthType>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
-  keyInput: Accessor<string>;
-  setKeyInput: Setter<string>;
-  editing: Accessor<boolean>;
-  setEditing: Setter<boolean>;
-  validationError: Accessor<string | null>;
-  setValidationError: Setter<string | null>;
+  isSubMode: boolean;
+  connected: boolean;
+  selectedAuthType: AuthType;
+  busy: boolean;
+  setBusy: SetValue<boolean>;
+  keyInput: string;
+  setKeyInput: SetValue<string>;
+  editing: boolean;
+  setEditing: SetValue<boolean>;
+  validationError: string | null;
+  setValidationError: SetValue<string | null>;
   getKeyPrefixDisplay: (authType: AuthType) => string;
   /**
    * Full set of providers from the modal — used to derive the active key
@@ -74,8 +68,8 @@ export interface ProviderKeyFormProps {
    * the form falls back to legacy single-key UX).
    */
   providers?: RoutingProvider[];
-  addKeyOpen?: Accessor<boolean>;
-  setAddKeyOpen?: Setter<boolean>;
+  addKeyOpen?: boolean;
+  setAddKeyOpen?: SetValue<boolean>;
   /**
    * False hides the single-key "Disconnect provider" action. A custom
    * provider is removed with its definition, never by dropping its last key.
@@ -85,93 +79,116 @@ export interface ProviderKeyFormProps {
   onUpdate: () => void;
 }
 
-const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
-  const isPopupOAuth = () => props.provDef.subscriptionAuthMode === 'popup_oauth';
-  const shouldRevokeOpenaiOAuth = () =>
-    props.provId === 'openai' && isPopupOAuth() && props.selectedAuthType() === 'subscription';
-  const isApiKeyCredential = () =>
-    !props.isSubMode() || props.provDef.subscriptionCredentialKind === 'api-key';
-  const credentialNoun = () =>
-    isApiKeyCredential()
-      ? t('providerSetup.keyForm.nounApiKey')
-      : t('providerSetup.keyForm.nounSetupToken');
-  const credentialOwnerName = () =>
-    props.isSubMode() && props.provDef.subscriptionCredentialName
-      ? props.provDef.subscriptionCredentialName
-      : props.provDef.name;
-  const inputAriaLabel = () =>
-    t('providerSetup.keyForm.credential', { owner: credentialOwnerName(), noun: credentialNoun() });
-  const editAriaLabel = () =>
-    t('providerSetup.keyForm.newCredential', {
-      owner: credentialOwnerName(),
-      noun: credentialNoun(),
-    });
-  const placeholder = () =>
-    props.isSubMode()
-      ? (props.provDef.subscriptionKeyPlaceholder ?? t('providerSetup.keyForm.pasteToken'))
-      : props.provDef.keyPlaceholder;
-  const endpointRegions = () =>
-    props.isSubMode()
-      ? (props.provDef.subscriptionEndpointRegions ?? [])
-      : (props.provDef.apiKeyEndpointRegions ?? []);
-  const hasEndpointRegions = () => endpointRegions().length > 0;
-  const defaultEndpointRegion = () => endpointRegions()[0]?.value;
-  const customEndpointOptions = () =>
-    endpointRegions().filter((region) => !!region.baseUrlPlaceholder);
-  const customEndpointOption = () =>
-    customEndpointOptions().find((region) => region.value === 'custom') ??
-    customEndpointOptions()[0];
+/** Link to the provider page where the user creates the credential. */
+function KeyHelpLink({ url, owner, noun }: { url?: string; owner: string; noun: string }) {
+  if (!url) return null;
+  return (
+    <p className="hint">
+      <a
+        className="provider-detail__key-help-link link-action"
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {t('providerSetup.keyForm.getCredential', { owner, noun })}
+      </a>
+    </p>
+  );
+}
+
+function TrashIcon() {
+  return <Trash2 size={16} aria-hidden="true" />;
+}
+
+const ProviderKeyForm = (props: ProviderKeyFormProps) => {
+  const { provDef, provId, isSubMode, connected, selectedAuthType } = props;
+  const isPopupOAuth = provDef.subscriptionAuthMode === 'popup_oauth';
+  const shouldRevokeOpenaiOAuth =
+    provId === 'openai' && isPopupOAuth && selectedAuthType === 'subscription';
+  const isApiKeyCredential = !isSubMode || provDef.subscriptionCredentialKind === 'api-key';
+  const credentialNoun = isApiKeyCredential
+    ? t('providerSetup.keyForm.nounApiKey')
+    : t('providerSetup.keyForm.nounSetupToken');
+  const credentialOwnerName =
+    isSubMode && provDef.subscriptionCredentialName
+      ? provDef.subscriptionCredentialName
+      : provDef.name;
+  const inputAriaLabel = t('providerSetup.keyForm.credential', {
+    owner: credentialOwnerName,
+    noun: credentialNoun,
+  });
+  const editAriaLabel = t('providerSetup.keyForm.newCredential', {
+    owner: credentialOwnerName,
+    noun: credentialNoun,
+  });
+  const placeholder = isSubMode
+    ? (provDef.subscriptionKeyPlaceholder ?? t('providerSetup.keyForm.pasteToken'))
+    : provDef.keyPlaceholder;
+  const endpointRegions: SubscriptionEndpointRegion[] = useMemo(
+    () =>
+      isSubMode
+        ? (provDef.subscriptionEndpointRegions ?? [])
+        : (provDef.apiKeyEndpointRegions ?? []),
+    [isSubMode, provDef.subscriptionEndpointRegions, provDef.apiKeyEndpointRegions],
+  );
+  const hasEndpointRegions = endpointRegions.length > 0;
+  const defaultEndpointRegion = endpointRegions[0]?.value;
+  const customEndpointOptions = endpointRegions.filter((region) => !!region.baseUrlPlaceholder);
+  const customEndpointOption =
+    customEndpointOptions.find((region) => region.value === 'custom') ?? customEndpointOptions[0];
   const customEndpointOptionForValue = (value: string | null | undefined) =>
-    customEndpointOptions().find((region) =>
+    customEndpointOptions.find((region) =>
       baseUrlPlaceholderMatches(region.baseUrlPlaceholder, value),
-    ) ?? customEndpointOption();
+    ) ?? customEndpointOption;
   const endpointRegionLabel = (value: string | null | undefined) =>
-    endpointRegions().find((region) => region.value === value)?.label ??
+    endpointRegions.find((region) => region.value === value)?.label ??
     (value ? customEndpointOptionForValue(value)?.label : undefined);
-  const whereToGetUrl = () =>
-    props.isSubMode()
-      ? getSubscriptionProviderKeyUrl(props.provId)
-      : getRoutingProviderApiKeyUrl(props.provId);
+  const whereToGetUrl = isSubMode
+    ? getSubscriptionProviderKeyUrl(provId)
+    : getRoutingProviderApiKeyUrl(provId);
 
   // Multi-key chains are supported for api_key and subscription. Local
   // providers (Ollama / LM Studio) don't carry credentials, so they stay
   // on the single-row surface.
-  const supportsMultiKey = () => props.selectedAuthType() !== 'local';
+  const supportsMultiKey = selectedAuthType !== 'local';
 
-  const activeKeys = createMemo<RoutingProvider[]>(() => {
+  const activeKeys = useMemo<RoutingProvider[]>(() => {
     if (!props.providers) return [];
     return props.providers
       .filter(
         (p) =>
-          p.provider === props.provId &&
-          p.auth_type === props.selectedAuthType() &&
-          p.is_active &&
-          p.has_api_key,
+          p.provider === provId && p.auth_type === selectedAuthType && p.is_active && p.has_api_key,
       )
       .slice()
       .sort((a, b) => a.priority - b.priority);
-  });
+  }, [props.providers, provId, selectedAuthType]);
 
-  const isListMode = () => supportsMultiKey() && activeKeys().length > 1;
-  const savedEndpointRegion = () => activeKeys()[0]?.region;
-  const [selectedEndpointRegion, setSelectedEndpointRegion] = createSignal<string | undefined>();
-  const [customEndpointUrl, setCustomEndpointUrl] = createSignal('');
+  const isListMode = supportsMultiKey && activeKeys.length > 1;
+  const savedEndpointRegion = activeKeys[0]?.region;
+  const hasActiveKeys = activeKeys.length > 0;
+  const [selectedEndpointRegion, setSelectedEndpointRegion] = useState<string | undefined>();
+  const [customEndpointUrl, setCustomEndpointUrl] = useState('');
 
-  createEffect(() => {
-    if (!hasEndpointRegions()) {
+  // Re-seed the region when the regions, the connection or the saved key
+  // change. A user's pick while connected stays until one of those moves.
+  const regionsKey = endpointRegions
+    .map((region) => `${region.value}\u0000${region.baseUrlPlaceholder ?? ''}`)
+    .join('\u0001');
+  useEffect(() => {
+    if (!hasEndpointRegions) {
       setSelectedEndpointRegion(undefined);
       setCustomEndpointUrl('');
       return;
     }
-    if (props.connected()) {
-      if (activeKeys().length > 0) {
-        const saved = savedEndpointRegion();
-        const customOption = saved ? customEndpointOptionForValue(saved) : customEndpointOption();
-        if (saved && !endpointRegions().some((region) => region.value === saved) && customOption) {
+    if (connected) {
+      if (hasActiveKeys) {
+        const saved = savedEndpointRegion;
+        const customOption = saved ? customEndpointOptionForValue(saved) : customEndpointOption;
+        if (saved && !endpointRegions.some((region) => region.value === saved) && customOption) {
           setSelectedEndpointRegion(customOption.value);
           setCustomEndpointUrl(saved);
         } else {
-          setSelectedEndpointRegion(saved ?? defaultEndpointRegion());
+          setSelectedEndpointRegion(saved ?? defaultEndpointRegion);
           if (saved !== customOption?.value) setCustomEndpointUrl('');
         }
       } else {
@@ -180,94 +197,94 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
       }
       return;
     }
-    const selected = selectedEndpointRegion();
-    if (!selected || !endpointRegions().some((region) => region.value === selected)) {
-      setSelectedEndpointRegion(defaultEndpointRegion());
-    }
-  });
+    setSelectedEndpointRegion((selected) =>
+      selected && endpointRegions.some((region) => region.value === selected)
+        ? selected
+        : defaultEndpointRegion,
+    );
+    // The regions are tracked through `regionsKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionsKey, connected, hasActiveKeys, savedEndpointRegion]);
 
-  const displayedEndpointRegion = () => selectedEndpointRegion() ?? defaultEndpointRegion();
-  const selectedEndpointRegionOption = () =>
-    endpointRegions().find((region) => region.value === displayedEndpointRegion());
-  const isCustomEndpointSelected = () => !!selectedEndpointRegionOption()?.baseUrlPlaceholder;
-  const endpointRegionPayload = () => {
-    if (!hasEndpointRegions()) return undefined;
-    if (isCustomEndpointSelected()) return customEndpointUrl().trim() || undefined;
-    const selected = selectedEndpointRegion();
-    if (selected) return selected;
-    return props.connected() ? undefined : defaultEndpointRegion();
-  };
+  const displayedEndpointRegion = selectedEndpointRegion ?? defaultEndpointRegion;
+  const selectedEndpointRegionOption = endpointRegions.find(
+    (region) => region.value === displayedEndpointRegion,
+  );
+  const isCustomEndpointSelected = !!selectedEndpointRegionOption?.baseUrlPlaceholder;
+  const endpointRegionPayload = (() => {
+    if (!hasEndpointRegions) return undefined;
+    if (isCustomEndpointSelected) return customEndpointUrl.trim() || undefined;
+    if (selectedEndpointRegion) return selectedEndpointRegion;
+    return connected ? undefined : defaultEndpointRegion;
+  })();
   const validateEndpointRegion = () => {
-    if (isCustomEndpointSelected() && !customEndpointUrl().trim()) {
+    if (isCustomEndpointSelected && !customEndpointUrl.trim()) {
       props.setValidationError(t('providerSetup.shared.baseUrlRequired'));
       return false;
     }
     return true;
   };
 
-  const EndpointRegionSelect = (selectProps: { id: string; disabled?: boolean }) => (
-    <Show when={hasEndpointRegions()}>
-      <div class="provider-detail__field">
-        <label class="provider-detail__label" for={selectProps.id}>
+  const renderEndpointRegionSelect = (id: string, disabled?: boolean) => {
+    if (!hasEndpointRegions) return null;
+    const baseUrlPlaceholder = selectedEndpointRegionOption?.baseUrlPlaceholder;
+    return (
+      <div className="mb-4">
+        <label className="label provider-detail__label" htmlFor={id}>
           {t('providerSetup.shared.region')}
         </label>
         <select
-          id={selectProps.id}
-          class="provider-detail__input"
-          value={displayedEndpointRegion()}
-          disabled={selectProps.disabled}
+          id={id}
+          className="field"
+          value={displayedEndpointRegion}
+          disabled={disabled}
           onChange={(e) => setSelectedEndpointRegion(e.currentTarget.value)}
         >
-          <For each={endpointRegions()}>
-            {(region) => <option value={region.value}>{region.label}</option>}
-          </For>
+          {endpointRegions.map((region) => (
+            <option key={region.value} value={region.value}>
+              {region.label}
+            </option>
+          ))}
         </select>
-        <Show when={selectedEndpointRegionOption()?.baseUrlPlaceholder}>
-          {(placeholder) => (
-            <>
-              <label
-                class="provider-detail__label"
-                for={`${selectProps.id}-base-url`}
-                style="margin-top: 8px;"
-              >
-                {t('providerSetup.shared.baseUrl')}
-              </label>
-              <input
-                id={`${selectProps.id}-base-url`}
-                class="provider-detail__input"
-                classList={{
-                  'provider-detail__input--error':
-                    props.validationError() === t('providerSetup.shared.baseUrlRequired'),
-                }}
-                type="url"
-                autocomplete="off"
-                placeholder={placeholder()}
-                value={customEndpointUrl()}
-                disabled={selectProps.disabled}
-                onInput={(e) => {
-                  setCustomEndpointUrl(e.currentTarget.value);
-                  props.setValidationError(null);
-                }}
-              />
-            </>
-          )}
-        </Show>
+        {baseUrlPlaceholder ? (
+          <>
+            <label className="label provider-detail__label mt-2" htmlFor={`${id}-base-url`}>
+              {t('providerSetup.shared.baseUrl')}
+            </label>
+            <input
+              id={`${id}-base-url`}
+              className="field"
+              aria-invalid={
+                props.validationError === t('providerSetup.shared.baseUrlRequired') || undefined
+              }
+              type="url"
+              autoComplete="off"
+              placeholder={baseUrlPlaceholder}
+              value={customEndpointUrl}
+              disabled={disabled}
+              onChange={(e) => {
+                setCustomEndpointUrl(e.currentTarget.value);
+                props.setValidationError(null);
+              }}
+            />
+          </>
+        ) : null}
       </div>
-    </Show>
-  );
+    );
+  };
 
-  const fieldLabel = () => {
-    if (isListMode()) return t('providerSetup.keyForm.apiKeys');
-    return isApiKeyCredential()
+  const fieldLabel = isListMode
+    ? t('providerSetup.keyForm.apiKeys')
+    : isApiKeyCredential
       ? t('providerSetup.keyForm.apiKey')
       : t('providerSetup.keyForm.setupToken');
-  };
+
+  const validateKey = (value: string) =>
+    isSubMode ? validateSubscriptionKey(provDef, value) : validateApiKey(provDef, value);
 
   const handleConnect = async (label?: string) => {
     if (!validateEndpointRegion()) return;
-    const result = props.isSubMode()
-      ? validateSubscriptionKey(props.provDef, props.keyInput())
-      : validateApiKey(props.provDef, props.keyInput());
+    const result = validateKey(props.keyInput);
     if (!result.valid) {
       props.setValidationError(result.error!);
       return;
@@ -276,13 +293,13 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
-        provider: props.provId,
-        apiKey: props.keyInput().replace(/\s/g, ''),
-        authType: props.selectedAuthType(),
-        ...(endpointRegionPayload() && { region: endpointRegionPayload() }),
+        provider: provId,
+        apiKey: props.keyInput.replace(/\s/g, ''),
+        authType: selectedAuthType,
+        ...(endpointRegionPayload && { region: endpointRegionPayload }),
         ...(label && { label }),
       });
-      toast.success(t('providerSetup.shared.connected', { name: props.provDef.name }));
+      toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
       props.onBack();
       props.onUpdate();
     } catch {
@@ -294,9 +311,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
 
   const handleUpdateKey = async (label?: string) => {
     if (!validateEndpointRegion()) return;
-    const result = props.isSubMode()
-      ? validateSubscriptionKey(props.provDef, props.keyInput())
-      : validateApiKey(props.provDef, props.keyInput());
+    const result = validateKey(props.keyInput);
     if (!result.valid) {
       props.setValidationError(result.error!);
       return;
@@ -305,20 +320,20 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
     // Without an explicit label the backend's legacy path writes to the row
     // labeled 'Default' — wrong target whenever the visible key is named
     // anything else. Pin the update to the key this view is showing.
-    const targetLabel = label ?? activeKeys()[0]?.label;
+    const targetLabel = label ?? activeKeys[0]?.label;
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
-        provider: props.provId,
-        apiKey: props.keyInput().replace(/\s/g, ''),
-        authType: props.selectedAuthType(),
-        ...(endpointRegionPayload() && { region: endpointRegionPayload() }),
+        provider: provId,
+        apiKey: props.keyInput.replace(/\s/g, ''),
+        authType: selectedAuthType,
+        ...(endpointRegionPayload && { region: endpointRegionPayload }),
         ...(targetLabel && { label: targetLabel }),
       });
       toast.success(
-        props.isSubMode() && !isApiKeyCredential()
-          ? t('providerSetup.keyForm.tokenUpdated', { name: props.provDef.name })
-          : t('providerSetup.keyForm.keyUpdated', { name: props.provDef.name }),
+        isSubMode && !isApiKeyCredential
+          ? t('providerSetup.keyForm.tokenUpdated', { name: provDef.name })
+          : t('providerSetup.keyForm.keyUpdated', { name: provDef.name }),
       );
       props.onBack();
       props.onUpdate();
@@ -335,15 +350,10 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
       // OpenAI subscription OAuth needs an explicit revoke call. Skip for
       // labeled deletes inside list mode (those are api_key keys, never the
       // OAuth subscription token).
-      if (!label && shouldRevokeOpenaiOAuth()) {
+      if (!label && shouldRevokeOpenaiOAuth) {
         await revokeOpenaiOAuth(props.agentName).catch(() => {});
       }
-      const result = await disconnectProvider(
-        props.agentName,
-        props.provId,
-        props.selectedAuthType(),
-        label,
-      );
+      const result = await disconnectProvider(props.agentName, provId, selectedAuthType, label);
       if (result?.notifications?.length) {
         for (const msg of result.notifications) {
           toast.error(msg);
@@ -360,317 +370,281 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
     }
   };
 
-  let connectInputRef: HTMLInputElement | undefined;
-  onMount(() => {
-    if (connectInputRef && !props.connected()) {
-      connectInputRef.focus();
-    }
-  });
-
-  return (
-    <>
-      {/* Not yet connected — first key */}
-      <Show when={!props.connected()}>
-        <EndpointRegionSelect id={`${props.provId}-subscription-endpoint`} />
-        <div class="provider-detail__field">
-          <label class="provider-detail__label">{fieldLabel()}</label>
-          <input
-            ref={connectInputRef}
-            class="provider-detail__input provider-detail__input--masked"
-            classList={{ 'provider-detail__input--error': !!props.validationError() }}
-            type="text"
-            autocomplete="off"
-            placeholder={placeholder()}
-            aria-label={inputAriaLabel()}
-            value={props.keyInput()}
-            onInput={(e) => {
-              props.setKeyInput(e.currentTarget.value);
-              props.setValidationError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleConnect();
-            }}
-          />
-          <Show when={props.validationError()}>
-            <div class="provider-detail__error">{props.validationError()}</div>
-          </Show>
-          <Show when={whereToGetUrl()}>
-            <p class="provider-detail__key-help">
-              <a
-                class="provider-detail__key-help-link"
-                href={whereToGetUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t('providerSetup.keyForm.getCredential', {
-                  owner: credentialOwnerName(),
-                  noun: credentialNoun(),
-                })}
-              </a>
-            </p>
-          </Show>
-        </div>
-        <button
-          class="btn btn--primary provider-detail__action"
-          disabled={props.busy() || !props.keyInput().trim()}
-          onClick={() => handleConnect()}
-        >
-          <Show when={!props.busy()} fallback={<span class="spinner" />}>
-            {t('providerSetup.shared.connect')}
-          </Show>
-        </button>
-      </Show>
-
-      {/* Connected — single key (legacy view, pixel-identical to pre-multi-key) */}
-      <Show when={props.connected() && !isListMode()}>
-        <div class="provider-detail__field">
-          <label class="provider-detail__label">{fieldLabel()}</label>
-          <Show when={!props.editing()}>
-            <div class="provider-detail__key-row">
-              <input
-                class="provider-detail__input provider-detail__input--disabled"
-                type="text"
-                value={props.getKeyPrefixDisplay(props.selectedAuthType())}
-                disabled
-                aria-label={
-                  isApiKeyCredential()
-                    ? t('providerSetup.keyForm.currentKeyMasked')
-                    : t('providerSetup.keyForm.currentTokenMasked')
-                }
-              />
-              <button
-                class="btn btn--outline btn--sm"
-                onClick={() => {
-                  props.setEditing(true);
-                  props.setKeyInput('');
-                  props.setValidationError(null);
-                }}
-              >
-                {t('providerSetup.keyForm.change')}
-              </button>
-              <Show when={props.canDisconnect !== false}>
-                <button
-                  class="provider-detail__disconnect-icon"
-                  disabled={props.busy()}
-                  onClick={() => handleDisconnect()}
-                  aria-label={t('providerSetup.keyForm.disconnectProvider')}
-                  title={t('providerSetup.shared.disconnect')}
-                >
-                  <Show when={!props.busy()} fallback={<span class="spinner" />}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    </svg>
-                  </Show>
-                </button>
-              </Show>
-            </div>
-            <Show when={supportsMultiKey() && activeKeys().length < MAX_KEYS_PER_PROVIDER}>
-              <AddAnotherKeyAction
-                onAdd={(label, apiKey, region) => handleAddKey(props, label, apiKey, region)}
-                busy={props.busy}
-                setBusy={props.setBusy}
-                provDef={props.provDef}
-                placeholder={placeholder() ?? t('providerSetup.keyForm.pasteApiKey')}
-                whereToGetUrl={whereToGetUrl}
-                credentialNoun={credentialNoun}
-                credentialOwnerName={credentialOwnerName}
-                existingLabels={() => activeKeys().map((k) => k.label)}
-                open={props.addKeyOpen}
-                setOpen={props.setAddKeyOpen}
-                isSubscription={props.isSubMode()}
-                endpointRegions={endpointRegions()}
-                initialEndpointRegion={displayedEndpointRegion()}
-              />
-            </Show>
-          </Show>
-          <Show when={props.editing()}>
-            <EndpointRegionSelect id={`${props.provId}-subscription-endpoint-edit`} />
-            <input
-              class="provider-detail__input provider-detail__input--masked"
-              classList={{ 'provider-detail__input--error': !!props.validationError() }}
-              type="text"
-              autocomplete="off"
-              placeholder={placeholder()}
-              aria-label={editAriaLabel()}
-              value={props.keyInput()}
-              onInput={(e) => {
-                props.setKeyInput(e.currentTarget.value);
-                props.setValidationError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleUpdateKey();
-              }}
-            />
-            <Show when={props.validationError()}>
-              <div class="provider-detail__error">{props.validationError()}</div>
-            </Show>
-            <Show when={whereToGetUrl()}>
-              <p class="provider-detail__key-help">
-                <a
-                  class="provider-detail__key-help-link"
-                  href={whereToGetUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('providerSetup.keyForm.getCredential', {
-                    owner: credentialOwnerName(),
-                    noun: credentialNoun(),
-                  })}
-                </a>
-              </p>
-            </Show>
-            <button
-              class="btn btn--primary provider-detail__action"
-              disabled={props.busy() || !props.keyInput().trim()}
-              onClick={() => handleUpdateKey()}
-              style="margin-top: 12px;"
-            >
-              {t('common.save')}
-            </button>
-          </Show>
-        </div>
-      </Show>
-
-      {/* Connected — list mode (multi-key) */}
-      <Show when={props.connected() && isListMode()}>
-        <KeyChainView
-          provDef={props.provDef}
-          provId={props.provId}
-          agentName={props.agentName}
-          authType={props.selectedAuthType}
-          activeKeys={activeKeys}
-          busy={props.busy}
-          setBusy={props.setBusy}
-          placeholder={placeholder() ?? t('providerSetup.keyForm.pasteApiKey')}
-          credentialNoun={credentialNoun}
-          credentialOwnerName={credentialOwnerName}
-          whereToGetUrl={whereToGetUrl}
-          addKeyOpen={props.addKeyOpen}
-          setAddKeyOpen={props.setAddKeyOpen}
-          endpointRegions={endpointRegions()}
-          endpointRegionLabel={endpointRegionLabel}
-          onUpdate={props.onUpdate}
-          onDelete={(label) => handleDisconnect(label)}
-        />
-      </Show>
-    </>
-  );
-};
-
-async function handleAddKey(
-  props: ProviderKeyFormProps,
-  label: string,
-  apiKey: string,
-  region?: string,
-): Promise<boolean> {
   // Subscription-mode providers (Anthropic Pro, ChatGPT Plus, etc.) often
   // validate paste tokens with a different prefix/format than their api_key
   // counterparts. Branch the validator so the chain-add flow doesn't reject
   // a valid setup token using the api-key rules.
-  const result = props.isSubMode()
-    ? validateSubscriptionKey(props.provDef, apiKey)
-    : validateApiKey(props.provDef, apiKey);
-  if (!result.valid) {
-    toast.error(result.error!);
-    return false;
+  const handleAddKey = async (label: string, apiKey: string, region?: string) => {
+    const result = validateKey(apiKey);
+    if (!result.valid) {
+      toast.error(result.error!);
+      return false;
+    }
+    props.setBusy(true);
+    try {
+      await connectProvider(props.agentName, {
+        provider: provId,
+        apiKey: apiKey.replace(/\s/g, ''),
+        authType: selectedAuthType,
+        label,
+        ...(region && { region }),
+      });
+      toast.success(t('providerSetup.keyForm.keyAdded', { name: provDef.name, label }));
+      props.onUpdate();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      props.setBusy(false);
+    }
+  };
+
+  const connectInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (connectInputRef.current && !connected) connectInputRef.current.focus();
+    // Focus once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const keyError = props.validationError ? (
+    <p className="mt-1 text-xs text-danger">{props.validationError}</p>
+  ) : null;
+  const helpLink = (
+    <KeyHelpLink url={whereToGetUrl} owner={credentialOwnerName} noun={credentialNoun} />
+  );
+  const addPlaceholder = placeholder ?? t('providerSetup.keyForm.pasteApiKey');
+
+  /* Not yet connected — first key */
+  if (!connected) {
+    return (
+      <>
+        {renderEndpointRegionSelect(`${provId}-subscription-endpoint`)}
+        <div className="mb-4">
+          <label className="label provider-detail__label">{fieldLabel}</label>
+          <input
+            ref={connectInputRef}
+            className="field provider-detail__input--masked font-mono"
+            aria-invalid={!!props.validationError || undefined}
+            type="text"
+            autoComplete="off"
+            placeholder={placeholder}
+            aria-label={inputAriaLabel}
+            value={props.keyInput}
+            onChange={(e) => {
+              props.setKeyInput(e.currentTarget.value);
+              props.setValidationError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleConnect();
+            }}
+          />
+          {keyError}
+          {helpLink}
+        </div>
+        <Button
+          block
+          className="provider-detail__action"
+          busy={props.busy}
+          disabled={!props.keyInput.trim()}
+          onClick={() => void handleConnect()}
+        >
+          {t('providerSetup.shared.connect')}
+        </Button>
+      </>
+    );
   }
-  props.setBusy(true);
-  try {
-    await connectProvider(props.agentName, {
-      provider: props.provId,
-      apiKey: apiKey.replace(/\s/g, ''),
-      authType: props.selectedAuthType(),
-      label,
-      ...(region && { region }),
-    });
-    toast.success(t('providerSetup.keyForm.keyAdded', { name: props.provDef.name, label }));
-    props.onUpdate();
-    return true;
-  } catch {
-    return false;
-  } finally {
-    props.setBusy(false);
+
+  /* Connected — list mode (multi-key) */
+  if (isListMode) {
+    return (
+      <KeyChainView
+        provDef={provDef}
+        provId={provId}
+        agentName={props.agentName}
+        authType={selectedAuthType}
+        activeKeys={activeKeys}
+        busy={props.busy}
+        setBusy={props.setBusy}
+        placeholder={addPlaceholder}
+        credentialNoun={credentialNoun}
+        credentialOwnerName={credentialOwnerName}
+        whereToGetUrl={whereToGetUrl}
+        addKeyOpen={props.addKeyOpen}
+        setAddKeyOpen={props.setAddKeyOpen}
+        endpointRegions={endpointRegions}
+        endpointRegionLabel={endpointRegionLabel}
+        onUpdate={props.onUpdate}
+        onDelete={(label) => void handleDisconnect(label)}
+      />
+    );
   }
-}
+
+  /* Connected — single key */
+  return (
+    <div className="mb-4">
+      <label className="label provider-detail__label">{fieldLabel}</label>
+      {!props.editing ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              className="field font-mono"
+              type="text"
+              value={props.getKeyPrefixDisplay(selectedAuthType)}
+              disabled
+              aria-label={
+                isApiKeyCredential
+                  ? t('providerSetup.keyForm.currentKeyMasked')
+                  : t('providerSetup.keyForm.currentTokenMasked')
+              }
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                props.setEditing(true);
+                props.setKeyInput('');
+                props.setValidationError(null);
+              }}
+            >
+              {t('providerSetup.keyForm.change')}
+            </Button>
+            {props.canDisconnect !== false ? (
+              <button
+                type="button"
+                className="icon-btn provider-detail__disconnect-icon shrink-0 text-danger"
+                disabled={props.busy}
+                onClick={() => void handleDisconnect()}
+                aria-label={t('providerSetup.keyForm.disconnectProvider')}
+                title={t('providerSetup.shared.disconnect')}
+              >
+                {props.busy ? <span className="spinner" aria-hidden="true" /> : <TrashIcon />}
+              </button>
+            ) : null}
+          </div>
+          {supportsMultiKey && activeKeys.length < MAX_KEYS_PER_PROVIDER ? (
+            <AddAnotherKeyAction
+              onAdd={handleAddKey}
+              busy={props.busy}
+              setBusy={props.setBusy}
+              provDef={provDef}
+              placeholder={addPlaceholder}
+              whereToGetUrl={whereToGetUrl}
+              credentialNoun={credentialNoun}
+              credentialOwnerName={credentialOwnerName}
+              existingLabels={activeKeys.map((k) => k.label ?? '')}
+              open={props.addKeyOpen}
+              setOpen={props.setAddKeyOpen}
+              isSubscription={isSubMode}
+              endpointRegions={endpointRegions}
+              initialEndpointRegion={displayedEndpointRegion}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {renderEndpointRegionSelect(`${provId}-subscription-endpoint-edit`)}
+          <input
+            className="field provider-detail__input--masked font-mono"
+            aria-invalid={!!props.validationError || undefined}
+            type="text"
+            autoComplete="off"
+            placeholder={placeholder}
+            aria-label={editAriaLabel}
+            value={props.keyInput}
+            onChange={(e) => {
+              props.setKeyInput(e.currentTarget.value);
+              props.setValidationError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleUpdateKey();
+            }}
+          />
+          {keyError}
+          {helpLink}
+          <Button
+            block
+            className="provider-detail__action mt-3"
+            disabled={props.busy || !props.keyInput.trim()}
+            onClick={() => void handleUpdateKey()}
+          >
+            {t('common.save')}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
 
 /** @internal Exported for testing only. */
 export interface AddAnotherKeyActionProps {
   onAdd: (label: string, apiKey: string, region?: string) => Promise<boolean>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
+  busy: boolean;
+  setBusy: SetValue<boolean>;
   provDef: ProviderDef;
   placeholder: string;
-  whereToGetUrl: () => string | undefined;
-  credentialNoun: () => string;
-  credentialOwnerName: () => string;
-  existingLabels: () => string[];
-  open?: Accessor<boolean>;
-  setOpen?: Setter<boolean>;
+  whereToGetUrl?: string;
+  credentialNoun: string;
+  credentialOwnerName: string;
+  existingLabels: string[];
+  /** When set, the parent controls whether the form is open (no toggle link). */
+  open?: boolean;
+  setOpen?: SetValue<boolean>;
   isSubscription?: boolean;
   endpointRegions?: SubscriptionEndpointRegion[];
   initialEndpointRegion?: string;
 }
 
 /** @internal Exported for testing only. */
-export const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
-  const [localOpen, setLocalOpen] = createSignal(false);
-  const isOpen = () => (props.open ?? localOpen)();
+export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const isOpen = props.open ?? localOpen;
   const setIsOpen = (v: boolean) => {
     (props.setOpen ?? setLocalOpen)(v);
   };
-  const [label, setLabel] = createSignal('');
-  const [apiKey, setApiKey] = createSignal('');
-  const [endpointRegion, setEndpointRegion] = createSignal<string | undefined>(
+  const [label, setLabel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [endpointRegion, setEndpointRegion] = useState<string | undefined>(
     props.initialEndpointRegion ?? props.endpointRegions?.[0]?.value,
   );
-  const [customEndpointUrl, setCustomEndpointUrl] = createSignal('');
-  let apiKeyInputRef: HTMLInputElement | undefined;
+  const [customEndpointUrl, setCustomEndpointUrl] = useState('');
+  const apiKeyInputRef = useRef<HTMLInputElement>(null);
+  const prevOpen = useRef<boolean | undefined>(undefined);
 
-  const defaultLabel = () => suggestNextProviderKeyLabel(props.existingLabels());
-  const selectedEndpointRegionOption = () =>
-    props.endpointRegions?.find((region) => region.value === endpointRegion());
-  const customEndpointPayload = () => {
-    if (!selectedEndpointRegionOption()?.baseUrlPlaceholder) return endpointRegion();
-    return customEndpointUrl().trim() || undefined;
-  };
-
-  // Sync label suggestion when opened externally and auto-focus the API key field.
-  // Use `on()` with explicit deps to avoid tracking label/endpointRegion signals,
-  // which would re-fire the effect (and steal focus) on every keystroke.
-  createEffect(
-    on(isOpen, (open, prevOpen) => {
-      if (open && !label().trim()) {
-        setLabel(defaultLabel());
-      }
-      const defaultEndpointRegion = props.endpointRegions?.[0]?.value;
-      if (open && defaultEndpointRegion && !endpointRegion()) {
-        setEndpointRegion(props.initialEndpointRegion ?? defaultEndpointRegion);
-      }
-      if (open && !prevOpen) {
-        requestAnimationFrame(() => apiKeyInputRef?.focus());
-      }
-    }),
+  // Lazy, like the Solid accessor: only computed once the form opens.
+  const defaultLabel = () => suggestNextProviderKeyLabel(props.existingLabels.filter(Boolean));
+  const selectedEndpointRegionOption = props.endpointRegions?.find(
+    (region) => region.value === endpointRegion,
   );
+  const customEndpointPayload = !selectedEndpointRegionOption?.baseUrlPlaceholder
+    ? endpointRegion
+    : customEndpointUrl.trim() || undefined;
+
+  // Sync the label suggestion and region when opened (also from outside) and
+  // focus the key field. Runs on open changes only, so typing never steals focus.
+  useEffect(() => {
+    const wasOpen = prevOpen.current;
+    prevOpen.current = isOpen;
+    if (isOpen && !label.trim()) {
+      setLabel(defaultLabel());
+    }
+    const defaultEndpointRegion = props.endpointRegions?.[0]?.value;
+    if (isOpen && defaultEndpointRegion && !endpointRegion) {
+      setEndpointRegion(props.initialEndpointRegion ?? defaultEndpointRegion);
+    }
+    if (isOpen && !wasOpen) {
+      requestAnimationFrame(() => apiKeyInputRef.current?.focus());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const submit = async () => {
-    if (selectedEndpointRegionOption()?.baseUrlPlaceholder && !customEndpointUrl().trim()) {
+    if (selectedEndpointRegionOption?.baseUrlPlaceholder && !customEndpointUrl.trim()) {
       toast.error(t('providerSetup.shared.baseUrlRequired'));
       return;
     }
-    const labelToUse = (label().trim() || defaultLabel()).slice(0, MAX_LABEL_LENGTH);
-    const ok = await props.onAdd(labelToUse, apiKey().trim(), customEndpointPayload());
+    const labelToUse = (label.trim() || defaultLabel()).slice(0, MAX_LABEL_LENGTH);
+    const ok = await props.onAdd(labelToUse, apiKey.trim(), customEndpointPayload);
     if (ok) {
       setIsOpen(false);
       setLabel('');
@@ -679,178 +653,141 @@ export const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) 
     }
   };
 
-  return (
-    <Show
-      when={isOpen()}
-      fallback={
-        !props.open ? (
-          <button
-            type="button"
-            class="provider-detail__add-link"
-            style="margin-top: 12px; background: none; border: none; padding: 0; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); cursor: pointer; text-align: left;"
-            onClick={() => {
-              setLabel(defaultLabel());
-              setIsOpen(true);
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              style="vertical-align: -2px; margin-right: 2px;"
-            >
-              <path d="M4 11h11v2H4zm0-5h16v2H4zm0 10h8v2H4zm15-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" />
-            </svg>{' '}
-            {props.isSubscription
-              ? t('providerSetup.shared.addConnection')
-              : t('providerSetup.shared.addAnotherKey')}
-          </button>
-        ) : undefined
-      }
-    >
-      <div
-        class="provider-detail__add-form"
-        style="margin-top: 12px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 6px;"
+  if (!isOpen) {
+    if (props.open !== undefined) return null;
+    return (
+      <button
+        type="button"
+        className="link-action mt-3 inline-flex items-center gap-1 text-sm text-muted"
+        onClick={() => {
+          setLabel(defaultLabel());
+          setIsOpen(true);
+        }}
       >
-        <label class="provider-detail__label" for="add-key-label">
-          {t('providerSetup.keyForm.name')}
-        </label>
-        <input
-          id="add-key-label"
-          class="provider-detail__input"
-          type="text"
-          maxlength={MAX_LABEL_LENGTH}
-          aria-label={t('providerSetup.keyForm.keyName')}
-          value={label()}
-          placeholder={defaultLabel()}
-          onInput={(e) => setLabel(e.currentTarget.value)}
-        />
-        <Show when={props.endpointRegions?.length}>
-          <label class="provider-detail__label" for="add-key-endpoint" style="margin-top: 8px;">
+        <ListPlus size={14} aria-hidden="true" />{' '}
+        {props.isSubscription
+          ? t('providerSetup.shared.addConnection')
+          : t('providerSetup.shared.addAnotherKey')}
+      </button>
+    );
+  }
+
+  const baseUrlPlaceholder = selectedEndpointRegionOption?.baseUrlPlaceholder;
+  return (
+    <div className="well mt-3 flex flex-col">
+      <label className="label" htmlFor="add-key-label">
+        {t('providerSetup.keyForm.name')}
+      </label>
+      <input
+        id="add-key-label"
+        className="field"
+        type="text"
+        maxLength={MAX_LABEL_LENGTH}
+        aria-label={t('providerSetup.keyForm.keyName')}
+        value={label}
+        placeholder={defaultLabel()}
+        onChange={(e) => setLabel(e.currentTarget.value)}
+      />
+      {props.endpointRegions?.length ? (
+        <>
+          <label className="label mt-2" htmlFor="add-key-endpoint">
             {t('providerSetup.shared.region')}
           </label>
           <select
             id="add-key-endpoint"
-            class="provider-detail__input"
-            value={endpointRegion()}
-            disabled={props.busy()}
+            className="field"
+            value={endpointRegion}
+            disabled={props.busy}
             onChange={(e) => setEndpointRegion(e.currentTarget.value)}
           >
-            <For each={props.endpointRegions ?? []}>
-              {(region) => <option value={region.value}>{region.label}</option>}
-            </For>
+            {props.endpointRegions.map((region) => (
+              <option key={region.value} value={region.value}>
+                {region.label}
+              </option>
+            ))}
           </select>
-          <Show when={selectedEndpointRegionOption()?.baseUrlPlaceholder}>
-            {(placeholder) => (
-              <>
-                <label
-                  class="provider-detail__label"
-                  for="add-key-base-url"
-                  style="margin-top: 8px;"
-                >
-                  {t('providerSetup.shared.baseUrl')}
-                </label>
-                <input
-                  id="add-key-base-url"
-                  class="provider-detail__input"
-                  type="url"
-                  autocomplete="off"
-                  placeholder={placeholder()}
-                  value={customEndpointUrl()}
-                  disabled={props.busy()}
-                  onInput={(e) => setCustomEndpointUrl(e.currentTarget.value)}
-                />
-              </>
-            )}
-          </Show>
-        </Show>
-        <label class="provider-detail__label" for="add-key-value" style="margin-top: 8px;">
-          {t('providerSetup.keyForm.credential', {
-            owner: props.credentialOwnerName(),
-            noun: props.credentialNoun(),
-          })}
-        </label>
-        <input
-          ref={apiKeyInputRef}
-          id="add-key-value"
-          class="provider-detail__input provider-detail__input--masked"
-          type="text"
-          autocomplete="off"
-          aria-label={t('providerSetup.keyForm.newCredential', {
-            owner: props.credentialOwnerName(),
-            noun: props.credentialNoun(),
-          })}
-          placeholder={props.placeholder}
-          value={apiKey()}
-          onInput={(e) => setApiKey(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
-          }}
-        />
-        <Show when={props.whereToGetUrl()}>
-          <p class="provider-detail__key-help">
-            <a
-              class="provider-detail__key-help-link"
-              href={props.whereToGetUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('providerSetup.keyForm.getCredential', {
-                owner: props.credentialOwnerName(),
-                noun: props.credentialNoun(),
-              })}
-            </a>
-          </p>
-        </Show>
-        <div style="display: flex; justify-content: space-between; margin-top: 12px;">
-          <button
-            class="btn btn--outline btn--sm"
-            onClick={() => setIsOpen(false)}
-            disabled={props.busy()}
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            class="btn btn--primary btn--sm"
-            disabled={props.busy() || !apiKey().trim()}
-            onClick={submit}
-          >
-            <Show when={!props.busy()} fallback={<span class="spinner" />}>
-              {t('providerSetup.keyForm.addKey')}
-            </Show>
-          </button>
-        </div>
+          {baseUrlPlaceholder ? (
+            <>
+              <label className="label mt-2" htmlFor="add-key-base-url">
+                {t('providerSetup.shared.baseUrl')}
+              </label>
+              <input
+                id="add-key-base-url"
+                className="field"
+                type="url"
+                autoComplete="off"
+                placeholder={baseUrlPlaceholder}
+                value={customEndpointUrl}
+                disabled={props.busy}
+                onChange={(e) => setCustomEndpointUrl(e.currentTarget.value)}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
+      <label className="label mt-2" htmlFor="add-key-value">
+        {t('providerSetup.keyForm.credential', {
+          owner: props.credentialOwnerName,
+          noun: props.credentialNoun,
+        })}
+      </label>
+      <input
+        ref={apiKeyInputRef}
+        id="add-key-value"
+        className="field provider-detail__input--masked font-mono"
+        type="text"
+        autoComplete="off"
+        aria-label={t('providerSetup.keyForm.newCredential', {
+          owner: props.credentialOwnerName,
+          noun: props.credentialNoun,
+        })}
+        placeholder={props.placeholder}
+        value={apiKey}
+        onChange={(e) => setApiKey(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void submit();
+        }}
+      />
+      <KeyHelpLink
+        url={props.whereToGetUrl}
+        owner={props.credentialOwnerName}
+        noun={props.credentialNoun}
+      />
+      <div className="mt-3 flex justify-between gap-2">
+        <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} disabled={props.busy}>
+          {t('common.cancel')}
+        </Button>
+        <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
+          {t('providerSetup.keyForm.addKey')}
+        </Button>
       </div>
-    </Show>
+    </div>
   );
-};
+}
 
 interface KeyChainViewProps {
   provDef: ProviderDef;
   provId: string;
   agentName: string;
-  authType: Accessor<AuthType>;
-  activeKeys: Accessor<RoutingProvider[]>;
-  busy: Accessor<boolean>;
-  setBusy: Setter<boolean>;
+  authType: AuthType;
+  activeKeys: RoutingProvider[];
+  busy: boolean;
+  setBusy: SetValue<boolean>;
   placeholder: string;
-  credentialNoun: () => string;
-  credentialOwnerName: () => string;
-  whereToGetUrl: () => string | undefined;
-  addKeyOpen?: Accessor<boolean>;
-  setAddKeyOpen?: Setter<boolean>;
+  credentialNoun: string;
+  credentialOwnerName: string;
+  whereToGetUrl?: string;
+  addKeyOpen?: boolean;
+  setAddKeyOpen?: SetValue<boolean>;
   endpointRegions: SubscriptionEndpointRegion[];
   endpointRegionLabel: (value: string | null | undefined) => string | undefined;
   onUpdate: () => void;
   onDelete: (label: string) => void;
 }
 
-const KeyChainView: Component<KeyChainViewProps> = (props) => {
-  const [renamingId, setRenamingId] = createSignal<string | null>(null);
-  const [renameValue, setRenameValue] = createSignal('');
+function KeyChainView(props: KeyChainViewProps) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const startRename = (k: RoutingProvider) => {
     setRenamingId(k.id);
@@ -858,14 +795,14 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
   };
 
   const commitRename = async (k: RoutingProvider) => {
-    const newLabel = renameValue().trim();
+    const newLabel = renameValue.trim();
     if (!newLabel || newLabel === k.label) {
       setRenamingId(null);
       return;
     }
     props.setBusy(true);
     try {
-      await renameProviderKey(props.agentName, props.provId, k.label, newLabel, props.authType());
+      await renameProviderKey(props.agentName, props.provId, k.label, newLabel, props.authType);
       toast.success(t('providerSetup.shared.renamedTo', { label: newLabel }));
       setRenamingId(null);
       props.onUpdate();
@@ -879,13 +816,13 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
   // Order is the default key first, then the order a custom provider's key
   // pool falls over in. Swaps one key with its neighbour.
   const moveKey = async (index: number, delta: -1 | 1) => {
-    const labels = props.activeKeys().map((k) => k.label);
+    const labels = props.activeKeys.map((k) => k.label);
     const target = index + delta;
     if (target < 0 || target >= labels.length) return;
     labels.splice(target, 0, ...labels.splice(index, 1));
     props.setBusy(true);
     try {
-      await reorderProviderKeys(props.agentName, props.provId, labels, props.authType());
+      await reorderProviderKeys(props.agentName, props.provId, labels, props.authType);
       props.onUpdate();
     } catch {
       // toast handled upstream
@@ -894,153 +831,136 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
     }
   };
 
+  // Subscription chains paste setup tokens, which validate differently from
+  // api keys. Pick the right validator based on the chain's auth_type.
+  const addKey = async (label: string, apiKey: string, region?: string) => {
+    const result =
+      props.authType === 'subscription'
+        ? validateSubscriptionKey(props.provDef, apiKey)
+        : validateApiKey(props.provDef, apiKey);
+    if (!result.valid) {
+      toast.error(result.error!);
+      return false;
+    }
+    props.setBusy(true);
+    try {
+      await connectProvider(props.agentName, {
+        provider: props.provId,
+        apiKey: apiKey.replace(/\s/g, ''),
+        authType: props.authType,
+        label,
+        ...(region && { region }),
+      });
+      toast.success(t('providerSetup.keyForm.keyAdded', { name: props.provDef.name, label }));
+      props.onUpdate();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      props.setBusy(false);
+    }
+  };
+
+  const last = props.activeKeys.length - 1;
   return (
-    <div class="provider-detail__field">
-      <label class="provider-detail__label">{t('providerSetup.keyForm.apiKeys')}</label>
+    <div className="mb-4">
+      <label className="label provider-detail__label">{t('providerSetup.keyForm.apiKeys')}</label>
       <ul
         role="list"
         aria-label={t('providerSetup.keyForm.apiKeysFor', { name: props.provDef.name })}
-        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"
+        className="m-0 flex list-none flex-col gap-2 p-0"
       >
-        <For each={props.activeKeys()}>
-          {(k, i) => (
-            <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / 0.3);">
-              <Show
-                when={renamingId() === k.id}
-                fallback={
-                  <>
-                    <div style="flex: 1; min-width: 0;">
-                      <div style="font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        {k.label}
-                      </div>
-                      <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                        {[
-                          k.key_prefix ? `${k.key_prefix}${'•'.repeat(12)}` : '••••••••••••',
-                          props.endpointRegionLabel(k.region),
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </div>
-                    </div>
-                    <button
-                      class="btn btn--outline btn--sm"
-                      style="flex-shrink: 0;"
-                      disabled={props.busy() || i() === 0}
-                      onClick={() => moveKey(i(), -1)}
-                      aria-label={t('providerSetup.keyForm.moveUp', { label: k.label })}
-                      title={t('providerSetup.keyForm.moveUpTitle')}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      class="btn btn--outline btn--sm"
-                      style="flex-shrink: 0;"
-                      disabled={props.busy() || i() === props.activeKeys().length - 1}
-                      onClick={() => moveKey(i(), 1)}
-                      aria-label={t('providerSetup.keyForm.moveDown', { label: k.label })}
-                      title={t('providerSetup.keyForm.moveDownTitle')}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      class="btn btn--outline btn--sm"
-                      style="flex-shrink: 0;"
-                      disabled={props.busy()}
-                      onClick={() => startRename(k)}
-                    >
-                      {t('providerSetup.shared.rename')}
-                    </button>
-                    <button
-                      class="provider-detail__disconnect-icon"
-                      disabled={props.busy()}
-                      onClick={() => props.onDelete(k.label)}
-                      aria-label={t('providerSetup.keyForm.deleteKey', { label: k.label })}
-                      title={t('providerSetup.keyForm.deleteKeyTitle')}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </>
-                }
-              >
+        {props.activeKeys.map((k, i) => (
+          <li
+            key={k.id}
+            className="flex items-center gap-2 rounded-control border border-line bg-sunken px-2.5 py-2"
+          >
+            {renamingId === k.id ? (
+              <>
                 <input
-                  class="provider-detail__input"
+                  className="field min-w-0 flex-1"
                   type="text"
-                  maxlength={MAX_LABEL_LENGTH}
+                  maxLength={MAX_LABEL_LENGTH}
                   aria-label={t('providerSetup.shared.renameNamed', { label: k.label })}
-                  value={renameValue()}
-                  onInput={(e) => setRenameValue(e.currentTarget.value)}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.currentTarget.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitRename(k);
+                    if (e.key === 'Enter') void commitRename(k);
                     if (e.key === 'Escape') setRenamingId(null);
                   }}
                 />
-                <button
-                  class="btn btn--primary btn--sm"
-                  disabled={props.busy()}
-                  onClick={() => commitRename(k)}
-                >
+                <Button size="sm" disabled={props.busy} onClick={() => void commitRename(k)}>
                   {t('common.save')}
-                </button>
-                <button
-                  class="btn btn--outline btn--sm"
-                  disabled={props.busy()}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={props.busy}
                   onClick={() => setRenamingId(null)}
                 >
                   {t('common.cancel')}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-ink">{k.label}</div>
+                  <div className="truncate font-mono text-xs text-muted">
+                    {[
+                      k.key_prefix ? `${k.key_prefix}${'•'.repeat(12)}` : '••••••••••••',
+                      props.endpointRegionLabel(k.region),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={cx('icon-btn', 'shrink-0')}
+                  disabled={props.busy || i === 0}
+                  onClick={() => void moveKey(i, -1)}
+                  aria-label={t('providerSetup.keyForm.moveUp', { label: k.label })}
+                  title={t('providerSetup.keyForm.moveUpTitle')}
+                >
+                  <ArrowUp size={14} aria-hidden="true" />
                 </button>
-              </Show>
-            </li>
-          )}
-        </For>
+                <button
+                  type="button"
+                  className="icon-btn shrink-0"
+                  disabled={props.busy || i === last}
+                  onClick={() => void moveKey(i, 1)}
+                  aria-label={t('providerSetup.keyForm.moveDown', { label: k.label })}
+                  title={t('providerSetup.keyForm.moveDownTitle')}
+                >
+                  <ArrowDown size={14} aria-hidden="true" />
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={props.busy}
+                  onClick={() => startRename(k)}
+                >
+                  {t('providerSetup.shared.rename')}
+                </Button>
+                <button
+                  type="button"
+                  className="icon-btn provider-detail__disconnect-icon shrink-0 text-danger"
+                  disabled={props.busy}
+                  onClick={() => props.onDelete(k.label)}
+                  aria-label={t('providerSetup.keyForm.deleteKey', { label: k.label })}
+                  title={t('providerSetup.keyForm.deleteKeyTitle')}
+                >
+                  <TrashIcon />
+                </button>
+              </>
+            )}
+          </li>
+        ))}
       </ul>
-      <Show when={props.activeKeys().length < MAX_KEYS_PER_PROVIDER}>
+      {props.activeKeys.length < MAX_KEYS_PER_PROVIDER ? (
         <AddAnotherKeyAction
-          onAdd={async (label, apiKey, region) => {
-            // Subscription chains paste setup tokens, which validate
-            // differently from api keys. Pick the right validator based on
-            // the chain's auth_type.
-            const result =
-              props.authType() === 'subscription'
-                ? validateSubscriptionKey(props.provDef, apiKey)
-                : validateApiKey(props.provDef, apiKey);
-            if (!result.valid) {
-              toast.error(result.error!);
-              return false;
-            }
-            props.setBusy(true);
-            try {
-              await connectProvider(props.agentName, {
-                provider: props.provId,
-                apiKey: apiKey.replace(/\s/g, ''),
-                authType: props.authType(),
-                label,
-                ...(region && { region }),
-              });
-              toast.success(
-                t('providerSetup.keyForm.keyAdded', { name: props.provDef.name, label }),
-              );
-              props.onUpdate();
-              return true;
-            } catch {
-              return false;
-            } finally {
-              props.setBusy(false);
-            }
-          }}
+          onAdd={addKey}
           busy={props.busy}
           setBusy={props.setBusy}
           provDef={props.provDef}
@@ -1048,16 +968,16 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
           whereToGetUrl={props.whereToGetUrl}
           credentialNoun={props.credentialNoun}
           credentialOwnerName={props.credentialOwnerName}
-          existingLabels={() => props.activeKeys().map((k) => k.label)}
+          existingLabels={props.activeKeys.map((k) => k.label ?? '')}
           open={props.addKeyOpen}
           setOpen={props.setAddKeyOpen}
-          isSubscription={props.authType() === 'subscription'}
+          isSubscription={props.authType === 'subscription'}
           endpointRegions={props.endpointRegions}
-          initialEndpointRegion={props.activeKeys()[0]?.region ?? props.endpointRegions[0]?.value}
+          initialEndpointRegion={props.activeKeys[0]?.region ?? props.endpointRegions[0]?.value}
         />
-      </Show>
+      ) : null}
     </div>
   );
-};
+}
 
 export default ProviderKeyForm;

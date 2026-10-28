@@ -1,38 +1,35 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@solidjs/testing-library";
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import NotFound from '../../src/pages/NotFound';
 
-vi.mock("@solidjs/router", () => ({
-  A: (props: Record<string, unknown>) => {
-    const { href, class: className, children, ...rest } = props;
-    return <a href={href as string} class={className as string} {...rest}>{children}</a>;
-  },
-}));
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <NotFound />
+    </MemoryRouter>,
+  );
+}
 
-vi.mock("@solidjs/meta", () => ({
-  Title: (props: Record<string, unknown>) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
-
-import NotFound from "../../src/pages/NotFound";
-
-describe("NotFound", () => {
-  it("shows 404 code", () => {
-    render(() => <NotFound />);
-    expect(screen.getByText("404")).toBeDefined();
+describe('NotFound', () => {
+  it('shows 404 code', () => {
+    renderPage();
+    expect(screen.getByText('404')).toBeDefined();
   });
 
-  it("shows page not found heading", () => {
-    render(() => <NotFound />);
-    expect(screen.getByText("Page not found")).toBeDefined();
+  it('shows page not found heading', () => {
+    renderPage();
+    expect(screen.getByText('Page not found')).toBeDefined();
   });
 
-  it("shows description text", () => {
-    render(() => <NotFound />);
+  it('shows description text', () => {
+    renderPage();
     expect(screen.getByText(/doesn't exist or has been moved/)).toBeDefined();
   });
 
-  it("has a link back to dashboard", () => {
-    render(() => <NotFound />);
-    expect(screen.getByText("Back to dashboard")).toBeDefined();
+  it('has a link back to dashboard', () => {
+    renderPage();
+    const link = screen.getByText('Back to dashboard').closest('a');
+    expect(link?.getAttribute('href')).toBe('/');
   });
 });

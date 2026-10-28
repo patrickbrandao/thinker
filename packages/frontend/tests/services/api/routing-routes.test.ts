@@ -96,9 +96,7 @@ describe('routing-routes dual-write API client', () => {
 
     it('drops `routes` defensively when length drifts from models', async () => {
       const fetchMock = setupFetch([]);
-      const routes: ModelRoute[] = [
-        { provider: 'openai', authType: 'api_key', model: 'm1' },
-      ];
+      const routes: ModelRoute[] = [{ provider: 'openai', authType: 'api_key', model: 'm1' }];
       await routing.setFallbacks('my-agent', 'simple', ['m1', 'm2'], routes);
 
       const body = lastBody(fetchMock);
@@ -220,7 +218,13 @@ describe('routing-routes dual-write API client', () => {
 
     it('PUTs to the header-tier override path with the encoded id', async () => {
       const fetchMock = setupFetch({});
-      await headerTiers.overrideHeaderTier('my-agent', 'ht with space', 'gpt-4o', 'OpenAI', 'api_key');
+      await headerTiers.overrideHeaderTier(
+        'my-agent',
+        'ht with space',
+        'gpt-4o',
+        'OpenAI',
+        'api_key',
+      );
       const [url, init] = fetchMock.mock.calls[0];
       // header-tier path uses /override suffix and encodes the id.
       expect(url).toContain('/routing/my-agent/header-tiers/ht%20with%20space/override');
@@ -252,9 +256,7 @@ describe('routing-routes dual-write API client', () => {
 
     it('drops `routes` defensively when lengths drift', async () => {
       const fetchMock = setupFetch([]);
-      const routes: ModelRoute[] = [
-        { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
-      ];
+      const routes: ModelRoute[] = [{ provider: 'openai', authType: 'api_key', model: 'gpt-4o' }];
       await headerTiers.setHeaderTierFallbacks(
         'my-agent',
         'ht-1',

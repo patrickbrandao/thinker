@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { render, screen, fireEvent } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import FilterSelect from '../../src/components/FilterSelect';
 
 const ITEMS = ['anthropic', 'gemini', 'openai'];
@@ -11,13 +11,13 @@ const COLORS: Record<string, string> = {
 };
 
 function renderFilter(
-  overrides: Partial<Parameters<typeof FilterSelect>[0]> = {},
+  overrides: Partial<ComponentProps<typeof FilterSelect>> = {},
   selected: Set<string> = new Set(ITEMS),
 ) {
   const onToggle = vi.fn();
   const onSelectAll = vi.fn();
   const onUnselectAll = vi.fn();
-  const result = render(() => (
+  const result = render(
     <FilterSelect
       noun="providers"
       items={ITEMS}
@@ -27,13 +27,13 @@ function renderFilter(
       onSelectAll={onSelectAll}
       onUnselectAll={onUnselectAll}
       {...overrides}
-    />
-  ));
+    />,
+  );
   return { ...result, onToggle, onSelectAll, onUnselectAll };
 }
 
-const openDropdown = async () => {
-  await fireEvent.click(document.querySelector('.agent-filter-select__trigger')!);
+const openDropdown = () => {
+  fireEvent.click(document.querySelector('.filter-select-trigger')!);
 };
 
 describe('FilterSelect', () => {
@@ -47,80 +47,83 @@ describe('FilterSelect', () => {
     expect(screen.getByText('1 of 3 providers')).toBeDefined();
   });
 
-  it('opens and closes the dropdown from the trigger', async () => {
+  it('opens and closes the dropdown from the trigger', () => {
     renderFilter();
-    expect(document.querySelector('.agent-filter-select__dropdown')).toBeNull();
-    await openDropdown();
-    expect(document.querySelector('.agent-filter-select__dropdown')).not.toBeNull();
-    await openDropdown();
-    expect(document.querySelector('.agent-filter-select__dropdown')).toBeNull();
+    expect(document.querySelector('.filter-select-menu')).toBeNull();
+    openDropdown();
+    expect(document.querySelector('.filter-select-menu')).not.toBeNull();
+    openDropdown();
+    expect(document.querySelector('.filter-select-menu')).toBeNull();
   });
 
-  it('renders one row per item with swatch color and raw name by default', async () => {
+  it('renders one row per item with swatch color and raw name by default', () => {
     renderFilter();
-    await openDropdown();
-    const swatches = document.querySelectorAll('.agent-filter-select__swatch');
+    openDropdown();
+    const swatches = document.querySelectorAll('.filter-select-swatch');
     expect(swatches.length).toBe(3);
     expect((swatches[0] as HTMLElement).style.background).toBe('rgb(17, 17, 17)');
     expect(screen.getByText('anthropic')).toBeDefined();
   });
 
-  it('uses the displayName resolver when provided', async () => {
+  it('uses the displayName resolver when provided', () => {
     renderFilter({ displayName: (item) => item.toUpperCase() });
-    await openDropdown();
+    openDropdown();
     expect(screen.getByText('ANTHROPIC')).toBeDefined();
   });
 
-  it('marks selected items with the on-toggle class', async () => {
+  it('marks selected items as checked', () => {
     renderFilter({}, new Set(['anthropic']));
-    await openDropdown();
-    const toggles = document.querySelectorAll('.agent-filter-select__toggle');
-    expect(toggles[0]!.classList.contains('agent-filter-select__toggle--on')).toBe(true);
-    expect(toggles[1]!.classList.contains('agent-filter-select__toggle--on')).toBe(false);
+    openDropdown();
+    const toggles = document.querySelectorAll('.filter-select-toggle');
+    expect(toggles[0]!.getAttribute('aria-checked')).toBe('true');
+    expect(toggles[1]!.getAttribute('aria-checked')).toBe('false');
+    const rows = screen.getAllByRole('menuitemcheckbox');
+    expect(rows[0]!.getAttribute('aria-checked')).toBe('true');
+    expect(rows[1]!.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('calls onToggle with the clicked item', async () => {
+  it('calls onToggle with the clicked item', () => {
     const { onToggle } = renderFilter();
-    await openDropdown();
-    await fireEvent.click(screen.getByText('gemini'));
+    openDropdown();
+    fireEvent.click(screen.getByText('gemini'));
     expect(onToggle).toHaveBeenCalledWith('gemini');
   });
 
-  it('disables "Select all" when everything is selected and does not call onSelectAll', async () => {
+  it('disables "Select all" when everything is selected and does not call onSelectAll', () => {
     const { onSelectAll } = renderFilter();
-    await openDropdown();
+    openDropdown();
     const selectAll = screen.getByText('Select all') as HTMLButtonElement;
     expect(selectAll.disabled).toBe(true);
-    await fireEvent.click(selectAll);
+    fireEvent.click(selectAll);
     expect(onSelectAll).not.toHaveBeenCalled();
   });
 
-  it('enables "Select all" when nothing is selected and calls onSelectAll', async () => {
+  it('enables "Select all" when nothing is selected and calls onSelectAll', () => {
     const { onSelectAll } = renderFilter({}, new Set<string>());
-    await openDropdown();
+    openDropdown();
     const selectAll = screen.getByText('Select all') as HTMLButtonElement;
     expect(selectAll.disabled).toBe(false);
-    await fireEvent.click(selectAll);
+    fireEvent.click(selectAll);
     expect(onSelectAll).toHaveBeenCalled();
   });
 
-  it('closes on outside click but stays open on inside click', async () => {
+  it('closes on outside click but stays open on inside click', () => {
     renderFilter();
-    await openDropdown();
-    await fireEvent.click(screen.getByText('anthropic'));
-    expect(document.querySelector('.agent-filter-select__dropdown')).not.toBeNull();
-    await fireEvent.click(document.body);
-    expect(document.querySelector('.agent-filter-select__dropdown')).toBeNull();
+    openDropdown();
+    fireEvent.click(screen.getByText('anthropic'));
+    expect(document.querySelector('.filter-select-menu')).not.toBeNull();
+    fireEvent.click(document.body);
+    expect(document.querySelector('.filter-select-menu')).toBeNull();
   });
 
-  it('closes on Escape', async () => {
+  it('closes on Escape', () => {
     renderFilter();
-    await openDropdown();
-    await fireEvent.keyDown(document, { key: 'Escape' });
-    expect(document.querySelector('.agent-filter-select__dropdown')).toBeNull();
+    openDropdown();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelector('.filter-select-menu')).toBeNull();
   });
 
-  it('removes document listeners on unmount', async () => {
+  it('removes document listeners on unmount', () => {
     const removeSpy = vi.spyOn(document, 'removeEventListener');
     const { unmount } = renderFilter();
     unmount();

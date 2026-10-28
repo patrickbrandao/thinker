@@ -1,5 +1,4 @@
-import * as i18n from '@solid-primitives/i18n';
-import { createSignal } from 'solid-js';
+import { signal, useSignal } from '../lib/signal.js';
 import en from './locales/en/index.js';
 import ptBR from './locales/pt-BR/index.js';
 
@@ -17,13 +16,51 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 };
 
 export type RawDictionary = typeof en;
-export type Dictionary = i18n.Flatten<RawDictionary>;
 
-const flatEn = i18n.flatten(en);
-const dictionaries: Record<Locale, Dictionary> = {
+type Leaf = string | ((...args: never[]) => string);
+
+/** Dot-joined key paths of a nested catalog that end at a string or function. */
+type Paths<T, P extends string = ''> = {
+  [K in keyof T & string]: T[K] extends Leaf ? `${P}${K}` : Paths<T[K], `${P}${K}.`>;
+}[keyof T & string];
+
+/** The catalog value at a dot-joined path. */
+type At<T, K extends string> = K extends `${infer Head}.${infer Rest}`
+  ? Head extends keyof T
+    ? At<T[Head], Rest>
+    : never
+  : K extends keyof T
+    ? T[K]
+    : never;
+
+export type TranslationKey = Paths<RawDictionary>;
+export type Dictionary = Record<string, unknown>;
+
+function flatten(
+  obj: object,
+  prefix = '',
+  out: Record<string, unknown> = {},
+): Record<string, unknown> {
+  for (const [key, value] of Object.entries(obj)) {
+    const path = `${prefix}${key}`;
+    if (typeof value === 'string' || typeof value === 'function') out[path] = value;
+    else if (value && typeof value === 'object') flatten(value, `${path}.`, out);
+  }
+  return out;
+}
+
+const flatEn = flatten(en);
+const dictionaries: Record<Locale, Record<string, unknown>> = {
   en: flatEn,
-  'pt-BR': { ...flatEn, ...i18n.flatten(ptBR) } as Dictionary,
+  'pt-BR': { ...flatEn, ...flatten(ptBR) },
 };
+
+/** Fills `{{ name }}` placeholders from `args`. */
+function resolveTemplate(template: string, args: Record<string, unknown>): string {
+  return template.replace(/{{\s*([^{}\s]+)\s*}}/g, (match, name: string) =>
+    name in args ? String(args[name]) : match,
+  );
+}
 
 const STORAGE_KEY = 'thinker.locale';
 const userKey = (userId: string) => `${STORAGE_KEY}.${userId}`;
@@ -65,10 +102,13 @@ export function detectBrowserLocale(): Locale {
   return 'en';
 }
 
-const [locale, setLocaleSignal] = createSignal<Locale>(
-  readStored(STORAGE_KEY) ?? detectBrowserLocale(),
-);
-export { locale };
+/** The active language. Read it with `useLocale()` in components. */
+export const locale = signal<Locale>(readStored(STORAGE_KEY) ?? detectBrowserLocale());
+
+/** Re-renders the component when the language changes and returns it. */
+export function useLocale(): Locale {
+  return useSignal(locale);
+}
 
 let currentUserId: string | null = null;
 
@@ -83,7 +123,7 @@ applyDocumentLang(locale());
  * preference API yet, so "per user" means per user on this browser.
  */
 export function setLocale(next: Locale, opts: { persist?: boolean } = {}): void {
-  setLocaleSignal(next);
+  locale.set(next);
   applyDocumentLang(next);
   if (opts.persist === false) return;
   writeStored(STORAGE_KEY, next);
@@ -110,21 +150,34 @@ export function resetLocaleForTests(next: Locale = 'en'): void {
 
 const dict = () => dictionaries[locale()];
 
+type TArgs<K extends TranslationKey> =
+  At<RawDictionary, K> extends (...args: infer A) => string
+    ? A
+    : [args?: Record<string, string | number>];
+
 /**
  * Translate a key. `{{ name }}` placeholders are filled from the second
- * argument; function entries (plurals) receive the extra arguments. Reading
- * it inside JSX or a memo keeps the text reactive to the language.
+ * argument; function entries (plurals) receive the extra arguments. The app
+ * root remounts when the language changes, so plain calls stay current.
  */
-export const t = i18n.translator(dict, i18n.resolveTemplate);
+export function t<K extends TranslationKey>(key: K, ...args: TArgs<K>): string {
+  const value = dict()[key];
+  if (typeof value === 'function') return (value as (...a: unknown[]) => string)(...args);
+  if (typeof value !== 'string') return key;
+  const first = args[0];
+  return first && typeof first === 'object'
+    ? resolveTemplate(value, first as Record<string, unknown>)
+    : value;
+}
 
 /**
  * Untyped lookup for keys built at runtime (e.g. `format.status.${code}`).
  * Returns undefined when the key does not exist, so callers can fall back.
  */
 export function tMaybe(key: string, args?: Record<string, string | number>): string | undefined {
-  const value = (dict() as Record<string, unknown>)[key];
+  const value = dict()[key];
   if (typeof value !== 'string') return undefined;
-  return i18n.resolveTemplate(value, args ?? {});
+  return resolveTemplate(value, args ?? {});
 }
 
 /** BCP 47 tag for `Intl` APIs. English keeps `en-US` formatting. */

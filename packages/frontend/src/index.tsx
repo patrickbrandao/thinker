@@ -1,23 +1,22 @@
-/* @refresh reload */
-import { render } from 'solid-js/web';
-import { Router, Route, Navigate } from '@solidjs/router';
-import { MetaProvider, Title } from '@solidjs/meta';
+import { StrictMode, Suspense, type ReactNode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import App from './App.jsx';
 import AuthLayout from './layouts/AuthLayout.jsx';
-import Workspace from './pages/Workspace.jsx';
 import RootRedirect from './components/RootRedirect.jsx';
 import AgentGuard from './components/AgentGuard.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
 import GuestGuard from './components/GuestGuard.jsx';
 import MeGate from './components/MeGate.jsx';
-import NotFound from './pages/NotFound.jsx';
 import ToastContainer from './components/ToastContainer.jsx';
+import NotFound from './pages/NotFound.jsx';
 import { lazyReload, clearReloadFlag } from './services/lazy-reload.js';
 import { RightSidebarProvider } from './services/right-sidebar.jsx';
 import { cleanUpStoredHeaders } from './services/playground-request-headers.js';
 import { removeLegacyStorageKeys } from './services/legacy-storage.js';
-import type { ParentComponent } from 'solid-js';
-import './styles/theme.css';
+import { watchSystemTheme } from './lib/theme.js';
+import { useLocale } from './i18n/index.js';
+import './styles/index.css';
 
 clearReloadFlag();
 // Wipe Playground header values saved in plain text by older builds, even if
@@ -26,7 +25,9 @@ cleanUpStoredHeaders();
 // Drop Web Storage keys left by pre-rename builds. Runs after the header
 // cleanup above, which still reads header names from one of them.
 removeLegacyStorageKeys();
+watchSystemTheme();
 
+const Workspace = lazyReload(() => import('./pages/Workspace.jsx'));
 const GlobalOverview = lazyReload(() => import('./pages/GlobalOverview.jsx'));
 const AgentDetail = lazyReload(() => import('./pages/AgentDetail.jsx'));
 const AgentOverview = lazyReload(() => import('./pages/AgentOverview.jsx'));
@@ -59,133 +60,348 @@ const Cli = lazyReload(() => import('./pages/integrations/Cli.jsx'));
 const Organization = lazyReload(() => import('./pages/Organization.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
+const Topology = lazyReload(() => import('./pages/Topology.jsx'));
 
-const GuestLayout: ParentComponent = (props) => (
+const Lazy = ({ children }: { children: ReactNode }) => (
+  <Suspense fallback={<div className="page" aria-busy="true" />}>{children}</Suspense>
+);
+
+/** Sign-in screens: guest-only, on the auth card. */
+const GuestLayout = () => (
   <GuestGuard>
-    <AuthLayout>{props.children}</AuthLayout>
+    <AuthLayout>
+      <Lazy>
+        <Outlet />
+      </Lazy>
+    </AuthLayout>
   </GuestGuard>
 );
 
-// Full-page onboarding: authenticated but outside the App dashboard shell.
-// The embedded Playground step calls useRightSidebar, so the provider App
-// normally supplies must be recreated here.
-const WelcomeLayout: ParentComponent = (props) => (
+// Full-page onboarding: authenticated but outside the dashboard shell. The
+// embedded Playground step calls useRightSidebar, so the provider App
+// normally supplies is recreated here.
+const WelcomeLayout = () => (
   <AuthGuard>
     <MeGate>
-      <RightSidebarProvider>{props.children}</RightSidebarProvider>
+      <RightSidebarProvider>
+        <Lazy>
+          <Outlet />
+        </Lazy>
+      </RightSidebarProvider>
     </MeGate>
   </AuthGuard>
 );
 
 // Forced password change: authenticated, outside the dashboard shell (which
 // stays blocked until the change succeeds).
-const ChangePasswordLayout: ParentComponent = (props) => (
+const ChangePasswordLayout = () => (
   <AuthGuard>
-    <AuthLayout>{props.children}</AuthLayout>
+    <AuthLayout>
+      <Lazy>
+        <Outlet />
+      </Lazy>
+    </AuthLayout>
   </AuthGuard>
 );
 
-// Remove the static <title> from index.html so @solidjs/meta can manage
-// document.title via its own <title> elements. The static tag is kept in
-// index.html for SEO (pre-JS crawlers / Lighthouse) but must be removed
-// before MetaProvider renders, otherwise the browser always picks the first
-// <title> in the DOM and ignores the dynamic ones.
+const GuardedOutlet = () => (
+  <AuthGuard>
+    <Lazy>
+      <Outlet />
+    </Lazy>
+  </AuthGuard>
+);
+
+/** Legacy /agents/* bookmarks → /harnesses/*. */
+function LegacyAgentsRedirect() {
+  const { pathname, search, hash } = useLocation();
+  return <Navigate to={`${pathname.replace(/^\/agents/, '/harnesses')}${search}${hash}`} replace />;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route element={<App />}>
+        <Route index element={<RootRedirect />} />
+        <Route
+          path="overview"
+          element={
+            <Lazy>
+              <GlobalOverview />
+            </Lazy>
+          }
+        />
+        <Route
+          path="messages"
+          element={
+            <Lazy>
+              <MessageLog />
+            </Lazy>
+          }
+        />
+        <Route
+          path="harnesses"
+          element={
+            <Lazy>
+              <Workspace />
+            </Lazy>
+          }
+        />
+        <Route
+          path="topology"
+          element={
+            <Lazy>
+              <Topology />
+            </Lazy>
+          }
+        />
+        <Route
+          path="playground"
+          element={
+            <Lazy>
+              <Playground />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/subscriptions"
+          element={
+            <Lazy>
+              <Subscriptions />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/usage-based"
+          element={
+            <Lazy>
+              <Byok />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/local"
+          element={
+            <Lazy>
+              <LocalProviders />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/connections/:connectionId"
+          element={
+            <Lazy>
+              <ConnectionDetail />
+            </Lazy>
+          }
+        />
+        <Route
+          path="integrations/mcp"
+          element={
+            <Lazy>
+              <McpServer />
+            </Lazy>
+          }
+        />
+        <Route
+          path="integrations/cli"
+          element={
+            <Lazy>
+              <Cli />
+            </Lazy>
+          }
+        />
+        <Route path="harnesses/:agentName" element={<AgentGuard />}>
+          {/* Redirects: /limits → /guardrails, /messages → global /messages */}
+          <Route
+            path="limits"
+            element={
+              <Lazy>
+                <AgentLimitsRedirect />
+              </Lazy>
+            }
+          />
+          <Route
+            path="messages"
+            element={
+              <Lazy>
+                <AgentMessagesRedirect />
+              </Lazy>
+            }
+          />
+          {/* Tabbed shell (AgentDetail renders <Outlet />) */}
+          <Route
+            element={
+              <Lazy>
+                <AgentDetail />
+              </Lazy>
+            }
+          >
+            <Route
+              index
+              element={
+                <Lazy>
+                  <AgentOverview />
+                </Lazy>
+              }
+            />
+            <Route
+              path="overview"
+              element={
+                <Lazy>
+                  <AgentOverview />
+                </Lazy>
+              }
+            />
+            <Route
+              path="routing"
+              element={
+                <Lazy>
+                  <Routing />
+                </Lazy>
+              }
+            />
+            <Route
+              path="providers"
+              element={
+                <Lazy>
+                  <AgentProviders />
+                </Lazy>
+              }
+            />
+            <Route
+              path="guardrails"
+              element={
+                <Lazy>
+                  <Limits />
+                </Lazy>
+              }
+            />
+            <Route
+              path="settings/*"
+              element={
+                <Lazy>
+                  <Settings />
+                </Lazy>
+              }
+            />
+          </Route>
+          {/* Non-tab harness routes: kept reachable but not primary tabs */}
+          <Route
+            path="model-prices"
+            element={
+              <Lazy>
+                <ModelPrices />
+              </Lazy>
+            }
+          />
+          <Route
+            path="help"
+            element={
+              <Lazy>
+                <Help />
+              </Lazy>
+            }
+          />
+        </Route>
+        <Route path="agents/*" element={<LegacyAgentsRedirect />} />
+        <Route path="agents" element={<LegacyAgentsRedirect />} />
+        <Route
+          path="connect-provider"
+          element={
+            <Lazy>
+              <ConnectProvider />
+            </Lazy>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <Lazy>
+              <Account />
+            </Lazy>
+          }
+        />
+        <Route
+          path="organization"
+          element={
+            <Lazy>
+              <Organization />
+            </Lazy>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <Lazy>
+              <AdminUsers />
+            </Lazy>
+          }
+        />
+      </Route>
+      <Route path="cli/auth" element={<GuardedOutlet />}>
+        <Route index element={<CliAuth />} />
+      </Route>
+      <Route path="consent" element={<GuardedOutlet />}>
+        <Route index element={<Consent />} />
+      </Route>
+      <Route
+        path="oauth-error"
+        element={
+          <AuthLayout>
+            <Lazy>
+              <OauthError />
+            </Lazy>
+          </AuthLayout>
+        }
+      />
+      <Route element={<GuestLayout />}>
+        <Route path="login" element={<Login />} />
+        <Route path="register" element={<Register />} />
+        <Route path="reset-password" element={<ResetPassword />} />
+      </Route>
+      <Route
+        path="setup"
+        element={
+          <AuthLayout>
+            <Lazy>
+              <Setup />
+            </Lazy>
+          </AuthLayout>
+        }
+      />
+      <Route path="change-password" element={<ChangePasswordLayout />}>
+        <Route index element={<ChangePassword />} />
+      </Route>
+      <Route path="welcome" element={<WelcomeLayout />}>
+        <Route index element={<Welcome />} />
+      </Route>
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+/** Remounts the tree when the language changes, so every `t()` call re-reads. */
+function Root() {
+  const locale = useLocale();
+  return (
+    <BrowserRouter key={locale}>
+      <title>Thinker</title>
+      <ToastContainer />
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+// The static <title> in index.html stays for crawlers; React 19 hoists the
+// <title> elements pages render, so drop the static one first.
 document.head.querySelector('title')?.remove();
 
 const root = document.getElementById('root');
+if (!root) throw new Error('Root element not found');
 
-if (!root) {
-  throw new Error('Root element not found');
-}
-
-render(
-  () => (
-    <MetaProvider>
-      <Title>Thinker</Title>
-      <ToastContainer />
-      <Router>
-        <Route path="/" component={App}>
-          <Route path="/" component={RootRedirect} />
-          <Route path="/overview" component={GlobalOverview} />
-          <Route path="/messages" component={MessageLog} />
-          <Route path="/harnesses" component={Workspace} />
-          <Route path="/playground" component={Playground} />
-          <Route path="/providers/subscriptions" component={Subscriptions} />
-          <Route path="/providers/usage-based" component={Byok} />
-          <Route path="/providers/local" component={LocalProviders} />
-          <Route path="/providers/connections/:connectionId" component={ConnectionDetail} />
-          <Route path="/integrations/mcp" component={McpServer} />
-          <Route path="/integrations/cli" component={Cli} />
-          <Route path="/harnesses/:agentName" component={AgentGuard}>
-            {/* Redirects: /limits → /guardrails, /messages → global /messages */}
-            <Route path="/limits" component={AgentLimitsRedirect} />
-            <Route path="/messages" component={AgentMessagesRedirect} />
-
-            {/* Tabbed shell wraps Overview / Routing / Limits / Settings */}
-            <Route path="/" component={AgentDetail}>
-              <Route path="/" component={AgentOverview} />
-              <Route path="/overview" component={AgentOverview} />
-              <Route path="/routing" component={Routing} />
-              <Route path="/providers" component={AgentProviders} />
-              <Route path="/guardrails" component={Limits} />
-              <Route path="/settings/*" component={Settings} />
-            </Route>
-
-            {/* Non-tab agent routes: kept reachable but not primary tabs */}
-            <Route path="/model-prices" component={ModelPrices} />
-            <Route path="/help" component={Help} />
-          </Route>
-
-          {/* Legacy /agents redirects → /harnesses (keep bookmarks alive) */}
-          <Route
-            path="/agents"
-            component={() => {
-              const { search, hash } = window.location;
-              return <Navigate href={`/harnesses${search}${hash}`} />;
-            }}
-          />
-          {/* The *rest splat matches zero trailing segments too, so this single
-              route also covers the bare /agents/:agentName path. */}
-          <Route
-            path="/agents/:agentName/*rest"
-            component={() => {
-              const { pathname, search, hash } = window.location;
-              const target = pathname.replace(/^\/agents/, '/harnesses');
-              return <Navigate href={`${target}${search}${hash}`} />;
-            }}
-          />
-
-          <Route path="/connect-provider" component={ConnectProvider} />
-          <Route path="/account" component={Account} />
-          <Route path="/organization" component={Organization} />
-          <Route path="/admin/users" component={AdminUsers} />
-        </Route>
-        <Route path="/cli/auth" component={AuthGuard}>
-          <Route path="/" component={CliAuth} />
-        </Route>
-        <Route path="/consent" component={AuthGuard}>
-          <Route path="/" component={Consent} />
-        </Route>
-        <Route path="/oauth-error" component={AuthLayout}>
-          <Route path="/" component={OauthError} />
-        </Route>
-        <Route path="/" component={GuestLayout}>
-          <Route path="/login" component={Login} />
-          <Route path="/register" component={Register} />
-          <Route path="/reset-password" component={ResetPassword} />
-        </Route>
-        <Route path="/setup" component={AuthLayout}>
-          <Route path="/" component={Setup} />
-        </Route>
-        <Route path="/change-password" component={ChangePasswordLayout}>
-          <Route path="/" component={ChangePassword} />
-        </Route>
-        <Route path="/welcome" component={WelcomeLayout}>
-          <Route path="/" component={Welcome} />
-        </Route>
-        <Route path="*404" component={NotFound} />
-      </Router>
-    </MetaProvider>
-  ),
-  root,
+createRoot(root).render(
+  <StrictMode>
+    <Root />
+  </StrictMode>,
 );

@@ -1,13 +1,12 @@
-import { useLocation } from '@solidjs/router';
+import { useLocation } from 'react-router';
 import { t, tMaybe } from '../i18n/index.js';
 import type { StageDef } from './providers.js';
 
-export function useAgentName(): () => string | null {
+/** Name of the harness in the current `/harnesses/:agentName/...` URL, or null. */
+export function useAgentName(): string | null {
   const location = useLocation();
-  return () => {
-    const match = location.pathname.match(/^\/harnesses\/([^/]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : null;
-  };
+  const match = location.pathname.match(/^\/harnesses\/([^/]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
 /** Translated label of a routing stage (falls back to the English definition). */

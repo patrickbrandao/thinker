@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
 import {
   FallbackIcon,
   HeartbeatIcon,
@@ -9,12 +9,12 @@ import {
   AttemptsCell,
   RecoveryCell,
 } from '../../src/components/message-table-cells';
-import { fireEvent } from '@solidjs/testing-library';
+import { fireEvent } from '@testing-library/react';
 import type { MessageRow } from '../../src/components/message-table-types';
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
+vi.mock('react-router', () => ({
+  Link: (props: any) => (
+    <a href={props.to} className={props.className}>
       {props.children}
     </a>
   ),
@@ -75,7 +75,7 @@ function baseRow(overrides: Partial<MessageRow> = {}): MessageRow {
 
 describe('FallbackIcon', () => {
   it('renders with aria-hidden', () => {
-    const { container } = render(() => <FallbackIcon />);
+    const { container } = render(<FallbackIcon />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(svg!.getAttribute('aria-hidden')).toBe('true');
@@ -84,7 +84,7 @@ describe('FallbackIcon', () => {
 
 describe('HeartbeatIcon', () => {
   it('renders with aria-hidden', () => {
-    const { container } = render(() => <HeartbeatIcon />);
+    const { container } = render(<HeartbeatIcon />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(svg!.getAttribute('aria-hidden')).toBe('true');
@@ -93,13 +93,13 @@ describe('HeartbeatIcon', () => {
 
 describe('AttemptsCell', () => {
   function renderCell(row: MessageRow) {
-    return render(() => (
+    return render(
       <table>
         <tbody>
           <tr>{AttemptsCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
   }
 
   it('renders just the attempt count (no icons) when fallback_from_model is set', () => {
@@ -118,13 +118,13 @@ describe('AttemptsCell', () => {
 
 describe('RecoveryCell', () => {
   function renderCell(row: MessageRow) {
-    return render(() => (
+    return render(
       <table>
         <tbody>
           <tr>{RecoveryCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
   }
 
   it('renders a dash when no fallback applies', () => {
@@ -154,38 +154,38 @@ describe('RecoveryCell', () => {
 describe('AgentCell', () => {
   it('renders agent_name when present', () => {
     const row = baseRow({ agent_name: 'my-agent' });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{AgentCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     expect(container.textContent).toContain('my-agent');
   });
 
   it('renders em dash when agent_name is null', () => {
     const row = baseRow({ agent_name: null });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{AgentCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     expect(container.textContent).toContain('—');
   });
 });
 
 describe('StatusCell merged pill', () => {
   function renderCell(row: MessageRow) {
-    return render(() => (
+    return render(
       <table>
         <tbody>
           <tr>{StatusCell(row, undefined)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
   }
 
   function onlyBadge(container: HTMLElement) {
@@ -310,13 +310,13 @@ describe('ModelCell', () => {
       header_tier_name: 'Ignored',
       routing_tier: 'default',
     });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{ModelCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     const badge = container.querySelector('.tier-badge--virtual');
     expect(badge).not.toBeNull();
     expect(badge!.textContent).toBe('deepseek/flash');
@@ -330,13 +330,13 @@ describe('ModelCell', () => {
       header_tier_name: 'My Custom Tier',
       header_tier_color: 'rose',
     });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{ModelCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     const badge = container.querySelector('.tier-badge--custom');
     expect(badge).not.toBeNull();
     expect(badge!.textContent).toBe('My Custom Tier');
@@ -345,13 +345,13 @@ describe('ModelCell', () => {
 
   it('uses indigo as default header tier color', () => {
     const row = baseRow({ header_tier_name: 'Tier A' });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{ModelCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     const badge = container.querySelector('.tier-badge--custom');
     expect(badge).not.toBeNull();
     expect(badge!.className).toContain('tier-color--indigo');
@@ -363,13 +363,13 @@ describe('ModelCell', () => {
       provider: 'custom:u-1',
       custom_provider_name: 'MyLLM',
     });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{ModelCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     expect(container.textContent).toContain('openai/gpt-oss-120b');
     expect(container.textContent).not.toContain('custom:');
     expect(container.textContent).not.toContain('Custom');
@@ -382,13 +382,13 @@ describe('ModelCell', () => {
       provider: 'custom:gone',
       custom_provider_name: null,
     });
-    const { container } = render(() => (
+    const { container } = render(
       <table>
         <tbody>
           <tr>{ModelCell(row)}</tr>
         </tbody>
-      </table>
-    ));
+      </table>,
+    );
     expect(container.textContent).toContain('my-model');
     expect(container.textContent).not.toContain('custom:');
     const avatar = container.querySelector('.provider-card__logo-letter');

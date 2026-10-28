@@ -1,19 +1,19 @@
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@solidjs/testing-library";
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
-vi.mock("@solidjs/router", () => ({
-  Navigate: (props: Record<string, unknown>) => (
-    <div data-testid="navigate" data-href={props.href as string} />
-  ),
-}));
+import RootRedirect from '../../src/components/RootRedirect';
 
-import RootRedirect from "../../src/components/RootRedirect";
-
-describe("RootRedirect", () => {
-  it("redirects the root path to the global Overview", () => {
-    const { container } = render(() => <RootRedirect />);
-    const navigate = container.querySelector('[data-testid="navigate"]');
-    expect(navigate).not.toBeNull();
-    expect(navigate?.getAttribute("data-href")).toBe("/overview");
+describe('RootRedirect', () => {
+  it('redirects the root path to the global Overview', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/overview" element={<span>Overview page</span>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Overview page')).toBeDefined();
   });
 });

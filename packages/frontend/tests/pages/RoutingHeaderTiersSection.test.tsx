@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor, screen } from '@solidjs/testing-library';
+import { act, render, fireEvent, waitFor, screen } from '@testing-library/react';
 
 const mockListHeaderTiers = vi.fn();
 const mockDeleteHeaderTier = vi.fn();
@@ -185,10 +185,10 @@ const tier2: HeaderTier = {
 
 function makeProps(overrides: Partial<Parameters<typeof RoutingHeaderTiersSection>[0]> = {}) {
   return {
-    agentName: () => 'demo',
-    models: () => [],
-    customProviders: () => [],
-    connectedProviders: () => [],
+    agentName: 'demo',
+    models: [],
+    customProviders: [],
+    connectedProviders: [],
     getModelParams: () => null,
     setModelParams: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -215,49 +215,43 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('renders the empty state when no tiers exist (with no externalTiers)', async () => {
     mockListHeaderTiers.mockResolvedValue([]);
-    render(() => <RoutingHeaderTiersSection {...makeProps()} />);
+    render(<RoutingHeaderTiersSection {...makeProps()} />);
     await waitFor(() => {
       expect(screen.getByText('No custom tiers activated')).toBeDefined();
     });
   });
 
   it('renders only enabled tiers as cards', async () => {
-    render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     expect(screen.getByTestId('card-ht-1')).toBeDefined();
     expect(screen.queryByTestId('card-ht-2')).toBeNull();
   });
 
   it('renders the Manage button when at least one tier exists', () => {
-    render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     expect(screen.getByText('Manage custom routing')).toBeDefined();
   });
 
   it('opens the manage modal when clicking the Manage button', () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    expect(container.querySelector('.header-tier-manage-modal')).not.toBeNull();
+    expect(document.querySelector('.header-tier-manage-modal')).not.toBeNull();
   });
 
   it('opens the create modal directly when there are zero tiers', async () => {
     // HeaderTierModal is lazy-loaded behind <Suspense>, so the modal mounts on
     // a microtask — await it instead of asserting synchronously.
-    const { findByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [] })} />
-    ));
+    const { findByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [] })} />,
+    );
     fireEvent.click(screen.getByText('Create custom tier'));
     expect(await findByTestId('tier-modal')).not.toBeNull();
   });
 
   it('opens edit modal when card.onEdit is invoked', async () => {
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('edit-ht-1'));
     await waitForTierModal();
     expect(getByTestId('tier-modal')).toBeDefined();
@@ -265,9 +259,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('calls overrideHeaderTier with the tier id when card emits override', async () => {
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('override-ht-1'));
     await waitFor(() => {
       expect(mockOverrideHeaderTier).toHaveBeenCalledWith(
@@ -283,9 +277,9 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('toasts an error when override fails', async () => {
     mockOverrideHeaderTier.mockRejectedValue(new Error('boom'));
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('override-ht-1'));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('boom');
@@ -294,11 +288,11 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('refetches when a card fires onFallbacksUpdate without routes (e.g. tier reset)', async () => {
     mockListHeaderTiers.mockResolvedValue([tier1]);
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <RoutingHeaderTiersSection
         {...makeProps({ externalTiers: undefined, externalRefetch: undefined })}
-      />
-    ));
+      />,
+    );
     await waitFor(() => {
       expect(getByTestId('fb-update-ht-1')).toBeDefined();
     });
@@ -311,20 +305,18 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('calls externalRefetch when fb update without routes and external prop wired', async () => {
     const externalRefetch = vi.fn();
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection
-        {...makeProps({ externalTiers: () => [tier1], externalRefetch })}
-      />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1], externalRefetch })} />,
+    );
     fireEvent.click(getByTestId('fb-update-ht-1'));
     expect(externalRefetch).toHaveBeenCalled();
   });
 
   it('calls externalMutate optimistically when fb update with routes and external prop wired', async () => {
     const externalMutate = vi.fn();
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1], externalMutate })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1], externalMutate })} />,
+    );
     fireEvent.click(getByTestId('fb-update-routes-ht-1'));
     expect(externalMutate).toHaveBeenCalledTimes(1);
     const mutator = externalMutate.mock.calls[0]![0] as (
@@ -339,11 +331,11 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('uses internalMutate optimistically when fb update with routes and no external prop', async () => {
     mockListHeaderTiers.mockResolvedValue([tier1]);
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <RoutingHeaderTiersSection
         {...makeProps({ externalTiers: undefined, externalRefetch: undefined })}
-      />
-    ));
+      />,
+    );
     await waitFor(() => {
       expect(getByTestId('fb-update-routes-ht-1')).toBeDefined();
     });
@@ -355,9 +347,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('calls toggleHeaderTier with false when disabling from a card', async () => {
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('disable-ht-1'));
     await waitFor(() => {
       expect(mockToggleHeaderTier).toHaveBeenCalledWith('demo', 'ht-1', false);
@@ -366,9 +358,9 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('updates a custom tier response mode from the card', async () => {
     const externalMutate = vi.fn();
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1], externalMutate })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1], externalMutate })} />,
+    );
     fireEvent.click(getByTestId('response-ht-1'));
     await waitFor(() => {
       expect(mockSetHeaderTierResponseMode).toHaveBeenCalledWith('demo', 'ht-1', 'stream');
@@ -383,9 +375,9 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('toasts when a custom tier response mode update fails', async () => {
     mockSetHeaderTierResponseMode.mockRejectedValue(new Error('response-fail'));
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('response-ht-1'));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('response-fail');
@@ -394,11 +386,11 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('uses internal state and buffered copy for response mode updates without external mutation', async () => {
     mockListHeaderTiers.mockResolvedValue([tier1]);
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <RoutingHeaderTiersSection
         {...makeProps({ externalTiers: undefined, externalMutate: undefined })}
-      />
-    ));
+      />,
+    );
     await waitFor(() => {
       expect(getByTestId('response-buffered-ht-1')).toBeDefined();
     });
@@ -410,11 +402,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('toggles tiers from the manage modal rows', async () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    const rows = container.querySelectorAll('.specificity-modal__row');
+    const rows = document.querySelectorAll('.specificity-modal__row');
     fireEvent.click(rows[0]);
     await waitFor(() => {
       expect(mockToggleHeaderTier).toHaveBeenCalledWith('demo', 'ht-1', false);
@@ -422,11 +412,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('toggles via Enter key on a manage modal row', async () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    const rows = container.querySelectorAll('.specificity-modal__row');
+    const rows = document.querySelectorAll('.specificity-modal__row');
     fireEvent.keyDown(rows[1], { key: 'Enter' });
     await waitFor(() => {
       expect(mockToggleHeaderTier).toHaveBeenCalledWith('demo', 'ht-2', true);
@@ -434,9 +422,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('opens the create modal from inside the manage modal', async () => {
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />,
+    );
     fireEvent.click(screen.getByText('Manage custom routing'));
     fireEvent.click(screen.getByText('Create new tier'));
     await waitForTierModal();
@@ -444,9 +432,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('auto-opens the SDK snippet modal after a fresh tier is created', async () => {
-    const { getByTestId, queryByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [] })} />
-    ));
+    const { getByTestId, queryByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [] })} />,
+    );
     fireEvent.click(screen.getByText('Create custom tier'));
     await waitForTierModal();
     fireEvent.click(getByTestId('tier-modal-save'));
@@ -454,9 +442,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('does NOT auto-open the snippet modal after an edit', async () => {
-    const { getByTestId, queryByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId, queryByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('edit-ht-1'));
     await waitForTierModal();
     fireEvent.click(getByTestId('tier-modal-save'));
@@ -464,9 +452,9 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it("invokes deleteHeaderTier from the modal's delete callback", async () => {
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('edit-ht-1'));
     await waitForTierModal();
     fireEvent.click(getByTestId('tier-modal-delete'));
@@ -477,29 +465,29 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('toasts an error when listHeaderTiers rejects on the internal resource', async () => {
     mockListHeaderTiers.mockRejectedValue(new Error('network'));
-    render(() => <RoutingHeaderTiersSection {...makeProps()} />);
+    render(<RoutingHeaderTiersSection {...makeProps()} />);
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('network');
     });
   });
 
   it('renders the section title in standalone mode', () => {
-    render(() => <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />);
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />);
     expect(screen.getByText('Custom routing')).toBeDefined();
   });
 
   it('hides the section title in embedded mode', () => {
-    render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1], embedded: true })} />
-    ));
+    render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1], embedded: true })} />,
+    );
     expect(screen.queryByText('Custom routing')).toBeNull();
   });
 
   it('toasts an error when delete fails (via the edit modal)', async () => {
     mockDeleteHeaderTier.mockRejectedValue(new Error('delete-fail'));
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('edit-ht-1'));
     await waitForTierModal();
     fireEvent.click(getByTestId('tier-modal-delete'));
@@ -510,9 +498,9 @@ describe('RoutingHeaderTiersSection', () => {
 
   it('toasts an error when toggle fails', async () => {
     mockToggleHeaderTier.mockRejectedValue(new Error('toggle-fail'));
-    const { getByTestId } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1] })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1] })} />,
+    );
     fireEvent.click(getByTestId('disable-ht-1'));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('toggle-fail');
@@ -520,36 +508,30 @@ describe('RoutingHeaderTiersSection', () => {
   });
 
   it('closes the manage modal when clicking the overlay', () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    expect(container.querySelector('.header-tier-manage-modal')).not.toBeNull();
-    const overlay = container.querySelector('.modal-overlay') as HTMLElement;
-    fireEvent.click(overlay);
-    expect(container.querySelector('.header-tier-manage-modal')).toBeNull();
+    expect(document.querySelector('.header-tier-manage-modal')).not.toBeNull();
+    const overlay = document.querySelector('.overlay') as HTMLElement;
+    fireEvent.mouseDown(overlay);
+    expect(document.querySelector('.header-tier-manage-modal')).toBeNull();
   });
 
   it('closes the manage modal on Escape', () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    fireEvent.keyDown(container.querySelector('.modal-overlay') as HTMLElement, {
+    fireEvent.keyDown(document.querySelector('.overlay') as HTMLElement, {
       key: 'Escape',
     });
-    expect(container.querySelector('.header-tier-manage-modal')).toBeNull();
+    expect(document.querySelector('.header-tier-manage-modal')).toBeNull();
   });
 
   it('dismisses the manage modal via the Done button', () => {
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    const buttons = Array.from(container.querySelectorAll('button'));
+    const buttons = Array.from(document.querySelectorAll('button'));
     const done = buttons.find((b) => b.textContent === 'Done') as HTMLButtonElement;
     fireEvent.click(done);
-    expect(container.querySelector('.header-tier-manage-modal')).toBeNull();
+    expect(document.querySelector('.header-tier-manage-modal')).toBeNull();
   });
 
   it("ignores duplicate clicks on a row while it's already toggling", async () => {
@@ -559,11 +541,9 @@ describe('RoutingHeaderTiersSection', () => {
         resolveToggle = r;
       }),
     );
-    const { container } = render(() => (
-      <RoutingHeaderTiersSection {...makeProps({ externalTiers: () => [tier1, tier2] })} />
-    ));
+    render(<RoutingHeaderTiersSection {...makeProps({ externalTiers: [tier1, tier2] })} />);
     fireEvent.click(screen.getByText('Manage custom routing'));
-    const rows = container.querySelectorAll('.specificity-modal__row');
+    const rows = document.querySelectorAll('.specificity-modal__row');
     fireEvent.click(rows[0]);
     fireEvent.click(rows[0]); // second click while toggling — should no-op
     resolveToggle();
@@ -575,58 +555,58 @@ describe('RoutingHeaderTiersSection', () => {
   describe('headless mode', () => {
     it('renders only the modals (no header/cards) and exposes an opener that opens manage', async () => {
       let opener: (() => void) | undefined;
-      const { container } = render(() => (
+      render(
         <RoutingHeaderTiersSection
           {...makeProps({
-            externalTiers: () => [tier1, tier2],
+            externalTiers: [tier1, tier2],
             headless: true,
             onOpenRef: (open) => {
               opener = open;
             },
           })}
-        />
-      ));
+        />,
+      );
       // Headless mode renders neither the section title nor the card grid.
       expect(screen.queryByText('Custom routing')).toBeNull();
-      expect(container.querySelector('.header-tier-list')).toBeNull();
+      expect(document.querySelector('.header-tier-list')).toBeNull();
       // The captured opener drives the manage modal (tiers exist).
-      opener?.();
+      act(() => opener?.());
       await waitFor(() => {
-        expect(container.querySelector('.header-tier-manage-modal')).not.toBeNull();
+        expect(document.querySelector('.header-tier-manage-modal')).not.toBeNull();
       });
     });
 
     it('opens the create modal via the onCreateRef opener', async () => {
       let createOpener: (() => void) | undefined;
-      const { findByTestId } = render(() => (
+      const { findByTestId } = render(
         <RoutingHeaderTiersSection
           {...makeProps({
-            externalTiers: () => [tier1],
+            externalTiers: [tier1],
             headless: true,
             onCreateRef: (open) => {
               createOpener = open;
             },
           })}
-        />
-      ));
-      createOpener?.();
+        />,
+      );
+      act(() => createOpener?.());
       expect((await findByTestId('tier-modal-mode')).textContent).toBe('create');
     });
 
     it('opens the edit modal for a specific tier via the onEditRef opener', async () => {
       let editOpener: ((tier: HeaderTier) => void) | undefined;
-      const { findByTestId } = render(() => (
+      const { findByTestId } = render(
         <RoutingHeaderTiersSection
           {...makeProps({
-            externalTiers: () => [tier1],
+            externalTiers: [tier1],
             headless: true,
             onEditRef: (open) => {
               editOpener = open;
             },
           })}
-        />
-      ));
-      editOpener?.(tier1);
+        />,
+      );
+      act(() => editOpener?.(tier1));
       expect((await findByTestId('tier-modal-mode')).textContent).toBe('edit');
     });
   });

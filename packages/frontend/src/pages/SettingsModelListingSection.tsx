@@ -1,26 +1,32 @@
-import { createResource, createSignal, For, type Component } from 'solid-js';
+import { useRef, useState } from 'react';
 import { getModelListing, updateModelListing, type ModelListingMode } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { useResource } from '../lib/use-resource.js';
+import { Panel } from '../components/ui.js';
+import Select from '../components/Select.js';
+import SettingsRow from './SettingsRow.js';
 import { t } from '../i18n/index.js';
 
 const MODES: ModelListingMode[] = ['closed', 'restricted', 'open'];
 
-const SettingsModelListingSection: Component<{ agentName: () => string }> = (props) => {
-  const [config, { mutate }] = createResource(() => props.agentName(), getModelListing);
-  const [saving, setSaving] = createSignal(false);
+export default function SettingsModelListingSection({ agentName }: { agentName: string }) {
+  const config = useResource(() => getModelListing(agentName), [agentName]);
+  const [saving, setSaving] = useState(false);
+  const currentAgent = useRef(agentName);
+  currentAgent.current = agentName;
 
-  const mode = (): ModelListingMode =>
-    !config.loading && !config.error ? (config()?.mode ?? 'open') : 'open';
-  const busy = () => saving() || config.loading || Boolean(config.error);
+  const ready = !config.loading && !config.error;
+  const mode: ModelListingMode = ready ? (config.data?.mode ?? 'open') : 'open';
+  const busy = saving || !ready;
 
   const change = async (next: ModelListingMode) => {
-    if (busy() || next === mode()) return;
-    const agentName = props.agentName();
+    if (busy || next === mode) return;
+    const target = agentName;
     setSaving(true);
     try {
-      const saved = await updateModelListing(agentName, next);
-      if (props.agentName() === agentName) {
-        mutate(saved);
+      const saved = await updateModelListing(target, next);
+      if (currentAgent.current === target) {
+        config.setData(saved);
         toast.success(t('harnesses.modelListing.savedToast'));
       }
     } catch {
@@ -31,33 +37,24 @@ const SettingsModelListingSection: Component<{ agentName: () => string }> = (pro
   };
 
   return (
-    <>
-      <h2 class="settings-section__title">{t('harnesses.modelListing.title')}</h2>
-      <div class="settings-card">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">{t('harnesses.modelListing.label')}</span>
-            <span class="settings-card__label-desc">
-              {t(`harnesses.modelListing.${mode()}Desc`)}
-            </span>
-          </div>
-          <div class="settings-card__control settings-card__control--end">
-            <select
-              class="select"
-              aria-label={t('harnesses.modelListing.label')}
-              value={mode()}
-              disabled={busy()}
-              onChange={(e) => void change(e.currentTarget.value as ModelListingMode)}
-            >
-              <For each={MODES}>
-                {(value) => <option value={value}>{t(`harnesses.modelListing.${value}`)}</option>}
-              </For>
-            </select>
-          </div>
+    <Panel title={t('harnesses.modelListing.title')}>
+      <SettingsRow
+        title={t('harnesses.modelListing.label')}
+        description={t(`harnesses.modelListing.${mode}Desc`)}
+      >
+        <div className="w-full sm:w-44">
+          <Select
+            label={t('harnesses.modelListing.label')}
+            value={mode}
+            disabled={busy}
+            options={MODES.map((value) => ({
+              value,
+              label: t(`harnesses.modelListing.${value}`),
+            }))}
+            onChange={(value) => void change(value as ModelListingMode)}
+          />
         </div>
-      </div>
-    </>
+      </SettingsRow>
+    </Panel>
   );
-};
-
-export default SettingsModelListingSection;
+}

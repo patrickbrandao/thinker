@@ -1,98 +1,55 @@
-import { For } from 'solid-js';
+import { Skel } from './ui.js';
 
-const GlobalOverviewSkeleton = () => (
-  <>
-    {/* Stats cards */}
-    <div class="overview-stats">
-      <For each={[1, 2, 3, 4]}>
-        {() => (
-          <div class="overview-stat-card">
-            <div class="skeleton skeleton--text" style="width: 70px; height: 12px;" />
-            <div
-              class="skeleton skeleton--text"
-              style="width: 50px; height: 28px; margin-top: 4px;"
-            />
+function PanelRows({
+  titleWidth,
+  rows,
+  cells,
+}: {
+  titleWidth: number;
+  rows: number;
+  cells: number[];
+}) {
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <Skel width={titleWidth} height={16} />
+      </div>
+      <div className="panel-body flex flex-col gap-3">
+        {Array.from({ length: rows }, (_, r) => (
+          <div key={r} className="flex items-center gap-3">
+            {cells.map((w, i) => (
+              <Skel key={i} width={w} height={12} />
+            ))}
           </div>
-        )}
-      </For>
-    </div>
-
-    {/* Chart card placeholder */}
-    <div
-      class="skeleton"
-      style="width: 100%; height: 340px; border-radius: var(--radius); margin-bottom: 24px;"
-    />
-
-    {/* Row 1: Models + Messages */}
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-      <div class="panel" style="margin-bottom: 0;">
-        <div
-          class="skeleton skeleton--text"
-          style="width: 80px; height: 16px; margin-bottom: 16px;"
-        />
-        <For each={[1, 2, 3, 4]}>
-          {() => (
-            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
-              <div class="skeleton skeleton--text" style="width: 140px;" />
-              <div class="skeleton skeleton--text" style="width: 50px;" />
-              <div class="skeleton" style="width: 60px; height: 6px; border-radius: 3px;" />
-            </div>
-          )}
-        </For>
+        ))}
       </div>
-      <div class="panel" style="margin-bottom: 0;">
-        <div
-          class="skeleton skeleton--text"
-          style="width: 120px; height: 16px; margin-bottom: 16px;"
-        />
-        <For each={[1, 2, 3, 4]}>
-          {() => (
-            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
-              <div class="skeleton skeleton--text" style="width: 60px;" />
-              <div class="skeleton skeleton--text" style="width: 100px;" />
-              <div class="skeleton skeleton--text" style="width: 50px;" />
-            </div>
-          )}
-        </For>
+    </section>
+  );
+}
+
+/** Placeholder for the global Overview while its first load (or a range switch) runs. */
+export default function GlobalOverviewSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-busy="true">
+      <div className="stat-tiles">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="stat-tile flex flex-col gap-2">
+            <Skel width={70} height={12} />
+            <Skel width={50} height={28} />
+          </div>
+        ))}
+      </div>
+
+      <Skel width="100%" height={340} />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PanelRows titleWidth={80} rows={4} cells={[140, 50, 60]} />
+        <PanelRows titleWidth={120} rows={4} cells={[60, 100, 50]} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PanelRows titleWidth={100} rows={3} cells={[20, 100, 50, 60]} />
+        <PanelRows titleWidth={90} rows={3} cells={[20, 100, 50, 60]} />
       </div>
     </div>
-
-    {/* Row 2: Connections + Agents */}
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div class="panel" style="margin-bottom: 0;">
-        <div
-          class="skeleton skeleton--text"
-          style="width: 100px; height: 16px; margin-bottom: 16px;"
-        />
-        <For each={[1, 2, 3]}>
-          {() => (
-            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
-              <div class="skeleton" style="width: 20px; height: 20px; border-radius: 50%;" />
-              <div class="skeleton skeleton--text" style="width: 100px;" />
-              <div class="skeleton skeleton--text" style="width: 50px;" />
-              <div class="skeleton" style="width: 60px; height: 20px; border-radius: 3px;" />
-            </div>
-          )}
-        </For>
-      </div>
-      <div class="panel" style="margin-bottom: 0;">
-        <div
-          class="skeleton skeleton--text"
-          style="width: 90px; height: 16px; margin-bottom: 16px;"
-        />
-        <For each={[1, 2, 3]}>
-          {() => (
-            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
-              <div class="skeleton" style="width: 20px; height: 20px; border-radius: 50%;" />
-              <div class="skeleton skeleton--text" style="width: 100px;" />
-              <div class="skeleton skeleton--text" style="width: 50px;" />
-              <div class="skeleton" style="width: 60px; height: 20px; border-radius: 3px;" />
-            </div>
-          )}
-        </For>
-      </div>
-    </div>
-  </>
-);
-
-export default GlobalOverviewSkeleton;
+  );
+}

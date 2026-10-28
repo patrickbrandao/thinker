@@ -1,8 +1,8 @@
-import { Show, type Component } from 'solid-js';
 import { t } from '../i18n/index.js';
+import { Button } from './ui.js';
 
 interface ErrorStateProps {
-  /** The error object from createResource (used to extract a message). */
+  /** The error from useResource (used to extract a message). */
   error?: unknown;
   /** Override the default title ("Something went wrong"). */
   title?: string;
@@ -18,24 +18,16 @@ function extractMessage(error: unknown): string {
   return t('ui.unexpectedError');
 }
 
-const ErrorState: Component<ErrorStateProps> = (props) => {
-  const displayMessage = () => props.message ?? extractMessage(props.error);
-
+export default function ErrorState({ error, title, message, onRetry }: ErrorStateProps) {
   return (
-    <div class="empty-state" role="alert">
-      <div class="empty-state__title">{props.title ?? t('common.somethingWentWrong')}</div>
-      <p style="max-width: 420px; margin: 0 auto;">{displayMessage()}</p>
-      <Show when={props.onRetry}>
-        <button
-          class="btn btn--outline btn--sm"
-          style="margin-top: var(--gap-md);"
-          onClick={props.onRetry}
-        >
+    <div className="empty" role="alert">
+      <h3>{title ?? t('common.somethingWentWrong')}</h3>
+      <p className="max-w-md text-sm">{message ?? extractMessage(error)}</p>
+      {onRetry ? (
+        <Button variant="ghost" size="sm" className="mt-3" onClick={onRetry}>
           {t('common.tryAgain')}
-        </button>
-      </Show>
+        </Button>
+      ) : null}
     </div>
   );
-};
-
-export default ErrorState;
+}

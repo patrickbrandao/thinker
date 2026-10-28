@@ -1,6 +1,7 @@
-import { type Component } from 'solid-js';
 import { type CustomProviderData, type RoutingProvider } from '../services/api.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../services/routing-params.js';
+import { t } from '../i18n/index.js';
+import { Modal } from './ui.js';
 import ProviderSelectContent from './ProviderSelectContent.js';
 
 interface Props {
@@ -15,38 +16,21 @@ interface Props {
   onPollProviders?: () => void | Promise<void>;
 }
 
-const ProviderSelectModal: Component<Props> = (props) => {
+/** The provider connect flow in a modal; the content renders its own header. */
+export default function ProviderSelectModal(props: Props) {
   return (
-    <div
-      class="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-      }}
-    >
-      <div
-        class="modal-card"
-        style="max-width: 480px; padding: 0; max-height: calc(100vh - 64px); overflow-y: auto;"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="provider-modal-title"
-      >
-        <ProviderSelectContent
-          agentName={props.agentName}
-          providers={props.providers}
-          customProviders={props.customProviders}
-          customProviderPrefill={props.customProviderPrefill}
-          providerDeepLink={props.providerDeepLink}
-          initialTab={props.initialTab}
-          onUpdate={props.onUpdate}
-          onPollProviders={props.onPollProviders}
-          onClose={props.onClose}
-        />
-      </div>
-    </div>
+    <Modal open wide onClose={props.onClose} label={t('providerSetup.shared.connectProvider')}>
+      <ProviderSelectContent
+        agentName={props.agentName}
+        providers={props.providers}
+        customProviders={props.customProviders}
+        customProviderPrefill={props.customProviderPrefill}
+        providerDeepLink={props.providerDeepLink}
+        initialTab={props.initialTab}
+        onUpdate={props.onUpdate}
+        onPollProviders={props.onPollProviders}
+        onClose={props.onClose}
+      />
+    </Modal>
   );
-};
-
-export default ProviderSelectModal;
+}

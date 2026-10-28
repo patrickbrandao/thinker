@@ -1,16 +1,21 @@
-import { createEffect, createSignal, onCleanup, Show, type Component } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import AgentTypeSelect from './AgentTypeSelect.jsx';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import AgentTypeSelect from './AgentTypeSelect.js';
 import { createAgent, getGlobalProviders } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
 import { refreshAgents } from '../services/sse.js';
 import { type AgentCategory, type AgentPlatform, PLATFORMS_BY_CATEGORY } from 'thinker-shared';
 import { t } from '../i18n/index.js';
+import { Button, Modal, Switch } from './ui.js';
+
+const DEFAULT_CATEGORY: AgentCategory = 'personal';
+const defaultPlatform = (): AgentPlatform | null =>
+  PLATFORMS_BY_CATEGORY[DEFAULT_CATEGORY][0] ?? null;
 
 /**
  * "Connect Harness" modal extracted from Workspace so it can be reused by other
- * onboarding surfaces (e.g. an empty-state CTA or a deep-link).
+ * onboarding surfaces (e.g. an empty-state CTA, the sidebar "+" or a deep-link).
  *
  * Onboarding navigation: a freshly created agent inherits access to every
  * connected provider, so Routing is the most useful first stop.
@@ -18,50 +23,66 @@ import { t } from '../i18n/index.js';
  * `state.openProviders` so Routing opens the provider-connect flow immediately —
  * the new user's very next action is to connect their first provider.
  */
-const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props) => {
+export default function AddAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
-  const [name, setName] = createSignal('');
-  const [category, setCategory] = createSignal<AgentCategory | null>('personal');
-  const [platform, setPlatform] = createSignal<AgentPlatform | null>(
-    PLATFORMS_BY_CATEGORY['personal'][0] ?? null,
-  );
-  const [creating, setCreating] = createSignal(false);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState<AgentCategory | null>(DEFAULT_CATEGORY);
+  const [platform, setPlatform] = useState<AgentPlatform | null>(defaultPlatform);
+  const [creating, setCreating] = useState(false);
   // Defaults ON — explicit so create always sends a choice rather than
   // relying on the server-side default.
-  const [recordingEnabled, setRecordingEnabled] = createSignal(true);
+  const [recordingEnabled, setRecordingEnabled] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Synchronous guard: two clicks in the same tick both see `creating` false.
+  const creatingRef = useRef(false);
 
   // Tracks whether the user dismissed the modal (overlay click / Escape) while a
   // create request was still in flight. A dismissed create must NOT run its
   // post-success side effects (toast, markAgentCreated) or navigate afterwards —
   // otherwise closing the modal mid-request still yanks the user to Routing once
   // the request resolves.
-  let cancelled = false;
+  const cancelled = useRef(false);
   // Monotonic id of the current create attempt. Each async hop re-checks the
   // token it started with, so a dismissed or superseded attempt drops its
   // result instead of acting on it.
-  let attemptToken = 0;
+  const attemptToken = useRef(0);
   const beginAttempt = (): number => {
-    cancelled = false;
-    return ++attemptToken;
+    cancelled.current = false;
+    return ++attemptToken.current;
   };
-  const isStale = (token: number): boolean => cancelled || token !== attemptToken;
+  const isStale = (token: number): boolean => cancelled.current || token !== attemptToken.current;
+
   // Reopening invalidates whatever the previous session left in flight. The
   // success path closes the modal *before* awaiting the providers lookup, and
   // closing is not a dismissal — so a user who immediately reopens to add a
   // second harness would otherwise be yanked to the first one the moment that
   // lookup lands, mid-typing.
-  createEffect(() => {
-    if (props.open) attemptToken++;
-  });
+  useEffect(() => {
+    if (!open) return;
+    attemptToken.current++;
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   // If the component unmounts mid-request, treat it like a dismissal so we never
   // navigate from a disposed modal.
-  onCleanup(() => {
-    cancelled = true;
-  });
+  useEffect(
+    () => () => {
+      cancelled.current = true;
+    },
+    [],
+  );
+
+  const resetForm = () => {
+    setName('');
+    setCategory(DEFAULT_CATEGORY);
+    setPlatform(defaultPlatform());
+    setRecordingEnabled(true);
+  };
 
   const dismiss = () => {
-    cancelled = true;
-    props.onClose();
+    cancelled.current = true;
+    onClose();
     resetForm();
   };
 
@@ -74,15 +95,16 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
    * @param token attempt id from {@link beginAttempt}, re-checked after every await.
    */
   const createAgentNow = async (token: number) => {
-    const agentName = name().trim();
+    const agentName = name.trim();
     if (!agentName) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
       const result = await createAgent({
         name: agentName,
-        ...(category() ? { agent_category: category()! } : {}),
-        ...(platform() ? { agent_platform: platform()! } : {}),
-        record_messages: recordingEnabled(),
+        ...(category ? { agent_category: category } : {}),
+        ...(platform ? { agent_platform: platform } : {}),
+        record_messages: recordingEnabled,
       });
       // Local creates do not wait for the asynchronous server-sent event. This
       // immediately reruns the sidebar's harness-list resource with fresh data.
@@ -91,7 +113,7 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
       // that dismissal and skip every success side effect + the navigation.
       if (isStale(token)) return;
       toast.success(t('harnesses.add.connected', { name: agentName }));
-      props.onClose();
+      onClose();
       resetForm();
       const slug = result?.agent?.name ?? agentName;
       markAgentCreated(slug);
@@ -125,124 +147,80 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
     } catch {
       // error toast already shown by fetchMutate
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
 
   const handleCreate = async () => {
-    if (!name().trim()) return;
+    if (!name.trim()) return;
     // A second submit while the create is already running would issue a
     // duplicate agent-creation request.
-    if (creating()) return;
+    if (creatingRef.current) return;
     await createAgentNow(beginAttempt());
   };
 
-  const resetForm = () => {
-    setName('');
-    setCategory('personal');
-    setPlatform(PLATFORMS_BY_CATEGORY['personal'][0] ?? null);
-    setRecordingEnabled(true);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) handleCreate();
-    if (e.key === 'Escape') dismiss();
-  };
-
   return (
-    <Show when={props.open}>
-      <div class="modal-overlay" onClick={dismiss}>
-        <div
-          class="modal-card"
-          style="max-width: 540px;"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-agent-title"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={handleKeyDown}
-        >
-          <h2 class="modal-card__title" id="add-agent-title">
-            {t('harnesses.add.title')}
-          </h2>
-          <p class="modal-card__desc">{t('harnesses.add.desc')}</p>
+    <Modal open={open} onClose={dismiss} title={t('harnesses.add.title')}>
+      <p className="mb-4 text-sm text-muted">{t('harnesses.add.desc')}</p>
 
-          <div class="agent-type-select-row">
-            <div>
-              <label class="modal-card__field-label">{t('harnesses.add.type')}</label>
-              <AgentTypeSelect
-                category={category()}
-                platform={platform()}
-                onCategoryChange={handleCategoryChange}
-                onPlatformChange={setPlatform}
-                disabled={creating()}
-              />
-            </div>
-            <div style="flex: 1;">
-              <label class="modal-card__field-label" for="agent-name-input">
-                {t('harnesses.add.name')}
-              </label>
-              <input
-                ref={(el) => requestAnimationFrame(() => el.focus())}
-                id="agent-name-input"
-                class="modal-card__input modal-card__input--lg"
-                type="text"
-                placeholder={t('harnesses.add.namePlaceholder')}
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
-                disabled={creating()}
-              />
-            </div>
-          </div>
-
-          <div class="add-agent-toggles">
-            <div class="model-params__group">
-              {/* Same label treatment as the Type / Harness name field labels,
-                  not the larger Model-params group header. */}
-              <div class="modal-card__field-label add-agent-toggles__header">
-                {t('harnesses.add.settings')}
-              </div>
-              <div class="model-params__group-card">
-                <div class="model-params__row">
-                  <div class="model-params__row-text">
-                    <div class="model-params__label-title">
-                      <span>{t('harnesses.add.enableLogs')}</span>
-                    </div>
-                    <div class="model-params__label-hint">{t('harnesses.add.logsHint')}</div>
-                  </div>
-                  <div class="model-params__row-control">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={recordingEnabled()}
-                      aria-label={t('harnesses.add.enableLogs')}
-                      class="settings-switch"
-                      classList={{ 'settings-switch--on': recordingEnabled() }}
-                      disabled={creating()}
-                      onClick={() => setRecordingEnabled(!recordingEnabled())}
-                    >
-                      <span class="settings-switch__track">
-                        <span class="settings-switch__thumb" />
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-card__footer">
-            <button
-              class="btn btn--primary btn--sm"
-              onClick={handleCreate}
-              disabled={!name().trim() || creating()}
-            >
-              {creating() ? <span class="spinner" /> : t('common.create')}
-            </button>
-          </div>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,200px)_1fr]">
+        <div>
+          <span className="label">{t('harnesses.add.type')}</span>
+          <AgentTypeSelect
+            category={category}
+            platform={platform}
+            onCategoryChange={handleCategoryChange}
+            onPlatformChange={setPlatform}
+            disabled={creating}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="agent-name-input">
+            {t('harnesses.add.name')}
+          </label>
+          <input
+            ref={inputRef}
+            id="agent-name-input"
+            className="field"
+            type="text"
+            placeholder={t('harnesses.add.namePlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleCreate();
+            }}
+            disabled={creating}
+          />
         </div>
       </div>
-    </Show>
-  );
-};
 
-export default AddAgentModal;
+      <div className="mt-4">
+        <span className="label">{t('harnesses.add.settings')}</span>
+        <div className="well flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-ink">{t('harnesses.add.enableLogs')}</div>
+            <div className="hint mt-0.5">{t('harnesses.add.logsHint')}</div>
+          </div>
+          <Switch
+            checked={recordingEnabled}
+            onChange={setRecordingEnabled}
+            label={t('harnesses.add.enableLogs')}
+            disabled={creating}
+          />
+        </div>
+      </div>
+
+      <div className="actions">
+        <Button
+          size="sm"
+          onClick={() => void handleCreate()}
+          disabled={!name.trim()}
+          busy={creating}
+        >
+          {creating ? null : t('common.create')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}

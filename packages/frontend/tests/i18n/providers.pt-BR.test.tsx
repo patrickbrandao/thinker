@@ -1,18 +1,8 @@
-import { render, screen, waitFor } from '@solidjs/testing-library';
+import { render, screen, waitFor } from '@testing-library/react';
+import { Fragment, type ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetLocaleForTests, setLocale } from '../../src/i18n';
-
-vi.mock('@solidjs/router', () => ({
-  useSearchParams: () => [{}, vi.fn()],
-  useNavigate: () => vi.fn(),
-  A: (props: { href: string; children?: unknown }) => (
-    <a href={props.href}>{props.children as never}</a>
-  ),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children as string}</title>,
-}));
+import { resetLocaleForTests, setLocale, useLocale } from '../../src/i18n';
 
 vi.mock('../../src/components/ProviderSelectModal.jsx', () => ({
   default: () => <div role="dialog" />,
@@ -26,11 +16,10 @@ vi.mock('../../src/components/Sparkline.jsx', () => ({
   default: () => <span />,
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  routingPing: () => 0,
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { messagePing: signal(0), analyticsPing: signal(0), routingPing: signal(0) };
+});
 
 vi.mock('../../src/services/api/routing.js', () => ({
   renameProviderKey: vi.fn(),
@@ -97,7 +86,19 @@ vi.mock('../../src/services/api.js', () => ({
 
 import Byok from '../../src/pages/providers/Byok';
 import CustomProviderForm from '../../src/components/CustomProviderForm';
-import NoConnectionsPrompt from '../../src/components/NoConnectionsPrompt';
+
+/** The app remounts its tree on a language change; mirror that here. */
+function RemountOnLocale({ children }: { children: ReactNode }) {
+  const locale = useLocale();
+  return <Fragment key={locale}>{children}</Fragment>;
+}
+
+const renderInRouter = (node: ReactNode) =>
+  render(
+    <MemoryRouter>
+      <RemountOnLocale>{node}</RemountOnLocale>
+    </MemoryRouter>,
+  );
 
 describe('provider pages in pt-BR', () => {
   beforeEach(() => {
@@ -105,43 +106,43 @@ describe('provider pages in pt-BR', () => {
   });
 
   it('renders the usage-based page in Portuguese', async () => {
-    render(() => <Byok />);
-    await waitFor(() => expect(screen.getByText('Production')).toBeDefined());
-    expect(screen.getByText('Por uso')).toBeDefined();
-    expect(screen.getByText('Minhas conexões por uso')).toBeDefined();
-    expect(screen.getByText('Provedores por uso compatíveis')).toBeDefined();
-    expect(screen.getByText('Custo total de API (30d)')).toBeDefined();
-    expect(screen.getByText('Ativa')).toBeDefined();
-    expect(screen.getByText('Ver detalhes')).toBeDefined();
-    expect(screen.getByText('Adicionar provedor personalizado')).toBeDefined();
+    renderInRouter(<Byok />);
+    await waitFor(() => expect(screen.getByText('Production')).toBeTruthy());
+    expect(screen.getByText('Por uso')).toBeTruthy();
+    expect(screen.getByText('Minhas conexões por uso')).toBeTruthy();
+    expect(screen.getByText('Provedores por uso compatíveis')).toBeTruthy();
+    expect(screen.getByText('Custo total de API (30d)')).toBeTruthy();
+    expect(screen.getByText('Ativa')).toBeTruthy();
+    expect(screen.getByText('Ver detalhes')).toBeTruthy();
+    expect(screen.getByText('Adicionar provedor personalizado')).toBeTruthy();
     // Currency follows the locale.
     expect(screen.getAllByText(/^US\$\s\d+,\d{2}$/).length).toBeGreaterThan(0);
   });
 
   it('switches language live', async () => {
-    render(() => <Byok />);
-    await waitFor(() => expect(screen.getByText('Minhas conexões por uso')).toBeDefined());
+    renderInRouter(<Byok />);
+    await waitFor(() => expect(screen.getByText('Minhas conexões por uso')).toBeTruthy());
     setLocale('en', { persist: false });
-    await waitFor(() => expect(screen.getByText('My usage-based connections')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('My usage-based connections')).toBeTruthy());
   });
 
   it('renders the custom provider form with the context window column in Portuguese', () => {
-    render(() => (
-      <CustomProviderForm agentName="demo-agent" onCreated={vi.fn()} onBack={vi.fn()} />
-    ));
-    expect(screen.getByText('Adicionar provedor personalizado')).toBeDefined();
-    expect(screen.getByText('Nome do provedor')).toBeDefined();
-    expect(screen.getByText('Formato da API')).toBeDefined();
-    expect(screen.getByText('Janela de contexto')).toBeDefined();
-    expect(screen.getByLabelText('Janela de contexto do modelo 1 em tokens')).toBeDefined();
-    expect(screen.getByText('+ Adicionar modelo')).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Conectar' })).toBeDefined();
+    render(<CustomProviderForm agentName="demo-agent" onCreated={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByText('Adicionar provedor personalizado')).toBeTruthy();
+    expect(screen.getByText('Nome do provedor')).toBeTruthy();
+    expect(screen.getByText('Formato da API')).toBeTruthy();
+    expect(screen.getByText('Janela de contexto')).toBeTruthy();
+    expect(screen.getByLabelText('Janela de contexto do modelo 1 em tokens')).toBeTruthy();
+    expect(screen.getByText('+ Adicionar modelo')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Conectar' })).toBeTruthy();
   });
 
-  it('renders the no-connections prompt in Portuguese', () => {
-    render(() => <NoConnectionsPrompt />);
-    expect(screen.getByText('Nenhum provedor conectado')).toBeDefined();
-    expect(screen.getByText('Assinaturas')).toBeDefined();
+  it('renders the no-connections prompt in Portuguese', async () => {
+    const { default: NoConnectionsPrompt } =
+      await import('../../src/components/NoConnectionsPrompt');
+    renderInRouter(<NoConnectionsPrompt />);
+    expect(screen.getByText('Nenhum provedor conectado')).toBeTruthy();
+    expect(screen.getByText('Assinaturas')).toBeTruthy();
     expect(screen.getAllByText('Conectar provedor')).toHaveLength(3);
   });
 });

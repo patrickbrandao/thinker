@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './base.css';
+@import './shell.css';
+
+/* `dark:` exists only for rare non-color tweaks; colors come from the tokens. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind utilities bound to the tokens: bg-bg, bg-elev, text-ink, border-line… */
+@theme inline {
+  --color-chrome: var(--bg-chrome);
+  --color-bg: var(--bg);
+  --color-sunken: var(--bg-sunken);
+  --color-elev: var(--bg-elev);
+  --color-s2: var(--surface-2);
+  --color-s3: var(--surface-3);
+  --color-s4: var(--surface-4);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink: var(--text);
+  --color-dim: var(--text-dim);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-tint: var(--accent-tint);
+  --color-on-accent: var(--on-accent);
+
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+
+  --radius-control: var(--radius-control);
+  --radius-surface: var(--radius-surface);
+  --radius-node: var(--radius-node);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}

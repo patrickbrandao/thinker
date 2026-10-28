@@ -1,11 +1,11 @@
-import { createSignal } from 'solid-js';
+import { signal } from '../lib/signal.js';
 
-const [name, setName] = createSignal<string | null>(null);
+export const agentDisplayNameSignal = signal<string | null>(null);
 
 export function agentDisplayName(): string | null {
-  return name();
+  return agentDisplayNameSignal();
 }
 
 export function setAgentDisplayName(value: string | null): void {
-  setName(value);
+  agentDisplayNameSignal.set(value);
 }

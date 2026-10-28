@@ -1,16 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
-import { resetLocaleForTests, setLocale } from '../../src/i18n';
-
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: 'test-agent' }),
-  A: (props: any) => <a href={props.href}>{props.children}</a>,
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
+import { act, render, screen } from '@testing-library/react';
+import { Fragment, type ReactNode } from 'react';
+import { MemoryRouter, Route, Routes } from 'react-router';
+import { resetLocaleForTests, setLocale, useLocale } from '../../src/i18n';
 
 const rule = {
   id: 'r1',
@@ -53,40 +45,54 @@ import PlaygroundRecentSidebar from '../../src/components/playground/PlaygroundH
 import PlaygroundPrompt from '../../src/components/playground/PlaygroundPrompt';
 import RequestHeadersPopover from '../../src/components/playground/RequestHeadersPopover';
 
+/** The app remounts its tree on a language change; mirror that here. */
+function RemountOnLocale({ children }: { children: ReactNode }) {
+  const locale = useLocale();
+  return <Fragment key={locale}>{children}</Fragment>;
+}
+
 describe('Guardrails and Playground in pt-BR', () => {
   beforeEach(() => {
     resetLocaleForTests('pt-BR');
   });
 
   it('renders the Limits page in Portuguese with localized currency', async () => {
-    render(() => <Limits />);
-    expect(await screen.findByText('Regras')).toBeDefined();
-    expect(screen.getByText('Criar regra')).toBeDefined();
-    expect(screen.getByText('Conecte um provedor para definir limites rígidos')).toBeDefined();
-    expect(await screen.findByText('US$ 12,50')).toBeDefined();
-    expect(screen.getByText('por dia')).toBeDefined();
-    expect(screen.getByTitle('Limite rígido')).toBeDefined();
+    render(
+      <MemoryRouter initialEntries={['/harnesses/test-agent/guardrails']}>
+        <Routes>
+          <Route path="/harnesses/:agentName/guardrails" element={<Limits />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Regras')).toBeTruthy();
+    expect(screen.getByText('Criar regra')).toBeTruthy();
+    expect(screen.getByText('Conecte um provedor para definir limites rígidos')).toBeTruthy();
+    expect(await screen.findByText('US$ 12,50')).toBeTruthy();
+    expect(screen.getByText('por dia')).toBeTruthy();
+    expect(screen.getByTitle('Limite rígido')).toBeTruthy();
   });
 
   it('renders the limit rule modal in Portuguese', () => {
-    render(() => <LimitRuleModal open onClose={() => {}} onSave={() => {}} />);
-    expect(screen.getByText('Métrica')).toBeDefined();
-    expect(screen.getByText('Bloquear requisições quando ultrapassar')).toBeDefined();
-    expect(screen.getByRole('option', { name: 'Por semana' })).toBeDefined();
+    render(<LimitRuleModal open onClose={() => {}} onSave={() => {}} />);
+    expect(screen.getByText('Métrica')).toBeTruthy();
+    expect(screen.getByText('Bloquear requisições quando ultrapassar')).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Por semana' })).toBeTruthy();
   });
 
   it('switches language live', () => {
     resetLocaleForTests('en');
-    render(() => (
-      <LimitRuleTable rules={[]} loading={false} hasProvider onToggleMenu={() => {}} />
-    ));
-    expect(screen.getByText('No rules yet')).toBeDefined();
-    setLocale('pt-BR', { persist: false });
-    expect(screen.getByText('Nenhuma regra ainda')).toBeDefined();
+    render(
+      <RemountOnLocale>
+        <LimitRuleTable rules={[]} loading={false} hasProvider onToggleMenu={() => {}} />
+      </RemountOnLocale>,
+    );
+    expect(screen.getByText('No rules yet')).toBeTruthy();
+    act(() => setLocale('pt-BR', { persist: false }));
+    expect(screen.getByText('Nenhuma regra ainda')).toBeTruthy();
   });
 
   it('renders the Playground history sidebar and prompt in Portuguese', () => {
-    render(() => (
+    render(
       <>
         <PlaygroundRecentSidebar
           open
@@ -104,28 +110,28 @@ describe('Guardrails and Playground in pt-BR', () => {
           disabled={false}
           running={false}
         />
-      </>
-    ));
-    expect(screen.getByText('Minhas execuções')).toBeDefined();
-    expect(screen.getByText('Nova execução')).toBeDefined();
+      </>,
+    );
+    expect(screen.getByText('Minhas execuções')).toBeTruthy();
+    expect(screen.getByText('Nova execução')).toBeTruthy();
     expect(
       screen.getByText('Nenhuma execução ainda. Envie um prompt para ver seu histórico aqui.'),
-    ).toBeDefined();
-    expect(screen.getByPlaceholderText('Envie um prompt para comparar modelos...')).toBeDefined();
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText('Envie um prompt para comparar modelos...')).toBeTruthy();
   });
 
   it('renders request header warnings in Portuguese', () => {
-    render(() => (
+    render(
       <RequestHeadersPopover
         open
         entries={[{ id: 'h1', key: 'Authorization', value: 'x' }]}
         onChange={() => {}}
         onClose={() => {}}
-      />
-    ));
-    expect(screen.getByText('Adicionar header')).toBeDefined();
+      />,
+    );
+    expect(screen.getByText('Adicionar header')).toBeTruthy();
     expect(
       screen.getByText('Authorization é reservado pelo Thinker e será descartado.'),
-    ).toBeDefined();
+    ).toBeTruthy();
   });
 });

@@ -1,4 +1,4 @@
-import { Show, type Component, type JSX } from 'solid-js';
+import type { ReactNode } from 'react';
 import type {
   AuthType,
   AvailableModel,
@@ -18,6 +18,7 @@ import RouteChainCard from './RouteChainCard.js';
 import VirtualModelShadowWarning from './VirtualModelShadowWarning.js';
 import { modelParamsScopeForVirtualModel } from 'thinker-shared';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 interface SwitchProps {
   label: string;
@@ -28,27 +29,27 @@ interface SwitchProps {
   onToggle: () => void;
 }
 
-const CardSwitch: Component<SwitchProps> = (props) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={props.on}
-    class="routing-switch virtual-model-card__switch"
-    classList={{ 'routing-switch--on': props.on }}
-    disabled={props.disabled || props.busy}
-    title={props.title}
-    onClick={() => props.onToggle()}
-  >
-    <span class="routing-switch__track">
-      <span class="routing-switch__thumb">
-        <Show when={props.busy}>
-          <span class="spinner virtual-model-card__switch-spinner" />
-        </Show>
-      </span>
-    </span>
-    <span class="routing-switch__label">{props.label}</span>
-  </button>
-);
+/** Labelled switch; `routing-switch*` classes are stable hooks, the look is `.switch`. */
+function CardSwitch(props: SwitchProps) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={props.on}
+      className={cx(
+        'routing-switch virtual-model-card__switch inline-flex items-center gap-2 text-xs text-dim disabled:cursor-not-allowed disabled:opacity-60',
+        props.on && 'routing-switch--on',
+      )}
+      disabled={props.disabled || props.busy}
+      title={props.title}
+      onClick={() => props.onToggle()}
+    >
+      <span className="switch inline-block shrink-0" aria-hidden="true" aria-checked={props.on} />
+      {props.busy ? <span className="spinner" aria-hidden="true" /> : null}
+      <span className="routing-switch__label">{props.label}</span>
+    </button>
+  );
+}
 
 export interface VirtualModelCardProps {
   agentName: string;
@@ -74,7 +75,7 @@ export interface VirtualModelCardProps {
   /** Which setting is being saved, for the spinner on its switch. */
   busy?: 'enabled' | 'continue_on_default' | 'response_mode' | null;
   /** Drag handle rendered before the name, supplied by the section. */
-  dragHandle?: JSX.Element;
+  dragHandle?: ReactNode;
   getModelParams?: (
     scope: string,
     provider: string,
@@ -95,80 +96,82 @@ export interface VirtualModelCardProps {
  * 5 fallbacks) plus the virtual model's own switches, the copyable `model`
  * value and the shadowing warning.
  */
-const VirtualModelCard: Component<VirtualModelCardProps> = (props) => {
-  const vm = () => props.virtualModel;
-  const isStream = () => vm().response_mode === 'stream';
+export default function VirtualModelCard(props: VirtualModelCardProps) {
+  const vm = props.virtualModel;
+  const isStream = vm.response_mode === 'stream';
 
   return (
     <RouteChainCard
       agentName={props.agentName}
-      chain={vm()}
+      chain={vm}
       cardClass="routing-card--virtual-model"
-      classList={{ 'routing-card--virtual-model-inactive': !vm().enabled }}
+      classList={{ 'routing-card--virtual-model-inactive': !vm.enabled }}
       models={props.models}
       customProviders={props.customProviders}
       connectedProviders={props.connectedProviders}
       onOverride={props.onOverride}
       onFallbacksUpdate={props.onFallbacksUpdate}
-      onResetChain={() => clearVirtualModelOverride(props.agentName, vm().id)}
+      onResetChain={() => clearVirtualModelOverride(props.agentName, vm.id)}
       persistFallbacks={(models, routes) =>
-        setVirtualModelFallbacks(props.agentName, vm().id, models, routes)
+        setVirtualModelFallbacks(props.agentName, vm.id, models, routes)
       }
-      persistClearFallbacks={() => clearVirtualModelFallbacks(props.agentName, vm().id)}
-      paramsScope={modelParamsScopeForVirtualModel(vm().id)}
+      persistClearFallbacks={() => clearVirtualModelFallbacks(props.agentName, vm.id)}
+      paramsScope={modelParamsScopeForVirtualModel(vm.id)}
       getModelParams={props.getModelParams}
       setModelParams={props.setModelParams}
       titleLeading={props.dragHandle}
       titleExtra={
-        <Show when={!vm().enabled}>
-          <span class="virtual-model-card__inactive">{t('models.vmCard.inactive')}</span>
-        </Show>
+        !vm.enabled ? (
+          <span className="virtual-model-card__inactive badge">{t('models.vmCard.inactive')}</span>
+        ) : null
       }
       details={
-        <div class="virtual-model-card__details">
+        <div className="virtual-model-card__details flex flex-col gap-2">
           <button
             type="button"
-            class="virtual-model-card__model"
+            className="virtual-model-card__model self-start truncate rounded-control bg-sunken px-2 py-0.5 font-mono text-xs text-ink hover:text-accent"
             title={t('models.vmCard.showExample')}
             onClick={() => props.onShowExample()}
           >
             {/* i18n-ignore */}
-            model: "{vm().name}"
+            model: &quot;{vm.name}&quot;
           </button>
-          <div class="virtual-model-card__switches">
+          <div className="virtual-model-card__switches flex flex-wrap items-center gap-x-4 gap-y-2">
             <CardSwitch
               label={t('models.vmCard.active')}
-              on={vm().enabled}
+              on={vm.enabled}
               busy={props.busy === 'enabled'}
-              title={vm().enabled ? t('models.vmCard.hideTitle') : t('models.vmCard.listTitle')}
-              onToggle={() => props.onToggle(!vm().enabled)}
+              title={vm.enabled ? t('models.vmCard.hideTitle') : t('models.vmCard.listTitle')}
+              onToggle={() => props.onToggle(!vm.enabled)}
             />
             <CardSwitch
               label={t('models.vmCard.continueOnDefault')}
-              on={vm().continue_on_default}
+              on={vm.continue_on_default}
               busy={props.busy === 'continue_on_default'}
               title={t('models.vmCard.continueTitle')}
-              onToggle={() => props.onContinueOnDefaultChange(!vm().continue_on_default)}
+              onToggle={() => props.onContinueOnDefaultChange(!vm.continue_on_default)}
             />
             <CardSwitch
               label={t('models.vmCard.stream')}
-              on={isStream()}
+              on={isStream}
               busy={props.busy === 'response_mode'}
               title={
-                isStream() ? t('models.vmCard.streamOnTitle') : t('models.vmCard.streamOffTitle')
+                isStream ? t('models.vmCard.streamOnTitle') : t('models.vmCard.streamOffTitle')
               }
-              onToggle={() => props.onResponseModeChange(isStream() ? 'buffered' : 'stream')}
+              onToggle={() => props.onResponseModeChange(isStream ? 'buffered' : 'stream')}
             />
           </div>
-          <VirtualModelShadowWarning shadows={vm().shadows ?? []} enabled={vm().enabled} />
+          <VirtualModelShadowWarning shadows={vm.shadows ?? []} enabled={vm.enabled} />
         </div>
       }
       renderMenu={(close) => {
         const item = (label: string, action: () => void, danger = false) => (
           <button
             type="button"
-            class="header-tier-card__menu-item"
-            classList={{ 'header-tier-card__menu-item--danger': danger }}
+            className={cx(
+              'header-tier-card__menu-item menu-item',
+              danger && 'header-tier-card__menu-item--danger is-danger',
+            )}
             onClick={() => {
               close();
               action();
@@ -181,18 +184,14 @@ const VirtualModelCard: Component<VirtualModelCardProps> = (props) => {
           <>
             {item(t('models.vmCard.copyExample'), props.onShowExample)}
             {item(t('models.vmCard.edit'), props.onEdit)}
-            <Show when={props.onMoveUp}>
-              {item(t('models.vmCard.moveUp'), () => props.onMoveUp?.())}
-            </Show>
-            <Show when={props.onMoveDown}>
-              {item(t('models.vmCard.moveDown'), () => props.onMoveDown?.())}
-            </Show>
+            {props.onMoveUp ? item(t('models.vmCard.moveUp'), () => props.onMoveUp?.()) : null}
+            {props.onMoveDown
+              ? item(t('models.vmCard.moveDown'), () => props.onMoveDown?.())
+              : null}
             {item(t('models.vmCard.delete'), props.onDelete, true)}
           </>
         );
       }}
     />
   );
-};
-
-export default VirtualModelCard;
+}

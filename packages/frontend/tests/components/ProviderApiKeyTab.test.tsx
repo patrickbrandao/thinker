@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 
 import ProviderApiKeyTab from '../../src/components/ProviderApiKeyTab';
 import type { ProviderDef } from '../../src/services/providers';
@@ -27,17 +27,22 @@ const baseProps = {
 
 describe('ProviderApiKeyTab', () => {
   it('sorts standard and custom providers alphabetically in the merged list', async () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
-        apiKeyProviders={[provider({ id: 'zee', name: 'Zeta' }), provider({ id: 'ant', name: 'Anthropic' })]}
-        customProviders={[{ id: 'c1', name: 'Custom-B', base_url: 'https://b', models: [] } as never]}
+        apiKeyProviders={[
+          provider({ id: 'zee', name: 'Zeta' }),
+          provider({ id: 'ant', name: 'Anthropic' }),
+        ]}
+        customProviders={[
+          { id: 'c1', name: 'Custom-B', base_url: 'https://b', models: [] } as never,
+        ]}
         isConnected={() => false}
         isNoKeyConnected={() => false}
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map(
@@ -58,7 +63,7 @@ describe('ProviderApiKeyTab', () => {
       models: [],
     } as never;
 
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[]}
         customProviders={[customProvider]}
@@ -67,8 +72,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={onEditCustom}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     const letter = container.querySelector('.provider-card__logo-letter');
@@ -78,7 +83,7 @@ describe('ProviderApiKeyTab', () => {
   });
 
   it('renders the Fireworks SVG asset for the Fireworks API-key provider', async () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[provider({ id: 'fireworks', name: 'Fireworks AI', initial: 'Fw' })]}
         customProviders={[]}
@@ -87,8 +92,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     const tile = Array.from(container.querySelectorAll('button.provider-toggle')).find((button) =>
@@ -101,7 +106,7 @@ describe('ProviderApiKeyTab', () => {
   it('sorts a mix of standard and multiple custom providers by name', async () => {
     // With two customs the sort comparator reads b.cp.name at least once,
     // covering the second arm of the `b.kind === 'standard'` ternary.
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[provider({ id: 'mid', name: 'MidProvider' })]}
         customProviders={[
@@ -113,12 +118,12 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
-    const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map((n) =>
-      n.textContent?.trim() ?? '',
+    const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map(
+      (n) => n.textContent?.trim() ?? '',
     );
     expect(names[0]).toContain('Alpha-Custom');
     expect(names[1]).toContain('MidProvider');
@@ -126,7 +131,7 @@ describe('ProviderApiKeyTab', () => {
   });
 
   it('treats a missing customProviders prop as an empty list', async () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[provider({ id: 'openai', name: 'OpenAI' })]}
         // customProviders deliberately omitted to cover the `?? []` branch
@@ -136,8 +141,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map(
@@ -146,10 +151,10 @@ describe('ProviderApiKeyTab', () => {
     expect(names).toEqual(['OpenAI']);
   });
 
-  it('hides a custom provider named after a canonical local tile so it doesn\'t duplicate the Local tab', async () => {
+  it("hides a custom provider named after a canonical local tile so it doesn't duplicate the Local tab", async () => {
     // LM Studio lives under the Local tab now; if someone created a custom
     // provider named "LM Studio" it would otherwise show up in both tabs.
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[provider({ id: 'openai', name: 'OpenAI' })]}
         customProviders={[
@@ -165,8 +170,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     const names = Array.from(container.querySelectorAll('.provider-toggle__name')).map(
@@ -177,7 +182,7 @@ describe('ProviderApiKeyTab', () => {
   });
 
   it('keeps the "Custom" badge for genuinely custom providers (non-canonical name)', async () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[]}
         customProviders={[
@@ -188,8 +193,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     expect(container.textContent).toContain('Custom');
@@ -197,7 +202,7 @@ describe('ProviderApiKeyTab', () => {
 
   it('fires onOpenCustomForm when the "Add custom provider" chip is clicked', async () => {
     const onOpenCustomForm = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[]}
         customProviders={[]}
@@ -206,8 +211,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={vi.fn()}
         onOpenCustomForm={onOpenCustomForm}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     fireEvent.click(container.querySelector('.provider-modal__add-custom-chip') as HTMLElement);
@@ -216,7 +221,7 @@ describe('ProviderApiKeyTab', () => {
 
   it('routes a standard API-key tile through onOpenDetail with api_key auth type', async () => {
     const onOpenDetail = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <ProviderApiKeyTab
         apiKeyProviders={[provider({ id: 'openai', name: 'OpenAI' })]}
         customProviders={[]}
@@ -225,8 +230,8 @@ describe('ProviderApiKeyTab', () => {
         onOpenDetail={onOpenDetail}
         onOpenCustomForm={vi.fn()}
         onEditCustom={vi.fn()}
-      />
-    ));
+      />,
+    );
     await flushMicrotasks();
 
     fireEvent.click(container.querySelector('button.provider-toggle') as HTMLButtonElement);

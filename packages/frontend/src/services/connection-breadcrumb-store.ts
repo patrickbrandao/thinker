@@ -1,35 +1,43 @@
-import { createSignal } from 'solid-js';
 import { t } from '../i18n/index.js';
+import { signal } from '../lib/signal.js';
 
 /** A label, or a getter so the text follows the active language. */
 type Label = string | (() => string);
 
-const [connName, setConnName] = createSignal<string | null>(null);
-const [connProviderId, setConnProviderId] = createSignal<string | null>(null);
-const [connLabel, setConnLabel] = createSignal<string | null>(null);
-const [connBackLink, setConnBackLink] = createSignal<string>('/providers/subscriptions');
-const [connBackLabel, setConnBackLabel] = createSignal<Label>(() =>
-  t('providers.kind.subscriptions'),
-);
+interface ConnectionBreadcrumb {
+  name: string | null;
+  providerId: string | null;
+  label: string | null;
+  backLink: string;
+  backLabel: Label;
+}
+
+export const connectionBreadcrumbSignal = signal<ConnectionBreadcrumb>({
+  name: null,
+  providerId: null,
+  label: null,
+  backLink: '/providers/subscriptions',
+  backLabel: () => t('providers.kind.subscriptions'),
+});
 
 export function connectionBreadcrumbName(): string | null {
-  return connName();
+  return connectionBreadcrumbSignal().name;
 }
 
 export function connectionBreadcrumbProviderId(): string | null {
-  return connProviderId();
+  return connectionBreadcrumbSignal().providerId;
 }
 
 export function connectionBreadcrumbLabel(): string | null {
-  return connLabel();
+  return connectionBreadcrumbSignal().label;
 }
 
 export function connectionBreadcrumbBackLink(): string {
-  return connBackLink();
+  return connectionBreadcrumbSignal().backLink;
 }
 
 export function connectionBreadcrumbBackLabel(): string {
-  const label = connBackLabel();
+  const label = connectionBreadcrumbSignal().backLabel;
   return typeof label === 'function' ? label() : label;
 }
 
@@ -40,9 +48,11 @@ export function setConnectionBreadcrumb(
   providerId?: string,
   label?: string,
 ): void {
-  setConnName(name);
-  setConnProviderId(providerId ?? null);
-  setConnLabel(label ?? null);
-  if (backLink) setConnBackLink(backLink);
-  if (backLabel) setConnBackLabel(() => backLabel);
+  connectionBreadcrumbSignal.set((prev) => ({
+    name,
+    providerId: providerId ?? null,
+    label: label ?? null,
+    backLink: backLink ?? prev.backLink,
+    backLabel: backLabel ?? prev.backLabel,
+  }));
 }

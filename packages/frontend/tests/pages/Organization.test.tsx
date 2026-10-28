@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../src/services/toast-store.js', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -53,7 +48,7 @@ describe('Organization page', () => {
 
   it('lets an admin manage non-owners only, without rename or delete', async () => {
     asRole('admin');
-    render(() => <Organization />);
+    render(<Organization />);
     await screen.findByText('owner@x.io');
     expect(screen.queryByLabelText('Role of owner@x.io')).toBeNull();
     expect(screen.getByLabelText('Role of view@x.io')).toBeTruthy();
@@ -68,7 +63,7 @@ describe('Organization page', () => {
 
   it('is read-only for a viewer', async () => {
     asRole('viewer');
-    render(() => <Organization />);
+    render(<Organization />);
     await screen.findByText('owner@x.io');
     expect(screen.queryByRole('form', { name: 'Add member' })).toBeNull();
     expect(screen.queryByText('Remove')).toBeNull();
@@ -86,17 +81,19 @@ describe('Organization page', () => {
       },
       temporaryPassword: 'Temp-Pass-123',
     });
-    render(() => <Organization />);
+    render(<Organization />);
     await screen.findByText('owner@x.io');
     expect(screen.getByText('Delete organization')).toBeTruthy();
     const form = screen.getByRole('form', { name: 'Add member' });
     const email = form.querySelector('input[type="email"]') as HTMLInputElement;
-    fireEvent.input(email, { target: { value: 'new@x.io' } });
+    fireEvent.change(email, { target: { value: 'new@x.io' } });
     fireEvent.submit(form);
     await waitFor(() =>
       expect(mockAddMember).toHaveBeenCalledWith('org-1', { email: 'new@x.io', role: 'member' }),
     );
-    expect((await screen.findByTestId('temporary-password')).textContent).toBe('Temp-Pass-123');
+    const box = await screen.findByTestId('temporary-password');
+    expect(box.textContent).toBe('Temp-Pass-123');
+    expect(box.closest('.well')?.querySelector('.copy-btn')).toBeTruthy();
     fireEvent.click(screen.getByText('I saved it'));
     expect(screen.queryByTestId('temporary-password')).toBeNull();
   });

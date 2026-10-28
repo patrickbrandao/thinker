@@ -1,10 +1,10 @@
-import type { Component } from 'solid-js';
 import NoConnectionsPrompt from '../NoConnectionsPrompt.jsx';
 
 interface Props {
+  /** Kept for the contract; the prompt now routes to the provider pages itself. */
   onConnect: () => void;
 }
 
-const PlaygroundEmptyState: Component<Props> = () => <NoConnectionsPrompt />;
-
-export default PlaygroundEmptyState;
+export default function PlaygroundEmptyState(_props: Props) {
+  return <NoConnectionsPrompt />;
+}

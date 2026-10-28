@@ -1,12 +1,13 @@
-import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
+import { useMemo, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { PLATFORM_ICONS } from 'thinker-shared';
-import CodeBlock from '../../components/CodeBlock.jsx';
+import CodeBlock from '../../components/CodeBlock.js';
+import RichText from '../../components/RichText.js';
+import { Panel, Tabs } from '../../components/ui.js';
 import { mcpEndpoint } from '../../services/install-endpoints.js';
 import { checkMcpEnabled } from '../../services/setup-status.js';
-
 import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
-import RichText from '../../components/RichText.jsx';
+import { useResource } from '../../lib/use-resource.js';
 import { t } from '../../i18n/index.js';
 
 interface ClientSetup {
@@ -69,102 +70,90 @@ export function clientSetups(endpoint: string): [ClientSetup, ...ClientSetup[]] 
   ];
 }
 
-const McpServer: Component = () => {
-  const endpoint = createMemo(() => mcpEndpoint());
-  const clients = createMemo(() => clientSetups(endpoint()));
-  const [activeId, setActiveId] = createSignal('claude-code');
-  const active = createMemo(() => clients().find((c) => c.id === activeId()) ?? clients()[0]);
-  // The nav entry is already hidden when MCP is off, but a bookmark still lands
-  // here. Say why rather than handing out an endpoint that answers 404 — and
-  // show neither panel until the answer is in, so a disabled install never
+export default function McpServer() {
+  const endpoint = mcpEndpoint();
+  const clients = useMemo(() => clientSetups(endpoint), [endpoint]);
+  const [activeId, setActiveId] = useState('claude-code');
+  const active = clients.find((c) => c.id === activeId) ?? clients[0];
+  // The menu entry is already hidden when MCP is off, but a bookmark still
+  // lands here. Say why rather than handing out an endpoint that answers 404,
+  // and show neither panel until the answer is in, so a disabled install never
   // flashes the endpoint first.
-  const [enabled] = createResource(checkMcpEnabled);
+  const enabled = useResource(checkMcpEnabled, []).data;
 
   return (
-    <div class="container--lg">
-      <Title>{t('common.pageTitle', { page: t('harnesses.mcp.title') })}</Title>
-      <Meta name="description" content={t('harnesses.mcp.metaDescription')} />
-      <div class="page-header">
+    <div className="page">
+      <title>{t('common.pageTitle', { page: t('harnesses.mcp.title') })}</title>
+      <meta name="description" content={t('harnesses.mcp.metaDescription')} />
+      <div className="page-head">
         <div>
-          <h1 class="page-header__title">{t('harnesses.mcp.title')}</h1>
-          <p class="page-header__subtitle">{t('harnesses.mcp.subtitle')}</p>
+          <h1>{t('harnesses.mcp.title')}</h1>
+          <div className="sub">{t('harnesses.mcp.subtitle')}</div>
         </div>
       </div>
 
-      <Show when={enabled() === false}>
-        <div class="panel">
-          <div class="panel__title">{t('harnesses.mcp.unavailableTitle')}</div>
-          <p class="integration-panel__desc" style="margin-bottom: 0;">
+      {enabled === false ? (
+        <Panel title={t('harnesses.mcp.unavailableTitle')}>
+          <p className="text-sm text-dim">
             <RichText
               text={t('harnesses.mcp.unavailableDesc')}
               parts={{
-                authUrl: <code>BETTER_AUTH_URL</code>,
-                flag: <code>MCP_ENABLED=false</code>,
+                authUrl: <code className="font-mono">BETTER_AUTH_URL</code>,
+                flag: <code className="font-mono">MCP_ENABLED=false</code>,
               }}
             />
           </p>
-        </div>
-      </Show>
+        </Panel>
+      ) : null}
 
-      <Show when={enabled() === true}>
-        <div class="panel">
-          <div class="panel__title">{t('harnesses.mcp.endpointTitle')}</div>
-          <p class="integration-panel__desc">{t('harnesses.mcp.endpointDesc')}</p>
-          <CodeBlock code={endpoint()} language="bash" />
-        </div>
+      {enabled === true ? (
+        <div className="flex flex-col gap-4">
+          <Panel title={t('harnesses.mcp.endpointTitle')}>
+            <p className="mb-3 text-sm text-dim">{t('harnesses.mcp.endpointDesc')}</p>
+            <CodeBlock code={endpoint} language="bash" />
+          </Panel>
 
-        <div class="panel">
-          <div class="panel__title">{t('harnesses.mcp.connectTitle')}</div>
-          <div class="integration-panel__tabs">
-            <div class="panel__tabs" role="tablist" aria-label={t('harnesses.mcp.clientTabs')}>
-              <For each={clients()}>
-                {(client) => (
-                  <button
-                    type="button"
-                    class="panel__tab"
-                    classList={{ 'panel__tab--active': activeId() === client.id }}
-                    role="tab"
-                    aria-selected={activeId() === client.id}
-                    onClick={() => setActiveId(client.id)}
-                  >
-                    <Show when={client.icon}>
-                      <img
-                        class="panel__tab-icon"
-                        src={client.icon}
-                        alt=""
-                        width="16"
-                        height="16"
-                      />
-                    </Show>
-                    {client.id === 'other' ? t('harnesses.platformOther') : client.label}
-                  </button>
-                )}
-              </For>
-            </div>
-          </div>
-          <CodeBlock code={active().code} language={active().language} />
-        </div>
+          <Panel title={t('harnesses.mcp.connectTitle')}>
+            <Tabs
+              className="mb-3"
+              label={t('harnesses.mcp.clientTabs')}
+              value={active.id}
+              onChange={setActiveId}
+              items={clients.map((client) => ({
+                key: client.id,
+                label: client.id === 'other' ? t('harnesses.platformOther') : client.label,
+                icon: client.icon ? (
+                  <img
+                    className="tab-icon size-4"
+                    src={client.icon}
+                    alt=""
+                    width={16}
+                    height={16}
+                  />
+                ) : undefined,
+              }))}
+            />
+            <CodeBlock code={active.code} language={active.language} />
+          </Panel>
 
-        <div class="panel">
-          <div class="integration-panel__header">
-            <div class="panel__title">{t('harnesses.mcp.modeTitle')}</div>
-            <a
-              href={THINKER_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn--outline btn--sm"
-              style="text-decoration: none;"
-            >
-              {t('harnesses.mcp.toolList')}
-            </a>
-          </div>
-          <p class="integration-panel__desc" style="margin-bottom: 0;">
-            {t('harnesses.mcp.modeDesc')}
-          </p>
+          <Panel
+            title={t('harnesses.mcp.modeTitle')}
+            actions={
+              <a
+                href={THINKER_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost btn-sm"
+              >
+                {t('harnesses.mcp.toolList')}
+                <ExternalLink aria-hidden="true" />
+              </a>
+            }
+          >
+            <p className="text-sm text-dim">{t('harnesses.mcp.modeDesc')}</p>
+          </Panel>
         </div>
-      </Show>
+      ) : null}
     </div>
   );
-};
-
-export default McpServer;
+}

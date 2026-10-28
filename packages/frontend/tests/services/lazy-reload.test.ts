@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('solid-js', () => ({
+// React.lazy is replaced by the identity so each test can call the wrapped
+// loader directly and observe its promise.
+vi.mock('react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react')>()),
   lazy: (factory: () => Promise<unknown>) => factory,
 }));
 
@@ -23,7 +26,7 @@ describe('lazyReload', () => {
   });
 
   it('passes through on successful import', async () => {
-    const mod = { default: (() => null) as unknown as import('solid-js').Component };
+    const mod = { default: (() => null) as unknown as import('react').ComponentType };
     const factory = lazyReload(() => Promise.resolve(mod));
     const result = await (factory as unknown as () => Promise<typeof mod>)();
     expect(result).toBe(mod);
@@ -49,9 +52,7 @@ describe('lazyReload', () => {
     sessionStorage.setItem(RELOAD_KEY, '1');
     const factory = lazyReload(() => Promise.reject(new Error('still broken')));
 
-    await expect(
-      (factory as unknown as () => Promise<unknown>)(),
-    ).rejects.toThrow('still broken');
+    await expect((factory as unknown as () => Promise<unknown>)()).rejects.toThrow('still broken');
 
     expect(reloadMock).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();

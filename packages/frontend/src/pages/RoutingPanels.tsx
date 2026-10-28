@@ -1,46 +1,40 @@
-import { For, Show, createMemo, type Component } from 'solid-js';
+import { useMemo } from 'react';
 import { PROVIDERS } from '../services/providers.js';
 import { providerIcon, customProviderLogo } from '../components/ProviderIcon.js';
 import { customProviderColor } from '../services/formatters.js';
 import { authBadgeFor, authLabel } from '../components/AuthBadge.js';
 import type { RoutingProvider, CustomProviderData } from '../services/api.js';
+import { Button, Skel } from '../components/ui.js';
 import { t } from '../i18n/index.js';
 
 /** Skeleton placeholder rendered while routing data is loading. */
-export const RoutingLoadingSkeleton: Component = () => {
-  const bar =
-    'background: hsl(var(--muted) / 0.45); border-radius: var(--radius); animation: skeleton-pulse 1.2s ease-in-out infinite;';
+export function RoutingLoadingSkeleton() {
   return (
-    <>
+    <div className="flex flex-col gap-4" aria-busy="true">
       {/* Provider icons + buttons row */}
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-        <div style={`width: 160px; height: 20px; ${bar}`} />
-        <div style="display: flex; gap: 8px;">
-          <div style={`width: 110px; height: 32px; ${bar}`} />
-          <div style={`width: 170px; height: 32px; ${bar}`} />
+      <div className="flex items-center justify-between gap-2">
+        <Skel width={160} height={20} />
+        <div className="flex gap-2">
+          <Skel width={110} height={32} />
+          <Skel width={170} height={32} />
         </div>
       </div>
-
       {/* Tabs row */}
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-        <div style={`width: 260px; height: 34px; ${bar}`} />
-        <div
-          style={`width: 140px; height: 22px; border-radius: 11px; background: hsl(var(--muted) / 0.45); animation: skeleton-pulse 1.2s ease-in-out infinite;`}
-        />
+      <div className="flex items-center justify-between gap-2">
+        <Skel width={260} height={34} />
+        <Skel width={140} height={22} />
       </div>
-
       {/* Description line */}
-      <div style={`width: 320px; height: 14px; margin-bottom: 16px; ${bar}`} />
-
+      <Skel width={320} height={14} />
       {/* Content rectangle */}
-      <div style={`width: 100%; height: 300px; ${bar}`} />
-    </>
+      <Skel width="100%" height={300} />
+    </div>
   );
-};
+}
 
 export interface ActiveProviderIconsProps {
-  activeProviders: () => RoutingProvider[];
-  customProviders: () => CustomProviderData[];
+  activeProviders: RoutingProvider[];
+  customProviders: CustomProviderData[];
 }
 
 interface ProviderGroup {
@@ -49,127 +43,142 @@ interface ProviderGroup {
   keys: RoutingProvider[];
 }
 
+const tooltipClass =
+  'routing-providers-info__tooltip pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 hidden -translate-x-1/2 flex-col gap-0.5 whitespace-nowrap rounded-control border border-line bg-elev px-2.5 py-1.5 text-xs text-dim group-hover:flex';
+
+function CustomProviderIcon({
+  provider,
+  customProviders,
+}: {
+  provider: string;
+  customProviders: CustomProviderData[];
+}) {
+  const cp = customProviders?.find((c) => `custom:${c.id}` === provider);
+  const logo = cp ? customProviderLogo(cp.name, 16, cp.base_url) : null;
+  const name = cp?.name ?? 'C';
+  return (
+    <span className="inline-flex items-center" title={cp?.name ?? provider}>
+      {logo ?? (
+        <span
+          className="provider-card__logo-letter inline-flex size-4 items-center justify-center rounded-full text-[9px] font-semibold text-on-accent"
+          style={{ background: customProviderColor(name) }}
+        >
+          {name.charAt(0).toUpperCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** Renders the provider icons row and connection count above the tier cards. */
-export const ActiveProviderIcons: Component<ActiveProviderIconsProps> = (props) => {
-  const grouped = createMemo<ProviderGroup[]>(() => {
+export function ActiveProviderIcons({
+  activeProviders,
+  customProviders,
+}: ActiveProviderIconsProps) {
+  const grouped = useMemo<ProviderGroup[]>(() => {
     const map = new Map<string, ProviderGroup>();
-    for (const prov of props.activeProviders()) {
+    for (const prov of activeProviders) {
       const key = `${prov.provider}::${prov.auth_type}`;
       const existing = map.get(key);
-      if (existing) {
-        existing.keys.push(prov);
-      } else {
-        map.set(key, { provider: prov.provider, auth_type: prov.auth_type, keys: [prov] });
-      }
+      if (existing) existing.keys.push(prov);
+      else map.set(key, { provider: prov.provider, auth_type: prov.auth_type, keys: [prov] });
     }
     return [...map.values()];
-  });
+  }, [activeProviders]);
 
   return (
-    <div class="routing-providers-info">
-      <span class="routing-providers-info__icons">
-        <For each={grouped()}>
-          {(group) => {
-            if (group.provider.startsWith('custom:')) {
-              const cp = createMemo(() =>
-                props.customProviders()?.find((c) => `custom:${c.id}` === group.provider),
-              );
-              const logo = createMemo(() => {
-                const c = cp();
-                return c ? customProviderLogo(c.name, 16, c.base_url) : null;
-              });
-              return (
-                <span class="routing-providers-info__icon" title={cp()?.name ?? group.provider}>
-                  <Show
-                    when={logo()}
-                    fallback={
-                      <span
-                        class="provider-card__logo-letter"
-                        style={{
-                          background: customProviderColor(cp()?.name ?? 'C'),
-                          width: '16px',
-                          height: '16px',
-                          'font-size': '9px',
-                          'border-radius': '50%',
-                        }}
-                      >
-                        {(cp()?.name ?? 'C').charAt(0).toUpperCase()}
-                      </span>
-                    }
-                  >
-                    {logo()}
-                  </Show>
-                </span>
-              );
-            }
-            const provDef = PROVIDERS.find((p) => p.id === group.provider);
-            const provName = provDef?.name ?? group.provider;
-            const keyCount = group.keys.length;
+    <div className="routing-providers-info flex items-center gap-2 text-sm text-muted">
+      <span className="flex items-center gap-1.5">
+        {grouped.map((group) => {
+          const key = `${group.provider}::${group.auth_type}`;
+          if (group.provider.startsWith('custom:')) {
             return (
-              <span class="routing-providers-info__icon routing-providers-info__icon--has-tooltip">
-                {providerIcon(group.provider, 16)}
-                {authBadgeFor(group.auth_type, 12)}
-                <Show when={keyCount > 1}>
-                  <span class="routing-providers-info__tooltip">
-                    <strong>
-                      {t('routing.panels.keyCount', {
-                        count: keyCount,
-                        auth: authLabel(group.auth_type),
-                      })}
-                    </strong>
-                    <For each={group.keys}>
-                      {(k) => <span>{k.label || t('routing.panels.defaultKey')}</span>}
-                    </For>
-                  </span>
-                </Show>
-                <Show when={keyCount === 1}>
-                  <span class="routing-providers-info__tooltip">
-                    <strong>{provName}</strong>
-                    <span>{authLabel(group.auth_type)}</span>
-                  </span>
-                </Show>
-              </span>
+              <CustomProviderIcon
+                key={key}
+                provider={group.provider}
+                customProviders={customProviders}
+              />
             );
-          }}
-        </For>
+          }
+          const provName = PROVIDERS.find((p) => p.id === group.provider)?.name ?? group.provider;
+          const keyCount = group.keys.length;
+          return (
+            <span key={key} className="group relative inline-flex items-center gap-0.5">
+              {providerIcon(group.provider, 16)}
+              {authBadgeFor(group.auth_type, 12)}
+              {keyCount > 1 ? (
+                <span className={tooltipClass}>
+                  <strong className="text-ink">
+                    {t('routing.panels.keyCount', {
+                      count: keyCount,
+                      auth: authLabel(group.auth_type),
+                    })}
+                  </strong>
+                  {group.keys.map((k) => (
+                    <span key={k.id}>{k.label || t('routing.panels.defaultKey')}</span>
+                  ))}
+                </span>
+              ) : (
+                <span className={tooltipClass}>
+                  <strong className="text-ink">{provName}</strong>
+                  <span>{authLabel(group.auth_type)}</span>
+                </span>
+              )}
+            </span>
+          );
+        })}
       </span>
-      <span class="routing-providers-info__label">
-        {t('routing.panels.connections', props.activeProviders().length)}
-      </span>
+      <span>{t('routing.panels.connections', activeProviders.length)}</span>
     </div>
   );
-};
+}
 
 export interface RoutingFooterProps {
-  hasOverrides: () => boolean;
-  resettingAll: () => boolean;
-  resettingTier: () => string | null;
+  hasOverrides: boolean;
+  resettingAll: boolean;
+  resettingTier: string | null;
   onResetAll: () => void;
   onShowInstructions: () => void;
   onShowHowRoutingWorks?: () => void;
 }
 
 /** Footer bar with reset-all and setup instructions buttons. */
-export const RoutingFooter: Component<RoutingFooterProps> = (props) => (
-  <div class="routing-footer">
-    <Show when={props.hasOverrides()}>
-      <button
-        class="btn btn--outline btn--sm"
-        onClick={() => props.onResetAll()}
-        disabled={props.resettingAll() || props.resettingTier() !== null}
-      >
-        {props.resettingAll() ? <span class="spinner" /> : t('routing.panels.resetAll')}
+export function RoutingFooter(props: RoutingFooterProps) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+      {props.hasOverrides ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => props.onResetAll()}
+          disabled={props.resettingAll || props.resettingTier !== null}
+          aria-label={t('routing.panels.resetAll')}
+        >
+          {props.resettingAll ? (
+            <span className="spinner" aria-hidden="true" />
+          ) : (
+            t('routing.panels.resetAll')
+          )}
+        </Button>
+      ) : null}
+      <div className="flex-1" />
+      {props.onShowHowRoutingWorks ? (
+        <>
+          <button
+            type="button"
+            className="link-action"
+            onClick={() => props.onShowHowRoutingWorks?.()}
+          >
+            {t('routing.howRoutingWorks')}
+          </button>
+          <span className="text-faint" aria-hidden="true">
+            |
+          </span>
+        </>
+      ) : null}
+      <button type="button" className="link-action" onClick={() => props.onShowInstructions()}>
+        {t('routing.panels.setupInstructions')}
       </button>
-    </Show>
-    <div style="flex: 1;" />
-    <Show when={props.onShowHowRoutingWorks}>
-      <button class="routing-footer__instructions" onClick={() => props.onShowHowRoutingWorks?.()}>
-        {t('routing.howRoutingWorks')}
-      </button>
-      <span class="routing-footer__sep">|</span>
-    </Show>
-    <button class="routing-footer__instructions" onClick={() => props.onShowInstructions()}>
-      {t('routing.panels.setupInstructions')}
-    </button>
-  </div>
-);
+    </div>
+  );
+}

@@ -1,33 +1,40 @@
-import { A, useSearchParams } from '@solidjs/router';
-import { Title, Meta } from '@solidjs/meta';
-import { type Component, createSignal, createUniqueId, onMount, Show } from 'solid-js';
+import { useEffect, useId, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router';
+import { AuthFooter, AuthHeader } from '../components/auth-ui.jsx';
+import { Button, Field } from '../components/ui.jsx';
 import { authClient } from '../services/auth-client.js';
 import { checkEmailConfigured } from '../services/setup-status.js';
 import { t } from '../i18n/index.js';
 
-const RequestResetForm: Component = () => {
-  const [email, setEmail] = createSignal('');
-  const [sent, setSent] = createSignal(false);
-  const [error, setError] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
+function RequestResetForm() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   // Assume email works until the status check says otherwise, so the form
   // renders immediately and only flips to the notice on a confirmed no-provider
   // install (typically self-hosted without EMAIL_PROVIDER set).
-  const [emailConfigured, setEmailConfigured] = createSignal(true);
-  const emailId = createUniqueId();
-  const errorId = createUniqueId();
+  const [emailConfigured, setEmailConfigured] = useState(true);
+  const emailId = useId();
+  const errorId = useId();
 
-  onMount(() => {
-    void checkEmailConfigured().then(setEmailConfigured);
-  });
+  useEffect(() => {
+    let alive = true;
+    void checkEmailConfigured().then((ok) => {
+      if (alive) setEmailConfigured(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     const { error: authError } = await authClient.requestPasswordReset({
-      email: email(),
+      email,
       redirectTo: '/reset-password',
     });
 
@@ -43,91 +50,81 @@ const RequestResetForm: Component = () => {
 
   return (
     <>
-      <div class="auth-header">
-        <h1 class="auth-header__title">{t('auth.reset.title')}</h1>
-        <p class="auth-header__subtitle">
-          {!emailConfigured()
+      <AuthHeader
+        title={t('auth.reset.title')}
+        subtitle={
+          !emailConfigured
             ? t('auth.reset.noEmail')
-            : sent()
+            : sent
               ? t('auth.reset.checkEmail')
-              : t('auth.reset.enterEmail')}
-        </p>
-      </div>
+              : t('auth.reset.enterEmail')
+        }
+      />
 
-      <Show when={!emailConfigured()}>
-        <div class="auth-form">
-          <div class="auth-form__notice" role="status">
-            {t('auth.reset.unavailableBefore')}{' '}
-            <A href="/account" class="auth-form__notice-link">
-              {t('auth.reset.accountLink')}
-            </A>{' '}
-            {t('auth.reset.unavailableAfter')}
-          </div>
+      {!emailConfigured ? (
+        <div className="form-notice" role="status">
+          {t('auth.reset.unavailableBefore')}{' '}
+          <Link to="/account">{t('auth.reset.accountLink')}</Link>{' '}
+          {t('auth.reset.unavailableAfter')}
         </div>
-      </Show>
+      ) : null}
 
-      <Show when={emailConfigured() && !sent()}>
-        <form class="auth-form" onSubmit={handleSubmit}>
-          {error() && (
-            <div id={errorId} class="auth-form__error" role="alert">
-              {error()}
+      {emailConfigured && !sent ? (
+        <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+          {error ? (
+            <div id={errorId} className="form-error" role="alert">
+              {error}
             </div>
-          )}
-          <label class="auth-form__label" for={emailId}>
-            {t('common.email')}
+          ) : null}
+          <Field label={t('common.email')} htmlFor={emailId}>
             <input
-              ref={(el) => requestAnimationFrame(() => el.focus())}
+              autoFocus
               id={emailId}
-              class="auth-form__input"
+              className="field"
               type="email"
-              autocomplete="email"
+              autoComplete="email"
               placeholder={t('auth.emailPlaceholder')}
-              value={email()}
-              onInput={(e) => setEmail(e.currentTarget.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              aria-describedby={error() ? errorId : undefined}
+              aria-describedby={error ? errorId : undefined}
             />
-          </label>
-          <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : t('auth.reset.sendLink')}
-          </button>
+          </Field>
+          <Button type="submit" block busy={loading}>
+            {t('auth.reset.sendLink')}
+          </Button>
         </form>
-      </Show>
+      ) : null}
 
-      <div class="auth-footer">
-        <A href="/login" class="auth-footer__link">
-          {t('auth.backToSignIn')}
-        </A>
-      </div>
+      <AuthFooter>
+        <Link to="/login">{t('auth.backToSignIn')}</Link>
+      </AuthFooter>
     </>
   );
-};
+}
 
-const SetNewPasswordForm: Component<{ token: string }> = (props) => {
-  const [password, setPassword] = createSignal('');
-  const [confirmPassword, setConfirmPassword] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [success, setSuccess] = createSignal(false);
-  const passwordId = createUniqueId();
-  const confirmId = createUniqueId();
-  const errorId = createUniqueId();
+function SetNewPasswordForm({ token }: { token: string }) {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const passwordId = useId();
+  const confirmId = useId();
+  const errorId = useId();
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password() !== confirmPassword()) {
+    if (password !== confirmPassword) {
       setError(t('auth.reset.mismatch'));
       return;
     }
 
     setLoading(true);
 
-    const { error: authError } = await authClient.resetPassword({
-      newPassword: password(),
-      token: props.token,
-    });
+    const { error: authError } = await authClient.resetPassword({ newPassword: password, token });
 
     setLoading(false);
 
@@ -139,95 +136,82 @@ const SetNewPasswordForm: Component<{ token: string }> = (props) => {
     setSuccess(true);
   };
 
+  const describedBy = error ? errorId : undefined;
+
   return (
     <>
-      <div class="auth-header">
-        <h1 class="auth-header__title">{t('auth.reset.setNewTitle')}</h1>
-        <p class="auth-header__subtitle">
-          {success() ? t('auth.reset.done') : t('auth.reset.enterNew')}
-        </p>
-      </div>
+      <AuthHeader
+        title={t('auth.reset.setNewTitle')}
+        subtitle={success ? t('auth.reset.done') : t('auth.reset.enterNew')}
+      />
 
-      <Show
-        when={!success()}
-        fallback={
-          <>
-            <div class="auth-form">
-              <div class="auth-form__success">{t('auth.reset.updated')}</div>
-            </div>
-            <div class="auth-footer">
-              <A href="/login" class="auth-footer__link">
-                {t('auth.login.submit')}
-              </A>
-            </div>
-          </>
-        }
-      >
-        <form class="auth-form" onSubmit={handleSubmit}>
-          {error() && (
-            <div id={errorId} class="auth-form__error" role="alert">
-              {error()}
-            </div>
-          )}
-          <label class="auth-form__label" for={passwordId}>
-            {t('auth.reset.newPassword')}
-            <input
-              ref={(el) => requestAnimationFrame(() => el.focus())}
-              id={passwordId}
-              class="auth-form__input"
-              type="password"
-              autocomplete="new-password"
-              placeholder={t('auth.reset.newPlaceholder')}
-              value={password()}
-              onInput={(e) => setPassword(e.currentTarget.value)}
-              required
-              minLength={8}
-              aria-describedby={error() ? errorId : undefined}
-            />
-          </label>
-          <label class="auth-form__label" for={confirmId}>
-            {t('auth.reset.confirmPassword')}
-            <input
-              id={confirmId}
-              class="auth-form__input"
-              type="password"
-              autocomplete="new-password"
-              placeholder={t('auth.reset.confirmPlaceholder')}
-              value={confirmPassword()}
-              onInput={(e) => setConfirmPassword(e.currentTarget.value)}
-              required
-              minLength={8}
-              aria-describedby={error() ? errorId : undefined}
-            />
-          </label>
-          <button class="auth-form__submit" type="submit" disabled={loading()}>
-            {loading() ? <span class="spinner" /> : t('auth.reset.submit')}
-          </button>
-        </form>
+      {success ? (
+        <>
+          <div className="form-notice">{t('auth.reset.updated')}</div>
+          <AuthFooter>
+            <Link to="/login">{t('auth.login.submit')}</Link>
+          </AuthFooter>
+        </>
+      ) : (
+        <>
+          <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+            {error ? (
+              <div id={errorId} className="form-error" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <Field label={t('auth.reset.newPassword')} htmlFor={passwordId}>
+              <input
+                autoFocus
+                id={passwordId}
+                className="field"
+                type="password"
+                autoComplete="new-password"
+                placeholder={t('auth.reset.newPlaceholder')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                aria-describedby={describedBy}
+              />
+            </Field>
+            <Field label={t('auth.reset.confirmPassword')} htmlFor={confirmId}>
+              <input
+                id={confirmId}
+                className="field"
+                type="password"
+                autoComplete="new-password"
+                placeholder={t('auth.reset.confirmPlaceholder')}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                aria-describedby={describedBy}
+              />
+            </Field>
+            <Button type="submit" block busy={loading}>
+              {t('auth.reset.submit')}
+            </Button>
+          </form>
 
-        <div class="auth-footer">
-          <A href="/login" class="auth-footer__link">
-            {t('auth.backToSignIn')}
-          </A>
-        </div>
-      </Show>
+          <AuthFooter>
+            <Link to="/login">{t('auth.backToSignIn')}</Link>
+          </AuthFooter>
+        </>
+      )}
     </>
   );
-};
+}
 
-const ResetPassword: Component = () => {
+export default function ResetPassword() {
   const [searchParams] = useSearchParams();
-  const token = () => searchParams.token as string | undefined;
+  const token = searchParams.get('token');
 
   return (
     <>
-      <Title>{t('common.pageTitle', { page: t('auth.reset.pageTitle') })}</Title>
-      <Meta name="description" content={t('auth.reset.metaDescription')} />
-      <Show when={token()} fallback={<RequestResetForm />}>
-        {(tok) => <SetNewPasswordForm token={tok()} />}
-      </Show>
+      <title>{t('common.pageTitle', { page: t('auth.reset.pageTitle') })}</title>
+      <meta name="description" content={t('auth.reset.metaDescription')} />
+      {token ? <SetNewPasswordForm token={token} /> : <RequestResetForm />}
     </>
   );
-};
-
-export default ResetPassword;
+}

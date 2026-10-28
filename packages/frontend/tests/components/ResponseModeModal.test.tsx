@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { render, fireEvent, screen } from '@testing-library/react';
 
 vi.mock('../../src/services/providers.js', () => ({
   STAGES: [
@@ -60,101 +59,100 @@ function makeTier(overrides?: Partial<TierAssignment>): TierAssignment {
 
 describe('ResponseModeModal', () => {
   it('renders with stream mode off (buffered) and shows buffered description', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
-    const { container } = render(() => (
+    const mode = 'buffered' as const;
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[makeTier()]}
         models={allStreamModels}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain(
+      />,
+    );
+    expect(document.body.textContent).toContain(
       'Responses are returned as a single payload once the model finishes generating',
     );
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
-    expect(toggle.classList.contains('routing-switch--on')).toBe(false);
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
 
   it('renders with stream mode on and shows stream description', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('stream');
-    const { container } = render(() => (
+    const mode = 'stream' as const;
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[makeTier()]}
         models={allStreamModels}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain(
+      />,
+    );
+    expect(document.body.textContent).toContain(
       'Responses are streamed token by token as the model generates them',
     );
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
-    expect(toggle.classList.contains('routing-switch--on')).toBe(true);
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
   });
 
   it('toggle calls onResponseModeChange with stream when no incompatible models', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onChange = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={onChange}
         tiers={[makeTier()]}
         models={allStreamModels}
         onClose={vi.fn()}
-      />
-    ));
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
+      />,
+    );
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
     fireEvent.click(toggle);
     expect(onChange).toHaveBeenCalledWith('stream');
   });
 
   it('toggle calls onResponseModeChange with buffered when currently streaming', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('stream');
+    const mode = 'stream' as const;
     const onChange = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={onChange}
         tiers={[makeTier()]}
         models={allStreamModels}
         onClose={vi.fn()}
-      />
-    ));
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
+      />,
+    );
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
     fireEvent.click(toggle);
     expect(onChange).toHaveBeenCalledWith('buffered');
   });
 
   it('toggle is disabled when incompatible models exist and mode is buffered', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onChange = vi.fn();
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={onChange}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
+      />,
+    );
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
     expect(toggle.disabled).toBe(true);
-    expect(toggle.classList.contains('routing-switch--disabled')).toBe(true);
     fireEvent.click(toggle);
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it('toggle is disabled when disabled prop is true', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
-    const [disabled] = createSignal(true);
-    const { container } = render(() => (
+    const mode = 'buffered' as const;
+    const disabled = true;
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
@@ -162,29 +160,29 @@ describe('ResponseModeModal', () => {
         tiers={[makeTier()]}
         models={allStreamModels}
         onClose={vi.fn()}
-      />
-    ));
-    const toggle = container.querySelector('.routing-switch') as HTMLButtonElement;
+      />,
+    );
+    const toggle = document.body.querySelector('.response-mode-modal__switch') as HTMLButtonElement;
     expect(toggle.disabled).toBe(true);
   });
 
   it('lists incompatible models with model name, tier label, and position', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const tier = makeTier({
       tier: 'simple',
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
       fallback_routes: [{ provider: 'openai', authType: 'api_key', model: 'o1-preview' }],
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    const rows = container.querySelectorAll('.response-mode-modal__blocker-row');
+      />,
+    );
+    const rows = document.body.querySelectorAll('.response-mode-modal__blocker-row');
     expect(rows.length).toBe(2);
 
     // Primary model
@@ -200,50 +198,50 @@ describe('ResponseModeModal', () => {
   });
 
   it('shows singular copy when exactly one model is incompatible', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('this model does');
-    expect(container.textContent).toContain('Change it to enable');
+      />,
+    );
+    expect(document.body.textContent).toContain('this model does');
+    expect(document.body.textContent).toContain('Change it to enable');
   });
 
   it('shows plural copy when multiple models are incompatible', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
       fallback_routes: [{ provider: 'openai', authType: 'api_key', model: 'o1-preview' }],
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('these models do');
-    expect(container.textContent).toContain('Change them to enable');
+      />,
+    );
+    expect(document.body.textContent).toContain('these models do');
+    expect(document.body.textContent).toContain('Change them to enable');
   });
 
   it('Change button calls onReplace with tier, primary position, and stream capability', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onReplace = vi.fn();
     const tier = makeTier({
       tier: 'complex',
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
@@ -251,17 +249,17 @@ describe('ResponseModeModal', () => {
         models={mixedModels}
         onClose={vi.fn()}
         onReplace={onReplace}
-      />
-    ));
-    const changeBtn = container.querySelector(
-      '.response-mode-modal__blocker-row .btn--outline',
+      />,
+    );
+    const changeBtn = document.body.querySelector(
+      '.response-mode-modal__blocker-row .response-mode-modal__change',
     ) as HTMLButtonElement;
     fireEvent.click(changeBtn);
     expect(onReplace).toHaveBeenCalledWith('complex', 'primary', 'stream');
   });
 
   it('Change button calls onReplace with fallback index for fallback models', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onReplace = vi.fn();
     const tier = makeTier({
       tier: 'simple',
@@ -269,7 +267,7 @@ describe('ResponseModeModal', () => {
       auto_assigned_route: null,
       fallback_routes: [{ provider: 'openai', authType: 'api_key', model: 'o1-preview' }],
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
@@ -277,10 +275,10 @@ describe('ResponseModeModal', () => {
         models={mixedModels}
         onClose={vi.fn()}
         onReplace={onReplace}
-      />
-    ));
-    const changeBtn = container.querySelector(
-      '.response-mode-modal__blocker-row .btn--outline',
+      />,
+    );
+    const changeBtn = document.body.querySelector(
+      '.response-mode-modal__blocker-row .response-mode-modal__change',
     ) as HTMLButtonElement;
     fireEvent.click(changeBtn);
     // Fallback 1 → index 0
@@ -288,129 +286,129 @@ describe('ResponseModeModal', () => {
   });
 
   it('close button calls onClose', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[]}
         models={[]}
         onClose={onClose}
-      />
-    ));
-    const closeBtn = container.querySelector('.modal__close') as HTMLButtonElement;
+      />,
+    );
+    const closeBtn = screen.getByRole('button', { name: 'Close' });
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('overlay click calls onClose', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[]}
         models={[]}
         onClose={onClose}
-      />
-    ));
-    fireEvent.click(container.querySelector('.modal-overlay') as HTMLElement);
+      />,
+    );
+    fireEvent.mouseDown(document.body.querySelector('.overlay') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('clicking inside the modal card does not call onClose', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[]}
         models={[]}
         onClose={onClose}
-      />
-    ));
-    fireEvent.click(container.querySelector('.response-mode-modal') as HTMLElement);
+      />,
+    );
+    fireEvent.mouseDown(document.body.querySelector('.response-mode-modal') as HTMLElement);
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it('Escape key on overlay calls onClose', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[]}
         models={[]}
         onClose={onClose}
-      />
-    ));
-    fireEvent.keyDown(container.querySelector('.modal-overlay') as HTMLElement, { key: 'Escape' });
+      />,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('uses override_route when present instead of auto_assigned_route', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
       auto_assigned_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // o1-preview (override) should be listed as incompatible, not gpt-4o (auto)
-    const modelNames = container.querySelectorAll('.response-mode-modal__blocker-model');
+    const modelNames = document.body.querySelectorAll('.response-mode-modal__blocker-model');
     expect(modelNames.length).toBe(1);
     expect(modelNames[0].textContent).toBe('o1-preview');
   });
 
   it('does not show blocker section when in stream mode even if models lack streaming', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('stream');
+    const mode = 'stream' as const;
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.response-mode-modal__blocker')).toBeNull();
+      />,
+    );
+    expect(document.body.querySelector('.response-mode-modal__blocker')).toBeNull();
   });
 
   it('falls back to tier id when tier does not match any stage', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const tier = makeTier({
       tier: 'unknown-tier',
       override_route: { provider: 'openai', authType: 'api_key', model: 'o1-preview' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={mixedModels}
         onClose={vi.fn()}
-      />
-    ));
-    const meta = container.querySelector('.response-mode-modal__blocker-meta');
+      />,
+    );
+    const meta = document.body.querySelector('.response-mode-modal__blocker-meta');
     expect(meta?.textContent).toContain('unknown-tier');
   });
 
   it('treats models without capabilities metadata as not supporting stream', () => {
-    const [mode] = createSignal<'buffered' | 'stream'>('buffered');
+    const mode = 'buffered' as const;
     const noCapsModel: AvailableModel = {
       ...noStreamModel,
       model_name: 'mystery-model',
@@ -419,17 +417,17 @@ describe('ResponseModeModal', () => {
     const tier = makeTier({
       override_route: { provider: 'openai', authType: 'api_key', model: 'mystery-model' },
     });
-    const { container } = render(() => (
+    render(
       <ResponseModeModal
         responseMode={mode}
         onResponseModeChange={vi.fn()}
         tiers={[tier]}
         models={[noCapsModel]}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Model without capabilities → hasStream returns false (via ?? false) → listed as incompatible
-    const modelNames = container.querySelectorAll('.response-mode-modal__blocker-model');
+    const modelNames = document.body.querySelectorAll('.response-mode-modal__blocker-model');
     expect(modelNames.length).toBe(1);
     expect(modelNames[0].textContent).toBe('mystery-model');
   });

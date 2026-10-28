@@ -1,12 +1,4 @@
-import {
-  Index,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
-  type Component,
-} from 'solid-js';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
 import {
   MAX_HEADER_ENTRIES,
@@ -16,6 +8,7 @@ import {
   type HeaderIssue,
 } from '../../services/playground-request-headers.js';
 import { PlusIcon, TrashIcon, XIcon } from './icons.jsx';
+import { Button, cx } from '../ui.jsx';
 import { t } from '../../i18n/index.js';
 
 interface Props {
@@ -35,187 +28,197 @@ export function headerIssueMessage(name: string, issue: HeaderIssue): string {
   return t(`playground.headers.issue.${issue}`, { name, max: MAX_HEADER_ENTRIES });
 }
 
-const RequestHeadersPopover: Component<Props> = (props) => {
-  const [panelRef, setPanelRef] = createSignal<HTMLElement | undefined>();
+const INPUT = 'playground-headers__input field h-8 min-w-0 font-mono text-xs';
 
-  createEffect(() => {
-    if (!props.open) return;
+/** Editor for the custom headers sent with every Playground provider call. */
+export default function RequestHeadersPopover({ open, entries, onChange, onClose }: Props) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        props.onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener('keydown', onKey);
-    onCleanup(() => window.removeEventListener('keydown', onKey));
-  });
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
-  useFocusTrap(
-    () => props.open,
-    () => panelRef(),
-  );
+  useFocusTrap(open, panelRef);
 
   // Screen-reader announcement for warnings that appear while typing. Only a
   // row whose issue *changes* to a new problem is announced, so typing more
   // characters into an already-invalid name doesn't repeat the message. The
   // first pass (opening with existing rows) is silent: the warning is still
   // reachable through each input's aria-describedby.
-  const [announcement, setAnnouncement] = createSignal('');
-  const issues = createMemo(() => headerEntryIssues(props.entries));
-  let previousIssues: Map<string, HeaderIssue | null> | undefined;
-  createEffect(() => {
+  const [announcement, setAnnouncement] = useState('');
+  const issues = useMemo(() => headerEntryIssues(entries), [entries]);
+  const previousIssues = useRef<Map<string, HeaderIssue | null> | undefined>(undefined);
+  useEffect(() => {
     // Closed: forget the last message so reopening doesn't replay a stale one.
-    if (!props.open) {
+    if (!open) {
       setAnnouncement('');
-      previousIssues = undefined;
+      previousIssues.current = undefined;
       return;
     }
     const next = new Map<string, HeaderIssue | null>();
-    const current = issues();
     let message = '';
     let anyIssue = false;
-    for (const e of props.entries) {
-      const issue = current.get(e.id) ?? null;
+    for (const e of entries) {
+      const issue = issues.get(e.id) ?? null;
       next.set(e.id, issue);
       if (!issue) continue;
       anyIssue = true;
-      if (previousIssues && !message && previousIssues.get(e.id) !== issue) {
+      const prev = previousIssues.current;
+      if (prev && !message && prev.get(e.id) !== issue) {
         message = headerIssueMessage(e.key.trim(), issue);
       }
     }
     if (message) setAnnouncement(message);
     else if (!anyIssue) setAnnouncement('');
-    previousIssues = next;
-  });
+    previousIssues.current = next;
+  }, [open, entries, issues]);
+
+  if (!open) return null;
 
   const update = (id: string, patch: Partial<HeaderEntry>) => {
-    props.onChange(props.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+    onChange(entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   };
   const remove = (id: string) => {
-    props.onChange(props.entries.filter((e) => e.id !== id));
+    onChange(entries.filter((e) => e.id !== id));
   };
   const add = () => {
-    props.onChange([...props.entries, blankEntry()]);
+    onChange([...entries, blankEntry()]);
   };
-  const clearAll = () => props.onChange([]);
+  const clearAll = () => onChange([]);
 
   return (
-    <Show when={props.open}>
-      <div class="playground-headers__backdrop" role="presentation" onClick={props.onClose} />
+    <>
       <div
-        ref={setPanelRef}
-        class="playground-headers"
+        className="playground-headers__backdrop fixed inset-0 z-40"
+        role="presentation"
+        onClick={onClose}
+      />
+      <div
+        ref={panelRef}
+        className="playground-headers absolute bottom-full left-0 z-50 mb-2 flex w-[min(34rem,calc(100vw-2rem))] flex-col gap-3 rounded-surface border border-line bg-elev p-4 shadow-[var(--shadow-float)]"
         role="dialog"
         aria-modal="true"
         aria-label={t('playground.headers.title')}
       >
-        <header class="playground-headers__header">
-          <h3 class="playground-headers__title">{t('playground.headers.title')}</h3>
+        <header className="flex items-center justify-between gap-2">
+          <h3 className="playground-headers__title text-sm font-semibold text-ink">
+            {t('playground.headers.title')}
+          </h3>
           <button
             type="button"
-            class="playground-headers__close"
+            className="playground-headers__close icon-btn h-7 w-7"
             aria-label={t('playground.headers.close')}
-            onClick={props.onClose}
+            onClick={onClose}
           >
             <XIcon size={16} />
           </button>
         </header>
 
-        <p class="playground-headers__hint">{t('playground.headers.hint')}</p>
+        <p className="playground-headers__hint hint mt-0">{t('playground.headers.hint')}</p>
 
-        <Show when={props.entries.length === 0}>
-          <p class="playground-headers__empty">{t('playground.headers.empty')}</p>
-        </Show>
+        {entries.length === 0 ? (
+          <p className="playground-headers__empty text-xs text-faint">
+            {t('playground.headers.empty')}
+          </p>
+        ) : null}
 
-        <div class="playground-headers__rows">
-          {/* Index (not For): rows are updated immutably, and For would
-              recreate the row on every keystroke, dropping input focus. */}
-          <Index each={props.entries}>
-            {(entry) => {
-              const issue = () => issues().get(entry().id) ?? null;
-              const nameIssue = () => {
-                const i = issue();
-                return i !== null && i !== 'control-chars' && i !== 'unsupported-chars';
-              };
-              const valueIssue = () =>
-                issue() === 'control-chars' || issue() === 'unsupported-chars';
-              const warningId = () => headerWarningId(entry().id);
-              return (
-                <div
-                  class="playground-headers__row"
-                  classList={{
-                    'playground-headers__row--blocked': issue() === 'blocked',
-                    'playground-headers__row--invalid-name':
-                      issue() === 'invalid-name' ||
-                      issue() === 'duplicate' ||
-                      issue() === 'over-limit',
-                    'playground-headers__row--invalid-value': valueIssue(),
-                  }}
+        <div className="playground-headers__rows flex max-h-72 flex-col gap-2 overflow-y-auto">
+          {entries.map((entry) => {
+            const issue = issues.get(entry.id) ?? null;
+            const valueIssue = issue === 'control-chars' || issue === 'unsupported-chars';
+            const nameIssue = issue !== null && !valueIssue;
+            const warningId = headerWarningId(entry.id);
+            return (
+              <div
+                key={entry.id}
+                className={cx(
+                  'playground-headers__row grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-2',
+                  issue === 'blocked' && 'playground-headers__row--blocked',
+                  (issue === 'invalid-name' || issue === 'duplicate' || issue === 'over-limit') &&
+                    'playground-headers__row--invalid-name',
+                  valueIssue && 'playground-headers__row--invalid-value',
+                )}
+              >
+                <input
+                  type="text"
+                  className={cx(INPUT, 'playground-headers__input--key')}
+                  placeholder={t('playground.headers.namePlaceholder')}
+                  value={entry.key}
+                  aria-label={t('playground.headers.nameLabel')}
+                  aria-invalid={nameIssue ? 'true' : undefined}
+                  aria-describedby={nameIssue ? warningId : undefined}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => update(entry.id, { key: e.currentTarget.value })}
+                />
+                <input
+                  type="text"
+                  className={cx(INPUT, 'playground-headers__input--value')}
+                  placeholder={t('playground.headers.valuePlaceholder')}
+                  value={entry.value}
+                  aria-label={t('playground.headers.valueLabel')}
+                  aria-invalid={valueIssue ? 'true' : undefined}
+                  aria-describedby={valueIssue ? warningId : undefined}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => update(entry.id, { value: e.currentTarget.value })}
+                />
+                <button
+                  type="button"
+                  className="playground-headers__remove icon-btn h-8 w-8 hover:text-danger"
+                  aria-label={t('playground.headers.remove', {
+                    name: entry.key || t('playground.headers.headerFallback'),
+                  })}
+                  onClick={() => remove(entry.id)}
                 >
-                  <input
-                    type="text"
-                    class="playground-headers__input playground-headers__input--key"
-                    placeholder={t('playground.headers.namePlaceholder')}
-                    value={entry().key}
-                    aria-label={t('playground.headers.nameLabel')}
-                    aria-invalid={nameIssue() ? 'true' : undefined}
-                    aria-describedby={nameIssue() ? warningId() : undefined}
-                    spellcheck={false}
-                    autocomplete="off"
-                    onInput={(e) => update(entry().id, { key: e.currentTarget.value })}
-                  />
-                  <input
-                    type="text"
-                    class="playground-headers__input playground-headers__input--value"
-                    placeholder={t('playground.headers.valuePlaceholder')}
-                    value={entry().value}
-                    aria-label={t('playground.headers.valueLabel')}
-                    aria-invalid={valueIssue() ? 'true' : undefined}
-                    aria-describedby={valueIssue() ? warningId() : undefined}
-                    spellcheck={false}
-                    autocomplete="off"
-                    onInput={(e) => update(entry().id, { value: e.currentTarget.value })}
-                  />
-                  <button
-                    type="button"
-                    class="playground-headers__remove"
-                    aria-label={t('playground.headers.remove', {
-                      name: entry().key || t('playground.headers.headerFallback'),
-                    })}
-                    onClick={() => remove(entry().id)}
-                  >
-                    <TrashIcon size={14} />
-                  </button>
-                  <Show when={issue()}>
-                    {(current) => (
-                      <p id={warningId()} class="playground-headers__warning">
-                        {headerIssueMessage(entry().key.trim(), current())}
-                      </p>
+                  <TrashIcon size={14} />
+                </button>
+                {issue ? (
+                  <p
+                    id={warningId}
+                    className={cx(
+                      'playground-headers__warning col-span-3 text-xs',
+                      issue === 'blocked' ? 'text-warn' : 'text-danger',
                     )}
-                  </Show>
-                </div>
-              );
-            }}
-          </Index>
+                  >
+                    {headerIssueMessage(entry.key.trim(), issue)}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
-        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {announcement()}
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcement}
         </div>
 
-        <footer class="playground-headers__footer">
-          <button type="button" class="playground-headers__add" onClick={add}>
+        <footer className="flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" className="playground-headers__add" onClick={add}>
             <PlusIcon size={14} /> {t('playground.headers.add')}
-          </button>
-          <Show when={props.entries.length > 0}>
-            <button type="button" class="playground-headers__clear" onClick={clearAll}>
+          </Button>
+          {entries.length > 0 ? (
+            <Button
+              variant="quiet"
+              size="sm"
+              className="playground-headers__clear"
+              onClick={clearAll}
+            >
               {t('playground.headers.clearAll')}
-            </button>
-          </Show>
+            </Button>
+          ) : null}
         </footer>
       </div>
-    </Show>
+    </>
   );
-};
-
-export default RequestHeadersPopover;
+}

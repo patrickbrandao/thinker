@@ -1,6 +1,8 @@
-import { createSignal, For, Show, type JSX } from 'solid-js';
-import InfoTooltip from './InfoTooltip.jsx';
+import { useId, useState, type ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
+import InfoTooltip from './InfoTooltip.js';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
 
 /**
  * Render an effective model parameter value as a readable string. Objects
@@ -19,125 +21,97 @@ export function formatParamValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-export function RequestHeadersSection(props: { headers: Record<string, string> }): JSX.Element {
-  const [open, setOpen] = createSignal(false);
-  const entries = (): Array<[string, string]> =>
-    Object.entries(props.headers).sort(([a], [b]) => a.localeCompare(b));
-  const tableId = `msg-detail-request-headers-${Math.random().toString(36).slice(2, 10)}`;
+/** A collapsible key/value table with a count badge (closed by default). */
+function TogglePanel({
+  title,
+  idPrefix,
+  rows,
+  keyLabel,
+  valueClass,
+  tooltip,
+}: {
+  title: string;
+  idPrefix: string;
+  rows: Array<[string, string]>;
+  keyLabel: string;
+  valueClass: string;
+  tooltip?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const tableId = `${idPrefix}-${useId().replace(/[^\w-]/g, '')}`;
   return (
-    <div class={`toggle-panel${open() ? ' toggle-panel--open' : ''}`}>
-      <div class="toggle-panel__header">
+    <div className={cx('toggle-panel mt-4', open && 'toggle-panel--open')}>
+      <div className="toggle-panel__header flex items-center gap-1.5">
         <button
           type="button"
-          class="msg-detail__section-title msg-detail__section-title--toggle"
-          aria-expanded={open() ? 'true' : 'false'}
+          className="msg-detail__section-title msg-detail__section-title--toggle eyebrow inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0"
+          aria-expanded={open ? 'true' : 'false'}
           aria-controls={tableId}
           onClick={() => setOpen((v) => !v)}
         >
-          {t('messages.details.requestHeaders')}
-          <span class="msg-detail__count-badge">{entries().length}</span>
           <span
-            class="msg-detail__chevron"
-            classList={{ 'msg-detail__chevron--open': open() }}
+            className={cx(
+              'msg-detail__chevron inline-flex transition-transform',
+              open && 'msg-detail__chevron--open rotate-90',
+            )}
             aria-hidden="true"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="10"
-              height="10"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="m18.57 11.18-10-7c-.3-.21-.7-.24-1.04-.07-.33.17-.54.51-.54.89v14c0 .37.21.71.54.89.15.08.3.11.46.11.2 0 .4-.06.57-.18l10-7a.997.997 0 0 0 0-1.64Z" />
-            </svg>
+            <ChevronRight className="size-3" />
           </span>
+          {title}
+          <span className="msg-detail__count-badge badge mono">{rows.length}</span>
         </button>
+        {tooltip}
       </div>
-      <Show when={open()}>
-        <div class="data-table-scroll" id={tableId}>
-          <table class="data-table msg-detail__table">
+      {open ? (
+        <div className="table-wrap mt-2" id={tableId}>
+          <table className="data msg-detail__table">
             <thead>
               <tr>
-                <th>{t('messages.details.header')}</th>
+                <th>{keyLabel}</th>
                 <th>{t('messages.details.value')}</th>
               </tr>
             </thead>
             <tbody>
-              <For each={entries()}>
-                {([k, v]) => (
-                  <tr>
-                    <td class="msg-detail__mono-xs">{k}</td>
-                    <td class="msg-detail__mono-xs msg-detail__log-body">{v}</td>
-                  </tr>
-                )}
-              </For>
+              {rows.map(([k, v]) => (
+                <tr key={k}>
+                  <td className="msg-detail__mono-xs font-mono text-xs">{k}</td>
+                  <td className={cx('msg-detail__mono-xs font-mono text-xs', valueClass)}>{v}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </Show>
+      ) : null}
     </div>
   );
 }
 
-export function ModelParamsSection(props: { params: Record<string, unknown> }): JSX.Element {
-  const [open, setOpen] = createSignal(false);
-  const entries = (): Array<[string, unknown]> =>
-    Object.entries(props.params).sort(([a], [b]) => a.localeCompare(b));
-  const tableId = `msg-detail-model-params-${Math.random().toString(36).slice(2, 10)}`;
+export function RequestHeadersSection({ headers }: { headers: Record<string, string> }) {
+  const rows = Object.entries(headers).sort(([a], [b]) => a.localeCompare(b));
   return (
-    <div class={`toggle-panel${open() ? ' toggle-panel--open' : ''}`}>
-      <div class="toggle-panel__header">
-        <button
-          type="button"
-          class="msg-detail__section-title msg-detail__section-title--toggle"
-          aria-expanded={open() ? 'true' : 'false'}
-          aria-controls={tableId}
-          onClick={() => setOpen((v) => !v)}
-        >
-          {t('messages.details.modelParameters')}
-          <span class="msg-detail__count-badge">{entries().length}</span>
-          <span
-            class="msg-detail__chevron"
-            classList={{ 'msg-detail__chevron--open': open() }}
-            aria-hidden="true"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="10"
-              height="10"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="m18.57 11.18-10-7c-.3-.21-.7-.24-1.04-.07-.33.17-.54.51-.54.89v14c0 .37.21.71.54.89.15.08.3.11.46.11.2 0 .4-.06.57-.18l10-7a.997.997 0 0 0 0-1.64Z" />
-            </svg>
-          </span>
-        </button>
-        <InfoTooltip text={t('messages.details.modelParamsTooltip')} />
-      </div>
-      <Show when={open()}>
-        <div class="data-table-scroll" id={tableId}>
-          <table class="data-table msg-detail__table">
-            <thead>
-              <tr>
-                <th>{t('messages.details.parameter')}</th>
-                <th>{t('messages.details.value')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={entries()}>
-                {([k, v]) => (
-                  <tr>
-                    <td class="msg-detail__mono-xs">{k}</td>
-                    <td class="msg-detail__mono-xs msg-detail__param-value">
-                      {formatParamValue(v)}
-                    </td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
-      </Show>
-    </div>
+    <TogglePanel
+      title={t('messages.details.requestHeaders')}
+      idPrefix="msg-detail-request-headers"
+      rows={rows}
+      keyLabel={t('messages.details.header')}
+      valueClass="msg-detail__log-body break-all"
+    />
+  );
+}
+
+export function ModelParamsSection({ params }: { params: Record<string, unknown> }) {
+  const rows = Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]): [string, string] => [k, formatParamValue(v)]);
+  return (
+    <TogglePanel
+      title={t('messages.details.modelParameters')}
+      idPrefix="msg-detail-model-params"
+      rows={rows}
+      keyLabel={t('messages.details.parameter')}
+      valueClass="msg-detail__param-value whitespace-pre-wrap break-words"
+      tooltip={<InfoTooltip text={t('messages.details.modelParamsTooltip')} />}
+    />
   );
 }

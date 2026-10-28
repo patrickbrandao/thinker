@@ -1,10 +1,11 @@
-import { type Component, createResource, Show } from 'solid-js';
 import FrameworkSnippets from './FrameworkSnippets.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import type { VirtualModel } from '../services/api/virtual-models.js';
-import { richText } from './VirtualModelsHint.js';
+import RichText from './RichText.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { Button, Modal } from './ui.js';
 
 interface Props {
   agentName: string;
@@ -17,76 +18,50 @@ interface Props {
  * `model: "<name>"`. Reuses {@link FrameworkSnippets}, as the header-tier
  * snippet modal does, with the model swapped in.
  */
-const VirtualModelSnippetModal: Component<Props> = (props) => {
-  const [keyData] = createResource(
-    () => props.agentName,
-    (n) => getAgentKey(n),
-  );
+export default function VirtualModelSnippetModal(props: Props) {
+  const { data: keyData } = useResource(() => getAgentKey(props.agentName), [props.agentName]);
 
-  const baseUrl = (): string => `${installOrigin()}/v1`;
+  const baseUrl = `${installOrigin()}/v1`;
+  const title = t('models.snippet.title', { name: props.virtualModel.name });
 
   return (
-    <div
-      class="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-      }}
+    <Modal
+      open
+      wide
+      onClose={props.onClose}
+      label={title}
+      title={<span id="virtual-model-snippet-title">{title}</span>}
     >
-      <div
-        class="modal-card virtual-model-snippet-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="virtual-model-snippet-title"
-      >
-        <div class="virtual-model-snippet-modal__header">
-          <h2 id="virtual-model-snippet-title" class="virtual-model-snippet-modal__title">
-            {t('models.snippet.title', { name: props.virtualModel.name })}
-          </h2>
-          <button
-            class="modal__close"
-            onClick={() => props.onClose()}
-            aria-label={t('common.close')}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="m9.17 13.41-3.54 3.54a.996.996 0 0 0 .71 1.7c.26 0 .51-.1.71-.29l2.83-2.83L12 13.41l2.83 2.83 2.12 2.12c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41l-3.54-3.54L13.42 12l4.95-4.95a.996.996 0 1 0-1.41-1.41l-4.95 4.95-4.95-4.95a.996.996 0 1 0-1.41 1.41L10.6 12l-1.41 1.41Z" />
-            </svg>
-          </button>
-        </div>
-        <p class="modal-card__desc virtual-model-snippet-modal__desc">
-          {richText(t('models.snippet.desc'), {
-            model: <code>model: "{props.virtualModel.name}"</code>,
-            endpoint: <code>/v1/models</code>,
-          })}
-        </p>
-        <Show when={!props.virtualModel.enabled}>
-          <p class="virtual-model-snippet-modal__inactive">{t('models.snippet.inactive')}</p>
-        </Show>
-
-        <FrameworkSnippets
-          apiKey={keyData()?.apiKey ?? null}
-          keyPrefix={keyData()?.keyPrefix ?? null}
-          baseUrl={baseUrl()}
-          model={props.virtualModel.name}
+      <p className="virtual-model-snippet-modal__desc mb-4 text-sm text-dim">
+        <RichText
+          text={t('models.snippet.desc')}
+          parts={{
+            model: (
+              <code className="font-mono text-ink">
+                {/* i18n-ignore */}
+                model: &quot;{props.virtualModel.name}&quot;
+              </code>
+            ),
+            endpoint: <code className="font-mono text-ink">/v1/models</code>,
+          }}
         />
+      </p>
+      {!props.virtualModel.enabled ? (
+        <p className="virtual-model-snippet-modal__inactive notice is-warn mb-4">
+          {t('models.snippet.inactive')}
+        </p>
+      ) : null}
 
-        <div class="virtual-model-snippet-modal__footer">
-          <button class="btn btn--primary" type="button" onClick={() => props.onClose()}>
-            {t('models.snippet.done')}
-          </button>
-        </div>
+      <FrameworkSnippets
+        apiKey={keyData?.apiKey ?? null}
+        keyPrefix={keyData?.keyPrefix ?? null}
+        baseUrl={baseUrl}
+        model={props.virtualModel.name}
+      />
+
+      <div className="actions">
+        <Button onClick={() => props.onClose()}>{t('models.snippet.done')}</Button>
       </div>
-    </div>
+    </Modal>
   );
-};
-
-export default VirtualModelSnippetModal;
+}

@@ -1,10 +1,9 @@
-import type { Component } from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
-import CodeBlock from '../../components/CodeBlock.jsx';
+import { ExternalLink } from 'lucide-react';
+import CodeBlock from '../../components/CodeBlock.js';
+import RichText from '../../components/RichText.js';
+import { Panel } from '../../components/ui.js';
 import { installOrigin } from '../../services/install-endpoints.js';
-
 import { THINKER_DOCS_URL } from '../../services/thinker-links.js';
-import RichText from '../../components/RichText.jsx';
 import { t } from '../../i18n/index.js';
 
 /** Installed from a checkout of the Thinker repository; it is not published to a registry. */
@@ -23,57 +22,56 @@ thinker provider connect xai --auth-type api_key --credential-env XAI_API_KEY
 thinker agent configure coding-assistant --models grok-4.5,grok-4 --provider xai
 thinker routing test coding-assistant`;
 
-const Cli: Component = () => {
-  const login = () => loginCommand(installOrigin());
+export default function Cli() {
+  const login = loginCommand(installOrigin());
 
   return (
-    <div class="container--lg">
-      <Title>{t('common.pageTitle', { page: 'CLI' })}</Title>
-      <Meta name="description" content={t('harnesses.cli.metaDescription')} />
-      <div class="page-header">
+    <div className="page">
+      <title>{t('common.pageTitle', { page: 'CLI' })}</title>
+      <meta name="description" content={t('harnesses.cli.metaDescription')} />
+      <div className="page-head">
         <div>
-          <h1 class="page-header__title">CLI</h1>
-          <p class="page-header__subtitle">{t('harnesses.cli.subtitle')}</p>
+          <h1>CLI</h1>
+          <div className="sub">{t('harnesses.cli.subtitle')}</div>
         </div>
       </div>
 
-      <div class="integration-grid">
-        <div class="panel">
-          <div class="panel__title">{t('harnesses.cli.installTitle')}</div>
-          <p class="integration-panel__desc">
-            <RichText
-              text={t('harnesses.cli.installDesc')}
-              parts={{ command: <code>thinker</code> }}
-            />
-          </p>
-          <CodeBlock code={INSTALL} language="bash" />
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel title={t('harnesses.cli.installTitle')}>
+            <p className="mb-3 text-sm text-dim">
+              <RichText
+                text={t('harnesses.cli.installDesc')}
+                parts={{ command: <code className="font-mono">thinker</code> }}
+              />
+            </p>
+            <CodeBlock code={INSTALL} language="bash" />
+          </Panel>
+
+          <Panel title={t('harnesses.cli.signInTitle')}>
+            <p className="mb-3 text-sm text-dim">{t('harnesses.cli.signInDesc')}</p>
+            <CodeBlock code={login} language="bash" />
+          </Panel>
         </div>
 
-        <div class="panel">
-          <div class="panel__title">{t('harnesses.cli.signInTitle')}</div>
-          <p class="integration-panel__desc">{t('harnesses.cli.signInDesc')}</p>
-          <CodeBlock code={login()} language="bash" />
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top: var(--gap-lg);">
-        <div class="integration-panel__header">
-          <div class="panel__title">{t('harnesses.cli.driveTitle')}</div>
-          <a
-            href={THINKER_DOCS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn--outline btn--sm"
-            style="text-decoration: none;"
-          >
-            {t('harnesses.cli.documentation')}
-          </a>
-        </div>
-        <p class="integration-panel__desc">{t('harnesses.cli.driveDesc')}</p>
-        <CodeBlock code={EXAMPLE} language="bash" />
+        <Panel
+          title={t('harnesses.cli.driveTitle')}
+          actions={
+            <a
+              href={THINKER_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              {t('harnesses.cli.documentation')}
+              <ExternalLink aria-hidden="true" />
+            </a>
+          }
+        >
+          <p className="mb-3 text-sm text-dim">{t('harnesses.cli.driveDesc')}</p>
+          <CodeBlock code={EXAMPLE} language="bash" />
+        </Panel>
       </div>
     </div>
   );
-};
-
-export default Cli;
+}

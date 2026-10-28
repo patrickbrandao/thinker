@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 import type { RoutingProvider } from '../../src/services/api/routing.js';
 import RouteKeyChip from '../../src/components/RouteKeyChip';
 
@@ -17,11 +17,14 @@ function makeKey(label: string, overrides: Partial<RoutingProvider> = {}): Routi
   };
 }
 
-const twoKeys: RoutingProvider[] = [makeKey('key-1'), makeKey('key-2', { id: 'id-key-2', priority: 1 })];
+const twoKeys: RoutingProvider[] = [
+  makeKey('key-1'),
+  makeKey('key-2', { id: 'id-key-2', priority: 1 }),
+];
 
 function renderChip(propsOverride: Partial<Parameters<typeof RouteKeyChip>[0]> = {}) {
   const onPick = propsOverride.onPick ?? vi.fn();
-  const result = render(() => (
+  const result = render(
     <RouteKeyChip
       keys={propsOverride.keys ?? twoKeys}
       currentLabel={propsOverride.currentLabel ?? null}
@@ -34,8 +37,8 @@ function renderChip(propsOverride: Partial<Parameters<typeof RouteKeyChip>[0]> =
       leadingMargin={propsOverride.leadingMargin}
       menuMinWidth={propsOverride.menuMinWidth}
       stopPropagation={propsOverride.stopPropagation}
-    />
-  ));
+    />,
+  );
   return { ...result, onPick };
 }
 
@@ -112,7 +115,7 @@ describe('RouteKeyChip', () => {
 
   it('disables option buttons whose lowercase label is in usedLabels', () => {
     const { container } = renderChip({
-      usedLabels: () => new Set(['key-1']),
+      usedLabels: new Set(['key-1']),
     });
     fireEvent.click(getTriggerButton(container));
 
@@ -275,7 +278,7 @@ describe('RouteKeyChip', () => {
     // a Set containing the lowercase form must mark it as used.
     const { container } = renderChip({
       keys: [makeKey('Key-MixedCase')],
-      usedLabels: () => new Set(['key-mixedcase']),
+      usedLabels: new Set(['key-mixedcase']),
     });
     fireEvent.click(getTriggerButton(container));
     const option = getOptionButtons(container)[0];

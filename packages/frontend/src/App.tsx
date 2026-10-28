@@ -1,97 +1,108 @@
-import { useLocation } from '@solidjs/router';
-import {
-  createEffect,
-  createSignal,
-  onCleanup,
-  onMount,
-  Show,
-  type ParentComponent,
-} from 'solid-js';
-import Header from './components/Header.jsx';
-import Sidebar from './components/Sidebar.jsx';
+import { useCallback, useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router';
+import Sidebar from './components/shell/Sidebar.jsx';
+import Topbar from './components/shell/Topbar.jsx';
+import CommandPalette from './components/shell/CommandPalette.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
 import MeGate from './components/MeGate.jsx';
-import VersionIndicator from './components/VersionIndicator.jsx';
 import { connectSse } from './services/sse.js';
 import { RightSidebarProvider, useRightSidebar } from './services/right-sidebar.jsx';
+import { cx } from './components/ui.jsx';
 import { t } from './i18n/index.js';
 
-const SseConnector: ParentComponent = (props) => {
-  onMount(() => {
-    const cleanup = connectSse();
-    onCleanup(cleanup);
-  });
-  return <>{props.children}</>;
-};
+const COLLAPSED_KEY = 'thinker.sidebarCollapsed';
 
-const AppInner: ParentComponent = (props) => {
-  const location = useLocation();
-  const [mobileNavOpen, setMobileNavOpen] = createSignal(false);
-  // The sidebar is global and rendered identically on every authenticated
-  // route. Guest/setup routes never reach this component, so we show the
-  // sidebar everywhere except the root redirect ("/") which navigates away
-  // immediately and needs no nav chrome.
-  const showSidebar = () => location.pathname !== '/';
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function Shell() {
+  const { pathname } = useLocation();
   const { content: rightSidebar } = useRightSidebar();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  createEffect<string | undefined>((previousPath) => {
-    const currentPath = location.pathname;
-    if (currentPath === previousPath) return currentPath;
-    setMobileNavOpen(false);
-    return currentPath;
-  });
+  useEffect(() => connectSse(), []);
+  useEffect(() => setMobileOpen(false), [pathname]);
+
+  // ⌘K / Ctrl+K anywhere opens the palette.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        // Storage blocked: the choice lasts for this page only.
+      }
+      return next;
+    });
+  }, []);
+
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   return (
-    <div class="app-shell">
-      <a href="#main-content" class="skip-link">
+    <div className={cx('app', collapsed && 'is-collapsed', mobileOpen && 'is-mobile-open')}>
+      <a href="#main-content" className="skip-link">
         {t('nav.skipToContent')}
       </a>
-      <Header
-        showMobileNavToggle={showSidebar()}
-        mobileNavOpen={mobileNavOpen()}
-        onMobileNavToggle={() => setMobileNavOpen((open) => !open)}
+      <Sidebar
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+        onNavigate={() => {
+          setMobileOpen(false);
+          window.dispatchEvent(new CustomEvent('sidebar-navigate'));
+        }}
       />
-      <Show when={showSidebar()}>
-        <Show when={mobileNavOpen()}>
-          <button
-            type="button"
-            class="mobile-nav-backdrop"
-            aria-label={t('nav.closeMenu')}
-            onClick={() => setMobileNavOpen(false)}
-          />
-        </Show>
-      </Show>
-      <div class="app-body" classList={{ 'app-body--with-sidebar': showSidebar() }}>
-        <Show when={showSidebar()}>
-          <Sidebar mobileOpen={mobileNavOpen()} onNavigate={() => setMobileNavOpen(false)} />
-        </Show>
-        <main
-          id="main-content"
-          class="main-content"
-          classList={{ 'main-content--full': !showSidebar() }}
-          aria-label={t('nav.dashboardContent')}
-        >
-          {props.children}
-        </main>
-        {rightSidebar()}
+      {mobileOpen ? (
+        <button
+          type="button"
+          className="mobile-backdrop"
+          aria-label={t('nav.closeMenu')}
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+      <div className="app-main">
+        <Topbar
+          onOpenSearch={() => setPaletteOpen(true)}
+          onOpenMobileNav={() => setMobileOpen(true)}
+        />
+        <div className="app-content">
+          <main id="main-content" className="app-scroll" aria-label={t('nav.dashboardContent')}>
+            <Outlet />
+          </main>
+          {rightSidebar}
+        </div>
       </div>
-      <VersionIndicator />
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
     </div>
   );
-};
+}
 
-const App: ParentComponent = (props) => {
+/** The authenticated dashboard: session, /me, SSE and the console shell. */
+export default function App() {
   return (
     <AuthGuard>
       <MeGate>
-        <SseConnector>
-          <RightSidebarProvider>
-            <AppInner>{props.children}</AppInner>
-          </RightSidebarProvider>
-        </SseConnector>
+        <RightSidebarProvider>
+          <Shell />
+        </RightSidebarProvider>
       </MeGate>
     </AuthGuard>
   );
-};
-
-export default App;
+}

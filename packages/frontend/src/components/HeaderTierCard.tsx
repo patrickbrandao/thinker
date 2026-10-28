@@ -1,4 +1,4 @@
-import { createSignal, Show, type Component } from 'solid-js';
+import { useState } from 'react';
 import type {
   AuthType,
   AvailableModel,
@@ -58,8 +58,9 @@ interface Props {
 }
 
 /** A custom (header) tier: the shared route-chain card plus its header rule. */
-const HeaderTierCard: Component<Props> = (props) => {
-  const [snippetOpen, setSnippetOpen] = createSignal(false);
+export default function HeaderTierCard(props: Props) {
+  const [snippetOpen, setSnippetOpen] = useState(false);
+  const menuItemClass = 'header-tier-card__menu-item menu-item';
 
   return (
     <>
@@ -82,7 +83,7 @@ const HeaderTierCard: Component<Props> = (props) => {
         setModelParams={props.setModelParams}
         details={
           <code
-            class="header-tier-card__rule"
+            className="header-tier-card__rule block truncate font-mono text-xs text-muted"
             title={`${props.tier.header_key}: ${props.tier.header_value}`}
           >
             {props.tier.header_key}: {props.tier.header_value}
@@ -92,7 +93,7 @@ const HeaderTierCard: Component<Props> = (props) => {
           <>
             <button
               type="button"
-              class="header-tier-card__menu-item"
+              className={menuItemClass}
               onClick={() => {
                 close();
                 setSnippetOpen(true);
@@ -100,10 +101,10 @@ const HeaderTierCard: Component<Props> = (props) => {
             >
               {t('routing.headerTierCard.sendHeader')}
             </button>
-            <Show when={props.onEdit}>
+            {props.onEdit ? (
               <button
                 type="button"
-                class="header-tier-card__menu-item"
+                className={menuItemClass}
                 onClick={() => {
                   close();
                   props.onEdit?.();
@@ -111,11 +112,11 @@ const HeaderTierCard: Component<Props> = (props) => {
               >
                 {t('routing.headerTierCard.editTier')}
               </button>
-            </Show>
-            <Show when={props.onDisable}>
+            ) : null}
+            {props.onDisable ? (
               <button
                 type="button"
-                class="header-tier-card__menu-item header-tier-card__menu-item--danger"
+                className={`${menuItemClass} header-tier-card__menu-item--danger is-danger`}
                 onClick={() => {
                   close();
                   props.onDisable?.();
@@ -123,21 +124,19 @@ const HeaderTierCard: Component<Props> = (props) => {
               >
                 {t('common.disable')}
               </button>
-            </Show>
+            ) : null}
           </>
         )}
       />
 
-      <Show when={snippetOpen()}>
+      {snippetOpen ? (
         <HeaderTierSnippetModal
           agentName={props.agentName}
           tier={props.tier}
           customProviders={props.customProviders}
           onClose={() => setSnippetOpen(false)}
         />
-      </Show>
+      ) : null}
     </>
   );
-};
-
-export default HeaderTierCard;
+}

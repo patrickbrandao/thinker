@@ -1,23 +1,30 @@
-import { createResource, createSignal, type Component } from 'solid-js';
+import { useRef, useState } from 'react';
 import { getRecording, updateRecording } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { useResource } from '../lib/use-resource.js';
+import { Panel, Switch } from '../components/ui.js';
+import SettingsRow from './SettingsRow.js';
 import { t } from '../i18n/index.js';
 
-const SettingsRecordingSection: Component<{ agentName: () => string }> = (props) => {
-  const [config, { mutate }] = createResource(() => props.agentName(), getRecording);
-  const [saving, setSaving] = createSignal(false);
+export default function SettingsRecordingSection({ agentName }: { agentName: string }) {
+  const config = useResource(() => getRecording(agentName), [agentName]);
+  const [saving, setSaving] = useState(false);
+  // The agent shown now, so a save that lands after a harness switch is dropped.
+  const currentAgent = useRef(agentName);
+  currentAgent.current = agentName;
 
-  const enabled = () => (!config.loading && !config.error ? (config()?.enabled ?? false) : false);
-  const busy = () => saving() || config.loading || Boolean(config.error);
+  const ready = !config.loading && !config.error;
+  const enabled = ready ? (config.data?.enabled ?? false) : false;
+  const busy = saving || !ready;
 
   const toggle = async () => {
-    if (busy()) return;
-    const agentName = props.agentName();
+    if (busy) return;
+    const target = agentName;
     setSaving(true);
     try {
-      const next = await updateRecording(agentName, { enabled: !enabled() });
-      if (props.agentName() === agentName) {
-        mutate(next);
+      const next = await updateRecording(target, { enabled: !enabled });
+      if (currentAgent.current === target) {
+        config.setData(next);
         toast.success(
           next.enabled
             ? t('harnesses.recording.enabledToast')
@@ -32,34 +39,18 @@ const SettingsRecordingSection: Component<{ agentName: () => string }> = (props)
   };
 
   return (
-    <>
-      <h2 class="settings-section__title">{t('harnesses.recording.title')}</h2>
-      <div class="settings-card">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">{t('harnesses.recording.enable')}</span>
-            <span class="settings-card__label-desc">{t('harnesses.recording.desc')}</span>
-          </div>
-          <div class="settings-card__control settings-card__control--end">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled()}
-              aria-label={t('harnesses.recording.enable')}
-              class="settings-switch"
-              classList={{ 'settings-switch--on': enabled() }}
-              disabled={busy()}
-              onClick={() => void toggle()}
-            >
-              <span class="settings-switch__track">
-                <span class="settings-switch__thumb" />
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
+    <Panel title={t('harnesses.recording.title')}>
+      <SettingsRow
+        title={t('harnesses.recording.enable')}
+        description={t('harnesses.recording.desc')}
+      >
+        <Switch
+          checked={enabled}
+          onChange={() => void toggle()}
+          label={t('harnesses.recording.enable')}
+          disabled={busy}
+        />
+      </SettingsRow>
+    </Panel>
   );
-};
-
-export default SettingsRecordingSection;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 import PlaygroundPrompt from '../../src/components/playground/PlaygroundPrompt';
 
 interface PropsOverride {
@@ -23,7 +23,7 @@ function setup(overrides: PropsOverride = {}) {
     onSubmit,
     onRecallPrevious,
   };
-  const utils = render(() => <PlaygroundPrompt {...props} />);
+  const utils = render(<PlaygroundPrompt {...props} />);
   const textarea = utils.container.querySelector('textarea')!;
   const button = utils.container.querySelector('button[type="submit"]') as HTMLButtonElement;
   return { ...utils, textarea, button, onSubmit, onChange, onRecallPrevious };
@@ -172,7 +172,7 @@ describe('PlaygroundPrompt', () => {
 
   describe('headers slot', () => {
     it('renders the optional headersSlot content in the toolbar', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <PlaygroundPrompt
           value="hi"
           disabled={false}
@@ -181,13 +181,13 @@ describe('PlaygroundPrompt', () => {
           onSubmit={vi.fn()}
           onRecallPrevious={vi.fn()}
           headersSlot={<span data-testid="hslot">slot-here</span>}
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('[data-testid="hslot"]')?.textContent).toBe('slot-here');
     });
 
     it('renders nothing in the slot area when headersSlot is absent', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <PlaygroundPrompt
           value="hi"
           disabled={false}
@@ -195,8 +195,8 @@ describe('PlaygroundPrompt', () => {
           onChange={vi.fn()}
           onSubmit={vi.fn()}
           onRecallPrevious={vi.fn()}
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.playground-prompt__toolbar-left')?.textContent).toBe('');
     });
   });

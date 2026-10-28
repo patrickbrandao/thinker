@@ -1,31 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
-
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
-  useLocation: () => ({ pathname: '/overview', search: '' }),
-  useNavigate: () => vi.fn(),
-  useSearchParams: () => [{}],
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
+    useSession: () => ({
+      data: { user: { name: 'Ada Lovelace', email: 'ada@example.com' } },
+      isPending: false,
+    }),
     signIn: { email: vi.fn().mockResolvedValue({}), social: vi.fn() },
     sendVerificationEmail: vi.fn().mockResolvedValue({}),
+    signOut: vi.fn(),
   },
 }));
 
-vi.mock('../../src/services/toast-store.js', () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+vi.mock('../../src/services/api/console.js', () => ({
+  searchConsole: () => Promise.resolve({ results: [] }),
+  getAlerts: () =>
+    Promise.resolve({
+      total: 1,
+      items: [
+        {
+          id: 'r1',
+          timestamp: new Date().toISOString(),
+          agentName: 'bot',
+          model: 'gpt-x',
+          status: 'error',
+          errorMessage: 'upstream exploded',
+          errorHttpStatus: 502,
+          errorClass: null,
+        },
+      ],
+    }),
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
@@ -35,8 +41,17 @@ vi.mock('../../src/services/setup-status.js', () => ({
 }));
 
 vi.mock('../../src/components/AddAgentModal.jsx', () => ({ default: () => null }));
+vi.mock('../../src/components/DuplicateAgentModal.jsx', () => ({ default: () => null }));
 
-vi.mock('../../src/services/api/organizations.js', () => ({
+vi.mock('../../src/services/api/organizations.js', async (orig) => ({
+  ...(await orig<object>()),
+  listOrganizations: () =>
+    Promise.resolve({
+      organizations: [
+        { id: 'org-1', name: 'Acme', role: 'owner' },
+        { id: 'org-2', name: 'Beta', role: 'viewer' },
+      ],
+    }),
   listMembers: () =>
     Promise.resolve({
       members: [
@@ -44,7 +59,6 @@ vi.mock('../../src/services/api/organizations.js', () => ({
         { userId: 'u-v', email: 'v@x.io', name: 'Vic', role: 'viewer', mustChangePassword: true },
       ],
     }),
-  listOrganizations: () => Promise.resolve({ organizations: [{ id: 'org-1', name: 'Acme' }] }),
   listAdminUsers: () =>
     Promise.resolve({
       users: [
@@ -59,56 +73,46 @@ vi.mock('../../src/services/api/organizations.js', () => ({
         },
       ],
     }),
-  addMember: vi.fn(),
-  renameOrganization: vi.fn(),
-  deleteOrganization: vi.fn(),
-  updateMemberRole: vi.fn(),
-  removeMember: vi.fn(),
-  createOrganization: vi.fn(),
-  createAdminUser: vi.fn(),
-  resetUserPassword: vi.fn(),
-  setInstanceAdmin: vi.fn(),
-  setActiveOrganization: vi.fn(),
 }));
 
 import { resetLocaleForTests } from '../../src/i18n';
 import { setMe } from '../../src/services/session-store';
-import Login from '../../src/pages/Login';
-import Sidebar from '../../src/components/Sidebar';
+import Sidebar from '../../src/components/shell/Sidebar';
+import Topbar from '../../src/components/shell/Topbar';
+import CommandPalette from '../../src/components/shell/CommandPalette';
+import AlertsMenu from '../../src/components/shell/AlertsMenu';
 import Organization from '../../src/pages/Organization';
 import AdminUsers from '../../src/pages/AdminUsers';
+import Login from '../../src/pages/Login';
+
+function inRouter(node: React.ReactNode, path = '/overview') {
+  return render(<MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>);
+}
 
 describe('shell, auth and organization screens in pt-BR', () => {
   beforeEach(() => {
     resetLocaleForTests('pt-BR');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    localStorage.clear();
     setMe({
       userId: 'u-me',
       isInstanceAdmin: true,
       mustChangePassword: false,
       organization: { id: 'org-1', name: 'Acme', role: 'owner' },
-    });
+    } as never);
   });
 
-  it('renders the sign-in page in Portuguese', () => {
-    render(() => <Login />);
+  it('renders the sign-in page in Portuguese', async () => {
+    inRouter(<Login />, '/login');
     expect(screen.getByText('Que bom ver você de novo')).toBeTruthy();
     expect(screen.getByPlaceholderText('Digite sua senha')).toBeTruthy();
     expect(screen.getByText('Esqueceu a senha?')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeTruthy();
-  });
-
-  it('renders the sidebar in Portuguese', () => {
-    render(() => <Sidebar />);
-    expect(screen.getByText('Visão geral')).toBeTruthy();
-    expect(screen.getByText('Requisições')).toBeTruthy();
-    expect(screen.getByText('Por uso')).toBeTruthy();
-    expect(screen.getByText('Membros e configurações')).toBeTruthy();
-    expect(screen.getByText('Seu papel: Proprietário')).toBeTruthy();
+    // Let the provider lookups settle inside the test.
+    await screen.findByText('Criar conta');
   });
 
   it('renders the Organization page in Portuguese', async () => {
-    render(() => <Organization />);
+    render(<Organization />);
     await screen.findByText('v@x.io');
     expect(screen.getByText('Membros')).toBeTruthy();
     expect(screen.getByText('Troca de senha pendente')).toBeTruthy();
@@ -117,10 +121,65 @@ describe('shell, auth and organization screens in pt-BR', () => {
   });
 
   it('renders the Users admin page in Portuguese', async () => {
-    render(() => <AdminUsers />);
+    render(<AdminUsers />);
     await screen.findByText('Acme · Proprietário');
     expect(screen.getByText('Todos os usuários')).toBeTruthy();
     expect(screen.getAllByText('Criar usuário').length).toBeGreaterThan(0);
     expect(screen.getByText('Redefinir senha')).toBeTruthy();
+  });
+
+  it('renders the sidebar in Portuguese', () => {
+    inRouter(<Sidebar collapsed={false} onToggleCollapsed={() => {}} onNavigate={() => {}} />);
+    expect(screen.getByRole('complementary', { name: 'Navegação' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Visão geral' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Requisições' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Topologia' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Por uso' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Assinaturas' })).toBeTruthy();
+    expect(screen.getByText('PROVEDORES')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeTruthy();
+  });
+
+  it('renders the user menu in Portuguese', async () => {
+    inRouter(<Sidebar collapsed={false} onToggleCollapsed={() => {}} onNavigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Ada Lovelace/ }));
+    const menu = screen.getByRole('menu', { name: 'Menu do usuário' });
+    expect(menu.textContent).toContain('Organização');
+    expect(menu.textContent).toContain('Seu papel: Proprietário');
+    expect(menu.textContent).toContain('admin da instância');
+    expect(screen.getByRole('menuitem', { name: /Organização e membros/ })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /Sair/ })).toBeTruthy();
+    expect(await screen.findByText('Trocar de organização')).toBeTruthy();
+  });
+
+  it('renders the topbar in Portuguese', () => {
+    inRouter(<Topbar onOpenSearch={() => {}} onOpenMobileNav={() => {}} />);
+    expect(screen.getByRole('navigation', { name: 'Trilha de navegação' }).textContent).toContain(
+      'Visão geral',
+    );
+    expect(screen.getByRole('button', { name: 'Procurar (⌘K)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Abrir menu de navegação' })).toBeTruthy();
+    expect(screen.getByText('Documentação')).toBeTruthy();
+  });
+
+  it('renders the command palette in Portuguese', () => {
+    inRouter(<CommandPalette open onClose={() => {}} />);
+    const input = screen.getByRole('combobox');
+    expect(input.getAttribute('placeholder')).toBe(
+      'Procurar páginas, harnesses, provedores, modelos…',
+    );
+    expect(screen.getByText('Ir para')).toBeTruthy();
+    expect(screen.getByText('Ações')).toBeTruthy();
+    expect(screen.getByText('Alternar tema claro/escuro')).toBeTruthy();
+  });
+
+  it('renders the alerts menu in Portuguese', async () => {
+    inRouter(<AlertsMenu />);
+    const bell = await screen.findByRole('button', { name: 'Alertas, 1 novos' });
+    fireEvent.click(bell);
+    expect(await screen.findByText('Ver requisições com falha')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar todos como vistos' }));
+    expect(await screen.findByText('Últimas 24 horas')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Alertas' })).toBeTruthy();
   });
 });

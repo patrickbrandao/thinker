@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
-import { Show } from 'solid-js';
-import { FREE_PLAN_REQUESTS_PER_MONTH } from 'thinker-shared';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ComponentType, ReactElement, ReactNode } from 'react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 const routerState = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -33,19 +33,10 @@ const apiMocks = vi.hoisted(() => ({
   getPerAgentCostTimeseries: vi.fn(),
 }));
 
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children}</title>,
-}));
-
-vi.mock('@solidjs/router', () => ({
-  A: (props: { href: string; children: unknown; class?: string }) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
+// Real router (Link, useParams); only navigation is spied on.
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => routerState.navigate,
-  useParams: () => routerState.params,
-  useSearchParams: () => [{}],
 }));
 
 vi.mock('../../src/services/api/core.js', () => ({
@@ -163,7 +154,7 @@ vi.mock('../../src/components/ProviderChartCard.jsx', () => ({
     requestStatusTimeseries?: { keys: string[] };
     recoveredTimeseries?: { keys: string[] };
     recoveredValue?: number;
-    seriesFilters?: unknown;
+    seriesFilters?: ReactNode;
     colorMap?: Record<string, string>;
   }) => (
     <div data-active-view={props.activeView} data-testid="provider-chart-card">
@@ -185,7 +176,7 @@ vi.mock('../../src/components/ProviderChartCard.jsx', () => ({
       <span data-testid="status-keys">{props.requestStatusTimeseries?.keys.join(',') ?? ''}</span>
       <span data-testid="recovered-keys">{props.recoveredTimeseries?.keys.join(',') ?? ''}</span>
       <span data-testid="recovered-value">{props.recoveredValue ?? ''}</span>
-      <div data-testid="series-filters">{props.seriesFilters as any}</div>
+      <div data-testid="series-filters">{props.seriesFilters}</div>
     </div>
   ),
 }));
@@ -214,7 +205,7 @@ vi.mock('../../src/components/UnifiedChartCard.jsx', () => ({
     requestStatusTimeseries?: { keys: string[] };
     recoveredTimeseries?: { keys: string[] };
     recoveredValue?: number;
-    seriesFilters?: unknown;
+    seriesFilters?: ReactNode;
     colorMap?: Record<string, string>;
   }) => (
     <div data-active-view={props.activeTab} data-testid="provider-chart-card">
@@ -240,7 +231,7 @@ vi.mock('../../src/components/UnifiedChartCard.jsx', () => ({
       <span data-testid="status-keys">{props.requestStatusTimeseries?.keys.join(',') ?? ''}</span>
       <span data-testid="recovered-keys">{props.recoveredTimeseries?.keys.join(',') ?? ''}</span>
       <span data-testid="recovered-value">{props.recoveredValue ?? ''}</span>
-      <div data-testid="series-filters">{props.seriesFilters as any}</div>
+      <div data-testid="series-filters">{props.seriesFilters}</div>
     </div>
   ),
 }));
@@ -263,7 +254,7 @@ vi.mock('../../src/components/Select.jsx', () => ({
   }) => (
     <select value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)}>
       {props.options.map((option) => (
-        <option value={option.value} disabled={option.disabled}>
+        <option key={option.value} value={option.value} disabled={option.disabled}>
           {option.description ? `${option.label} · ${option.description}` : option.label}
         </option>
       ))}
@@ -272,13 +263,12 @@ vi.mock('../../src/components/Select.jsx', () => ({
 }));
 
 vi.mock('../../src/components/AddAgentModal.jsx', () => ({
-  default: (props: { open: boolean; onClose: () => void }) => (
-    <Show when={props.open}>
+  default: (props: { open: boolean; onClose: () => void }) =>
+    props.open ? (
       <div data-testid="add-agent-modal">
         <button onClick={props.onClose}>Dismiss add agent</button>
       </div>
-    </Show>
-  ),
+    ) : null,
 }));
 
 const mockCustomProviderForm = vi.fn();
@@ -327,12 +317,16 @@ vi.mock('../../src/components/AuthBadge.jsx', () => ({
   authBadgeFor: (authType: string | null) => <span data-auth-badge={authType ?? ''} />,
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  agentPing: () => 0,
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  routingPing: () => 0,
-}));
+// SSE pings are signals pages subscribe to with useSignal; they never fire here.
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal.js');
+  return {
+    agentPing: signal(0),
+    messagePing: signal(0),
+    analyticsPing: signal(0),
+    routingPing: signal(0),
+  };
+});
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock('../../src/services/toast-store.js', () => ({
@@ -368,8 +362,22 @@ vi.mock('thinker-shared', () => ({
   isSuccessStatus: (s: string | null | undefined) => s == null || s === 'ok' || s === 'success',
 }));
 
-import GlobalOverview from '../../src/pages/GlobalOverview';
 import ConnectionDetail from '../../src/pages/providers/ConnectionDetail';
+import { setConnectionBreadcrumb } from '../../src/services/connection-breadcrumb-store.js';
+
+/** Renders a page inside the router; the connection route reads routerState.params. */
+function renderPage(ui: ReactElement, path?: string) {
+  const entry =
+    path ?? `/providers/connections/${encodeURIComponent(routerState.params.connectionId ?? '')}`;
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/providers/connections/:connectionId" element={ui} />
+        <Route path="*" element={ui} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const overviewResponse = {
   summary: {
@@ -765,8 +773,15 @@ afterEach(() => {
 });
 
 describe('GlobalOverview (analytics)', () => {
+  // Lazy so this file imports cleanly while GlobalOverview is still Solid.
+  let GlobalOverview: ComponentType = () => null;
+  beforeAll(async () => {
+    GlobalOverview = (await import('../../src/pages/GlobalOverview'))
+      .default as unknown as ComponentType;
+  });
+
   it('renders the dashboard with harness and provider data', async () => {
-    const { container } = render(() => <GlobalOverview />);
+    const { container } = renderPage(<GlobalOverview />, '/');
 
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
     expect(screen.getByText('Overview')).toBeDefined();
@@ -805,7 +820,7 @@ describe('GlobalOverview (analytics)', () => {
   });
 
   it('navigates to harness and connection detail on row click', async () => {
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
 
     // provider connection row → connection detail
@@ -828,7 +843,7 @@ describe('GlobalOverview (analytics)', () => {
   it('offers every dashboard range, long windows included, with no plan lock', async () => {
     localStorage.setItem('thinker_global_range', '365d');
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
 
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
     expect(apiMocks.getOverview).toHaveBeenCalledWith('365d', undefined, true);
@@ -870,7 +885,7 @@ describe('GlobalOverview (analytics)', () => {
       ],
     });
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
 
     // Chart series lists the resolved name once customProviderData loads.
@@ -887,7 +902,7 @@ describe('GlobalOverview (analytics)', () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
     apiMocks.getGlobalProviders.mockResolvedValue({ providers: [] });
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     await waitFor(() => expect(screen.getByText('No activity yet')).toBeDefined());
     expect(screen.getByText('Set up harness')).toBeDefined();
 
@@ -902,7 +917,7 @@ describe('GlobalOverview (analytics)', () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
     apiMocks.getGlobalProviders.mockResolvedValue({ providers: [] });
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     await waitFor(() => expect(screen.getByText('No activity yet')).toBeDefined());
     fireEvent.click(screen.getByText('Set up harness'));
     await waitFor(() => expect(screen.getByTestId('add-agent-modal')).toBeDefined());
@@ -918,7 +933,7 @@ describe('GlobalOverview (analytics)', () => {
   it('shows the no-providers state when harnesses exist without providers', async () => {
     apiMocks.getGlobalProviders.mockResolvedValue({ providers: [] });
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     await waitFor(() => expect(screen.getByText('No providers connected')).toBeDefined());
     expect(screen.getByText('Connect provider')).toBeDefined();
   });
@@ -927,7 +942,7 @@ describe('GlobalOverview (analytics)', () => {
     apiMocks.getAgents.mockRejectedValue(new Error('agents down'));
     apiMocks.getGlobalProviders.mockRejectedValue(new Error('providers down'));
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
     // Both empty → onboarding empty state
     await waitFor(() => expect(screen.getByText('No activity yet')).toBeDefined());
   });
@@ -937,7 +952,7 @@ describe('GlobalOverview (analytics)', () => {
     // usage resource catch returns [] and the merged rows show 0 tokens.
     apiMocks.getGlobalProviderUsage.mockRejectedValue(new Error('usage down'));
 
-    render(() => <GlobalOverview />);
+    renderPage(<GlobalOverview />, '/');
 
     await waitFor(() => expect(screen.getAllByText(/0 tokens/).length).toBeGreaterThan(0));
   });
@@ -945,9 +960,11 @@ describe('GlobalOverview (analytics)', () => {
 
 describe('ConnectionDetail (analytics)', () => {
   it('renders connection analytics, models, and harness breakdown', async () => {
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
 
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    // The chart card paints once the connection-scoped analytics resolve.
+    await screen.findByTestId('provider-chart-card');
     expect(screen.getAllByText('Harnesses').length).toBeGreaterThan(0);
     expect(screen.getAllByText('gpt-5').length).toBeGreaterThan(0);
     expect(screen.getByTestId('requests-info-tooltip').textContent).toContain(
@@ -963,20 +980,32 @@ describe('ConnectionDetail (analytics)', () => {
     expect(screen.getByText('Connection name')).toBeDefined();
     // Close the inline manage modal via the Done button.
     fireEvent.click(screen.getByText('Done'));
+    await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
 
-    for (const scroller of container.querySelectorAll('.scroll-panel__body')) {
-      Object.defineProperties(scroller, {
-        scrollHeight: { value: 100, configurable: true },
-        scrollTop: { value: 92, configurable: true },
-        clientHeight: { value: 10, configurable: true },
-      });
-      fireEvent.scroll(scroller);
-    }
+    // Requests, models and harnesses each render a scrollable data table.
+    expect(container.querySelectorAll('.table-wrap table.data')).toHaveLength(3);
+  });
+
+  it('sets the topbar breadcrumb and clears it on unmount', async () => {
+    const { unmount } = renderPage(<ConnectionDetail />);
+    await waitFor(() =>
+      expect(setConnectionBreadcrumb).toHaveBeenCalledWith(
+        'OpenAI',
+        '/providers/usage-based',
+        expect.any(Function),
+        'openai',
+        'Default',
+      ),
+    );
+    unmount();
+    expect(setConnectionBreadcrumb).toHaveBeenLastCalledWith(null);
   });
 
   it('persists chart range and view selection', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    // The chart card paints once the connection-scoped analytics resolve.
+    await screen.findByTestId('provider-chart-card');
 
     const rangeSelect = screen.getByRole('combobox') as HTMLSelectElement;
     fireEvent.change(rangeSelect, { target: { value: '365d' } });
@@ -987,14 +1016,16 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('shows the Attempts tab, By HTTP status default, and no Recovered tab', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    // The chart card paints once the connection-scoped analytics resolve.
+    await screen.findByTestId('provider-chart-card');
     fireEvent.click(screen.getByText('Requests chart'));
 
     // Grouping buttons, in order: HTTP status (default), attempt status,
     // harness. No provider grouping and no request notion here.
     await waitFor(() => expect(screen.getByText('By HTTP status')).toBeDefined());
-    expect(screen.getByText('By HTTP status').className).toContain('--active');
+    expect(screen.getByText('By HTTP status').getAttribute('aria-pressed')).toBe('true');
     const buttons = screen
       .getAllByRole('button')
       .map((b) => b.textContent?.trim())
@@ -1037,8 +1068,10 @@ describe('ConnectionDetail (analytics)', () => {
       timeseries: [{ date: '2026-06-04', alpha: 7, beta: 5 }],
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    // The chart card paints once the connection-scoped analytics resolve.
+    await screen.findByTestId('provider-chart-card');
     fireEvent.click(screen.getByText('Requests chart'));
     fireEvent.click(screen.getByText('By harness'));
     await waitFor(() => expect(screen.getByTestId('msg-agents').textContent).toBe('alpha,beta'));
@@ -1049,30 +1082,27 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('lays out the header, meta row, controls and stat grid with responsive classes', async () => {
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
-    // The mobile layout lives in connection-detail.css: every block that used
-    // to be a fixed inline flex row / 5-column grid now carries a class the
-    // 768px breakpoint can reflow.
-    expect(container.querySelector('.connection-detail__header')).not.toBeNull();
-    expect(container.querySelector('.connection-detail__meta')).not.toBeNull();
-    expect(container.querySelector('.connection-detail__controls')).not.toBeNull();
+    // The header, meta row and controls use the console's wrapping page-head
+    // layout so the phone width can reflow them.
+    expect(container.querySelector('.page-head')).not.toBeNull();
+    expect(container.querySelector('.page-head .sub')).not.toBeNull();
+    expect(container.querySelector('.page-head .page-actions')).not.toBeNull();
     // The status pill (and the Custom tag on custom connections) share one
-    // badge class so the phone breakpoint can size them as a matched pair.
-    expect(container.querySelector('.connection-detail__badge')?.textContent).toBe('Active');
-    const stats = container.querySelector('.overview-stats');
-    // Four cards use the base four-column grid, no five-card modifier.
-    expect(stats?.classList.contains('overview-stats--5')).toBe(false);
+    // badge class so they size as a matched pair.
+    expect(container.querySelector('.page-head .badge')?.textContent).toBe('Active');
+    const stats = container.querySelector('.stat-tiles');
+    // Four cards in the auto-fit tile grid, no fixed inline column count.
+    expect(stats?.querySelectorAll('.stat-tile')).toHaveLength(4);
     expect((stats as HTMLElement).style.gridTemplateColumns).toBe('');
   });
 
   it('shows the attempt cards row: rate, counts and fallback retries', async () => {
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     await waitFor(() => {
-      const cards = [...container.querySelectorAll('.overview-stat-card')].map((c) =>
-        c.textContent?.trim(),
-      );
+      const cards = [...container.querySelectorAll('.stat-tile')].map((c) => c.textContent?.trim());
       // 9 ok / 12 attempts = 75.0%.
       expect(cards.join(' | ')).toContain('75.0%');
       expect(cards.find((c) => c?.includes('Succeeded attempts'))).toContain('9');
@@ -1083,7 +1113,7 @@ describe('ConnectionDetail (analytics)', () => {
       expect(fb).toContain('8 succeeded');
     });
     // Four attempt cards; no Autofix card.
-    const cards = container.querySelectorAll('.overview-stat-card');
+    const cards = container.querySelectorAll('.stat-tile');
     expect(cards).toHaveLength(4);
     expect(container.textContent).not.toMatch(/autofix/i);
   });
@@ -1093,10 +1123,10 @@ describe('ConnectionDetail (analytics)', () => {
     ['Succeeded attempts', '&attempts=has_succeeded'],
     ['Fallback retries', '&trigger=fallback'],
   ])('links the %s card to the connection-scoped Requests log', async (label, extra) => {
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     const card = await waitFor(() => {
-      const found = [...container.querySelectorAll('.overview-stat-card')].find((c) =>
+      const found = [...container.querySelectorAll('.stat-tile')].find((c) =>
         c.textContent?.includes(label),
       );
       expect(found).toBeDefined();
@@ -1110,7 +1140,7 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('opens the inline manage modal from the connection detail', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1149,7 +1179,7 @@ describe('ConnectionDetail (analytics)', () => {
     apiMocks.getPerAgentMessageTimeseries.mockResolvedValue({ agents: [], timeseries: [] });
     apiMocks.getPerAgentCostTimeseries.mockResolvedValue({ agents: [], timeseries: [] });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
 
     await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
     // "Custom" appears both as the badge and as the connection label.
@@ -1180,7 +1210,7 @@ describe('ConnectionDetail (analytics)', () => {
       },
     });
 
-    const { container } = render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Inactive')).toBeDefined());
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1191,8 +1221,8 @@ describe('ConnectionDetail (analytics)', () => {
     expect(dialog.textContent).not.toContain('Connection');
     expect(dialog.textContent).not.toContain('Default');
     expect(dialog.textContent).not.toContain('Enter Default exactly.');
-    expect(container.querySelector('.connection-delete-confirmation__target')).toBeNull();
-    expect(container.querySelector('.connection-delete-confirmation__hint')).toBeNull();
+    expect(document.querySelector('.connection-delete-confirmation__target')).toBeNull();
+    expect(document.querySelector('.connection-delete-confirmation__hint')).toBeNull();
     const deleteButton = screen.getByRole('button', {
       name: 'Delete connection',
     }) as HTMLButtonElement;
@@ -1227,9 +1257,9 @@ describe('ConnectionDetail (analytics)', () => {
       }),
     );
 
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     // Loading state renders a skeleton placeholder (no "Loading..." text).
-    expect(container.querySelector('[style*="skeleton-pulse"]')).not.toBeNull();
+    expect(container.querySelector('.skel')).not.toBeNull();
 
     resolveDetail(connectionDetail);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
@@ -1245,7 +1275,7 @@ describe('ConnectionDetail (analytics)', () => {
       recent_messages: [],
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Connection not found')).toBeDefined());
     expect(screen.queryByText('Loading...')).toBeNull();
     expect(screen.getByText('Back to overview')).toBeDefined();
@@ -1256,9 +1286,9 @@ describe('ConnectionDetail (analytics)', () => {
     // skeleton forever (calling detail() re-throws on error in Solid).
     apiMocks.getConnectionDetail.mockRejectedValueOnce(new Error('network down'));
 
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText("Couldn't load this connection")).toBeDefined());
-    expect(container.querySelector('[style*="skeleton-pulse"]')).toBeNull();
+    expect(container.querySelector('.skel')).toBeNull();
 
     // Retry re-fetches; on success the connection renders.
     apiMocks.getConnectionDetail.mockResolvedValueOnce(connectionDetail);
@@ -1276,7 +1306,7 @@ describe('ConnectionDetail (analytics)', () => {
       connection: { ...connectionDetail.connection, id: 'conn-work', label: 'Work' },
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Work').length).toBeGreaterThan(0));
 
     // analytics summary/timeseries: getProviderAnalytics(authType, range, agent, provider, label)
@@ -1300,7 +1330,7 @@ describe('ConnectionDetail (analytics)', () => {
       },
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1323,7 +1353,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('closes the custom provider edit modal and refetches on onCreated', async () => {
     setupCustomConnectionDetail();
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1339,7 +1369,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('closes the custom provider edit modal on onBack', async () => {
     setupCustomConnectionDetail();
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1353,7 +1383,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('closes the custom provider edit modal and navigates back on onDeleted', async () => {
     setupCustomConnectionDetail();
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1382,14 +1412,14 @@ describe('ConnectionDetail (analytics)', () => {
     // is shown as the display name.
     apiMocks.getCustomProviders.mockRejectedValue(new Error('custom lookup failed'));
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Custom key').length).toBeGreaterThan(0));
   });
 
   it('falls back to no providers when the harness list cannot load', async () => {
     apiMocks.getAgents.mockRejectedValue(new Error('agents down'));
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
 
     // Manage still opens the inline modal even when harness list fails.
@@ -1406,8 +1436,10 @@ describe('ConnectionDetail (analytics)', () => {
       throw new Error('storage blocked');
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    // The chart card paints once the connection-scoped analytics resolve.
+    await screen.findByTestId('provider-chart-card');
 
     // range + view persistence both throw and are swallowed
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '30d' } });
@@ -1415,9 +1447,7 @@ describe('ConnectionDetail (analytics)', () => {
 
     // filter persistence (toggle / select all) all throw + swallow
     fireEvent.click(screen.getByText('All harnesses (2)'));
-    const toggle = screen
-      .getAllByText('demo-agent')
-      .find((el) => el.closest('.agent-filter-select'));
+    const toggle = screen.getAllByText('demo-agent').find((el) => el.closest('.filter-select'));
     fireEvent.click(toggle!);
     fireEvent.click(screen.getByText('Select all'));
 
@@ -1433,7 +1463,7 @@ describe('ConnectionDetail (analytics)', () => {
   };
 
   it('renames a connection and refetches on success', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
@@ -1456,7 +1486,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('shows an inline error when renaming a connection fails', async () => {
     apiMocks.renameConnection.mockRejectedValueOnce(new Error('rename boom'));
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
@@ -1471,7 +1501,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('falls back to a generic message when the rename error has no message', async () => {
     apiMocks.renameConnection.mockRejectedValueOnce({});
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
@@ -1481,7 +1511,7 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('rejects an empty rename with a validation message', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     // Whitespace-only trims to empty → validation error, no API call.
@@ -1493,7 +1523,7 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('closes the modal without an API call when the name is unchanged', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     // The Save button is disabled when the value equals the label, so submit via
@@ -1506,7 +1536,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('renames a connection when the workspace has no harness', async () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
@@ -1524,7 +1554,7 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('disconnects a connection and navigates back on success', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Disconnect'));
@@ -1544,7 +1574,7 @@ describe('ConnectionDetail (analytics)', () => {
         resolveDisconnect = resolve;
       }),
     );
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     const disconnectBtn = screen.getByText('Disconnect') as HTMLButtonElement;
@@ -1564,7 +1594,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('shows an error toast when disconnecting fails', async () => {
     apiMocks.disconnectConnection.mockRejectedValueOnce(new Error('disconnect boom'));
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Disconnect'));
@@ -1575,7 +1605,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('falls back to a generic message when the disconnect error has no message', async () => {
     apiMocks.disconnectConnection.mockRejectedValueOnce({});
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Disconnect'));
@@ -1585,7 +1615,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('disconnects a connection when the workspace has no harness', async () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Disconnect'));
@@ -1598,7 +1628,7 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('refreshes models and refetches on success', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Refresh models'));
@@ -1610,7 +1640,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('shows an error toast when refreshing models fails', async () => {
     apiMocks.refreshConnectionModels.mockRejectedValueOnce(new Error('refresh boom'));
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Refresh models'));
@@ -1620,7 +1650,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('refreshes models when the workspace has no harness', async () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     fireEvent.click(screen.getByText('Refresh models'));
@@ -1638,7 +1668,7 @@ describe('ConnectionDetail (analytics)', () => {
       ...connectionDetail,
       connection: { ...connectionDetail.connection, id: 'conn-custom', provider: 'custom:cp-1' },
     });
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
 
     expect(screen.getByText('Connection name')).toBeDefined();
@@ -1647,11 +1677,11 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   it('closes the manage modal when Escape is pressed on the overlay', async () => {
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await openManageModal();
     expect(screen.getByText('Connection name')).toBeDefined();
 
-    const overlay = document.querySelector('.modal-overlay') as HTMLElement;
+    const overlay = document.querySelector('.overlay') as HTMLElement;
     fireEvent.keyDown(overlay, { key: 'Escape' });
 
     await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
@@ -1671,7 +1701,7 @@ describe('ConnectionDetail (analytics)', () => {
       },
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Claude').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1687,7 +1717,7 @@ describe('ConnectionDetail (analytics)', () => {
       ],
     });
 
-    const { container } = render(() => <ConnectionDetail />);
+    const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     // The model cell falls back to an em dash when msg.model is falsy (line 708).
     const dashCell = Array.from(container.querySelectorAll('td')).find(
@@ -1708,7 +1738,7 @@ describe('ConnectionDetail (analytics)', () => {
       },
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Stale').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
@@ -1743,7 +1773,7 @@ describe('ConnectionDetail (analytics)', () => {
       },
     });
 
-    render(() => <ConnectionDetail />);
+    renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Old Claude').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));

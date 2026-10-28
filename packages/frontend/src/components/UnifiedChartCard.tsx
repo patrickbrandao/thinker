@@ -1,11 +1,13 @@
-import { Show, Suspense, lazy, type Component, type JSX } from 'solid-js';
-import InfoTooltip from './InfoTooltip.jsx';
+import { Suspense, lazy, type ReactNode } from 'react';
+import InfoTooltip from './InfoTooltip.js';
+import { cx } from './ui.js';
 import { formatNumber, formatCost } from '../services/formatters.js';
 import { type StatusTimeseries } from '../services/api/analytics.js';
 import { t } from '../i18n/index.js';
 
-const MultiAgentTokenChart = lazy(() => import('./MultiAgentTokenChart.jsx'));
-const ReliabilityChart = lazy(() => import('./ReliabilityChart.jsx'));
+// uPlot is heavy: the charts load on demand, outside the initial bundle.
+const MultiAgentTokenChart = lazy(() => import('./MultiAgentTokenChart.js'));
+const ReliabilityChart = lazy(() => import('./ReliabilityChart.js'));
 
 export type ChartTab = 'requests' | 'recovered' | 'cost' | 'tokens';
 
@@ -47,203 +49,205 @@ export interface UnifiedChartCardProps {
   range: string;
   colorMap?: Record<string, string>;
   /** Filter controls rendered in the subtitle bar */
-  seriesFilters?: JSX.Element;
+  seriesFilters?: ReactNode;
 }
 
-const trendBadge = (pct: number) => {
+/** Neutral trend pill (+12%), clamped to ±999%; nothing for a flat trend. */
+export function TrendBadge({ pct }: { pct: number }) {
   if (pct === 0) return null;
   const clamped = Math.max(-999, Math.min(999, Math.round(pct)));
   if (clamped === 0) return null;
-  const sign = clamped > 0 ? '+' : '';
   return (
-    <span class="trend trend--neutral">
-      {sign}
+    <span className="trend badge">
+      {clamped > 0 ? '+' : ''}
       {clamped}%
     </span>
   );
-};
+}
 
-const EMPTY = (msg: string) => (
-  <div style="height: 260px; color: hsl(var(--muted-foreground)); display: flex; align-items: center; justify-content: center;">
-    {msg}
-  </div>
+/** One stat in a chart card header; clicking it switches the chart view. */
+export function ChartStatTab({
+  active,
+  label,
+  info,
+  value,
+  trend,
+  onClick,
+}: {
+  active: boolean;
+  label: ReactNode;
+  info?: string;
+  value: ReactNode;
+  trend?: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      className={cx(
+        'chart-card__stat flex min-w-0 flex-col items-start gap-1 border-b-2 px-4 py-3 text-left transition-colors',
+        active ? 'is-active border-accent bg-s2' : 'border-transparent hover:bg-s2',
+      )}
+      onClick={onClick}
+    >
+      <span className="flex items-center gap-1 text-xs text-muted">
+        {label}
+        {info ? <InfoTooltip text={info} /> : null}
+      </span>
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="text-xl font-semibold tabular-nums text-ink">{value}</span>
+        {trend}
+      </span>
+    </button>
+  );
+}
+
+export const chartEmpty = (msg: string) => (
+  <div className="flex h-[260px] items-center justify-center text-sm text-muted">{msg}</div>
 );
 
-const UnifiedChartCard: Component<UnifiedChartCardProps> = (props) => {
-  const showCost = () => props.costValue != null;
+/**
+ * The overview chart card: stat tabs (requests, recovered, cost, tokens) over
+ * one chart body. Each tab picks its series; filters sit in the subtitle bar.
+ */
+export default function UnifiedChartCard(props: UnifiedChartCardProps) {
+  const showCost = props.costValue != null;
+  const requestsLabel = props.requestsLabel ?? t('overview.chart.requests');
 
-  const tabTitle = (): string => {
+  const tabTitle = {
+    requests: requestsLabel,
+    recovered: t('overview.chart.recoveredRequests'),
+    cost: t('overview.chart.cost'),
+    tokens: t('overview.chart.tokenUsage'),
+  }[props.activeTab];
+
+  const requestsBody = () => {
+    const status = props.requestStatusTimeseries;
+    if (status) {
+      return status.buckets.length > 0 ? (
+        <ReliabilityChart
+          timeseries={status}
+          range={props.range}
+          seriesMode={props.requestStatusSeriesMode ?? 'disposition'}
+        />
+      ) : (
+        chartEmpty(t('overview.chart.noRequestData'))
+      );
+    }
+    const agents = props.agentRequestTimeseries;
+    return agents?.agents.length ? (
+      <MultiAgentTokenChart
+        agents={agents.agents}
+        timeseries={agents.timeseries}
+        range={props.range}
+        colorMap={props.colorMap}
+        // i18n-ignore: chart mode flag, not shown
+        label="Requests"
+      />
+    ) : (
+      chartEmpty(t('overview.chart.noRequestData'))
+    );
+  };
+
+  const body = () => {
     switch (props.activeTab) {
       case 'requests':
-        return props.requestsLabel ?? t('overview.chart.requests');
+        return requestsBody();
       case 'recovered':
-        return t('overview.chart.recoveredRequests');
+        return props.recoveredTimeseries && props.recoveredTimeseries.buckets.length > 0 ? (
+          <ReliabilityChart
+            timeseries={props.recoveredTimeseries}
+            range={props.range}
+            seriesMode="disposition"
+          />
+        ) : (
+          chartEmpty(t('overview.chart.noRecovered'))
+        );
       case 'cost':
-        return t('overview.chart.cost');
+        return props.agentCostTimeseries?.agents.length ? (
+          <MultiAgentTokenChart
+            agents={props.agentCostTimeseries.agents}
+            timeseries={props.agentCostTimeseries.timeseries}
+            range={props.range}
+            colorMap={props.colorMap}
+            // i18n-ignore: chart mode flag, not shown
+            label="Cost"
+          />
+        ) : (
+          chartEmpty(t('overview.chart.noCostData'))
+        );
       case 'tokens':
-        return t('overview.chart.tokenUsage');
+        return props.agentTimeseries?.agents.length ? (
+          <MultiAgentTokenChart
+            agents={props.agentTimeseries.agents}
+            timeseries={props.agentTimeseries.timeseries}
+            range={props.range}
+            colorMap={props.colorMap}
+          />
+        ) : (
+          chartEmpty(t('overview.chart.noTokenData'))
+        );
     }
   };
 
   return (
-    <div class="chart-card">
-      {/* ── Stat header tabs ── */}
-      <div class="chart-card__header">
-        <button
-          type="button"
-          class="chart-card__stat chart-card__stat--clickable"
-          classList={{ 'chart-card__stat--active': props.activeTab === 'requests' }}
+    <section className="chart-card panel overflow-hidden">
+      <div
+        className="grid grid-cols-2 border-b border-line sm:flex sm:flex-wrap"
+        role="tablist"
+        aria-label={tabTitle}
+      >
+        <ChartStatTab
+          active={props.activeTab === 'requests'}
+          label={requestsLabel}
+          info={props.requestsInfoTooltip}
+          value={formatNumber(props.requestsValue)}
+          trend={<TrendBadge pct={props.requestsTrendPct} />}
           onClick={() => props.onTabChange('requests')}
-        >
-          <span class="chart-card__label">
-            {props.requestsLabel ?? t('overview.chart.requests')}
-            <Show when={props.requestsInfoTooltip}>
-              <InfoTooltip text={props.requestsInfoTooltip!} />
-            </Show>
-          </span>
-          <div class="chart-card__value-row">
-            <span class="chart-card__value">{formatNumber(props.requestsValue)}</span>
-            {trendBadge(props.requestsTrendPct)}
-          </div>
-        </button>
-        <Show when={props.recoveredTimeseries}>
-          <button
-            type="button"
-            class="chart-card__stat chart-card__stat--clickable"
-            classList={{ 'chart-card__stat--active': props.activeTab === 'recovered' }}
+        />
+        {props.recoveredTimeseries ? (
+          <ChartStatTab
+            active={props.activeTab === 'recovered'}
+            label={t('overview.chart.recoveredRequests')}
+            info={t('overview.tips.recoveredRequests')}
+            value={formatNumber(props.recoveredValue ?? 0)}
+            trend={<TrendBadge pct={props.recoveredTrendPct ?? 0} />}
             onClick={() => props.onTabChange('recovered')}
-          >
-            <span class="chart-card__label">
-              {t('overview.chart.recoveredRequests')}
-              <InfoTooltip text={t('overview.tips.recoveredRequests')} />
-            </span>
-            <div class="chart-card__value-row">
-              <span class="chart-card__value">{formatNumber(props.recoveredValue ?? 0)}</span>
-              {trendBadge(props.recoveredTrendPct ?? 0)}
-            </div>
-          </button>
-        </Show>
-        <Show when={showCost()}>
-          <button
-            type="button"
-            class="chart-card__stat chart-card__stat--clickable"
-            classList={{ 'chart-card__stat--active': props.activeTab === 'cost' }}
+          />
+        ) : null}
+        {showCost ? (
+          <ChartStatTab
+            active={props.activeTab === 'cost'}
+            label={t('overview.chart.cost')}
+            info={props.costInfoTooltip}
+            value={formatCost(props.costValue!) ?? formatCost(0)}
+            trend={<TrendBadge pct={props.costTrendPct ?? 0} />}
             onClick={() => props.onTabChange('cost')}
-          >
-            <span class="chart-card__label">
-              {t('overview.chart.cost')}
-              <Show when={props.costInfoTooltip}>
-                <InfoTooltip text={props.costInfoTooltip!} />
-              </Show>
-            </span>
-            <div class="chart-card__value-row">
-              <span class="chart-card__value">{formatCost(props.costValue!) ?? formatCost(0)}</span>
-              {trendBadge(props.costTrendPct ?? 0)}
-            </div>
-          </button>
-        </Show>
-        <button
-          type="button"
-          class="chart-card__stat chart-card__stat--clickable"
-          classList={{ 'chart-card__stat--active': props.activeTab === 'tokens' }}
+          />
+        ) : null}
+        <ChartStatTab
+          active={props.activeTab === 'tokens'}
+          label={t('overview.chart.tokenUsage')}
+          value={formatNumber(props.tokensValue)}
+          trend={<TrendBadge pct={props.tokensTrendPct} />}
           onClick={() => props.onTabChange('tokens')}
-        >
-          <span class="chart-card__label">{t('overview.chart.tokenUsage')}</span>
-          <div class="chart-card__value-row">
-            <span class="chart-card__value">{formatNumber(props.tokensValue)}</span>
-            {trendBadge(props.tokensTrendPct)}
-          </div>
-        </button>
+        />
       </div>
 
-      {/* ── Subtitle bar: title + contextual filters ── */}
-      <div class="chart-card__subtitle">
-        <span class="chart-card__subtitle-title">{tabTitle()}</span>
-        {/* The grouping filters (by status/provider/harness) only apply to the
-            other tabs — recovered is already a fixed fallback subset. */}
-        <Show when={props.seriesFilters && props.activeTab !== 'recovered'}>
-          <div class="chart-card__filters">{props.seriesFilters}</div>
-        </Show>
+      {/* Subtitle bar: title + contextual filters. The grouping filters do not
+          apply to the recovered tab, which is already a fixed fallback subset. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+        <span className="text-sm font-semibold text-ink">{tabTitle}</span>
+        {props.seriesFilters && props.activeTab !== 'recovered' ? (
+          <div className="flex flex-wrap items-center gap-2">{props.seriesFilters}</div>
+        ) : null}
       </div>
 
-      {/* ── Chart body ── */}
-      <div class="chart-card__body">
-        <Suspense fallback={EMPTY(t('overview.chart.loading'))}>
-          <Show when={props.activeTab === 'requests'}>
-            <Show
-              when={props.requestStatusTimeseries}
-              fallback={
-                <Show
-                  when={props.agentRequestTimeseries?.agents.length}
-                  fallback={EMPTY(t('overview.chart.noRequestData'))}
-                >
-                  <MultiAgentTokenChart
-                    agents={props.agentRequestTimeseries!.agents}
-                    timeseries={props.agentRequestTimeseries!.timeseries}
-                    range={props.range}
-                    colorMap={props.colorMap}
-                    // i18n-ignore: chart mode flag, not shown
-                    label="Requests"
-                  />
-                </Show>
-              }
-            >
-              <Show
-                when={props.requestStatusTimeseries!.buckets.length > 0}
-                fallback={EMPTY(t('overview.chart.noRequestData'))}
-              >
-                <ReliabilityChart
-                  timeseries={props.requestStatusTimeseries!}
-                  range={props.range}
-                  seriesMode={props.requestStatusSeriesMode ?? 'disposition'}
-                />
-              </Show>
-            </Show>
-          </Show>
-          <Show when={props.activeTab === 'recovered'}>
-            <Show
-              when={props.recoveredTimeseries && props.recoveredTimeseries.buckets.length > 0}
-              fallback={EMPTY(t('overview.chart.noRecovered'))}
-            >
-              <ReliabilityChart
-                timeseries={props.recoveredTimeseries!}
-                range={props.range}
-                seriesMode="disposition"
-              />
-            </Show>
-          </Show>
-          <Show when={props.activeTab === 'cost'}>
-            <Show
-              when={props.agentCostTimeseries?.agents.length}
-              fallback={EMPTY(t('overview.chart.noCostData'))}
-            >
-              <MultiAgentTokenChart
-                agents={props.agentCostTimeseries!.agents}
-                timeseries={props.agentCostTimeseries!.timeseries}
-                range={props.range}
-                colorMap={props.colorMap}
-                // i18n-ignore: chart mode flag, not shown
-                label="Cost"
-              />
-            </Show>
-          </Show>
-          <Show when={props.activeTab === 'tokens'}>
-            <Show
-              when={props.agentTimeseries?.agents.length}
-              fallback={EMPTY(t('overview.chart.noTokenData'))}
-            >
-              <MultiAgentTokenChart
-                agents={props.agentTimeseries!.agents}
-                timeseries={props.agentTimeseries!.timeseries}
-                range={props.range}
-                colorMap={props.colorMap}
-              />
-            </Show>
-          </Show>
-        </Suspense>
+      <div className="px-2 pb-3">
+        <Suspense fallback={chartEmpty(t('overview.chart.loading'))}>{body()}</Suspense>
       </div>
-    </div>
+    </section>
   );
-};
-
-export default UnifiedChartCard;
+}

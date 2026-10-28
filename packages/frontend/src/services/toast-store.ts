@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { signal } from '../lib/signal.js';
 
 export type ToastType = 'error' | 'success' | 'warning';
 
@@ -17,19 +17,17 @@ const DEFAULT_DURATIONS: Record<ToastType, number> = {
 
 let nextId = 0;
 
-const [toasts, setToasts] = createSignal<Toast[]>([]);
-
-export { toasts };
+export const toasts = signal<Toast[]>([]);
 
 export function addToast(type: ToastType, message: string, duration?: number) {
   const id = nextId++;
   const ms = duration ?? DEFAULT_DURATIONS[type];
-  setToasts((prev) => [...prev, { id, type, message, duration: ms }]);
+  toasts.set((prev) => [...prev, { id, type, message, duration: ms }]);
   return id;
 }
 
 export function dismissToast(id: number) {
-  setToasts((prev) => prev.filter((t) => t.id !== id));
+  toasts.set((prev) => prev.filter((t) => t.id !== id));
 }
 
 export const toast = {

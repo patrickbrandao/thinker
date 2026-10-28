@@ -1,11 +1,12 @@
-import { type Component, createResource } from 'solid-js';
 import FrameworkSnippets from './FrameworkSnippets.jsx';
 import { getAgentKey } from '../services/api.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import type { HeaderTier } from '../services/api/header-tiers.js';
 import type { CustomProviderData } from '../services/api.js';
 import { customProviderAliases, publicModelId } from '../services/public-model-id.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { Button, Modal } from './ui.js';
 
 interface Props {
   agentName: string;
@@ -20,19 +21,14 @@ interface Props {
  * header. Reuses {@link FrameworkSnippets} (the same tabbed UI used in the
  * onboarding wizard) with `customHeaders` filled from the tier's rule.
  */
-const HeaderTierSnippetModal: Component<Props> = (props) => {
-  const [keyData] = createResource(
-    () => props.agentName,
-    (n) => getAgentKey(n),
-  );
+export default function HeaderTierSnippetModal(props: Props) {
+  const { data: keyData } = useResource(() => getAgentKey(props.agentName), [props.agentName]);
 
-  const baseUrl = (): string => {
-    return `${installOrigin()}/v1`;
-  };
+  const baseUrl = `${installOrigin()}/v1`;
 
-  const customHeaders = (): Record<string, string> => ({
+  const customHeaders: Record<string, string> = {
     [props.tier.header_key]: props.tier.header_value,
-  });
+  };
 
   // A custom provider's model shows its public id (`<alias>/<model>` when the
   // provider has an alias), not the internal `custom:<uuid>/<model>` key.
@@ -43,67 +39,31 @@ const HeaderTierSnippetModal: Component<Props> = (props) => {
     return publicModelId(route, customProviderAliases(props.customProviders));
   };
 
+  const title = t('routing.snippet.title', { name: props.tier.name });
+
   return (
-    <div
-      class="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-      }}
+    <Modal
+      open
+      wide
+      onClose={props.onClose}
+      label={title}
+      title={<span id="header-tier-snippet-title">{title}</span>}
     >
-      <div
-        class="modal-card"
-        style="max-width: 720px;"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="header-tier-snippet-title"
-      >
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-          <h2
-            id="header-tier-snippet-title"
-            style="margin: 0; font-size: var(--font-size-lg); font-weight: 600;"
-          >
-            {t('routing.snippet.title', { name: props.tier.name })}
-          </h2>
-          <button
-            class="modal__close"
-            onClick={() => props.onClose()}
-            aria-label={t('common.close')}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="m9.17 13.41-3.54 3.54a.996.996 0 0 0 .71 1.7c.26 0 .51-.1.71-.29l2.83-2.83L12 13.41l2.83 2.83 2.12 2.12c.2.2.45.29.71.29s.51-.1.71-.29a.996.996 0 0 0 0-1.41l-3.54-3.54L13.42 12l4.95-4.95a.996.996 0 1 0-1.41-1.41l-4.95 4.95-4.95-4.95a.996.996 0 1 0-1.41 1.41L10.6 12l-1.41 1.41Z" />
-            </svg>
-          </button>
-        </div>
-        <p class="modal-card__desc" style="margin-top: 0;">
-          {t('routing.snippet.descBefore')} <code>{modelText()}</code>
-          {t('routing.snippet.descAfter')}
-        </p>
+      <p className="header-tier-snippet__desc mb-4 text-sm text-dim">
+        {t('routing.snippet.descBefore')} <code className="font-mono text-ink">{modelText()}</code>
+        {t('routing.snippet.descAfter')}
+      </p>
 
-        <FrameworkSnippets
-          apiKey={keyData()?.apiKey ?? null}
-          keyPrefix={keyData()?.keyPrefix ?? null}
-          baseUrl={baseUrl()}
-          customHeaders={customHeaders()}
-        />
+      <FrameworkSnippets
+        apiKey={keyData?.apiKey ?? null}
+        keyPrefix={keyData?.keyPrefix ?? null}
+        baseUrl={baseUrl}
+        customHeaders={customHeaders}
+      />
 
-        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
-          <button class="btn btn--primary" type="button" onClick={() => props.onClose()}>
-            {t('common.done')}
-          </button>
-        </div>
+      <div className="actions">
+        <Button onClick={() => props.onClose()}>{t('common.done')}</Button>
       </div>
-    </div>
+    </Modal>
   );
-};
-
-export default HeaderTierSnippetModal;
+}

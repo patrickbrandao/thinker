@@ -1,18 +1,18 @@
-import type { ParentComponent } from 'solid-js';
+import type { ReactNode } from 'react';
+import { Outlet } from 'react-router';
 import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../services/thinker-links.js';
 
-const AuthLayout: ParentComponent = (props) => {
+/** Centered card on the dotted background, for sign-in and setup screens. */
+export default function AuthLayout({ children }: { children?: ReactNode }) {
   return (
-    <div class="auth-layout">
-      <div class="auth-card">
-        <div class="auth-logo">
-          <img src={THINKER_LOGO_URL} alt="Thinker" class="auth-logo__img auth-logo__img--light" />
-          <img src={THINKER_LOGO_DARK_URL} alt="" class="auth-logo__img auth-logo__img--dark" />
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-logo">
+          <img src={THINKER_LOGO_URL} alt="Thinker" className="logo-light" />
+          <img src={THINKER_LOGO_DARK_URL} alt="" className="logo-dark" />
         </div>
-        {props.children}
+        {children ?? <Outlet />}
       </div>
     </div>
   );
-};
-
-export default AuthLayout;
+}

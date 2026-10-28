@@ -1,6 +1,6 @@
-import { createSignal, createResource, Show, onCleanup, type Component } from 'solid-js';
-import { useParams } from '@solidjs/router';
-import { Title, Meta } from '@solidjs/meta';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useParams } from 'react-router';
+import { Info, Plus, TriangleAlert } from 'lucide-react';
 import EmailProviderModal from '../components/EmailProviderModal.js';
 import EmailProviderSection from '../components/EmailProviderSection.js';
 import LimitRuleModal from '../components/LimitRuleModal.js';
@@ -8,12 +8,14 @@ import type { LimitRuleData } from '../components/LimitRuleModal.js';
 import LimitRuleTable from '../components/LimitRuleTable.js';
 import LimitHistoryTable from '../components/LimitHistoryTable.js';
 import { KebabMenu, DeleteRuleModal, RemoveProviderModal } from '../components/LimitModals.js';
+import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
+import { Button } from '../components/ui.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
-import ReadOnlyRegion from '../components/ReadOnlyRegion.jsx';
 import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { checkEmailConfigured } from '../services/setup-status.js';
+import { useResource } from '../lib/use-resource.js';
 import {
   getNotificationRules,
   getNotificationLogs,
@@ -26,45 +28,73 @@ import {
   type NotificationRule,
 } from '../services/api.js';
 
-const Limits: Component = () => {
+/** Guardrails tab of a harness: spend/token rules, the email sender, alert history. */
+export default function Limits() {
   const params = useParams<{ agentName: string }>();
-  const agentName = () => decodeURIComponent(params.agentName);
+  const agentName = decodeURIComponent(params.agentName ?? '');
 
-  const [rules, { refetch: refetchRules }] = createResource(
-    () => agentName(),
-    (name) => getNotificationRules(name),
-  );
-  const [logs] = createResource(
-    () => agentName(),
-    (name) => getNotificationLogs(name),
-  );
-  const [routingStatus] = createResource(() => agentName(), getRoutingStatus);
-  const [emailConfigured] = createResource(checkEmailConfigured);
-  const [emailProvider, { refetch: refetchProvider }] = createResource(getEmailProvider);
-  // Solid re-throws when you read an errored resource, so every read below goes
-  // through this accessor. A failed initial fetch or a failed refresh after a
-  // successful delete reads as "no provider saved" instead of taking the page down.
-  const savedProvider = () => (emailProvider.error ? undefined : emailProvider());
-  const [showModal, setShowModal] = createSignal(false);
-  const [showEditProvider, setShowEditProvider] = createSignal(false);
-  const [showRemoveProvider, setShowRemoveProvider] = createSignal(false);
-  const [removingProvider, setRemovingProvider] = createSignal(false);
-  const [editRule, setEditRule] = createSignal<NotificationRule | null>(null);
-  const [openMenuId, setOpenMenuId] = createSignal<string | null>(null);
-  const [menuPos, setMenuPos] = createSignal<{ top: number; left: number }>({ top: 0, left: 0 });
-  const [deleteTarget, setDeleteTarget] = createSignal<NotificationRule | null>(null);
-  const [deleteConfirmed, setDeleteConfirmed] = createSignal(false);
-  const [deleting, setDeleting] = createSignal(false);
+  const rules = useResource(() => getNotificationRules(agentName), [agentName]);
+  const logs = useResource(() => getNotificationLogs(agentName), [agentName]);
+  const routingStatus = useResource(() => getRoutingStatus(agentName), [agentName]);
+  const emailConfigured = useResource(() => checkEmailConfigured(), []);
+  const emailProvider = useResource(() => getEmailProvider(), []);
+  // A failed initial fetch or a failed refresh after a successful delete reads
+  // as "no provider saved" instead of showing stale data.
+  const savedProvider = emailProvider.error ? undefined : emailProvider.data;
 
-  const routingEnabled = () => routingStatus()?.enabled ?? false;
+  const [showModal, setShowModal] = useState(false);
+  const [showEditProvider, setShowEditProvider] = useState(false);
+  const [showRemoveProvider, setShowRemoveProvider] = useState(false);
+  const [removingProvider, setRemovingProvider] = useState(false);
+  const [editRule, setEditRule] = useState<NotificationRule | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [deleteTarget, setDeleteTarget] = useState<NotificationRule | null>(null);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const routingEnabled = routingStatus.data?.enabled ?? false;
   // There is a sender when the operator saved a provider in the dashboard or
   // set the EMAIL_* environment variables. Assume one while the status loads.
-  const hasProvider = () => !!savedProvider() || emailConfigured() !== false;
+  const hasProvider = !!savedProvider || emailConfigured.data !== false;
+  const ruleList = rules.data ?? [];
+  const hasEmailRules = ruleList.some((r) => r.action === 'notify' || r.action === 'both');
+  const blockRulesExceeded = ruleList.some(
+    (r) =>
+      (r.action === 'block' || r.action === 'both') && r.is_active && Number(r.trigger_count) > 0,
+  );
 
-  const hasEmailRules = () => {
-    const r = rules();
-    if (!r) return false;
-    return r.some((rule) => rule.action === 'notify' || rule.action === 'both');
+  // The kebab menu closes on the next click anywhere on the page.
+  const menuCleanup = useRef<(() => void) | null>(null);
+  const closeMenu = () => {
+    menuCleanup.current?.();
+    menuCleanup.current = null;
+    setOpenMenuId(null);
+  };
+  useEffect(() => () => menuCleanup.current?.(), []);
+
+  const toggleMenu = (ruleId: string, e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (openMenuId === ruleId) {
+      closeMenu();
+      return;
+    }
+    menuCleanup.current?.();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 4, left: rect.right });
+    setOpenMenuId(ruleId);
+    const onDocClick = () => {
+      menuCleanup.current = null;
+      setOpenMenuId(null);
+    };
+    const timer = setTimeout(
+      () => document.addEventListener('click', onDocClick, { once: true }),
+      0,
+    );
+    menuCleanup.current = () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', onDocClick);
+    };
   };
 
   const handleRemoveProvider = async () => {
@@ -81,30 +111,8 @@ const Limits: Component = () => {
     setRemovingProvider(false);
     setShowRemoveProvider(false);
     toast.success(t('limits.toast.providerRemoved'));
-    try {
-      await refetchProvider();
-    } catch {
-      // next visit refetches
-    }
+    await emailProvider.reload();
   };
-
-  const closeMenu = () => setOpenMenuId(null);
-  const handleDocClick = () => closeMenu();
-
-  const toggleMenu = (ruleId: string, e: MouseEvent) => {
-    e.stopPropagation();
-    if (openMenuId() === ruleId) {
-      closeMenu();
-    } else {
-      const btn = e.currentTarget as HTMLElement;
-      const rect = btn.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.right });
-      setOpenMenuId(ruleId);
-      setTimeout(() => document.addEventListener('click', handleDocClick, { once: true }), 0);
-    }
-  };
-
-  onCleanup(() => document.removeEventListener('click', handleDocClick));
 
   const handleEdit = (rule: NotificationRule) => {
     closeMenu();
@@ -113,16 +121,15 @@ const Limits: Component = () => {
   };
 
   const handleSave = async (data: LimitRuleData) => {
-    const editing = editRule();
     try {
-      if (editing) {
-        await updateNotificationRule(editing.id, { ...data });
+      if (editRule) {
+        await updateNotificationRule(editRule.id, { ...data });
         toast.success(t('limits.toast.ruleUpdated'));
       } else {
-        await createNotificationRule({ agent_name: agentName(), ...data });
+        await createNotificationRule({ agent_name: agentName, ...data });
         toast.success(t('limits.toast.ruleCreated'));
       }
-      await refetchRules();
+      await rules.reload();
       setShowModal(false);
       setEditRule(null);
     } catch {
@@ -137,12 +144,11 @@ const Limits: Component = () => {
   };
 
   const handleDelete = async () => {
-    const target = deleteTarget();
-    if (!target) return;
+    if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deleteNotificationRule(target.id);
-      await refetchRules();
+      await deleteNotificationRule(deleteTarget.id);
+      await rules.reload();
       toast.success(t('limits.toast.ruleDeleted'));
     } catch {
       // error toast from fetchMutate
@@ -153,182 +159,127 @@ const Limits: Component = () => {
     setDeleteConfirmed(false);
   };
 
-  const blockRulesExceeded = () => {
-    const r = rules();
-    if (!r) return false;
-    return r.some(
-      (rule) =>
-        (rule.action === 'block' || rule.action === 'both') &&
-        rule.is_active &&
-        Number(rule.trigger_count) > 0,
-    );
-  };
+  const name = agentDisplayName() ?? agentName;
+  const canManage = roleCan.manageProviders();
+  const historyLogs = logs.data ?? [];
 
   return (
-    <div class="container--lg">
-      <Title>{t('limits.pageTitle', { name: agentDisplayName() ?? agentName() })}</Title>
-      <Meta
-        name="description"
-        content={t('limits.metaDescription', { name: agentDisplayName() ?? agentName() })}
-      />
+    <div className="flex flex-col gap-4">
+      <title>{t('limits.pageTitle', { name })}</title>
+      <meta name="description" content={t('limits.metaDescription', { name })} />
 
-      <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
-        <span class="breadcrumb">{t('limits.subtitle')}</span>
-        <Show when={roleCan.manageProviders()}>
-          <button
-            class="btn btn--primary btn--sm"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">{t('limits.subtitle')}</p>
+        {canManage ? (
+          <Button
+            size="sm"
             onClick={() => {
               setEditRule(null);
               setShowModal(true);
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
+            <Plus aria-hidden="true" />
             {t('limits.createRule')}
-          </button>
-        </Show>
+          </Button>
+        ) : null}
       </div>
 
-      <Show when={blockRulesExceeded()}>
-        <div class="limits-warning-banner" role="alert">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
+      {blockRulesExceeded ? (
+        <div className="notice is-danger" role="alert">
+          <TriangleAlert aria-hidden="true" />
           <span>{t('limits.hardLimitTriggered')}</span>
         </div>
-      </Show>
+      ) : null}
 
-      <Show when={routingStatus() && !routingEnabled()}>
-        <div class="limits-routing-cta">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
+      {routingStatus.data && !routingEnabled ? (
+        <div className="notice is-info">
+          <Info aria-hidden="true" />
           <div>
-            <strong>{t('limits.connectProviderTitle')}</strong>
-            <p>{t('limits.connectProviderBody')}</p>
+            <strong className="text-ink">{t('limits.connectProviderTitle')}</strong>
+            <p className="mt-0.5 text-sm text-dim">{t('limits.connectProviderBody')}</p>
           </div>
         </div>
-      </Show>
+      ) : null}
 
-      <ReadOnlyRegion readOnly={!roleCan.manageProviders()} notice={t('limits.readOnlyNotice')}>
+      <ReadOnlyRegion readOnly={!canManage} notice={t('limits.readOnlyNotice')}>
         <EmailProviderSection
-          emailProvider={savedProvider()}
-          loading={emailProvider.loading || emailProvider.state === 'unresolved'}
-          onConfigured={refetchProvider}
+          emailProvider={savedProvider}
+          loading={emailProvider.loading}
+          onConfigured={() => void emailProvider.reload()}
           onEdit={() => setShowEditProvider(true)}
           onRemove={() => setShowRemoveProvider(true)}
         />
 
         <LimitRuleTable
-          rules={rules()}
-          loading={rules.loading}
-          hasProvider={hasProvider()}
+          rules={rules.data}
+          loading={rules.loading && rules.data === undefined}
+          hasProvider={hasProvider}
           onToggleMenu={toggleMenu}
         />
       </ReadOnlyRegion>
 
-      <Show when={!logs.loading && (logs() ?? []).length > 0}>
-        <div style="margin-top: var(--gap-lg);">
-          <LimitHistoryTable logs={logs()} loading={false} />
-        </div>
-      </Show>
+      {!logs.loading && historyLogs.length > 0 ? (
+        <LimitHistoryTable logs={historyLogs} loading={false} />
+      ) : null}
 
       <KebabMenu
-        openMenuId={openMenuId()}
-        menuPos={menuPos()}
-        rules={rules() ?? []}
+        openMenuId={openMenuId}
+        menuPos={menuPos}
+        rules={ruleList}
         onEdit={handleEdit}
         onDelete={openDeleteConfirm}
       />
 
       <DeleteRuleModal
-        target={deleteTarget()}
-        confirmed={deleteConfirmed()}
-        deleting={deleting()}
+        target={deleteTarget}
+        confirmed={deleteConfirmed}
+        deleting={deleting}
         onConfirmChange={setDeleteConfirmed}
         onCancel={() => {
           setDeleteTarget(null);
           setDeleteConfirmed(false);
         }}
-        onDelete={handleDelete}
+        onDelete={() => void handleDelete()}
       />
 
       <LimitRuleModal
-        open={showModal()}
+        open={showModal}
         onClose={() => {
           setShowModal(false);
           setEditRule(null);
         }}
         onSave={handleSave}
-        hasProvider={hasProvider()}
+        hasProvider={hasProvider}
         editData={
-          editRule()
+          editRule
             ? {
-                metric_type: editRule()!.metric_type,
-                threshold: Number(editRule()!.threshold),
-                period: editRule()!.period,
-                action: editRule()!.action ?? 'notify',
+                metric_type: editRule.metric_type,
+                threshold: Number(editRule.threshold),
+                period: editRule.period,
+                action: editRule.action ?? 'notify',
               }
             : null
         }
       />
 
       <RemoveProviderModal
-        open={showRemoveProvider()}
-        hasEmailRules={hasEmailRules()}
-        removing={removingProvider()}
+        open={showRemoveProvider}
+        hasEmailRules={hasEmailRules}
+        removing={removingProvider}
         onCancel={() => setShowRemoveProvider(false)}
-        onRemove={handleRemoveProvider}
+        onRemove={() => void handleRemoveProvider()}
       />
 
       <EmailProviderModal
-        open={showEditProvider()}
-        initialProvider={savedProvider()?.provider ?? 'resend'}
+        open={showEditProvider}
+        initialProvider={savedProvider?.provider ?? 'resend'}
         editMode={true}
-        existingKeyPrefix={savedProvider()?.keyPrefix ?? null}
-        existingDomain={savedProvider()?.domain ?? null}
-        existingNotificationEmail={savedProvider()?.notificationEmail ?? null}
+        existingKeyPrefix={savedProvider?.keyPrefix ?? null}
+        existingDomain={savedProvider?.domain ?? null}
+        existingNotificationEmail={savedProvider?.notificationEmail ?? null}
         onClose={() => setShowEditProvider(false)}
-        onSaved={() => refetchProvider()}
+        onSaved={() => void emailProvider.reload()}
       />
     </div>
   );
-};
-
-export default Limits;
+}

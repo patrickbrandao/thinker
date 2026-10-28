@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
 import CostByModelTable from '../../src/components/CostByModelTable';
 
 function row(overrides: Record<string, unknown> = {}) {
@@ -15,25 +15,30 @@ function row(overrides: Record<string, unknown> = {}) {
 
 describe('CostByModelTable', () => {
   it('renders a header row with Model/Tokens/% of total/Cost', () => {
-    const { container } = render(() => (
-      <CostByModelTable rows={[]} />
-    ));
+    const { container } = render(<CostByModelTable rows={[]} />);
     const headers = Array.from(container.querySelectorAll('th')).map((h) => h.textContent?.trim());
     expect(headers).toEqual(['Model', 'Tokens', '% of total', 'Cost']);
   });
 
   it('is titled "Model usage" and adds attempt reliability columns when data is provided', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[row({ model: 'gpt-4o' })]}
         reliability={[{ model: 'gpt-4o', attempts: 120, failed: 10, succeeded: 110 }]}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).toContain('Model usage');
     const headers = Array.from(container.querySelectorAll('th')).map((h) => h.textContent?.trim());
     // Attempt world: Total attempts counts
     // every provider call on the model; Success rate is attempt-level.
-    expect(headers).toEqual(['Model', 'Tokens', '% of total', 'Cost', 'Total attempts', 'Success rate']);
+    expect(headers).toEqual([
+      'Model',
+      'Tokens',
+      '% of total',
+      'Cost',
+      'Total attempts',
+      'Success rate',
+    ]);
     const cells = Array.from(container.querySelectorAll('tbody td')).map((c) =>
       c.textContent?.trim(),
     );
@@ -43,15 +48,15 @@ describe('CostByModelTable', () => {
   });
 
   it('sorts rows by estimated_cost descending', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[
           row({ model: 'cheap', estimated_cost: 0.5 }),
           row({ model: 'pricey', estimated_cost: 5 }),
           row({ model: 'mid', estimated_cost: 2 }),
         ]}
-      />
-    ));
+      />,
+    );
     const firstCells = Array.from(container.querySelectorAll('tbody tr td:first-child')).map(
       (td) => td.textContent?.trim() ?? '',
     );
@@ -62,19 +67,15 @@ describe('CostByModelTable', () => {
   });
 
   it('formats tokens and rounds the share percentage', () => {
-    const { container } = render(() => (
-      <CostByModelTable rows={[row({ tokens: 12345, share_pct: 42.6 })]} />
-    ));
+    const { container } = render(
+      <CostByModelTable rows={[row({ tokens: 12345, share_pct: 42.6 })]} />,
+    );
     expect(container.textContent).toContain('12.3k');
     expect(container.textContent).toContain('43%');
   });
 
   it('renders a dash for null/zero costs', () => {
-    const { container } = render(() => (
-      <CostByModelTable
-        rows={[row({ estimated_cost: 0 })]}
-      />
-    ));
+    const { container } = render(<CostByModelTable rows={[row({ estimated_cost: 0 })]} />);
     const costCell = container.querySelector('tbody tr td:nth-child(4)');
     // formatCost(0) returns '$0.00' (non-null), so the fallback em-dash should
     // NOT appear. But extremely small values below the display threshold do
@@ -84,15 +85,13 @@ describe('CostByModelTable', () => {
   });
 
   it('adds a tooltip with the full cost for sub-penny amounts', () => {
-    const { container } = render(() => (
-      <CostByModelTable rows={[row({ estimated_cost: 0.00123 })]} />
-    ));
+    const { container } = render(<CostByModelTable rows={[row({ estimated_cost: 0.00123 })]} />);
     const costCell = container.querySelector('tbody tr td:nth-child(4)');
     expect(costCell?.getAttribute('title')).toBe('$0.001230');
   });
 
   it('renders a custom-provider letter badge and the stripped model text', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[
           row({
@@ -102,8 +101,8 @@ describe('CostByModelTable', () => {
             auth_type: null,
           }),
         ]}
-      />
-    ));
+      />,
+    );
     const letterBadge = container.querySelector('.provider-card__logo-letter');
     expect(letterBadge).not.toBeNull();
     expect(letterBadge?.textContent).toBe('M');
@@ -114,7 +113,7 @@ describe('CostByModelTable', () => {
   });
 
   it('falls back to the stripped custom prefix when the provider was deleted', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[
           row({
@@ -124,8 +123,8 @@ describe('CostByModelTable', () => {
             auth_type: null,
           }),
         ]}
-      />
-    ));
+      />,
+    );
     const letterBadge = container.querySelector('.provider-card__logo-letter');
     // stripCustomPrefix('custom:abc/my-model') → 'my-model' → first letter "M".
     expect(letterBadge?.textContent).toBe('M');
@@ -134,11 +133,9 @@ describe('CostByModelTable', () => {
   });
 
   it('renders a provider icon + auth badge for recognised model prefixes', () => {
-    const { container } = render(() => (
-      <CostByModelTable
-        rows={[row({ model: 'claude-opus-4', auth_type: 'subscription' })]}
-      />
-    ));
+    const { container } = render(
+      <CostByModelTable rows={[row({ model: 'claude-opus-4', auth_type: 'subscription' })]} />,
+    );
     const providerCell = container.querySelector('tbody tr td');
     expect(providerCell?.querySelector('.provider-auth-badge--sub')).not.toBeNull();
     // Tooltip on the outer wrapper reflects the auth label.
@@ -148,21 +145,21 @@ describe('CostByModelTable', () => {
   it('prefers the stored provider over model-name inference', () => {
     // Model name starts with "minimax-" which would infer MiniMax,
     // but the stored provider is "ollama" — icon tooltip should say Ollama.
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[row({ model: 'minimax-chat', provider: 'ollama', auth_type: 'api_key' })]}
-      />
-    ));
+      />,
+    );
     const providerSpan = container.querySelector('tbody tr td span[title]');
     expect(providerSpan?.getAttribute('title')).toContain('Ollama');
   });
 
   it('falls back to model-name inference when provider is null', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[row({ model: 'claude-opus-4', provider: null, auth_type: 'api_key' })]}
-      />
-    ));
+      />,
+    );
     const providerSpan = container.querySelector('tbody tr td span[title]');
     expect(providerSpan?.getAttribute('title')).toContain('Anthropic');
   });
@@ -179,28 +176,18 @@ describe('CostByModelTable', () => {
     function barWidthStyle(container: HTMLElement): string {
       // Cell structure: <td><div flex><div bar-bg><div bar-fill/></div><span/></div></td>
       // The bar fill is the deepest div, three levels below the cell.
-      const inner = container.querySelector(
-        'tbody tr td:nth-child(3) > div > div > div',
-      );
+      const inner = container.querySelector('tbody tr td:nth-child(3) > div > div > div');
       return inner?.getAttribute('style') ?? '';
     }
 
     it('handles share_pct = 0', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ share_pct: 0 })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ share_pct: 0 })]} />);
       expect(barWidthStyle(container)).toContain('width: 0%');
       expect(shareCellOf(container)?.textContent).toContain('0%');
     });
 
     it('handles share_pct = -1 without crashing', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ share_pct: -1 })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ share_pct: -1 })]} />);
       // The text label uses Math.round, so "-1%" is shown verbatim.
       expect(shareCellOf(container)?.textContent).toContain('-1%');
       // jsdom filters invalid CSS values (width cannot be negative), so the
@@ -210,11 +197,7 @@ describe('CostByModelTable', () => {
     });
 
     it('handles share_pct > 100 without crashing', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ share_pct: 150 })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ share_pct: 150 })]} />);
       expect(shareCellOf(container)?.textContent).toContain('150%');
       // Width over 100% is allowed by the browser (will overflow the parent),
       // but we just verify the value made it into the style untouched.
@@ -222,25 +205,17 @@ describe('CostByModelTable', () => {
     });
 
     it('handles share_pct = NaN without crashing', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ share_pct: NaN })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ share_pct: NaN })]} />);
       // Math.round(NaN) is NaN — rendered as "NaN%". The component must
       // remain renderable; we only care that no exception was thrown.
       expect(shareCellOf(container)?.textContent).toContain('NaN%');
-      // The width style contains "NaN%" which is invalid CSS, but Solid
-      // still attaches the attribute. Ensure the row exists.
+      // The width style contains "NaN%", which is invalid CSS and dropped.
+      // Ensure the row exists.
       expect(container.querySelector('tbody tr')).not.toBeNull();
     });
 
     it('handles estimated_cost = -0.50 (returns null → em-dash)', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ estimated_cost: -0.5 })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ estimated_cost: -0.5 })]} />);
       const cell = costCellOf(container);
       expect(cell?.textContent?.trim()).toBe('—');
       // No tooltip should be attached for invalid / negative costs.
@@ -248,11 +223,7 @@ describe('CostByModelTable', () => {
     });
 
     it('handles estimated_cost = NaN without crashing', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ estimated_cost: NaN })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ estimated_cost: NaN })]} />);
       const cell = costCellOf(container);
       // formatCost(NaN) currently falls through the comparisons and prints
       // "$NaN". The contract under test is that the component does not
@@ -265,11 +236,7 @@ describe('CostByModelTable', () => {
     });
 
     it('handles estimated_cost = Infinity without crashing', () => {
-      const { container } = render(() => (
-        <CostByModelTable
-          rows={[row({ estimated_cost: Infinity })]}
-        />
-      ));
+      const { container } = render(<CostByModelTable rows={[row({ estimated_cost: Infinity })]} />);
       const cell = costCellOf(container);
       const text = cell?.textContent?.trim() ?? '';
       // formatCost(Infinity) → "$Infinity". Em-dash is also acceptable if
@@ -281,12 +248,12 @@ describe('CostByModelTable', () => {
   });
 
   it('words the Total attempts tooltip around fallback retries only', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <CostByModelTable
         rows={[row({ model: 'gpt-4o' })]}
         reliability={[{ model: 'gpt-4o', attempts: 10, failed: 1, succeeded: 9 }]}
-      />
-    ));
+      />,
+    );
     const labels = [...container.querySelectorAll('.info-tooltip')]
       .map((e) => e.getAttribute('aria-label'))
       .join(' ');

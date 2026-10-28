@@ -1,8 +1,10 @@
-import { createSignal, Show, onCleanup, type Component } from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { type AgentCategory, type AgentPlatform, PLATFORM_ICONS } from 'thinker-shared';
 import { platformLabel } from '../services/agent-type-labels.js';
 import { t } from '../i18n/index.js';
-import AgentTypeGrid from './AgentTypeGrid.jsx';
+import AgentTypeGrid from './AgentTypeGrid.js';
+import { cx } from './ui.js';
 
 interface Props {
   category: AgentCategory | null;
@@ -17,73 +19,64 @@ const iconFor = (plat: AgentPlatform, cat: AgentCategory): string | undefined =>
   return PLATFORM_ICONS[plat];
 };
 
-const AgentTypeSelect: Component<Props> = (props) => {
-  const [open, setOpen] = createSignal(false);
-  let ref: HTMLDivElement | undefined;
+/** Trigger button showing the chosen harness type; opens AgentTypeGrid as a dropdown. */
+export default function AgentTypeSelect(props: Props) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const selectedIcon = () => {
-    const plat = props.platform;
-    const cat = props.category;
-    if (!plat || !cat) return '/icons/other.svg';
-    return iconFor(plat, cat);
-  };
+  const selectedIcon =
+    !props.platform || !props.category
+      ? '/icons/other.svg'
+      : iconFor(props.platform, props.category);
 
-  const handleClickOutside = (e: MouseEvent) => {
-    if (ref && !ref.contains(e.target as Node)) setOpen(false);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') setOpen(false);
-  };
-
-  if (typeof document !== 'undefined') {
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => {
+    return () => {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
-    });
-  }
+    };
+  }, [open]);
+
+  const label = props.platform ? platformLabel(props.platform) : t('harnesses.typeSelect.select');
 
   return (
-    <div class="agent-type-select" ref={ref}>
+    <div className="agent-type-select relative" ref={ref}>
       <button
-        class="agent-type-select__trigger"
-        classList={{ 'agent-type-select__trigger--open': open() }}
-        onClick={() => setOpen(!open())}
+        className={cx(
+          'agent-type-select__trigger field flex items-center gap-2 text-left',
+          open && 'agent-type-select__trigger--open',
+        )}
+        onClick={() => setOpen(!open)}
         type="button"
         disabled={props.disabled}
         aria-haspopup="listbox"
-        aria-expanded={open()}
-        aria-label={t('harnesses.typeSelect.aria', {
-          type: props.platform ? platformLabel(props.platform) : t('harnesses.typeSelect.select'),
-        })}
+        aria-expanded={open}
+        aria-label={t('harnesses.typeSelect.aria', { type: label })}
       >
-        <Show when={selectedIcon()}>
+        {selectedIcon ? (
           <img
-            src={selectedIcon()}
+            src={selectedIcon}
             alt=""
-            width="24"
-            height="24"
-            class="agent-type-select__trigger-icon"
+            width="18"
+            height="18"
+            className="agent-type-select__trigger-icon shrink-0"
           />
-        </Show>
-        <span class="agent-type-select__trigger-label">
-          {props.platform ? platformLabel(props.platform) : t('harnesses.typeSelect.select')}
-        </span>
-        <svg
-          class="agent-type-select__caret"
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          fill="currentColor"
-          viewBox="0 0 24 24"
+        ) : null}
+        <span className="agent-type-select__trigger-label flex-1 truncate">{label}</span>
+        <ChevronDown
+          className="agent-type-select__caret size-4 shrink-0 text-muted"
           aria-hidden="true"
-        >
-          <path d="M15.69 8H8.3c-1.29 0-1.98 1.52-1.13 2.49l3.69 4.22c.6.68 1.66.68 2.26 0l3.69-4.22c.85-.97.16-2.49-1.13-2.49Z" />
-        </svg>
+        />
       </button>
-      <Show when={open()}>
+      {open ? (
         <AgentTypeGrid
           inline={false}
           category={props.category}
@@ -95,9 +88,7 @@ const AgentTypeSelect: Component<Props> = (props) => {
           }}
           disabled={props.disabled}
         />
-      </Show>
+      ) : null}
     </div>
   );
-};
-
-export default AgentTypeSelect;
+}

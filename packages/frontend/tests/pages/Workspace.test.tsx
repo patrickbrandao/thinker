@@ -1,71 +1,54 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router';
 
 const mockNavigate = vi.fn();
-let mockSearchParams: Record<string, string | undefined> = {};
-const mockSetSearchParams = vi.fn((next: Record<string, string | undefined>) => {
-  mockSearchParams = { ...mockSearchParams, ...next };
-});
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<object>()),
   useNavigate: () => mockNavigate,
-  useSearchParams: () => [mockSearchParams, mockSetSearchParams] as const,
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
 }));
 
 const mockGetAgents = vi.fn();
 const mockCreateAgent = vi.fn();
 const mockDeleteAgent = vi.fn();
 const mockGetGlobalProviders = vi.fn();
-vi.mock('../../src/services/api.js', () => ({
+vi.mock('../../src/services/api', () => ({
   getAgents: (...args: unknown[]) => mockGetAgents(...args),
   createAgent: (...args: unknown[]) => mockCreateAgent(...args),
   deleteAgent: (...args: unknown[]) => mockDeleteAgent(...args),
   getGlobalProviders: (...args: unknown[]) => mockGetGlobalProviders(...args),
 }));
 
-vi.mock('../../src/components/DuplicateAgentModal.jsx', async () => {
-  const { Show } = await import('solid-js');
-  return {
-    default: (props: {
-      open: boolean;
-      sourceName: string;
-      onClose: () => void;
-      onDuplicated?: () => void;
-    }) => (
-      <Show when={props.open}>
-        <div data-testid="duplicate-modal" data-source={props.sourceName}>
-          <button data-testid="duplicate-modal-close" onClick={() => props.onClose()}>
-            close
-          </button>
-          <button
-            data-testid="duplicate-modal-done"
-            onClick={() => {
-              props.onDuplicated?.();
-              props.onClose();
-            }}
-          >
-            done
-          </button>
-        </div>
-      </Show>
-    ),
-  };
-});
+vi.mock('../../src/components/DuplicateAgentModal', () => ({
+  default: (props: {
+    open: boolean;
+    sourceName: string;
+    onClose: () => void;
+    onDuplicated?: () => void;
+  }) =>
+    props.open ? (
+      <div data-testid="duplicate-modal" data-source={props.sourceName}>
+        <button data-testid="duplicate-modal-close" onClick={() => props.onClose()}>
+          close
+        </button>
+        <button
+          data-testid="duplicate-modal-done"
+          onClick={() => {
+            props.onDuplicated?.();
+            props.onClose();
+          }}
+        >
+          done
+        </button>
+      </div>
+    ) : null,
+}));
 
-vi.mock('../../src/services/toast-store.js', () => ({
+vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock('../../src/services/formatters.js', () => ({
+vi.mock('../../src/services/formatters', () => ({
   formatNumber: (v: number) => String(v),
   // Mirrors the real formatCost contract: Number() coercion, null for
   // negative or non-finite input (so null coerces to 0 and renders $0.00),
@@ -79,20 +62,23 @@ vi.mock('../../src/services/formatters.js', () => ({
   formatTime: (ts: string) => ts,
 }));
 
-vi.mock('../../src/components/Sparkline.jsx', () => ({
+vi.mock('../../src/components/Sparkline', () => ({
   default: () => <div data-testid="sparkline" />,
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  pingCount: () => 0,
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  agentPing: () => 0,
-  routingPing: () => 0,
-  refreshAgents: vi.fn(),
-}));
+vi.mock('../../src/services/sse', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return {
+    pingCount: signal(0),
+    messagePing: signal(0),
+    analyticsPing: signal(0),
+    agentPing: signal(0),
+    routingPing: signal(0),
+    refreshAgents: vi.fn(),
+  };
+});
 
-vi.mock('../../src/components/AgentTypeSelect.jsx', () => ({
+vi.mock('../../src/components/AgentTypeSelect', () => ({
   default: (props: any) => (
     <div
       data-testid="agent-type-picker"
@@ -111,7 +97,7 @@ vi.mock('../../src/components/AgentTypeSelect.jsx', () => ({
 }));
 
 const mockMarkAgentCreated = vi.fn();
-vi.mock('../../src/services/recent-agents.js', () => ({
+vi.mock('../../src/services/recent-agents', () => ({
   markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
   markSetupPending: vi.fn(),
 }));
@@ -158,11 +144,24 @@ vi.mock('thinker-shared', () => ({
 
 import Workspace from '../../src/pages/Workspace';
 
+let currentSearch = '';
+function SearchProbe() {
+  currentSearch = useLocation().search;
+  return null;
+}
+function render(ui: () => React.ReactElement, path = '/harnesses') {
+  return rtlRender(
+    <MemoryRouter initialEntries={[path]}>
+      {ui()}
+      <SearchProbe />
+    </MemoryRouter>,
+  );
+}
+
 describe('Workspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    mockSearchParams = {};
     mockGetAgents.mockResolvedValue({
       agents: [
         {
@@ -199,15 +198,15 @@ describe('Workspace', () => {
   it('renders agent cards with display name when data loads', async () => {
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Demo Agent');
+      expect(document.body.textContent).toContain('Demo Agent');
     });
   });
 
   it('shows agent stats', async () => {
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('15000');
-      expect(container.textContent).toContain('42');
+      expect(document.body.textContent).toContain('15000');
+      expect(document.body.textContent).toContain('42');
     });
   });
 
@@ -215,21 +214,21 @@ describe('Workspace', () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('No harnesses yet');
+      expect(document.body.textContent).toContain('No harnesses yet');
     });
   });
 
   it('shows loading skeleton', () => {
     mockGetAgents.mockReturnValue(new Promise(() => {}));
     const { container } = render(() => <Workspace />);
-    expect(container.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.skel').length).toBeGreaterThan(0);
   });
 
   it('opens create harness modal on Connect Harness click', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    expect(container.querySelector('.modal-card__input')).not.toBeNull();
+    expect(document.querySelector('#agent-name-input')).not.toBeNull();
   });
 
   it('agents link to agent detail page', async () => {
@@ -243,15 +242,15 @@ describe('Workspace', () => {
   it('shows agent card stat labels', async () => {
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Tokens');
-      expect(container.textContent).toContain('Requests');
+      expect(document.body.textContent).toContain('Tokens');
+      expect(document.body.textContent).toContain('Requests');
     });
   });
 
   it('shows message count in agent card', async () => {
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('42');
+      expect(document.body.textContent).toContain('42');
     });
   });
 
@@ -260,8 +259,8 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'new-agent' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new-agent' } });
     const createBtn = screen.getByText('Create');
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
@@ -284,19 +283,19 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    expect(container.textContent).toContain('Name your harness to start tracking');
+    expect(document.body.textContent).toContain('Name your harness to start tracking');
   });
 
   it('shows breadcrumb text', () => {
     const { container } = render(() => <Workspace />);
-    expect(container.textContent).toContain('View and manage all your connected harnesses');
+    expect(document.body.textContent).toContain('View and manage all your connected harnesses');
   });
 
   it('shows connect button in empty state', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Connect your first harness');
+      expect(document.body.textContent).toContain('Connect your first harness');
     });
   });
 
@@ -310,11 +309,11 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'new-agent' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new-agent' } });
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
-      const btns = container.querySelectorAll('.modal-card button.btn--primary');
+      const btns = document.querySelectorAll('[role="dialog"] .actions button');
       const createBtn = btns[btns.length - 1] as HTMLButtonElement;
       expect(createBtn.querySelector('.spinner')).not.toBeNull();
       expect(createBtn.disabled).toBe(true);
@@ -331,8 +330,8 @@ describe('Workspace', () => {
     );
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'new-agent' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new-agent' } });
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
       expect(input.disabled).toBe(true);
@@ -345,8 +344,8 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'new-agent' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new-agent' } });
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalled();
@@ -357,8 +356,8 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'enter-agent' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'enter-agent' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith(
@@ -371,22 +370,23 @@ describe('Workspace', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'test' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'test' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     // Modal should be closed (no modal input visible)
-    expect(container.querySelector('.modal-card__input')).toBeNull();
+    expect(document.querySelector('#agent-name-input')).toBeNull();
   });
 
   it('closes modal on overlay click', () => {
     const { container } = render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    expect(container.querySelector('.modal-overlay')).not.toBeNull();
-    const overlay = container.querySelector('.modal-overlay')!;
-    fireEvent.click(overlay);
+    expect(document.querySelector('.overlay')).not.toBeNull();
+    const overlay = document.querySelector('.overlay')!;
+    // The shared Modal closes on a backdrop mousedown.
+    fireEvent.mouseDown(overlay);
     // Modal should be closed after overlay click
-    expect(container.querySelector('.modal-card__input')).toBeNull();
+    expect(document.querySelector('#agent-name-input')).toBeNull();
   });
 
   it('does not redirect in any mode', async () => {
@@ -400,17 +400,17 @@ describe('Workspace', () => {
   it('shows AgentTypePicker in create modal', () => {
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
-    expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
   });
 
   it('sets first platform when category changes in create modal', () => {
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
     // First pick a platform
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
     // Then change category which should set platform to first of new category
-    fireEvent.click(container.querySelector('[data-testid="pick-category"]')!);
-    const picker = container.querySelector('[data-testid="agent-type-picker"]');
+    fireEvent.click(document.querySelector('[data-testid="pick-category"]')!);
+    const picker = document.querySelector('[data-testid="agent-type-picker"]');
     expect(picker!.getAttribute('data-platform')).toBe('openclaw');
   });
 
@@ -418,10 +418,10 @@ describe('Workspace', () => {
     mockCreateAgent.mockResolvedValue({ agent: { name: 'typed-agent' }, apiKey: 'k' });
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'typed-agent' } });
-    fireEvent.click(container.querySelector('[data-testid="pick-category"]')!);
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'typed-agent' } });
+    fireEvent.click(document.querySelector('[data-testid="pick-category"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith(
@@ -445,8 +445,8 @@ describe('Workspace', () => {
   it('does not submit when name is empty', async () => {
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: '   ' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.click(screen.getByText('Create'));
     expect(mockCreateAgent).not.toHaveBeenCalled();
   });
@@ -466,7 +466,7 @@ describe('Workspace', () => {
     });
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('raw-agent');
+      expect(document.body.textContent).toContain('raw-agent');
     });
   });
 
@@ -476,42 +476,40 @@ describe('Workspace', () => {
     await vi.waitFor(() => {
       // ErrorState component should render
       expect(
-        container.querySelector('.error-state') || container.textContent?.includes('error'),
+        container.querySelector('.error-state') || document.body.textContent?.includes('error'),
       ).toBeDefined();
     });
   });
 
   it('auto-opens the create modal and clears ?add when deep-linked', async () => {
-    mockSearchParams = { add: 'true' };
-    const { container } = render(() => <Workspace />);
+    render(() => <Workspace />, '/harnesses?add=true');
     await vi.waitFor(() => {
-      expect(container.querySelector('.modal-card__input')).not.toBeNull();
+      expect(document.querySelector('#agent-name-input')).not.toBeNull();
     });
     // The deep-link param is cleared (replace, so a refresh/back doesn't re-open it).
-    expect(mockSetSearchParams).toHaveBeenCalledWith({ add: undefined }, { replace: true });
+    await vi.waitFor(() => expect(currentSearch).not.toContain('add='));
   });
 
   it('does not auto-open the modal without the ?add deep-link', async () => {
-    mockSearchParams = {};
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
       expect(mockGetAgents).toHaveBeenCalled();
     });
-    expect(container.querySelector('.modal-card__input')).toBeNull();
-    expect(mockSetSearchParams).not.toHaveBeenCalled();
+    expect(document.querySelector('#agent-name-input')).toBeNull();
+    expect(currentSearch).toBe('');
   });
 
   it('opens modal from empty state connect button', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     const { container } = render(() => <Workspace />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Connect your first harness');
+      expect(document.body.textContent).toContain('Connect your first harness');
     });
-    const btn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const btn = Array.from(document.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Connect your first harness'),
     )!;
     fireEvent.click(btn);
-    expect(container.querySelector('.modal-card__input')).not.toBeNull();
+    expect(document.querySelector('#agent-name-input')).not.toBeNull();
   });
 
   it('shows platform icon when agent has a platform', async () => {
@@ -546,11 +544,11 @@ describe('Workspace', () => {
     );
     const { container } = render(() => <Workspace />);
     fireEvent.click(screen.getAllByText('Connect Harness')[0]);
-    const input = container.querySelector('.modal-card__input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'test' } });
+    const input = document.querySelector('#agent-name-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'test' } });
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
-      const picker = container.querySelector('[data-testid="agent-type-picker"]');
+      const picker = document.querySelector('[data-testid="agent-type-picker"]');
       expect(picker!.getAttribute('data-disabled')).toBe('true');
     });
     resolveCreate!({ agent: { name: 'test' }, apiKey: 'k' });
@@ -580,8 +578,8 @@ describe('Workspace', () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
-      expect(container.textContent).toContain('Duplicate');
-      expect(container.textContent).toContain('Delete');
+      expect(document.body.textContent).toContain('Duplicate');
+      expect(document.body.textContent).toContain('Delete');
     });
 
     it('toggles the popover closed on a second trigger click', async () => {
@@ -635,7 +633,7 @@ describe('Workspace', () => {
     it('refetches agents after a successful duplicate', async () => {
       const { container, getByTestId } = render(() => <Workspace />);
       await vi.waitFor(() => {
-        expect(container.textContent).toContain('Demo Agent');
+        expect(document.body.textContent).toContain('Demo Agent');
       });
       expect(mockGetAgents).toHaveBeenCalledTimes(1);
       await clickKebab(container);
@@ -650,22 +648,22 @@ describe('Workspace', () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      expect(container.textContent).toContain('Delete demo-agent');
-      expect(container.querySelector('input[placeholder="demo-agent"]')).not.toBeNull();
+      expect(document.body.textContent).toContain('Delete demo-agent');
+      expect(document.querySelector('input[placeholder="demo-agent"]')).not.toBeNull();
     });
 
     it('requires exact name match before enabling delete button', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const deleteBtn = Array.from(container.querySelectorAll('button')).find(
+      const deleteBtn = Array.from(document.querySelectorAll('button')).find(
         (b) => b.textContent?.trim() === 'Delete harness',
       ) as HTMLButtonElement;
       expect(deleteBtn.hasAttribute('disabled')).toBe(true);
-      const input = container.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
-      fireEvent.input(input, { target: { value: 'wrong-name' } });
+      const input = document.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'wrong-name' } });
       expect(deleteBtn.hasAttribute('disabled')).toBe(true);
-      fireEvent.input(input, { target: { value: 'demo-agent' } });
+      fireEvent.change(input, { target: { value: 'demo-agent' } });
       expect(deleteBtn.hasAttribute('disabled')).toBe(false);
     });
 
@@ -673,13 +671,13 @@ describe('Workspace', () => {
       mockDeleteAgent.mockResolvedValue({ deleted: true });
       const { container } = render(() => <Workspace />);
       await vi.waitFor(() => {
-        expect(container.textContent).toContain('Demo Agent');
+        expect(document.body.textContent).toContain('Demo Agent');
       });
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const input = container.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
-      fireEvent.input(input, { target: { value: 'demo-agent' } });
-      const deleteBtn = Array.from(container.querySelectorAll('button')).find(
+      const input = document.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'demo-agent' } });
+      const deleteBtn = Array.from(document.querySelectorAll('button')).find(
         (b) => b.textContent?.trim() === 'Delete harness',
       ) as HTMLButtonElement;
       fireEvent.click(deleteBtn);
@@ -694,27 +692,27 @@ describe('Workspace', () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const input = container.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
-      fireEvent.input(input, { target: { value: 'demo-agent' } });
-      const deleteBtn = Array.from(container.querySelectorAll('button')).find(
+      const input = document.querySelector('input[placeholder="demo-agent"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'demo-agent' } });
+      const deleteBtn = Array.from(document.querySelectorAll('button')).find(
         (b) => b.textContent?.trim() === 'Delete harness',
       ) as HTMLButtonElement;
       fireEvent.click(deleteBtn);
       await vi.waitFor(() => {
         expect(mockDeleteAgent).toHaveBeenCalled();
       });
-      expect(container.textContent).toContain('Delete demo-agent');
+      expect(document.body.textContent).toContain('Delete demo-agent');
     });
 
     it('cancels the delete modal without deleting', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const cancelBtn = Array.from(container.querySelectorAll('button')).find(
+      const cancelBtn = Array.from(document.querySelectorAll('button')).find(
         (b) => b.textContent?.trim() === 'Cancel',
       ) as HTMLButtonElement;
       fireEvent.click(cancelBtn);
-      expect(container.textContent).not.toContain('Delete demo-agent');
+      expect(document.body.textContent).not.toContain('Delete demo-agent');
       expect(mockDeleteAgent).not.toHaveBeenCalled();
     });
 
@@ -722,18 +720,18 @@ describe('Workspace', () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const overlay = container.querySelector('.modal-overlay') as HTMLDivElement;
-      fireEvent.click(overlay);
-      expect(container.textContent).not.toContain('Delete demo-agent');
+      const overlay = document.querySelector('.overlay') as HTMLDivElement;
+      fireEvent.mouseDown(overlay);
+      expect(document.body.textContent).not.toContain('Delete demo-agent');
     });
 
     it('closes the delete modal on Escape from the overlay', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const overlay = container.querySelector('.modal-overlay') as HTMLDivElement;
+      const overlay = document.querySelector('.overlay') as HTMLDivElement;
       fireEvent.keyDown(overlay, { key: 'Escape' });
-      expect(container.textContent).not.toContain('Delete demo-agent');
+      expect(document.body.textContent).not.toContain('Delete demo-agent');
     });
   });
 });
@@ -742,7 +740,6 @@ describe('Workspace — view toggle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    mockSearchParams = {};
     mockGetAgents.mockResolvedValue({
       agents: [
         {
@@ -762,19 +759,19 @@ describe('Workspace — view toggle', () => {
 
   it('defaults to the grid view with the toggle visible', async () => {
     const { container } = render(() => <Workspace />);
-    await waitFor(() => expect(container.textContent).toContain('Demo Agent'));
-    const tabs = container.querySelectorAll('.panel__tabs .panel__tab');
+    await waitFor(() => expect(document.body.textContent).toContain('Demo Agent'));
+    const tabs = container.querySelectorAll('.segmented button');
     expect(tabs).toHaveLength(2);
-    expect(tabs[0].classList.contains('panel__tab--active')).toBe(true);
-    expect(container.querySelector('table.data-table')).toBeNull();
+    expect(tabs[0].getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('table.data')).toBeNull();
   });
 
   it('switches to the table view with one row per harness and persists the choice', async () => {
     const { container } = render(() => <Workspace />);
-    await waitFor(() => expect(container.textContent).toContain('Demo Agent'));
+    await waitFor(() => expect(document.body.textContent).toContain('Demo Agent'));
     fireEvent.click(screen.getByLabelText('Table view'));
 
-    const table = container.querySelector('table.data-table');
+    const table = container.querySelector('table.data');
     expect(table).not.toBeNull();
     const row = table!.querySelector('tbody tr')!;
     expect(row.textContent).toContain('Demo Agent');
@@ -782,7 +779,6 @@ describe('Workspace — view toggle', () => {
     expect(row.textContent).toContain('15000');
     expect(row.textContent).toContain('$5.50');
     expect(row.querySelector('a[href="/harnesses/demo-agent"]')).not.toBeNull();
-    // The platform icon carries the class the dark-mode invert rules target.
     expect(row.querySelector('img.workspace-table__icon')).not.toBeNull();
     expect(container.querySelector('.agents-grid')).toBeNull();
     expect(localStorage.getItem('thinker_harness_view')).toBe('table');
@@ -791,7 +787,7 @@ describe('Workspace — view toggle', () => {
   it('restores the persisted table view on mount and can switch back', async () => {
     localStorage.setItem('thinker_harness_view', 'table');
     const { container } = render(() => <Workspace />);
-    await waitFor(() => expect(container.querySelector('table.data-table')).not.toBeNull());
+    await waitFor(() => expect(container.querySelector('table.data')).not.toBeNull());
     fireEvent.click(screen.getByLabelText('Grid view'));
     expect(container.querySelector('.agents-grid')).not.toBeNull();
     expect(localStorage.getItem('thinker_harness_view')).toBe('grid');
@@ -810,7 +806,7 @@ describe('Workspace — view toggle', () => {
     });
     try {
       const { container } = render(() => <Workspace />);
-      await waitFor(() => expect(container.textContent).toContain('Demo Agent'));
+      await waitFor(() => expect(document.body.textContent).toContain('Demo Agent'));
       expect(container.querySelector('.agents-grid')).not.toBeNull();
     } finally {
       if (original) Object.defineProperty(window, 'localStorage', original);
@@ -830,9 +826,9 @@ describe('Workspace — view toggle', () => {
     });
     try {
       const { container } = render(() => <Workspace />);
-      await waitFor(() => expect(container.textContent).toContain('Demo Agent'));
+      await waitFor(() => expect(document.body.textContent).toContain('Demo Agent'));
       fireEvent.click(screen.getByLabelText('Table view'));
-      expect(container.querySelector('table.data-table')).not.toBeNull();
+      expect(container.querySelector('table.data')).not.toBeNull();
     } finally {
       if (original) Object.defineProperty(window, 'localStorage', original);
     }
@@ -847,16 +843,16 @@ describe('Workspace — view toggle', () => {
       }),
     );
     const { container } = render(() => <Workspace />);
-    const table = container.querySelector('table.data-table');
+    const table = container.querySelector('table.data');
     expect(table).not.toBeNull();
     expect(table!.querySelector('thead')?.textContent).toContain('Harness');
     // Skeleton rows mirror the loaded table: 6 cells including the actions column.
     const firstRow = table!.querySelector('tbody tr')!;
     expect(firstRow.querySelectorAll('td')).toHaveLength(6);
-    expect(firstRow.querySelector('.skeleton')).not.toBeNull();
+    expect(firstRow.querySelector('.skel')).not.toBeNull();
     expect(container.querySelector('.agents-grid')).toBeNull();
     resolveAgents({ agents: [] });
-    await waitFor(() => expect(container.textContent).toContain('No harnesses yet'));
+    await waitFor(() => expect(document.body.textContent).toContain('No harnesses yet'));
   });
 
   it('renders em dashes for missing cost and last_active in the table view', async () => {
@@ -875,11 +871,9 @@ describe('Workspace — view toggle', () => {
       ],
     });
     const { container } = render(() => <Workspace />);
-    await waitFor(() =>
-      expect(container.querySelector('table.data-table tbody tr')).not.toBeNull(),
-    );
+    await waitFor(() => expect(container.querySelector('table.data tbody tr')).not.toBeNull());
     const cells = Array.from(
-      container.querySelectorAll('table.data-table tbody tr td'),
+      container.querySelectorAll('table.data tbody tr td'),
       (td) => td.textContent,
     );
     // Cost and Last active both fall back to an em dash.
@@ -909,6 +903,6 @@ describe('Workspace — view toggle', () => {
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByText('Delete'));
-    await waitFor(() => expect(container.textContent).toContain('Delete demo-agent'));
+    await waitFor(() => expect(document.body.textContent).toContain('Delete demo-agent'));
   });
 });

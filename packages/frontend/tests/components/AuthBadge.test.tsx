@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
 import { authBadgeFor, authLabel } from '../../src/components/AuthBadge';
 
 describe('authLabel', () => {
@@ -27,7 +27,7 @@ describe('authBadgeFor', () => {
   });
 
   it('renders a subscription badge with the user icon and the correct aria label', () => {
-    const { container } = render(() => authBadgeFor('subscription', 16));
+    const { container } = render(<>{authBadgeFor('subscription', 16)}</>);
     const badge = container.querySelector('.provider-auth-badge--sub');
     expect(badge).not.toBeNull();
     expect(badge?.getAttribute('aria-label')).toBe('Subscription provider');
@@ -36,7 +36,7 @@ describe('authBadgeFor', () => {
   });
 
   it('renders an api-key badge with the key icon and the correct aria label', () => {
-    const { container } = render(() => authBadgeFor('api_key', 16));
+    const { container } = render(<>{authBadgeFor('api_key', 16)}</>);
     const badge = container.querySelector('.provider-auth-badge--key');
     expect(badge).not.toBeNull();
     expect(badge?.getAttribute('aria-label')).toBe('API key provider');
@@ -44,7 +44,7 @@ describe('authBadgeFor', () => {
   });
 
   it('renders a local badge with the house icon and the correct aria label', () => {
-    const { container } = render(() => authBadgeFor('local', 16));
+    const { container } = render(<>{authBadgeFor('local', 16)}</>);
     const badge = container.querySelector('.provider-auth-badge--local');
     expect(badge).not.toBeNull();
     expect(badge?.getAttribute('aria-label')).toBe('Local provider');
@@ -54,14 +54,14 @@ describe('authBadgeFor', () => {
 
   it('applies the overlay modifier for tiny sizes (<=8px) across all auth types', () => {
     for (const authType of ['api_key', 'subscription', 'local']) {
-      const { container } = render(() => authBadgeFor(authType, 8));
+      const { container } = render(<>{authBadgeFor(authType, 8)}</>);
       const badge = container.querySelector('.provider-auth-badge--overlay');
       expect(badge).not.toBeNull();
     }
   });
 
   it('omits the overlay modifier for larger sizes', () => {
-    const { container } = render(() => authBadgeFor('subscription', 24));
+    const { container } = render(<>{authBadgeFor('subscription', 24)}</>);
     expect(container.querySelector('.provider-auth-badge--overlay')).toBeNull();
   });
 });

@@ -1,24 +1,16 @@
-import {
-  createSignal,
-  createResource,
-  createEffect,
-  on,
-  Show,
-  For,
-  createMemo,
-  type Component,
-} from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
-import ErrorState from '../components/ErrorState.jsx';
-import InfoTooltip from '../components/InfoTooltip.jsx';
-import ModelPricesFilterBar from '../components/ModelPricesFilterBar.jsx';
-import Pagination from '../components/Pagination.jsx';
-import { providerIcon } from '../components/ProviderIcon.jsx';
+import { useMemo, useState } from 'react';
+import ErrorState from '../components/ErrorState.js';
+import InfoTooltip from '../components/InfoTooltip.js';
+import ModelPricesFilterBar from '../components/ModelPricesFilterBar.js';
+import Pagination from '../components/Pagination.js';
+import { providerIcon } from '../components/ProviderIcon.js';
+import { Badge, Button, Skel } from '../components/ui.js';
 import { getModelPrices } from '../services/api.js';
 import { getModelDisplayName, preloadModelDisplayNames } from '../services/model-display.js';
-import { createClientPagination } from '../services/pagination.js';
+import { useClientPagination } from '../services/pagination.js';
 import { resolveProviderId } from '../services/routing-utils.js';
 import { usd } from '../services/formatters.js';
+import { useResource } from '../lib/use-resource.js';
 import { intlLocale, t } from '../i18n/index.js';
 
 interface ModelPrice {
@@ -43,329 +35,273 @@ type SortKey =
 type SortDir = 'asc' | 'desc';
 
 function formatPrice(price: number | null): string {
-  if (price == null) return '\u2014';
+  if (price == null) return '—';
   if (price < 0.01) return usd(price, 4);
   if (price < 1) return usd(price, 3);
   return usd(price, 2);
 }
 
-const ModelPrices: Component = () => {
+const rawDisplayName = (m: ModelPrice) => m.display_name || getModelDisplayName(m.model_name);
+const resolveDisplayName = (m: ModelPrice) => rawDisplayName(m).replace(/\s*\(free\)/i, '');
+
+function formatSyncTime(ts: string | null): string {
+  if (!ts) return t('models.prices.never');
+  return new Date(ts).toLocaleString(intlLocale(), {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const sortedUnique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
+
+export default function ModelPrices() {
   preloadModelDisplayNames();
-  const [data, { refetch }] = createResource(() => getModelPrices() as Promise<ModelPricesData>);
-  const [sortKey, setSortKey] = createSignal<SortKey>('provider');
-  const [sortDir, setSortDir] = createSignal<SortDir>('asc');
-  const [selectedModels, setSelectedModels] = createSignal<Set<string>>(new Set());
-  const [selectedProviders, setSelectedProviders] = createSignal<Set<string>>(new Set());
+  const { data, error, loading, reload } = useResource(
+    () => getModelPrices() as Promise<ModelPricesData>,
+    [],
+  );
+  const [sortKey, setSortKey] = useState<SortKey>('provider');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(() => new Set());
+  const [selectedProviders, setSelectedProviders] = useState<Set<string>>(() => new Set());
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey() === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
+  const models = data?.models;
+  const allProviders = useMemo(() => sortedUnique((models ?? []).map((m) => m.provider)), [models]);
+  const allModelNames = useMemo(
+    () => sortedUnique((models ?? []).map((m) => m.model_name)),
+    [models],
+  );
 
-  const allProviders = createMemo(() => {
-    const models = data()?.models;
-    if (!models) return [];
-    const unique = [...new Set(models.map((m) => m.provider))];
-    return unique.sort((a, b) => a.localeCompare(b));
-  });
+  const filteredModels = useMemo(
+    () =>
+      (models ?? []).filter((m) => {
+        if (selectedModels.size > 0 && !selectedModels.has(m.model_name)) return false;
+        if (selectedProviders.size > 0 && !selectedProviders.has(m.provider)) return false;
+        return true;
+      }),
+    [models, selectedModels, selectedProviders],
+  );
 
-  const allModelNames = createMemo(() => {
-    const models = data()?.models;
-    if (!models) return [];
-    const unique = [...new Set(models.map((m) => m.model_name))];
-    return unique.sort((a, b) => a.localeCompare(b));
-  });
-
-  const filteredModels = createMemo(() => {
-    const models = data()?.models;
-    if (!models) return [];
-    const selModels = selectedModels();
-    const selProviders = selectedProviders();
-
-    return models.filter((m) => {
-      if (selModels.size > 0 && !selModels.has(m.model_name)) return false;
-      if (selProviders.size > 0 && !selProviders.has(m.provider)) return false;
-      return true;
-    });
-  });
-
-  const resolveDisplayName = (m: ModelPrice) =>
-    (m.display_name || getModelDisplayName(m.model_name)).replace(/\s*\(free\)/i, '');
-
-  const sortedModels = createMemo(() => {
-    const models = filteredModels();
-    if (!models.length) return [];
-    const key = sortKey();
-    const dir = sortDir();
-    return [...models].sort((a, b) => {
-      if (key === 'display_name') {
+  const sortedModels = useMemo(() => {
+    if (!filteredModels.length) return [];
+    return [...filteredModels].sort((a, b) => {
+      if (sortKey === 'display_name') {
         const av = resolveDisplayName(a);
         const bv = resolveDisplayName(b);
-        return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       }
-      const av = a[key];
-      const bv = b[key];
+      const av = a[sortKey];
+      const bv = b[sortKey];
       if (typeof av === 'string' && typeof bv === 'string') {
-        return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       }
       // Sort nulls to the bottom regardless of sort direction
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
-      return dir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
+      return sortDir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
-  });
+  }, [filteredModels, sortKey, sortDir]);
 
-  const pager = createClientPagination(sortedModels, 25);
+  const pager = useClientPagination(sortedModels, 25);
 
-  createEffect(
-    on([selectedModels, selectedProviders, sortKey, sortDir], () => pager.resetPage(), {
-      defer: true,
-    }),
-  );
-
-  const indicator = (key: SortKey) => {
-    if (sortKey() !== key) return '';
-    return sortDir() === 'asc' ? ' \u25B2' : ' \u25BC';
+  // Any change of filter or sort order starts again from the first page.
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+    pager.resetPage();
   };
 
-  const addModel = (model: string) => {
-    setSelectedModels((prev) => {
+  const updateSet = (setter: typeof setSelectedModels, op: 'add' | 'delete') => (value: string) => {
+    setter((prev) => {
       const next = new Set(prev);
-      next.add(model);
+      next[op](value);
       return next;
     });
-  };
-
-  const removeModel = (model: string) => {
-    setSelectedModels((prev) => {
-      const next = new Set(prev);
-      next.delete(model);
-      return next;
-    });
-  };
-
-  const addProvider = (provider: string) => {
-    setSelectedProviders((prev) => {
-      const next = new Set(prev);
-      next.add(provider);
-      return next;
-    });
-  };
-
-  const removeProvider = (provider: string) => {
-    setSelectedProviders((prev) => {
-      const next = new Set(prev);
-      next.delete(provider);
-      return next;
-    });
+    pager.resetPage();
   };
 
   const clearFilters = () => {
-    setSelectedModels(new Set<string>());
-    setSelectedProviders(new Set<string>());
+    setSelectedModels(new Set());
+    setSelectedProviders(new Set());
+    pager.resetPage();
   };
 
-  const formatSyncTime = (ts: string | null) => {
-    if (!ts) return t('models.prices.never');
-    const d = new Date(ts);
-    return d.toLocaleString(intlLocale(), {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const columns: Array<{ key: SortKey; label: string; tooltip?: string; num?: boolean }> = [
+    { key: 'display_name', label: t('models.prices.colModel') },
+    { key: 'model_name', label: t('models.prices.colModelId') },
+    { key: 'provider', label: t('models.prices.colProvider') },
+    {
+      key: 'input_price_per_million',
+      label: t('models.prices.colSend'),
+      tooltip: t('models.prices.sendTooltip'),
+      num: true,
+    },
+    {
+      key: 'output_price_per_million',
+      label: t('models.prices.colReceive'),
+      tooltip: t('models.prices.receiveTooltip'),
+      num: true,
+    },
+  ];
+
+  const ariaSort = (key: SortKey) =>
+    sortKey !== key ? undefined : sortDir === 'asc' ? 'ascending' : 'descending';
 
   return (
-    <div class="container--full">
-      <Title>{t('common.pageTitle', { page: t('models.prices.title') })}</Title>
-      <Meta name="description" content={t('models.prices.metaDescription')} />
-      <div class="page-header">
+    <div className="page wide">
+      <title>{t('common.pageTitle', { page: t('models.prices.title') })}</title>
+      <meta name="description" content={t('models.prices.metaDescription')} />
+      <div className="page-head">
         <div>
           <h1>{t('models.prices.title')}</h1>
-          <span class="breadcrumb">{t('models.prices.subtitle')}</span>
+          <p className="sub">{t('models.prices.subtitle')}</p>
         </div>
-        <Show when={data()?.lastSyncedAt}>
-          <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-            {t('models.prices.lastUpdated', { time: formatSyncTime(data()!.lastSyncedAt) })}
+        {data?.lastSyncedAt ? (
+          <span className="text-xs text-muted">
+            {t('models.prices.lastUpdated', { time: formatSyncTime(data.lastSyncedAt) })}
           </span>
-        </Show>
+        ) : null}
       </div>
 
-      <Show
-        when={!data.loading}
-        fallback={
-          <div class="panel" style="min-height: 600px;">
-            <div class="model-filter">
-              <div class="model-filter__row">
-                <div
-                  class="skeleton skeleton--text"
-                  style="width: 280px; height: 36px; border-radius: var(--radius);"
-                />
-                <div class="model-filter__summary">
-                  <div class="skeleton skeleton--text" style="width: 80px;" />
-                </div>
-              </div>
-            </div>
-            <table class="data-table" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th>{t('models.prices.colModel')}</th>
-                  <th>{t('models.prices.colModelId')}</th>
-                  <th>{t('models.prices.colProvider')}</th>
-                  <th>{t('models.prices.colSend')}</th>
-                  <th>{t('models.prices.colReceive')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}>
-                  {() => (
-                    <tr>
-                      <td>
-                        <div class="skeleton skeleton--text" style="width: 70%;" />
-                      </td>
-                      <td>
-                        <div class="skeleton skeleton--text" style="width: 60%;" />
-                      </td>
-                      <td>
-                        <div class="skeleton skeleton--text" style="width: 60%;" />
-                      </td>
-                      <td>
-                        <div class="skeleton skeleton--text" style="width: 50%;" />
-                      </td>
-                      <td>
-                        <div class="skeleton skeleton--text" style="width: 50%;" />
-                      </td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
+      {loading && !data ? (
+        <div className="table-wrap">
+          <div className="flex items-center justify-between gap-3 border-b border-line p-3">
+            <Skel width={280} height={34} />
+            <Skel width={80} />
           </div>
-        }
-      >
-        <Show when={!data.error} fallback={<ErrorState error={data.error} onRetry={refetch} />}>
-          <div class="panel">
-            <ModelPricesFilterBar
-              allModels={allModelNames()}
-              allProviders={allProviders()}
-              selectedModels={selectedModels()}
-              selectedProviders={selectedProviders()}
-              onAddModel={addModel}
-              onRemoveModel={removeModel}
-              onAddProvider={addProvider}
-              onRemoveProvider={removeProvider}
-              onClearFilters={clearFilters}
-              totalCount={data()?.models?.length ?? 0}
-              filteredCount={filteredModels().length}
-            />
-            <Show
-              when={pager.totalItems() > 0}
-              fallback={
-                <div class="model-filter__empty">
-                  <p class="model-filter__empty-title">{t('models.prices.noMatchTitle')}</p>
-                  <p class="model-filter__empty-hint">{t('models.prices.noMatchHint')}</p>
-                  <button class="btn btn--outline btn--sm" onClick={clearFilters} type="button">
-                    {t('models.prices.clearFilters')}
-                  </button>
-                </div>
-              }
-            >
-              <table class="data-table">
+          <table className="data">
+            <thead>
+              <tr>
+                {columns.map((c) => (
+                  <th key={c.key} className={c.num ? 'num' : undefined}>
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 10 }, (_, i) => (
+                <tr key={i}>
+                  {['70%', '60%', '60%', '50%', '50%'].map((w, j) => (
+                    <td key={j}>
+                      <Skel width={w} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => void reload()} />
+      ) : (
+        <div className="table-wrap">
+          <ModelPricesFilterBar
+            allModels={allModelNames}
+            allProviders={allProviders}
+            selectedModels={selectedModels}
+            selectedProviders={selectedProviders}
+            onAddModel={updateSet(setSelectedModels, 'add')}
+            onRemoveModel={updateSet(setSelectedModels, 'delete')}
+            onAddProvider={updateSet(setSelectedProviders, 'add')}
+            onRemoveProvider={updateSet(setSelectedProviders, 'delete')}
+            onClearFilters={clearFilters}
+            totalCount={models?.length ?? 0}
+            filteredCount={filteredModels.length}
+          />
+          {pager.totalItems > 0 ? (
+            <>
+              <table className="data">
                 <thead>
                   <tr>
-                    <th class="data-table__sortable" onClick={() => handleSort('display_name')}>
-                      {t('models.prices.colModel')}
-                      {indicator('display_name')}
-                    </th>
-                    <th class="data-table__sortable" onClick={() => handleSort('model_name')}>
-                      {t('models.prices.colModelId')}
-                      {indicator('model_name')}
-                    </th>
-                    <th class="data-table__sortable" onClick={() => handleSort('provider')}>
-                      {t('models.prices.colProvider')}
-                      {indicator('provider')}
-                    </th>
-                    <th
-                      class="data-table__sortable"
-                      onClick={() => handleSort('input_price_per_million')}
-                    >
-                      {t('models.prices.colSend')}
-                      {indicator('input_price_per_million')}
-                      <InfoTooltip text={t('models.prices.sendTooltip')} />
-                    </th>
-                    <th
-                      class="data-table__sortable"
-                      onClick={() => handleSort('output_price_per_million')}
-                    >
-                      {t('models.prices.colReceive')}
-                      {indicator('output_price_per_million')}
-                      <InfoTooltip text={t('models.prices.receiveTooltip')} />
-                    </th>
+                    {columns.map((c) => (
+                      <th
+                        key={c.key}
+                        className={c.num ? 'sortable num' : 'sortable'}
+                        aria-sort={ariaSort(c.key)}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 uppercase [font:inherit] text-inherit hover:text-ink"
+                            onClick={() => handleSort(c.key)}
+                          >
+                            {c.label}
+                            {sortKey === c.key ? (
+                              <span aria-hidden="true">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                            ) : null}
+                          </button>
+                          {c.tooltip ? <InfoTooltip text={c.tooltip} /> : null}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  <For each={pager.pageItems()}>
-                    {(model) => {
-                      const rawName = () =>
-                        model.display_name || getModelDisplayName(model.model_name);
-                      const isFree = () => /\(free\)/i.test(rawName());
-                      const displayName = () => rawName().replace(/\s*\(free\)/i, '');
-                      const pid = () => resolveProviderId(model.provider);
-                      return (
-                        <tr>
-                          <td style="font-size: var(--font-size-sm);">
-                            {displayName()}
-                            <Show when={isFree()}>
+                  {pager.pageItems.map((model) => {
+                    const isFree = /\(free\)/i.test(rawDisplayName(model));
+                    const pid = resolveProviderId(model.provider);
+                    return (
+                      <tr key={`${model.provider}:${model.model_name}`}>
+                        <td className="row-title">
+                          {resolveDisplayName(model)}
+                          {isFree ? (
+                            <>
                               {' '}
-                              <span class="free-tag">{t('models.prices.free')}</span>
-                            </Show>
-                          </td>
-                          <td style="font-family: var(--font-mono); font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                            {model.model_name}
-                          </td>
-                          <td>
-                            <span style="display: inline-flex; align-items: center; gap: 6px;">
-                              <Show when={pid()}>
-                                <span style="display: inline-flex; flex-shrink: 0;">
-                                  {providerIcon(pid()!, 16)}
-                                </span>
-                              </Show>
-                              {model.provider}
-                            </span>
-                          </td>
-                          <td style="font-family: var(--font-mono);">
-                            {formatPrice(model.input_price_per_million)}
-                          </td>
-                          <td style="font-family: var(--font-mono);">
-                            {formatPrice(model.output_price_per_million)}
-                          </td>
-                        </tr>
-                      );
-                    }}
-                  </For>
+                              <Badge tone="ok" className="free-tag">
+                                {t('models.prices.free')}
+                              </Badge>
+                            </>
+                          ) : null}
+                        </td>
+                        <td className="font-mono text-xs text-muted">{model.model_name}</td>
+                        <td>
+                          <span className="inline-flex items-center gap-1.5">
+                            {pid ? (
+                              <span className="inline-flex shrink-0">{providerIcon(pid, 16)}</span>
+                            ) : null}
+                            {model.provider}
+                          </span>
+                        </td>
+                        <td className="num">{formatPrice(model.input_price_per_million)}</td>
+                        <td className="num">{formatPrice(model.output_price_per_million)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              <Pagination
-                currentPage={pager.currentPage}
-                totalItems={pager.totalItems}
-                pageSize={pager.pageSize}
-                hasNextPage={pager.hasNextPage}
-                onPrevious={pager.previousPage}
-                onNext={pager.nextPage}
-              />
-            </Show>
-          </div>
-        </Show>
-      </Show>
+              {pager.totalItems > pager.pageSize ? (
+                <div className="border-t border-line px-3 pb-3">
+                  <Pagination
+                    currentPage={pager.currentPage}
+                    totalItems={pager.totalItems}
+                    pageSize={pager.pageSize}
+                    hasNextPage={pager.hasNextPage}
+                    onPrevious={pager.previousPage}
+                    onNext={pager.nextPage}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="empty">
+              <h3>{t('models.prices.noMatchTitle')}</h3>
+              <p className="max-w-md text-sm">{t('models.prices.noMatchHint')}</p>
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                {t('models.prices.clearFilters')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
-};
-
-export default ModelPrices;
+}

@@ -1,14 +1,13 @@
-import { Title } from '@solidjs/meta';
-import { useNavigate, useSearchParams } from '@solidjs/router';
 import {
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  For,
-  Show,
-  type Component,
-} from 'solid-js';
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type SyntheticEvent,
+} from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { ChevronDown, LayoutGrid, List, Pencil, Shapes } from 'lucide-react';
 import {
   getAgents,
   getCustomProviders,
@@ -28,23 +27,19 @@ import { getPlaygroundAgent } from '../../services/api/playground.js';
 import type { AuthType, CustomProviderData, RoutingProvider } from '../../services/api.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../../services/routing-params.js';
 import { PROVIDERS, subscriptionCatalog, type ProviderDef } from '../../services/providers.js';
-import {
-  customProviderColor,
-  formatCost,
-  formatNumber,
-  formatTimeAgo,
-} from '../../services/formatters.js';
+import { formatCost, formatNumber, formatTimeAgo } from '../../services/formatters.js';
 import InfoTooltip from '../../components/InfoTooltip.jsx';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import { toast } from '../../services/toast-store.js';
 import { t } from '../../i18n/index.js';
-import { roleCan } from '../../services/session-store.js';
+import { me, roleCan } from '../../services/session-store.js';
 import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import Sparkline from '../../components/Sparkline.jsx';
 import { attemptSuccessRate } from '../../services/api/analytics.js';
-import '../../styles/routing.css';
-import '../../styles/analytics-overview.css';
+import { Badge, Button, Modal, Skel, cx } from '../../components/ui.js';
+import { useResource } from '../../lib/use-resource.js';
+import { useSignal } from '../../lib/signal.js';
 
 type ProviderPageKind = 'subscriptions' | 'byok' | 'local';
 type ViewMode = 'list' | 'grid';
@@ -143,221 +138,134 @@ const providerDisplayName = (
 ): string =>
   customProviderName(providerId, customProviders) ?? standardProviderName(providerId) ?? providerId;
 
+const formatRate = (rate: number | null) => (rate == null ? '—' : `${(rate * 100).toFixed(1)}%`);
+
 /** Shimmer placeholder shown in usage cells while the usage fetch is in flight. */
-const UsageShimmer: Component<{ width?: number }> = (props) => (
-  <span
-    aria-hidden="true"
-    style={{
-      display: 'inline-block',
-      width: `${props.width ?? 56}px`,
-      height: '12px',
-      'border-radius': 'var(--radius-sm)',
-      background: 'hsl(var(--muted) / 0.6)',
-      animation: 'skeleton-pulse 1.2s ease-in-out infinite',
-      'vertical-align': 'middle',
-    }}
-  />
-);
+const UsageShimmer = ({ width }: { width?: number }) => <Skel width={width ?? 56} height={12} />;
 
-const StatusBadge: Component<{ active: boolean }> = (props) => (
-  <Show
-    when={props.active}
-    fallback={
-      <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;">
-        {t('providers.inactive')}
-      </span>
-    }
-  >
-    <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--success)); color: white; font-size: var(--font-size-xs); font-weight: 600;">
-      {t('providers.active')}
-    </span>
-  </Show>
-);
-
-const ProviderMark: Component<{ providerId: string; name: string; size?: number }> = (props) => {
-  const size = () => props.size ?? 20;
-  return (
-    <Show
-      when={providerIcon(props.providerId, size())}
-      fallback={
-        <span
-          style={{
-            display: 'inline-flex',
-            'align-items': 'center',
-            'justify-content': 'center',
-            width: `${size()}px`,
-            height: `${size()}px`,
-            'border-radius': '4px',
-            'font-size': size() > 20 ? '12px' : '11px',
-            'font-weight': '600',
-            color: 'white',
-            background: customProviderColor(props.name || props.providerId),
-          }}
-        >
-          {(props.name || props.providerId).charAt(0).toUpperCase()}
-        </span>
-      }
-    >
-      <span style={`display: flex; align-items: center; width: ${size()}px; height: ${size()}px;`}>
-        {providerIcon(props.providerId, size())}
-      </span>
-    </Show>
+const StatusBadge = ({ active }: { active: boolean }) =>
+  active ? (
+    <Badge tone="ok">{t('providers.active')}</Badge>
+  ) : (
+    <Badge>{t('providers.inactive')}</Badge>
   );
-};
 
-const ListIcon: Component = () => (
-  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z" />
-  </svg>
-);
+function ProviderMark({
+  providerId,
+  name,
+  size = 20,
+}: {
+  providerId: string;
+  name: string;
+  size?: number;
+}) {
+  const icon = providerIcon(providerId, size);
+  if (icon)
+    return (
+      <span className="flex shrink-0 items-center" style={{ width: size, height: size }}>
+        {icon}
+      </span>
+    );
+  return (
+    <span
+      className={cx(
+        'inline-flex shrink-0 items-center justify-center rounded-[4px] bg-accent-tint font-semibold text-accent',
+        size > 20 ? 'text-xs' : 'text-[11px]',
+      )}
+      style={{ width: size, height: size }}
+    >
+      {(name || providerId).charAt(0).toUpperCase()}
+    </span>
+  );
+}
 
-const GridIcon: Component = () => (
-  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
-  </svg>
-);
+function ActiveLabel({ children }: { children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-ok">
+      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
 
-const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props) => {
-  const copy = () => pageCopy(props.kind);
+export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPageProps) {
+  useSignal(me);
+  const copy = pageCopy(kind);
+  const canManage = roleCan.manageProviders();
   const navigate = useNavigate();
-  const [showModal, setShowModal] = createSignal(false);
-  const [showCustomModal, setShowCustomModal] = createSignal(false);
-  const [deepLink, setDeepLink] = createSignal<ProviderDeepLink | null>(null);
-  const [customProviderPrefill, setCustomProviderPrefill] =
-    createSignal<CustomProviderPrefill | null>(null);
-  const [viewMode, setViewMode] = createSignal<ViewMode>('grid');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showModal, setShowModal] = useState(false);
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [deepLink, setDeepLink] = useState<ProviderDeepLink | null>(null);
+  const [customProviderPrefill, setCustomProviderPrefill] = useState<CustomProviderPrefill | null>(
+    null,
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   // Past this many connections the list is capped inside its own card, so the
   // supported-provider catalog below stays reachable without a long scroll.
-  const [connectionsExpanded, setConnectionsExpanded] = createSignal(false);
-  const connectionsCollapsible = () => connectedRows().length > CONNECTIONS_COLLAPSE_THRESHOLD;
-  const connectionsCollapsed = () => connectionsCollapsible() && !connectionsExpanded();
-  let connectionsScroller: HTMLDivElement | undefined;
-  const toggleConnections = () => {
-    setConnectionsExpanded((open) => !open);
-    // Expanding takes the cap off, which drops the scroll position. The
-    // at-bottom flag from before it would otherwise survive into the next
-    // collapse and keep the fade hidden at the top of the list.
-    if (connectionsScroller) {
-      connectionsScroller.scrollTop = 0;
-      connectionsScroller.parentElement?.classList.remove('scroll-panel--at-bottom');
-    }
-  };
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [connectionsExpanded, setConnectionsExpanded] = useState(false);
+  const connectionsScroller = useRef<HTMLDivElement>(null);
 
   // Inline rename state
-  const [renamingId, setRenamingId] = createSignal<string | null>(null);
-  const [renameValue, setRenameValue] = createSignal('');
-  const [renameError, setRenameError] = createSignal('');
-  const [renameBusy, setRenameBusy] = createSignal(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
 
-  const startRename = (connectionId: string, currentLabel: string, e: Event) => {
-    e.stopPropagation();
-    setRenamingId(connectionId);
-    setRenameValue(currentLabel);
-    setRenameError('');
-  };
-
-  const cancelRename = (e?: Event) => {
-    e?.stopPropagation();
-    setRenamingId(null);
-    setRenameError('');
-  };
-
-  const submitRename = async (
-    provider: string,
-    currentLabel: string,
-    authType: string,
-    e?: Event,
-  ) => {
-    e?.stopPropagation();
-    const newLabel = renameValue().trim();
-    if (!newLabel) {
-      setRenameError(t('providers.nameEmpty'));
-      return;
-    }
-    if (newLabel === currentLabel) {
-      cancelRename();
-      return;
-    }
-    if (!firstAgentName()) return;
-    setRenameBusy(true);
-    setRenameError('');
-    try {
-      await renameProviderKey(
-        firstAgentName(),
-        provider,
-        currentLabel,
-        newLabel,
-        authType as AuthType,
-      );
-      toast.success(t('providers.connectionRenamed'));
-      setRenamingId(null);
-      refetchGlobalProviders();
-    } catch (err: any) {
-      setRenameError(err?.message ?? t('providers.renameFailed'));
-    } finally {
-      setRenameBusy(false);
-    }
-  };
+  const analyticsTick = useSignal(analyticsPing);
+  const routingTick = useSignal(routingPing);
 
   // CONFIG resource — paints the page immediately (cheap endpoint, no
   // agent_messages scan).
-  const [config, { refetch: refetchConfig }] = createResource(async () => {
+  const config = useResource(async () => {
     try {
       return await getGlobalProviders();
     } catch {
       return { providers: [], model_counts: {} };
     }
-  });
+  }, []);
 
   // USAGE resource — the expensive 30d aggregation, fetched independently. Its
-  // source includes the SSE ping signals so coalesced message activity
-  // (analyticsPing) or a provider connect/disconnect/rename (routingPing)
-  // re-runs the usage fetch.
-  const [usage, { refetch: refetchUsage }] = createResource(
-    () => ({ m: analyticsPing(), r: routingPing() }),
-    async () => {
-      try {
-        return (await getProviderUsage()).providers;
-      } catch {
-        return [];
-      }
-    },
-  );
+  // deps include the SSE pings so coalesced message activity (analyticsPing) or
+  // a provider connect/disconnect/rename (routingPing) re-runs the usage fetch.
+  const usage = useResource(async () => {
+    try {
+      return (await getProviderUsage()).providers;
+    } catch {
+      return [];
+    }
+  }, [analyticsTick, routingTick]);
 
   // Distinguish "loading" (shimmer the usage cells) from "loaded-zero" (a real
   // 0). Only the FIRST load shimmers; SSE-driven refetches keep the prior
-  // numbers on screen (usage() stays defined) so the table doesn't flicker.
-  const usageLoading = () => usage.loading && usage() === undefined;
+  // numbers on screen so the table doesn't flicker.
+  const usageLoading = usage.loading && usage.data === undefined;
 
   // Coordinate a usage refetch alongside config on connect/disconnect/rename.
-  const refetchGlobalProviders = () => {
-    void refetchConfig();
-    void refetchUsage();
-  };
+  const refetchGlobalProviders = () => Promise.all([config.reload(), usage.reload()]);
 
   // Merge config + usage by (provider, auth_type). While usage is still loading
-  // every row carries zeroed usage; `usageLoading()` tells the view to shimmer
+  // every row carries zeroed usage; `usageLoading` tells the view to shimmer
   // instead of rendering those zeros.
-  const data = () => ({
-    providers: mergeUsage(config()?.providers ?? [], usage()),
-    model_counts: config()?.model_counts ?? {},
-  });
+  const mergedProviders = useMemo(
+    () => mergeUsage(config.data?.providers ?? [], usage.data),
+    [config.data, usage.data],
+  );
 
-  const [agents] = createResource(async () => {
+  const agents = useResource(async () => {
     try {
       const result = (await getAgents()) as { agents?: AgentRow[] } | AgentRow[];
       return Array.isArray(result) ? result : (result.agents ?? []);
     } catch {
-      return [];
+      return [] as AgentRow[];
     }
-  });
+  }, []);
 
   // Connections belong to the organization; the agent name only addresses the
   // routing endpoints. With no harness yet, the reserved Playground agent
   // stands in, so providers can be connected before the first harness.
-  const [playgroundAgent] = createResource(
-    () => (agents() !== undefined && agents()!.length === 0 ? true : undefined),
+  const noHarness = agents.data !== undefined && agents.data.length === 0;
+  const playgroundAgent = useResource(
     async () => {
       try {
         return (await getPlaygroundAgent()).name;
@@ -365,91 +273,90 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
         return '';
       }
     },
+    [],
+    { enabled: noHarness },
   );
-  const firstAgentName = () => agents()?.[0]?.agent_name ?? playgroundAgent() ?? '';
+  const firstAgentName = agents.data?.[0]?.agent_name ?? playgroundAgent.data ?? '';
 
-  const [modalProviders, { refetch: refetchModalProviders }] = createResource(
-    () => firstAgentName(),
-    async (agentName): Promise<RoutingProvider[]> => {
-      if (!agentName) return [];
-      try {
-        return await getAgentProviders(agentName);
-      } catch {
-        return [];
-      }
-    },
+  const modalProviders = useResource(async (): Promise<RoutingProvider[]> => {
+    if (!firstAgentName) return [];
+    try {
+      return await getAgentProviders(firstAgentName);
+    } catch {
+      return [];
+    }
+  }, [firstAgentName]);
+
+  const customProviders = useResource(async (): Promise<CustomProviderData[]> => {
+    if (!firstAgentName) return [];
+    try {
+      return await getCustomProviders(firstAgentName);
+    } catch {
+      return [];
+    }
+  }, [firstAgentName]);
+
+  const connectedSummaries = mergedProviders.filter(
+    (provider) => provider.auth_type === copy.authType,
   );
-
-  const [customProviders, { refetch: refetchCustomProviders }] = createResource(
-    () => firstAgentName(),
-    async (agentName): Promise<CustomProviderData[]> => {
-      if (!agentName) return [];
-      try {
-        return await getCustomProviders(agentName);
-      } catch {
-        return [];
-      }
-    },
-  );
-
-  const connectedSummaries = () =>
-    (data()?.providers ?? []).filter((provider) => provider.auth_type === copy().authType);
 
   const hasUsage = (summary: TenantProviderSummary) =>
     summary.consumption_tokens > 0 || summary.consumption_messages > 0;
 
-  const connectedRows = () => {
-    const rows: Array<{
-      summary: TenantProviderSummary;
-      connection: TenantProviderSummary['connections'][number];
-      name: string;
-    }> = [];
-    for (const summary of connectedSummaries()) {
-      for (const connection of summary.connections) {
-        if (!connection.is_active && props.kind !== 'subscriptions' && !hasUsage(summary)) continue;
-        rows.push({
-          summary,
-          connection,
-          name: providerDisplayName(summary.provider, customProviders() ?? []),
-        });
-      }
+  const connectedRows: Array<{
+    summary: TenantProviderSummary;
+    connection: TenantProviderSummary['connections'][number];
+    name: string;
+  }> = [];
+  for (const summary of connectedSummaries) {
+    for (const connection of summary.connections) {
+      if (!connection.is_active && kind !== 'subscriptions' && !hasUsage(summary)) continue;
+      connectedRows.push({
+        summary,
+        connection,
+        name: providerDisplayName(summary.provider, customProviders.data ?? []),
+      });
     }
-    return rows;
+  }
+
+  const connectionsCollapsible = connectedRows.length > CONNECTIONS_COLLAPSE_THRESHOLD;
+  const connectionsCollapsed = connectionsCollapsible && !connectionsExpanded;
+  const toggleConnections = () => {
+    setConnectionsExpanded((open) => !open);
+    // Expanding takes the cap off, which drops the scroll position. The
+    // at-bottom flag from before it would otherwise survive into the next
+    // collapse and keep the fade hidden at the top of the list.
+    const scroller = connectionsScroller.current;
+    if (scroller) {
+      scroller.scrollTop = 0;
+      scroller.parentElement?.classList.remove('scroll-panel--at-bottom');
+    }
   };
 
-  const connectedByProvider = () => {
-    const map = new Map<string, TenantProviderSummary>();
-    for (const summary of connectedSummaries()) map.set(summary.provider, summary);
-    return map;
-  };
+  const connectedByProvider = new Map<string, TenantProviderSummary>();
+  for (const summary of connectedSummaries) connectedByProvider.set(summary.provider, summary);
 
-  const catalogProviders = () =>
-    providerListForKind(
-      props.kind,
-      (providerId) =>
-        connectedByProvider()
-          .get(providerId)
-          ?.connections.some((connection) => connection.is_active) ?? false,
-    );
+  const catalogProviders = providerListForKind(
+    kind,
+    (providerId) =>
+      connectedByProvider.get(providerId)?.connections.some((connection) => connection.is_active) ??
+      false,
+  );
 
   const activeConnectionCount = (providerId: string) =>
-    connectedByProvider()
-      .get(providerId)
-      ?.connections.filter((connection) => connection.is_active).length ?? 0;
+    connectedByProvider.get(providerId)?.connections.filter((connection) => connection.is_active)
+      .length ?? 0;
 
-  const totalApiCost = createMemo(() =>
-    connectedSummaries().reduce((sum, summary) => sum + summary.consumption_cost, 0),
+  const totalApiCost = connectedSummaries.reduce(
+    (sum, summary) => sum + summary.consumption_cost,
+    0,
   );
 
   // Attempt-world totals for the header cards: summed over THIS page's rows
   // (provider + auth_type grain), so the Subscriptions page never blends an
   // api_key connection's failures into its numbers, and vice versa.
-  const totalAttempts = createMemo(() =>
-    connectedSummaries().reduce((sum, s) => sum + s.attempts_30d, 0),
-  );
-  const totalAttemptsSucceeded = createMemo(() =>
-    connectedSummaries().reduce((sum, s) => sum + s.succeeded_30d, 0),
-  );
+  const totalAttempts = connectedSummaries.reduce((sum, s) => sum + s.attempts_30d, 0);
+  const totalAttemptsSucceeded = connectedSummaries.reduce((sum, s) => sum + s.succeeded_30d, 0);
 
   const connectionDenominator = (summary: TenantProviderSummary) =>
     Math.max(
@@ -464,7 +371,7 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
   const usageForConnection = (
     summary: TenantProviderSummary,
     connection: { label?: string | null },
-  ) => connectionUsage(usage(), summary.provider, summary.auth_type, connection.label);
+  ) => connectionUsage(usage.data, summary.provider, summary.auth_type, connection.label);
 
   const perConnectionTokens = (
     summary: TenantProviderSummary,
@@ -487,12 +394,61 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
     usageForConnection(summary, connection)?.last_used_at ??
     (summary.connections.length === 1 ? summary.last_used_at : null);
 
-  const showMetricCard = () =>
-    !!copy().metricLabel && (connectedRows().length > 0 || totalApiCost() > 0);
+  const showMetricCard = !!copy.metricLabel && (connectedRows.length > 0 || totalApiCost > 0);
 
   const activeLabel = (count: number) => {
-    if (props.kind === 'local') return t('providers.connected');
-    return copy().activeLabel(count);
+    if (kind === 'local') return t('providers.connected');
+    return copy.activeLabel(count);
+  };
+
+  const startRename = (connectionId: string, currentLabel: string, e: SyntheticEvent) => {
+    e.stopPropagation();
+    setRenamingId(connectionId);
+    setRenameValue(currentLabel);
+    setRenameError('');
+  };
+
+  const cancelRename = (e?: SyntheticEvent) => {
+    e?.stopPropagation();
+    setRenamingId(null);
+    setRenameError('');
+  };
+
+  const submitRename = async (
+    provider: string,
+    currentLabel: string,
+    authType: string,
+    e?: SyntheticEvent,
+  ) => {
+    e?.stopPropagation();
+    const newLabel = renameValue.trim();
+    if (!newLabel) {
+      setRenameError(t('providers.nameEmpty'));
+      return;
+    }
+    if (newLabel === currentLabel) {
+      cancelRename();
+      return;
+    }
+    if (!firstAgentName) return;
+    setRenameBusy(true);
+    setRenameError('');
+    try {
+      await renameProviderKey(
+        firstAgentName,
+        provider,
+        currentLabel,
+        newLabel,
+        authType as AuthType,
+      );
+      toast.success(t('providers.connectionRenamed'));
+      setRenamingId(null);
+      void refetchGlobalProviders();
+    } catch (err: unknown) {
+      setRenameError((err as { message?: string })?.message ?? t('providers.renameFailed'));
+    } finally {
+      setRenameBusy(false);
+    }
   };
 
   const openModal = (providerId?: string) => {
@@ -500,32 +456,34 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
     // Deep-link with the page's auth type so the connection form opens in the
     // matching mode (e.g. the Subscriptions page opens the OAuth/subscription
     // flow rather than the API-key form for providers that support both).
-    setDeepLink(providerId ? { providerId, authType: copy().authType } : null);
-    void refetchModalProviders();
+    setDeepLink(providerId ? { providerId, authType: copy.authType } : null);
+    void modalProviders.reload();
     setShowModal(true);
   };
 
   // Deep-link support: visiting a provider page with ?add=true auto-opens the
   // connect modal so onboarding surfaces can route a user straight into adding
   // a provider. React on every navigation (not just initial mount) and clear the
-  // param (replace) so a refresh or back-nav doesn't re-trigger it. Runs in an
-  // effect — never the render body — so the param write/modal open stay reactive
-  // side effects rather than firing during render.
-  createEffect(() => {
-    if (searchParams.add === 'true') {
-      setSearchParams({ add: undefined }, { replace: true });
-      openModal();
-    }
-  });
-
-  const openCustomProvider = () => {
-    setShowCustomModal(true);
-  };
+  // param (replace) so a refresh or back-nav doesn't re-trigger it.
+  const addParam = searchParams.get('add');
+  useEffect(() => {
+    if (addParam !== 'true') return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('add');
+        return next;
+      },
+      { replace: true },
+    );
+    openModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addParam]);
 
   const handleCustomModalClose = () => {
     setShowCustomModal(false);
     void refetchGlobalProviders();
-    void refetchCustomProviders();
+    void customProviders.reload();
   };
 
   const handleModalClose = () => {
@@ -537,393 +495,359 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
 
   const handleModalUpdate = async () => {
     await Promise.all([
-      refetchModalProviders(),
+      modalProviders.reload(),
       refetchGlobalProviders(),
-      refetchCustomProviders(),
+      customProviders.reload(),
     ]);
   };
 
+  const goToConnection = (id: string) => navigate(`/providers/connections/${id}`);
+
+  const connectButton = (providerId: string) =>
+    canManage ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="whitespace-nowrap"
+        disabled={!firstAgentName}
+        onClick={() => openModal(providerId)}
+      >
+        {copy.addLabel}
+      </Button>
+    ) : null;
+
   return (
-    <div class="container--lg">
-      <Title>{copy().title}</Title>
-      <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
+    <div className="page wide">
+      <title>{copy.title}</title>
+      <div className="page-head">
         <div>
-          <h1 class="page-header__title">{copy().heading}</h1>
-          <p class="page-header__subtitle">{copy().subtitle}</p>
+          <h1>{copy.heading}</h1>
+          <p className="sub">{copy.subtitle}</p>
         </div>
-        <Show when={copy().customAddLabel && roleCan.manageProviders()}>
-          <button
-            class="btn btn--outline btn--sm"
-            onClick={() => openCustomProvider()}
-            style="display: inline-flex; align-items: center; gap: 6px;"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="M7 11h10c.37 0 .72-.21.89-.54s.14-.73-.08-1.04l-5-7c-.38-.53-1.25-.53-1.63 0l-5 7A.997.997 0 0 0 6.99 11Zm5-6.28L15.06 9H8.95l3.06-4.28ZM17.5 13c-2.48 0-4.5 2.02-4.5 4.5s2.02 4.5 4.5 4.5 4.5-2.02 4.5-4.5-2.02-4.5-4.5-4.5m0 7a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5M3 22h7c.55 0 1-.45 1-1v-7c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v7c0 .55.45 1 1 1m1-7h5v5H4z" />
-            </svg>
-            {copy().customAddLabel}
-          </button>
-        </Show>
+        {copy.customAddLabel && canManage ? (
+          <div className="page-actions">
+            <Button variant="ghost" size="sm" onClick={() => setShowCustomModal(true)}>
+              <Shapes size={14} aria-hidden="true" />
+              {copy.customAddLabel}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      <Show when={connectedRows().length > 0}>
-        <div
-          class="overview-stats"
-          classList={{ 'overview-stats--3': !showMetricCard() }}
-          style="margin-bottom: 24px;"
-        >
-          <Show when={showMetricCard()}>
-            <div class="overview-stat-card">
-              <span class="overview-stat-card__label">{copy().metricLabel}</span>
-              <div class="overview-stat-card__value-row">
-                <Show when={!usageLoading()} fallback={<UsageShimmer width={72} />}>
-                  <span class="overview-stat-card__value">
-                    {formatCost(totalApiCost()) ?? '$0.00'}
-                  </span>
-                </Show>
+      {connectedRows.length > 0 ? (
+        <>
+          <div className="stat-tiles mb-6">
+            {showMetricCard ? (
+              <div className="stat-tile">
+                <div className="stat-label">{copy.metricLabel}</div>
+                <div className="stat-value">
+                  {usageLoading ? (
+                    <UsageShimmer width={72} />
+                  ) : (
+                    (formatCost(totalApiCost) ?? '$0.00')
+                  )}
+                </div>
+              </div>
+            ) : null}
+            <div className="stat-tile">
+              <div className="stat-label inline-flex items-center gap-1">
+                {t('providers.totalAttempts30d')}
+                <InfoTooltip text={t('ui.analytics.totalAttempts')} />
+              </div>
+              <div className="stat-value">{formatNumber(totalAttempts)}</div>
+            </div>
+            <div className="stat-tile">
+              <div className="stat-label inline-flex items-center gap-1">
+                {t('providers.successRate30d')}
+                <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
+              </div>
+              <div className="stat-value">
+                {formatRate(
+                  attemptSuccessRate({
+                    attempts: totalAttempts,
+                    succeeded: totalAttemptsSucceeded,
+                  }),
+                )}
               </div>
             </div>
-          </Show>
-          <div class="overview-stat-card">
-            <span class="overview-stat-card__label">
-              {t('providers.totalAttempts30d')}
-              <InfoTooltip text={t('ui.analytics.totalAttempts')} />
-            </span>
-            <div class="overview-stat-card__value-row">
-              <span class="overview-stat-card__value">{formatNumber(totalAttempts())}</span>
-            </div>
           </div>
-          <div class="overview-stat-card">
-            <span class="overview-stat-card__label">
-              {t('providers.successRate30d')}
-              <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
-            </span>
-            <div class="overview-stat-card__value-row">
-              <span class="overview-stat-card__value">
-                {(() => {
-                  const rate = attemptSuccessRate({
-                    attempts: totalAttempts(),
-                    succeeded: totalAttemptsSucceeded(),
-                  });
-                  return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
-                })()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Show>
 
-      <Show when={connectedRows().length > 0}>
-        <h3 style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 12px;">
-          {copy().connectedHeading}
-        </h3>
-        <div
-          class="panel connections-panel"
-          classList={{ 'connections-panel--collapsed': connectionsCollapsed() }}
-          style="padding: 0; margin-bottom: 24px;"
-        >
-          <div class="connections-panel__viewport">
-            <div
-              class="connections-panel__body"
-              id="connected-connections"
-              ref={connectionsScroller}
-              onScroll={toggleScrollFade}
-            >
-              <table class="data-table" style="width: 100%;">
-                <thead>
-                  <tr>
-                    <th>{t('providers.page.colProvider')}</th>
-                    <th>{t('providers.page.colConnection')}</th>
-                    <th>{t('providers.page.colStatus')}</th>
-                    <th>{t('providers.page.colUsage30d')}</th>
-                    <Show when={copy().rowMetricHeading}>
-                      <th>{copy().rowMetricHeading}</th>
-                    </Show>
-                    <th class="rel-col">
-                      {t('providers.totalAttempts30d')}
-                      <InfoTooltip text={t('ui.analytics.totalAttempts')} />
-                    </th>
-                    <th class="rel-col">
-                      {t('providers.successRate30d')}
-                      <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
-                    </th>
-                    <th>{t('providers.lastUsed')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={connectedRows()}>
-                    {(row) => (
-                      <tr
-                        style="cursor: pointer;"
-                        onClick={() => navigate(`/providers/connections/${row.connection.id}`)}
-                        onKeyDown={(event) => {
-                          if (event.target !== event.currentTarget) return;
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            navigate(`/providers/connections/${row.connection.id}`);
-                          }
-                        }}
-                        tabindex="0"
-                      >
-                        <td>
-                          <span style="display: flex; align-items: center; gap: 10px;">
-                            <ProviderMark providerId={row.summary.provider} name={row.name} />
-                            <span style="font-weight: 500;">{row.name}</span>
-                            <Show when={row.summary.provider.startsWith('custom:')}>
-                              <span style="display: inline-flex; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid hsl(var(--border)); font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                                {t('providers.custom')}
-                              </span>
-                            </Show>
-                          </span>
-                        </td>
-                        <td
-                          style="color: hsl(var(--muted-foreground));"
-                          onClick={(e) => e.stopPropagation()}
+          <h2 className="mb-3 text-sm font-semibold text-ink">{copy.connectedHeading}</h2>
+          <div
+            className={cx(
+              'connections-panel panel mb-6 overflow-hidden',
+              connectionsCollapsed && 'connections-panel--collapsed',
+            )}
+          >
+            <div className="connections-panel__viewport group relative">
+              <div
+                className={cx(
+                  'connections-panel__body overflow-x-auto',
+                  connectionsCollapsed &&
+                    'max-h-[340px] overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-elev',
+                )}
+                id="connected-connections"
+                ref={connectionsScroller}
+                onScroll={toggleScrollFade}
+              >
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>{t('providers.page.colProvider')}</th>
+                      <th>{t('providers.page.colConnection')}</th>
+                      <th>{t('providers.page.colStatus')}</th>
+                      <th>{t('providers.page.colUsage30d')}</th>
+                      {copy.rowMetricHeading ? <th>{copy.rowMetricHeading}</th> : null}
+                      <th>
+                        <span className="inline-flex items-center gap-1">
+                          {t('providers.totalAttempts30d')}
+                          <InfoTooltip text={t('ui.analytics.totalAttempts')} />
+                        </span>
+                      </th>
+                      <th>
+                        <span className="inline-flex items-center gap-1">
+                          {t('providers.successRate30d')}
+                          <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
+                        </span>
+                      </th>
+                      <th>{t('providers.lastUsed')}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {connectedRows.map((row) => {
+                      const u = usageForConnection(row.summary, row.connection);
+                      const spark = u?.sparkline_7d ?? row.summary.sparkline_7d;
+                      const lastUsed = connectionLastUsedAt(row.summary, row.connection);
+                      const authType = row.summary.auth_type ?? copy.authType;
+                      return (
+                        <tr
+                          key={row.connection.id}
+                          className="group/row cursor-pointer"
+                          tabIndex={0}
+                          onClick={() => goToConnection(row.connection.id)}
+                          onKeyDown={(event: KeyboardEvent<HTMLTableRowElement>) => {
+                            if (event.target !== event.currentTarget) return;
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              goToConnection(row.connection.id);
+                            }
+                          }}
                         >
-                          <Show
-                            when={renamingId() === row.connection.id}
-                            fallback={
-                              <span
-                                style="display: inline-flex; align-items: center; gap: 6px; cursor: default;"
-                                class="connection-label-cell"
-                              >
+                          <td>
+                            <span className="flex items-center gap-2.5">
+                              <ProviderMark providerId={row.summary.provider} name={row.name} />
+                              <span className="row-title">{row.name}</span>
+                              {row.summary.provider.startsWith('custom:') ? (
+                                <Badge tone="outline">{t('providers.custom')}</Badge>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td className="text-muted" onClick={(e) => e.stopPropagation()}>
+                            {renamingId === row.connection.id ? (
+                              <>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    className="field h-7 w-32"
+                                    aria-invalid={renameError ? true : undefined}
+                                    value={renameValue}
+                                    autoFocus
+                                    onChange={(e) => {
+                                      setRenameValue(e.currentTarget.value);
+                                      setRenameError('');
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter')
+                                        void submitRename(
+                                          row.summary.provider,
+                                          row.connection.label,
+                                          authType,
+                                          e,
+                                        );
+                                      if (e.key === 'Escape') cancelRename(e);
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    disabled={renameBusy}
+                                    onClick={(e) =>
+                                      void submitRename(
+                                        row.summary.provider,
+                                        row.connection.label,
+                                        authType,
+                                        e,
+                                      )
+                                    }
+                                  >
+                                    {t('common.save')}
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={cancelRename}>
+                                    {t('common.cancel')}
+                                  </Button>
+                                </div>
+                                {renameError ? (
+                                  <div className="mt-0.5 text-xs text-danger">{renameError}</div>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="inline-flex cursor-default items-center gap-1.5">
                                 {row.connection.label}
-                                <Show when={roleCan.manageProviders()}>
+                                {canManage ? (
                                   <button
                                     type="button"
-                                    class="connection-label-cell__edit"
+                                    className="inline-flex cursor-pointer items-center rounded-control border-0 bg-transparent p-0.5 text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-ink focus-visible:opacity-100"
                                     onClick={(e) =>
                                       startRename(row.connection.id, row.connection.label, e)
                                     }
                                     aria-label={t('providers.page.renameAria', {
                                       label: row.connection.label,
                                     })}
-                                    style="background: none; border: none; cursor: pointer; padding: 2px; color: hsl(var(--muted-foreground)); opacity: 0; transition: opacity 0.15s; display: inline-flex; align-items: center; line-height: 1;"
                                   >
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                    >
-                                      <path d="M5 21h14c1.1 0 2-.9 2-2v-7h-2v7H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2" />
-                                      <path d="M7 13v3c0 .55.45 1 1 1h3c.27 0 .52-.11.71-.29l9-9a.996.996 0 0 0 0-1.41l-3-3a.996.996 0 0 0-1.41 0l-9.01 8.99A1 1 0 0 0 7 13m10-7.59L18.59 7 17.5 8.09 15.91 6.5zm-8 8 5.5-5.5 1.59 1.59-5.5 5.5H9z" />
-                                    </svg>
+                                    <Pencil size={13} aria-hidden="true" />
                                   </button>
-                                </Show>
+                                ) : null}
                               </span>
-                            }
-                          >
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                              <input
-                                type="text"
-                                class={`provider-detail__input${renameError() ? ' provider-detail__input--error' : ''}`}
-                                value={renameValue()}
-                                onInput={(e) => {
-                                  setRenameValue(e.currentTarget.value);
-                                  setRenameError('');
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter')
-                                    submitRename(
-                                      row.summary.provider,
-                                      row.connection.label,
-                                      row.summary.auth_type ?? copy().authType,
-                                      e,
-                                    );
-                                  if (e.key === 'Escape') cancelRename(e);
-                                }}
-                                style="width: 120px;"
-                                ref={(el) => requestAnimationFrame(() => el.focus())}
-                              />
-                              <button
-                                class="btn btn--primary btn--sm"
-                                style="font-size: var(--font-size-xs); padding: 4px 10px;"
-                                disabled={renameBusy()}
-                                onClick={(e) =>
-                                  submitRename(
-                                    row.summary.provider,
-                                    row.connection.label,
-                                    row.summary.auth_type ?? copy().authType,
-                                    e,
-                                  )
-                                }
-                              >
-                                {t('common.save')}
-                              </button>
-                              <button
-                                class="btn btn--outline btn--sm"
-                                style="font-size: var(--font-size-xs); padding: 4px 10px;"
-                                onClick={cancelRename}
-                              >
-                                {t('common.cancel')}
-                              </button>
-                            </div>
-                            <Show when={renameError()}>
-                              <div style="color: hsl(var(--destructive)); font-size: var(--font-size-xs); margin-top: 2px;">
-                                {renameError()}
-                              </div>
-                            </Show>
-                          </Show>
-                        </td>
-                        <td>
-                          <StatusBadge active={row.connection.is_active} />
-                        </td>
-                        <td>
-                          <Show when={!usageLoading()} fallback={<UsageShimmer width={96} />}>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                              {(() => {
-                                const u = usageForConnection(row.summary, row.connection);
-                                const spark = u?.sparkline_7d ?? row.summary.sparkline_7d;
-                                return (
-                                  <>
-                                    <Show when={spark?.length}>
-                                      <span style="flex-shrink: 0;">
-                                        <Sparkline data={spark} width={60} height={20} />
-                                      </span>
-                                    </Show>
-                                    <span>
-                                      {formatNumber(
-                                        perConnectionTokens(row.summary, row.connection),
-                                      )}{' '}
-                                      {t('providers.page.tokensSuffix')}
-                                    </span>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </Show>
-                        </td>
-                        <Show when={copy().rowMetricHeading}>
-                          <td>
-                            <Show when={!usageLoading()} fallback={<UsageShimmer />}>
-                              {formatCost(perConnectionCost(row.summary, row.connection)) ??
-                                '$0.00'}
-                            </Show>
-                          </td>
-                        </Show>
-                        {/* Attempt reliability at the row's own grain (provider +
-                        auth_type): a subscription row never shows a rate
-                        blended with the provider's api_key traffic. */}
-                        <td class="rel-col">
-                          <Show when={!usageLoading()} fallback={<UsageShimmer width={48} />}>
-                            {formatNumber(
-                              usageForConnection(row.summary, row.connection)?.attempts_30d ??
-                                row.summary.attempts_30d,
                             )}
-                          </Show>
-                        </td>
-                        <td class="rel-col">
-                          <Show when={!usageLoading()} fallback={<UsageShimmer width={48} />}>
-                            {(() => {
-                              const u = usageForConnection(row.summary, row.connection);
-                              const rate = attemptSuccessRate({
-                                attempts: u?.attempts_30d ?? row.summary.attempts_30d,
-                                succeeded: u?.succeeded_30d ?? row.summary.succeeded_30d,
-                              });
-                              return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
-                            })()}
-                          </Show>
-                        </td>
-                        <td style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                          <Show when={!usageLoading()} fallback={<UsageShimmer width={48} />}>
-                            {connectionLastUsedAt(row.summary, row.connection)
-                              ? formatTimeAgo(connectionLastUsedAt(row.summary, row.connection)!)
-                              : '-'}
-                          </Show>
-                        </td>
-                        <td style="text-align: right;">
-                          <button
-                            class="btn btn--outline btn--sm"
-                            style="font-size: var(--font-size-xs); white-space: nowrap;"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              navigate(`/providers/connections/${row.connection.id}`);
-                            }}
-                          >
-                            {t('providers.page.viewDetails')}
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
+                          </td>
+                          <td>
+                            <StatusBadge active={row.connection.is_active} />
+                          </td>
+                          <td>
+                            {usageLoading ? (
+                              <UsageShimmer width={96} />
+                            ) : (
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                {spark?.length ? (
+                                  <span className="shrink-0">
+                                    <Sparkline data={spark} width={60} height={20} />
+                                  </span>
+                                ) : null}
+                                <span>
+                                  {formatNumber(perConnectionTokens(row.summary, row.connection))}{' '}
+                                  {t('providers.page.tokensSuffix')}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          {copy.rowMetricHeading ? (
+                            <td className="num">
+                              {usageLoading ? (
+                                <UsageShimmer />
+                              ) : (
+                                (formatCost(perConnectionCost(row.summary, row.connection)) ??
+                                '$0.00')
+                              )}
+                            </td>
+                          ) : null}
+                          {/* Attempt reliability at the row's own grain (provider +
+                          auth_type): a subscription row never shows a rate
+                          blended with the provider's api_key traffic. */}
+                          <td className="num">
+                            {usageLoading ? (
+                              <UsageShimmer width={48} />
+                            ) : (
+                              formatNumber(u?.attempts_30d ?? row.summary.attempts_30d)
+                            )}
+                          </td>
+                          <td className="num">
+                            {usageLoading ? (
+                              <UsageShimmer width={48} />
+                            ) : (
+                              formatRate(
+                                attemptSuccessRate({
+                                  attempts: u?.attempts_30d ?? row.summary.attempts_30d,
+                                  succeeded: u?.succeeded_30d ?? row.summary.succeeded_30d,
+                                }),
+                              )
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap text-xs text-muted">
+                            {usageLoading ? (
+                              <UsageShimmer width={48} />
+                            ) : lastUsed ? (
+                              formatTimeAgo(lastUsed)
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="row-actions">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="whitespace-nowrap"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                goToConnection(row.connection.id);
+                              }}
+                            >
+                              {t('providers.page.viewDetails')}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {connectionsCollapsed ? (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-elev to-transparent group-[.scroll-panel--at-bottom]:hidden"
+                />
+              ) : null}
             </div>
+            {connectionsCollapsible ? (
+              <button
+                type="button"
+                className="connections-panel__toggle flex w-full cursor-pointer items-center justify-center gap-1.5 border-0 border-t border-solid border-line bg-transparent px-3 py-2 text-xs font-medium text-muted hover:bg-s2 hover:text-ink"
+                aria-expanded={connectionsExpanded}
+                aria-controls="connected-connections"
+                onClick={toggleConnections}
+              >
+                {connectionsExpanded
+                  ? t('common.showLess')
+                  : t('providers.page.showAll', { count: connectedRows.length })}
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  className={cx('transition-transform', connectionsExpanded && 'rotate-180')}
+                />
+              </button>
+            ) : null}
           </div>
-          <Show when={connectionsCollapsible()}>
-            <button
-              type="button"
-              class="connections-panel__toggle"
-              aria-expanded={connectionsExpanded()}
-              aria-controls="connected-connections"
-              onClick={toggleConnections}
-            >
-              <Show
-                when={connectionsExpanded()}
-                fallback={t('providers.page.showAll', { count: connectedRows().length })}
-              >
-                {t('common.showLess')}
-              </Show>
-              <svg
-                class="connections-panel__chevron"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-          </Show>
-        </div>
-      </Show>
+        </>
+      ) : null}
 
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
-        <h3 style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin: 0;">
-          {copy().supportedHeading}
-        </h3>
-        <div class="panel__tabs" role="tablist" style="height: 30px;">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="m-0 text-sm font-semibold text-ink">{copy.supportedHeading}</h2>
+        <div className="segmented" role="tablist">
           <button
+            type="button"
             role="tab"
-            aria-selected={viewMode() === 'grid'}
-            class="panel__tab"
-            classList={{ 'panel__tab--active': viewMode() === 'grid' }}
-            onClick={() => setViewMode('grid')}
+            aria-selected={viewMode === 'grid'}
             aria-label={t('providers.page.gridView')}
-            style="padding: 0 8px;"
+            className="inline-flex items-center"
+            onClick={() => setViewMode('grid')}
           >
-            <GridIcon />
+            <LayoutGrid size={14} aria-hidden="true" />
           </button>
           <button
+            type="button"
             role="tab"
-            aria-selected={viewMode() === 'list'}
-            class="panel__tab"
-            classList={{ 'panel__tab--active': viewMode() === 'list' }}
-            onClick={() => setViewMode('list')}
+            aria-selected={viewMode === 'list'}
             aria-label={t('providers.page.listView')}
-            style="padding: 0 8px;"
+            className="inline-flex items-center"
+            onClick={() => setViewMode('list')}
           >
-            <ListIcon />
+            <List size={14} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      <Show when={viewMode() === 'list'}>
-        <div class="panel" style="padding: 0; overflow-x: auto;">
-          <table class="data-table" style="width: 100%;">
+      {viewMode === 'list' ? (
+        <div className="table-wrap">
+          <table className="data">
             <thead>
               <tr>
                 <th>{t('providers.page.colProvider')}</th>
@@ -931,145 +855,79 @@ const ProviderConnectionsPage: Component<ProviderConnectionsPageProps> = (props)
               </tr>
             </thead>
             <tbody>
-              <For each={catalogProviders()}>
-                {(provider) => {
-                  const activeCount = () => activeConnectionCount(provider.id);
-                  return (
-                    <tr>
-                      <td>
-                        <span style="display: flex; align-items: center; gap: 10px;">
-                          <ProviderMark providerId={provider.id} name={provider.name} />
-                          <span style="font-weight: 500;">{provider.name}</span>
-                        </span>
-                      </td>
-                      <td style="text-align: right;">
-                        <span style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px;">
-                          <Show when={activeCount() > 0}>
-                            <span style="color: hsl(var(--success)); font-size: var(--font-size-xs); font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
-                              <svg
-                                width="8"
-                                height="8"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path d="M12 5a7 7 0 1 0 0 14 7 7 0 1 0 0-14" />
-                              </svg>
-                              {activeLabel(activeCount())}
-                            </span>
-                          </Show>
-                          <Show when={roleCan.manageProviders()}>
-                            <button
-                              class="btn btn--outline btn--sm"
-                              disabled={!firstAgentName()}
-                              style="white-space: nowrap;"
-                              onClick={() => openModal(provider.id)}
-                            >
-                              {copy().addLabel}
-                            </button>
-                          </Show>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                }}
-              </For>
+              {catalogProviders.map((provider) => {
+                const activeCount = activeConnectionCount(provider.id);
+                return (
+                  <tr key={provider.id}>
+                    <td>
+                      <span className="flex items-center gap-2.5">
+                        <ProviderMark providerId={provider.id} name={provider.name} />
+                        <span className="row-title">{provider.name}</span>
+                      </span>
+                    </td>
+                    <td className="row-actions">
+                      <span className="inline-flex items-center justify-end gap-2">
+                        {activeCount > 0 ? (
+                          <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
+                        ) : null}
+                        {connectButton(provider.id)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </Show>
-
-      <Show when={viewMode() === 'grid'}>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-          <For each={catalogProviders()}>
-            {(provider) => {
-              const activeCount = () => activeConnectionCount(provider.id);
-              return (
-                <div
-                  class="panel"
-                  style="padding: 16px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 0;"
-                >
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                      <ProviderMark providerId={provider.id} name={provider.name} size={24} />
-                      <span style="font-weight: 600; font-size: var(--font-size-sm); color: hsl(var(--foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        {provider.name}
-                      </span>
-                    </div>
-                  </div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                    <Show when={activeCount() > 0} fallback={<span />}>
-                      <span style="color: hsl(var(--success)); font-size: var(--font-size-xs); font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
-                        <svg
-                          width="8"
-                          height="8"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path d="M12 5a7 7 0 1 0 0 14 7 7 0 1 0 0-14" />
-                        </svg>
-                        {activeLabel(activeCount())}
-                      </span>
-                    </Show>
-                    <Show when={roleCan.manageProviders()}>
-                      <button
-                        class="btn btn--outline btn--sm"
-                        disabled={!firstAgentName()}
-                        style="font-size: var(--font-size-xs); white-space: nowrap;"
-                        onClick={() => openModal(provider.id)}
-                      >
-                        {copy().addLabel}
-                      </button>
-                    </Show>
-                  </div>
+      ) : (
+        <div className="card-grid">
+          {catalogProviders.map((provider) => {
+            const activeCount = activeConnectionCount(provider.id);
+            return (
+              <div key={provider.id} className="card flex flex-col gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <ProviderMark providerId={provider.id} name={provider.name} size={24} />
+                  <span className="truncate text-sm font-semibold text-ink">{provider.name}</span>
                 </div>
-              );
-            }}
-          </For>
+                <div className="flex items-center justify-between gap-3">
+                  {activeCount > 0 ? (
+                    <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
+                  ) : (
+                    <span />
+                  )}
+                  {connectButton(provider.id)}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </Show>
+      )}
 
-      <Show when={showModal() && firstAgentName()}>
+      {showModal && firstAgentName ? (
         <ProviderSelectModal
-          agentName={firstAgentName()}
-          providers={modalProviders() ?? []}
-          customProviders={customProviders() ?? []}
-          customProviderPrefill={customProviderPrefill()}
-          providerDeepLink={deepLink()}
-          initialTab={copy().authType}
+          agentName={firstAgentName}
+          providers={modalProviders.data ?? []}
+          customProviders={customProviders.data ?? []}
+          customProviderPrefill={customProviderPrefill}
+          providerDeepLink={deepLink}
+          initialTab={copy.authType}
           onUpdate={handleModalUpdate}
           onClose={handleModalClose}
         />
-      </Show>
+      ) : null}
 
-      <Show when={showCustomModal() && firstAgentName()}>
-        <div
-          class="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleCustomModalClose();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') handleCustomModalClose();
-          }}
-        >
-          <div
-            class="modal-card routing-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('providers.page.addCustomProvider')}
-            style="max-width: 600px; max-height: 85vh; overflow-y: auto;"
-          >
-            <CustomProviderForm
-              agentName={firstAgentName()}
-              onCreated={handleCustomModalClose}
-              onBack={() => handleCustomModalClose()}
-            />
-          </div>
-        </div>
-      </Show>
+      <Modal
+        open={showCustomModal && !!firstAgentName}
+        onClose={handleCustomModalClose}
+        label={t('providers.page.addCustomProvider')}
+        wide
+      >
+        <CustomProviderForm
+          agentName={firstAgentName}
+          onCreated={handleCustomModalClose}
+          onBack={handleCustomModalClose}
+        />
+      </Modal>
     </div>
   );
-};
-
-export default ProviderConnectionsPage;
+}

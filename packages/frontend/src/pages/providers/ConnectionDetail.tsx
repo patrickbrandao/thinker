@@ -1,16 +1,5 @@
-import { Title } from '@solidjs/meta';
-import { toggleScrollFade } from '../../services/scroll-fade.js';
-import { A, useNavigate, useParams } from '@solidjs/router';
-import {
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-  type Component,
-} from 'solid-js';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   getConnectionDetail,
   getProviderAnalytics,
@@ -55,12 +44,19 @@ import {
   streamWarmupError,
 } from '../../services/stream-warmup.js';
 import { roleCan } from '../../services/session-store.js';
-import '../../styles/charts.css';
-import '../../styles/analytics-overview.css';
-import '../../styles/connection-detail.css';
 import { getModelDisplayName } from '../../services/model-display.js';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
-import '../../styles/routing.css';
+import { useResource } from '../../lib/use-resource.js';
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  EmptyState,
+  Modal,
+  Panel,
+  Skel,
+  cx,
+} from '../../components/ui.js';
 
 const AUTH_TYPE_KIND: Record<string, string> = {
   subscription: 'subscriptions',
@@ -124,268 +120,245 @@ interface AnalyticsResponse {
   attempts: { total: number; successful: number; success_rate: number };
 }
 
+type GroupBy = 'status' | 'http' | 'harness';
+type Series = { agents: string[]; timeseries: Array<Record<string, number | string>> };
+
 const CD_RANGES = ['24h', '7d', '30d', '90d', '365d'] as const;
 const cdRangeOptions = () =>
   CD_RANGES.map((value) => ({ label: t(`providers.detail.range.${value}`), value }));
 
-const ConnectionDetail: Component = () => {
-  const params = useParams<{ connectionId: string }>();
+const readStorage = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writeStorage = (key: string, value: string) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+};
+
+const backLinkFor = (authType: string | undefined) =>
+  BACK_LINKS[authType ?? 'subscription'] ?? '/providers/subscriptions';
+const backLabelFor = (authType: string | undefined) => {
+  const kind = AUTH_TYPE_KIND[authType ?? 'subscription'];
+  return (kind && tMaybe(`providers.kind.${kind}`)) ?? t('providers.kind.providers');
+};
+
+const formatRate = (rate: number | null) => (rate == null ? '—' : `${(rate * 100).toFixed(1)}%`);
+
+/** Thin share bar + percentage used by the models and harnesses tables. */
+function ShareBar({ pct }: { pct: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-15 overflow-hidden rounded-full bg-s3">
+        <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-muted">{pct}%</span>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  extra,
+  title,
+  onClick,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  extra?: ReactNode;
+  title?: string;
+  onClick?: () => void;
+}) {
+  const body = (
+    <>
+      <span className="stat-label flex items-center gap-1">{label}</span>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="stat-value">{value}</span>
+        {extra}
+      </div>
+    </>
+  );
+  return onClick ? (
+    <button
+      type="button"
+      className="stat-tile cursor-pointer text-left hover:border-line-strong"
+      title={title}
+      onClick={onClick}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="stat-tile">{body}</div>
+  );
+}
+
+const ConnectionDetail = () => {
+  const { connectionId = '' } = useParams<{ connectionId: string }>();
   const navigate = useNavigate();
-  const [detail, { refetch: refetchDetail }] = createResource(
-    () => params.connectionId,
-    (id) => getConnectionDetail(id) as Promise<DetailResponse>,
+  const detail = useResource(
+    () => getConnectionDetail(connectionId) as Promise<DetailResponse>,
+    [connectionId],
   );
 
-  const conn = () => (detail.error ? null : (detail()?.connection ?? null));
-  const provDef = () => PROVIDERS.find((p) => p.id === conn()?.provider);
-  const isCustomProvider = () => conn()?.provider?.startsWith('custom:') ?? false;
+  const conn = detail.error ? null : (detail.data?.connection ?? null);
+  const provDef = PROVIDERS.find((p) => p.id === conn?.provider);
+  const isCustomProvider = conn?.provider?.startsWith('custom:') ?? false;
+  const authType = conn?.auth_type;
+  const provider = conn?.provider;
+  const label = conn?.label;
+
+  // Only the custom-provider edit form still goes through agent-scoped routes.
+  const agents = useResource(async () => {
+    try {
+      const res = await getAgents();
+      return ((res as any)?.agents ?? res ?? []) as Array<{ agent_name: string }>;
+    } catch {
+      return [] as Array<{ agent_name: string }>;
+    }
+  }, []);
+  const firstAgentName = (agents.data ?? [])[0]?.agent_name ?? '';
 
   // Fetch custom provider name for custom: providers
-  const [customProviderData] = createResource(
-    () => {
-      const c = conn();
-      if (!c || !c.provider.startsWith('custom:')) return null;
-      const agentName = (agents() ?? [])[0]?.agent_name;
-      return agentName ? { agentName, providerId: c.provider.replace('custom:', '') } : null;
-    },
-    async (p) => {
-      if (!p) return null;
+  const customProvider = useResource(
+    async () => {
       try {
-        const list = await fetchCustomProviders(p.agentName);
-        return (list as any[])?.find((cp: any) => cp.id === p.providerId) ?? null;
+        const list = await fetchCustomProviders(firstAgentName);
+        const providerId = (provider ?? '').replace('custom:', '');
+        return (list as any[])?.find((cp: any) => cp.id === providerId) ?? null;
       } catch {
         return null;
       }
     },
+    [provider, firstAgentName],
+    { enabled: isCustomProvider && !!firstAgentName },
   );
+  const customProviderData = isCustomProvider ? (customProvider.data ?? null) : null;
 
-  const providerDisplayName = () => {
-    if (provDef()) return provDef()!.name;
-    const cp = customProviderData();
-    if (cp) return cp.name;
-    return conn()?.provider ?? '';
-  };
+  const providerDisplayName = provDef
+    ? provDef.name
+    : customProviderData
+      ? (customProviderData.name as string)
+      : (provider ?? '');
 
-  // Deep links into the Requests log, scoped to THIS connection and the
-  // card's current window, so the list matches what the card counted.
-  const requestsLink = (extra: string) =>
-    `/messages?connections=${encodeURIComponent(params.connectionId)}&range=${chartRange()}${extra}`;
-  const viewMore = () => <span class="view-more-link">{t('providers.detail.viewMore')}</span>;
+  const backLink = backLinkFor(authType);
+  const backLabel = backLabelFor(authType);
 
-  const backLink = () =>
-    BACK_LINKS[conn()?.auth_type ?? 'subscription'] ?? '/providers/subscriptions';
-  const backLabel = () => {
-    const kind = AUTH_TYPE_KIND[conn()?.auth_type ?? 'subscription'];
-    return (kind && tMaybe(`providers.kind.${kind}`)) ?? t('providers.kind.providers');
-  };
-
-  // Set breadcrumb for Header
-  createEffect(() => {
-    const c = conn();
-    if (c) {
-      setConnectionBreadcrumb(providerDisplayName(), backLink(), backLabel, c.provider, c.label);
+  // Set breadcrumb for the topbar; cleared when the page unmounts.
+  useEffect(() => {
+    if (conn) {
+      setConnectionBreadcrumb(
+        providerDisplayName,
+        backLinkFor(conn.auth_type),
+        () => backLabelFor(conn.auth_type),
+        conn.provider,
+        conn.label,
+      );
     }
-  });
-  onCleanup(() => setConnectionBreadcrumb(null));
+  }, [conn?.provider, conn?.label, conn?.auth_type, providerDisplayName]);
+  useEffect(() => () => setConnectionBreadcrumb(null), []);
 
   // Chart state (persisted in sessionStorage)
-  const rangeKey = () => `chart-range:${params.connectionId}`;
-  const viewKey = () => `chart-view:${params.connectionId}`;
-  const savedRange = () => {
-    try {
-      const v = sessionStorage.getItem(rangeKey());
-      // Restore any persisted range, including longer windows, so saved
-      // selections survive reload instead of silently resetting to the 7d default.
-      if (v === '24h' || v === '7d' || v === '30d' || v === '90d' || v === '365d') return v;
-    } catch {
-      /* ignore */
-    }
-    return '7d';
-  };
-  const savedView = () => {
-    try {
-      const v = sessionStorage.getItem(viewKey());
-      if (v === 'tokens' || v === 'cost' || v === 'requests') return v;
-    } catch {
-      /* ignore */
-    }
-    return 'tokens' as const;
-  };
-  const [chartRange, setChartRangeRaw] = createSignal(savedRange());
+  const [chartRange, setChartRangeRaw] = useState<string>(() => {
+    const v = readStorage(`chart-range:${connectionId}`);
+    // Restore any persisted range, including longer windows, so saved
+    // selections survive reload instead of silently resetting to the 7d default.
+    return v && (CD_RANGES as readonly string[]).includes(v) ? v : '7d';
+  });
   const setChartRange = (v: string) => {
     setChartRangeRaw(v);
-    try {
-      sessionStorage.setItem(rangeKey(), v);
-    } catch {
-      /* ignore */
-    }
+    writeStorage(`chart-range:${connectionId}`, v);
   };
-  const [chartView, setChartViewRaw] = createSignal<ChartTab>(savedView());
+  const [chartView, setChartViewRaw] = useState<ChartTab>(() => {
+    const v = readStorage(`chart-view:${connectionId}`);
+    return v === 'tokens' || v === 'cost' || v === 'requests' ? v : 'tokens';
+  });
   const setChartView = (v: ChartTab) => {
     setChartViewRaw(v);
-    try {
-      sessionStorage.setItem(viewKey(), v);
-    } catch {
-      /* ignore */
-    }
+    writeStorage(`chart-view:${connectionId}`, v);
   };
-  const [chartAgent] = createSignal('');
 
-  // Attempts tab view: By attempt status (default) or By harness. Persisted
-  // per connection like the range and the active tab.
-  const groupKey = () => `chart-group:${params.connectionId}`;
-  const savedGroup = (): 'status' | 'http' | 'harness' => {
-    try {
-      const v = sessionStorage.getItem(groupKey());
-      return v === 'harness' || v === 'status' ? v : 'http';
-    } catch {
-      return 'http';
-    }
-  };
-  const [groupBy, setGroupByRaw] = createSignal<'status' | 'http' | 'harness'>(savedGroup());
-  const setGroupBy = (v: 'status' | 'http' | 'harness') => {
+  // Attempts tab view: By HTTP status (default), attempt status or harness.
+  // Persisted per connection like the range and the active tab.
+  const [groupBy, setGroupByRaw] = useState<GroupBy>(() => {
+    const v = readStorage(`chart-group:${connectionId}`);
+    return v === 'harness' || v === 'status' ? v : 'http';
+  });
+  const setGroupBy = (v: GroupBy) => {
     setGroupByRaw(v);
-    try {
-      sessionStorage.setItem(groupKey(), v);
-    } catch {
-      /* ignore */
-    }
+    writeStorage(`chart-group:${connectionId}`, v);
   };
 
-  const [analytics] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return {
-        range: chartRange(),
-        agent: chartAgent(),
-        authType: c.auth_type,
-        provider: c.provider,
-        // Scope every chart/summary query to this exact connection
-        // (provider+auth_type+label). Without the label, two connections that
-        // share provider+auth_type but differ by label show each other's usage.
-        label: c.label,
-      };
-    },
-    (p) => {
-      if (!p) return null;
-      return getProviderAnalytics(
-        p.authType,
-        p.range,
-        p.agent || undefined,
-        p.provider,
-        p.label,
-        // Scope the cards + chart to this exact connection (tenant_providers id),
-        // so a freshly added key shows its own usage, not a sibling key's.
-        params.connectionId,
-      ) as Promise<AnalyticsResponse>;
-    },
-  );
+  // Every chart/summary query is scoped to this exact connection
+  // (provider+auth_type+label, plus the tenant_providers id), so two
+  // connections that share provider+auth_type don't show each other's usage.
+  const scope = [chartRange, authType, provider, label, connectionId];
+  const enabled = { enabled: !!conn };
+  const a = authType ?? '';
+  const p = provider ?? '';
 
-  const [agentTimeseries] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getPerAgentTimeseries(p.authType, p.provider, p.range, p.label, params.connectionId);
-    },
+  const analytics = useResource(
+    () =>
+      getProviderAnalytics(
+        a,
+        chartRange,
+        undefined,
+        p,
+        label,
+        connectionId,
+      ) as Promise<AnalyticsResponse>,
+    scope,
+    enabled,
   );
-
-  const [agentMessageTimeseries] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getPerAgentMessageTimeseries(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
+  const agentTimeseries = useResource(
+    () => getPerAgentTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
   );
-
+  const agentMessageTimeseries = useResource(
+    () => getPerAgentMessageTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
+  );
   // Attempt world: every provider call on this connection, by its own
-  // outcome. Default view of the Attempts chart; the harness view shares the
-  // same universe so both stack to the same totals.
-  const [attemptStatusTs] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getConnectionAttemptStatusTimeseries(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
+  // outcome. The harness view shares the same universe so both stack to the
+  // same totals.
+  const attemptStatusTs = useResource(
+    () => getConnectionAttemptStatusTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
   );
-  const [attemptsByAgentTs] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getConnectionAttemptsByAgentTimeseries(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
+  const attemptsByAgentTs = useResource(
+    () => getConnectionAttemptsByAgentTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
   );
-  const [httpStatusTs] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getConnectionAttemptHttpStatusTimeseries(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
+  const httpStatusTs = useResource(
+    () => getConnectionAttemptHttpStatusTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
   );
-  const [breakdown] = createResource(
-    () => {
-      const c = conn();
-      if (!c) return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getConnectionAttemptBreakdown(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
+  const breakdown = useResource(
+    () => getConnectionAttemptBreakdown(a, p, chartRange, label, connectionId),
+    scope,
+    enabled,
   );
 
-  const attemptTotals = () => {
-    const ts = attemptStatusTs();
+  const isByok = authType === 'api_key';
+  const agentCostTimeseries = useResource(
+    () => getPerAgentCostTimeseries(a, p, chartRange, label, connectionId),
+    scope,
+    { enabled: !!conn && isByok },
+  );
+
+  const attemptTotals = (() => {
+    const ts = attemptStatusTs.data;
     if (!ts) return { attempts: 0, succeeded: 0 };
     const successIdx = ts.keys.indexOf('success');
     let attempts = 0;
@@ -397,140 +370,98 @@ const ConnectionDetail: Component = () => {
       }
     }
     return { attempts, succeeded };
-  };
-
-  const isByok = () => conn()?.auth_type === 'api_key';
-
-  const [agentCostTimeseries] = createResource(
-    () => {
-      const c = conn();
-      if (!c || c.auth_type !== 'api_key') return null;
-      return { range: chartRange(), authType: c.auth_type, provider: c.provider, label: c.label };
-    },
-    (p) => {
-      if (!p) return null;
-      return getPerAgentCostTimeseries(
-        p.authType,
-        p.provider,
-        p.range,
-        p.label,
-        params.connectionId,
-      );
-    },
-  );
+  })();
 
   // Harness tag selection for chart filtering (persisted in sessionStorage).
   // `null` means "no persisted preference" (→ default to all selected); a Set
   // — even an empty one — means an explicit user choice, so a genuine
   // "Unselect all" survives and isn't coerced back to "all selected".
-  const storageKey = () => `agent-filter:${params.connectionId}`;
-  const loadSavedAgents = (): Set<string> | null => {
+  const storageKey = `agent-filter:${connectionId}`;
+  const [selectedAgents, setSelectedAgents] = useState<Set<string> | null>(() => {
     try {
-      const saved = sessionStorage.getItem(storageKey());
+      const saved = readStorage(storageKey);
       if (saved !== null) return new Set(JSON.parse(saved) as string[]);
     } catch {
       /* ignore */
     }
     return null;
-  };
-  const [selectedAgents, setSelectedAgents] = createSignal<Set<string> | null>(loadSavedAgents());
+  });
   const persistSelection = (next: Set<string>) => {
     setSelectedAgents(next);
-    try {
-      sessionStorage.setItem(storageKey(), JSON.stringify([...next]));
-    } catch {
-      /* ignore */
-    }
+    writeStorage(storageKey, JSON.stringify([...next]));
   };
-  // Merge agent lists from both token and message timeseries
-  const allAgents = createMemo(() => {
-    const tokenAgents = agentTimeseries()?.agents ?? [];
-    const msgAgents = agentMessageTimeseries()?.agents ?? [];
-    const costAgents = agentCostTimeseries()?.agents ?? [];
-    const attemptAgents = attemptsByAgentTs()?.agents ?? [];
-    const set = new Set([...tokenAgents, ...msgAgents, ...costAgents, ...attemptAgents]);
-    return [...set].sort();
+
+  // Merge agent lists from every per-harness series.
+  const allAgents = [
+    ...new Set([
+      ...(agentTimeseries.data?.agents ?? []),
+      ...(agentMessageTimeseries.data?.agents ?? []),
+      ...(agentCostTimeseries.data?.agents ?? []),
+      ...(attemptsByAgentTs.data?.agents ?? []),
+    ]),
+  ].sort();
+
+  const agentColorMap: Record<string, string> = {};
+  allAgents.forEach((agent, i) => {
+    agentColorMap[agent] = AGENT_COLORS[i % AGENT_COLORS.length]!;
   });
 
-  const agentColorMap = createMemo(() => {
-    const map: Record<string, string> = {};
-    const agents = allAgents();
-    for (let i = 0; i < agents.length; i++) {
-      map[agents[i]!] = AGENT_COLORS[i % AGENT_COLORS.length]!;
-    }
-    return map;
-  });
-
-  const effectiveSelected = () => {
-    const sel = selectedAgents();
-    // No persisted preference (null) → default to all selected. An explicit
-    // (possibly empty) Set is honored as-is so "Unselect all" sticks.
-    if (sel === null) return new Set(allAgents());
-    return sel;
-  };
+  // No persisted preference (null) → default to all selected. An explicit
+  // (possibly empty) Set is honored as-is so "Unselect all" sticks.
+  const effectiveSelected = selectedAgents ?? new Set(allAgents);
 
   const toggleAgent = (agent: string) => {
-    const next = new Set(effectiveSelected());
-    if (next.has(agent)) {
-      next.delete(agent);
-    } else {
-      next.add(agent);
-    }
+    const next = new Set(effectiveSelected);
+    if (next.has(agent)) next.delete(agent);
+    else next.add(agent);
     persistSelection(next);
   };
 
   // Filter a series bundle down to the selected agents. An explicit empty
   // selection (genuine "Unselect all") yields empty agents/series, so the chart
   // renders its empty state instead of silently showing everything.
-  type Series = { agents: string[]; timeseries: Array<Record<string, number | string>> };
   const filterSeries = (raw: Series | null | undefined): Series | undefined => {
     if (!raw) return undefined;
-    const sel = effectiveSelected();
-    const agents = raw.agents.filter((a) => sel.has(a));
+    const agentsKept = raw.agents.filter((x) => effectiveSelected.has(x));
     const timeseries = raw.timeseries.map((row) => {
       const filtered: Record<string, number | string> = {};
       for (const [k, v] of Object.entries(row)) {
-        if (k === 'hour' || k === 'date' || sel.has(k)) filtered[k] = v;
+        if (k === 'hour' || k === 'date' || effectiveSelected.has(k)) filtered[k] = v;
       }
       return filtered;
     });
-    return { agents, timeseries };
+    return { agents: agentsKept, timeseries };
   };
 
-  const filteredAgentTimeseries = createMemo(() => filterSeries(agentTimeseries()));
-  const filteredAgentMessageTimeseries = createMemo(() => filterSeries(agentMessageTimeseries()));
-  const filteredAgentCostTimeseries = createMemo(() => filterSeries(agentCostTimeseries()));
-  const filteredAttemptsByAgentTimeseries = createMemo(() => filterSeries(attemptsByAgentTs()));
+  const harnessFilter = (
+    <FilterSelect
+      noun={t('providers.detail.harnessesNoun')}
+      items={allAgents}
+      selected={effectiveSelected}
+      colorMap={agentColorMap}
+      onToggle={toggleAgent}
+      onSelectAll={() => persistSelection(new Set(allAgents))}
+      onUnselectAll={() => persistSelection(new Set<string>())}
+    />
+  );
 
   // Manage modal state
-  const [showManageModal, setShowManageModal] = createSignal(false);
-  const [renameValue, setRenameValue] = createSignal('');
-  const [renaming, setRenaming] = createSignal(false);
-  const [renameError, setRenameError] = createSignal('');
-  const [refreshingModels, setRefreshingModels] = createSignal(false);
-  const [warmupValue, setWarmupValue] = createSignal('');
-  const [savingWarmup, setSavingWarmup] = createSignal(false);
-  const [warmupError, setWarmupError] = createSignal('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
-  const [deleteConfirmName, setDeleteConfirmName] = createSignal('');
-  const [deletingConnection, setDeletingConnection] = createSignal(false);
-
-  // Only the custom-provider edit form still goes through agent-scoped routes.
-  const [agents] = createResource(async () => {
-    try {
-      const res = await getAgents();
-      return (res as any)?.agents ?? res ?? [];
-    } catch {
-      return [];
-    }
-  });
-  const firstAgentName = () => (agents() ?? [])[0]?.agent_name ?? '';
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState('');
+  const [refreshingModels, setRefreshingModels] = useState(false);
+  const [warmupValue, setWarmupValue] = useState('');
+  const [savingWarmup, setSavingWarmup] = useState(false);
+  const [warmupError, setWarmupError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deletingConnection, setDeletingConnection] = useState(false);
 
   const openManageModal = () => {
-    const c = conn();
-    if (c) setRenameValue(c.label);
+    if (conn) setRenameValue(conn.label);
     setRenameError('');
-    setWarmupValue(warmupMsToSecondsInput(c?.stream_warmup_ms));
+    setWarmupValue(warmupMsToSecondsInput(conn?.stream_warmup_ms));
     setWarmupError('');
     setShowDeleteConfirm(false);
     setDeleteConfirmName('');
@@ -543,40 +474,26 @@ const ConnectionDetail: Component = () => {
     setDeleteConfirmName('');
   };
 
-  const openDeleteConfirm = () => {
-    setDeleteConfirmName('');
-    setShowDeleteConfirm(true);
-  };
-
-  const closeDeleteConfirm = () => {
-    setShowDeleteConfirm(false);
-    setDeleteConfirmName('');
-  };
-
-  const deleteConfirmMatches = () => {
-    const c = conn();
-    return !!c && deleteConfirmName() === c.label;
-  };
+  const deleteConfirmMatches = !!conn && deleteConfirmName === conn.label;
 
   const handleRename = async () => {
-    const c = conn();
-    if (!c) return;
-    const newLabel = renameValue().trim();
+    if (!conn) return;
+    const newLabel = renameValue.trim();
     if (!newLabel) {
       setRenameError(t('providers.nameEmpty'));
       return;
     }
-    if (newLabel === c.label) {
+    if (newLabel === conn.label) {
       closeManageModal();
       return;
     }
     setRenaming(true);
     setRenameError('');
     try {
-      await renameConnection(c.provider, c.label, newLabel, c.auth_type as any);
+      await renameConnection(conn.provider, conn.label, newLabel, conn.auth_type as any);
       toast.success(t('providers.connectionRenamed'));
       closeManageModal();
-      refetchDetail();
+      void detail.reload();
     } catch (e: any) {
       setRenameError(e?.message ?? t('providers.renameFailed'));
     } finally {
@@ -584,13 +501,11 @@ const ConnectionDetail: Component = () => {
     }
   };
 
-  const warmupUnchanged = () =>
-    parseWarmupSeconds(warmupValue()) === (conn()?.stream_warmup_ms ?? null);
+  const warmupUnchanged = parseWarmupSeconds(warmupValue) === (conn?.stream_warmup_ms ?? null);
 
   const handleSaveWarmup = async () => {
-    const c = conn();
-    if (!c) return;
-    const ms = parseWarmupSeconds(warmupValue());
+    if (!conn) return;
+    const ms = parseWarmupSeconds(warmupValue);
     if (ms === undefined) {
       setWarmupError(streamWarmupError());
       return;
@@ -598,9 +513,9 @@ const ConnectionDetail: Component = () => {
     setSavingWarmup(true);
     setWarmupError('');
     try {
-      await setConnectionStreamWarmup(c.id, ms);
+      await setConnectionStreamWarmup(conn.id, ms);
       toast.success(t('providers.detail.warmupSaved'));
-      refetchDetail();
+      void detail.reload();
     } catch (e: any) {
       setWarmupError(e?.message ?? t('providers.detail.saveFailed'));
     } finally {
@@ -609,14 +524,13 @@ const ConnectionDetail: Component = () => {
   };
 
   const handleDisconnect = async () => {
-    const c = conn();
-    if (!c) return;
-    if (!c.is_active && !deleteConfirmMatches()) return;
+    if (!conn) return;
+    if (!conn.is_active && !deleteConfirmMatches) return;
     setDeletingConnection(true);
     try {
-      await disconnectConnection(c.provider, c.auth_type as any, c.label);
+      await disconnectConnection(conn.provider, conn.auth_type as any, conn.label);
       toast.success(t('providers.detail.connectionRemoved'));
-      navigate(backLink());
+      navigate(backLink);
     } catch (e: any) {
       toast.error(e?.message ?? t('providers.detail.disconnectFailed'));
     } finally {
@@ -629,7 +543,7 @@ const ConnectionDetail: Component = () => {
     try {
       await refreshConnectionModels();
       toast.success(t('providers.detail.modelsRefreshed'));
-      refetchDetail();
+      void detail.reload();
     } catch {
       toast.error(t('providers.detail.refreshFailed'));
     } finally {
@@ -637,892 +551,642 @@ const ConnectionDetail: Component = () => {
     }
   };
 
-  // A resolved-but-null connection means the id is unknown / the connection
-  // was deleted. Branch on the resource so this renders a not-found state
-  // instead of the loading fallback spinning forever.
-  // A rejected fetch leaves the resource errored; surface a retryable error state
-  // instead of spinning the loading skeleton forever. Reading detail.error never
-  // throws, unlike calling detail(), so guard the other branches on it too.
-  const hasError = () => !detail.loading && !!detail.error;
-  const notFound = () =>
-    !hasError() && !detail.loading && detail() !== undefined && conn() === null;
+  // Deep links into the Requests log, scoped to THIS connection and the
+  // card's current window, so the list matches what the card counted.
+  const requestsLink = (extra: string) =>
+    `/messages?connections=${encodeURIComponent(connectionId)}&range=${chartRange}${extra}`;
+  const viewMore = <span className="link-action text-xs">{t('providers.detail.viewMore')}</span>;
+
+  // A rejected fetch surfaces a retryable error state; a resolved-but-null
+  // connection (unknown id / deleted) renders not-found. Neither may leave the
+  // loading skeleton spinning forever.
+  const hasError = !detail.loading && !!detail.error;
+  const notFound = !hasError && !detail.loading && detail.data !== undefined && conn === null;
+
+  if (hasError) {
+    return (
+      <div className="page">
+        <title>{t('providers.detail.loadErrorTitle')}</title>
+        <EmptyState
+          title={t('providers.detail.loadErrorHeading')}
+          description={t('providers.detail.loadErrorBody')}
+          action={
+            <Button variant="ghost" size="sm" onClick={() => void detail.reload()}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+  if (notFound) {
+    return (
+      <div className="page">
+        <title>{t('providers.detail.notFoundTitle')}</title>
+        <EmptyState
+          title={t('providers.detail.notFoundHeading')}
+          description={t('providers.detail.notFoundBody')}
+          action={
+            <ButtonLink to="/" variant="ghost" size="sm">
+              {t('providers.detail.backToOverview')}
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
+  }
+  if (!detail.data || !conn) {
+    return (
+      <div className="page">
+        <Skel width="100%" height={300} />
+      </div>
+    );
+  }
+
+  const c = conn;
+  const data = detail.data;
+  const b = breakdown.data;
+  const icon32 = providerIcon(c.provider, 32);
+  const totalCost = (() => {
+    const ts = agentCostTimeseries.data;
+    if (!ts) return undefined;
+    let sum = 0;
+    for (const row of ts.timeseries) {
+      for (const x of ts.agents) sum += Number(row[x] ?? 0);
+    }
+    return sum;
+  })();
+
+  const emptyRow = (text: string) => (
+    <p className="px-4 py-6 text-center text-sm text-muted">{text}</p>
+  );
+  const metaItem = (k: string, v: ReactNode) => (
+    <span>
+      <span className="font-semibold text-ink">{k}</span> <span className="text-muted">{v}</span>
+    </span>
+  );
 
   return (
-    <div class="container--lg">
-      <Show when={hasError()}>
-        <Title>{t('providers.detail.loadErrorTitle')}</Title>
-        <div style="padding: 48px 0; text-align: center;">
-          <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 8px;">
-            {t('providers.detail.loadErrorHeading')}
+    <div className="page">
+      <title>
+        {t('providers.detail.pageTitle', { provider: providerDisplayName, label: c.label })}
+      </title>
+
+      <div className="mb-4">
+        <Link to={backLink} className="text-sm text-muted no-underline hover:text-ink">
+          ← {backLabel}
+        </Link>
+      </div>
+
+      <div className="page-head">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex size-8 shrink-0 items-center">
+              {icon32 ?? (
+                <span
+                  className="inline-flex size-8 items-center justify-center rounded-control text-base font-bold text-on-accent"
+                  style={{ background: customProviderColor(providerDisplayName) }}
+                >
+                  {providerDisplayName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <h1 className="flex flex-wrap items-baseline gap-2">
+              {providerDisplayName}
+              <span className="text-sm font-normal text-muted">{c.label}</span>
+            </h1>
+            <div className="flex items-center gap-2">
+              {isCustomProvider ? <Badge tone="outline">{t('providers.custom')}</Badge> : null}
+              {c.is_active ? (
+                <Badge tone="ok">{t('providers.active')}</Badge>
+              ) : (
+                <Badge>{t('providers.inactive')}</Badge>
+              )}
+            </div>
           </div>
-          <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 16px;">
-            {t('providers.detail.loadErrorBody')}
+          <div className="sub flex flex-wrap gap-x-4 gap-y-1">
+            {metaItem(t('providers.detail.connectionName'), c.label)}
+            {metaItem(t('providers.detail.models'), c.cached_model_count)}
+            {metaItem(
+              t('providers.detail.firstConnection'),
+              c.connected_at ? formatTimeAgo(c.connected_at) : '—',
+            )}
+            {metaItem(
+              t('providers.detail.lastUsed'),
+              c.last_used_at ? formatTimeAgo(c.last_used_at) : '—',
+            )}
           </div>
-          <button type="button" class="btn btn--outline btn--sm" onClick={() => refetchDetail()}>
-            {t('common.retry')}
-          </button>
         </div>
-      </Show>
-      <Show when={notFound()}>
-        <Title>{t('providers.detail.notFoundTitle')}</Title>
-        <div style="padding: 48px 0; text-align: center;">
-          <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 8px;">
-            {t('providers.detail.notFoundHeading')}
-          </div>
-          <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 16px;">
-            {t('providers.detail.notFoundBody')}
-          </div>
-          <A href="/" class="btn btn--outline btn--sm" style="text-decoration: none;">
-            {t('providers.detail.backToOverview')}
-          </A>
+        <div className="page-actions">
+          {allAgents.length > 1 ? harnessFilter : null}
+          <Select value={chartRange} onChange={setChartRange} options={cdRangeOptions()} />
+          {roleCan.manageProviders() ? (
+            <Button variant="ghost" size="sm" onClick={openManageModal}>
+              {t('providers.detail.manage')}
+            </Button>
+          ) : null}
         </div>
-      </Show>
-      <Show
-        when={!notFound() && !hasError() && detail() && conn()}
-        fallback={
-          <Show when={!notFound() && !hasError()}>
-            <div style="width: 100%; height: 300px; border-radius: var(--radius); background: hsl(var(--muted) / 0.45); animation: skeleton-pulse 1.2s ease-in-out infinite;" />
-          </Show>
+      </div>
+
+      {/* Attempt world cards: the connection's own numbers on the filtered period. */}
+      <div className="stat-tiles mb-4">
+        <StatTile
+          label={
+            <>
+              {t('providers.successRate')}
+              <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
+            </>
+          }
+          value={formatRate(
+            b ? attemptSuccessRate({ attempts: b.attempts, succeeded: b.succeeded }) : null,
+          )}
+        />
+        <StatTile
+          label={t('providers.detail.succeededAttempts')}
+          title={t('providers.detail.succeededTitle')}
+          onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
+          value={formatNumber(b?.succeeded ?? 0)}
+          extra={viewMore}
+        />
+        <StatTile
+          label={t('providers.detail.failedAttempts')}
+          title={t('providers.detail.failedTitle')}
+          onClick={() => navigate(requestsLink('&attempts=has_failed'))}
+          value={formatNumber(b?.failed ?? 0)}
+          extra={viewMore}
+        />
+        <StatTile
+          label={t('providers.detail.fallbackRetries')}
+          title={t('providers.detail.fallbackTitle')}
+          onClick={() => navigate(requestsLink('&trigger=fallback'))}
+          value={formatNumber(b?.fallback_retries ?? 0)}
+          extra={
+            <>
+              {(b?.fallback_retries ?? 0) > 0 ? (
+                <span className="text-xs text-muted">
+                  {t('providers.detail.succeeded', {
+                    count: formatNumber(b?.fallback_retries_succeeded ?? 0),
+                  })}
+                </span>
+              ) : null}
+              {viewMore}
+            </>
+          }
+        />
+      </div>
+
+      {analytics.data ? (
+        <div className="mb-4">
+          <UnifiedChartCard
+            activeTab={chartView}
+            onTabChange={setChartView}
+            requestsLabel={t('providers.detail.attempts')}
+            requestsInfoTooltip={t('ui.analytics.totalAttempts')}
+            requestsValue={attemptTotals.attempts}
+            requestsTrendPct={0}
+            tokensValue={analytics.data.summary.tokens.value}
+            tokensTrendPct={analytics.data.summary.tokens.trend_pct}
+            costValue={isByok ? (totalCost ?? 0) : undefined}
+            range={chartRange}
+            agentTimeseries={filterSeries(agentTimeseries.data)}
+            agentRequestTimeseries={
+              groupBy === 'harness' ? filterSeries(attemptsByAgentTs.data) : undefined
+            }
+            requestStatusTimeseries={
+              groupBy === 'status'
+                ? (attemptStatusTs.data ?? undefined)
+                : groupBy === 'http'
+                  ? (httpStatusTs.data ?? undefined)
+                  : undefined
+            }
+            requestStatusSeriesMode={groupBy === 'http' ? 'http_status' : 'disposition'}
+            agentCostTimeseries={isByok ? filterSeries(agentCostTimeseries.data) : undefined}
+            colorMap={agentColorMap}
+            seriesFilters={
+              <>
+                {/* Status/harness grouping only applies to the Attempts tab;
+                    Tokens and Cost stay per-harness. */}
+                {chartView === 'requests' ? (
+                  <div className="segmented">
+                    {(
+                      [
+                        ['http', t('providers.detail.byHttpStatus')],
+                        ['status', t('providers.detail.byAttemptStatus')],
+                        ['harness', t('providers.detail.byHarness')],
+                      ] as const
+                    ).map(([key, text]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-pressed={groupBy === key}
+                        onClick={() => setGroupBy(key)}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {(chartView !== 'requests' || groupBy === 'harness') && allAgents.length > 1
+                  ? harnessFilter
+                  : null}
+              </>
+            }
+          />
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-4">
+        <Panel title={t('providers.detail.recentRequests')} bodyClassName="p-0">
+          {data.recent_messages.length > 0 ? (
+            <div className="table-wrap max-h-96 rounded-none border-0">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('providers.detail.colDate')}</th>
+                    <th>{t('providers.detail.colRequestId')}</th>
+                    <th>{t('providers.detail.colModel')}</th>
+                    <th className="num">{t('providers.detail.colTokens')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recent_messages.map((msg: any, i: number) => (
+                    <tr key={msg.id ?? i}>
+                      <td className="whitespace-nowrap">
+                        {msg.timestamp ? formatTimeAgo(msg.timestamp) : '—'}
+                      </td>
+                      <td className="font-mono text-xs text-muted">
+                        {msg.id ? msg.id.slice(0, 8) : '—'}
+                      </td>
+                      <td className="max-w-45 truncate">
+                        {msg.model ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex size-3.5 shrink-0">
+                              {providerIcon(msg.provider ?? c.provider, 14)}
+                            </span>
+                            {getModelDisplayName(msg.model)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="num">
+                        {formatNumber((msg.input_tokens ?? 0) + (msg.output_tokens ?? 0))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            emptyRow(t('providers.detail.noRequests'))
+          )}
+        </Panel>
+
+        <Panel title={t('providers.detail.modelsTitle')} bodyClassName="p-0">
+          {data.model_usage.length > 0 ? (
+            <div className="table-wrap max-h-96 rounded-none border-0">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('providers.detail.colModel')}</th>
+                    <th className="num">{t('providers.detail.colTokens')}</th>
+                    <th>{t('providers.detail.colPctTotal')}</th>
+                    {isByok ? <th className="num">{t('providers.detail.colCost')}</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.model_usage.map((m) => (
+                    <tr key={m.model}>
+                      <td className="row-title max-w-50 truncate">{m.model}</td>
+                      <td className="num">{formatNumber(m.tokens)}</td>
+                      <td>
+                        <ShareBar pct={m.pct_of_total} />
+                      </td>
+                      {isByok ? (
+                        <td className="num font-semibold text-ink">
+                          {formatCost(m.cost) ?? '$0.00'}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            emptyRow(t('providers.detail.noModelUsage'))
+          )}
+        </Panel>
+
+        <Panel title={t('providers.detail.harnessesTitle')} bodyClassName="p-0">
+          {data.agents.length > 0 ? (
+            <div className="table-wrap max-h-96 rounded-none border-0">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('providers.detail.colHarness')}</th>
+                    <th className="num">{t('providers.detail.colTokens30d')}</th>
+                    <th>{t('providers.detail.colPctTotal')}</th>
+                    {isByok ? <th className="num">{t('providers.detail.colCost30d')}</th> : null}
+                    <th className="num">
+                      <span className="inline-flex items-center gap-1">
+                        {t('providers.totalAttempts')}
+                        <InfoTooltip text={t('ui.analytics.totalAttempts')} />
+                      </span>
+                    </th>
+                    <th className="num">
+                      <span className="inline-flex items-center gap-1">
+                        {t('providers.successRate')}
+                        <InfoTooltip text={t('ui.analytics.connectionHarnessSuccessRate')} />
+                      </span>
+                    </th>
+                    <th>{t('providers.lastUsed')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.agents.map((agent) => {
+                    const platform = platformIcon(agent.agent_platform, null);
+                    return (
+                      <tr key={agent.agent_name}>
+                        <td>
+                          <Link
+                            to={`/harnesses/${encodeURIComponent(agent.agent_name)}`}
+                            className="row-title flex items-center gap-2 no-underline"
+                          >
+                            {platform ? (
+                              <img
+                                src={platform}
+                                alt=""
+                                width="16"
+                                height="16"
+                                className="platform-icon rounded-sm"
+                              />
+                            ) : null}
+                            {agent.agent_name}
+                          </Link>
+                        </td>
+                        <td className="num">{formatNumber(agent.tokens_30d)}</td>
+                        <td>
+                          <ShareBar pct={agent.pct_of_total} />
+                        </td>
+                        {isByok ? (
+                          <td className="num">{formatCost(agent.cost_30d) ?? '$0.00'}</td>
+                        ) : null}
+                        <td className="num">{formatNumber(agent.attempts_30d ?? 0)}</td>
+                        <td className="num">
+                          {formatRate(
+                            attemptSuccessRate({
+                              attempts: agent.attempts_30d ?? 0,
+                              succeeded: agent.succeeded_30d,
+                            }),
+                          )}
+                        </td>
+                        <td className="text-muted">
+                          {agent.last_used ? formatTimeAgo(agent.last_used) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            emptyRow(t('providers.detail.noHarnesses'))
+          )}
+        </Panel>
+      </div>
+
+      {/* Custom provider edit modal */}
+      <Modal
+        open={showManageModal && isCustomProvider && !!customProviderData}
+        onClose={closeManageModal}
+        label={t('providers.detail.editCustomProvider')}
+        wide
+      >
+        <CustomProviderForm
+          agentName={firstAgentName}
+          initialData={customProviderData!}
+          onCreated={() => {
+            closeManageModal();
+            void detail.reload();
+          }}
+          onBack={closeManageModal}
+          onDeleted={() => {
+            closeManageModal();
+            navigate(backLink);
+          }}
+        />
+      </Modal>
+
+      {/* Manage connection modal */}
+      <Modal
+        open={showManageModal && !(isCustomProvider && customProviderData)}
+        onClose={closeManageModal}
+        label={providerDisplayName}
+        title={
+          <span className="flex items-center gap-2.5">
+            <span className="flex size-7 items-center">
+              {provDef ? (
+                providerIcon(provDef.id, 28)
+              ) : (
+                <span className="flex size-7 items-center justify-center rounded-full bg-s3 text-sm font-semibold text-muted">
+                  {providerDisplayName.charAt(0)}
+                </span>
+              )}
+            </span>
+            {providerDisplayName}
+          </span>
         }
       >
-        {(() => {
-          const c = conn()!;
-          return (
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="label" htmlFor="connection-rename">
+              {t('providers.detail.connectionNameLabel')}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="connection-rename"
+                type="text"
+                className="field flex-1"
+                aria-invalid={renameError ? true : undefined}
+                value={renameValue}
+                onChange={(e) => {
+                  setRenameValue(e.currentTarget.value);
+                  setRenameError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleRename();
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={renaming || renameValue.trim() === c.label}
+                onClick={() => void handleRename()}
+              >
+                {renaming ? t('providers.detail.saving') : t('providers.detail.save')}
+              </Button>
+            </div>
+            {renameError ? <p className="form-error mt-1">{renameError}</p> : null}
+          </div>
+
+          {/* Stream warm-up override (#244) */}
+          <div>
+            <label className="label" htmlFor="connection-stream-warmup">
+              {t('providers.detail.streamWarmup')}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="connection-stream-warmup"
+                type="number"
+                min={MIN_STREAM_WARMUP_SECONDS}
+                max={MAX_STREAM_WARMUP_SECONDS}
+                step="1"
+                placeholder={t('providers.detail.inherit')}
+                className="field flex-1"
+                aria-invalid={warmupError ? true : undefined}
+                value={warmupValue}
+                onChange={(e) => {
+                  setWarmupValue(e.currentTarget.value);
+                  setWarmupError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSaveWarmup();
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={savingWarmup || warmupUnchanged}
+                onClick={() => void handleSaveWarmup()}
+              >
+                {savingWarmup ? t('providers.detail.applying') : t('providers.detail.apply')}
+              </Button>
+            </div>
+            <p className="hint">{t('providers.detail.warmupHint')}</p>
+            {warmupError ? <p className="form-error mt-1">{warmupError}</p> : null}
+          </div>
+
+          {c.is_active ? (
             <>
-              <Title>
-                {t('providers.detail.pageTitle', {
-                  provider: providerDisplayName(),
-                  label: c.label,
-                })}
-              </Title>
-
-              {/* Back link */}
-              <div style="margin-bottom: 24px;">
-                <A
-                  href={backLink()}
-                  style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-decoration: none;"
-                >
-                  ← {backLabel()}
-                </A>
-              </div>
-
-              {/* Header */}
-              <div class="connection-detail__header">
-                <div class="connection-detail__identity">
-                  <div class="connection-detail__title-row">
-                    <div class="connection-detail__title">
-                      <span style="display: flex; align-items: center; flex-shrink: 0; width: 32px; height: 32px;">
-                        <Show
-                          when={providerIcon(c.provider, 32)}
-                          fallback={
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                'align-items': 'center',
-                                'justify-content': 'center',
-                                width: '32px',
-                                height: '32px',
-                                'border-radius': '8px',
-                                'font-size': '16px',
-                                'font-weight': '700',
-                                color: 'white',
-                                background: customProviderColor(providerDisplayName()),
-                              }}
-                            >
-                              {providerDisplayName().charAt(0).toUpperCase()}
-                            </span>
-                          }
-                        >
-                          {providerIcon(c.provider, 32)}
-                        </Show>
-                      </span>
-                      <h1 class="page-header__title">
-                        {providerDisplayName()}
-                        <span style="font-size: var(--font-size-sm); font-weight: 400; color: hsl(var(--muted-foreground));">
-                          {c.label}
-                        </span>
-                      </h1>
-                    </div>
-                    <div class="connection-detail__badges">
-                      <Show when={isCustomProvider()}>
-                        <span
-                          class="connection-detail__badge"
-                          style="padding: 2px 8px; border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;"
-                        >
-                          {t('providers.custom')}
-                        </span>
-                      </Show>
-                      <Show
-                        when={c.is_active}
-                        fallback={
-                          <span
-                            class="connection-detail__badge"
-                            style="padding: 4px 12px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); font-weight: 500;"
-                          >
-                            {t('providers.inactive')}
-                          </span>
-                        }
-                      >
-                        <span
-                          class="connection-detail__badge"
-                          style="padding: 4px 12px; background: hsl(var(--success)); color: white; font-size: var(--font-size-sm); font-weight: 600;"
-                        >
-                          {t('providers.active')}
-                        </span>
-                      </Show>
-                    </div>
-                  </div>
-                  <div class="connection-detail__meta">
-                    <span>
-                      <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        {t('providers.detail.connectionName')}
-                      </span>{' '}
-                      <span style="color: hsl(var(--muted-foreground));">{c.label}</span>
-                    </span>
-                    <span>
-                      <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        {t('providers.detail.models')}
-                      </span>{' '}
-                      <span style="color: hsl(var(--muted-foreground));">
-                        {c.cached_model_count}
-                      </span>
-                    </span>
-                    <span>
-                      <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        {t('providers.detail.firstConnection')}
-                      </span>{' '}
-                      <span style="color: hsl(var(--muted-foreground));">
-                        {c.connected_at ? formatTimeAgo(c.connected_at) : '—'}
-                      </span>
-                    </span>
-                    <span>
-                      <span style="font-weight: 600; color: hsl(var(--foreground));">
-                        {t('providers.detail.lastUsed')}
-                      </span>{' '}
-                      <span style="color: hsl(var(--muted-foreground));">
-                        {c.last_used_at ? formatTimeAgo(c.last_used_at) : '—'}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-                <div class="connection-detail__controls">
-                  <Show when={allAgents().length > 1}>
-                    <FilterSelect
-                      noun={t('providers.detail.harnessesNoun')}
-                      items={allAgents()}
-                      selected={effectiveSelected()}
-                      colorMap={agentColorMap()}
-                      onToggle={toggleAgent}
-                      onSelectAll={() => persistSelection(new Set(allAgents()))}
-                      onUnselectAll={() => persistSelection(new Set<string>())}
-                    />
-                  </Show>
-                  <Select
-                    value={chartRange()}
-                    onChange={setChartRange}
-                    options={cdRangeOptions()}
-                  />
-                  <Show when={roleCan.manageProviders()}>
-                    <button class="btn btn--outline btn--sm" onClick={openManageModal}>
-                      {t('providers.detail.manage')}
-                    </button>
-                  </Show>
-                </div>
-              </div>
-
-              {/* Attempt world cards: the connection's own numbers on the
-                  filtered period. */}
-              <div class="overview-stats" style="margin-bottom: 16px;">
-                <div class="overview-stat-card">
-                  <span class="overview-stat-card__label">
-                    {t('providers.successRate')}
-                    <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
-                  </span>
-                  <div class="overview-stat-card__value-row">
-                    <span class="overview-stat-card__value">
-                      {(() => {
-                        const b = breakdown();
-                        const rate = b
-                          ? attemptSuccessRate({ attempts: b.attempts, succeeded: b.succeeded })
-                          : null;
-                        return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
-                      })()}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  class="overview-stat-card"
-                  style="cursor: pointer;"
-                  title={t('providers.detail.succeededTitle')}
-                  onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
-                >
-                  <span class="overview-stat-card__label">
-                    {t('providers.detail.succeededAttempts')}
-                  </span>
-                  <div class="overview-stat-card__value-row">
-                    <span class="overview-stat-card__value">
-                      {formatNumber(breakdown()?.succeeded ?? 0)}
-                    </span>
-                    {viewMore()}
-                  </div>
-                </div>
-                <div
-                  class="overview-stat-card"
-                  style="cursor: pointer;"
-                  title={t('providers.detail.failedTitle')}
-                  onClick={() => navigate(requestsLink('&attempts=has_failed'))}
-                >
-                  <span class="overview-stat-card__label">
-                    {t('providers.detail.failedAttempts')}
-                  </span>
-                  <div class="overview-stat-card__value-row">
-                    <span class="overview-stat-card__value">
-                      {formatNumber(breakdown()?.failed ?? 0)}
-                    </span>
-                    {viewMore()}
-                  </div>
-                </div>
-                <div
-                  class="overview-stat-card"
-                  style="cursor: pointer;"
-                  title={t('providers.detail.fallbackTitle')}
-                  onClick={() => navigate(requestsLink('&trigger=fallback'))}
-                >
-                  <span class="overview-stat-card__label">
-                    {t('providers.detail.fallbackRetries')}
-                  </span>
-                  <div class="overview-stat-card__value-row">
-                    <span class="overview-stat-card__value">
-                      {formatNumber(breakdown()?.fallback_retries ?? 0)}
-                    </span>
-                    <Show when={(breakdown()?.fallback_retries ?? 0) > 0}>
-                      <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                        {t('providers.detail.succeeded', {
-                          count: formatNumber(breakdown()?.fallback_retries_succeeded ?? 0),
-                        })}
-                      </span>
-                    </Show>
-                    {viewMore()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart */}
-              <Show when={analytics()}>
-                {(() => {
-                  const totalCost = createMemo(() => {
-                    const ts = agentCostTimeseries();
-                    if (!ts) return undefined;
-                    let sum = 0;
-                    for (const row of ts.timeseries) {
-                      for (const a of ts.agents) sum += Number(row[a] ?? 0);
-                    }
-                    return sum;
-                  });
-                  return (
-                    <UnifiedChartCard
-                      activeTab={chartView()}
-                      onTabChange={setChartView}
-                      requestsLabel={t('providers.detail.attempts')}
-                      requestsInfoTooltip={t('ui.analytics.totalAttempts')}
-                      requestsValue={attemptTotals().attempts}
-                      requestsTrendPct={0}
-                      tokensValue={analytics()!.summary.tokens.value}
-                      tokensTrendPct={analytics()!.summary.tokens.trend_pct}
-                      costValue={isByok() ? (totalCost() ?? 0) : undefined}
-                      range={chartRange()}
-                      agentTimeseries={filteredAgentTimeseries() ?? undefined}
-                      agentRequestTimeseries={
-                        groupBy() === 'harness' ? filteredAttemptsByAgentTimeseries() : undefined
-                      }
-                      requestStatusTimeseries={
-                        groupBy() === 'status'
-                          ? (attemptStatusTs() ?? undefined)
-                          : groupBy() === 'http'
-                            ? (httpStatusTs() ?? undefined)
-                            : undefined
-                      }
-                      requestStatusSeriesMode={groupBy() === 'http' ? 'http_status' : 'disposition'}
-                      agentCostTimeseries={
-                        isByok() ? (filteredAgentCostTimeseries() ?? undefined) : undefined
-                      }
-                      colorMap={agentColorMap()}
-                      seriesFilters={
-                        <>
-                          {/* Status/harness grouping only applies to the
-                              Requests tab; Tokens and Cost stay per-harness. */}
-                          <Show when={chartView() === 'requests'}>
-                            <button
-                              class="chart-card__filter-btn"
-                              classList={{
-                                'chart-card__filter-btn--active': groupBy() === 'http',
-                              }}
-                              onClick={() => setGroupBy('http')}
-                            >
-                              {t('providers.detail.byHttpStatus')}
-                            </button>
-                            <button
-                              class="chart-card__filter-btn"
-                              classList={{
-                                'chart-card__filter-btn--active': groupBy() === 'status',
-                              }}
-                              onClick={() => setGroupBy('status')}
-                            >
-                              {t('providers.detail.byAttemptStatus')}
-                            </button>
-                            <button
-                              class="chart-card__filter-btn"
-                              classList={{
-                                'chart-card__filter-btn--active': groupBy() === 'harness',
-                              }}
-                              onClick={() => setGroupBy('harness')}
-                            >
-                              {t('providers.detail.byHarness')}
-                            </button>
-                          </Show>
-                          <Show
-                            when={
-                              (chartView() !== 'requests' || groupBy() === 'harness') &&
-                              allAgents().length > 1
-                            }
-                          >
-                            <FilterSelect
-                              noun={t('providers.detail.harnessesNoun')}
-                              items={allAgents()}
-                              selected={effectiveSelected()}
-                              colorMap={agentColorMap()}
-                              onToggle={toggleAgent}
-                              onSelectAll={() => persistSelection(new Set(allAgents()))}
-                              onUnselectAll={() => persistSelection(new Set<string>())}
-                            />
-                          </Show>
-                        </>
-                      }
-                    />
-                  );
-                })()}
-              </Show>
-
-              {/* Recent Requests (full width) */}
-              <div class="panel scroll-panel" style="margin-bottom: 24px;">
-                <div
-                  class="panel__title"
-                  style="display: flex; justify-content: space-between; align-items: center;"
-                >
-                  {t('providers.detail.recentRequests')}
-                </div>
-                <Show
-                  when={detail()!.recent_messages.length > 0}
-                  fallback={
-                    <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      {t('providers.detail.noRequests')}
-                    </div>
-                  }
-                >
-                  <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th>{t('providers.detail.colDate')}</th>
-                          <th>{t('providers.detail.colRequestId')}</th>
-                          <th>{t('providers.detail.colModel')}</th>
-                          <th>{t('providers.detail.colTokens')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={detail()!.recent_messages}>
-                          {(msg: any) => (
-                            <tr>
-                              <td style="white-space: nowrap;">
-                                {msg.timestamp ? formatTimeAgo(msg.timestamp) : '—'}
-                              </td>
-                              <td style="font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                                {msg.id ? msg.id.slice(0, 8) : '—'}
-                              </td>
-                              <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                <span style="display: inline-flex; align-items: center; gap: 4px;">
-                                  {msg.model ? (
-                                    <>
-                                      <span style="display: inline-flex; flex-shrink: 0; position: relative; width: 14px; height: 14px;">
-                                        {providerIcon(msg.provider ?? c.provider, 14)}
-                                      </span>
-                                      {getModelDisplayName(msg.model)}
-                                    </>
-                                  ) : (
-                                    '—'
-                                  )}
-                                </span>
-                              </td>
-                              <td>
-                                {formatNumber((msg.input_tokens ?? 0) + (msg.output_tokens ?? 0))}
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
-                </Show>
-              </div>
-
-              {/* Models (full width) */}
-              <div class="panel scroll-panel" style="margin-bottom: 24px;">
-                <div class="panel__title">{t('providers.detail.modelsTitle')}</div>
-                <Show
-                  when={detail()!.model_usage.length > 0}
-                  fallback={
-                    <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      {t('providers.detail.noModelUsage')}
-                    </div>
-                  }
-                >
-                  <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th>{t('providers.detail.colModel')}</th>
-                          <th>{t('providers.detail.colTokens')}</th>
-                          <th>{t('providers.detail.colPctTotal')}</th>
-                          <Show when={isByok()}>
-                            <th>{t('providers.detail.colCost')}</th>
-                          </Show>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={detail()!.model_usage}>
-                          {(m) => (
-                            <tr>
-                              <td style="font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                {m.model}
-                              </td>
-                              <td>{formatNumber(m.tokens)}</td>
-                              <td>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                  <div style="width: 60px; height: 6px; background: hsl(var(--muted)); border-radius: 3px; overflow: hidden;">
-                                    <div
-                                      style={{
-                                        width: `${m.pct_of_total}%`,
-                                        height: '100%',
-                                        background: 'hsl(var(--success))',
-                                        'border-radius': '3px',
-                                      }}
-                                    />
-                                  </div>
-                                  <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                                    {m.pct_of_total}%
-                                  </span>
-                                </div>
-                              </td>
-                              <Show when={isByok()}>
-                                <td style="font-weight: 600; color: hsl(var(--foreground));">
-                                  {formatCost(m.cost) ?? '$0.00'}
-                                </td>
-                              </Show>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
-                </Show>
-              </div>
-
-              {/* Harnesses (full width) */}
-              <div class="panel scroll-panel" style="margin-bottom: 0;">
-                <div class="panel__title">{t('providers.detail.harnessesTitle')}</div>
-                <Show
-                  when={detail()!.agents.length > 0}
-                  fallback={
-                    <div style="padding: 24px 16px; color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-align: center;">
-                      {t('providers.detail.noHarnesses')}
-                    </div>
-                  }
-                >
-                  <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th>{t('providers.detail.colHarness')}</th>
-                          <th>{t('providers.detail.colTokens30d')}</th>
-                          <th>{t('providers.detail.colPctTotal')}</th>
-                          <Show when={isByok()}>
-                            <th>{t('providers.detail.colCost30d')}</th>
-                          </Show>
-                          <th class="rel-col">
-                            {t('providers.totalAttempts')}
-                            <InfoTooltip text={t('ui.analytics.totalAttempts')} />
-                          </th>
-                          <th class="rel-col">
-                            {t('providers.successRate')}
-                            <InfoTooltip text={t('ui.analytics.connectionHarnessSuccessRate')} />
-                          </th>
-                          <th>{t('providers.lastUsed')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={detail()!.agents}>
-                          {(agent) => (
-                            <tr>
-                              <td>
-                                <A
-                                  href={`/harnesses/${encodeURIComponent(agent.agent_name)}`}
-                                  style="text-decoration: none; color: hsl(var(--foreground)); font-weight: 500; display: flex; align-items: center; gap: 8px;"
-                                >
-                                  <Show when={platformIcon(agent.agent_platform, null)}>
-                                    <img
-                                      src={platformIcon(agent.agent_platform, null)!}
-                                      alt=""
-                                      width="16"
-                                      height="16"
-                                      class="platform-icon"
-                                      style="border-radius: 3px;"
-                                    />
-                                  </Show>
-                                  {agent.agent_name}
-                                </A>
-                              </td>
-                              <td>{formatNumber(agent.tokens_30d)}</td>
-                              <td>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                  <div style="width: 60px; height: 6px; background: hsl(var(--muted)); border-radius: 3px; overflow: hidden;">
-                                    <div
-                                      style={{
-                                        width: `${agent.pct_of_total}%`,
-                                        height: '100%',
-                                        background: 'hsl(var(--success))',
-                                        'border-radius': '3px',
-                                      }}
-                                    />
-                                  </div>
-                                  <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                                    {agent.pct_of_total}%
-                                  </span>
-                                </div>
-                              </td>
-                              <Show when={isByok()}>
-                                <td>{formatCost(agent.cost_30d) ?? '$0.00'}</td>
-                              </Show>
-                              <td class="rel-col">{formatNumber(agent.attempts_30d ?? 0)}</td>
-                              <td class="rel-col">
-                                {(() => {
-                                  const rate = attemptSuccessRate({
-                                    attempts: agent.attempts_30d ?? 0,
-                                    succeeded: agent.succeeded_30d,
-                                  });
-                                  return rate == null ? '—' : `${(rate * 100).toFixed(1)}%`;
-                                })()}
-                              </td>
-                              <td style="color: hsl(var(--muted-foreground));">
-                                {agent.last_used ? formatTimeAgo(agent.last_used) : '—'}
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
-                </Show>
-              </div>
-              {/* Manage connection modal */}
-              <Show when={showManageModal()}>
-                <Show
-                  when={isCustomProvider() && customProviderData()}
-                  fallback={
-                    <div
-                      class="modal-overlay"
-                      onClick={(e) => {
-                        if (e.target === e.currentTarget) closeManageModal();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') closeManageModal();
-                      }}
-                    >
-                      <div
-                        class="modal-card"
-                        style="max-width: 420px; padding: 24px;"
-                        role="dialog"
-                        aria-modal="true"
-                      >
-                        {/* Header with provider name and close button */}
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                          <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="display: flex; align-items: center; width: 28px; height: 28px;">
-                              <Show
-                                when={provDef()}
-                                fallback={
-                                  <span style="width: 28px; height: 28px; border-radius: 50%; background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: hsl(var(--muted-foreground));">
-                                    {providerDisplayName().charAt(0)}
-                                  </span>
-                                }
-                              >
-                                {providerIcon(provDef()!.id, 28)}
-                              </Show>
-                            </span>
-                            <span style="font-size: var(--font-size-lg); font-weight: 600; color: hsl(var(--foreground));">
-                              {providerDisplayName()}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={closeManageModal}
-                            style="background: none; border: none; cursor: pointer; padding: 4px; color: hsl(var(--muted-foreground)); font-size: 18px; line-height: 1;"
-                            aria-label={t('providers.detail.close')}
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        {/* Connection name */}
-                        <div style="margin-bottom: 16px;">
-                          <label style="display: block; font-size: var(--font-size-sm); font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 6px;">
-                            {t('providers.detail.connectionNameLabel')}
-                          </label>
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                            <input
-                              type="text"
-                              class={`provider-detail__input${renameError() ? ' provider-detail__input--error' : ''}`}
-                              value={renameValue()}
-                              onInput={(e) => {
-                                setRenameValue(e.currentTarget.value);
-                                setRenameError('');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRename();
-                              }}
-                              style="flex: 1;"
-                            />
-                            <button
-                              class="btn btn--primary btn--sm"
-                              disabled={renaming() || renameValue().trim() === conn()?.label}
-                              onClick={handleRename}
-                            >
-                              {renaming()
-                                ? t('providers.detail.saving')
-                                : t('providers.detail.save')}
-                            </button>
-                          </div>
-                          <Show when={renameError()}>
-                            <div style="color: hsl(var(--destructive)); font-size: var(--font-size-sm); margin-top: 4px;">
-                              {renameError()}
-                            </div>
-                          </Show>
-                        </div>
-
-                        {/* Stream warm-up override (#244) */}
-                        <div style="margin-bottom: 16px;">
-                          <label
-                            for="connection-stream-warmup"
-                            style="display: block; font-size: var(--font-size-sm); font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 6px;"
-                          >
-                            {t('providers.detail.streamWarmup')}
-                          </label>
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                            <input
-                              id="connection-stream-warmup"
-                              type="number"
-                              min={MIN_STREAM_WARMUP_SECONDS}
-                              max={MAX_STREAM_WARMUP_SECONDS}
-                              step="1"
-                              placeholder={t('providers.detail.inherit')}
-                              class={`provider-detail__input${warmupError() ? ' provider-detail__input--error' : ''}`}
-                              value={warmupValue()}
-                              onInput={(e) => {
-                                setWarmupValue(e.currentTarget.value);
-                                setWarmupError('');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveWarmup();
-                              }}
-                              style="flex: 1;"
-                            />
-                            <button
-                              class="btn btn--primary btn--sm"
-                              disabled={savingWarmup() || warmupUnchanged()}
-                              onClick={handleSaveWarmup}
-                            >
-                              {savingWarmup()
-                                ? t('providers.detail.applying')
-                                : t('providers.detail.apply')}
-                            </button>
-                          </div>
-                          <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin-top: 4px;">
-                            {t('providers.detail.warmupHint')}
-                          </div>
-                          <Show when={warmupError()}>
-                            <div style="color: hsl(var(--destructive)); font-size: var(--font-size-sm); margin-top: 4px;">
-                              {warmupError()}
-                            </div>
-                          </Show>
-                        </div>
-
-                        <Show when={c.is_active}>
-                          {/* Models */}
-                          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid hsl(var(--border));">
-                            <span style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));">
-                              {t('providers.detail.modelCount', c.cached_model_count ?? 0)}
-                            </span>
-                            {/* Custom provider models are entered by hand; discovery skips them. */}
-                            <Show when={!isCustomProvider()}>
-                              <button
-                                class="btn btn--outline btn--sm"
-                                disabled={refreshingModels()}
-                                onClick={handleRefreshModels}
-                                style="display: inline-flex; align-items: center; gap: 6px;"
-                              >
-                                {refreshingModels()
-                                  ? t('providers.detail.refreshing')
-                                  : t('providers.detail.refreshModels')}
-                              </button>
-                            </Show>
-                          </div>
-
-                          {/* Connection info */}
-                          <div style="padding: 12px 0; border-top: 1px solid hsl(var(--border)); font-size: var(--font-size-sm); color: hsl(var(--muted-foreground));">
-                            {t('providers.detail.connectedVia')}{' '}
-                            {c.auth_type === 'subscription'
-                              ? t('providers.detail.viaSubscription')
-                              : c.auth_type === 'api_key'
-                                ? t('providers.detail.viaApiKey')
-                                : t('providers.detail.viaLocal')}
-                          </div>
-
-                          {/* Actions */}
-                          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid hsl(var(--border));">
-                            <button
-                              class="btn btn--danger btn--sm"
-                              onClick={handleDisconnect}
-                              disabled={deletingConnection()}
-                            >
-                              {deletingConnection()
-                                ? t('providers.detail.disconnecting')
-                                : t('providers.detail.disconnect')}
-                            </button>
-                            <button
-                              class="btn btn--outline btn--sm"
-                              onClick={closeManageModal}
-                              disabled={deletingConnection()}
-                            >
-                              {t('providers.detail.done')}
-                            </button>
-                          </div>
-                        </Show>
-
-                        <Show when={!c.is_active}>
-                          <Show
-                            when={showDeleteConfirm()}
-                            fallback={
-                              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid hsl(var(--border));">
-                                <button class="btn btn--danger btn--sm" onClick={openDeleteConfirm}>
-                                  {t('providers.detail.delete')}
-                                </button>
-                                <button class="btn btn--outline btn--sm" onClick={closeManageModal}>
-                                  {t('providers.detail.close')}
-                                </button>
-                              </div>
-                            }
-                          >
-                            <div
-                              class="connection-delete-confirmation"
-                              role="alertdialog"
-                              aria-labelledby="delete-connection-confirm-title"
-                              aria-describedby="delete-connection-confirm-copy"
-                            >
-                              <div class="connection-delete-confirmation__warning">
-                                <h3
-                                  id="delete-connection-confirm-title"
-                                  class="connection-delete-confirmation__title"
-                                >
-                                  {t('providers.detail.deleteHistoryTitle')}
-                                </h3>
-                                <p
-                                  id="delete-connection-confirm-copy"
-                                  class="connection-delete-confirmation__copy"
-                                >
-                                  {t('providers.detail.deleteHistoryBody')}
-                                </p>
-                              </div>
-                              <label
-                                for="delete-connection-confirm-input"
-                                class="connection-delete-confirmation__label"
-                              >
-                                {t('providers.detail.typeNameToConfirm')}
-                              </label>
-                              <input
-                                id="delete-connection-confirm-input"
-                                class="provider-detail__input"
-                                type="text"
-                                value={deleteConfirmName()}
-                                onInput={(e) => setDeleteConfirmName(e.currentTarget.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && deleteConfirmMatches()) {
-                                    handleDisconnect();
-                                  }
-                                }}
-                                placeholder={c.label}
-                              />
-                              <div class="connection-delete-confirmation__footer">
-                                <button
-                                  class="btn btn--outline btn--sm"
-                                  onClick={closeDeleteConfirm}
-                                  disabled={deletingConnection()}
-                                >
-                                  {t('providers.detail.cancel')}
-                                </button>
-                                <button
-                                  class="btn btn--danger btn--sm"
-                                  onClick={handleDisconnect}
-                                  disabled={!deleteConfirmMatches() || deletingConnection()}
-                                >
-                                  {deletingConnection()
-                                    ? t('providers.detail.deleting')
-                                    : t('providers.detail.deleteConnection')}
-                                </button>
-                              </div>
-                            </div>
-                          </Show>
-                        </Show>
-                      </div>
-                    </div>
-                  }
-                >
-                  {/* Custom provider edit modal */}
-                  <div
-                    class="modal-overlay"
-                    onClick={(e) => {
-                      if (e.target === e.currentTarget) closeManageModal();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') closeManageModal();
-                    }}
+              <div className="flex items-center justify-between border-t border-line pt-3">
+                <span className="text-sm text-muted">
+                  {t('providers.detail.modelCount', c.cached_model_count ?? 0)}
+                </span>
+                {/* Custom provider models are entered by hand; discovery skips them. */}
+                {!isCustomProvider ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={refreshingModels}
+                    onClick={() => void handleRefreshModels()}
                   >
-                    <div
-                      class="modal-card routing-modal"
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label={t('providers.detail.editCustomProvider')}
-                      style="max-width: 600px; max-height: 85vh; overflow-y: auto;"
-                    >
-                      <CustomProviderForm
-                        agentName={firstAgentName()}
-                        initialData={customProviderData()!}
-                        onCreated={() => {
-                          closeManageModal();
-                          refetchDetail();
-                        }}
-                        onBack={closeManageModal}
-                        onDeleted={() => {
-                          closeManageModal();
-                          navigate(backLink());
-                        }}
-                      />
-                    </div>
-                  </div>
-                </Show>
-              </Show>
+                    {refreshingModels
+                      ? t('providers.detail.refreshing')
+                      : t('providers.detail.refreshModels')}
+                  </Button>
+                ) : null}
+              </div>
+              <div className="border-t border-line pt-3 text-sm text-muted">
+                {t('providers.detail.connectedVia')}{' '}
+                {c.auth_type === 'subscription'
+                  ? t('providers.detail.viaSubscription')
+                  : c.auth_type === 'api_key'
+                    ? t('providers.detail.viaApiKey')
+                    : t('providers.detail.viaLocal')}
+              </div>
+              <div className="flex items-center justify-between border-t border-line pt-4">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void handleDisconnect()}
+                  disabled={deletingConnection}
+                >
+                  {deletingConnection
+                    ? t('providers.detail.disconnecting')
+                    : t('providers.detail.disconnect')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeManageModal}
+                  disabled={deletingConnection}
+                >
+                  {t('providers.detail.done')}
+                </Button>
+              </div>
             </>
-          );
-        })()}
-      </Show>
+          ) : showDeleteConfirm ? (
+            <div
+              className="flex flex-col gap-3 border-t border-line pt-3"
+              role="alertdialog"
+              aria-labelledby="delete-connection-confirm-title"
+              aria-describedby="delete-connection-confirm-copy"
+            >
+              <div className="rounded-control bg-danger-tint p-3">
+                <h3 id="delete-connection-confirm-title" className="text-sm text-danger">
+                  {t('providers.detail.deleteHistoryTitle')}
+                </h3>
+                <p id="delete-connection-confirm-copy" className="mt-1 text-sm text-dim">
+                  {t('providers.detail.deleteHistoryBody')}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="delete-connection-confirm-input" className="label">
+                  {t('providers.detail.typeNameToConfirm')}
+                </label>
+                <input
+                  id="delete-connection-confirm-input"
+                  className="field"
+                  type="text"
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && deleteConfirmMatches) void handleDisconnect();
+                  }}
+                  placeholder={c.label}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteConfirmName('');
+                  }}
+                  disabled={deletingConnection}
+                >
+                  {t('providers.detail.cancel')}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void handleDisconnect()}
+                  disabled={!deleteConfirmMatches || deletingConnection}
+                >
+                  {deletingConnection
+                    ? t('providers.detail.deleting')
+                    : t('providers.detail.deleteConnection')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className={cx('flex items-center justify-between border-t border-line pt-3')}>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  setDeleteConfirmName('');
+                  setShowDeleteConfirm(true);
+                }}
+              >
+                {t('providers.detail.delete')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={closeManageModal}>
+                {t('providers.detail.close')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -1,5 +1,15 @@
-import { For, Show, createMemo, createSignal, onCleanup, type Component } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Settings } from 'lucide-react';
 import {
   coerceContentToText,
   extractRecordedConversationMessages,
@@ -11,9 +21,17 @@ import {
   type ToolCall,
 } from 'thinker-shared';
 import type { AttemptRecording } from '../services/api/messages.js';
-import MarkdownContent from './playground/MarkdownContent.js';
+import MarkdownContentImpl from './playground/MarkdownContent.js';
 import JsonBlock from './JsonBlock.js';
 import { t } from '../i18n/index.js';
+import { cx } from './ui.js';
+
+// MarkdownContent belongs to the playground area; typed here by its props
+// contract so this file does not depend on how that component is written.
+const MarkdownContent = MarkdownContentImpl as unknown as ComponentType<{
+  text: string;
+  class?: string;
+}>;
 
 type Recording = AttemptRecording;
 export type RecordingView = 'messages' | 'tools' | 'raw';
@@ -24,19 +42,20 @@ const SIDEBAR_MIN = 150;
 const SIDEBAR_MAX = 480;
 const ALL_ROLES: Role[] = ['system', 'user', 'assistant', 'tool', 'unknown'];
 
+/** Role chip colors, from the category tokens. */
+const ROLE_CLASS: Record<Role, string> = {
+  system: 'bg-s3 text-dim',
+  user: 'bg-accent-tint text-accent-soft',
+  assistant: 'bg-ok-tint text-ok',
+  tool: 'bg-warn-tint text-warn',
+  unknown: 'bg-s3 text-muted',
+};
+
 interface OutlineRow {
   index: number;
   role: Role;
   preview: string;
   tokens: number;
-}
-
-function pretty(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }
 
 function toolArguments(value: unknown): unknown {
@@ -57,481 +76,498 @@ function approxTokens(text: string): number {
   return Math.max(1, Math.round(text.length / 4));
 }
 
-const TruncatedId: Component<{ id: string }> = (props) => {
-  const [pos, setPos] = createSignal<{ top: number; left: number } | null>(null);
-  let ref: HTMLElement | undefined;
+function TruncatedId({ id }: { id: string }) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLElement>(null);
 
   const show = () => {
-    if (!ref) return;
-    const r = ref.getBoundingClientRect();
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
     setPos({ top: r.top - 8, left: r.left + r.width / 2 });
   };
   const hide = () => setPos(null);
-  onCleanup(hide);
 
   return (
-    <code ref={ref} class="request-messages__tool-id" onMouseEnter={show} onMouseLeave={hide}>
-      {props.id}
-      <Show when={pos()}>
-        <Portal>
-          <span
-            class="info-tooltip__bubble"
-            role="tooltip"
-            style={{
-              position: 'fixed',
-              top: `${pos()!.top}px`,
-              left: `${pos()!.left}px`,
-              transform: 'translate(-50%, -100%)',
-              'font-family': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-              'word-break': 'break-all',
-              'max-width': '320px',
-            }}
-          >
-            {props.id}
-          </span>
-        </Portal>
-      </Show>
+    <code
+      ref={ref}
+      className="request-messages__tool-id max-w-[160px] truncate font-mono text-xs text-muted"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+    >
+      {id}
+      {pos
+        ? createPortal(
+            <span
+              role="tooltip"
+              className="pointer-events-none fixed z-[80] max-w-[320px] break-all rounded-control border border-line bg-elev px-2.5 py-1.5 font-mono text-xs text-dim shadow-[var(--shadow-float)]"
+              style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)' }}
+            >
+              {id}
+            </span>,
+            document.body,
+          )
+        : null}
     </code>
   );
-};
+}
 
 const ToolIcon = () => (
-  <span class="request-messages__tool-icon" aria-hidden="true">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      fill="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.3.07-.61.07-.93s-.03-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.07.62-.07.94s.03.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.12-.61l-2.01-1.58z" />
-    </svg>
+  <span className="request-messages__tool-icon inline-flex text-muted" aria-hidden="true">
+    <Settings className="size-4" />
   </span>
 );
 
-const ToolCalls: Component<{ calls: ToolCall[] }> = (props) => (
-  <div class="request-messages__tool-calls">
-    <For each={props.calls}>
-      {(call) => (
-        <div class="request-messages__tool-call">
-          <div class="request-messages__tool-call-head">
+function ToolCalls({ calls }: { calls: ToolCall[] }) {
+  return (
+    <div className="request-messages__tool-calls mt-2 flex flex-col gap-2">
+      {calls.map((call, i) => (
+        <div key={call.id ?? i} className="request-messages__tool-call well">
+          <div className="request-messages__tool-call-head mb-1.5 flex items-center gap-2">
             <ToolIcon />
-            <strong class="request-messages__tool-name">
+            <strong className="request-messages__tool-name text-sm text-ink">
               {call.function?.name ?? t('messages.recording.unknownTool')}
             </strong>
-            <Show when={call.id}>
-              <TruncatedId id={call.id!} />
-            </Show>
+            {call.id ? <TruncatedId id={call.id} /> : null}
           </div>
-          <Show when={call.function?.arguments != null}>
+          {call.function?.arguments != null ? (
             <JsonBlock value={toolArguments(call.function?.arguments)} />
-          </Show>
+          ) : null}
         </div>
-      )}
-    </For>
-  </div>
-);
+      ))}
+    </div>
+  );
+}
 
-const MessageTurn: Component<{
+function MessageTurn({
+  message,
+  index,
+  active,
+  onRef,
+}: {
   message: ChatMessage;
   index: number;
   active: boolean;
-  onRef?: (el: HTMLElement) => void;
-}> = (props) => {
-  const [expanded, setExpanded] = createSignal(true);
-  const [capped, setCapped] = createSignal(true);
+  onRef?: (el: HTMLElement | null) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [capped, setCapped] = useState(true);
 
-  const role = () => normalizeRole(props.message.role);
-  const content = () => coerceContentToText(props.message.content);
-  const toolCalls = () => props.message.tool_calls ?? [];
+  const role = normalizeRole(message.role);
+  const content = coerceContentToText(message.content);
+  const toolCalls = message.tool_calls ?? [];
 
-  const parsedJson = () => {
-    const text = content().trim();
+  const parsedJson = useMemo(() => {
+    const text = content.trim();
     if (!text.startsWith('{') && !text.startsWith('[')) return null;
     try {
       return JSON.parse(text) as unknown;
     } catch {
       return null;
     }
-  };
-  const preview = () => previewStr(content());
-  const isCappable = () => content().length > CAP_CHARS || toolCalls().length > 3;
+  }, [content]);
+  const preview = previewStr(content);
+  const isCappable = content.length > CAP_CHARS || toolCalls.length > 3;
 
   return (
     <article
-      ref={(el) => props.onRef?.(el)}
-      class="request-message"
-      classList={{ 'request-message--active': props.active }}
+      ref={onRef}
+      className={cx(
+        'request-message rounded-control border bg-elev',
+        active ? 'request-message--active border-accent' : 'border-line',
+      )}
     >
       <button
         type="button"
-        class="request-message__header"
-        aria-expanded={expanded()}
+        className="request-message__header flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 py-2 text-left"
+        aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span class="request-message__index">#{props.index + 1}</span>
-        <span class={`request-message__role request-message__role--${role()}`}>
-          {/* i18n-ignore: chat protocol role names */}
-          {role() === 'unknown' ? (props.message.role ?? 'unknown') : role()}
-        </span>
-        <Show when={props.message.name}>
-          <code class="request-message__meta-code">{props.message.name}</code>
-        </Show>
-        <Show when={props.message.tool_call_id}>
-          <code class="request-message__meta-code">{props.message.tool_call_id}</code>
-        </Show>
-        <Show when={!expanded() && preview()}>
-          <span class="request-message__preview">{preview()}</span>
-        </Show>
+        <span className="request-message__index font-mono text-xs text-faint">#{index + 1}</span>
         <span
-          class="request-message__chevron"
-          classList={{ 'request-message__chevron--open': expanded() }}
+          className={cx(
+            `request-message__role request-message__role--${role} badge`,
+            ROLE_CLASS[role],
+          )}
+        >
+          {/* i18n-ignore: chat protocol role names */}
+          {role === 'unknown' ? (message.role ?? 'unknown') : role}
+        </span>
+        {message.name ? (
+          <code className="request-message__meta-code font-mono text-xs text-muted">
+            {message.name}
+          </code>
+        ) : null}
+        {message.tool_call_id ? (
+          <code className="request-message__meta-code font-mono text-xs text-muted">
+            {message.tool_call_id}
+          </code>
+        ) : null}
+        {!expanded && preview ? (
+          <span className="request-message__preview min-w-0 flex-1 truncate text-xs text-muted">
+            {preview}
+          </span>
+        ) : null}
+        <span
+          className={cx(
+            'request-message__chevron ml-auto inline-flex text-faint transition-transform',
+            expanded && 'request-message__chevron--open rotate-180',
+          )}
           aria-hidden="true"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path d="M17.35 8H6.65c-.64 0-.99.76-.56 1.24l5.35 6.11c.3.34.83.34 1.13 0l5.35-6.11C18.34 8.76 18 8 17.36 8Z" />
-          </svg>
+          <ChevronDown className="size-4" />
         </span>
       </button>
 
-      <Show when={expanded()}>
-        <div
-          class="request-message__body"
-          classList={{ 'request-message__body--capped': isCappable() && capped() }}
-        >
-          <Show when={content()}>
-            {parsedJson() != null ? (
-              <JsonBlock class="request-message__content" value={parsedJson()} />
-            ) : (
-              <MarkdownContent class="request-message__content" text={content()} />
+      {expanded ? (
+        <>
+          <div
+            className={cx(
+              'request-message__body px-3 pb-3 text-sm text-dim',
+              isCappable && capped && 'request-message__body--capped max-h-[420px] overflow-hidden',
             )}
-          </Show>
-          <Show when={toolCalls().length > 0}>
-            <ToolCalls calls={toolCalls()} />
-          </Show>
-        </div>
-        <Show when={isCappable()}>
-          <div class="request-message__footer">
-            <button
-              type="button"
-              class="request-message__uncap"
-              onClick={() => setCapped((v) => !v)}
-            >
-              {capped() ? t('messages.recording.expandFull') : t('messages.recording.collapseBack')}
-            </button>
+          >
+            {content ? (
+              parsedJson != null ? (
+                <JsonBlock className="request-message__content" value={parsedJson} />
+              ) : (
+                <MarkdownContent class="request-message__content break-words" text={content} />
+              )
+            ) : null}
+            {toolCalls.length > 0 ? <ToolCalls calls={toolCalls} /> : null}
           </div>
-        </Show>
-      </Show>
+          {isCappable ? (
+            <div className="request-message__footer border-t border-line px-3 py-1.5">
+              <button
+                type="button"
+                className="request-message__uncap link-action text-xs"
+                onClick={() => setCapped((v) => !v)}
+              >
+                {capped ? t('messages.recording.expandFull') : t('messages.recording.collapseBack')}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </article>
   );
-};
+}
 
-const ConversationSplit: Component<{ messages: ChatMessage[] }> = (props) => {
-  const [activeTurnIndex, setActiveTurnIndex] = createSignal(-1);
-  const [visibleRoles, setVisibleRoles] = createSignal(new Set<Role>(ALL_ROLES));
-  const [sidebarWidth, setSidebarWidth] = createSignal(SIDEBAR_DEFAULT);
-  const [searchQuery, setSearchQuery] = createSignal('');
-  const turnRefs: Record<number, HTMLElement> = {};
+function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
+  const [activeTurnIndex, setActiveTurnIndex] = useState(-1);
+  const [visibleRoles, setVisibleRoles] = useState(() => new Set<Role>(ALL_ROLES));
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
+  const [searchQuery, setSearchQuery] = useState('');
+  const turnRefs = useRef<Record<number, HTMLElement | null>>({});
+  const drag = useRef({ startX: 0, startWidth: 0 });
+  const listeners = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
-  const presentRoles = createMemo(() => {
+  const presentRoles = useMemo(() => {
     const roles = new Set<Role>();
-    for (const m of props.messages) roles.add(normalizeRole(m.role));
+    for (const m of messages) roles.add(normalizeRole(m.role));
     return ALL_ROLES.filter((r) => roles.has(r));
-  });
+  }, [messages]);
 
-  const visibleMessages = createMemo(() =>
-    props.messages
-      .map((m, i) => ({ message: m, globalIndex: i }))
-      .filter(({ message }) => visibleRoles().has(normalizeRole(message.role))),
-  );
+  const visibleMessages = messages
+    .map((m, i) => ({ message: m, globalIndex: i }))
+    .filter(({ message }) => visibleRoles.has(normalizeRole(message.role)));
 
-  const outlineRows = createMemo<OutlineRow[]>(() => {
-    const q = searchQuery().toLowerCase().trim();
-    return visibleMessages()
-      .map(({ message, globalIndex }) => {
-        const text = coerceContentToText(message.content);
-        const prev = previewStr(text);
-        if (q && !prev.toLowerCase().includes(q)) return null;
-        return {
-          index: globalIndex,
-          role: normalizeRole(message.role),
-          preview: prev || '—',
-          tokens: approxTokens(text),
-        };
-      })
-      .filter((r): r is OutlineRow => r !== null);
-  });
+  const q = searchQuery.toLowerCase().trim();
+  const outlineRows = visibleMessages
+    .map(({ message, globalIndex }): OutlineRow | null => {
+      const text = coerceContentToText(message.content);
+      const prev = previewStr(text);
+      if (q && !prev.toLowerCase().includes(q)) return null;
+      return {
+        index: globalIndex,
+        role: normalizeRole(message.role),
+        preview: prev || '—',
+        tokens: approxTokens(text),
+      };
+    })
+    .filter((r): r is OutlineRow => r !== null);
 
   function jumpTo(globalIndex: number) {
     setActiveTurnIndex(globalIndex);
-    turnRefs[globalIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    turnRefs.current[globalIndex]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   }
 
-  let dragStartX = 0;
-  let dragStartWidth = 0;
+  const stopDrag = () => {
+    if (!listeners.current) return;
+    document.removeEventListener('mousemove', listeners.current.move);
+    document.removeEventListener('mouseup', listeners.current.up);
+    listeners.current = null;
+  };
 
-  function onHandleMouseDown(e: MouseEvent) {
-    dragStartX = e.clientX;
-    dragStartWidth = sidebarWidth();
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', onDragUp);
+  function onHandleMouseDown(e: ReactMouseEvent) {
+    drag.current = { startX: e.clientX, startWidth: sidebarWidth };
+    const move = (ev: MouseEvent) => {
+      const delta = ev.clientX - drag.current.startX;
+      setSidebarWidth(
+        Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, drag.current.startWidth + delta)),
+      );
+    };
+    stopDrag();
+    listeners.current = { move, up: stopDrag };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', stopDrag);
     e.preventDefault();
   }
 
-  function onDragMove(e: MouseEvent) {
-    const delta = e.clientX - dragStartX;
-    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStartWidth + delta));
-    setSidebarWidth(next);
-  }
-
-  function onDragUp() {
-    document.removeEventListener('mousemove', onDragMove);
-    document.removeEventListener('mouseup', onDragUp);
-  }
-
-  onCleanup(() => {
-    document.removeEventListener('mousemove', onDragMove);
-    document.removeEventListener('mouseup', onDragUp);
-  });
+  useEffect(() => stopDrag, []);
 
   const toggleRole = (role: Role) => {
     setVisibleRoles((prev) => {
       const next = new Set(prev);
-      if (next.has(role) && next.size > 1) {
-        next.delete(role);
-      } else {
-        next.add(role);
-      }
+      if (next.has(role) && next.size > 1) next.delete(role);
+      else next.add(role);
       return next;
     });
   };
 
   return (
-    <div class="conv-split">
+    <div className="conv-split flex h-full min-h-0 flex-col sm:flex-row">
       {/* Rail */}
-      <div class="conv-rail" style={{ width: `${sidebarWidth()}px` }}>
-        <div class="conv-rail__search-wrap">
+      <div
+        className="conv-rail flex min-h-0 w-full shrink-0 flex-col border-b border-line sm:w-[var(--rail-w)] sm:border-b-0"
+        style={{ '--rail-w': `${sidebarWidth}px` } as CSSProperties}
+      >
+        <div className="conv-rail__search-wrap p-2">
           <input
-            class="conv-rail__search"
+            className="conv-rail__search field h-8 text-xs"
             type="search"
             placeholder={t('messages.recording.filterPlaceholder')}
-            value={searchQuery()}
-            onInput={(e) => setSearchQuery(e.currentTarget.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.currentTarget.value)}
           />
         </div>
-        <div class="conv-rail__roles">
-          <For each={presentRoles()}>
-            {(role) => (
-              <button
-                type="button"
-                class={`conv-rail__role-pill conv-rail__role-pill--${role}`}
-                classList={{ 'conv-rail__role-pill--off': !visibleRoles().has(role) }}
-                onClick={() => toggleRole(role)}
-                title={t('messages.recording.toggleRole', { role })}
-              >
-                {role}
-              </button>
-            )}
-          </For>
+        <div className="conv-rail__roles flex flex-wrap gap-1 px-2 pb-2">
+          {presentRoles.map((role) => (
+            <button
+              key={role}
+              type="button"
+              className={cx(
+                `conv-rail__role-pill conv-rail__role-pill--${role} badge cursor-pointer border-0`,
+                ROLE_CLASS[role],
+                !visibleRoles.has(role) && 'conv-rail__role-pill--off opacity-40',
+              )}
+              aria-pressed={visibleRoles.has(role)}
+              onClick={() => toggleRole(role)}
+              title={t('messages.recording.toggleRole', { role })}
+            >
+              {role}
+            </button>
+          ))}
         </div>
-        <div class="conv-rail__list">
-          <For each={outlineRows()}>
-            {(row) => (
-              <button
-                type="button"
-                class="conv-outline-row"
-                classList={{ 'conv-outline-row--active': activeTurnIndex() === row.index }}
-                onClick={() => jumpTo(row.index)}
+        <div className="conv-rail__list max-h-48 min-h-0 flex-1 overflow-y-auto px-1 pb-2 sm:max-h-none">
+          {outlineRows.map((row) => (
+            <button
+              key={row.index}
+              type="button"
+              className={cx(
+                'conv-outline-row flex w-full cursor-pointer items-center gap-1.5 rounded-control border-0 bg-transparent px-1.5 py-1 text-left text-xs hover:bg-s2',
+                activeTurnIndex === row.index && 'conv-outline-row--active bg-accent-tint',
+              )}
+              onClick={() => jumpTo(row.index)}
+            >
+              <span
+                className={cx(
+                  `conv-outline-row__badge conv-outline-row__badge--${row.role} badge h-4 px-1 text-[10px]`,
+                  ROLE_CLASS[row.role],
+                )}
               >
-                <span class={`conv-outline-row__badge conv-outline-row__badge--${row.role}`}>
-                  {row.role.slice(0, 2).toUpperCase()}
-                </span>
-                <span class="conv-outline-row__num">#{row.index + 1}</span>
-                <span class="conv-outline-row__preview">{row.preview}</span>
-                <span class="conv-outline-row__tokens">{row.tokens}t</span>
-              </button>
-            )}
-          </For>
-          <Show when={outlineRows().length === 0}>
-            <div class="conv-rail__empty">{t('messages.recording.noMatches')}</div>
-          </Show>
+                {row.role.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="conv-outline-row__num font-mono text-faint">#{row.index + 1}</span>
+              <span className="conv-outline-row__preview min-w-0 flex-1 truncate text-dim">
+                {row.preview}
+              </span>
+              <span className="conv-outline-row__tokens font-mono text-faint">{row.tokens}t</span>
+            </button>
+          ))}
+          {outlineRows.length === 0 ? (
+            <div className="conv-rail__empty px-2 py-3 text-xs text-faint">
+              {t('messages.recording.noMatches')}
+            </div>
+          ) : null}
         </div>
       </div>
 
       {/* Resize handle */}
-      <div class="conv-resize-handle" onMouseDown={onHandleMouseDown} />
+      <div
+        className="conv-resize-handle hidden w-1 shrink-0 cursor-col-resize bg-line hover:bg-accent sm:block"
+        onMouseDown={onHandleMouseDown}
+      />
 
       {/* Turn list */}
-      <div class="conv-turns">
-        <For each={visibleMessages()}>
-          {({ message, globalIndex }) => (
-            <MessageTurn
-              message={message}
-              index={globalIndex}
-              active={activeTurnIndex() === globalIndex}
-              onRef={(el) => {
-                turnRefs[globalIndex] = el;
-              }}
-            />
-          )}
-        </For>
+      <div className="conv-turns flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+        {visibleMessages.map(({ message, globalIndex }) => (
+          <MessageTurn
+            key={globalIndex}
+            message={message}
+            index={globalIndex}
+            active={activeTurnIndex === globalIndex}
+            onRef={(el) => {
+              turnRefs.current[globalIndex] = el;
+            }}
+          />
+        ))}
       </div>
     </div>
   );
-};
+}
 
-const RequestMessages: Component<{ recording: Recording | null; view?: RecordingView }> = (
-  props,
-) => {
-  const view = () => props.view ?? 'messages';
-  const messages = createMemo(() =>
-    props.recording
-      ? extractRecordedConversationMessages(
-          props.recording.request_body,
-          props.recording.response_body,
-        )
-      : [],
+function Empty({ children, small }: { children: ReactNode; small?: boolean }) {
+  return (
+    <div
+      className={cx(
+        'request-messages__empty flex flex-col items-center gap-1 text-center text-sm text-muted',
+        small ? 'request-messages__empty--sm py-3' : 'py-10',
+      )}
+    >
+      {children}
+    </div>
   );
-  const toolCalls = createMemo(() => messages().flatMap((m) => m.tool_calls ?? []));
-  const availableTools = createMemo(() =>
-    props.recording ? extractRequestTools(props.recording.request_body) : [],
+}
+
+function ToolsSection({
+  title,
+  count,
+  emptyText,
+  children,
+}: {
+  title: string;
+  count: number;
+  emptyText: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="request-tools-section">
+      <h4 className="request-tools-section__title eyebrow mb-2 flex items-center gap-1.5">
+        {title}
+        <span className="request-tools-section__count badge mono">{count}</span>
+      </h4>
+      {count > 0 ? (
+        <div className="request-messages__tools flex flex-col gap-2">{children}</div>
+      ) : (
+        <Empty small>{emptyText}</Empty>
+      )}
+    </section>
   );
+}
+
+export default function RequestMessages({
+  recording,
+  view = 'messages',
+}: {
+  recording: Recording | null;
+  view?: RecordingView;
+}) {
+  const messages = useMemo(
+    () =>
+      recording
+        ? extractRecordedConversationMessages(recording.request_body, recording.response_body)
+        : [],
+    [recording],
+  );
+  const toolCalls = messages.flatMap((m) => m.tool_calls ?? []);
+  const availableTools = useMemo(
+    () => (recording ? extractRequestTools(recording.request_body) : []),
+    [recording],
+  );
+
+  if (!recording) {
+    return (
+      <Empty>
+        <div className="request-messages__empty-icon text-2xl text-faint" aria-hidden="true">
+          ◌
+        </div>
+        <strong className="text-ink">{t('messages.recording.noLogsTitle')}</strong>
+        <span className="max-w-sm">{t('messages.recording.noLogsBody')}</span>
+      </Empty>
+    );
+  }
 
   return (
-    <Show
-      when={props.recording}
-      fallback={
-        <div class="request-messages__empty">
-          <div class="request-messages__empty-icon" aria-hidden="true">
-            ◌
+    <div className="request-messages flex h-full min-h-0 flex-col">
+      {view === 'messages' ? (
+        messages.length > 0 ? (
+          <ConversationSplit messages={messages} />
+        ) : (
+          <div className="request-messages__scroll-area flex-1 overflow-y-auto p-4">
+            <Empty>{t('messages.recording.noTurns')}</Empty>
           </div>
-          <strong>{t('messages.recording.noLogsTitle')}</strong>
-          <span>{t('messages.recording.noLogsBody')}</span>
-        </div>
-      }
-    >
-      {(recording) => (
-        <div class="request-messages">
-          <Show when={view() === 'messages'}>
-            <Show
-              when={messages().length > 0}
-              fallback={
-                <div class="request-messages__scroll-area">
-                  <div class="request-messages__empty">{t('messages.recording.noTurns')}</div>
-                </div>
-              }
+        )
+      ) : null}
+
+      {view === 'tools' ? (
+        <div className="request-messages__scroll-area flex-1 overflow-y-auto p-4">
+          <div className="request-messages__tools-page flex flex-col gap-5">
+            <ToolsSection
+              title={t('messages.recording.called')}
+              count={toolCalls.length}
+              emptyText={t('messages.recording.noToolsCalled')}
             >
-              <ConversationSplit messages={messages()} />
-            </Show>
-          </Show>
+              {toolCalls.map((call, i) => (
+                <article key={call.id ?? i} className="request-tool well">
+                  <div className="request-tool__head mb-1.5 flex flex-wrap items-center gap-2">
+                    <ToolIcon />
+                    <strong className="request-messages__tool-name text-sm text-ink">
+                      {call.function?.name ?? t('messages.recording.unknownTool')}
+                    </strong>
+                    {/* i18n-ignore: tool type from the API */}
+                    <span className="request-tool__type badge mono">{call.type ?? 'function'}</span>
+                    {call.id ? <TruncatedId id={call.id} /> : null}
+                  </div>
+                  {call.function?.arguments != null ? (
+                    <JsonBlock value={toolArguments(call.function?.arguments)} />
+                  ) : null}
+                </article>
+              ))}
+            </ToolsSection>
 
-          <Show when={view() === 'tools'}>
-            <div class="request-messages__scroll-area">
-              <div class="request-messages__tools-page">
-                {/* Called tools */}
-                <section class="request-tools-section">
-                  <h4 class="request-tools-section__title">
-                    {t('messages.recording.called')}
-                    <span class="request-tools-section__count">{toolCalls().length}</span>
-                  </h4>
-                  <Show
-                    when={toolCalls().length > 0}
-                    fallback={
-                      <div class="request-messages__empty request-messages__empty--sm">
-                        {t('messages.recording.noToolsCalled')}
-                      </div>
-                    }
-                  >
-                    <div class="request-messages__tools">
-                      <For each={toolCalls()}>
-                        {(call) => (
-                          <article class="request-tool">
-                            <div class="request-tool__head">
-                              <ToolIcon />
-                              <strong class="request-messages__tool-name">
-                                {call.function?.name ?? t('messages.recording.unknownTool')}
-                              </strong>
-                              {/* i18n-ignore: tool type from the API */}
-                              <span class="request-tool__type">{call.type ?? 'function'}</span>
-                              <Show when={call.id}>
-                                <TruncatedId id={call.id!} />
-                              </Show>
-                            </div>
-                            <Show when={call.function?.arguments != null}>
-                              <JsonBlock value={toolArguments(call.function?.arguments)} />
-                            </Show>
-                          </article>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                </section>
-
-                {/* Available tools */}
-                <section class="request-tools-section">
-                  <h4 class="request-tools-section__title">
-                    {t('messages.recording.available')}
-                    <span class="request-tools-section__count">{availableTools().length}</span>
-                  </h4>
-                  <Show
-                    when={availableTools().length > 0}
-                    fallback={
-                      <div class="request-messages__empty request-messages__empty--sm">
-                        {t('messages.recording.noToolsOffered')}
-                      </div>
-                    }
-                  >
-                    <div class="request-messages__tools">
-                      <For each={availableTools()}>
-                        {(tool: ChatTool) => (
-                          <article class="request-tool request-tool--available">
-                            <div class="request-tool__head">
-                              <strong class="request-messages__tool-name">
-                                {tool.function?.name ?? t('messages.recording.unknownTool')}
-                              </strong>
-                              {/* i18n-ignore: tool type from the API */}
-                              <span class="request-tool__type">{tool.type ?? 'function'}</span>
-                            </div>
-                            <Show when={tool.function?.description}>
-                              <p class="request-tool__description">{tool.function!.description}</p>
-                            </Show>
-                            <Show when={tool.function?.parameters != null}>
-                              <JsonBlock value={tool.function?.parameters} />
-                            </Show>
-                          </article>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                </section>
-              </div>
-            </div>
-          </Show>
-
-          <Show when={view() === 'raw'}>
-            <div class="request-messages__scroll-area">
-              <div class="request-messages__raw">
-                <section>
-                  <h4>{t('messages.recording.request')}</h4>
-                  <JsonBlock value={recording().request_body} />
-                </section>
-                <section>
-                  <h4>{t('messages.recording.response')}</h4>
-                  <JsonBlock value={recording().response_body} />
-                </section>
-              </div>
-            </div>
-          </Show>
+            <ToolsSection
+              title={t('messages.recording.available')}
+              count={availableTools.length}
+              emptyText={t('messages.recording.noToolsOffered')}
+            >
+              {availableTools.map((tool: ChatTool, i) => (
+                <article key={i} className="request-tool request-tool--available well">
+                  <div className="request-tool__head mb-1.5 flex flex-wrap items-center gap-2">
+                    <strong className="request-messages__tool-name text-sm text-ink">
+                      {tool.function?.name ?? t('messages.recording.unknownTool')}
+                    </strong>
+                    {/* i18n-ignore: tool type from the API */}
+                    <span className="request-tool__type badge mono">{tool.type ?? 'function'}</span>
+                  </div>
+                  {tool.function?.description ? (
+                    <p className="request-tool__description mb-1.5 text-xs text-dim">
+                      {tool.function.description}
+                    </p>
+                  ) : null}
+                  {tool.function?.parameters != null ? (
+                    <JsonBlock value={tool.function?.parameters} />
+                  ) : null}
+                </article>
+              ))}
+            </ToolsSection>
+          </div>
         </div>
-      )}
-    </Show>
-  );
-};
+      ) : null}
 
-export default RequestMessages;
+      {view === 'raw' ? (
+        <div className="request-messages__scroll-area flex-1 overflow-y-auto p-4">
+          <div className="request-messages__raw flex flex-col gap-4">
+            <section>
+              <h4 className="eyebrow mb-2">{t('messages.recording.request')}</h4>
+              <JsonBlock value={recording.request_body} />
+            </section>
+            <section>
+              <h4 className="eyebrow mb-2">{t('messages.recording.response')}</h4>
+              <JsonBlock value={recording.response_body} />
+            </section>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

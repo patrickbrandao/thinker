@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 
 interface CapturedProps {
   tierId: string;
@@ -44,7 +44,7 @@ describe('PlaygroundModelPicker', () => {
   it('namespaces the tierId per column and adapts onSelect back to the column id', () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <PlaygroundModelPicker
         columnId="col-1"
         models={[{ model_name: 'gpt-4o' } as never]}
@@ -52,8 +52,8 @@ describe('PlaygroundModelPicker', () => {
         connectedProviders={[{ id: 'p1' } as never]}
         onSelect={onSelect}
         onClose={onClose}
-      />
-    ));
+      />,
+    );
 
     expect(captured?.tierId).toBe('playground:col-1');
     expect(captured?.models).toHaveLength(1);

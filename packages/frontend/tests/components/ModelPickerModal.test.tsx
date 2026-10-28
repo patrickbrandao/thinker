@@ -1,6 +1,50 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@solidjs/testing-library';
-import { createResource, Suspense } from 'solid-js';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
+import { Suspense } from 'react';
+import { useResource } from '../../src/lib/use-resource';
+
+// ModelCapabilityBadges belongs to another area of the React port; this stand-in
+// mirrors its accessible summaries (aria-labels) so the picker cases keep them.
+vi.mock('../../src/components/ModelCapabilityBadges.js', async () => {
+  const { t } = await import('../../src/i18n/index.js');
+  const caps = ['text', 'image', 'audio', 'video', 'stream', 'tools'] as const;
+  const LABELS = Object.fromEntries(caps.map((c) => [c, t(`models.capability.${c}`)])) as Record<
+    string,
+    string
+  >;
+  const ICONS = Object.fromEntries(caps.map((c) => [c, `<svg data-cap="${c}"></svg>`]));
+  const DISPLAY_ORDER = ['stream', 'tools', 'image', 'audio', 'video'];
+  const MODALITY_ORDER = ['text', 'image', 'audio', 'video'];
+  const Badges = (props: { capabilities?: readonly string[] }) => {
+    const supported = DISPLAY_ORDER.filter((c) => (props.capabilities ?? []).includes(c));
+    const label =
+      (props.capabilities?.length ?? 0) === 0
+        ? t('models.capability.unknown')
+        : supported.length === 0
+          ? t('models.capability.textOnly')
+          : t('models.capability.summary', { list: supported.map((c) => LABELS[c]).join(', ') });
+    return <span className="model-capability-badges" aria-label={label} />;
+  };
+  const Modalities = (props: { modalities?: readonly string[]; direction: 'input' | 'output' }) => {
+    const supported = MODALITY_ORDER.filter((m) => (props.modalities ?? []).includes(m));
+    const direction =
+      props.direction === 'input' ? t('models.capability.input') : t('models.capability.output');
+    const label =
+      supported.length === 0
+        ? t('models.capability.modalitiesUnknown', { direction })
+        : t('models.capability.modalitySummary', {
+            direction,
+            list: supported.map((m) => LABELS[m]).join(', '),
+          });
+    return <span className="model-capability-badges model-modality-badges" aria-label={label} />;
+  };
+  return {
+    default: Badges,
+    ModelModalityBadges: Modalities,
+    CAPABILITY_LABELS: LABELS,
+    CAPABILITY_ICONS: ICONS,
+  };
+});
 
 vi.mock('../../src/components/ProviderIcon.js', () => ({
   providerIcon: () => null,
@@ -179,7 +223,7 @@ describe('ModelPickerModal', () => {
         models_fetched_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
       }));
 
-      const first = render(() => (
+      const first = render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -189,8 +233,8 @@ describe('ModelPickerModal', () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           onProviderRefreshed={onProviderRefreshed}
-        />
-      ));
+        />,
+      );
 
       await waitFor(() => {
         expect(mockRefreshModels).toHaveBeenCalledOnce();
@@ -199,7 +243,7 @@ describe('ModelPickerModal', () => {
       });
 
       first.unmount();
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -209,8 +253,8 @@ describe('ModelPickerModal', () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           onProviderRefreshed={onProviderRefreshed}
-        />
-      ));
+        />,
+      );
 
       await Promise.resolve();
       expect(mockRefreshModels).toHaveBeenCalledOnce();
@@ -219,7 +263,7 @@ describe('ModelPickerModal', () => {
     });
 
     it('does not refresh when provider models were already fetched today', async () => {
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -228,8 +272,8 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
 
       await Promise.resolve();
       expect(mockRefreshModels).not.toHaveBeenCalled();
@@ -242,7 +286,7 @@ describe('ModelPickerModal', () => {
         models_fetched_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
       }));
 
-      const first = render(() => (
+      const first = render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -251,12 +295,12 @@ describe('ModelPickerModal', () => {
           connectedProviders={staleProviders}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
       await waitFor(() => expect(mockRefreshModels).toHaveBeenCalledOnce());
 
       first.unmount();
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -265,8 +309,8 @@ describe('ModelPickerModal', () => {
           connectedProviders={staleProviders}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
 
       await Promise.resolve();
       expect(mockRefreshModels).toHaveBeenCalledOnce();
@@ -288,38 +332,38 @@ describe('ModelPickerModal', () => {
       }));
 
       const Parent = () => {
-        const [models, { refetch }] = createResource(async () => {
+        const { data: models, reload } = useResource(async () => {
           modelRequestCount += 1;
           if (modelRequestCount === 1) return baseModels;
           return new Promise<AvailableModel[]>((resolve) => {
             resolveModelsRefetch = resolve;
           });
-        });
+        }, []);
 
         return (
           <Suspense fallback={<div data-testid="picker-loading" />}>
             <ModelPickerModal
               tierId="default"
               agentName="demo-agent"
-              models={models() ?? []}
+              models={models ?? []}
               tiers={[]}
               connectedProviders={staleProviders}
               onSelect={vi.fn()}
               onClose={vi.fn()}
               onProviderRefreshed={async () => {
-                await refetch();
+                await reload();
               }}
             />
           </Suspense>
         );
       };
 
-      const { container } = render(() => <Parent />);
+      render(<Parent />);
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeDefined();
       });
 
-      fireEvent.scroll(container.querySelector('.routing-modal__list') as HTMLElement, {
+      fireEvent.scroll(document.body.querySelector('.routing-modal__list') as HTMLElement, {
         target: { scrollTop: 200 },
       });
       resolveAutomaticRefresh({ ok: true });
@@ -344,7 +388,7 @@ describe('ModelPickerModal', () => {
         },
       ];
 
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -353,8 +397,8 @@ describe('ModelPickerModal', () => {
           connectedProviders={providers}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
 
       await Promise.resolve();
       expect(mockRefreshModels).not.toHaveBeenCalled();
@@ -362,7 +406,7 @@ describe('ModelPickerModal', () => {
   });
 
   it('renders the tier label as subtitle when the tier matches a STAGES entry', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -370,13 +414,15 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.routing-modal__subtitle')?.textContent).toContain('Simple');
+      />,
+    );
+    expect(document.body.querySelector('.routing-modal__subtitle')?.textContent).toContain(
+      'Simple',
+    );
   });
 
   it('renders the SPECIFICITY_STAGES label when the tier matches a specificity stage', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="coding"
         models={baseModels}
@@ -384,13 +430,15 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.routing-modal__subtitle')?.textContent).toContain('Coding');
+      />,
+    );
+    expect(document.body.querySelector('.routing-modal__subtitle')?.textContent).toContain(
+      'Coding',
+    );
   });
 
   it('renders the DEFAULT_STAGE label as subtitle for the default tier', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="default"
         models={baseModels}
@@ -398,15 +446,15 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.routing-modal__subtitle')?.textContent).toContain(
+      />,
+    );
+    expect(document.body.querySelector('.routing-modal__subtitle')?.textContent).toContain(
       'Default tier',
     );
   });
 
   it('omits the subtitle entirely when the tier id matches no stage (Playground)', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="playground:col-1"
         models={baseModels}
@@ -414,10 +462,10 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // No matching stage → render nothing rather than a misleading bare "tier".
-    expect(container.querySelector('.routing-modal__subtitle')).toBeNull();
+    expect(document.body.querySelector('.routing-modal__subtitle')).toBeNull();
   });
 
   it('filters out models that do not support the required stream capability', () => {
@@ -426,7 +474,7 @@ describe('ModelPickerModal', () => {
       { ...baseModels[0]!, capabilities: ['text', 'stream'] },
       { ...baseModels[1]!, capabilities: ['text'] },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="default"
         models={modelsWithCapabilities}
@@ -435,10 +483,10 @@ describe('ModelPickerModal', () => {
         requiredCapability="stream"
         onSelect={onSelect}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
 
-    const buttons = Array.from(container.querySelectorAll('.routing-modal__model'));
+    const buttons = Array.from(document.body.querySelectorAll('.routing-modal__model'));
     // requiredCapability pre-selects the capability filter, so models without
     // stream are filtered out entirely rather than shown as disabled.
     const streamModel = buttons.find((button) => button.textContent?.includes('GPT-4o'));
@@ -451,7 +499,7 @@ describe('ModelPickerModal', () => {
   });
 
   it('filters out all models when none support the required capability', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="default"
         models={baseModels}
@@ -460,17 +508,17 @@ describe('ModelPickerModal', () => {
         requiredCapability="image"
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
 
     // No models have the image capability, so all are filtered out
-    const models = container.querySelectorAll('.routing-modal__model');
+    const models = document.body.querySelectorAll('.routing-modal__model');
     expect(models.length).toBe(0);
   });
 
   describe('per-group refresh button', () => {
     it('does not render group refresh buttons when agentName is missing', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           models={baseModels}
@@ -478,13 +526,13 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      expect(container.querySelector('.routing-modal__group-refresh')).toBeNull();
+        />,
+      );
+      expect(document.body.querySelector('.routing-modal__group-refresh')).toBeNull();
     });
 
     it('renders a refresh button next to each non-custom group when agentName is set', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -493,15 +541,15 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const buttons = container.querySelectorAll('.routing-modal__group-refresh');
+        />,
+      );
+      const buttons = document.body.querySelectorAll('.routing-modal__group-refresh');
       expect(buttons.length).toBeGreaterThan(0);
     });
 
     it('calls refreshProviderModels with provider id and active tab on click', async () => {
       const onProviderRefreshed = vi.fn();
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -511,8 +559,8 @@ describe('ModelPickerModal', () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           onProviderRefreshed={onProviderRefreshed}
-        />
-      ));
+        />,
+      );
 
       const btn = screen.getByLabelText('Refresh OpenAI models');
       fireEvent.click(btn);
@@ -531,7 +579,7 @@ describe('ModelPickerModal', () => {
         last_fetched_at: null,
         error: 'Provider returned no models',
       });
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -540,8 +588,8 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
 
       fireEvent.click(screen.getByLabelText('Refresh OpenAI models'));
 
@@ -552,7 +600,7 @@ describe('ModelPickerModal', () => {
 
     it('does not bubble click to the parent overlay', async () => {
       const onClose = vi.fn();
-      render(() => (
+      render(
         <ModelPickerModal
           tierId="default"
           agentName="demo-agent"
@@ -561,8 +609,8 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={onClose}
-        />
-      ));
+        />,
+      );
 
       fireEvent.click(screen.getByLabelText('Refresh OpenAI models'));
 
@@ -574,7 +622,7 @@ describe('ModelPickerModal', () => {
   });
 
   it('hides tabs when only one auth category is connected', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -582,13 +630,13 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.panel__tabs')).toBeNull();
+      />,
+    );
+    expect(document.body.querySelector('[role="tablist"]')).toBeNull();
   });
 
   it('shows tabs when multiple auth categories are connected', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -596,15 +644,15 @@ describe('ModelPickerModal', () => {
         connectedProviders={subAndApi}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.panel__tabs')).not.toBeNull();
-    expect(container.textContent).toContain('Subscription');
-    expect(container.textContent).toContain('Usage-based');
+      />,
+    );
+    expect(document.body.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('Subscription');
+    expect(document.body.textContent).toContain('Usage-based');
   });
 
   it('defaults to the subscription tab when subscription is connected', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -612,14 +660,14 @@ describe('ModelPickerModal', () => {
         connectedProviders={subAndApi}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const subTab = container.querySelector('[role="tab"][aria-selected="true"]');
+      />,
+    );
+    const subTab = document.body.querySelector('[role="tab"][aria-selected="true"]');
     expect(subTab?.textContent).toContain('Subscription');
   });
 
   it('switches to api_key tab when clicked', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -627,9 +675,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={subAndApi}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const apiTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+      />,
+    );
+    const apiTab = Array.from(document.body.querySelectorAll('[role="tab"]')).find((t) =>
       t.textContent?.includes('Usage-based'),
     ) as HTMLButtonElement;
     fireEvent.click(apiTab);
@@ -637,7 +685,7 @@ describe('ModelPickerModal', () => {
   });
 
   it('toggles the Free models filter on api_key tab', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -645,20 +693,20 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const pill = container.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
+      />,
+    );
+    const pill = document.body.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
     expect(pill).not.toBeNull();
     fireEvent.click(pill);
     expect(pill.classList.contains('routing-modal__cap-pill--active')).toBe(true);
     // Only gpt-4o-mini is free → only one model rendered
-    const modelButtons = container.querySelectorAll('.routing-modal__model');
+    const modelButtons = document.body.querySelectorAll('.routing-modal__model');
     expect(modelButtons.length).toBe(1);
     expect(modelButtons[0].textContent).toContain('GPT-4o mini');
   });
 
   it('does not render a recommendation tag for a legacy auto-assigned route', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -666,9 +714,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const recommended = container.querySelector('.routing-modal__recommended');
+      />,
+    );
+    const recommended = document.body.querySelector('.routing-modal__recommended');
     expect(recommended).toBeNull();
   });
 
@@ -679,7 +727,7 @@ describe('ModelPickerModal', () => {
         override_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -687,16 +735,16 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const tags = Array.from(container.querySelectorAll('.routing-modal__role-tag')).map(
+      />,
+    );
+    const tags = Array.from(document.body.querySelectorAll('.routing-modal__role-tag')).map(
       (t) => t.textContent,
     );
     expect(tags).toContain('Primary');
   });
 
   it('tags fallback rows with their 1-based index', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -704,9 +752,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const tags = Array.from(container.querySelectorAll('.routing-modal__role-tag')).map(
+      />,
+    );
+    const tags = Array.from(document.body.querySelectorAll('.routing-modal__role-tag')).map(
       (t) => t.textContent,
     );
     expect(tags).toContain('Fallback 1');
@@ -723,7 +771,7 @@ describe('ModelPickerModal', () => {
         fallback_routes: null,
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -731,9 +779,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const tags = Array.from(container.querySelectorAll('.routing-modal__role-tag')).map(
+      />,
+    );
+    const tags = Array.from(document.body.querySelectorAll('.routing-modal__role-tag')).map(
       (t) => t.textContent,
     );
     expect(tags).not.toContain('Primary');
@@ -741,7 +789,7 @@ describe('ModelPickerModal', () => {
 
   it('invokes onSelect with (tierId, model, providerId, authType) on click', () => {
     const onSelect = vi.fn();
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -749,9 +797,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={onSelect}
         onClose={vi.fn()}
-      />
-    ));
-    const firstModel = container.querySelector('.routing-modal__model') as HTMLButtonElement;
+      />,
+    );
+    const firstModel = document.body.querySelector('.routing-modal__model') as HTMLButtonElement;
     fireEvent.click(firstModel);
     expect(onSelect).toHaveBeenCalledWith(
       'simple',
@@ -774,7 +822,7 @@ describe('ModelPickerModal', () => {
         display_name: 'Cross-vendor model',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={crossProvider}
@@ -782,18 +830,20 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const groupName = container.querySelector('.routing-modal__group-name') as HTMLElement | null;
+      />,
+    );
+    const groupName = document.body.querySelector(
+      '.routing-modal__group-name',
+    ) as HTMLElement | null;
     expect(groupName?.textContent).toBe('OpenAI');
-    expect(container.querySelector('.routing-modal__model')?.textContent).toContain(
+    expect(document.body.querySelector('.routing-modal__model')?.textContent).toContain(
       'Cross-vendor model',
     );
   });
 
   it('shows the search input only when more than 5 models are available', () => {
     const onlyOne: AvailableModel[] = [baseModels[0]];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={onlyOne}
@@ -801,9 +851,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.querySelector('.routing-modal__search')).toBeNull();
+      />,
+    );
+    expect(document.body.querySelector('.routing-modal__search')).toBeNull();
   });
 
   it('filters by search term against model labels', () => {
@@ -814,7 +864,7 @@ describe('ModelPickerModal', () => {
       { ...baseModels[0], model_name: 'gpt-extra-3', display_name: 'extra-3' },
       { ...baseModels[0], model_name: 'gpt-extra-4', display_name: 'extra-4' },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={many}
@@ -822,12 +872,12 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const search = container.querySelector('.routing-modal__search') as HTMLInputElement;
+      />,
+    );
+    const search = document.body.querySelector('.routing-modal__search') as HTMLInputElement;
     expect(search).not.toBeNull();
     fireEvent.input(search, { target: { value: 'extra-1' } });
-    const labels = Array.from(container.querySelectorAll('.routing-modal__model-label')).map(
+    const labels = Array.from(document.body.querySelectorAll('.routing-modal__model-label')).map(
       (e) => e.textContent,
     );
     expect(labels.some((l) => l?.includes('extra-1'))).toBe(true);
@@ -836,7 +886,7 @@ describe('ModelPickerModal', () => {
 
   it('renders the empty state with a Connect providers button when handler is provided and nothing is connected', () => {
     const onConnect = vi.fn();
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[]}
@@ -845,9 +895,9 @@ describe('ModelPickerModal', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onConnectProviders={onConnect}
-      />
-    ));
-    const empty = container.querySelector('.routing-modal__empty');
+      />,
+    );
+    const empty = document.body.querySelector('.routing-modal__empty');
     expect(empty?.textContent).toMatch(/No API key providers connected/);
     const btn = empty?.querySelector('button') as HTMLButtonElement;
     fireEvent.click(btn);
@@ -856,7 +906,7 @@ describe('ModelPickerModal', () => {
 
   it('calls onClose on overlay click and Escape key', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -864,17 +914,17 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={onClose}
-      />
-    ));
-    fireEvent.click(container.querySelector('.modal-overlay') as HTMLElement);
+      />,
+    );
+    fireEvent.mouseDown(document.body.querySelector('.overlay') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(container.querySelector('.modal-overlay') as HTMLElement, { key: 'Escape' });
+    fireEvent.keyDown(document.body.querySelector('.overlay') as HTMLElement, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('calls onClose on the explicit close button', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -882,9 +932,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={onClose}
-      />
-    ));
-    fireEvent.click(container.querySelector('.modal__close') as HTMLButtonElement);
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -909,7 +959,7 @@ describe('ModelPickerModal', () => {
         display_name: 'Llama 3',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={localModels}
@@ -917,9 +967,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={localOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('Runs on your machine');
+      />,
+    );
+    expect(document.body.textContent).toContain('Runs on your machine');
   });
 
   it('renders the included per-request quota burn rate when present', () => {
@@ -944,7 +994,7 @@ describe('ModelPickerModal', () => {
         cost_per_request: 0.013636,
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={gatewayModels}
@@ -952,9 +1002,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={gatewayProviders}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('Included ($0.0136 quota/req)');
+      />,
+    );
+    expect(document.body.textContent).toContain('Included ($0.0136 quota/req)');
   });
 
   it('filters the list by group name when search matches the group label', () => {
@@ -965,7 +1015,7 @@ describe('ModelPickerModal', () => {
       { ...baseModels[0], model_name: 'extra-3', display_name: 'Extra 3' },
       { ...baseModels[0], model_name: 'extra-4', display_name: 'Extra 4' },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={many}
@@ -973,11 +1023,11 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const search = container.querySelector('.routing-modal__search') as HTMLInputElement;
+      />,
+    );
+    const search = document.body.querySelector('.routing-modal__search') as HTMLInputElement;
     fireEvent.input(search, { target: { value: 'openai' } });
-    const groups = container.querySelectorAll('.routing-modal__group-name');
+    const groups = document.body.querySelectorAll('.routing-modal__group-name');
     expect(Array.from(groups).some((g) => g.textContent?.toLowerCase().includes('openai'))).toBe(
       true,
     );
@@ -1004,7 +1054,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={noDisplay}
@@ -1012,11 +1062,11 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiAnthropic}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // The slash branch strips "anthropic/" and looks up the bare name in
     // the labels map → "Claude Opus" hits via PROVIDERS mock.
-    expect(container.textContent).toContain('Claude Opus');
+    expect(document.body.textContent).toContain('Claude Opus');
   });
 
   it('returns the bare name when the slash-stripped key is also unknown', () => {
@@ -1038,7 +1088,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={noDisplay}
@@ -1046,9 +1096,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiAnthropic}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('unknown-model');
+      />,
+    );
+    expect(document.body.textContent).toContain('unknown-model');
   });
 
   it('uses a direct label-map hit when the bare name matches PROVIDERS catalog', () => {
@@ -1059,7 +1109,7 @@ describe('ModelPickerModal', () => {
         display_name: undefined as unknown as string,
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={bareName}
@@ -1067,10 +1117,10 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // The direct labels.get("gpt-4o") hit returns "GPT-4o" from the PROVIDERS mock.
-    expect(container.textContent).toContain('GPT-4o');
+    expect(document.body.textContent).toContain('GPT-4o');
   });
 
   it('renders a custom-provider group with logo letter and exposes its name', () => {
@@ -1104,7 +1154,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={customModels}
@@ -1113,16 +1163,16 @@ describe('ModelPickerModal', () => {
         connectedProviders={customConnected}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Custom-provider header shows the provider name "Groq" (rendered through
     // customProviderNameMap + the cpNames fallback).
-    const groupNames = Array.from(container.querySelectorAll('.routing-modal__group-name')).map(
+    const groupNames = Array.from(document.body.querySelectorAll('.routing-modal__group-name')).map(
       (e) => e.textContent,
     );
     expect(groupNames).toContain('Groq');
     // The icon falls back to a styled letter span ("G").
-    const letter = container.querySelector('.provider-card__logo-letter');
+    const letter = document.body.querySelector('.provider-card__logo-letter');
     expect(letter?.textContent).toBe('G');
   });
 
@@ -1148,7 +1198,7 @@ describe('ModelPickerModal', () => {
       },
     ];
 
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={bedrockModels}
@@ -1156,15 +1206,19 @@ describe('ModelPickerModal', () => {
         connectedProviders={bedrockConnected}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
 
-    expect(container.querySelector('.routing-modal__group-name')?.textContent).toBe('AWS Bedrock');
-    expect(container.querySelector('.routing-modal__model-label')?.textContent).toBe('Claude Opus');
+    expect(document.body.querySelector('.routing-modal__group-name')?.textContent).toBe(
+      'AWS Bedrock',
+    );
+    expect(document.body.querySelector('.routing-modal__model-label')?.textContent).toBe(
+      'Claude Opus',
+    );
   });
 
   it('renders the no-search empty state when search is non-empty and matches nothing', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[
@@ -1178,17 +1232,17 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const search = container.querySelector('.routing-modal__search') as HTMLInputElement;
+      />,
+    );
+    const search = document.body.querySelector('.routing-modal__search') as HTMLInputElement;
     fireEvent.input(search, { target: { value: 'zzznopnoresult' } });
-    expect(container.textContent).toContain('No models match your search');
+    expect(document.body.textContent).toContain('No models match your search');
   });
 
   it('renders the no-free-models empty state when the Free filter has no matches', () => {
     // baseModels[0] has nonzero pricing — filter to free-only with only that
     // model leaves an empty list and triggers the dedicated empty-state copy.
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[baseModels[0]]}
@@ -1196,11 +1250,11 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const pill = container.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
+      />,
+    );
+    const pill = document.body.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
     fireEvent.click(pill);
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       'No free models available from your connected providers',
     );
   });
@@ -1226,7 +1280,7 @@ describe('ModelPickerModal', () => {
       },
     ];
     // Both tabs are present, but subscription tab has zero models in the list.
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[]}
@@ -1234,9 +1288,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={subOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('No subscription providers connected');
+      />,
+    );
+    expect(document.body.textContent).toContain('No subscription providers connected');
   });
 
   it('renders the no-local empty state on the Local tab when no local models exist', () => {
@@ -1251,7 +1305,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[]}
@@ -1259,9 +1313,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={localOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    expect(container.textContent).toContain('No local providers connected');
+      />,
+    );
+    expect(document.body.textContent).toContain('No local providers connected');
   });
 
   it('clicks the Subscription tab and resets the free-only filter', () => {
@@ -1284,7 +1338,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -1292,18 +1346,18 @@ describe('ModelPickerModal', () => {
         connectedProviders={both}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
     // Switch to API Keys, toggle free-only on
-    const apiTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+    const apiTab = Array.from(document.body.querySelectorAll('[role="tab"]')).find((t) =>
       t.textContent?.includes('Usage-based'),
     ) as HTMLButtonElement;
     fireEvent.click(apiTab);
-    const pill = container.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
+    const pill = document.body.querySelector('.routing-modal__cap-pill') as HTMLButtonElement;
     fireEvent.click(pill);
     expect(pill.classList.contains('routing-modal__cap-pill--active')).toBe(true);
     // Click Subscription tab — the click handler sets activeTab + resets free-only.
-    const subTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+    const subTab = Array.from(document.body.querySelectorAll('[role="tab"]')).find((t) =>
       t.textContent?.includes('Subscription'),
     ) as HTMLButtonElement;
     fireEvent.click(subTab);
@@ -1323,7 +1377,7 @@ describe('ModelPickerModal', () => {
     ];
 
     it('renders capability filter pills for capabilities present in the model list', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={modelsWithCapabilities}
@@ -1331,9 +1385,9 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const pills = container.querySelectorAll(
+        />,
+      );
+      const pills = document.body.querySelectorAll(
         '.routing-modal__filter-right .routing-modal__cap-pill',
       );
       // Modalities are shown in the row columns; filter pills stay action-focused.
@@ -1344,7 +1398,7 @@ describe('ModelPickerModal', () => {
     });
 
     it('toggles a capability filter on and off when clicking a pill', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={modelsWithCapabilities}
@@ -1352,9 +1406,9 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const pills = container.querySelectorAll(
+        />,
+      );
+      const pills = document.body.querySelectorAll(
         '.routing-modal__filter-right .routing-modal__cap-pill',
       );
       // Find the "Tools" pill
@@ -1366,7 +1420,7 @@ describe('ModelPickerModal', () => {
       fireEvent.click(toolsPill);
       expect(toolsPill.classList.contains('routing-modal__cap-pill--active')).toBe(true);
       // Only one model has tools capability (gpt-4o)
-      const modelButtons = container.querySelectorAll('.routing-modal__model');
+      const modelButtons = document.body.querySelectorAll('.routing-modal__model');
       expect(modelButtons.length).toBe(1);
       expect(modelButtons[0].textContent).toContain('GPT-4o');
       // Toggle off
@@ -1375,7 +1429,7 @@ describe('ModelPickerModal', () => {
     });
 
     it('availableCapabilities returns correct set from model list', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={modelsWithCapabilities}
@@ -1383,9 +1437,9 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const pills = container.querySelectorAll(
+        />,
+      );
+      const pills = document.body.querySelectorAll(
         '.routing-modal__filter-right .routing-modal__cap-pill',
       );
       expect(pills.length).toBe(2);
@@ -1393,7 +1447,7 @@ describe('ModelPickerModal', () => {
   });
 
   it('renders capabilities, input modalities, and output modalities as separate columns', () => {
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={[
@@ -1408,15 +1462,15 @@ describe('ModelPickerModal', () => {
         connectedProviders={apiKeyOnly}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
+      />,
+    );
 
-    expect(container.querySelector('.routing-modal__table-head')?.textContent).toContain(
+    expect(document.body.querySelector('.routing-modal__table-head')?.textContent).toContain(
       'Capabilities',
     );
-    expect(container.querySelector('[aria-label="Capabilities: Stream, Tools"]')).toBeTruthy();
-    expect(container.querySelector('[aria-label="Input: Text, Image"]')).toBeTruthy();
-    expect(container.querySelector('[aria-label="Output: Text"]')).toBeTruthy();
+    expect(document.body.querySelector('[aria-label="Capabilities: Stream, Tools"]')).toBeTruthy();
+    expect(document.body.querySelector('[aria-label="Input: Text, Image"]')).toBeTruthy();
+    expect(document.body.querySelector('[aria-label="Output: Text"]')).toBeTruthy();
   });
 
   it('clicks the Local tab when local + api_key are both connected', () => {
@@ -1432,7 +1486,7 @@ describe('ModelPickerModal', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    render(
       <ModelPickerModal
         tierId="simple"
         models={baseModels}
@@ -1440,9 +1494,9 @@ describe('ModelPickerModal', () => {
         connectedProviders={localAndApi}
         onSelect={vi.fn()}
         onClose={vi.fn()}
-      />
-    ));
-    const localTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+      />,
+    );
+    const localTab = Array.from(document.body.querySelectorAll('[role="tab"]')).find((t) =>
       t.textContent?.includes('Local'),
     ) as HTMLButtonElement;
     fireEvent.click(localTab);
@@ -1457,7 +1511,7 @@ describe('ModelPickerModal', () => {
     }));
 
     it('does not mount every model row when the catalog is large', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={manyModels}
@@ -1465,17 +1519,17 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
+        />,
+      );
 
-      const rows = container.querySelectorAll('.routing-modal__model');
+      const rows = document.body.querySelectorAll('.routing-modal__model');
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.length).toBeLessThan(80);
-      expect(container.textContent).not.toContain('GPT-4o 199');
+      expect(document.body.textContent).not.toContain('GPT-4o 199');
     });
 
     it('reveals a late model after the list is scrolled', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={manyModels}
@@ -1483,18 +1537,18 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const list = container.querySelector('.routing-modal__list') as HTMLElement;
+        />,
+      );
+      const list = document.body.querySelector('.routing-modal__list') as HTMLElement;
       Object.defineProperty(list, 'scrollTop', { configurable: true, writable: true, value: 7800 });
       fireEvent.scroll(list);
 
-      expect(container.textContent).toContain('GPT-4o 199');
-      expect(container.textContent).not.toContain('GPT-4o 000');
+      expect(document.body.textContent).toContain('GPT-4o 199');
+      expect(document.body.textContent).not.toContain('GPT-4o 000');
     });
 
     it('search still brings a late model into the window', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={manyModels}
@@ -1502,17 +1556,17 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const search = container.querySelector('.routing-modal__search') as HTMLInputElement;
+        />,
+      );
+      const search = document.body.querySelector('.routing-modal__search') as HTMLInputElement;
       fireEvent.input(search, { target: { value: 'GPT-4o 199' } });
 
-      expect(container.textContent).toContain('GPT-4o 199');
-      expect(container.querySelectorAll('.routing-modal__model').length).toBe(1);
+      expect(document.body.textContent).toContain('GPT-4o 199');
+      expect(document.body.querySelectorAll('.routing-modal__model').length).toBe(1);
     });
 
     it('resets to the top of the filtered list after the user had scrolled', () => {
-      const { container } = render(() => (
+      render(
         <ModelPickerModal
           tierId="simple"
           models={manyModels}
@@ -1520,21 +1574,20 @@ describe('ModelPickerModal', () => {
           connectedProviders={apiKeyOnly}
           onSelect={vi.fn()}
           onClose={vi.fn()}
-        />
-      ));
-      const list = container.querySelector('.routing-modal__list') as HTMLElement;
+        />,
+      );
+      const list = document.body.querySelector('.routing-modal__list') as HTMLElement;
       Object.defineProperty(list, 'scrollTop', { configurable: true, writable: true, value: 7800 });
       fireEvent.scroll(list);
 
-      expect(container.textContent).not.toContain('GPT-4o 000');
+      expect(document.body.textContent).not.toContain('GPT-4o 000');
 
-      const search = container.querySelector('.routing-modal__search') as HTMLInputElement;
+      const search = document.body.querySelector('.routing-modal__search') as HTMLInputElement;
       // Matches every row, so shrink-clamp cannot explain a jump back to the top.
       fireEvent.input(search, { target: { value: 'GPT-4o' } });
 
-      expect(container.textContent).toContain('GPT-4o 000');
-      expect(container.textContent).not.toContain('GPT-4o 199');
+      expect(document.body.textContent).toContain('GPT-4o 000');
+      expect(document.body.textContent).not.toContain('GPT-4o 199');
     });
   });
-
 });

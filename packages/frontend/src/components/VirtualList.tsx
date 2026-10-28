@@ -1,61 +1,72 @@
 import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  untrack,
-  type JSX,
-} from 'solid-js';
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 /** Used until the scroller has a real layout height, so the first paint is windowed. */
 export const VIRTUAL_LIST_DEFAULT_VIEWPORT = 480;
 const DEFAULT_OVERSCAN = 8;
-const RESET_UNSET = Symbol('virtual-list-reset-unset');
 
 export interface VirtualListProps<T> {
   items: readonly T[];
   itemHeight: (item: T, index: number) => number;
   overscan?: number;
+  /** Class of the scroller (kept from the Solid contract); `className` also works. */
   class?: string;
+  className?: string;
   /** When this value changes, the scroller returns to the top. */
   resetKey?: unknown;
-  children: (item: T, index: number) => JSX.Element;
+  /** Render one row. Rows are keyed by index within the visible window. */
+  children: (item: T, index: number) => ReactNode;
 }
 
-const VirtualList = <T,>(props: VirtualListProps<T>): JSX.Element => {
-  const [scrollTop, setScrollTop] = createSignal(0);
-  const [viewport, setViewport] = createSignal(VIRTUAL_LIST_DEFAULT_VIEWPORT);
-  let scroller: HTMLDivElement | undefined;
+/**
+ * Windowed list: only the rows that intersect the scroller (plus `overscan`
+ * on each side) are mounted; padding above and below keeps the scrollbar
+ * honest. The caller sizes the scroller (e.g. `max-h-[60vh] overflow-y-auto`).
+ */
+export default function VirtualList<T>(props: VirtualListProps<T>) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewport, setViewport] = useState(VIRTUAL_LIST_DEFAULT_VIEWPORT);
+  const scroller = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(scrollTop);
+  scrollTopRef.current = scrollTop;
 
-  const applyScrollTop = (next: number) => {
+  const applyScrollTop = useCallback((next: number) => {
     setScrollTop(next);
-    if (scroller) scroller.scrollTop = next;
-  };
+    if (scroller.current) scroller.current.scrollTop = next;
+  }, []);
 
-  const measure = () => {
-    const height = scroller?.clientHeight ?? 0;
-    if (height > 0) setViewport(height);
-  };
-
-  onMount(() => {
+  useEffect(() => {
+    const el = scroller.current;
+    const measure = () => {
+      const height = el?.clientHeight ?? 0;
+      if (height > 0) setViewport(height);
+    };
     measure();
-    if (!scroller || typeof ResizeObserver === 'undefined') return;
+    if (!el || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
-    observer.observe(scroller);
-    onCleanup(() => observer.disconnect());
-  });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-  createEffect((previous: unknown) => {
-    const key = props.resetKey;
-    if (previous !== RESET_UNSET && key !== previous) applyScrollTop(0);
-    return key;
-  }, RESET_UNSET);
+  // Back to the top whenever resetKey changes (not on the first render).
+  const lastResetKey = useRef(props.resetKey);
+  useLayoutEffect(() => {
+    if (props.resetKey === lastResetKey.current) return;
+    lastResetKey.current = props.resetKey;
+    applyScrollTop(0);
+  }, [props.resetKey, applyScrollTop]);
 
-  const layout = createMemo(() => {
-    const items = props.items;
-    const heights = items.map((item, index) => props.itemHeight(item, index));
+  const { items, itemHeight } = props;
+  const layout = useMemo(() => {
+    const heights = items.map((item, index) => itemHeight(item, index));
     const offsets = new Array<number>(items.length);
     let acc = 0;
     for (let i = 0; i < items.length; i++) {
@@ -63,19 +74,19 @@ const VirtualList = <T,>(props: VirtualListProps<T>): JSX.Element => {
       acc += heights[i]!;
     }
     return { heights, offsets, total: acc };
-  });
+  }, [items, itemHeight]);
 
-  createEffect(() => {
-    const max = Math.max(0, layout().total - viewport());
-    if (untrack(scrollTop) > max) applyScrollTop(max);
-  });
+  // Clamp when the list shrinks under the current scroll offset.
+  useLayoutEffect(() => {
+    const max = Math.max(0, layout.total - viewport);
+    if (scrollTopRef.current > max) applyScrollTop(max);
+  }, [layout, viewport, applyScrollTop]);
 
-  const visible = createMemo(() => {
-    const items = props.items;
-    const { heights, offsets, total } = layout();
-    const overscan = props.overscan ?? DEFAULT_OVERSCAN;
-    const top = scrollTop();
-    const bottom = top + viewport();
+  const overscan = props.overscan ?? DEFAULT_OVERSCAN;
+  const visible = useMemo(() => {
+    const { heights, offsets, total } = layout;
+    const top = scrollTop;
+    const bottom = top + viewport;
 
     let lo = 0;
     let hi = items.length - 1;
@@ -103,28 +114,19 @@ const VirtualList = <T,>(props: VirtualListProps<T>): JSX.Element => {
       padTop: offsets[start] ?? 0,
       padBottom: total - (last < 0 ? 0 : (offsets[last] ?? 0) + (heights[last] ?? 0)),
     };
-  });
+  }, [items, layout, scrollTop, viewport, overscan]);
 
   return (
     <div
-      class={props.class}
-      ref={(el) => {
-        scroller = el;
-      }}
+      className={[props.class, props.className].filter(Boolean).join(' ') || undefined}
+      ref={scroller}
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
-      <div
-        style={{
-          'padding-top': `${visible().padTop}px`,
-          'padding-bottom': `${visible().padBottom}px`,
-        }}
-      >
-        <For each={visible().slice}>
-          {(item, index) => props.children(item, visible().start + index())}
-        </For>
+      <div style={{ paddingTop: visible.padTop, paddingBottom: visible.padBottom }}>
+        {visible.slice.map((item, i) => (
+          <Fragment key={visible.start + i}>{props.children(item, visible.start + i)}</Fragment>
+        ))}
       </div>
     </div>
   );
-};
-
-export default VirtualList;
+}

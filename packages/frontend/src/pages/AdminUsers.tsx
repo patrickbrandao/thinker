@@ -1,7 +1,7 @@
-import { For, Show, createResource, createSignal, type Component } from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
-import ErrorState from '../components/ErrorState.jsx';
-import TemporaryPasswordBox from '../components/TemporaryPasswordBox.jsx';
+import { useState, type FormEvent } from 'react';
+import ErrorState from '../components/ErrorState.js';
+import TemporaryPasswordBox from '../components/TemporaryPasswordBox.js';
+import { Badge, Button, Field, Panel, Switch } from '../components/ui.js';
 import {
   createAdminUser,
   listAdminUsers,
@@ -12,9 +12,10 @@ import {
 } from '../services/api/organizations.js';
 import { formatTimeAgo } from '../services/formatters.js';
 import { ALL_ROLES, roleLabel } from '../services/permissions.js';
-import { isInstanceAdmin, me } from '../services/session-store.js';
+import { me } from '../services/session-store.js';
 import { toast } from '../services/toast-store.js';
-import '../styles/organization.css';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 
 /**
@@ -22,37 +23,35 @@ import { t } from '../i18n/index.js';
  * account creation, password reset and the instance-admin flag. Temporary
  * passwords are shown once and never stored.
  */
-const AdminUsers: Component = () => {
-  const [users, { refetch }] = createResource(
-    () => isInstanceAdmin() || undefined,
-    async () => (await listAdminUsers()).users,
-  );
-  const [orgs] = createResource(
-    () => isInstanceAdmin() || undefined,
-    async () => (await listOrganizations()).organizations,
-  );
+export default function AdminUsers() {
+  const profile = useSignal(me);
+  const isAdmin = profile?.isInstanceAdmin === true;
+  const users = useResource(async () => (await listAdminUsers()).users, [], { enabled: isAdmin });
+  const orgs = useResource(async () => (await listOrganizations()).organizations, [], {
+    enabled: isAdmin,
+  });
 
-  const [email, setEmail] = createSignal('');
-  const [name, setName] = createSignal('');
-  const [makeAdmin, setMakeAdmin] = createSignal(false);
-  const [orgId, setOrgId] = createSignal('');
-  const [role, setRole] = createSignal<OrgRole>('member');
-  const [creating, setCreating] = createSignal(false);
-  const [tempPassword, setTempPassword] = createSignal<{ email: string; password: string } | null>(
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [makeAdmin, setMakeAdmin] = useState(false);
+  const [orgId, setOrgId] = useState('');
+  const [role, setRole] = useState<OrgRole>('member');
+  const [creating, setCreating] = useState(false);
+  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(
     null,
   );
-  const [confirmReset, setConfirmReset] = createSignal<string | null>(null);
-  const [busyUser, setBusyUser] = createSignal<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
+  const [busyUser, setBusyUser] = useState<string | null>(null);
 
-  const handleCreate = async (e: Event) => {
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setCreating(true);
     try {
       const res = await createAdminUser({
-        email: email().trim(),
-        name: name().trim(),
-        ...(makeAdmin() ? { isInstanceAdmin: true } : {}),
-        ...(orgId() ? { organizationId: orgId(), role: role() } : {}),
+        email: email.trim(),
+        name: name.trim(),
+        ...(makeAdmin ? { isInstanceAdmin: true } : {}),
+        ...(orgId ? { organizationId: orgId, role } : {}),
       });
       setTempPassword({ email: res.user.email, password: res.temporaryPassword });
       setEmail('');
@@ -60,7 +59,7 @@ const AdminUsers: Component = () => {
       setMakeAdmin(false);
       setOrgId('');
       setRole('member');
-      await refetch();
+      await users.reload();
     } catch {
       // toasted by fetchMutate
     } finally {
@@ -75,7 +74,7 @@ const AdminUsers: Component = () => {
       setConfirmReset(null);
       setTempPassword({ email: userEmail, password: res.temporaryPassword });
       window.scrollTo?.({ top: 0, behavior: 'smooth' });
-      await refetch();
+      await users.reload();
     } catch {
       // toasted by fetchMutate
     } finally {
@@ -92,216 +91,222 @@ const AdminUsers: Component = () => {
       // toasted by fetchMutate
     } finally {
       setBusyUser(null);
-      await refetch();
+      await users.reload();
     }
   };
 
   return (
-    <div class="container--lg">
-      <Title>{t('common.pageTitle', { page: t('org.users.title') })}</Title>
-      <Meta name="description" content={t('org.users.metaDescription')} />
-      <Show
-        when={isInstanceAdmin()}
-        fallback={
-          <ErrorState title={t('org.users.notAvailable')} message={t('org.users.adminsOnly')} />
-        }
-      >
-        <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
-          <div>
-            <h1 class="page-header__title">{t('org.users.title')}</h1>
-            <p class="page-header__subtitle">{t('org.users.subtitle')}</p>
-          </div>
-        </div>
-
-        <h2 class="settings-section__title">{t('org.users.create')}</h2>
-        <div class="settings-card">
-          <form class="org-form" onSubmit={handleCreate} aria-label={t('org.users.create')}>
-            <label class="org-form__field">
-              {t('common.email')}
-              <input
-                class="auth-form__input"
-                type="email"
-                value={email()}
-                onInput={(e) => setEmail(e.currentTarget.value)}
-                required
-              />
-            </label>
-            <label class="org-form__field">
-              {t('common.name')}
-              <input
-                class="auth-form__input"
-                type="text"
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
-                required
-              />
-            </label>
-            <label class="org-form__field">
-              {t('org.users.orgOptional')}
-              <select
-                class="org-select"
-                value={orgId()}
-                onChange={(e) => setOrgId(e.currentTarget.value)}
-              >
-                <option value="">{t('common.none')}</option>
-                <For each={orgs() ?? []}>{(o) => <option value={o.id}>{o.name}</option>}</For>
-              </select>
-            </label>
-            <label class="org-form__field">
-              {t('common.role')}
-              <select
-                class="org-select"
-                value={role()}
-                disabled={!orgId()}
-                onChange={(e) => setRole(e.currentTarget.value as OrgRole)}
-              >
-                <For each={ALL_ROLES}>{(r) => <option value={r}>{roleLabel(r)}</option>}</For>
-              </select>
-            </label>
-            <label class="org-form__field org-form__field--inline">
-              <input
-                type="checkbox"
-                checked={makeAdmin()}
-                onChange={(e) => setMakeAdmin(e.currentTarget.checked)}
-              />
-              {t('org.users.instanceAdmin')}
-            </label>
-            <div class="org-form__actions">
-              <button class="btn btn--primary btn--sm" type="submit" disabled={creating()}>
-                {t('org.users.create')}
-              </button>
+    <div className="page">
+      <title>{t('common.pageTitle', { page: t('org.users.title') })}</title>
+      <meta name="description" content={t('org.users.metaDescription')} />
+      {!isAdmin ? (
+        <ErrorState title={t('org.users.notAvailable')} message={t('org.users.adminsOnly')} />
+      ) : (
+        <>
+          <div className="page-head">
+            <div>
+              <h1>{t('org.users.title')}</h1>
+              <div className="sub">{t('org.users.subtitle')}</div>
             </div>
-          </form>
-          <Show when={tempPassword()}>
-            {(tp) => (
-              <div style="padding: 0 var(--gap-lg) var(--gap-lg);">
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <Panel title={t('org.users.create')} bodyClassName="flex flex-col gap-4">
+              <form
+                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_140px]"
+                onSubmit={handleCreate}
+                aria-label={t('org.users.create')}
+              >
+                <Field label={t('common.email')} htmlFor="admin-user-email">
+                  <input
+                    id="admin-user-email"
+                    className="field"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label={t('common.name')} htmlFor="admin-user-name">
+                  <input
+                    id="admin-user-name"
+                    className="field"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label={t('org.users.orgOptional')} htmlFor="admin-user-org">
+                  <select
+                    id="admin-user-org"
+                    className="field"
+                    value={orgId}
+                    onChange={(e) => setOrgId(e.target.value)}
+                  >
+                    <option value="">{t('common.none')}</option>
+                    {(orgs.data ?? []).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t('common.role')} htmlFor="admin-user-role">
+                  <select
+                    id="admin-user-role"
+                    className="field"
+                    value={role}
+                    disabled={!orgId}
+                    onChange={(e) => setRole(e.target.value as OrgRole)}
+                  >
+                    {ALL_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {roleLabel(r)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 lg:col-span-4">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={makeAdmin}
+                      onChange={(e) => setMakeAdmin(e.target.checked)}
+                    />
+                    {t('org.users.instanceAdmin')}
+                  </label>
+                  <Button type="submit" busy={creating}>
+                    {t('org.users.create')}
+                  </Button>
+                </div>
+              </form>
+              {tempPassword ? (
                 <TemporaryPasswordBox
-                  email={tp().email}
-                  password={tp().password}
+                  email={tempPassword.email}
+                  password={tempPassword.password}
                   onDismiss={() => setTempPassword(null)}
                 />
-              </div>
-            )}
-          </Show>
-        </div>
+              ) : null}
+            </Panel>
 
-        <h2 class="settings-section__title">{t('org.users.all')}</h2>
-        <Show when={!users.error} fallback={<ErrorState error={users.error} onRetry={refetch} />}>
-          <div class="panel org-table-wrap" style="padding: 0;">
-            <table class="data-table org-table" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th>{t('org.users.user')}</th>
-                  <th>{t('org.users.organizations')}</th>
-                  <th>{t('common.status')}</th>
-                  <th>{t('org.users.created')}</th>
-                  <th>{t('org.users.instanceAdmin')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                <Show when={users.loading && !users()}>
-                  <tr>
-                    <td colspan="6" class="org-table__muted">
-                      {t('org.users.loading')}
-                    </td>
-                  </tr>
-                </Show>
-                <For each={users() ?? []}>
-                  {(user) => {
-                    const isSelf = () => user.id === me()?.userId;
-                    return (
+            <Panel title={t('org.users.all')} bodyClassName="p-0">
+              {users.error ? (
+                <ErrorState error={users.error} onRetry={() => void users.reload()} />
+              ) : (
+                <div className="table-wrap rounded-none border-0">
+                  <table className="data">
+                    <thead>
                       <tr>
-                        <td>
-                          <div style="font-weight: 500;">
-                            {user.name || user.email}
-                            <Show when={isSelf()}>
-                              <span class="org-table__muted"> {t('org.page.you')}</span>
-                            </Show>
-                          </div>
-                          <div class="org-table__muted">{user.email}</div>
-                        </td>
-                        <td>
-                          <Show
-                            when={user.organizations.length > 0}
-                            fallback={<span class="org-table__muted">{t('common.none')}</span>}
-                          >
-                            <div class="org-table__orgs">
-                              <For each={user.organizations}>
-                                {(o) => (
-                                  <span class="role-badge">
-                                    {o.name} · {roleLabel(o.role)}
-                                  </span>
-                                )}
-                              </For>
-                            </div>
-                          </Show>
-                        </td>
-                        <td>
-                          <Show
-                            when={user.mustChangePassword}
-                            fallback={<span class="org-table__muted">{t('org.page.active')}</span>}
-                          >
-                            <span class="role-badge role-badge--warning">
-                              {t('org.page.pendingPassword')}
-                            </span>
-                          </Show>
-                        </td>
-                        <td class="org-table__muted">{formatTimeAgo(user.createdAt)}</td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={t('org.users.instanceAdminOf', { email: user.email })}
-                            checked={user.isInstanceAdmin}
-                            // Revoking your own flag would lock you out of this page.
-                            disabled={isSelf() || busyUser() === user.id}
-                            title={isSelf() ? t('org.users.cannotRevokeSelf') : undefined}
-                            onChange={(e) =>
-                              void handleToggleAdmin(user.id, e.currentTarget.checked)
-                            }
-                          />
-                        </td>
-                        <td class="org-table__actions">
-                          <Show
-                            when={confirmReset() === user.id}
-                            fallback={
-                              <button
-                                type="button"
-                                class="btn btn--outline btn--sm"
-                                onClick={() => setConfirmReset(user.id)}
-                              >
-                                {t('org.users.resetPassword')}
-                              </button>
-                            }
-                          >
-                            <button
-                              type="button"
-                              class="btn btn--danger btn--sm"
-                              disabled={busyUser() === user.id}
-                              onClick={() => void handleReset(user.id, user.email)}
-                            >
-                              {t('org.users.confirmReset')}
-                            </button>
-                            <button
-                              type="button"
-                              class="btn btn--outline btn--sm"
-                              onClick={() => setConfirmReset(null)}
-                            >
-                              {t('common.cancel')}
-                            </button>
-                          </Show>
-                        </td>
+                        <th>{t('org.users.user')}</th>
+                        <th>{t('org.users.organizations')}</th>
+                        <th>{t('common.status')}</th>
+                        <th>{t('org.users.created')}</th>
+                        <th>{t('org.users.instanceAdmin')}</th>
+                        <th />
                       </tr>
-                    );
-                  }}
-                </For>
-              </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                      {users.loading && !users.data ? (
+                        <tr>
+                          <td colSpan={6} className="text-muted">
+                            {t('org.users.loading')}
+                          </td>
+                        </tr>
+                      ) : null}
+                      {(users.data ?? []).map((user) => {
+                        const isSelf = user.id === profile?.userId;
+                        return (
+                          <tr key={user.id}>
+                            <td>
+                              <div className="row-title">
+                                {user.name || user.email}
+                                {isSelf ? (
+                                  <span className="font-normal text-muted">
+                                    {' '}
+                                    {t('org.page.you')}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="row-sub">{user.email}</div>
+                            </td>
+                            <td>
+                              {user.organizations.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {user.organizations.map((o) => (
+                                    <Badge key={o.id}>
+                                      {o.name} · {roleLabel(o.role)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted">{t('common.none')}</span>
+                              )}
+                            </td>
+                            <td>
+                              {user.mustChangePassword ? (
+                                <Badge tone="warn">{t('org.page.pendingPassword')}</Badge>
+                              ) : (
+                                <span className="text-muted">{t('org.page.active')}</span>
+                              )}
+                            </td>
+                            <td className="text-muted">{formatTimeAgo(user.createdAt)}</td>
+                            <td>
+                              <span
+                                title={isSelf ? t('org.users.cannotRevokeSelf') : undefined}
+                                className="inline-flex"
+                              >
+                                <Switch
+                                  label={t('org.users.instanceAdminOf', { email: user.email })}
+                                  checked={user.isInstanceAdmin}
+                                  // Revoking your own flag would lock you out of this page.
+                                  disabled={isSelf || busyUser === user.id}
+                                  onChange={(next) => void handleToggleAdmin(user.id, next)}
+                                />
+                              </span>
+                            </td>
+                            <td>
+                              <div className="row-actions gap-1.5">
+                                {confirmReset === user.id ? (
+                                  <>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      disabled={busyUser === user.id}
+                                      onClick={() => void handleReset(user.id, user.email)}
+                                    >
+                                      {t('org.users.confirmReset')}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setConfirmReset(null)}
+                                    >
+                                      {t('common.cancel')}
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setConfirmReset(user.id)}
+                                  >
+                                    {t('org.users.resetPassword')}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
           </div>
-        </Show>
-      </Show>
+        </>
+      )}
     </div>
   );
-};
-
-export default AdminUsers;
+}

@@ -1,13 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-vi.mock('@solidjs/router', () => ({
-  useNavigate: () => vi.fn(),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
+const mockNavigate = vi.fn();
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
 }));
 
 const mockListAccounts = vi.fn();
@@ -15,7 +11,7 @@ const mockChangePassword = vi.fn();
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => ({
+    useSession: () => ({
       data: { user: { id: 'u1', name: 'Test User', email: 'test@test.com' } },
       isPending: false,
     }),
@@ -54,57 +50,63 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 import Account from '../../src/pages/Account';
+import { setThemePreference, themePreference } from '../../src/lib/theme';
+
+const pressed = (label: string) =>
+  screen.getByRole('button', { name: label }).getAttribute('aria-pressed');
 
 describe('Account', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    setThemePreference('system');
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'credential' }], error: null });
     mockChangePassword.mockResolvedValue({ data: {}, error: null });
   });
 
   it('renders Account Preferences heading', () => {
-    render(() => <Account />);
+    render(<Account />);
     expect(screen.getByText('Account Preferences')).toBeDefined();
   });
 
   it('shows display name input with user name', () => {
-    render(() => <Account />);
+    render(<Account />);
     const input = screen.getByLabelText('Display name') as HTMLInputElement;
     expect(input.value).toBe('Test User');
   });
 
   it('shows email input', () => {
-    render(() => <Account />);
+    render(<Account />);
     const input = screen.getByLabelText('Email') as HTMLInputElement;
     expect(input.value).toBe('test@test.com');
   });
 
   it('shows theme options', () => {
-    render(() => <Account />);
+    render(<Account />);
     expect(screen.getByText('Light')).toBeDefined();
     expect(screen.getByText('Dark')).toBeDefined();
     expect(screen.getByText('System')).toBeDefined();
   });
 
   it('shows workspace section', () => {
-    render(() => <Account />);
+    render(<Account />);
     expect(screen.getByText('Workspace')).toBeDefined();
   });
 
   it('shows Back button', () => {
-    render(() => <Account />);
-    expect(screen.getByText('Back')).toBeDefined();
+    render(<Account />);
+    fireEvent.click(screen.getByText('Back'));
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('shows profile information section', () => {
-    render(() => <Account />);
+    render(<Account />);
     expect(screen.getByText('Profile information')).toBeDefined();
   });
 
   it('shows Security section for a credential account', async () => {
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'credential' }], error: null });
-    render(() => <Account />);
+    render(<Account />);
     expect(await screen.findByText('Security')).toBeDefined();
     expect(screen.getByLabelText('Current password')).toBeDefined();
     expect(screen.getByLabelText('New password')).toBeDefined();
@@ -113,26 +115,30 @@ describe('Account', () => {
 
   it('hides Security section for an OAuth-only account', async () => {
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'google' }], error: null });
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Profile information');
+    await waitFor(() => expect(mockListAccounts).toHaveBeenCalled());
     expect(screen.queryByText('Security')).toBeNull();
   });
 
   it('hides Security section when listAccounts returns no data', async () => {
     mockListAccounts.mockResolvedValue({ data: null, error: { message: 'boom' } });
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Profile information');
+    await waitFor(() => expect(mockListAccounts).toHaveBeenCalled());
     expect(screen.queryByText('Security')).toBeNull();
   });
 
   const fillPw = (current: string, next: string, confirm: string) => {
-    fireEvent.input(screen.getByLabelText('Current password'), { target: { value: current } });
-    fireEvent.input(screen.getByLabelText('New password'), { target: { value: next } });
-    fireEvent.input(screen.getByLabelText('Confirm new password'), { target: { value: confirm } });
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: current } });
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: next } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), {
+      target: { value: confirm },
+    });
   };
 
   it('rejects when new and confirm do not match', async () => {
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('oldpass1', 'newpass12', 'different12');
     fireEvent.click(screen.getByText('Change password'));
@@ -141,7 +147,7 @@ describe('Account', () => {
   });
 
   it('rejects a new password shorter than 8 characters', async () => {
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('oldpass1', 'short', 'short');
     fireEvent.click(screen.getByText('Change password'));
@@ -150,7 +156,7 @@ describe('Account', () => {
   });
 
   it('rejects when the new password equals the current password', async () => {
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('samepass1', 'samepass1', 'samepass1');
     fireEvent.click(screen.getByText('Change password'));
@@ -161,7 +167,7 @@ describe('Account', () => {
   });
 
   it('changes the password and revokes other sessions on success', async () => {
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('oldpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
@@ -184,7 +190,7 @@ describe('Account', () => {
 
   it('shows an inline error when changePassword fails', async () => {
     mockChangePassword.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('wrongpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
@@ -196,7 +202,7 @@ describe('Account', () => {
 
   it('falls back to a generic error message when changePassword error has no message', async () => {
     mockChangePassword.mockResolvedValue({ data: null, error: {} });
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('wrongpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
@@ -205,60 +211,73 @@ describe('Account', () => {
 
   it('recovers and re-enables the button when changePassword rejects', async () => {
     mockChangePassword.mockRejectedValue(new Error('network down'));
-    render(() => <Account />);
+    render(<Account />);
     await screen.findByText('Security');
     fillPw('oldpass1', 'newpass12', 'newpass12');
-    const button = screen.getByText('Change password') as HTMLButtonElement;
+    const button = screen.getByText('Change password').closest('button') as HTMLButtonElement;
     fireEvent.click(button);
     expect(await screen.findByText('Failed to change password')).toBeDefined();
     await waitFor(() => expect(button.disabled).toBe(false));
   });
 
   it('shows appearance section', () => {
-    render(() => <Account />);
+    render(<Account />);
     expect(screen.getByText('Appearance')).toBeDefined();
   });
 
   it('shows workspace ID', () => {
-    const { container } = render(() => <Account />);
+    const { container } = render(<Account />);
     expect(container.textContent).toContain('u1');
   });
 
   it('applies light theme when Light clicked', () => {
-    render(() => <Account />);
+    render(<Account />);
     fireEvent.click(screen.getByText('Light'));
     expect(localStorage.getItem('theme')).toBe('light');
+    expect(pressed('Light')).toBe('true');
   });
 
   it('applies dark theme when Dark clicked', () => {
-    render(() => <Account />);
+    render(<Account />);
     fireEvent.click(screen.getByText('Dark'));
     expect(localStorage.getItem('theme')).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
 
   it('removes theme from storage when System clicked', () => {
-    localStorage.setItem('theme', 'dark');
-    render(() => <Account />);
+    setThemePreference('dark');
+    render(<Account />);
     fireEvent.click(screen.getByText('System'));
     expect(localStorage.getItem('theme')).toBeNull();
+    expect(themePreference()).toBe('system');
   });
 
-  it('copies user ID to clipboard when copy button clicked', () => {
-    const { container } = render(() => <Account />);
-    const copyBtn = container.querySelector('.settings-card__copy-btn')!;
-    fireEvent.click(copyBtn);
+  it('copies user ID to clipboard when copy button clicked', async () => {
+    const { container } = render(<Account />);
+    const copyBtn = container.querySelector('.copy-btn') as HTMLElement;
+    await act(async () => {
+      copyBtn.click();
+    });
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('u1');
   });
 
   it('reads stored theme on mount', () => {
-    localStorage.setItem('theme', 'dark');
-    render(() => <Account />);
-    // Component should read and apply stored theme
-    expect(localStorage.getItem('theme')).toBe('dark');
+    setThemePreference('dark');
+    render(<Account />);
+    expect(pressed('Dark')).toBe('true');
+    expect(pressed('System')).toBe('false');
+  });
+
+  it('follows a theme change made elsewhere, like the topbar toggle', () => {
+    render(<Account />);
+    expect(pressed('System')).toBe('true');
+    act(() => setThemePreference('light'));
+    expect(pressed('Light')).toBe('true');
+    expect(pressed('System')).toBe('false');
   });
 
   it('shows no billing, plan or usage-email sections', async () => {
-    const { container } = render(() => <Account />);
+    const { container } = render(<Account />);
     await waitFor(() => expect(mockListAccounts).toHaveBeenCalled());
     expect(screen.queryByText('Billing')).toBeNull();
     expect(screen.queryByText('Email preferences')).toBeNull();

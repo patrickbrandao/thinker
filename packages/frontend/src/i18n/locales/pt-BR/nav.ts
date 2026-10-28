@@ -19,6 +19,7 @@ const ptBR: Catalog<typeof en> = {
   mcpServer: 'Servidor MCP',
   sectionTools: 'FERRAMENTAS',
   playground: 'Playground',
+  topology: 'Topologia',
   sectionOrganization: 'ORGANIZAÇÃO',
   membersSettings: 'Membros e configurações',
   users: 'Usuários',

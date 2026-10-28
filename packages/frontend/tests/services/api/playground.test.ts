@@ -66,20 +66,18 @@ describe('playground API client', () => {
 
   describe('streamPlayground', () => {
     it('POSTs the request body to /playground/run and threads the AbortSignal', async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(
-          streamResponse([
-            sse({ type: 'delta', text: 'hi' }),
-            sse({
-              type: 'done',
-              columnId: 'col-1',
-              content: 'hi there',
-              metrics: { cost: 0.001, inputTokens: 1, outputTokens: 2, durationMs: 10 },
-              headers: { 'x-id': 'a' },
-            }),
-          ]),
-        );
+      const fetchMock = vi.fn().mockResolvedValue(
+        streamResponse([
+          sse({ type: 'delta', text: 'hi' }),
+          sse({
+            type: 'done',
+            columnId: 'col-1',
+            content: 'hi there',
+            metrics: { cost: 0.001, inputTokens: 1, outputTokens: 2, durationMs: 10 },
+            headers: { 'x-id': 'a' },
+          }),
+        ]),
+      );
       vi.stubGlobal('fetch', fetchMock);
 
       const ctrl = new AbortController();
@@ -114,7 +112,10 @@ describe('playground API client', () => {
     });
 
     it('throws the parsed JSON error message when the request fails before the stream opens', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ message: 'rate limited' }, 429)));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(jsonResponse({ message: 'rate limited' }, 429)),
+      );
       await expect(
         playground.streamPlayground(
           { agentName: 'demo', model: 'm', provider: 'p' },
@@ -126,9 +127,7 @@ describe('playground API client', () => {
     it('throws when the content-type is not an event stream (HTML/JSON 200)', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue(
-          jsonResponse({ message: 'unexpected non-stream body' }, 200),
-        ),
+        vi.fn().mockResolvedValue(jsonResponse({ message: 'unexpected non-stream body' }, 200)),
       );
       await expect(
         playground.streamPlayground(
@@ -213,12 +212,14 @@ describe('playground API client', () => {
     it('throws the message carried by a mid-stream error event', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue(
-          streamResponse([
-            sse({ type: 'delta', text: 'partial' }),
-            sse({ type: 'error', message: 'upstream exploded' }),
-          ]),
-        ),
+        vi
+          .fn()
+          .mockResolvedValue(
+            streamResponse([
+              sse({ type: 'delta', text: 'partial' }),
+              sse({ type: 'error', message: 'upstream exploded' }),
+            ]),
+          ),
       );
       await expect(
         playground.streamPlayground(
@@ -317,9 +318,7 @@ describe('playground API client', () => {
     it('throws "Stream ended without a result" when no done event arrives', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue(
-          streamResponse([sse({ type: 'delta', text: 'only a delta' })]),
-        ),
+        vi.fn().mockResolvedValue(streamResponse([sse({ type: 'delta', text: 'only a delta' })])),
       );
       await expect(
         playground.streamPlayground(

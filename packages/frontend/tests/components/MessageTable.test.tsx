@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 import type { MessageRow } from '../../src/components/message-table-types';
 import { COMPACT_COLUMNS, DETAILED_COLUMNS } from '../../src/components/message-table-types';
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
+vi.mock('react-router', () => ({
+  Link: (props: any) => (
+    <a href={props.to} className={props.className}>
       {props.children}
     </a>
   ),
@@ -104,17 +104,12 @@ function makeRow(overrides: Partial<MessageRow> = {}): MessageRow {
   };
 }
 
-
 describe('MessageTable', () => {
   describe('column configuration', () => {
     it('renders compact column headers', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[]}
-          columns={COMPACT_COLUMNS}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
+      );
       const headers = container.querySelectorAll('th');
       expect(headers.length).toBe(10);
       // Identity first (status, when, what), then mechanics.
@@ -131,14 +126,14 @@ describe('MessageTable', () => {
     });
 
     it('renders detailed column headers with tooltips', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[]}
           columns={DETAILED_COLUMNS}
           agentName="agent-1"
           showHeaderTooltips
-        />
-      ));
+        />,
+      );
       const headers = container.querySelectorAll('th');
       expect(headers.length).toBe(12);
       expect(headers[0]!.textContent).toContain('Status');
@@ -156,27 +151,23 @@ describe('MessageTable', () => {
     });
 
     it('renders "Tokens" without tooltip when showHeaderTooltips is false', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[]}
-          columns={COMPACT_COLUMNS}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
+      );
       const tokensHeader = container.querySelectorAll('th')[7]!; // 'totalTokens' is at index 7 in COMPACT_COLUMNS (after recovery)
       expect(tokensHeader.textContent).toBe('Tokens');
       expect(tokensHeader.querySelector('[data-testid="info-tooltip"]')).toBeNull();
     });
 
     it('renders same number of columns for each row as headers', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow()]}
           columns={DETAILED_COLUMNS}
           agentName="agent-1"
           showHeaderTooltips
-        />
-      ));
+        />,
+      );
       const headers = container.querySelectorAll('th');
       const cells = container.querySelectorAll('tbody td');
       expect(cells.length).toBe(headers.length);
@@ -185,173 +176,159 @@ describe('MessageTable', () => {
 
   describe('data rendering', () => {
     it('renders date cell', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" />,
+      );
       expect(container.textContent).toContain('2026-02-16 10:00:00');
     });
 
     it('renders message ID (first 8 chars)', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ id: 'e83a3049-xxxx' })]}
           columns={['message']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('e83a3049');
     });
 
     it('renders heartbeat icon when routing_reason is heartbeat', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ routing_reason: 'heartbeat' })]}
           columns={['message']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const heartbeat = container.querySelector('[title="Heartbeat"]');
       expect(heartbeat).toBeDefined();
       expect(heartbeat).not.toBeNull();
     });
 
     it('renders cost value', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ cost: 1.5 })]}
-          columns={['cost']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ cost: 1.5 })]} columns={['cost']} agentName="agent-1" />,
+      );
       expect(container.textContent).toContain('$1.50');
     });
 
     it('renders flat-fee subscription cost as $0.00 when cost is null', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ auth_type: 'subscription', cost: null })]}
           columns={['cost']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('$0.00');
       expect(container.querySelector('[title="Included in subscription"]')).not.toBeNull();
     });
 
     it('renders the per-request cost for OpenCode-Go-style subscriptions', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ auth_type: 'subscription', cost: 0.013636 })]}
           columns={['cost']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('$0.01');
-      expect(
-        container.querySelector('[title^="Per-request subscription cost:"]'),
-      ).not.toBeNull();
+      expect(container.querySelector('[title^="Per-request subscription cost:"]')).not.toBeNull();
     });
 
     it('renders em dash for null cost', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ cost: null })]}
-          columns={['cost']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ cost: null })]} columns={['cost']} agentName="agent-1" />,
+      );
       expect(container.textContent).toContain('\u2014');
     });
 
     it('renders total tokens', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ total_tokens: 1500 })]}
           columns={['totalTokens']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('1500');
     });
 
     it('renders input and output tokens', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ input_tokens: 200, output_tokens: 80 })]}
           columns={['input', 'output']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('200');
       expect(container.textContent).toContain('80');
     });
 
     it('renders cache tokens', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ cache_read_tokens: 500, cache_creation_tokens: 100 })]}
           columns={['cache']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('Read: 500');
       expect(container.textContent).toContain('Write: 100');
     });
 
     it('renders em dash for zero cache tokens', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ cache_read_tokens: 0, cache_creation_tokens: 0 })]}
           columns={['cache']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('\u2014');
     });
 
     it('renders duration', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ duration_ms: 450 })]}
           columns={['duration']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.textContent).toContain('450ms');
     });
   });
 
   describe('model column', () => {
     it('renders known provider icon and model name', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ model: 'gpt-4o' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('[data-testid="icon-openai"]')).not.toBeNull();
       expect(container.textContent).toContain('gpt-4o');
     });
 
     it('uses getModelDisplayName over display_name', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ model: 'gpt-4o', display_name: 'GPT-4o' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       // getModelDisplayName is mocked to strip custom prefix; for gpt-4o it returns as-is
       expect(container.textContent).toContain('gpt-4o');
     });
 
     it('uses stored provider over model-name inference for ollama-cloud tagged models', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[
             makeRow({ id: 'm1', model: 'gemma4:31b', provider: 'ollama-cloud' }),
@@ -360,8 +337,8 @@ describe('MessageTable', () => {
           ]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       // All three rows should render the ollama-cloud icon, not ollama (colon
       // heuristic) or deepseek (prefix match).
       const cloudIcons = container.querySelectorAll('[data-testid="icon-ollama-cloud"]');
@@ -371,13 +348,13 @@ describe('MessageTable', () => {
     });
 
     it('falls back to model-name inference when provider field is absent (legacy rows)', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ model: 'gpt-4o', provider: null })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('[data-testid="icon-openai"]')).not.toBeNull();
     });
 
@@ -387,7 +364,7 @@ describe('MessageTable', () => {
       // NOT the generic provider-icon branch. Without the isCustomProvider
       // check, provId becomes 'custom:abc' (from resolveProviderId) which
       // does not equal 'custom', so the custom branch would be skipped.
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[
             makeRow({
@@ -398,8 +375,8 @@ describe('MessageTable', () => {
           ]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const avatar = container.querySelector('.provider-card__logo-letter');
       expect(avatar).not.toBeNull();
       expect(avatar!.textContent).toBe('M');
@@ -409,57 +386,53 @@ describe('MessageTable', () => {
     });
 
     it('renders custom provider letter avatar', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ model: 'custom:abc/my-model', custom_provider_name: 'MyProvider' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const avatar = container.querySelector('.provider-card__logo-letter');
       expect(avatar).not.toBeNull();
       expect(avatar!.textContent).toBe('M');
     });
 
     it('renders em dash for null model', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ model: null })]}
-          columns={['model']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ model: null })]} columns={['model']} agentName="agent-1" />,
+      );
       expect(container.textContent).toContain('\u2014');
     });
 
     it('renders routing tier badge', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ routing_tier: 'fast' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const badge = container.querySelector('.tier-badge--fast');
       expect(badge).not.toBeNull();
       expect(badge!.textContent).toBe('fast');
     });
 
     it('renders direct routing tier badge in uppercase', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ routing_tier: 'direct' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const badge = container.querySelector('.tier-badge--direct');
       expect(badge).not.toBeNull();
       expect(badge!.textContent).toBe('DIRECT');
     });
 
     it('renders specificity category badge (with underscores replaced) over tier badge', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[
             makeRow({
@@ -469,8 +442,8 @@ describe('MessageTable', () => {
           ]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const specBadge = container.querySelector('.tier-badge--specificity');
       expect(specBadge).not.toBeNull();
       // underscores replaced with spaces
@@ -480,26 +453,26 @@ describe('MessageTable', () => {
     });
 
     it('no longer renders a fallback badge in the model column (moved to Trigger)', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ fallback_from_model: 'claude-opus-4-6' })]}
           columns={['model']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.tier-badge--fallback')).toBeNull();
     });
   });
 
   describe('attempts column', () => {
     it('renders just the attempt count (no icons) when fallback_from_model is set', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ id: 'row-77', fallback_from_model: 'gpt-4o', attempt_count: 2 })]}
           columns={['attempts']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('td')!.textContent).toContain('2');
       // Icons live in the recovery column
       expect(container.querySelector('[title="Fallback"]')).toBeNull();
@@ -508,50 +481,46 @@ describe('MessageTable', () => {
 
   describe('recovery column', () => {
     it('renders fallback icon with text label when fallback_from_model is set', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ fallback_from_model: 'gpt-4o' })]}
           columns={['recovery']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const badge = container.querySelector('[title="Fallback"]') as HTMLElement;
       expect(badge).not.toBeNull();
       expect(badge.textContent).toContain('fallback');
     });
 
     it('renders dash when no fallback applies', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['recovery']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['recovery']} agentName="agent-1" />,
+      );
       expect(container.querySelector('td')!.textContent).toContain('\u2014');
     });
   });
 
   describe('status column', () => {
     it('renders success status badge', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'ok' })]}
           columns={['status']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.status-badge--ok')).not.toBeNull();
     });
 
     it('renders rate_limited as a plain "Failed" status with no limits link', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'rate_limited', error_origin: 'provider' })]}
           columns={['status']}
           agentName="my-agent"
-        />
-      ));
+        />,
+      );
       // A provider rate limit is just a failure — it must not link to the
       // Thinker spend-limits page, and shows the binary Failed pill.
       expect(container.querySelector('a')).toBeNull();
@@ -562,13 +531,13 @@ describe('MessageTable', () => {
     it('renders a plain Failed badge for an error row (no status-cell tooltip)', () => {
       // The status-cell hover tooltip was removed — error detail now lives in the
       // expanded accordion, so the status cell is just the binary Failed pill.
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'error', error_message: 'timeout' })]}
           columns={['status']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.status-badge-tooltip')).toBeNull();
       const badge = container.querySelector('.status-badge--error');
       expect(badge).not.toBeNull();
@@ -578,13 +547,13 @@ describe('MessageTable', () => {
     it('renders a fallback_error row as a plain "Failed" pill (no status SVG)', () => {
       // fallback_error is no longer a distinct status — it's just a failure, and
       // the fallback itself is surfaced in the Trigger column, not here.
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'fallback_error', error_origin: 'provider' })]}
           columns={['status']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.status-badge--fallback_error')).toBeNull();
       const badge = container.querySelector('.status-badge--error');
       expect(badge).not.toBeNull();
@@ -594,26 +563,22 @@ describe('MessageTable', () => {
 
   describe('row configuration', () => {
     it('sets row id with rowIdPrefix', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ id: 'test-id-123' })]}
           columns={['date']}
           agentName="agent-1"
           rowIdPrefix="msg-"
-        />
-      ));
+        />,
+      );
       const row = container.querySelector('tr[id="msg-test-id-123"]');
       expect(row).not.toBeNull();
     });
 
     it('does not set row id when rowIdPrefix is omitted', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" />,
+      );
       const bodyRow = container.querySelector('tbody tr');
       expect(bodyRow!.getAttribute('id')).toBeNull();
     });
@@ -621,39 +586,30 @@ describe('MessageTable', () => {
 
   describe('expand details', () => {
     it('renders chevron button for each row when expandable', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow(), makeRow({ id: 'row-2' })]}
           columns={['date']}
           agentName="agent-1"
           expandable
-        />
-      ));
+        />,
+      );
       const buttons = container.querySelectorAll('.msg-detail__chevron-btn');
       expect(buttons.length).toBe(2);
     });
 
     it('does not render chevron when expandable is false', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" />,
+      );
       expect(container.querySelector('.msg-detail__chevron-btn')).toBeNull();
       expect(container.querySelector('.msg-detail__chevron-th')).toBeNull();
     });
 
     it('expands details panel when chevron is clicked', async () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" expandable />,
+      );
       expect(container.querySelector('[data-testid="message-details"]')).toBeNull();
       const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLButtonElement;
       fireEvent.click(btn);
@@ -661,14 +617,9 @@ describe('MessageTable', () => {
     });
 
     it('collapses details panel on second click', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" expandable />,
+      );
       const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLButtonElement;
       fireEvent.click(btn);
       expect(container.querySelector('[data-testid="message-details"]')).not.toBeNull();
@@ -677,14 +628,9 @@ describe('MessageTable', () => {
     });
 
     it('adds open class to chevron button when expanded', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" expandable />,
+      );
       const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLElement;
       expect(btn.classList.contains('msg-detail__chevron-btn--open')).toBe(false);
       fireEvent.click(btn);
@@ -692,14 +638,14 @@ describe('MessageTable', () => {
     });
 
     it('passes correct messageId to MessageDetails', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ id: 'specific-msg-id' })]}
           columns={['date']}
           agentName="agent-1"
           expandable
-        />
-      ));
+        />,
+      );
       const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLButtonElement;
       fireEvent.click(btn);
       const details = container.querySelector('[data-testid="message-details"]');
@@ -708,14 +654,9 @@ describe('MessageTable', () => {
     });
 
     it('sets aria-label on chevron button', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" expandable />,
+      );
       const btn = container.querySelector('.msg-detail__chevron-btn') as HTMLElement;
       expect(btn.getAttribute('aria-label')).toBe('Expand details');
       fireEvent.click(btn);
@@ -723,14 +664,9 @@ describe('MessageTable', () => {
     });
 
     it('expands the panel when the row body (a non-interactive cell) is clicked', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date']}
-          agentName="agent-1"
-          expandable
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date']} agentName="agent-1" expandable />,
+      );
       expect(container.querySelector('[data-testid="message-details"]')).toBeNull();
       // Click a plain cell — the click bubbles to the row handler and toggles.
       const cell = container.querySelector('.msg-row--clickable td') as HTMLElement;
@@ -742,14 +678,14 @@ describe('MessageTable', () => {
       // A Thinker policy-limit row renders an <a> link to the limits page.
       // Clicking it must NOT toggle the row (the handler bails on
       // button/a/[role=button]).
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ status: 'error', error_origin: 'policy', agent_name: 'my-agent' })]}
           columns={['status']}
           agentName="my-agent"
           expandable
-        />
-      ));
+        />,
+      );
       const link = container.querySelector('.msg-row--clickable a') as HTMLElement;
       expect(link).not.toBeNull();
       fireEvent.click(link);
@@ -761,21 +697,17 @@ describe('MessageTable', () => {
     it('compact and detailed columns render identical model cell for same data', () => {
       const row = makeRow({ model: 'gpt-4o', display_name: 'GPT-4o', routing_tier: 'fast' });
 
-      const { container: compact } = render(() => (
-        <MessageTable
-          items={[row]}
-          columns={COMPACT_COLUMNS}
-          agentName="agent-1"
-        />
-      ));
-      const { container: detailed } = render(() => (
+      const { container: compact } = render(
+        <MessageTable items={[row]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
+      );
+      const { container: detailed } = render(
         <MessageTable
           items={[row]}
           columns={DETAILED_COLUMNS}
           agentName="agent-1"
           showHeaderTooltips
-        />
-      ));
+        />,
+      );
 
       // Both should show the same model text
       const compactModel = compact.querySelector('.tier-badge--fast');
@@ -788,21 +720,17 @@ describe('MessageTable', () => {
     it('compact and detailed columns render identical status cell for same data', () => {
       const row = makeRow({ status: 'error', error_message: 'timeout' });
 
-      const { container: compact } = render(() => (
-        <MessageTable
-          items={[row]}
-          columns={COMPACT_COLUMNS}
-          agentName="agent-1"
-        />
-      ));
-      const { container: detailed } = render(() => (
+      const { container: compact } = render(
+        <MessageTable items={[row]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
+      );
+      const { container: detailed } = render(
         <MessageTable
           items={[row]}
           columns={DETAILED_COLUMNS}
           agentName="agent-1"
           showHeaderTooltips
-        />
-      ));
+        />,
+      );
 
       const compactBadge = compact.querySelector('.status-badge--error');
       const detailedBadge = detailed.querySelector('.status-badge--error');
@@ -811,13 +739,13 @@ describe('MessageTable', () => {
     });
 
     it('supports custom column subsets for future pages', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <MessageTable
           items={[makeRow({ duration_ms: 300 })]}
           columns={['date', 'cost', 'totalTokens', 'duration', 'status']}
           agentName="agent-1"
-        />
-      ));
+        />,
+      );
       const headers = container.querySelectorAll('th');
       expect(headers.length).toBe(5);
       expect(headers[0]!.textContent).toContain('Date');
@@ -830,44 +758,32 @@ describe('MessageTable', () => {
 
   describe('agent column (global mode)', () => {
     it('renders Agent column header when agent column is in columns list', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ agent_name: 'my-agent' })]}
-          columns={['agent', 'date']}
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ agent_name: 'my-agent' })]} columns={['agent', 'date']} />,
+      );
       const headers = container.querySelectorAll('th');
       expect(headers[0]!.textContent).toContain('Harness');
       expect(headers[1]!.textContent).toContain('Date');
     });
 
     it('renders agent_name value in agent cell', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ agent_name: 'my-agent' })]}
-          columns={['agent']}
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ agent_name: 'my-agent' })]} columns={['agent']} />,
+      );
       expect(container.textContent).toContain('my-agent');
     });
 
     it('renders em dash when agent_name is null', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow({ agent_name: null })]}
-          columns={['agent']}
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow({ agent_name: null })]} columns={['agent']} />,
+      );
       expect(container.textContent).toContain('—');
     });
 
     it('works without agentName prop (global mode)', () => {
-      const { container } = render(() => (
-        <MessageTable
-          items={[makeRow()]}
-          columns={['date', 'status']}
-        />
-      ));
+      const { container } = render(
+        <MessageTable items={[makeRow()]} columns={['date', 'status']} />,
+      );
       expect(container.querySelector('.data-table')).not.toBeNull();
     });
   });

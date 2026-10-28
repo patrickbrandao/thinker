@@ -29,6 +29,7 @@ import { Tenant } from '../src/entities/tenant.entity';
 import { OrganizationMember, OrganizationRole } from '../src/entities/organization-member.entity';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { OrganizationsModule } from '../src/organizations/organizations.module';
+import { ConsoleModule } from '../src/console/console.module';
 import { UserProfile } from '../src/entities/user-profile.entity';
 import { Agent } from '../src/entities/agent.entity';
 import { AgentApiKey } from '../src/entities/agent-api-key.entity';
@@ -294,6 +295,7 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
         PlaygroundModule,
         SetupModule,
         OrganizationsModule,
+        ConsoleModule,
       ],
       providers: [
         { provide: APP_GUARD, useClass: MockSessionGuard },

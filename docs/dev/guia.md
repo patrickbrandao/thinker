@@ -20,7 +20,7 @@ Monorepo com npm workspaces e Turborepo:
 packages/
 ├── shared/     thinker-shared    tipos e helpers usados por backend, frontend e CLI (provedores, tiers, snippets)
 ├── backend/    thinker-backend   NestJS 12, TypeORM 1.1, PostgreSQL 18, Better Auth
-├── frontend/   thinker-frontend  SolidJS + Vite, dashboard
+├── frontend/   thinker-frontend  React 19 + Vite + Tailwind 4, dashboard
 ├── cli/        thinker-cli       CLI `thinker` (privada, não publicada)
 └── thinker/    thinker           pacote sem código que guarda a versão canônica
 contracts/gateway/                testes de contrato HTTP do gateway
@@ -140,12 +140,25 @@ Uma proteção (`packages/backend/test/e2e-db-guard.ts`) recusa rodar sem `DATAB
 
 Qualquer mudança de comportamento em tempo de execução também passa pelo agente `qa-docker`, contra a imagem construída localmente.
 
+### Dashboard (console)
+
+O dashboard é React 19 com react-router 7, Vite e Tailwind 4 ([ADR 0007](../adr/0007-console-react.md)). As peças que toda tela usa:
+
+- **Shell** (`src/App.tsx`, `src/components/shell/`): sidebar com ícones e labels, recolhível (a escolha fica em `localStorage`, `thinker.sidebarCollapsed`; abaixo de 900 px vira gaveta); barra superior com a trilha, Documentação e os ícones Procurar, Alterar tema e Alertas; menu do usuário no rodapé da sidebar, com a organização atual, a troca e a criação de organizações, membros, administração de usuários, integrações (MCP e CLI), preferências da conta e sair.
+- **Menu principal:** um arquivo só, `src/config/navigation.tsx`. A sidebar, a trilha e o "Ir para" da paleta ⌘K leem dele.
+- **Paleta ⌘K** (`CommandPalette.tsx`): páginas e ações filtradas no navegador, mais `GET /api/v1/search?q=` (mínimo 2 caracteres), que procura na organização ativa harnesses, conexões, provedores custom, modelos virtuais, header tiers, modelos do catálogo e membros (`backend/src/console/`).
+- **Alertas** (`AlertsMenu.tsx`): `GET /api/v1/alerts`, as requisições com falha das últimas 24 horas. O contador mostra as mais novas que a última abertura, guardada no navegador (`thinker.alertsSeenAt`); cada item abre a requisição em `/messages?request=<id>`.
+- **Tema:** claro, escuro ou o do sistema (`src/lib/theme.ts`, chave `theme` no `localStorage`, aplicada antes da pintura por `public/theme-init.js`). O ícone do topo alterna entre claro e escuro; Preferências da conta oferece também "sistema".
+- **Estado e dados:** stores globais são `signal()` com `useSignal()` (`src/lib/signal.ts`); telas carregam dados com `useResource(fetcher, deps)` (`src/lib/use-resource.ts`), que descarta respostas atrasadas. Os pings do SSE (`services/sse.ts`) entram como dependência para recarregar.
+- **Estilo:** tokens por papel em `src/styles/tokens.css` (fundos, fios, quatro níveis de texto, um acento azul, estados, portas e séries de gráfico, nos dois temas) e as classes de `base.css`/`shell.css`. Componentes usam os primitivos de `src/components/ui.tsx` e utilitários Tailwind ligados aos tokens (`bg-elev`, `text-muted`, `border-line`...); nada de hex nem de `dark:` para cor.
+- **Fluxo (React Flow):** `src/components/flow/` traz o palco (`FlowCanvas`), os nós (entrada, roteamento, provedor, pool), as arestas (animadas quando há tráfego) e o auto layout em colunas. A página `/topology` usa o palco e carrega num chunk próprio; o adaptador com os dados reais ainda não existe.
+
 ### Traduções do dashboard (#42)
 
-O dashboard fala inglês (`en`, referência e fallback) e português do Brasil (`pt-BR`), com [`@solid-primitives/i18n`](https://github.com/solidjs-community/solid-primitives/tree/main/packages/i18n). Os catálogos vão no bundle: nada é baixado em tempo de execução.
+O dashboard fala inglês (`en`, referência e fallback) e português do Brasil (`pt-BR`), com um `t()` próprio e tipado (`packages/frontend/src/i18n/index.ts`). Os catálogos vão no bundle: nada é baixado em tempo de execução.
 
 - **Onde ficam:** `packages/frontend/src/i18n/locales/{en,pt-BR}/<namespace>.ts`, um arquivo por área (`common`, `nav`, `auth`, `org`, `routing`, `providers`...). O `pt-BR` é tipado como `Catalog<typeof en>`, então o typecheck acusa chave faltando.
-- **No código:** `t('routing.title')`, com `{{ nome }}` preenchido pelo segundo argumento (`t('format.minutesAgo', { n: 5 })`). Plurais são funções no catálogo, com a mesma assinatura nos dois idiomas. Chaves montadas em tempo de execução usam `tMaybe`, que devolve `undefined` quando a chave não existe. Chame `t()` dentro do JSX ou de um memo para o texto acompanhar a troca de idioma; constantes de módulo guardam chaves, não textos.
+- **No código:** `t('routing.title')`, com `{{ nome }}` preenchido pelo segundo argumento (`t('format.minutesAgo', { n: 5 })`). Plurais são funções no catálogo, com a mesma assinatura nos dois idiomas. Chaves montadas em tempo de execução usam `tMaybe`, que devolve `undefined` quando a chave não existe. A árvore do app é remontada quando o idioma muda, então basta chamar `t()` na renderização; constantes de módulo guardam chaves, não textos. Plurais recebem os argumentos na ordem do catálogo (`t('shell.alerts.labelUnseen', 3)`).
 - **Datas, números e moeda:** sempre por `Intl` com `intlLocale()` ou pelos helpers de `services/formatters.ts` (`formatCost`, `usd`, `formatNumber`, `formatTime`). Em inglês a saída continua `en-US`.
 - **Idioma escolhido:** em Preferências da conta (`/account`). O padrão vem do navegador (`pt*` → `pt-BR`, senão `en`). A escolha fica no `localStorage` (`thinker.locale.<userId>`, mais `thinker.locale` para as telas de login) e volta depois de um novo login. Ainda não há preferência no backend, então ela vale por navegador.
 - **Fica em inglês:** nomes de marca, provedor e modelo, comandos e trechos de código, variáveis de ambiente, URLs e mensagens de erro vindas da API.
@@ -326,7 +339,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** (guiado po
 | O que mudou no upstream | `manifest-tracker` |
 | Desenho de feature grande, ADR | `architect` |
 | NestJS, TypeORM, auth, proxy | `backend-dev` |
-| Dashboard SolidJS | `frontend-dev` |
+| Dashboard React | `frontend-dev` |
 | Adaptadores, catálogos, preços, OAuth de assinatura | `providers` |
 | Imagem em Docker local, smoke e e2e | `qa-docker` |
 | Revisão de PR | `reviewer` |

@@ -1,8 +1,8 @@
-import { For, Show, type Component } from 'solid-js';
 import ProviderBanner from './ProviderBanner.js';
 import EmailProviderSetup from './EmailProviderSetup.js';
 import type { EmailProviderConfig } from '../services/api.js';
 import { t } from '../i18n/index.js';
+import { Skel } from './ui.js';
 
 interface EmailProviderSectionProps {
   emailProvider: EmailProviderConfig | null | undefined;
@@ -12,85 +12,71 @@ interface EmailProviderSectionProps {
   onRemove: () => void;
 }
 
-// No margin on the wrapper: .provider-card carries its own bottom gap, and the
-// unboxed setup/skeleton branches bring theirs.
-const EmailProviderSection: Component<EmailProviderSectionProps> = (props) => (
-  <div>
-    <Show
-      when={!props.loading}
-      fallback={
-        <Show
-          when={!!props.emailProvider}
-          fallback={
-            <div style="margin-bottom: var(--gap-lg);">
-              <div class="skeleton skeleton--text" style="width: 180px; height: 16px;" />
-              <div
-                class="skeleton skeleton--text"
-                style="width: 280px; height: 13px; margin: 8px 0 var(--gap-lg);"
-              />
-              <div class="provider-setup-grid">
-                <For each={[1, 2, 3]}>
-                  {() => (
-                    <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; border: 1px solid hsl(var(--border)); border-radius: var(--radius);">
-                      <div
-                        class="skeleton skeleton--rect"
-                        style="width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0;"
-                      />
-                      <div>
-                        <div class="skeleton skeleton--text" style="width: 64px; height: 13px;" />
-                        <div
-                          class="skeleton skeleton--text"
-                          style="width: 88px; height: 11px; margin-top: 4px;"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-          }
-        >
-          <div class="provider-card">
-            <div class="provider-card__header">
-              <span class="provider-card__label">{t('harnesses.email.yourProvider')}</span>
-              <div
-                class="skeleton skeleton--text"
-                style="width: 16px; height: 16px; border-radius: calc(var(--radius) - 2px);"
-              />
-            </div>
-            <div class="provider-card__body">
-              <div
-                class="skeleton skeleton--rect"
-                style="width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;"
-              />
-              <div>
-                <div class="skeleton skeleton--text" style="width: 80px; height: 14px;" />
-                <div
-                  class="skeleton skeleton--text"
-                  style="width: 160px; height: 12px; margin-top: 2px;"
-                />
-              </div>
+/**
+ * The email sender block of the Limits page: the provider banner when one is
+ * saved, the setup picker otherwise, and a matching skeleton while loading.
+ */
+export default function EmailProviderSection({
+  emailProvider,
+  loading,
+  onConfigured,
+  onEdit,
+  onRemove,
+}: EmailProviderSectionProps) {
+  if (loading) {
+    if (emailProvider) {
+      return (
+        <div className="provider-card card mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="provider-card__label text-xs font-medium text-muted">
+              {t('harnesses.email.yourProvider')}
+            </span>
+            <Skel width={16} height={16} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skel width={36} height={36} />
+            <div className="flex flex-col gap-1">
+              <Skel width={80} height={14} />
+              <Skel width={160} height={12} />
             </div>
           </div>
-        </Show>
-      }
-    >
-      <Show
-        when={props.emailProvider}
-        fallback={
-          <div style="margin-bottom: var(--gap-lg);">
-            <EmailProviderSetup onConfigured={props.onConfigured} />
-          </div>
-        }
-      >
-        <ProviderBanner
-          config={props.emailProvider!}
-          onEdit={props.onEdit}
-          onRemove={props.onRemove}
-        />
-      </Show>
-    </Show>
-  </div>
-);
+        </div>
+      );
+    }
+    return (
+      <div className="mb-4">
+        <Skel width={180} height={16} />
+        <div className="mb-3 mt-2">
+          <Skel width={280} height={13} />
+        </div>
+        <div className="provider-setup-grid grid gap-3 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card flex items-center gap-3">
+              <span className="skel-rect inline-flex">
+                <Skel width={32} height={32} />
+              </span>
+              <div className="flex flex-col gap-1">
+                <Skel width={64} height={13} />
+                <Skel width={88} height={11} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-export default EmailProviderSection;
+  if (!emailProvider) {
+    return (
+      <div className="mb-4">
+        <EmailProviderSetup onConfigured={onConfigured} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <ProviderBanner config={emailProvider} onEdit={onEdit} onRemove={onRemove} />
+    </div>
+  );
+}
