@@ -13,6 +13,7 @@ import { useResource } from '../lib/use-resource.js';
 import { ModelParamsSection, RequestHeadersSection } from './MessageDetailsSections.js';
 import { FallbackIcon } from './message-table-cells.js';
 import { routingTierLabel } from './message-table-types.js';
+import { RequestTimelineChart } from './RequestTimelineChart.js';
 import { t, tMaybe } from '../i18n/index.js';
 import { cx } from './ui.js';
 
@@ -246,6 +247,12 @@ function ErrorRecovery({ m }: { m: DetailMessage }) {
   );
 }
 
+function formatPeer(ip: string | undefined, port: number | undefined): string | null {
+  if (!ip) return null;
+  if (port == null) return ip;
+  return ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;
+}
+
 function DetailsBody({ m }: { m: DetailMessage }) {
   const provider = m.model ? inferProviderName(m.model) : null;
   // Normalize status for display: a superseded failure (the fallback
@@ -328,6 +335,33 @@ function DetailsBody({ m }: { m: DetailMessage }) {
           <MetaField label={t('messages.details.field.skill')} value={m.skill_name} />
         </div>
       </div>
+
+      {m.caller_attribution?.clientIp || m.caller_attribution?.peerIp ? (
+        <div className="msg-detail__section mt-4">
+          <SectionTitle>{t('messages.details.origin')}</SectionTitle>
+          <div className="msg-detail__meta flex flex-wrap items-center gap-x-5 gap-y-2">
+            <MetaField
+              label={t('messages.details.field.clientIp')}
+              value={m.caller_attribution.clientIp}
+            />
+            <MetaField
+              label={t('messages.details.field.clientIpSource')}
+              value={m.caller_attribution.clientIpSource}
+            />
+            <MetaField
+              label={t('messages.details.field.peer')}
+              value={formatPeer(m.caller_attribution.peerIp, m.caller_attribution.peerPort)}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {m.timeline && m.timeline.events.length > 0 ? (
+        <div className="msg-detail__section mt-4">
+          <SectionTitle>{t('messages.details.timeline.title')}</SectionTitle>
+          <RequestTimelineChart timeline={m.timeline} />
+        </div>
+      ) : null}
 
       <ErrorRecovery m={m} />
 

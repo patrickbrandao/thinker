@@ -135,15 +135,16 @@ describe('MessageTable', () => {
         />,
       );
       const headers = container.querySelectorAll('th');
-      expect(headers.length).toBe(11);
+      expect(headers.length).toBe(12);
       expect(headers[0]!.textContent).toContain('Status');
       expect(headers[1]!.textContent).toContain('Date');
-      expect(headers[2]!.textContent).toContain('Model');
-      expect(headers[3]!.textContent).toBe('Attempts');
-      expect(headers[4]!.textContent).toContain('Request');
-      expect(headers[6]!.textContent).toContain('Total Tokens');
-      expect(headers[9]!.textContent).toContain('Cache');
-      expect(headers[10]!.textContent).toContain('Latency');
+      expect(headers[2]!.textContent).toBe('Client IP');
+      expect(headers[3]!.textContent).toContain('Model');
+      expect(headers[4]!.textContent).toBe('Attempts');
+      expect(headers[5]!.textContent).toContain('Request');
+      expect(headers[7]!.textContent).toContain('Total Tokens');
+      expect(headers[10]!.textContent).toContain('Cache');
+      expect(headers[11]!.textContent).toContain('Latency');
       // Tooltips should be present for token columns
       const tooltips = container.querySelectorAll('[data-testid="info-tooltip"]');
       expect(tooltips.length).toBeGreaterThanOrEqual(3);

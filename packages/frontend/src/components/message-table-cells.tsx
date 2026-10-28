@@ -90,6 +90,10 @@ export function DateCell(item: MessageRow) {
   );
 }
 
+export function ClientIpCell(item: MessageRow) {
+  return <td className={cx('w-[1%] whitespace-nowrap', MONO_XS)}>{item.client_ip || '—'}</td>;
+}
+
 export function MessageCell(item: MessageRow) {
   return (
     <td className={MONO_XS}>
@@ -459,5 +463,7 @@ export function renderCell(key: MessageColumnKey, item: MessageRow, ctx: CellRen
       return AttemptsCell(item);
     case 'agent':
       return AgentCell(item, ctx.agentPlatformLookup);
+    case 'clientIp':
+      return ClientIpCell(item);
   }
 }

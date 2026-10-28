@@ -5,6 +5,7 @@ import { AgentMessage } from '../../entities/agent-message.entity';
 import type { CallerAttribution } from '../../routing/proxy/caller-classifier';
 import { isSuccessStatus, type RequestParamDefaults } from 'thinker-shared';
 import { ThinkerRequest } from '../../entities/request.entity';
+import type { RequestTimeline } from '../../routing/proxy/request-timeline';
 import type { RecordingResponseBody } from '../../routing/proxy/attempt-recording.types';
 import { RequestRecordingStorageService } from '../../common/services/request-recording-storage.service';
 import { decodeRequestRecording } from '../../common/utils/request-recording-codec';
@@ -47,6 +48,7 @@ export interface MessageDetailResponse {
     request_headers: Record<string, string> | null;
     request_params: RequestParamDefaults | null;
     caller_attribution: CallerAttribution | null;
+    timeline: RequestTimeline | null;
     virtual_model_id: string | null;
     virtual_model_name: string | null;
     attempts?: Array<{
@@ -198,6 +200,7 @@ export class MessageDetailsService {
         request_params: (request?.request_params ??
           message?.request_params) as RequestParamDefaults | null,
         caller_attribution: request?.caller_attribution ?? message?.caller_attribution ?? null,
+        timeline: request?.timeline ?? null,
         virtual_model_id: message?.virtual_model_id ?? null,
         virtual_model_name: message?.virtual_model_name ?? null,
         ...(request

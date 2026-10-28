@@ -30,6 +30,8 @@ import { ProviderParamSpecService } from '../routing-core/provider-param-spec.se
 import { resolveModelCapabilityMetadata } from '../../model-discovery/model-capabilities';
 import { classifyCaller } from './caller-classifier';
 import { clientIpInfo } from '../../common/utils/client-ip';
+import { requestReceivedAtMs } from '../../common/utils/request-received';
+import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
 import { sanitizeRequestHeaders } from './request-headers';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
@@ -282,6 +284,7 @@ export class ProxyController {
       clientIp,
       clientIpSource,
       peerIp,
+      peerPort: req.socket?.remotePort,
     };
     const requestHeaders = sanitizeRequestHeaders(req.headers);
     const isStream = body.stream === true;
@@ -293,9 +296,21 @@ export class ProxyController {
     let currentAttempt: ProviderAttemptRef | undefined;
     let currentAttemptStart: ProviderAttemptStart | undefined;
 
-    const clientAbort = new AbortController();
-    res.once('close', () => clientAbort.abort());
     const startTime = Date.now();
+    const timelineAttempts: TimelineAttempt[] = [];
+    const saveTimeline = this.trackTimeline(
+      req,
+      res,
+      requestId,
+      tenantId,
+      startTime,
+      timelineAttempts,
+    );
+    const clientAbort = new AbortController();
+    res.once('close', () => {
+      clientAbort.abort();
+      saveTimeline();
+    });
 
     // The Request exists as pending from ingress, before Thinker routes it or
     // starts any provider call. A recording failure must not reject user traffic.
@@ -338,6 +353,7 @@ export class ProxyController {
       };
       currentAttempt = attempt;
       currentAttemptStart = start;
+      timelineAttempts.push({ ref: attempt, start });
       // Cooldown skips still need a unique position in the routing chain, but
       // must not look like an in-flight provider call or trigger provider-call
       // accounting before their terminal policy row is written.
@@ -546,6 +562,44 @@ export class ProxyController {
     } finally {
       if (slotAcquired) this.rateLimiter.releaseSlot(tenantId);
     }
+  }
+
+  /**
+   * Collects the response-side marks (headers written, last byte flushed) and
+   * returns the writer the close handler calls to store the whole Request
+   * timeline. Writing at close means every provider mark is already final.
+   */
+  private trackTimeline(
+    req: Request,
+    res: ExpressResponse,
+    requestId: string,
+    tenantId: string,
+    startTime: number,
+    attempts: TimelineAttempt[],
+  ): () => void {
+    let responseStartedAtMs: number | undefined;
+    let responseCompletedAtMs: number | undefined;
+    const writeHead = res.writeHead;
+    if (typeof writeHead === 'function') {
+      res.writeHead = function (this: ExpressResponse, ...args: unknown[]) {
+        responseStartedAtMs ??= Date.now();
+        return (writeHead as (...a: unknown[]) => ExpressResponse).apply(this, args);
+      } as typeof res.writeHead;
+    }
+    res.once('finish', () => {
+      responseCompletedAtMs = Date.now();
+    });
+    return () => {
+      const timeline = buildRequestTimeline({
+        receivedAtMs: requestReceivedAtMs(req, startTime),
+        attempts,
+        responseStartedAtMs,
+        responseCompletedAtMs,
+      });
+      void this.recorder
+        .recordRequestTimeline(tenantId, requestId, timeline)
+        .catch((e) => this.logger.warn(`Failed to record Request timeline: ${e}`));
+    };
   }
 
   /**

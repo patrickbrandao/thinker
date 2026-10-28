@@ -13,6 +13,7 @@ import {
 } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ThinkerRequest } from '../../entities/request.entity';
+import type { RequestTimeline } from './request-timeline';
 import {
   ModelPricingCacheService,
   type PricingEntry,
@@ -559,6 +560,29 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       }
     }
     return false;
+  }
+
+  /**
+   * Store the Request timeline. The pending row is written at ingress, so it
+   * normally exists; when that write failed, a terminal writer may still be
+   * creating the row, so one delayed retry covers it.
+   */
+  async recordRequestTimeline(
+    tenantId: string,
+    requestId: string,
+    timeline: RequestTimeline,
+  ): Promise<void> {
+    const getRepository = this.messageRepo.manager?.getRepository?.bind(this.messageRepo.manager);
+    if (!getRepository) return;
+    const repo = getRepository(ThinkerRequest);
+    if (typeof repo.update !== 'function') return;
+    const write = () =>
+      repo.update({ id: requestId, tenant_id: tenantId }, { timeline: timeline as never });
+    const result = await write();
+    if (result.affected === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      await write();
+    }
   }
 
   /** Persist the accepted Request before routing or provider work begins. */
