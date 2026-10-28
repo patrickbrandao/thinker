@@ -64,17 +64,17 @@ describe('AgentDetail', () => {
     expect(container.querySelector('h1')?.textContent?.trim()).toBe('my-agent');
   });
 
-  it('renders a tablist with exactly 5 tabs', () => {
+  it('renders a tablist with exactly 6 tabs', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
-    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(5);
+    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(6);
   });
 
-  it('renders tabs labeled Overview, Routing, Providers, Limits, Settings in order', () => {
+  it('renders tabs labeled Overview, Routing, Models, Providers, Limits, Settings in order', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const labels = Array.from(tabsOf(container)).map((t) => t.textContent);
-    expect(labels).toEqual(['Overview', 'Routing', 'Providers', 'Limits', 'Settings']);
+    expect(labels).toEqual(['Overview', 'Routing', 'Models', 'Providers', 'Limits', 'Settings']);
   });
 
   it('Overview tab links to the agent root path', () => {
@@ -87,19 +87,24 @@ describe('AgentDetail', () => {
     expect(tabsOf(container)[1].getAttribute('href')).toBe('/harnesses/my-agent/routing');
   });
 
+  it('Models tab links to /harnesses/:name/models', () => {
+    const { container } = renderAt('/harnesses/my-agent');
+    expect(tabsOf(container)[2].getAttribute('href')).toBe('/harnesses/my-agent/models');
+  });
+
   it('Providers tab links to /harnesses/:name/providers', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    expect(tabsOf(container)[2].getAttribute('href')).toBe('/harnesses/my-agent/providers');
+    expect(tabsOf(container)[3].getAttribute('href')).toBe('/harnesses/my-agent/providers');
   });
 
   it('Limits tab links to /harnesses/:name/guardrails', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    expect(tabsOf(container)[3].getAttribute('href')).toBe('/harnesses/my-agent/guardrails');
+    expect(tabsOf(container)[4].getAttribute('href')).toBe('/harnesses/my-agent/guardrails');
   });
 
   it('Settings tab links to /harnesses/:name/settings', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    expect(tabsOf(container)[4].getAttribute('href')).toBe('/harnesses/my-agent/settings');
+    expect(tabsOf(container)[5].getAttribute('href')).toBe('/harnesses/my-agent/settings');
   });
 
   it('marks Overview tab active when pathname is the agent root', () => {
@@ -110,6 +115,7 @@ describe('AgentDetail', () => {
     expect(tabs[2].getAttribute('aria-selected')).toBe('false');
     expect(tabs[3].getAttribute('aria-selected')).toBe('false');
     expect(tabs[4].getAttribute('aria-selected')).toBe('false');
+    expect(tabs[5].getAttribute('aria-selected')).toBe('false');
   });
 
   it('marks Overview tab active when pathname is /overview', () => {
@@ -124,19 +130,24 @@ describe('AgentDetail', () => {
     expect(tabs[1].getAttribute('aria-selected')).toBe('true');
   });
 
+  it('marks Models tab active when pathname is /models', () => {
+    const { container } = renderAt('/harnesses/my-agent/models');
+    expect(tabsOf(container)[2].getAttribute('aria-selected')).toBe('true');
+  });
+
   it('marks Limits tab active when pathname is /guardrails', () => {
     const { container } = renderAt('/harnesses/my-agent/guardrails');
-    expect(tabsOf(container)[3].getAttribute('aria-selected')).toBe('true');
+    expect(tabsOf(container)[4].getAttribute('aria-selected')).toBe('true');
   });
 
   it('marks Providers tab active when pathname is /providers', () => {
     const { container } = renderAt('/harnesses/my-agent/providers');
-    expect(tabsOf(container)[2].getAttribute('aria-selected')).toBe('true');
+    expect(tabsOf(container)[3].getAttribute('aria-selected')).toBe('true');
   });
 
   it('marks Settings tab active when pathname starts with /settings', () => {
     const { container } = renderAt('/harnesses/my-agent/settings/advanced');
-    expect(tabsOf(container)[4].getAttribute('aria-selected')).toBe('true');
+    expect(tabsOf(container)[5].getAttribute('aria-selected')).toBe('true');
   });
 
   it('renders the nested route inside the shell', () => {

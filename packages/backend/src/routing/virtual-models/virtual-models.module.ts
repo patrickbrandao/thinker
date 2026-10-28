@@ -8,6 +8,7 @@ import { RoutingCoreModule } from '../routing-core/routing-core.module';
 import { VirtualModelService } from './virtual-model.service';
 import { VirtualModelController } from './virtual-model.controller';
 import { ModelListRoutingService } from './model-list-routing.service';
+import { ModelListController } from './model-list.controller';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { ModelListRoutingService } from './model-list-routing.service';
     RoutingCoreModule,
   ],
   providers: [VirtualModelService, ModelListRoutingService],
-  controllers: [VirtualModelController],
+  controllers: [VirtualModelController, ModelListController],
   exports: [VirtualModelService, ModelListRoutingService],
 })
 export class VirtualModelsModule {}

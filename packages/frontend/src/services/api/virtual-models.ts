@@ -136,3 +136,35 @@ export function setVirtualModelFallbacks(
 export function clearVirtualModelFallbacks(agentName: string, id: string) {
   return fetchMutate(itemPath(agentName, id, '/fallbacks'), { method: 'DELETE' });
 }
+
+/** One row of a harness's Models tab, in `GET /v1/models` order. */
+export interface HarnessModelEntry {
+  id: string;
+  kind: 'auto' | 'virtual' | 'model';
+  owned_by: string;
+  context_length: number | null;
+  display_name?: string;
+  provider?: string;
+  provider_model_id?: string;
+  auth_type?: string;
+  input_price_per_token?: number | null;
+  output_price_per_token?: number | null;
+  reasoning?: boolean;
+  code?: boolean;
+  input_modalities?: string[];
+  output_modalities?: string[];
+  primary?: ModelRoute | null;
+  fallbacks?: ModelRoute[];
+  continue_on_default?: boolean;
+  response_mode?: ResponseMode;
+}
+
+export interface HarnessModelList {
+  listing: 'open' | 'restricted' | 'closed';
+  data: HarnessModelEntry[];
+}
+
+/** What this harness's `GET /v1/models` lists, with details for the dashboard. */
+export function getHarnessModelList(agentName: string) {
+  return fetchJson<HarnessModelList>(routingPath(agentName, 'model-list'));
+}
