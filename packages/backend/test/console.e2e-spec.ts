@@ -92,11 +92,11 @@ it('builds the topology with routes and the traffic of the window', async () => 
   await ds.query(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, agent_name, timestamp, status, model,
                                  provider, auth_type, virtual_model_id, cost_usd,
-                                 input_tokens, output_tokens)
+                                 input_tokens, output_tokens, caller_attribution)
      VALUES ($1, $3, $4, 'console-search-bot', now(), 'ok', 'gpt-4o-mini', 'openai', 'api_key',
-             $5, 0.5, 100, 50),
+             $5, 0.5, 100, 50, '{"userAgent":"x","clientIp":"203.0.113.7"}'),
             ($2, $3, $4, 'console-search-bot', now() - interval '3 days', 'ok', 'gpt-4o-mini',
-             'openai', 'api_key', $5, 1, 10, 10)`,
+             'openai', 'api_key', $5, 1, 10, 10, NULL)`,
     [randomUUID(), randomUUID(), TEST_TENANT_ID, agent.id, vm],
   );
 
@@ -116,17 +116,30 @@ it('builds the topology with routes and the traffic of the window', async () => 
     expect.arrayContaining([
       expect.objectContaining({ source: harness, target: hub, kind: 'entry', requests: 1 }),
       expect.objectContaining({
+        source: 'client:203.0.113.7',
+        target: harness,
+        kind: 'client',
+        requests: 1,
+      }),
+      expect.objectContaining({
         source: hub,
         target: 'provider:openai:api_key',
         kind: 'primary',
+        model: 'gpt-4o-mini',
         requests: 1,
       }),
       expect.objectContaining({
         source: hub,
         target: 'provider:anthropic:api_key',
         kind: 'fallback',
+        model: 'claude-haiku',
         requests: 0,
       }),
+    ]),
+  );
+  expect(res.body.clients).toEqual(
+    expect.arrayContaining([
+      { id: 'client:203.0.113.7', ip: '203.0.113.7', requests: 1, errors: 0 },
     ]),
   );
   const openai = res.body.providers.find((p: { id: string }) => p.id === 'provider:openai:api_key');

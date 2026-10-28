@@ -56,6 +56,7 @@ export default {
     ranges: { '1h': '1h', '24h': '24h', '7d': '7d', '30d': '30d' },
     range: 'Period',
     kinds: {
+      client: 'Client',
       entry: 'Harness',
       hub: 'Route',
       item: 'Provider',

@@ -1200,6 +1200,14 @@
         "shell.css"
       ]
     },
+    "node-client": {
+      "classes": [
+        "node-client"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "node-count": {
       "classes": [
         "node-count"
@@ -1232,6 +1240,14 @@
         "canvas.css"
       ]
     },
+    "node-ip": {
+      "classes": [
+        "node-ip"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "node-kind": {
       "classes": [
         "node-kind"
@@ -1240,9 +1256,49 @@
         "canvas.css"
       ]
     },
+    "node-line": {
+      "classes": [
+        "node-line"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "node-metric": {
       "classes": [
         "node-metric"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "node-name": {
+      "classes": [
+        "node-name"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "node-pill": {
+      "classes": [
+        "node-pill"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "node-route": {
+      "classes": [
+        "node-route"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "node-routes": {
+      "classes": [
+        "node-routes"
       ],
       "files": [
         "canvas.css"
@@ -1912,8 +1968,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 188,
-    "classes": 197,
+    "blocks": 195,
+    "classes": 204,
     "canonicalRules": 3,
     "ghostRules": 3
   }

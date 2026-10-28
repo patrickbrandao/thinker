@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (188 BEM blocks, 197 classes)
+## Blocks (195 BEM blocks, 204 classes)
 actions (shell.css): actions
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
@@ -192,12 +192,19 @@ nav-group-label (shell.css): nav-group-label
 nav-item (shell.css): nav-item
 nav-label (shell.css): nav-label
 nav-row (shell.css): nav-row
+node-client (canvas.css): node-client
 node-count (canvas.css): node-count
 node-entry (canvas.css): node-entry
 node-group (canvas.css): node-group
 node-hub (canvas.css): node-hub
+node-ip (canvas.css): node-ip
 node-kind (canvas.css): node-kind
+node-line (canvas.css): node-line
 node-metric (canvas.css): node-metric
+node-name (canvas.css): node-name
+node-pill (canvas.css): node-pill
+node-route (canvas.css): node-route
+node-routes (canvas.css): node-routes
 node-sub (canvas.css): node-sub
 node-title (canvas.css): node-title
 notice (shell.css): notice
