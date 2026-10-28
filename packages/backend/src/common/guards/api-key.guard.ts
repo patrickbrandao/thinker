@@ -1,3 +1,4 @@
+import { clientIpLogFields } from '../utils/client-ip';
 import {
   CanActivate,
   ExecutionContext,
@@ -45,7 +46,7 @@ export class ApiKeyGuard implements CanActivate {
     const apiKey = request.headers['x-api-key'];
 
     if (!apiKey || typeof apiKey !== 'string') {
-      this.logger.warn(`Rejected request without API key from ${request.ip}`);
+      this.logger.warn(`Rejected request without API key from ${clientIpLogFields(request)}`);
       throw new UnauthorizedException('X-API-Key header required');
     }
 
@@ -66,7 +67,7 @@ export class ApiKeyGuard implements CanActivate {
         (found.expires_at && new Date(found.expires_at).getTime() <= now) ||
         (absoluteExpiryAt !== null && absoluteExpiryAt <= now);
       if (expired) {
-        this.logger.warn(`Rejected expired API key from ${request.ip}`);
+        this.logger.warn(`Rejected expired API key from ${clientIpLogFields(request)}`);
         throw new UnauthorizedException('API key expired — run thinker login');
       }
       // Keys are tenant credentials: the tenant comes straight off the key
@@ -135,7 +136,7 @@ export class ApiKeyGuard implements CanActivate {
       return true;
     }
 
-    this.logger.warn(`Rejected invalid API key from ${request.ip}`);
+    this.logger.warn(`Rejected invalid API key from ${clientIpLogFields(request)}`);
     throw new UnauthorizedException('Invalid API key');
   }
 

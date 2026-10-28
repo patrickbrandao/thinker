@@ -98,7 +98,7 @@ describe('auth.instance', () => {
     loadModule();
 
     const config = mockBetterAuth.mock.calls[0][0];
-    expect(config.session).toEqual({ cookieCache: { enabled: true, maxAge: 5 * 60 } });
+    expect(config.session.cookieCache).toEqual({ enabled: true, maxAge: 5 * 60 });
   });
 
   it('does not set skipStateCookieCheck in account config', () => {

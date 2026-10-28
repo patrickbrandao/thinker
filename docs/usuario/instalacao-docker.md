@@ -91,7 +91,11 @@ BETTER_AUTH_URL=http://192.168.1.20:8080
 
 1. Aponte o proxy para `127.0.0.1:2099` (ou a porta escolhida).
 2. No `.env`, ponha a URL pública em `BETTER_AUTH_URL` (por exemplo `https://thinker.exemplo.com`).
-3. Defina `TRUST_PROXY` com o endereço ou CIDR do proxy (por exemplo `TRUST_PROXY=172.18.0.0/16`, ou o número de saltos, `TRUST_PROXY=1`). O padrão do compose é `loopback`, para que clientes não falsifiquem `X-Forwarded-For` e escapem do limite por IP.
+3. Confira de onde vem o IP do cliente. O Thinker só lê `X-Forwarded-For` (percorrido da direita para a esquerda, pulando proxies confiáveis) e, na falta dele, `X-Real-IP` quando a conexão TCP chega de um proxy confiável; de qualquer outro endereço, esses cabeçalhos são ignorados e vale o IP da conexão. Sem `TRUSTED_PROXIES`, são confiáveis as faixas privadas e reservadas (RFC 1918, CGNAT `100.64.0.0/10`, loopback, link-local, ULA IPv6 etc.).
+
+   **Responsabilidade do administrador:** se clientes reais podem chegar ao Thinker com IP dentro dessas faixas (VPN, Tailscale, CGNAT, LAN corporativa, outros contêineres na mesma rede, ou a porta publicada pelo Docker, que entrega a conexão pelo gateway da bridge), defina `TRUSTED_PROXIES` com o IP exato do proxy reverso, por exemplo `TRUSTED_PROXIES=172.30.0.2`. Com valor, a lista padrão é desconsiderada por completo. O ideal é o contêiner não publicar porta e só o proxy alcançá-lo.
+
+   Cada requisição registra os dois endereços: `client_ip` (o deduzido), `client_ip_source` (`x-forwarded-for`, `x-real-ip` ou `tcp`) e `peer_ip` (a conexão TCP, isto é, o proxy). Eles aparecem nos logs de erro e de limite de taxa, na atribuição de cada requisição do gateway e, nas sessões de login, em `ipAddress`, `ipAddressSource` e `peerIpAddress`. O boot informa no log qual lista está em uso.
 4. Para streaming (SSE), desligue o buffering de resposta no proxy.
 
 Sem HTTPS o servidor avisa no boot que não pode enviar HSTS. Numa LAN só com HTTP, `THINKER_DISABLE_HSTS=1` silencia o aviso. O servidor MCP exige `BETTER_AUTH_URL` em HTTPS (ou localhost); com uma URL HTTP de LAN ele se desliga sozinho.

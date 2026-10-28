@@ -65,6 +65,6 @@ describe('auth instance schema validation', () => {
   it('disables the init-time runtime check that races the boot migration', () => {
     // Read the source rather than importing the instance (it needs env and a pool).
     const source = readFileSync(join(__dirname, 'auth.instance.ts'), 'utf8');
-    expect(source).toMatch(/advanced:\s*\{\s*database:\s*\{\s*validateSchema:\s*false\s*\}\s*\}/);
+    expect(source).toMatch(/advanced:\s*\{\s*database:\s*\{\s*validateSchema:\s*false\s*\}/);
   });
 });

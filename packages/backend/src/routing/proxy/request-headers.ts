@@ -35,6 +35,10 @@ const NOISE_HEADERS = new Set<string>([
   'x-forwarded-proto',
   'x-forwarded-port',
   'x-real-ip',
+  // Stamped by clientIpMiddleware; the resolved address lives in caller_attribution.
+  'x-thinker-client-ip',
+  'x-thinker-client-ip-source',
+  'x-thinker-peer-ip',
   'x-request-start',
   'x-envoy-external-address',
   // Google Cloud edge: `forwarded` (RFC 7239) carries the caller's IP, the

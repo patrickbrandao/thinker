@@ -12,6 +12,14 @@ import { mcpOAuthResponse } from './auth/mcp-oauth-response';
 import { mountMcpDiscovery, mountMcpUnavailable } from './mcp/mcp-discovery';
 import { SpaFallbackFilter } from './common/filters/spa-fallback.filter';
 import { httpErrorLogger } from './common/middleware/http-error-logger.middleware';
+import { clientIpMiddleware } from './common/middleware/client-ip.middleware';
+import {
+  TrustedProxiesError,
+  type TrustedProxies,
+  loadTrustedProxies,
+  normalizeIp,
+  setTrustedProxies,
+} from './common/utils/client-ip';
 import {
   API_BODY_LIMIT,
   PROXY_BODY_LIMIT,
@@ -46,10 +54,29 @@ export async function bootstrap() {
   // variables that are set and ignored, so a stale .env doesn't fail silently.
   warnLegacyEnvVars(process.env, logger);
 
+  // Which TCP peers may set X-Forwarded-For / X-Real-IP. An invalid entry
+  // stops the boot instead of silently trusting less (or more).
+  let trusted: TrustedProxies;
+  try {
+    trusted = loadTrustedProxies(process.env['TRUSTED_PROXIES']);
+  } catch (err) {
+    if (err instanceof TrustedProxiesError) throw new StartupConfigError(err.message);
+    throw err;
+  }
+  setTrustedProxies(trusted);
+  logger.log(
+    `Trusted proxies (${trusted.mode === 'env' ? 'TRUSTED_PROXIES' : 'default private ranges'}): ${trusted.prefixes.join(', ')}`,
+  );
+  if (process.env['TRUST_PROXY']) {
+    logger.warn('TRUST_PROXY is no longer read; set TRUSTED_PROXIES instead.');
+  }
+
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
     logger: new ConsoleLogger({ prefix: 'Thinker' }),
   });
+  // Before anything reads the client address.
+  app.use(clientIpMiddleware);
   app.enableShutdownHooks();
   app.useGlobalFilters(new SpaFallbackFilter(process.env['BETTER_AUTH_URL']));
 
@@ -138,29 +165,9 @@ export async function bootstrap() {
 
   expressApp.use(httpErrorLogger);
 
-  // Trust reverse proxy (Railway, Render, Traefik, Nginx, etc.) so Express
-  // sees the real client IP from X-Forwarded-For headers. Enabled in
-  // production deployments only — dev runs on loopback with no proxy.
-  //
-  // Restrict the trust to loopback / link-local / private subnets so a
-  // remote attacker cannot forge an X-Forwarded-For value to make Express
-  // think the request originated from a trusted IP. Operators with proxies
-  // outside these ranges should set TRUST_PROXY explicitly.
-  if (!isDev) {
-    // Env values are always strings, but Express's `trust proxy` treats
-    // numbers (hop count) and booleans differently from their string
-    // equivalents — `"1"` is parsed as a CIDR / IP literal, not "trust
-    // first hop". Coerce numeric and bool-shaped values explicitly.
-    const rawTrustProxy = process.env['TRUST_PROXY'] ?? 'loopback, linklocal, uniquelocal';
-    const trustProxy: string | number | boolean = /^\d+$/.test(rawTrustProxy)
-      ? Number(rawTrustProxy)
-      : rawTrustProxy === 'true'
-        ? true
-        : rawTrustProxy === 'false'
-          ? false
-          : rawTrustProxy;
-    expressApp.set('trust proxy', trustProxy);
-  }
+  // X-Forwarded-Proto / -Host and express-rate-limit follow the same trusted
+  // set as the client address (clientIpMiddleware has already fixed `req.ip`).
+  expressApp.set('trust proxy', (addr: string) => trusted.contains(normalizeIp(addr) ?? addr));
 
   // Rate limit auth endpoints (Better Auth runs outside NestJS, so
   // ThrottlerGuard doesn't apply). Each endpoint gets its own limiter so
