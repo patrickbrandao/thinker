@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (190 BEM blocks, 199 classes)
+## Blocks (191 BEM blocks, 200 classes)
 actions (shell.css): actions
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
@@ -121,6 +121,7 @@ edge-saving (canvas.css): edge-saving
 empty (base.css): empty
 eyebrow (base.css): eyebrow
 field (base.css, shell.css): field
+flow-edge (canvas.css): flow-edge
 flow-node (canvas.css): flow-node
 form-error (shell.css): form-error
 form-notice (shell.css): form-notice

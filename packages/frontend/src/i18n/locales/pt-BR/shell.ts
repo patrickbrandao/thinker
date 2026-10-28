@@ -53,14 +53,27 @@ const shell: Catalog<typeof en> = {
   },
   flow: {
     subtitle: 'Como o tráfego sai dos harnesses, passa pelo roteamento e chega aos provedores.',
-    preview: 'Prévia',
-    emptyHint:
-      'A visão de topologia está em preparação. Harnesses, rotas e provedores vão aparecer aqui.',
+    hint: 'Clique duas vezes num nó para abri-lo.',
+    empty: 'Nenhum harness ainda. Crie um e as rotas e provedores dele vão aparecer aqui.',
+    emptyActive: 'Nenhum tráfego neste período.',
+    activeOnly: 'Só com tráfego',
+    ranges: { '1h': '1h', '24h': '24h', '7d': '7d', '30d': '30d' },
+    range: 'Período',
     kinds: {
       entry: 'Harness',
       hub: 'Rota',
       item: 'Provedor',
       group: 'Pool',
+    },
+    hubs: { auto: 'Roteamento auto', virtual: 'Modelo virtual', header: 'Header tier' },
+    links: { primary: 'Rota principal', fallback: 'Fallback', usage: 'Usado, sem rota' },
+    auth: { api_key: 'Chave de API', subscription: 'Assinatura', local: 'Local' },
+    disabled: 'desativado',
+    notConnected: 'não conectado',
+    models: (n: number) => `${n} modelo${n === 1 ? '' : 's'}`,
+    metrics: {
+      requests: (n: string) => `${n} req`,
+      errors: (n: string) => `${n} erro${n === '1' ? '' : 's'}`,
     },
   },
 };

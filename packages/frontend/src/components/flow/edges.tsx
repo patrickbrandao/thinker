@@ -18,6 +18,7 @@ function FlowEdgeView(props: EdgeProps<FlowEdge>) {
   return (
     <g
       className={cx(
+        'flow-edge',
         (data?.live ?? 0) > 0 && 'edge-live',
         data?.state === 'saving' && 'edge-saving',
         data?.state === 'error' && 'edge-error',

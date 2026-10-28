@@ -11,6 +11,7 @@
   }
   .stage-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     padding: 14px 20px;
@@ -154,10 +155,11 @@
     background: var(--port, var(--border-strong));
   }
 
-  /* Edges */
-  .react-flow__edge-path {
-    stroke: var(--port, var(--border-strong));
-    stroke-width: 1.6;
+  /* Edges. React Flow's base.css is unlayered, so its stroke rule wins over
+     this layer: color the path through its variables instead. */
+  .flow-edge {
+    --xy-edge-stroke: var(--port, var(--border-strong));
+    --xy-edge-stroke-width: 1.6;
   }
   .edge-live .react-flow__edge-path {
     stroke-dasharray: 6 4;
@@ -168,8 +170,8 @@
     opacity: 0.6;
     animation: edge-flow 0.6s linear infinite;
   }
-  .edge-error .react-flow__edge-path {
-    stroke: var(--danger);
+  .flow-edge.edge-error {
+    --xy-edge-stroke: var(--danger);
   }
   @keyframes edge-flow {
     to {
