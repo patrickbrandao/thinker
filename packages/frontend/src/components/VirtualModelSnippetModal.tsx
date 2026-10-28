@@ -9,7 +9,8 @@ import { Button, Modal } from './ui.js';
 
 interface Props {
   agentName: string;
-  virtualModel: VirtualModel;
+  /** `auto` passes `{ name: 'auto', enabled: true }`. */
+  virtualModel: Pick<VirtualModel, 'name' | 'enabled'>;
   onClose: () => void;
 }
 

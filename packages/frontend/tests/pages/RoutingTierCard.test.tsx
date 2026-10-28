@@ -69,6 +69,11 @@ vi.mock('../../src/services/formatters.js', async (importOriginal) => ({
 
 // Capture FallbackList interactions via a mock that exposes its props.
 const fallbackListProps: Array<Record<string, unknown>> = [];
+vi.mock('../../src/components/VirtualModelSnippetModal.js', () => ({
+  default: (props: { virtualModel: { name: string } }) => (
+    <div data-testid="snippet-modal">{props.virtualModel.name}</div>
+  ),
+}));
 vi.mock('../../src/components/FallbackList.js', () => ({
   default: (props: Record<string, unknown>) => {
     fallbackListProps.push(props);
@@ -260,6 +265,18 @@ function makeProps(overrides: Partial<Parameters<typeof RoutingTierCard>[0]> = {
 }
 
 describe('RoutingTierCard', () => {
+  it('titles the default stage "Virtual model: auto" and opens its example from the script icon', () => {
+    const { getByText, getByLabelText, getByTestId } = render(
+      <RoutingTierCard
+        {...makeProps({ stage: { id: 'default', step: 0, label: 'Default', desc: '' } })}
+      />,
+    );
+    expect(getByText('Virtual model:')).toBeTruthy();
+    expect(getByText('auto')).toBeTruthy();
+    fireEvent.click(getByLabelText('Show how to use auto'));
+    expect(getByTestId('snippet-modal').textContent).toBe('auto');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     fallbackListProps.length = 0;

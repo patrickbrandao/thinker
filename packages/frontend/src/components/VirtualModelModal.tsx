@@ -6,6 +6,7 @@ import VirtualModelShadowWarning from './VirtualModelShadowWarning.js';
 import {
   createVirtualModel,
   setVirtualModelResponseMode,
+  toggleVirtualModel,
   updateVirtualModel,
   type VirtualModel,
 } from '../services/api/virtual-models.js';
@@ -53,14 +54,15 @@ const NO_ERRORS: VirtualModelFormErrors = { invalidModels: [] };
 
 /**
  * Create or edit a virtual model (ADR 0004). Create takes the whole chain;
- * edit changes the name and the switches, and the chain is edited on the card,
- * as for custom tiers.
+ * edit changes the name and the switches (active, continue on default,
+ * stream), and the chain is edited on the card.
  */
 export default function VirtualModelModal(props: Props) {
   const editing = props.editing;
 
   const [name, setName] = useState(editing?.name ?? '');
   const [touched, setTouched] = useState(false);
+  const [enabled, setEnabled] = useState(editing?.enabled ?? true);
   const [continueOnDefault, setContinueOnDefault] = useState(editing?.continue_on_default ?? false);
   const [streamMode, setStreamMode] = useState(editing?.response_mode === 'stream');
   const [primary, setPrimary] = useState<VirtualModelRouteInput | null>(null);
@@ -187,6 +189,10 @@ export default function VirtualModelModal(props: Props) {
           saved = await setVirtualModelResponseMode(props.agentName, editing.id, responseMode, {
             silent: true,
           });
+          partial = saved;
+        }
+        if (saved.enabled !== enabled) {
+          saved = await toggleVirtualModel(props.agentName, editing.id, enabled);
         }
       } else {
         saved = await createVirtualModel(props.agentName, {
@@ -304,7 +310,7 @@ export default function VirtualModelModal(props: Props) {
           <div className="mt-3">
             <VirtualModelShadowWarning
               shadows={shadows.ids}
-              enabled={editing?.enabled ?? true}
+              enabled={enabled}
               preview={shadows.preview}
             />
           </div>
@@ -365,6 +371,23 @@ export default function VirtualModelModal(props: Props) {
                 ) : null}
               </div>
             </>
+          ) : null}
+
+          {editing ? (
+            <div className="virtual-model-modal__switch-row mt-4 flex items-start justify-between gap-3">
+              <div>
+                <span className="text-sm font-medium text-ink">{t('models.vmModal.active')}</span>
+                <p className="hint mt-0.5">{t('models.vmModal.activeDesc')}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                aria-label={t('models.vmModal.active')}
+                className={cx('switch routing-switch shrink-0', enabled && 'routing-switch--on')}
+                onClick={() => setEnabled(!enabled)}
+              />
+            </div>
           ) : null}
 
           <div className="virtual-model-modal__switch-row mt-4 flex items-start justify-between gap-3">

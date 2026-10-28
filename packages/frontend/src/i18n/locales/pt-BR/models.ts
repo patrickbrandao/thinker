@@ -131,6 +131,8 @@ const ptBR: Catalog<typeof en> = {
     addFallback: '+ Adicionar fallback ({{ count }}/{{ max }})',
     noModelsHint:
       'Opcional. Sem modelos, as requisições para este nome falham com M301, a menos que Continuar no Padrão esteja ativado.',
+    active: 'Ativo',
+    activeDesc: 'Lista em /v1/models e roteia as requisições que enviam este nome.',
     continueOnDefault: 'Continuar no Padrão',
     continueDesc:
       'Quando todos os modelos desta cadeia estiverem indisponíveis ou falharem, continua com os modelos do nível Padrão.',
@@ -143,14 +145,7 @@ const ptBR: Catalog<typeof en> = {
   vmCard: {
     inactive: 'Inativo',
     showExample: 'Mostrar um exemplo para copiar',
-    active: 'Ativo',
-    hideTitle: 'Ocultar de /v1/models e parar de atender requisições',
-    listTitle: 'Listar em /v1/models e atender requisições',
-    continueOnDefault: 'Continuar no Padrão',
-    continueTitle: 'Quando a cadeia acabar, continua com a cadeia do nível Padrão',
-    stream: 'Stream',
-    streamOnTitle: 'As respostas chegam por stream, token a token',
-    streamOffTitle: 'As respostas chegam em um único payload',
+    showExampleFor: 'Mostrar como usar {{ name }}',
     copyExample: 'Copiar exemplo',
     edit: 'Editar modelo virtual',
     moveUp: 'Mover para cima',
@@ -189,8 +184,6 @@ const ptBR: Catalog<typeof en> = {
   },
   section: {
     loadFailed: 'Não foi possível carregar os modelos virtuais',
-    isActive: '"{{ name }}" está ativo',
-    isInactive: '"{{ name }}" está inativo',
     deleted: '"{{ name }}" excluído',
     created: '"{{ name }}" criado',
     create: 'Criar modelo virtual',

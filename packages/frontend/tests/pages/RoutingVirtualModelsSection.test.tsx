@@ -3,17 +3,11 @@ import type React from 'react';
 import { act, render, fireEvent, screen, waitFor } from '@testing-library/react';
 
 const mockList = vi.fn();
-const mockToggle = vi.fn();
-const mockUpdate = vi.fn();
-const mockResponseMode = vi.fn();
 const mockDelete = vi.fn();
 const mockReorder = vi.fn();
 const mockOverride = vi.fn();
 vi.mock('../../src/services/api/virtual-models.js', () => ({
   listVirtualModels: (...a: unknown[]) => mockList(...a),
-  toggleVirtualModel: (...a: unknown[]) => mockToggle(...a),
-  updateVirtualModel: (...a: unknown[]) => mockUpdate(...a),
-  setVirtualModelResponseMode: (...a: unknown[]) => mockResponseMode(...a),
   deleteVirtualModel: (...a: unknown[]) => mockDelete(...a),
   reorderVirtualModels: (...a: unknown[]) => mockReorder(...a),
   setVirtualModelOverride: (...a: unknown[]) => mockOverride(...a),
@@ -34,11 +28,7 @@ vi.mock('../../src/components/VirtualModelCard.js', () => ({
   default: (props: Record<string, any>) => (
     <div data-testid={`card-${props.virtualModel.name}`}>
       <span>{props.virtualModel.name}</span>
-      <span data-testid={`busy-${props.virtualModel.name}`}>{String(props.busy ?? '')}</span>
       {props.dragHandle}
-      <button onClick={() => props.onToggle(!props.virtualModel.enabled)}>toggle</button>
-      <button onClick={() => props.onContinueOnDefaultChange(true)}>cod</button>
-      <button onClick={() => props.onResponseModeChange('stream')}>stream</button>
       <button onClick={() => props.onDelete()}>delete</button>
       <button onClick={() => props.onEdit()}>edit</button>
       <button onClick={() => props.onShowExample()}>example</button>
@@ -172,42 +162,6 @@ describe('RoutingVirtualModelsSection', () => {
     mockList.mockRejectedValue(new Error('nope'));
     renderSection();
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('nope'));
-  });
-
-  it('toggles, switches continue on default and the response mode with the saved row', async () => {
-    mockList.mockResolvedValue([vm('a')]);
-    let resolveToggle!: (v: VirtualModel) => void;
-    mockToggle.mockReturnValue(new Promise((r) => (resolveToggle = r)));
-    mockUpdate.mockResolvedValue(vm('a', 'a', { enabled: false, continue_on_default: true }));
-    mockResponseMode.mockResolvedValue(vm('a', 'a', { response_mode: 'stream' }));
-    renderSection();
-    fireEvent.click(await screen.findByText('toggle'));
-    expect(screen.getByTestId('busy-a').textContent).toBe('enabled');
-    resolveToggle(vm('a', 'a', { enabled: false }));
-    await waitFor(() => expect(screen.getByTestId('busy-a').textContent).toBe(''));
-    expect(mockToggle).toHaveBeenCalledWith('demo', 'a', false);
-    expect(mockToastSuccess).toHaveBeenCalledWith('"a" is inactive');
-
-    fireEvent.click(screen.getByText('cod'));
-    await waitFor(() =>
-      expect(mockUpdate).toHaveBeenCalledWith(
-        'demo',
-        'a',
-        { continue_on_default: true },
-        { silent: false },
-      ),
-    );
-    fireEvent.click(screen.getByText('stream'));
-    await waitFor(() => expect(mockResponseMode).toHaveBeenCalledWith('demo', 'a', 'stream'));
-  });
-
-  it('keeps the row when a switch fails', async () => {
-    mockList.mockResolvedValue([vm('a')]);
-    mockToggle.mockRejectedValue(new Error('bad'));
-    renderSection();
-    fireEvent.click(await screen.findByText('toggle'));
-    await waitFor(() => expect(screen.getByTestId('busy-a').textContent).toBe(''));
-    expect(screen.getByTestId('card-a')).toBeTruthy();
   });
 
   it('sets the primary and applies fallback updates, reloading after each', async () => {

@@ -4,10 +4,12 @@ import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockSetResponseMode = vi.fn();
+const mockToggle = vi.fn();
 vi.mock('../../src/services/api/virtual-models.js', () => ({
   createVirtualModel: (...a: unknown[]) => mockCreate(...a),
   updateVirtualModel: (...a: unknown[]) => mockUpdate(...a),
   setVirtualModelResponseMode: (...a: unknown[]) => mockSetResponseMode(...a),
+  toggleVirtualModel: (...a: unknown[]) => mockToggle(...a),
 }));
 
 // The picker is exercised in its own tests: here it hands back a fixed model.
@@ -228,6 +230,23 @@ describe('VirtualModelModal', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockSetResponseMode).toHaveBeenCalledWith('demo', 'vm-1', 'stream', { silent: true });
+  });
+
+  it('activates and deactivates on edit through the toggle endpoint', async () => {
+    mockToggle.mockResolvedValue({ ...existing, enabled: false });
+    const { onSaved } = renderModal({ editing: existing });
+    const active = screen.getByRole('switch', { name: 'Active' });
+    expect(active.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(active);
+    fireEvent.click(screen.getByText('Save changes'));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(mockToggle).toHaveBeenCalledWith('demo', 'vm-1', false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('has no Active switch on create', () => {
+    renderModal();
+    expect(screen.queryByRole('switch', { name: 'Active' })).toBeNull();
   });
 
   it('keeps a partly saved edit: error inline once, the card gets the rename', async () => {

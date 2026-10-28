@@ -48,9 +48,6 @@ function renderCard(overrides: Partial<VirtualModel> = {}, extra: Record<string,
   const handlers = {
     onOverride: vi.fn(),
     onFallbacksUpdate: vi.fn(),
-    onToggle: vi.fn(),
-    onContinueOnDefaultChange: vi.fn(),
-    onResponseModeChange: vi.fn(),
     onEdit: vi.fn(),
     onDelete: vi.fn(),
     onShowExample: vi.fn(),
@@ -77,48 +74,25 @@ describe('VirtualModelCard', () => {
     fallbackProps = {};
   });
 
-  it('shows the name, the copyable model value, the primary and the fallbacks', () => {
+  it('titles the card "Virtual model: <name>" and shows the primary and the fallbacks', () => {
     renderCard();
+    expect(screen.getByText('Virtual model:')).toBeTruthy();
     expect(screen.getByText('deepseek/flash')).toBeTruthy();
-    expect(screen.getByText('model: "deepseek/flash"')).toBeTruthy();
+    expect(screen.queryByText('model: "deepseek/flash"')).toBeNull();
     expect(screen.getByText('deepseek-chat')).toBeTruthy();
     expect(screen.getByTestId('fallback-list')).toBeTruthy();
     expect(fallbackProps.fallbacks).toEqual(['gpt-5.5']);
     expect(fallbackProps.modelParamsScope).toBe('virtual:vm-1');
   });
 
-  it('reflects the switches and reports changes', () => {
-    const { handlers } = renderCard({ continue_on_default: true, response_mode: 'stream' });
-    const active = screen.getByRole('switch', { name: 'Active' });
-    const cod = screen.getByRole('switch', { name: 'Continue on Default' });
-    const stream = screen.getByRole('switch', { name: 'Stream' });
-    expect(active.getAttribute('aria-checked')).toBe('true');
-    expect(cod.getAttribute('aria-checked')).toBe('true');
-    expect(stream.getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(active);
-    fireEvent.click(cod);
-    fireEvent.click(stream);
-    expect(handlers.onToggle).toHaveBeenCalledWith(false);
-    expect(handlers.onContinueOnDefaultChange).toHaveBeenCalledWith(false);
-    expect(handlers.onResponseModeChange).toHaveBeenCalledWith('buffered');
-  });
-
-  it('disables the switch being saved', () => {
-    renderCard({}, { busy: 'continue_on_default' });
-    expect(
-      (screen.getByRole('switch', { name: 'Continue on Default' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
-    expect((screen.getByRole('switch', { name: 'Active' }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+  it('keeps the switches out of the card', () => {
+    renderCard();
+    expect(screen.queryByRole('switch')).toBeNull();
   });
 
   it('marks an inactive virtual model', () => {
     renderCard({ enabled: false });
     expect(screen.getByText('Inactive')).toBeTruthy();
-    expect(screen.getByRole('switch', { name: 'Active' }).getAttribute('aria-checked')).toBe(
-      'false',
-    );
   });
 
   it('warns about shadowed ids', () => {
@@ -149,9 +123,9 @@ describe('VirtualModelCard', () => {
     }
   });
 
-  it('opens the example from the model value', () => {
+  it('opens the example from the script icon', () => {
     const { handlers } = renderCard();
-    fireEvent.click(screen.getByText('model: "deepseek/flash"'));
+    fireEvent.click(screen.getByLabelText('Show how to use deepseek/flash'));
     expect(handlers.onShowExample).toHaveBeenCalled();
   });
 

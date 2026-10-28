@@ -85,12 +85,13 @@ Um harness pode ter quantos virtuais quiser. Eles aparecem em `GET /v1/models` l
 
 ### Criar pelo dashboard
 
-Na página de roteamento do harness, na seção **Virtual models** (separada dos tiers customizados), crie um virtual:
+Na página **Roteamento** do harness, clique em **Criar modelo virtual** na barra de ações:
 
 1. Digite o nome. O dashboard valida enquanto você digita.
-2. Escolha o modelo principal e até 5 fallbacks (no modal de criação ou depois, no cartão do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
+2. Escolha o modelo principal e até 5 fallbacks (no modal de criação ou depois, no card do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
 3. Se quiser, ligue **Continue on Default** (veja abaixo) e escolha o modo de resposta (`buffered` ou `stream`).
-4. Clique em `model: "<nome>"` no cartão (ou em **Copy example** no menu do cartão) para copiar um exemplo com a URL base do harness e o nome.
+
+O card mostra o título "Modelo virtual: `<nome>`" e a cadeia. Os interruptores **Ativo**, **Continue on Default** e **Stream** ficam no modal de edição (menu do card, **Edit virtual model**), não no card. O ícone de script antes do nome, também presente no card `auto`, abre um exemplo para copiar com a URL base do harness, a chave e o nome.
 
 Cada rota é validada ao salvar: um modelo que o harness não consegue rotear (provedor não habilitado, modelo desconhecido, rótulo de chave inexistente) é recusado com HTTP 400. Os cartões podem ser reordenados por arraste; essa ordem vale também em `/v1/models`. Pela linha de comando, veja [CLI](cli.md#modelos-virtuais).
 

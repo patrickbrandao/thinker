@@ -9,9 +9,6 @@ import {
   listVirtualModels,
   reorderVirtualModels,
   setVirtualModelOverride,
-  setVirtualModelResponseMode,
-  toggleVirtualModel,
-  updateVirtualModel,
   type VirtualModel,
 } from '../services/api/virtual-models.js';
 import type {
@@ -20,7 +17,6 @@ import type {
   CustomProviderData,
   ModelRoute,
   RequestParamDefaults,
-  ResponseMode,
   RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
@@ -55,8 +51,6 @@ export interface RoutingVirtualModelsSectionProps {
   ) => Promise<unknown>;
 }
 
-type BusyField = 'enabled' | 'continue_on_default' | 'response_mode';
-
 /** Move `ids[from]` to position `to`. */
 export function moveId(ids: readonly string[], from: number, to: number): string[] {
   const next = [...ids];
@@ -89,7 +83,6 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
 
   const [modal, setModal] = useState<VirtualModel | 'new' | null>(null);
   const [snippetFor, setSnippetFor] = useState<VirtualModel | null>(null);
-  const [busy, setBusy] = useState<{ id: string; field: BusyField } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const [armedId, setArmedId] = useState<string | null>(null);
@@ -109,39 +102,6 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
    * change moves them: reload the list after every write.
    */
   const reload = () => void list.reload();
-
-  const runBusy = async (id: string, field: BusyField, action: () => Promise<VirtualModel>) => {
-    setBusy({ id, field });
-    try {
-      replace(await action());
-      reload();
-    } catch {
-      // fetchMutate already showed the backend message.
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleToggle = (vm: VirtualModel, enabled: boolean) =>
-    runBusy(vm.id, 'enabled', async () => {
-      const saved = await toggleVirtualModel(props.agentName, vm.id, enabled);
-      toast.success(
-        enabled
-          ? t('models.section.isActive', { name: vm.name })
-          : t('models.section.isInactive', { name: vm.name }),
-      );
-      return saved;
-    });
-
-  const handleContinueOnDefault = (vm: VirtualModel, value: boolean) =>
-    runBusy(vm.id, 'continue_on_default', () =>
-      updateVirtualModel(props.agentName, vm.id, { continue_on_default: value }, { silent: false }),
-    );
-
-  const handleResponseMode = (vm: VirtualModel, mode: ResponseMode) =>
-    runBusy(vm.id, 'response_mode', () =>
-      setVirtualModelResponseMode(props.agentName, vm.id, mode),
-    );
 
   const handleOverride = async (
     vm: VirtualModel,
@@ -264,18 +224,12 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
                 models={props.models}
                 customProviders={props.customProviders}
                 connectedProviders={props.connectedProviders}
-                busy={busy?.id === vm.id ? busy.field : null}
                 onOverride={(m: string, p: string, a?: AuthType, label?: string) =>
                   handleOverride(vm, m, p, a, label)
                 }
                 onFallbacksUpdate={(_models: string[], routes?: ModelRoute[] | null) =>
                   handleFallbacksUpdate(vm, routes)
                 }
-                onToggle={(enabled: boolean) => void handleToggle(vm, enabled)}
-                onContinueOnDefaultChange={(value: boolean) =>
-                  void handleContinueOnDefault(vm, value)
-                }
-                onResponseModeChange={(mode: ResponseMode) => void handleResponseMode(vm, mode)}
                 onEdit={() => setModal(vm)}
                 onDelete={() => {
                   if (confirm(deleteVirtualModelPrompt(vm.name))) void handleDelete(vm);
