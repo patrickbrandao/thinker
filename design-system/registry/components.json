@@ -652,6 +652,14 @@
         "shell.css"
       ]
     },
+    "full": {
+      "classes": [
+        "full"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "function_": {
       "classes": [
         "function_"
@@ -1902,7 +1910,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 935
+      "line": 939
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -1911,7 +1919,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 935
+      "line": 939
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -1920,7 +1928,7 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 944
+      "line": 948
     }
   ],
   "ghostRules": [
@@ -1931,8 +1939,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 928,
-      "losesTo": "shell.css:935"
+      "line": 932,
+      "losesTo": "shell.css:939"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -1941,8 +1949,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 928,
-      "losesTo": "shell.css:935"
+      "line": 932,
+      "losesTo": "shell.css:939"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -1951,8 +1959,8 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 940,
-      "losesTo": "shell.css:944"
+      "line": 944,
+      "losesTo": "shell.css:948"
     }
   ],
   "componentSheets": {
@@ -1968,8 +1976,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 195,
-    "classes": 204,
+    "blocks": 196,
+    "classes": 205,
     "canonicalRules": 3,
     "ghostRules": 3
   }
