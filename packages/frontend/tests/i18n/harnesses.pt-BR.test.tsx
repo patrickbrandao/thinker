@@ -1,26 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { render as rtlRender, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { resetLocaleForTests } from '../../src/i18n';
 
-vi.mock('@solidjs/router', () => ({
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<object>()),
   useNavigate: () => vi.fn(),
-  useSearchParams: () => [{}, vi.fn()] as const,
   useParams: () => ({ agentName: 'test-agent' }),
-  useLocation: () => ({ pathname: '/harnesses/test-agent/settings', state: null }),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
+  useLocation: () => ({ pathname: '/harnesses/test-agent/settings', state: null, search: '' }),
 }));
 
 const mockGetAgents = vi.fn();
-vi.mock('../../src/services/api.js', () => ({
+vi.mock('../../src/services/api', () => ({
   getAgents: (...args: unknown[]) => mockGetAgents(...args),
   createAgent: vi.fn(),
   deleteAgent: vi.fn(),
@@ -37,28 +28,35 @@ vi.mock('../../src/services/api.js', () => ({
   updateAgent: vi.fn(),
   getRecording: () => Promise.resolve({ enabled: false }),
   updateRecording: vi.fn(),
+  getModelListing: () => Promise.resolve({ mode: 'open' }),
+  updateModelListing: vi.fn(),
 }));
 
-vi.mock('../../src/services/toast-store.js', () => ({
+vi.mock('../../src/services/api/virtual-models', () => ({
+  listVirtualModels: () => Promise.resolve([]),
+}));
+
+vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock('../../src/components/SetupStepAddProvider.jsx', () => ({
+vi.mock('../../src/components/SetupStepAddProvider', () => ({
   default: () => <div data-testid="setup-add-provider" />,
 }));
 
-vi.mock('../../src/components/VirtualModelsHint.jsx', () => ({
-  createActiveVirtualModelNames: () => () => [],
-}));
+// Other areas, not under test here.
+vi.mock('../../src/components/SetupModal', () => ({ default: () => null }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  agentPing: () => 0,
-  analyticsPing: () => 0,
-  refreshAgents: vi.fn(),
-}));
+vi.mock('../../src/services/sse', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return { agentPing: signal(0), analyticsPing: signal(0), refreshAgents: vi.fn() };
+});
 
 import Workspace from '../../src/pages/Workspace';
 import Settings from '../../src/pages/Settings';
+
+const render = (ui: () => React.ReactElement) =>
+  rtlRender(<MemoryRouter initialEntries={['/harnesses']}>{ui()}</MemoryRouter>);
 
 describe('harness screens in pt-BR', () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
-import { createSignal } from 'solid-js';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 
 const mockDuplicateAgent = vi.fn();
 const mockGetDuplicatePreview = vi.fn();
@@ -8,20 +8,21 @@ const mockNavigate = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockMarkAgentCreated = vi.fn();
 
-vi.mock('../../src/services/api.js', () => ({
+vi.mock('../../src/services/api', () => ({
   duplicateAgent: (...args: unknown[]) => mockDuplicateAgent(...args),
   getDuplicatePreview: (...args: unknown[]) => mockGetDuplicatePreview(...args),
 }));
 
-vi.mock('../../src/services/toast-store.js', () => ({
+vi.mock('../../src/services/toast-store', () => ({
   toast: { success: (...a: unknown[]) => mockToastSuccess(...a), error: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock('../../src/services/recent-agents.js', () => ({
+vi.mock('../../src/services/recent-agents', () => ({
   markAgentCreated: (...a: unknown[]) => mockMarkAgentCreated(...a),
 }));
 
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<object>()),
   useNavigate: () => mockNavigate,
 }));
 
@@ -57,12 +58,12 @@ describe('DuplicateAgentModal', () => {
   });
 
   it('does not render when closed', () => {
-    render(() => <DuplicateAgentModal open={false} sourceName="my-agent" onClose={vi.fn()} />);
-    expect(q('.modal-overlay')).toBeNull();
+    render(<DuplicateAgentModal open={false} sourceName="my-agent" onClose={vi.fn()} />);
+    expect(q('.overlay')).toBeNull();
   });
 
   it('renders the source agent name in the title and prefills the suggested name', async () => {
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
 
     expect(screen.getByText(/Duplicate "my-agent"/)).toBeDefined();
 
@@ -73,7 +74,7 @@ describe('DuplicateAgentModal', () => {
   });
 
   it('shows copied and not-copied sections without an accordion', async () => {
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
 
     await waitFor(() => {
       const allItems = qa('.duplicate-agent__list li');
@@ -101,7 +102,7 @@ describe('DuplicateAgentModal', () => {
 
   it('calls duplicateAgent, shows toast, and navigates on success', async () => {
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
 
     await waitFor(() => {
       const input = q('#duplicate-agent-name') as HTMLInputElement | null;
@@ -137,7 +138,7 @@ describe('DuplicateAgentModal', () => {
       },
       suggested_name: '',
     });
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
 
     await waitFor(() => {
       const btn = Array.from(document.querySelectorAll('button')).find(
@@ -149,7 +150,7 @@ describe('DuplicateAgentModal', () => {
 
   it('closes when Cancel is clicked', () => {
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
 
     const cancelBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent?.trim() === 'Cancel',
@@ -160,7 +161,7 @@ describe('DuplicateAgentModal', () => {
 
   it('closes on Escape keypress', async () => {
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
 
     await waitFor(() => {
       expect(q('#duplicate-agent-name')).toBeDefined();
@@ -171,7 +172,7 @@ describe('DuplicateAgentModal', () => {
   });
 
   it('submits on Enter keypress', async () => {
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
 
     await waitFor(() => {
       const input = q('#duplicate-agent-name') as HTMLInputElement | null;
@@ -189,7 +190,7 @@ describe('DuplicateAgentModal', () => {
   it('swallows errors silently (toast already shown by fetchMutate)', async () => {
     mockDuplicateAgent.mockRejectedValueOnce(new Error('boom'));
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
 
     await waitFor(() => {
       const input = q('#duplicate-agent-name') as HTMLInputElement | null;
@@ -212,23 +213,24 @@ describe('DuplicateAgentModal', () => {
 
   it('closes when the overlay backdrop is clicked', async () => {
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
     await waitFor(() => {
-      expect(q('.modal-overlay')).toBeDefined();
+      expect(q('.overlay')).toBeDefined();
     });
-    const overlay = q('.modal-overlay') as HTMLDivElement;
-    fireEvent.click(overlay);
+    const overlay = q('.overlay') as HTMLDivElement;
+    // The shared Modal closes on a backdrop mousedown.
+    fireEvent.mouseDown(overlay);
     expect(onClose).toHaveBeenCalled();
   });
 
   it('does not close when a click inside the modal card bubbles to the overlay', async () => {
     const onClose = vi.fn();
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
     await waitFor(() => {
-      expect(q('.modal-card')).toBeDefined();
+      expect(q('[role="dialog"]')).toBeDefined();
     });
-    const card = q('.modal-card') as HTMLDivElement;
-    fireEvent.click(card);
+    const card = q('[role="dialog"]') as HTMLDivElement;
+    fireEvent.mouseDown(card);
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -251,18 +253,21 @@ describe('DuplicateAgentModal', () => {
         }),
     );
 
-    // Use a reactive `open` signal so calling onClose actually flips the prop
-    // and runs the modal's createEffect, matching real parent wiring.
-    const [open, setOpen] = createSignal(true);
+    // Use parent state so calling onClose actually flips the prop and runs
+    // the modal's close effect, matching real parent wiring.
     const onDuplicated = vi.fn();
-    render(() => (
-      <DuplicateAgentModal
-        open={open()}
-        sourceName="my-agent"
-        onClose={() => setOpen(false)}
-        onDuplicated={onDuplicated}
-      />
-    ));
+    function Parent() {
+      const [open, setOpen] = useState(true);
+      return (
+        <DuplicateAgentModal
+          open={open}
+          sourceName="my-agent"
+          onClose={() => setOpen(false)}
+          onDuplicated={onDuplicated}
+        />
+      );
+    }
+    render(<Parent />);
 
     await waitFor(() => {
       const input = q('#duplicate-agent-name') as HTMLInputElement | null;
@@ -284,7 +289,7 @@ describe('DuplicateAgentModal', () => {
     fireEvent.click(cancelBtn);
     // Modal has closed (props.open flipped to false)
     await waitFor(() => {
-      expect(q('.modal-overlay')).toBeNull();
+      expect(q('.overlay')).toBeNull();
     });
 
     resolveDuplicate({
@@ -309,7 +314,7 @@ describe('DuplicateAgentModal', () => {
   });
 
   it('keeps user-typed name when they edit it', async () => {
-    render(() => <DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
+    render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={vi.fn()} />);
 
     await waitFor(() => {
       const input = q('#duplicate-agent-name') as HTMLInputElement | null;
@@ -317,7 +322,7 @@ describe('DuplicateAgentModal', () => {
     });
 
     const input = q('#duplicate-agent-name') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'my-custom-name' } });
+    fireEvent.change(input, { target: { value: 'my-custom-name' } });
     expect(input.value).toBe('my-custom-name');
   });
 });

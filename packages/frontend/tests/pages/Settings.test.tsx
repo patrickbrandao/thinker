@@ -1,18 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 
 let mockAgentName = 'test-agent';
 const mockNavigate = vi.fn();
-vi.mock('@solidjs/router', () => ({
+vi.mock('react-router', async (orig) => ({
+  ...(await orig<object>()),
   useParams: () => ({ agentName: mockAgentName }),
   useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: `/harnesses/${mockAgentName}/settings`, state: null }),
-  useSearchParams: () => [{}],
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: (props: any) => <meta name={props.name ?? ''} content={props.content ?? ''} />,
 }));
 
 const mockGetAgentKey = vi.fn();
@@ -23,7 +18,7 @@ const mockRotateAgentKey = vi.fn();
 const mockUpdateAgent = vi.fn();
 const mockGetRecording = vi.fn(() => Promise.resolve({ enabled: false }));
 const mockUpdateRecording = vi.fn(() => Promise.resolve({ enabled: false }));
-vi.mock('../../src/services/api.js', () => ({
+vi.mock('../../src/services/api', () => ({
   getAgentKey: (...args: unknown[]) => mockGetAgentKey(...args),
   getAgentInfo: (...args: unknown[]) => mockGetAgentInfo(...args),
   deleteAgent: (...args: unknown[]) => mockDeleteAgent(...args),
@@ -36,11 +31,15 @@ vi.mock('../../src/services/api.js', () => ({
   updateModelListing: (_agent: string, mode: string) => Promise.resolve({ mode }),
 }));
 
-vi.mock('../../src/services/toast-store.js', () => ({
+vi.mock('../../src/services/api/virtual-models', () => ({
+  listVirtualModels: () => Promise.resolve([]),
+}));
+
+vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock('../../src/components/ErrorState.jsx', () => ({
+vi.mock('../../src/components/ErrorState', () => ({
   default: (props: any) => (
     <div data-testid="error-state" data-error={String(props.error ?? '')}>
       {props.title ?? 'Something went wrong'}
@@ -48,11 +47,11 @@ vi.mock('../../src/components/ErrorState.jsx', () => ({
   ),
 }));
 
-vi.mock('../../src/components/CopyButton.jsx', () => ({
+vi.mock('../../src/components/CopyButton', () => ({
   default: () => <button>Copy</button>,
 }));
 
-vi.mock('../../src/components/AgentTypeGrid.jsx', () => ({
+vi.mock('../../src/components/AgentTypeGrid', () => ({
   default: (props: any) => (
     <div
       data-testid="agent-type-picker"
@@ -81,7 +80,7 @@ vi.mock('../../src/components/AgentTypeGrid.jsx', () => ({
 }));
 
 let mockSetupThrows = false;
-vi.mock('../../src/components/SetupStepAddProvider.jsx', () => ({
+vi.mock('../../src/components/SetupStepAddProvider', () => ({
   default: (props: any) => {
     if (mockSetupThrows) throw new Error('render crash');
     return (
@@ -97,7 +96,7 @@ vi.mock('../../src/components/SetupStepAddProvider.jsx', () => ({
 }));
 
 const mockMarkAgentCreated = vi.fn();
-vi.mock('../../src/services/recent-agents.js', () => ({
+vi.mock('../../src/services/recent-agents', () => ({
   markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
 }));
 
@@ -146,11 +145,19 @@ vi.mock('thinker-shared', () => ({
   },
 }));
 
-vi.mock('../../src/services/agent-platform-store.js', () => ({
+// SetupModal belongs to another area; a stand-in keeps the "opens after save" contract.
+vi.mock('../../src/components/SetupModal', () => ({
+  default: (props: { open: boolean }) =>
+    props.open ? <div role="dialog">Set up harness</div> : null,
+}));
+
+vi.mock('../../src/services/agent-platform-store', () => ({
   setAgentPlatform: vi.fn(),
 }));
 
 import Settings from '../../src/pages/Settings';
+
+const render = (ui: () => React.ReactElement) => rtlRender(ui());
 
 describe('Settings', () => {
   beforeEach(() => {
@@ -276,7 +283,7 @@ describe('Settings', () => {
   it('opens delete modal on Delete harness click', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    expect(container.textContent).toContain('Delete test-agent');
+    expect(document.body.textContent).toContain('Delete test-agent');
   });
 
   it('has rotate key button', () => {
@@ -299,7 +306,7 @@ describe('Settings', () => {
   it('save button enables when agent name changes', () => {
     render(() => <Settings />);
     const input = screen.getByLabelText('Harness name') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'new-name' } });
+    fireEvent.change(input, { target: { value: 'new-name' } });
     const saveBtn = screen.getByText('Save') as HTMLButtonElement;
     expect(saveBtn.disabled).toBe(false);
   });
@@ -313,7 +320,7 @@ describe('Settings', () => {
       configurable: true,
     });
     render(() => <Settings />);
-    fireEvent.input(screen.getByLabelText('Harness name'), { target: { value: 'new-name' } });
+    fireEvent.change(screen.getByLabelText('Harness name'), { target: { value: 'new-name' } });
     fireEvent.click(screen.getByText('Save'));
     await vi.waitFor(() => {
       expect(mockRenameAgent).toHaveBeenCalledWith('test-agent', 'new-name');
@@ -332,7 +339,7 @@ describe('Settings', () => {
     mockRenameAgent.mockRejectedValueOnce(new Error('Conflict'));
     render(() => <Settings />);
     const input = screen.getByLabelText('Harness name') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'bad-name' } });
+    fireEvent.change(input, { target: { value: 'bad-name' } });
     fireEvent.click(screen.getByText('Save'));
     await vi.waitFor(() => {
       expect(input.value).toBe('test-agent');
@@ -367,14 +374,14 @@ describe('Settings', () => {
   it('closes delete modal on Escape key', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.keyDown(container.querySelector('.modal-overlay')!, { key: 'Escape' });
-    expect(container.querySelector('.modal-overlay')).toBeNull();
+    fireEvent.keyDown(document.querySelector('.overlay')!, { key: 'Escape' });
+    expect(document.querySelector('.overlay')).toBeNull();
   });
 
   it('delete button is disabled until name matches', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const deleteBtn = Array.from(document.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Delete this harness'),
     ) as HTMLButtonElement;
     expect(deleteBtn.disabled).toBe(true);
@@ -383,10 +390,10 @@ describe('Settings', () => {
   it('calls deleteAgent when confirmed', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.input(container.querySelector('.modal-overlay input[type="text"]')!, {
+    fireEvent.change(document.querySelector('.overlay input[type="text"]')!, {
       target: { value: 'test-agent' },
     });
-    const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const deleteBtn = Array.from(document.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Delete this harness'),
     )!;
     fireEvent.click(deleteBtn);
@@ -425,10 +432,10 @@ describe('Settings', () => {
     mockDeleteAgent.mockRejectedValue(new Error('Delete failed'));
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.input(container.querySelector('.modal-overlay input[type="text"]')!, {
+    fireEvent.change(document.querySelector('.overlay input[type="text"]')!, {
       target: { value: 'test-agent' },
     });
-    const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const deleteBtn = Array.from(document.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Delete this harness'),
     )!;
     fireEvent.click(deleteBtn);
@@ -469,15 +476,15 @@ describe('Settings', () => {
     )!;
     fireEvent.click(changeBtn);
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
     // Change category via mock picker
-    fireEvent.click(container.querySelector('[data-testid="pick-app"]')!);
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-app"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
     // Click the Save button inside the modal
-    const modalSaveBtn = Array.from(container.querySelectorAll('.modal-card__footer button')).find(
-      (b) => b.textContent?.includes('Save'),
-    ) as HTMLButtonElement;
+    const modalSaveBtn = Array.from(
+      document.querySelectorAll('[role="dialog"] .actions button'),
+    ).find((b) => b.textContent?.includes('Save')) as HTMLButtonElement;
     expect(modalSaveBtn).not.toBeUndefined();
     fireEvent.click(modalSaveBtn);
     await vi.waitFor(() => {
@@ -502,16 +509,16 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
-    fireEvent.click(container.querySelector('[data-testid="pick-app"]')!);
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
-    const modalSaveBtn = Array.from(container.querySelectorAll('.modal-card__footer button')).find(
-      (b) => b.textContent?.includes('Save'),
-    )!;
+    fireEvent.click(document.querySelector('[data-testid="pick-app"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
+    const modalSaveBtn = Array.from(
+      document.querySelectorAll('[role="dialog"] .actions button'),
+    ).find((b) => b.textContent?.includes('Save'))!;
     fireEvent.click(modalSaveBtn);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Set up harness');
+      expect(document.body.textContent).toContain('Set up harness');
     });
   });
 
@@ -526,19 +533,20 @@ describe('Settings', () => {
   it('closes delete modal when clicking overlay', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const overlay = container.querySelector('.modal-overlay')!;
-    // Click on the overlay itself (not the modal card inside)
-    fireEvent.click(overlay);
-    expect(container.querySelector('.modal-overlay')).toBeNull();
+    const overlay = document.querySelector('.overlay')!;
+    // Press on the overlay itself (not the modal card inside); the shared Modal
+    // closes on a backdrop mousedown.
+    fireEvent.mouseDown(overlay);
+    expect(document.querySelector('.overlay')).toBeNull();
   });
 
   it('closes delete modal when clicking close button', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const closeBtn = container.querySelector('[aria-label="Close"]');
+    const closeBtn = document.querySelector('.overlay [aria-label="Close"]');
     expect(closeBtn).not.toBeNull();
     fireEvent.click(closeBtn!);
-    expect(container.querySelector('.modal-overlay')).toBeNull();
+    expect(document.querySelector('.overlay')).toBeNull();
   });
 
   it('opens type modal when Change button clicked', async () => {
@@ -555,7 +563,7 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
   });
 
@@ -590,25 +598,25 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
     // Change type
-    fireEvent.click(container.querySelector('[data-testid="pick-app"]')!);
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-app"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
     // Click save in modal
-    const modalSaveBtn = Array.from(container.querySelectorAll('.modal-card__footer button')).find(
-      (b) => b.textContent?.includes('Save'),
-    )!;
+    const modalSaveBtn = Array.from(
+      document.querySelectorAll('[role="dialog"] .actions button'),
+    ).find((b) => b.textContent?.includes('Save'))!;
     fireEvent.click(modalSaveBtn);
     // Verify save button shows spinner and picker is disabled
     await vi.waitFor(() => {
-      const spinnerBtn = Array.from(container.querySelectorAll('.modal-card__footer button')).find(
-        (b) => b.querySelector('.spinner'),
-      );
+      const spinnerBtn = Array.from(
+        document.querySelectorAll('[role="dialog"] .actions button'),
+      ).find((b) => b.querySelector('.spinner'));
       expect(spinnerBtn).not.toBeUndefined();
       expect(spinnerBtn!.hasAttribute('disabled')).toBe(true);
       // Verify picker disabled prop is true during save
-      const picker = container.querySelector('[data-testid="agent-type-picker"]');
+      const picker = document.querySelector('[data-testid="agent-type-picker"]');
       expect(picker!.getAttribute('data-disabled')).toBe('true');
     });
     resolveSave!({});
@@ -645,13 +653,13 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
-    fireEvent.click(container.querySelector('[data-testid="pick-app"]')!);
-    fireEvent.click(container.querySelector('[data-testid="pick-platform"]')!);
-    const modalSaveBtn = Array.from(container.querySelectorAll('.modal-card__footer button')).find(
-      (b) => b.textContent?.includes('Save'),
-    ) as HTMLButtonElement;
+    fireEvent.click(document.querySelector('[data-testid="pick-app"]')!);
+    fireEvent.click(document.querySelector('[data-testid="pick-platform"]')!);
+    const modalSaveBtn = Array.from(
+      document.querySelectorAll('[role="dialog"] .actions button'),
+    ).find((b) => b.textContent?.includes('Save')) as HTMLButtonElement;
     fireEvent.click(modalSaveBtn);
     await vi.waitFor(() => {
       expect(mockUpdateAgent).toHaveBeenCalled();
@@ -659,7 +667,7 @@ describe('Settings', () => {
     // After the rejection, the modal should still be visible (not advanced to setup modal)
     // and the Save button should be re-enabled (savingType back to false).
     await vi.waitFor(() => {
-      const stillThere = container.querySelector('.modal-card__footer button');
+      const stillThere = document.querySelector('[role="dialog"] .actions button');
       expect(stillThere!.hasAttribute('disabled')).toBe(false);
     });
   });
@@ -678,16 +686,16 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
     // The change-type modal is the second overlay — find the one hosting the picker
-    const pickerModal = container
+    const pickerModal = document
       .querySelector('[data-testid="agent-type-picker"]')!
-      .closest('.modal-overlay') as HTMLElement;
+      .closest('.overlay') as HTMLElement;
     expect(pickerModal).not.toBeNull();
     fireEvent.keyDown(pickerModal, { key: 'Escape' });
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
     });
   });
 
@@ -705,14 +713,14 @@ describe('Settings', () => {
       )!,
     );
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
-    const pickerModal = container
+    const pickerModal = document
       .querySelector('[data-testid="agent-type-picker"]')!
-      .closest('.modal-overlay') as HTMLElement;
-    fireEvent.click(pickerModal);
+      .closest('.overlay') as HTMLElement;
+    fireEvent.mouseDown(pickerModal);
     await vi.waitFor(() => {
-      expect(container.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
+      expect(document.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
     });
   });
 
@@ -744,8 +752,8 @@ describe('Settings', () => {
   it('submits delete via Enter key on confirm input', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const input = container.querySelector('.modal-overlay input[type="text"]') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'test-agent' } });
+    const input = document.querySelector('.overlay input[type="text"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'test-agent' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     await vi.waitFor(() => {
       expect(mockDeleteAgent).toHaveBeenCalledWith('test-agent');
@@ -755,8 +763,8 @@ describe('Settings', () => {
   it('does not delete via Enter when name does not match', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const input = container.querySelector('.modal-overlay input[type="text"]') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'wrong-name' } });
+    const input = document.querySelector('.overlay input[type="text"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'wrong-name' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(mockDeleteAgent).not.toHaveBeenCalled();
   });

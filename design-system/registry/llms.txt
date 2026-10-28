@@ -481,7 +481,7 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 ## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (16)
 analytics-overview.css ← components/ReliabilityKpiCards.tsx, pages/GlobalOverview.tsx, pages/providers/ConnectionDetail.tsx, pages/providers/ProviderConnectionsPage.tsx
 connection-detail.css ← pages/providers/ConnectionDetail.tsx
-model-filter.css ← components/ModelPricesFilterBar.tsx, pages/MessageLog.tsx
+model-filter.css ← pages/MessageLog.tsx
 overview.css ← pages/GlobalOverview.tsx, pages/MessageLog.tsx, pages/Overview.tsx
 reliability-card.css ← components/ReliabilityChart.tsx
 request-drawer.css ← components/RequestDrawer.tsx

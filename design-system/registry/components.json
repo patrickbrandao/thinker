@@ -4462,7 +4462,6 @@
       "pages/providers/ConnectionDetail.tsx"
     ],
     "model-filter.css": [
-      "components/ModelPricesFilterBar.tsx",
       "pages/MessageLog.tsx"
     ],
     "overview.css": [

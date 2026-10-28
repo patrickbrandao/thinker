@@ -1,90 +1,63 @@
-import type { Component } from 'solid-js';
-import { Title, Meta } from '@solidjs/meta';
+import { ExternalLink } from 'lucide-react';
 import { THINKER_DOCS_URL, THINKER_ISSUES_URL } from '../services/thinker-links.js';
 import { t } from '../i18n/index.js';
 
-const Help: Component = () => {
+function HelpRow({
+  title,
+  description,
+  href,
+  action,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}) {
   return (
-    <div class="container--sm">
-      <Title>{t('common.pageTitle', { page: t('harnesses.help.title') })}</Title>
-      <Meta name="description" content={t('harnesses.help.metaDescription')} />
-      <div class="page-header">
-        <div>
-          <h1>{t('harnesses.help.title')}</h1>
-          <span class="breadcrumb">{t('harnesses.help.subtitle')}</span>
-        </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5 last:border-b-0">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-ink">{title}</div>
+        <p className="mt-0.5 text-xs text-muted">{description}</p>
       </div>
-
-      <div class="settings-card">
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">{t('harnesses.help.docsTitle')}</span>
-            <span class="settings-card__label-desc">{t('harnesses.help.docsDesc')}</span>
-          </div>
-          <div class="settings-card__control">
-            <a
-              href={THINKER_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn--outline btn--sm"
-              style="text-decoration: none;"
-            >
-              {t('harnesses.help.openDocs')}
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                style="margin-left: 4px;"
-                aria-hidden="true"
-              >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </a>
-          </div>
-        </div>
-        <div class="settings-card__row">
-          <div class="settings-card__label">
-            <span class="settings-card__label-title">{t('harnesses.help.issuesTitle')}</span>
-            <span class="settings-card__label-desc">{t('harnesses.help.issuesDesc')}</span>
-          </div>
-          <div class="settings-card__control">
-            <a
-              href={THINKER_ISSUES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn--outline btn--sm"
-              style="text-decoration: none;"
-            >
-              {t('harnesses.help.openIssues')}
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                style="margin-left: 4px;"
-                aria-hidden="true"
-              >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </div>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-ghost btn-sm no-underline"
+      >
+        {action}
+        <ExternalLink aria-hidden="true" />
+      </a>
     </div>
   );
-};
+}
 
-export default Help;
+export default function Help() {
+  return (
+    <div className="page narrow">
+      <title>{t('common.pageTitle', { page: t('harnesses.help.title') })}</title>
+      <meta name="description" content={t('harnesses.help.metaDescription')} />
+      <div className="page-head">
+        <div>
+          <h1>{t('harnesses.help.title')}</h1>
+          <p className="sub">{t('harnesses.help.subtitle')}</p>
+        </div>
+      </div>
+
+      <section className="panel">
+        <HelpRow
+          title={t('harnesses.help.docsTitle')}
+          description={t('harnesses.help.docsDesc')}
+          href={THINKER_DOCS_URL}
+          action={t('harnesses.help.openDocs')}
+        />
+        <HelpRow
+          title={t('harnesses.help.issuesTitle')}
+          description={t('harnesses.help.issuesDesc')}
+          href={THINKER_ISSUES_URL}
+          action={t('harnesses.help.openIssues')}
+        />
+      </section>
+    </div>
+  );
+}
