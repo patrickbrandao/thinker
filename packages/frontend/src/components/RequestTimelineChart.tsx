@@ -107,6 +107,21 @@ export function RequestTimelineChart({ timeline }: { timeline: RequestTimeline }
       </circle>
     </g>
   );
+  // Duration of one interval, written above its segment when there is room.
+  const segment = (from: number, to: number, y: number, key: string) =>
+    x(to) - x(from) >= 44 ? (
+      <text
+        key={key}
+        x={(x(from) + x(to)) / 2}
+        y={y - 8}
+        textAnchor="middle"
+        fill="var(--text-muted)"
+        style={{ fontSize: 10 }}
+      >
+        {formatSpan(to - from)}
+      </text>
+    ) : null;
+  const firstRequest = events.find((e) => e.type === 'provider_request')?.at;
   const at = (type: RequestTimelineEvent['type'], ms: number) =>
     `${t(`messages.details.timeline.event.${type}`)}\n${formatPreciseTimestamp(ms)}\n+${formatSpan(ms - start)}`;
 
@@ -168,6 +183,10 @@ export function RequestTimelineChart({ timeline }: { timeline: RequestTimeline }
           stroke="var(--border-strong)"
           strokeWidth={2}
         />
+        {firstRequest != null ? segment(start, firstRequest, laneY(0), 'routing') : null}
+        {lastChunk > start && completed != null && completed > lastChunk
+          ? segment(lastChunk, completed, laneY(0), 'flush')
+          : null}
         {events
           .filter((e) => e.attempt == null)
           .map((e, i) => marker(e.at, laneY(0), 'var(--text-muted)', at(e.type, e.at), `t${i}`))}
@@ -194,6 +213,12 @@ export function RequestTimelineChart({ timeline }: { timeline: RequestTimeline }
                   strokeDasharray="4 3"
                 />
               ) : null}
+              {lane.request != null && waitEnd != null
+                ? segment(lane.request, waitEnd, y, 'wait')
+                : null}
+              {lane.response != null && lane.lastChunk != null
+                ? segment(lane.response, lane.lastChunk, y, 'stream')
+                : null}
               {lane.response != null && lane.lastChunk != null ? (
                 <rect
                   x={x(Math.min(lane.response, lane.firstChunk ?? lane.response))}
