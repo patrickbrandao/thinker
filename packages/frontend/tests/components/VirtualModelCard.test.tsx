@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen } from '@solidjs/testing-library';
+import { render, fireEvent, screen } from '@testing-library/react';
 
 const mockClearOverride = vi.fn().mockResolvedValue(undefined);
 const mockSetFallbacks = vi.fn().mockResolvedValue([]);
@@ -57,7 +57,7 @@ function renderCard(overrides: Partial<VirtualModel> = {}, extra: Record<string,
     onMoveUp: vi.fn(),
     onMoveDown: vi.fn(),
   };
-  const utils = render(() => (
+  const utils = render(
     <VirtualModelCard
       agentName="demo"
       virtualModel={{ ...base, ...overrides }}
@@ -66,8 +66,8 @@ function renderCard(overrides: Partial<VirtualModel> = {}, extra: Record<string,
       connectedProviders={[]}
       {...handlers}
       {...extra}
-    />
-  ));
+    />,
+  );
   return { ...utils, handlers };
 }
 

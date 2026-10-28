@@ -1,7 +1,9 @@
-import { createSignal, createResource, For, Show, type Component } from 'solid-js';
+import { useEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { getModelPrices } from '../services/api.js';
 import { resolveProviderId } from '../services/routing-utils.js';
 import { PROVIDERS } from '../services/providers.js';
+import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
 import { t } from '../i18n/index.js';
 
@@ -40,50 +42,62 @@ function labelForModel(name: string): string {
   return name;
 }
 
-const ModelSelectDropdown: Component<ModelSelectDropdownProps> = (props) => {
-  const [data] = createResource(() => getModelPrices() as Promise<ModelPricesData>);
-  const [search, setSearch] = createSignal('');
-  const [open, setOpen] = createSignal(true);
+type GroupModel = { value: string; label: string; cliValue: string };
+type Group = { provId: string; name: string; models: GroupModel[] };
 
-  const groupedModels = () => {
-    const d = data();
-    if (!d?.models) return [];
+function groupModels(d: ModelPricesData | undefined, search: string): Group[] {
+  if (!d?.models) return [];
+  const q = search.toLowerCase().trim();
+  const groupMap = new Map<string, Group>();
 
-    const q = search().toLowerCase().trim();
-
-    type GroupModel = { value: string; label: string; cliValue: string };
-    const groupMap = new Map<string, { provId: string; name: string; models: GroupModel[] }>();
-
-    for (const m of d.models) {
-      const provId = resolveProviderId(m.provider);
-      if (!provId) continue;
-      if (!groupMap.has(provId)) {
-        const provDef = PROVIDERS.find((p) => p.id === provId);
-        groupMap.set(provId, { provId, name: provDef?.name ?? m.provider, models: [] });
-      }
-      groupMap.get(provId)!.models.push({
-        value: m.model_name,
-        label: labelForModel(m.model_name),
-        cliValue: computeCliValue(m.model_name, m.provider),
-      });
+  for (const m of d.models) {
+    const provId = resolveProviderId(m.provider);
+    if (!provId) continue;
+    if (!groupMap.has(provId)) {
+      const provDef = PROVIDERS.find((p) => p.id === provId);
+      groupMap.set(provId, { provId, name: provDef?.name ?? m.provider, models: [] });
     }
+    groupMap.get(provId)!.models.push({
+      value: m.model_name,
+      label: labelForModel(m.model_name),
+      cliValue: computeCliValue(m.model_name, m.provider),
+    });
+  }
 
-    const groups: { provId: string; name: string; models: GroupModel[] }[] = [];
-    for (const group of groupMap.values()) {
-      if (q) {
-        const nameMatch = group.name.toLowerCase().includes(q);
-        const filtered = nameMatch
-          ? group.models
-          : group.models.filter(
-              (m) => m.label.toLowerCase().includes(q) || m.value.toLowerCase().includes(q),
-            );
-        if (filtered.length > 0) groups.push({ ...group, models: filtered });
-      } else if (group.models.length > 0) {
-        groups.push(group);
-      }
+  const groups: Group[] = [];
+  for (const group of groupMap.values()) {
+    if (q) {
+      const nameMatch = group.name.toLowerCase().includes(q);
+      const filtered = nameMatch
+        ? group.models
+        : group.models.filter(
+            (m) => m.label.toLowerCase().includes(q) || m.value.toLowerCase().includes(q),
+          );
+      if (filtered.length > 0) groups.push({ ...group, models: filtered });
+    } else if (group.models.length > 0) {
+      groups.push(group);
     }
-    return groups;
-  };
+  }
+  return groups;
+}
+
+/**
+ * Inline searchable model list grouped by provider. The `routing-modal__*`
+ * classes are stable test hooks.
+ */
+export default function ModelSelectDropdown(props: ModelSelectDropdownProps) {
+  const data = useResource(() => getModelPrices() as Promise<ModelPricesData>, []);
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(true);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  const groups = groupModels(data.data, search);
 
   const handleSelect = (cliValue: string, label: string) => {
     props.onSelect(cliValue, label);
@@ -97,87 +111,79 @@ const ModelSelectDropdown: Component<ModelSelectDropdownProps> = (props) => {
   };
 
   return (
-    <div class="routing-modal__inline-picker">
-      <Show when={!open() && props.selectedValue}>
+    <div className="flex flex-col gap-2">
+      {!open && props.selectedValue ? (
         <button
-          class="routing-modal__selected-display"
+          className="routing-modal__selected-display field flex h-auto cursor-pointer flex-col items-start gap-0.5 py-2 text-left"
           onClick={handleReopen}
           type="button"
           aria-label={t('models.dropdown.change')}
         >
-          <span class="routing-modal__selected-label">
-            {labelForModel(props.selectedValue!.split('/').pop()!)}
+          <span className="font-medium text-ink">
+            {labelForModel(props.selectedValue.split('/').pop()!)}
           </span>
-          <span class="routing-modal__selected-hint">{t('models.dropdown.clickToChange')}</span>
+          <span className="text-xs text-muted">{t('models.dropdown.clickToChange')}</span>
         </button>
-      </Show>
+      ) : null}
 
-      <Show when={open()}>
-        <div class="routing-modal__search-wrap" style="padding: 0;">
-          <svg
-            class="routing-modal__search-icon"
-            style="left: 14px;"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            ref={(el) => requestAnimationFrame(() => el.focus())}
-            class="routing-modal__search"
-            type="text"
-            placeholder={t('models.searchPlaceholder')}
-            aria-label={t('models.dropdown.searchLabel')}
-            value={search()}
-            onInput={(e) => setSearch(e.currentTarget.value)}
-          />
-        </div>
-
-        <Show when={data.loading}>
-          <div class="routing-modal__empty">{t('models.dropdown.loading')}</div>
-        </Show>
-
-        <Show when={!data.loading && data()}>
-          <div class="routing-modal__list">
-            <For each={groupedModels()}>
-              {(group) => (
-                <div class="routing-modal__group">
-                  <div class="routing-modal__group-header">
-                    <span class="routing-modal__group-icon">{providerIcon(group.provId, 16)}</span>
-                    <span class="routing-modal__group-name">{group.name}</span>
-                  </div>
-                  <For each={group.models}>
-                    {(model) => (
-                      <button
-                        class="routing-modal__model"
-                        onClick={() => handleSelect(model.cliValue, model.label)}
-                        type="button"
-                      >
-                        <span class="routing-modal__model-label">{model.label}</span>
-                        <span class="routing-modal__model-id">{model.value}</span>
-                      </button>
-                    )}
-                  </For>
-                </div>
-              )}
-            </For>
-            <Show when={groupedModels().length === 0}>
-              <div class="routing-modal__empty">{t('models.noSearchMatch')}</div>
-            </Show>
+      {open ? (
+        <>
+          <div className="relative">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted"
+            />
+            <input
+              ref={searchRef}
+              className="routing-modal__search field pl-8"
+              type="text"
+              placeholder={t('models.searchPlaceholder')}
+              aria-label={t('models.dropdown.searchLabel')}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+            />
           </div>
-        </Show>
-      </Show>
+
+          {data.loading ? (
+            <div className="routing-modal__empty py-6 text-center text-sm text-muted">
+              {t('models.dropdown.loading')}
+            </div>
+          ) : null}
+
+          {!data.loading && data.data ? (
+            <div className="routing-modal__list max-h-80 overflow-y-auto rounded-control border border-line">
+              {groups.map((group) => (
+                <div key={group.provId} className="routing-modal__group">
+                  <div className="sticky top-0 flex items-center gap-2 border-b border-line bg-s2 px-3 py-1.5 text-xs font-semibold text-muted">
+                    <span className="inline-flex">{providerIcon(group.provId, 16)}</span>
+                    <span className="routing-modal__group-name">{group.name}</span>
+                  </div>
+                  {group.models.map((model) => (
+                    <button
+                      key={model.cliValue}
+                      className="routing-modal__model flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-3 py-2 text-left hover:bg-s2"
+                      onClick={() => handleSelect(model.cliValue, model.label)}
+                      type="button"
+                    >
+                      <span className="routing-modal__model-label truncate text-sm text-ink">
+                        {model.label}
+                      </span>
+                      <span className="truncate font-mono text-xs text-faint">{model.value}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+              {groups.length === 0 ? (
+                <div className="routing-modal__empty py-6 text-center text-sm text-muted">
+                  {t('models.noSearchMatch')}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
-};
+}
 
-export default ModelSelectDropdown;
 export { computeCliValue, labelForModel };

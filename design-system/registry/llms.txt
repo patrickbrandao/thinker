@@ -96,7 +96,7 @@
 --z-toast: 8000
 --z-tooltip: 9999
 
-## Blocks (218 BEM blocks, 1113 classes)
+## Blocks (155 BEM blocks, 622 classes)
 account-back-btn (agents.css): account-back-btn
 account-modal (agents.css): account-modal account-modal--standalone account-modal__inner
 account-security-error (agents.css): account-security-error
@@ -110,7 +110,6 @@ agent-filter-select (theme.css): agent-filter-select__trigger
 agent-type-select (agent-type-select.css): agent-type-select agent-type-select__caret agent-type-select__column agent-type-select__dropdown agent-type-select__dropdown--inline agent-type-select__group-label agent-type-select__groups agent-type-select__option agent-type-select__option--selected agent-type-select__option-icon agent-type-select__trigger agent-type-select__trigger--open agent-type-select__trigger-icon agent-type-select__trigger-label
 agent-type-select-row (agent-type-select.css): agent-type-select-row
 agents-grid (agents.css): agents-grid
-anthropic-detail (routing-providers.css): anthropic-detail__alt anthropic-detail__alt-divider anthropic-detail__alt-hint anthropic-detail__btn anthropic-detail__primary
 api-key-display (wizard.css): api-key-display__code api-key-display__prefix api-key-display__value api-key-display__warning
 app-body (layout.css): app-body
 app-layout (theme.css): app-layout
@@ -127,23 +126,15 @@ auth-social-btn (auth.css): auth-social-btn auth-social-btn--discord auth-social
 auth-social-group (auth.css): auth-social-group
 auth-terms (auth.css): auth-terms auth-terms__link
 breadcrumb (layout.css, theme.css): breadcrumb
-btn (controls.css, layout.css, limits.css, modals.css, routing-providers.css, routing.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
+btn (controls.css, layout.css, limits.css, modals.css, skeleton.css, theme.css): btn btn--danger btn--ghost btn--outline btn--primary btn--sm
 cards-grid (layout.css, theme.css, wizard.css): cards-grid
 chart-card (cards.css, theme.css): chart-card chart-card__body chart-card__controls chart-card__filter-btn chart-card__filter-btn--active chart-card__filters chart-card__header chart-card__label chart-card__stat chart-card__stat--active chart-card__stat--clickable chart-card__subtitle chart-card__subtitle-title chart-card__value chart-card__value-row
 chart-tooltip (charts.css, theme.css): chart-tooltip
-complexity-empty (routing.css): complexity-empty complexity-empty__desc complexity-empty__title
 confirm-modal (limits.css): confirm-modal__confirm-row confirm-modal__footer confirm-modal__warning
-connection-delete-confirmation (routing-providers.css): connection-delete-confirmation connection-delete-confirmation__copy connection-delete-confirmation__footer connection-delete-confirmation__label connection-delete-confirmation__title connection-delete-confirmation__warning
-connection-label-cell (routing-providers.css): connection-label-cell connection-label-cell__edit
-connections-panel (routing-providers.css): connections-panel connections-panel--collapsed connections-panel__body connections-panel__chevron connections-panel__toggle connections-panel__viewport
-container (layout.css, routing.css, theme.css): container--full container--lg container--md container--sm
-copilot-device-login (routing-providers.css): copilot-device-login__code copilot-device-login__code-box copilot-device-login__code-row copilot-device-login__copy-btn copilot-device-login__open-btn copilot-device-login__waiting
+container (layout.css, theme.css): container--full container--lg container--md container--sm
 count-link (theme.css): count-link
-custom-provider-item (routing-providers.css): custom-provider-item custom-provider-item__delete custom-provider-item__icon custom-provider-item__info custom-provider-item__meta custom-provider-item__name
-custom-provider-model-row (routing-providers.css): custom-provider-model-row custom-provider-model-row__name custom-provider-model-row__price custom-provider-model-row__remove
-custom-provider-models (routing-providers.css): custom-provider-models custom-provider-models__column custom-provider-models__column--name custom-provider-models__column--price custom-provider-models__column-spacer custom-provider-models__columns custom-provider-models__label
-custom-select (custom-select.css, routing-providers.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
-dark (agent-type-select.css, agents.css, auth.css, controls.css, data.css, modals.css, platform-icons.css, routing-deprecation.css, routing-providers.css, routing.css, tokens.css, wizard.css): dark
+custom-select (custom-select.css): custom-select custom-select__chevron custom-select__dropdown custom-select__dropdown--portal custom-select__dropdown--wide custom-select__option custom-select__option--disabled custom-select__option--selected custom-select__option--top custom-select__option-desc custom-select__option-text custom-select__option-text--inline custom-select__trigger custom-select__trigger--open custom-select__value
+dark (agent-type-select.css, agents.css, auth.css, controls.css, data.css, modals.css, platform-icons.css, tokens.css, wizard.css): dark
 data-table (data.css, feedback.css, theme.css): data-table data-table__sortable
 data-table-scroll (data.css): data-table-scroll
 duplicate-agent (agents.css): duplicate-agent__badge duplicate-agent__list duplicate-agent__section duplicate-agent__section-header
@@ -151,7 +142,6 @@ empty-state (data.css, theme.css): empty-state empty-state__img empty-state__img
 error-recovery-row (data.css): error-recovery-row error-recovery-row--solo error-recovery-row__arrow error-recovery-row__arrow-down error-recovery-row__arrow-right error-recovery-row__card error-recovery-row__card--fallback error-recovery-row__card-text error-recovery-row__card-title error-recovery-row__error error-recovery-row__error--full error-recovery-row__meta-hint error-recovery-row__meta-label error-recovery-row__meta-table error-recovery-row__meta-value error-recovery-row__title
 expandable-card (charts.css, theme.css): expandable-card expandable-card__btn expandable-card__content expandable-card__fade
 fallback-icon (data.css): fallback-icon
-fallback-list (routing.css): fallback-list fallback-list__add fallback-list__card fallback-list__card--dragging fallback-list__card--skipped fallback-list__card--swapping fallback-list__drag-handle fallback-list__drop-indicator fallback-list__drop-indicator--active fallback-list__empty fallback-list__empty-desc fallback-list__empty-icon fallback-list__empty-title fallback-list__icon fallback-list__items fallback-list__model fallback-list__params fallback-list__rank fallback-list__remove
 feed-item (data.css, theme.css): feed-item feed-item__body feed-item__desc feed-item__icon feed-item__meta feed-item__status feed-item__sub feed-item__time
 feedback-btn (feedback.css): feedback-btn feedback-btn--active-dislike feedback-btn--active-like
 feedback-cell (feedback.css): feedback-cell
@@ -160,12 +150,7 @@ feedback-tag (feedback.css): feedback-tag feedback-tag--selected
 framework-snippets (wizard.css): framework-snippets__block framework-snippets__connection framework-snippets__field framework-snippets__label framework-snippets__toggle-row framework-snippets__value
 free-tag (theme.css): free-tag
 header (controls.css, theme.css): header header__avatar header__avatar-btn header__breadcrumb-current header__breadcrumb-icon header__breadcrumb-label header__breadcrumb-link header__breadcrumb-provider-icon header__docs-link header__dropdown header__dropdown-divider header__dropdown-email header__dropdown-header header__dropdown-item header__dropdown-item--danger header__dropdown-name header__gear header__gear-btn header__left header__logo header__logo-img header__logo-img--dark header__logo-img--light header__right header__separator
-header-combo (routing-header-tiers.css): header-combo header-combo--invalid header-combo__error header-combo__input header-combo__menu header-combo__option header-combo__option--free header-combo__option--hover header-combo__option-group header-combo__option-label header-combo__option-row header-combo__option-sublabel
 header-controls (layout.css, theme.css): header-controls
-header-tier-card (routing-header-tiers.css): header-tier-card__actions header-tier-card__icon-btn header-tier-card__kebab header-tier-card__kebab-btn header-tier-card__menu header-tier-card__menu-item header-tier-card__menu-item--danger header-tier-card__name header-tier-card__ordinal header-tier-card__rule header-tier-card__title
-header-tier-manage (routing-header-tiers.css): header-tier-manage__create-btn header-tier-manage__footer
-header-tier-manage-modal (routing-header-tiers.css): header-tier-manage-modal
-header-tier-modal (routing-header-tiers.css): header-tier-modal header-tier-modal__back header-tier-modal__close header-tier-modal__delete-btn header-tier-modal__error header-tier-modal__footer header-tier-modal__footer-right header-tier-modal__swatch header-tier-modal__swatch--active header-tier-modal__swatch--amber header-tier-modal__swatch--blue header-tier-modal__swatch--brown header-tier-modal__swatch--coral header-tier-modal__swatch--cyan header-tier-modal__swatch--emerald header-tier-modal__swatch--fuchsia header-tier-modal__swatch--gray header-tier-modal__swatch--green header-tier-modal__swatch--indigo header-tier-modal__swatch--lime header-tier-modal__swatch--navy header-tier-modal__swatch--orange header-tier-modal__swatch--pink header-tier-modal__swatch--purple header-tier-modal__swatch--red header-tier-modal__swatch--rose header-tier-modal__swatch--sky header-tier-modal__swatch--slate header-tier-modal__swatch--stone header-tier-modal__swatch--teal header-tier-modal__swatch--violet header-tier-modal__swatch--yellow header-tier-modal__swatch--zinc header-tier-modal__swatches
 info-tooltip (tooltip.css): info-tooltip info-tooltip__bubble info-tooltip__icon
 integration-grid (wizard.css): integration-grid
 integration-panel (wizard.css): integration-panel__desc integration-panel__header integration-panel__tabs
@@ -184,74 +169,37 @@ mobile-nav-toggle (theme.css): mobile-nav-toggle
 modal (modals.css, theme.css): modal modal__body modal__close modal__footer modal__header modal__title
 modal-back-btn (modals.css): modal-back-btn
 modal-backdrop (modals.css, theme.css): modal-backdrop
-modal-card (limits.css, modals.css, notifications.css, routing-header-tiers.css, routing.css): modal-card modal-card__back-link modal-card__cta modal-card__desc modal-card__field-error modal-card__field-hint modal-card__field-label modal-card__field-link modal-card__footer modal-card__footer--split modal-card__input modal-card__input--error modal-card__input--lg modal-card__note modal-card__privacy modal-card__title
+modal-card (limits.css, modals.css, notifications.css): modal-card modal-card__back-link modal-card__cta modal-card__desc modal-card__field-error modal-card__field-hint modal-card__field-label modal-card__field-link modal-card__footer modal-card__footer--split modal-card__input modal-card__input--error modal-card__input--lg modal-card__note modal-card__privacy modal-card__title
 modal-key-box (wizard.css): modal-key-box modal-key-box__copy modal-key-box__header modal-key-box__label modal-key-box__value modal-key-box__warning
 modal-overlay (modals.css): modal-overlay
 modal-stepper (modals.css): modal-stepper modal-stepper__circle modal-stepper__label modal-stepper__line modal-stepper__step modal-stepper__step--active modal-stepper__step--done
 modal-terminal (agents.css, wizard.css): modal-terminal modal-terminal__body modal-terminal__code modal-terminal__copy modal-terminal__copy--disabled modal-terminal__dot modal-terminal__dot--green modal-terminal__dot--red modal-terminal__dot--yellow modal-terminal__dots modal-terminal__header modal-terminal__line--comment modal-terminal__prompt modal-terminal__tab modal-terminal__tab--active modal-terminal__tab-sep modal-terminal__tabs
 model-bar (data.css, theme.css): model-bar model-bar__fill model-bar__name model-bar__pct model-bar__track
-model-capability-badge (routing.css): model-capability-badge model-capability-badge--icon-only model-capability-badge--unknown model-capability-badge__icon
-model-capability-badges (routing.css): model-capability-badges model-capability-badges--compact model-capability-badges--empty
-model-modality-badges (routing-modal.css): model-modality-badges
-model-params (params-card.css, routing.css): model-params__body model-params__default-hint model-params__dialog model-params__empty model-params__field model-params__footer model-params__footer-actions model-params__group model-params__group-card model-params__group-header model-params__help model-params__help-tooltip model-params__label-hint model-params__label-title model-params__number model-params__number--slider model-params__param-key model-params__reset model-params__row model-params__row--disabled model-params__row-control model-params__row-text model-params__separator model-params__slider model-params__slider-bound model-params__slider-bounds model-params__slider-control model-params__slider-field model-params__slider-field--disabled model-params__slider-tick model-params__slider-track-bg model-params__slider-track-wrapper model-params__status model-params__toggle
-model-params-modal (routing.css): model-params-modal model-params-modal--empty
+model-params (params-card.css): model-params__group model-params__group-card model-params__group-header model-params__label-hint model-params__label-title model-params__row model-params__row-control model-params__row-text model-params__separator
 msg-detail (data.css): msg-detail msg-detail__cell msg-detail__chevron msg-detail__chevron--open msg-detail__chevron-btn msg-detail__chevron-btn--open msg-detail__chevron-cell msg-detail__chevron-th msg-detail__count msg-detail__count-badge msg-detail__error msg-detail__error-box msg-detail__error-code msg-detail__error-inline msg-detail__eye-btn msg-detail__fallback-banner msg-detail__loader msg-detail__log-body msg-detail__meta msg-detail__meta-item msg-detail__meta-label msg-detail__miscat-btn msg-detail__mono msg-detail__mono-xs msg-detail__param-value msg-detail__row msg-detail__section msg-detail__section-row msg-detail__section-title msg-detail__section-title--inline msg-detail__section-title--toggle msg-detail__severity-dot msg-detail__spinner msg-detail__summary msg-detail__summary-item msg-detail__table
 msg-row (data.css): msg-row--clickable msg-row--expanded msg-row--selected
-no-connections-prompt (routing.css): no-connections-prompt no-connections-prompt__card no-connections-prompt__card-desc no-connections-prompt__card-icon no-connections-prompt__card-title no-connections-prompt__cards no-connections-prompt__desc no-connections-prompt__header no-connections-prompt__title
 not-found (layout.css): not-found not-found__code not-found__link not-found__text not-found__title
 notif-hint (notifications.css): notif-hint
 notif-table (notifications.css): notif-table notif-table--flush notif-table__actions notif-table__mono notif-table__period notif-table__row--disabled
 notification-modal (notifications.css): notification-modal__select
 notification-rule (notifications.css): notification-rule__delete notification-rule__edit
 notification-toggle (notifications.css): notification-toggle notification-toggle__slider
-output-controls (routing.css): output-controls output-controls--compact output-controls__field output-controls__label output-controls__segment output-controls__segment--active output-controls__segments
 overview (agents.css): overview__platform-icon
 page-header (layout.css, theme.css): page-header page-header--wrap page-header__intro
 pagination (data.css): pagination pagination__btn pagination__controls pagination__summary
-panel (cards.css, charts.css, limits.css, routing-providers.css, routing-tabs.css, theme.css, wizard.css): panel panel--disabled panel__header panel__tab panel__tab--active panel__tab-icon panel__tabs panel__title
+panel (cards.css, charts.css, limits.css, theme.css, wizard.css): panel panel--disabled panel__header panel__tab panel__tab--active panel__tab-icon panel__tabs panel__title
 platform-icon (platform-icons.css): platform-icon
-provider-auth-badge (routing.css): provider-auth-badge provider-auth-badge--key provider-auth-badge--local provider-auth-badge--overlay provider-auth-badge--sub
-provider-card (notifications.css, routing-providers.css): provider-card provider-card__actions provider-card__body provider-card__dropdown provider-card__dropdown-item provider-card__dropdown-item--danger provider-card__email provider-card__header provider-card__key provider-card__label provider-card__logo provider-card__logo-letter provider-card__menu provider-card__menu-btn provider-card__meta provider-card__name
-provider-detail (routing-providers.css): provider-detail provider-detail__action provider-detail__beta-badge provider-detail__disconnect provider-detail__disconnect-icon provider-detail__error provider-detail__field provider-detail__footer provider-detail__format provider-detail__format-help provider-detail__format-legend provider-detail__format-option provider-detail__format-option--active provider-detail__format-option--disabled provider-detail__format-option-path provider-detail__format-option-title provider-detail__format-options provider-detail__header provider-detail__header-actions provider-detail__hint provider-detail__icon provider-detail__input provider-detail__input--disabled provider-detail__input--error provider-detail__input--masked provider-detail__key-help provider-detail__key-help-link provider-detail__key-row provider-detail__label provider-detail__label-muted provider-detail__models-bar provider-detail__name provider-detail__no-key provider-detail__refresh-btn provider-detail__refresh-icon--spinning provider-detail__signin-btn provider-detail__subtitle provider-detail__title-group
-provider-icon (routing-providers.css): provider-icon--opencode-go-dark provider-icon--opencode-go-light provider-icon--opencode-zen-dark provider-icon--opencode-zen-light
-provider-modal (routing-providers.css): provider-modal__add-custom provider-modal__add-custom-chip provider-modal__disclaimer provider-modal__disclaimer-label provider-modal__footer provider-modal__list provider-modal__request-sub provider-modal__request-sub-btn provider-modal__tab-hint provider-modal__tab-icon provider-modal__tabs-wrapper provider-modal__view provider-modal__view--from-left provider-modal__view--from-right
+provider-card (notifications.css): provider-card provider-card__actions provider-card__body provider-card__dropdown provider-card__dropdown-item provider-card__dropdown-item--danger provider-card__email provider-card__header provider-card__key provider-card__label provider-card__logo provider-card__menu provider-card__menu-btn provider-card__meta provider-card__name
 provider-modal-option (notifications.css): provider-modal-option provider-modal-option--active provider-modal-option__logo
 provider-modal-picker (notifications.css): provider-modal-picker
 provider-setup (notifications.css): provider-setup__subtitle provider-setup__title
 provider-setup-card (notifications.css): provider-setup-card provider-setup-card__desc provider-setup-card__logo provider-setup-card__name
 provider-setup-grid (notifications.css): provider-setup-grid
-provider-toggle (routing-providers.css, routing.css): provider-toggle provider-toggle--action provider-toggle__actions provider-toggle__add-btn provider-toggle__add-tooltip provider-toggle__badge provider-toggle__badge--connected provider-toggle__disconnect-btn provider-toggle__expand provider-toggle__icon provider-toggle__info provider-toggle__key-input provider-toggle__key-row provider-toggle__local-only provider-toggle__name provider-toggle__name--action provider-toggle__subtitle provider-toggle__switch provider-toggle__switch--on provider-toggle__switch-thumb provider-toggle__tag
 recovery-card (data.css): recovery-card recovery-card--fallback recovery-card__branding recovery-card__phrase recovery-card__title
 recovery-card-row (data.css): recovery-card-row
 recovery-opt-icon (data.css): recovery-opt-icon recovery-opt-icon__none
 rel-col (theme.css): rel-col
-response-mode-btn (routing.css): response-mode-btn response-mode-btn__icon
-response-mode-modal (routing.css): response-mode-modal response-mode-modal__blocker response-mode-modal__blocker-list response-mode-modal__blocker-meta response-mode-modal__blocker-model response-mode-modal__blocker-row response-mode-modal__blocker-text response-mode-modal__body response-mode-modal__desc response-mode-modal__field-header response-mode-modal__field-title
-routing-action (routing.css): routing-action routing-action--danger
-routing-card (routing-header-tiers.css, routing-specificity.css, routing-virtual-models.css, routing.css): routing-card routing-card--cta routing-card--disabled routing-card--header-tier routing-card--virtual-model routing-card--virtual-model-inactive routing-card__actions routing-card__auto-tag routing-card__body routing-card__change-btn routing-card__change-icon routing-card__change-label routing-card__chip-action routing-card__chip-action--active routing-card__chip-action--configured routing-card__chip-action--dialog-open routing-card__chip-footer routing-card__chip-main routing-card__chip-meta routing-card__chip-price routing-card__chip-reset routing-card__desc routing-card__disabled-desc routing-card__disabled-text routing-card__empty routing-card__empty-link routing-card__empty-text routing-card__fallbacks routing-card__fallbacks-label routing-card__header routing-card__header-action routing-card__header-action--danger routing-card__header-add routing-card__main routing-card__model-chip routing-card__model-chip--dragging routing-card__model-chip--drop-target routing-card__model-chip--skipped routing-card__model-row routing-card__override routing-card__override-icon routing-card__reset-btn routing-card__right routing-card__skipped-badge routing-card__sub routing-card__sub--subscription routing-card__tier
-routing-cards (routing.css): routing-cards routing-cards--centered routing-cards--unified-compact routing-cards--wide
-routing-cards-backdrop (routing.css): routing-cards-backdrop
-routing-complexity (routing-tabs.css): routing-complexity__disable
-routing-deprecation (routing-deprecation.css): routing-deprecation routing-deprecation__body routing-deprecation__icon routing-deprecation__title
-routing-disable-btn (routing.css): routing-disable-btn
-routing-enable-card (routing.css): routing-enable-card routing-enable-card__desc routing-enable-card__icon routing-enable-card__title
-routing-footer (routing.css): routing-footer routing-footer__instructions routing-footer__sep
-routing-modal (routing-modal.css, routing.css): routing-modal__cap-pill routing-modal__cap-pill--active routing-modal__card routing-modal__empty routing-modal__filter-bar routing-modal__filter-check routing-modal__filter-left routing-modal__filter-pill routing-modal__filter-pill--active routing-modal__filter-pill-icon routing-modal__filter-right routing-modal__group routing-modal__group-header routing-modal__group-icon routing-modal__group-name routing-modal__group-refresh routing-modal__group-refresh-icon--spinning routing-modal__header routing-modal__inline-picker routing-modal__list routing-modal__model routing-modal__model--disabled routing-modal__model-cell routing-modal__model-cell--price routing-modal__model-cell-label routing-modal__model-disabled-reason routing-modal__model-id routing-modal__model-id--subscription routing-modal__model-label routing-modal__model-left routing-modal__model-meta routing-modal__model-price routing-modal__recommended routing-modal__role-tag routing-modal__search routing-modal__search-icon routing-modal__search-wrap routing-modal__selected-display routing-modal__selected-hint routing-modal__selected-label routing-modal__subtitle routing-modal__table-head routing-modal__title
-routing-no-providers (routing.css): routing-no-providers routing-no-providers__desc routing-no-providers__icon routing-no-providers__title
-routing-page-header (routing.css): routing-page-header
-routing-pipeline-help (routing-tabs.css): routing-pipeline-help routing-pipeline-help__label
-routing-pipeline-help-step (routing-tabs.css): routing-pipeline-help-step routing-pipeline-help-step__desc routing-pipeline-help-step__head routing-pipeline-help-step__num routing-pipeline-help-step__tag
-routing-pipeline-help-steps (routing-tabs.css): routing-pipeline-help-steps
-routing-pipeline-help-summary (routing-tabs.css): routing-pipeline-help-summary
-routing-priority-legend (routing.css): routing-priority-legend
-routing-providers-info (routing.css): routing-providers-info routing-providers-info__icon routing-providers-info__icon--has-tooltip routing-providers-info__icons routing-providers-info__label routing-providers-info__tooltip
-routing-section (routing-header-tiers.css, routing-specificity.css, routing-tabs.css, routing-virtual-models.css, routing.css): routing-section routing-section--dimmed routing-section--virtual-models routing-section__controls routing-section__cta routing-section__empty routing-section__empty-desc routing-section__empty-title routing-section__header routing-section__header--header-tiers routing-section__header--with-control routing-section__subtitle routing-section__title
-routing-switch (routing.css): routing-switch routing-switch--disabled routing-switch--on routing-switch__label routing-switch__thumb routing-switch__track
-routing-tabs (routing-tabs.css): routing-tabs routing-tabs__arrow routing-tabs__dot routing-tabs__dot--off routing-tabs__dot--on routing-tabs__header routing-tabs__header-right routing-tabs__panel
-routing-tooltip (routing.css): routing-tooltip
-routing-unified-add-card (routing.css): routing-unified-add-card
 rule-menu (limits.css): rule-menu__btn rule-menu__dropdown rule-menu__item rule-menu__item--danger
-scroll-panel (routing-providers.css): scroll-panel--at-bottom
 security-event (data.css, theme.css): security-event security-event__badge security-event__desc security-event__dot security-event__dot--critical security-event__dot--info security-event__dot--warning security-event__time
 select (controls.css, theme.css): select
 settings-card (agents.css, controls.css, notifications.css): settings-card settings-card--danger settings-card--disabled settings-card__body settings-card__control settings-card__control--end settings-card__copy-btn settings-card__desc settings-card__footer settings-card__id-row settings-card__id-value settings-card__input settings-card__key-actions settings-card__key-row settings-card__key-value settings-card__label settings-card__label-desc settings-card__label-desc--meta settings-card__label-title settings-card__row
@@ -276,16 +224,10 @@ sidebar (controls.css, theme.css): sidebar sidebar--mobile-open sidebar__badge s
 skeleton (skeleton.css): skeleton skeleton--rect skeleton--text
 skill-dot (data.css): skill-dot skill-dot--active
 skip-link (layout.css): skip-link
-specificity-cards (routing-specificity.css): specificity-cards
-specificity-empty (routing-specificity.css): specificity-empty specificity-empty__desc specificity-empty__title
-specificity-header (routing-specificity.css): specificity-header specificity-header__left
-specificity-modal (routing-specificity.css): specificity-modal specificity-modal__desc specificity-modal__footer specificity-modal__icon specificity-modal__info specificity-modal__list specificity-modal__name specificity-modal__row specificity-modal__stage-desc specificity-modal__title specificity-modal__toggle specificity-modal__toggle--on specificity-modal__toggle-thumb
-specificity-output-controls (routing-specificity.css): specificity-output-controls
 spinner (skeleton.css): spinner
 sr-only (skeleton.css): sr-only
 status-badge (data.css, theme.css): status-badge status-badge--error status-badge--fallback_error status-badge--neutral status-badge--ok status-badge--rate_limited status-badge--retry
 status-badge-tooltip (data.css): status-badge-tooltip status-badge-tooltip__bubble
-subscription-detail (routing-providers.css): subscription-detail__alt subscription-detail__alt-divider subscription-detail__alt-hint subscription-detail__btn subscription-detail__primary
 summary-card (cards.css, theme.css): summary-card summary-card__label summary-card__subtitle summary-card__value
 theme-picker (agents.css): theme-picker theme-picker__option theme-picker__option--active
 theme-toggle (layout.css, theme.css): theme-toggle theme-toggle__icon
@@ -309,11 +251,6 @@ u-value (charts.css, theme.css): u-value
 u-wrap (cards.css, charts.css, theme.css): u-wrap
 version-indicator (version-indicator.css): version-indicator
 view-more-link (cards.css): view-more-link
-virtual-model-card (routing-virtual-models.css): virtual-model-card__details virtual-model-card__drag virtual-model-card__inactive virtual-model-card__model virtual-model-card__switch virtual-model-card__switch-spinner virtual-model-card__switches
-virtual-model-modal (routing-virtual-models.css): virtual-model-modal virtual-model-modal__chain virtual-model-modal__close virtual-model-modal__hint virtual-model-modal__name virtual-model-modal__route virtual-model-modal__route--invalid virtual-model-modal__route-model virtual-model-modal__route-position virtual-model-modal__route-provider virtual-model-modal__route-remove virtual-model-modal__server-error virtual-model-modal__switch-row
-virtual-model-shadow (routing-virtual-models.css): virtual-model-shadow virtual-model-shadow__desc virtual-model-shadow__icon virtual-model-shadow__list virtual-model-shadow__title
-virtual-model-slot (routing-virtual-models.css): virtual-model-slot virtual-model-slot--dragging virtual-model-slot--drop-target
-virtual-model-snippet-modal (routing-virtual-models.css): virtual-model-snippet-modal virtual-model-snippet-modal__desc virtual-model-snippet-modal__footer virtual-model-snippet-modal__header virtual-model-snippet-modal__inactive virtual-model-snippet-modal__title
 workspace-table (agents.css): workspace-table__actions workspace-table__icon workspace-table__name
 
 ## Primitives (0)
@@ -387,17 +324,7 @@ workspace-table (agents.css): workspace-table__actions workspace-table__icon wor
 .modal__close { width: 32px }  at modals.css:47 loses to theme.css:1137
 .modal__close { height: 32px }  at modals.css:48 loses to theme.css:1138
 
-## Component-loaded sheets — imported by components, not theme.css; they load after the global styles (8)
-routing-deprecation.css ← components/RoutingDeprecationNotice.tsx
-routing-header-tiers.css ← pages/RoutingHeaderTiersSection.tsx, pages/RoutingVirtualModelsSection.tsx
-routing-specificity.css ← pages/RoutingSpecificitySection.tsx
-routing-virtual-models.css ← pages/RoutingVirtualModelsSection.tsx
-routing-providers.css ← (via @import)
-routing-modal.css ← (via @import)
-routing-tabs.css ← (via @import)
-routing.css ← pages/Routing.tsx
-
-## Orphan stylesheets — in src/styles but imported nowhere (11)
+## Orphan stylesheets — in src/styles but imported nowhere (19)
 agent-chart-tooltip.css
 analytics-overview.css
 connection-detail.css
@@ -408,4 +335,12 @@ overview.css
 playground.css
 reliability-card.css
 request-drawer.css
+routing-deprecation.css
+routing-header-tiers.css
+routing-modal.css
+routing-providers.css
+routing-specificity.css
+routing-tabs.css
+routing-virtual-models.css
+routing.css
 welcome.css

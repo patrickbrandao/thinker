@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type Component, type Accessor, type JSX } from 'solid-js';
+import { useState, type ReactNode } from 'react';
 import { toast } from '../services/toast-store.js';
 import {
   toggleSpecificity,
@@ -20,11 +20,11 @@ import type {
   RoutingProvider,
   CustomProviderData,
 } from '../services/api.js';
-import '../styles/routing-specificity.css';
 import OutputControls from '../components/OutputControls.js';
 import RoutingDeprecationNotice from '../components/RoutingDeprecationNotice.js';
+import { Button, Modal } from '../components/ui.js';
 
-const SPECIFICITY_ICONS: Record<string, () => JSX.Element> = {
+const SPECIFICITY_ICONS: Record<string, () => ReactNode> = {
   coding: () => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -140,16 +140,16 @@ const SPECIFICITY_ICONS: Record<string, () => JSX.Element> = {
 };
 
 export interface RoutingSpecificitySectionProps {
-  agentName: () => string;
-  assignments: Accessor<SpecificityAssignment[] | undefined>;
-  models: () => AvailableModel[];
-  customProviders: () => CustomProviderData[];
-  activeProviders: () => RoutingProvider[];
-  connectedProviders: () => RoutingProvider[];
-  changingTier: () => string | null;
-  resettingTier: () => string | null;
-  resettingAll: () => boolean;
-  addingFallback: () => string | null;
+  agentName: string;
+  assignments: SpecificityAssignment[] | undefined;
+  models: AvailableModel[];
+  customProviders: CustomProviderData[];
+  activeProviders: RoutingProvider[];
+  connectedProviders: RoutingProvider[];
+  changingTier: string | null;
+  resettingTier: string | null;
+  resettingAll: boolean;
+  addingFallback: string | null;
   onDropdownOpen: (category: string) => void;
   onOverride: (category: string, model: string, provider: string, authType?: AuthType) => void;
   onPinKey?: (
@@ -161,8 +161,8 @@ export interface RoutingSpecificitySectionProps {
   onReset: (category: string) => void;
   onFallbackUpdate: (category: string, fallbacks: string[], routes?: ModelRoute[] | null) => void;
   onAddFallback: (category: string) => void;
-  responseMode: () => ResponseMode;
-  changingResponseMode: () => boolean;
+  responseMode: ResponseMode;
+  changingResponseMode: boolean;
   onResponseModeChange: (mode: ResponseMode) => void | Promise<void>;
   refetchAll: () => Promise<void>;
   refetchSpecificity?: () => Promise<void>;
@@ -193,25 +193,22 @@ function toTierAssignment(a: SpecificityAssignment | undefined): TierAssignment 
   return { ...a, tier: a.category };
 }
 
-const RoutingSpecificitySection: Component<RoutingSpecificitySectionProps> = (props) => {
-  const [toggling, setToggling] = createSignal<string | null>(null);
-  const [showModal, setShowModal] = createSignal(false);
+export default function RoutingSpecificitySection(props: RoutingSpecificitySectionProps) {
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const getAssignment = (category: string) =>
-    props.assignments()?.find((a) => a.category === category);
-
+    props.assignments?.find((a) => a.category === category);
   const isActive = (category: string) => getAssignment(category)?.is_active ?? false;
-
-  const hasAnyActive = () => SPECIFICITY_STAGES.some((s) => isActive(s.id));
-
-  const activeTiers = () => SPECIFICITY_STAGES.filter((s) => isActive(s.id));
+  const activeTiers = SPECIFICITY_STAGES.filter((s) => isActive(s.id));
+  const hasAnyActive = activeTiers.length > 0;
 
   const handleToggle = async (category: string, label: string, active: boolean) => {
-    const shouldInheritStreaming = active && props.responseMode() === 'stream';
+    const shouldInheritStreaming = active && props.responseMode === 'stream';
     setToggling(category);
     try {
-      await toggleSpecificity(props.agentName(), category, active);
-      if (showModal() && props.refetchSpecificity) {
+      await toggleSpecificity(props.agentName, category, active);
+      if (showModal && props.refetchSpecificity) {
         await props.refetchSpecificity();
       } else {
         await props.refetchAll();
@@ -231,49 +228,46 @@ const RoutingSpecificitySection: Component<RoutingSpecificitySectionProps> = (pr
     }
   };
 
-  const manageButton = () => (
-    <Show when={hasAnyActive()}>
-      <button class="btn btn--primary btn--sm" onClick={() => setShowModal(true)}>
-        {t('routing.specificity.manage')}
-      </button>
-    </Show>
-  );
+  const closeAndPickFirstEmpty = () => {
+    setShowModal(false);
+    const firstEmpty = SPECIFICITY_STAGES.find((s) => {
+      const a = getAssignment(s.id);
+      return a?.is_active && !a.override_route && !a.auto_assigned_route;
+    });
+    if (firstEmpty) props.onDropdownOpen(firstEmpty.id);
+  };
+
+  const manageButton = hasAnyActive ? (
+    <Button size="sm" onClick={() => setShowModal(true)}>
+      {t('routing.specificity.manage')}
+    </Button>
+  ) : null;
 
   // This section only renders for legacy/invested agents (gated in Routing.tsx),
   // so the deprecation banner is always appropriate here.
-  const deprecationNotice = () => (
+  const deprecationNotice = (
     <RoutingDeprecationNotice title={t('routing.deprecation.title')}>
       {t('routing.deprecation.body')}
     </RoutingDeprecationNotice>
   );
 
-  const content = () => (
+  const content = (
     <>
-      <Show
-        when={activeTiers().length > 0}
-        fallback={
-          <div class="specificity-empty">
-            <span class="specificity-empty__title">{t('routing.specificity.emptyTitle')}</span>
-            <span class="specificity-empty__desc">{t('routing.specificity.emptyDesc')}</span>
-            <button class="btn btn--primary btn--sm" onClick={() => setShowModal(true)}>
-              {t('routing.specificity.addTier')}
-            </button>
+      {hasAnyActive ? (
+        <>
+          <div className="flex justify-end">
+            <OutputControls
+              responseMode={props.responseMode}
+              disabled={props.changingResponseMode}
+              onResponseModeChange={props.onResponseModeChange}
+            />
           </div>
-        }
-      >
-        <div class="specificity-output-controls">
-          <OutputControls
-            responseMode={props.responseMode}
-            disabled={props.changingResponseMode}
-            onResponseModeChange={props.onResponseModeChange}
-          />
-        </div>
-        <div class="specificity-cards">
-          <For each={activeTiers()}>
-            {(stage) => (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {activeTiers.map((stage) => (
               <RoutingTierCard
+                key={stage.id}
                 stage={stage}
-                tier={() => toTierAssignment(getAssignment(stage.id))}
+                tier={toTierAssignment(getAssignment(stage.id))}
                 models={props.models}
                 customProviders={props.customProviders}
                 activeProviders={props.activeProviders}
@@ -293,148 +287,115 @@ const RoutingSpecificitySection: Component<RoutingSpecificitySectionProps> = (pr
                   getAssignment(cat)?.fallback_routes?.map((r) => r.model) ?? []
                 }
                 connectedProviders={props.connectedProviders}
-                persistFallbacks={(_agentName, category, models, routes) =>
-                  setSpecificityFallbacks(_agentName, category, models, routes)
+                persistFallbacks={(agentName, category, models, routes) =>
+                  setSpecificityFallbacks(agentName, category, models, routes)
                 }
-                persistClearFallbacks={(_agentName, category) =>
-                  clearSpecificityFallbacks(_agentName, category)
+                persistClearFallbacks={(agentName, category) =>
+                  clearSpecificityFallbacks(agentName, category)
                 }
                 getModelParams={props.getModelParams}
                 setModelParams={props.setModelParams}
               />
-            )}
-          </For>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="empty">
+          <h3>{t('routing.specificity.emptyTitle')}</h3>
+          <p className="max-w-md text-sm">{t('routing.specificity.emptyDesc')}</p>
+          <Button size="sm" onClick={() => setShowModal(true)}>
+            {t('routing.specificity.addTier')}
+          </Button>
         </div>
-      </Show>
+      )}
 
-      <Show when={showModal()}>
-        <div
-          class="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowModal(false);
-          }}
-        >
-          <div
-            class="modal-card specificity-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="specificity-modal-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="specificity-modal-title" class="specificity-modal__title">
-              {t('routing.specificity.manage')}
-            </h2>
-            <p class="specificity-modal__desc">{t('routing.specificity.modalDesc')}</p>
-            <div class="specificity-modal__list">
-              <For each={SPECIFICITY_STAGES}>
-                {(stage) => {
-                  const active = () => isActive(stage.id);
-                  const loading = () => toggling() === stage.id;
-                  return (
-                    <div
-                      class="specificity-modal__row"
-                      role="button"
-                      tabIndex={0}
-                      style="cursor: pointer;"
-                      onClick={() =>
-                        !loading() && handleToggle(stage.id, stageLabel(stage), !active())
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          if (!loading()) handleToggle(stage.id, stageLabel(stage), !active());
-                        }
-                      }}
-                    >
-                      <span class="specificity-modal__icon">{SPECIFICITY_ICONS[stage.id]?.()}</span>
-                      <div class="specificity-modal__info">
-                        <span class="specificity-modal__name">{stageLabel(stage)}</span>
-                        <span class="specificity-modal__stage-desc">{stageDesc(stage)}</span>
-                      </div>
-                      <button
-                        class="specificity-modal__toggle"
-                        classList={{
-                          'specificity-modal__toggle--on': active(),
-                        }}
-                        disabled={loading()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!loading()) handleToggle(stage.id, stageLabel(stage), !active());
-                        }}
-                        aria-label={
-                          active()
-                            ? t('routing.specificity.disableStage', { label: stageLabel(stage) })
-                            : t('routing.specificity.enableStage', { label: stageLabel(stage) })
-                        }
-                      >
-                        <Show
-                          when={loading()}
-                          fallback={<span class="specificity-modal__toggle-thumb" />}
-                        >
-                          <span class="specificity-modal__toggle-thumb">
-                            <span class="spinner" style="width: 10px; height: 10px;" />
-                          </span>
-                        </Show>
-                      </button>
-                    </div>
-                  );
-                }}
-              </For>
-            </div>
-            <div class="specificity-modal__footer">
-              <button
-                class="btn btn--primary"
-                onClick={() => {
-                  setShowModal(false);
-                  const firstEmpty = SPECIFICITY_STAGES.find((s) => {
-                    const a = getAssignment(s.id);
-                    return a?.is_active && !a.override_route && !a.auto_assigned_route;
-                  });
-                  if (firstEmpty) {
-                    props.onDropdownOpen(firstEmpty.id);
-                  }
-                }}
-              >
-                {t('common.done')}
-              </button>
-            </div>
+      <Modal
+        open={showModal}
+        title={t('routing.specificity.manage')}
+        onClose={() => setShowModal(false)}
+      >
+        <div className="specificity-modal flex flex-col gap-3">
+          <p className="text-sm text-dim">{t('routing.specificity.modalDesc')}</p>
+          <div className="flex flex-col divide-y divide-line rounded-control border border-line">
+            {SPECIFICITY_STAGES.map((stage) => {
+              const active = isActive(stage.id);
+              const loading = toggling === stage.id;
+              const label = stageLabel(stage);
+              const toggle = () => {
+                if (!loading) void handleToggle(stage.id, label, !active);
+              };
+              return (
+                <div
+                  key={stage.id}
+                  className="specificity-modal__row flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-s2"
+                  role="button"
+                  tabIndex={0}
+                  onClick={toggle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggle();
+                    }
+                  }}
+                >
+                  <span className="shrink-0 text-muted">{SPECIFICITY_ICONS[stage.id]?.()}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-medium text-ink">{label}</span>
+                    <span className="text-xs text-muted">{stageDesc(stage)}</span>
+                  </div>
+                  {loading ? <span className="spinner" aria-hidden="true" /> : null}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={active}
+                    className="switch specificity-modal__toggle shrink-0"
+                    disabled={loading}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggle();
+                    }}
+                    aria-label={
+                      active
+                        ? t('routing.specificity.disableStage', { label })
+                        : t('routing.specificity.enableStage', { label })
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="actions">
+            <Button onClick={closeAndPickFirstEmpty}>{t('common.done')}</Button>
           </div>
         </div>
-      </Show>
+      </Modal>
     </>
   );
 
   if (props.embedded) {
     return (
-      <div>
-        {deprecationNotice()}
-        <div class="routing-section__header specificity-header" style="margin-bottom: 16px;">
-          <div class="specificity-header__left">
-            <span class="routing-section__subtitle">{t('routing.specificity.subtitle')}</span>
-          </div>
-          {manageButton()}
+      <div className="flex flex-col gap-4">
+        {deprecationNotice}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-muted">{t('routing.specificity.subtitle')}</span>
+          {manageButton}
         </div>
-        {content()}
+        {content}
       </div>
     );
   }
 
   return (
-    <div class="routing-section">
-      {deprecationNotice()}
-      <div class="routing-section__header specificity-header">
-        <div class="specificity-header__left">
-          <span class="routing-section__title">{t('routing.specificity.title')}</span>
-          <span class="routing-section__subtitle">{t('routing.specificity.subtitle')}</span>
+    <section className="flex flex-col gap-4">
+      {deprecationNotice}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-base font-semibold text-ink">{t('routing.specificity.title')}</h2>
+          <span className="text-sm text-muted">{t('routing.specificity.subtitle')}</span>
         </div>
-        {manageButton()}
+        {manageButton}
       </div>
-      {content()}
-    </div>
+      {content}
+    </section>
   );
-};
-
-export default RoutingSpecificitySection;
+}

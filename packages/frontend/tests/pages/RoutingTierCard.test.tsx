@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@solidjs/testing-library';
-
-vi.mock('solid-js/web', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('solid-js/web')>();
-  return { ...mod, Portal: (props: any) => props.children };
-});
+import { render, fireEvent, waitFor } from '@testing-library/react';
 
 import { getModelParamSpecs } from '../../src/services/api/model-params.js';
 
@@ -241,23 +236,23 @@ const activeProviders: RoutingProvider[] = [
 function makeProps(overrides: Partial<Parameters<typeof RoutingTierCard>[0]> = {}) {
   return {
     stage,
-    tier: () => baseTier,
-    models: () => models,
-    customProviders: () => [],
-    activeProviders: () => activeProviders,
+    tier: baseTier,
+    models,
+    customProviders: [],
+    activeProviders,
     tiersLoading: false,
-    changingTier: () => null,
-    resettingTier: () => null,
-    resettingAll: () => false,
-    addingFallback: () => null,
-    agentName: () => 'demo',
+    changingTier: null,
+    resettingTier: null,
+    resettingAll: false,
+    addingFallback: null,
+    agentName: 'demo',
     onDropdownOpen: vi.fn(),
     onOverride: vi.fn(),
     onReset: vi.fn(),
     onFallbackUpdate: vi.fn(),
     onAddFallback: vi.fn(),
     getFallbacksFor: () => baseTier.fallback_routes!.map((r) => r.model),
-    connectedProviders: () => activeProviders,
+    connectedProviders: activeProviders,
     getModelParams: () => null,
     setModelParams: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -272,7 +267,7 @@ describe('RoutingTierCard', () => {
   });
 
   it('renders the stage label and the primary chip with the override model', () => {
-    const { container } = render(() => <RoutingTierCard {...makeProps()} />);
+    const { container } = render(<RoutingTierCard {...makeProps()} />);
     expect(container.querySelector('.routing-card__tier')?.textContent).toBe('Simple');
     expect(container.querySelector('.routing-card__main')?.textContent).toContain('GPT-4o');
   });
@@ -301,15 +296,15 @@ describe('RoutingTierCard', () => {
       },
     ];
 
-    const { container, getByTestId } = render(() => (
+    const { container, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => streamTier,
-          models: () => streamModels,
+          tier: streamTier,
+          models: streamModels,
           getFallbacksFor: () => streamTier.fallback_routes.map((r) => r.model),
         })}
-      />
-    ));
+      />,
+    );
 
     expect(container.querySelector('.routing-card__model-chip--skipped')).not.toBeNull();
     expect(container.querySelector('.routing-card__skipped-badge')?.textContent).toContain(
@@ -319,8 +314,8 @@ describe('RoutingTierCard', () => {
   });
 
   it('renders the loading skeleton when tiersLoading is true', () => {
-    const { container } = render(() => <RoutingTierCard {...makeProps({ tiersLoading: true })} />);
-    expect(container.querySelector('.skeleton')).not.toBeNull();
+    const { container } = render(<RoutingTierCard {...makeProps({ tiersLoading: true })} />);
+    expect(container.querySelector('.skel')).not.toBeNull();
   });
 
   it('ignores a legacy auto_assigned_route when there is no override', () => {
@@ -329,13 +324,13 @@ describe('RoutingTierCard', () => {
       override_route: null,
       auto_assigned_route: { provider: 'openai', authType: 'api_key' as const, model: 'gpt-4o' },
     };
-    const { container } = render(() => <RoutingTierCard {...makeProps({ tier: () => tier })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ tier: tier })} />);
     expect(container.querySelector('.routing-card__main')).toBeNull();
   });
 
   it('does NOT render the Reset button when there are no customizations', () => {
     const tier = { ...baseTier, override_route: null, fallback_routes: null };
-    const { container } = render(() => <RoutingTierCard {...makeProps({ tier: () => tier })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ tier: tier })} />);
     const resetBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Reset'),
     );
@@ -344,7 +339,7 @@ describe('RoutingTierCard', () => {
 
   it('renders the + Add model button when no model is set and not loading', () => {
     const tier = { ...baseTier, override_route: null, auto_assigned_route: null };
-    const { container } = render(() => <RoutingTierCard {...makeProps({ tier: () => tier })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ tier: tier })} />);
     const addBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('+ Add model'),
     );
@@ -353,7 +348,7 @@ describe('RoutingTierCard', () => {
 
   it('opens the dropdown when the change button is clicked', () => {
     const onDropdownOpen = vi.fn();
-    const { container } = render(() => <RoutingTierCard {...makeProps({ onDropdownOpen })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ onDropdownOpen })} />);
     // The params affordance shares the chip-action class, so target the change
     // button by its aria-label.
     fireEvent.click(
@@ -365,9 +360,9 @@ describe('RoutingTierCard', () => {
   it('opens the dropdown when the + Add model button is clicked', () => {
     const onDropdownOpen = vi.fn();
     const tier = { ...baseTier, override_route: null, auto_assigned_route: null };
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, onDropdownOpen })} />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, onDropdownOpen })} />,
+    );
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('+ Add model'),
@@ -377,53 +372,53 @@ describe('RoutingTierCard', () => {
   });
 
   it('opens the confirm-reset modal when Reset is clicked', () => {
-    const { container } = render(() => <RoutingTierCard {...makeProps()} />);
+    const { container } = render(<RoutingTierCard {...makeProps()} />);
     const reset = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Reset'),
     ) as HTMLButtonElement;
     fireEvent.click(reset);
-    expect(container.querySelector('#reset-tier-modal-title')).not.toBeNull();
+    expect(document.querySelector('#reset-tier-modal-title')).not.toBeNull();
   });
 
   it('invokes onReset only when the user confirms in the modal', () => {
     const onReset = vi.fn();
-    const { container } = render(() => <RoutingTierCard {...makeProps({ onReset })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ onReset })} />);
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Reset'),
       ) as HTMLButtonElement,
     );
     // Confirm with the danger Reset button inside the modal
-    const dangerBtn = container.querySelector('.btn--danger') as HTMLButtonElement;
+    const dangerBtn = document.querySelector('.overlay .btn-danger') as HTMLButtonElement;
     fireEvent.click(dangerBtn);
     expect(onReset).toHaveBeenCalledWith('simple');
   });
 
   it('dismisses the confirm modal on Cancel without calling onReset', () => {
     const onReset = vi.fn();
-    const { container } = render(() => <RoutingTierCard {...makeProps({ onReset })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ onReset })} />);
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Reset'),
       ) as HTMLButtonElement,
     );
-    const cancelBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const cancelBtn = Array.from(document.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Cancel'),
     ) as HTMLButtonElement;
     fireEvent.click(cancelBtn);
     expect(onReset).not.toHaveBeenCalled();
-    expect(container.querySelector('#reset-tier-modal-title')).toBeNull();
+    expect(document.querySelector('#reset-tier-modal-title')).toBeNull();
   });
 
   it('forwards the up-to-date fallback_routes through to FallbackList', () => {
-    render(() => <RoutingTierCard {...makeProps()} />);
+    render(<RoutingTierCard {...makeProps()} />);
     const props = fallbackListProps[fallbackListProps.length - 1];
     expect(props.fallbackRoutes).toEqual(baseTier.fallback_routes);
   });
 
   it('invokes onFallbackUpdate with both arrays when FallbackList updates', () => {
     const onFallbackUpdate = vi.fn();
-    const { getByTestId } = render(() => <RoutingTierCard {...makeProps({ onFallbackUpdate })} />);
+    const { getByTestId } = render(<RoutingTierCard {...makeProps({ onFallbackUpdate })} />);
     fireEvent.click(getByTestId('trigger-update'));
     expect(onFallbackUpdate).toHaveBeenCalledWith(
       'simple',
@@ -434,7 +429,7 @@ describe('RoutingTierCard', () => {
 
   it('invokes onAddFallback when FallbackList signals the add request', () => {
     const onAddFallback = vi.fn();
-    const { getByTestId } = render(() => <RoutingTierCard {...makeProps({ onAddFallback })} />);
+    const { getByTestId } = render(<RoutingTierCard {...makeProps({ onAddFallback })} />);
     fireEvent.click(getByTestId('trigger-add'));
     expect(onAddFallback).toHaveBeenCalledWith('simple');
   });
@@ -442,9 +437,9 @@ describe('RoutingTierCard', () => {
   it('inserts the primary at slot 2 on drop, persisting both arrays', async () => {
     const onFallbackUpdate = vi.fn();
     const onOverride = vi.fn();
-    const { getByTestId } = render(() => (
-      <RoutingTierCard {...makeProps({ onFallbackUpdate, onOverride })} />
-    ));
+    const { getByTestId } = render(
+      <RoutingTierCard {...makeProps({ onFallbackUpdate, onOverride })} />,
+    );
     // Slot 2 = end of list. The primary "gpt-4o" gets inserted at index 2,
     // then shifted out of position 0 → newFallbacks = ["claude", "gpt-4o"]
     // (fb-2 stays, then primary at end), newPrimary = "gpt-4o-mini" (was at
@@ -481,7 +476,7 @@ describe('RoutingTierCard', () => {
   it('reverts the optimistic state on persistence failure during a primary swap', async () => {
     mockSetFallbacks.mockRejectedValue(new Error('boom'));
     const onFallbackUpdate = vi.fn();
-    const { getByTestId } = render(() => <RoutingTierCard {...makeProps({ onFallbackUpdate })} />);
+    const { getByTestId } = render(<RoutingTierCard {...makeProps({ onFallbackUpdate })} />);
     fireEvent.click(getByTestId('trigger-primary-drop-2'));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Failed to update fallbacks');
@@ -504,15 +499,15 @@ describe('RoutingTierCard', () => {
         { provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' },
       ],
     };
-    const { container, getByTestId } = render(() => (
+    const { container, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
+          tier: tier,
           getFallbacksFor: () => tier.fallback_routes!.map((r) => r.model),
           onOverride,
         })}
-      />
-    ));
+      />,
+    );
     // Start dragging a fallback to populate fallbackDragging state
     fireEvent.click(getByTestId('trigger-fb-drag-start-1'));
     fireEvent.dragOver(container.querySelector('.routing-card__model-chip') as HTMLElement, {
@@ -537,7 +532,7 @@ describe('RoutingTierCard', () => {
 
   it('uses persistFallbacks override when provided to the card', async () => {
     const persistFallbacks = vi.fn().mockResolvedValue(undefined);
-    const { getByTestId } = render(() => <RoutingTierCard {...makeProps({ persistFallbacks })} />);
+    const { getByTestId } = render(<RoutingTierCard {...makeProps({ persistFallbacks })} />);
     fireEvent.click(getByTestId('trigger-primary-drop-2'));
     await waitFor(() => {
       expect(persistFallbacks).toHaveBeenCalled();
@@ -555,9 +550,7 @@ describe('RoutingTierCard', () => {
     //   short-circuits at `if (fbIndex === null) return;` and onOverride is
     //   never invoked.
     const onOverride = vi.fn();
-    const { container, getByTestId } = render(() => (
-      <RoutingTierCard {...makeProps({ onOverride })} />
-    ));
+    const { container, getByTestId } = render(<RoutingTierCard {...makeProps({ onOverride })} />);
     fireEvent.click(getByTestId('trigger-fb-drag-start-1'));
     fireEvent.click(getByTestId('trigger-fb-drag-end'));
     // Now that drag-end has fired, a drop on the primary chip should be a no-op.
@@ -574,9 +567,7 @@ describe('RoutingTierCard', () => {
 
   it('renders the FallbackList only when there is an effective model', () => {
     const tier = { ...baseTier, override_route: null, auto_assigned_route: null };
-    const { queryByTestId } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier })} />
-    ));
+    const { queryByTestId } = render(<RoutingTierCard {...makeProps({ tier: tier })} />);
     expect(queryByTestId('fallback-list')).toBeNull();
   });
 
@@ -584,15 +575,15 @@ describe('RoutingTierCard', () => {
     const onOverride = vi.fn();
     // No primary drop should occur with no fallbacks and a same-slot drop
     const tier = { ...baseTier, fallback_routes: null };
-    const { container, getByTestId } = render(() => (
+    const { container, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
+          tier: tier,
           getFallbacksFor: () => [],
           onOverride,
         })}
-      />
-    ));
+      />,
+    );
     fireEvent.dragStart(container.querySelector('.routing-card__model-chip') as HTMLElement, {
       dataTransfer: { effectAllowed: '', setData: vi.fn() },
     });
@@ -602,17 +593,13 @@ describe('RoutingTierCard', () => {
   });
 
   it('renders the chip skeleton while changingTier matches the stage', () => {
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ changingTier: () => 'simple' })} />
-    ));
-    const chipSkeleton = container.querySelector('.routing-card__model-chip .skeleton');
+    const { container } = render(<RoutingTierCard {...makeProps({ changingTier: 'simple' })} />);
+    const chipSkeleton = container.querySelector('.routing-card__model-chip .skel');
     expect(chipSkeleton).not.toBeNull();
   });
 
   it('disables the Reset button while resettingAll is true', () => {
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ resettingAll: () => true })} />
-    ));
+    const { container } = render(<RoutingTierCard {...makeProps({ resettingAll: true })} />);
     const reset = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Reset'),
     ) as HTMLButtonElement;
@@ -620,7 +607,7 @@ describe('RoutingTierCard', () => {
   });
 
   it('renders the auth badge from the override route when available', () => {
-    const { container } = render(() => <RoutingTierCard {...makeProps()} />);
+    const { container } = render(<RoutingTierCard {...makeProps()} />);
     expect(container.querySelector('[data-testid="auth-api_key"]')).not.toBeNull();
   });
 
@@ -639,14 +626,14 @@ describe('RoutingTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          activeProviders: () => subProviders,
+          tier: tier,
+          activeProviders: subProviders,
         })}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).toContain('Included in subscription');
   });
 
@@ -679,15 +666,15 @@ describe('RoutingTierCard', () => {
         cost_per_request: 0.013636,
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          activeProviders: () => subProviders,
-          models: () => gatewayModels,
+          tier: tier,
+          activeProviders: subProviders,
+          models: gatewayModels,
         })}
-      />
-    ));
+      />,
+    );
     expect(container.textContent).toContain('Included ($0.0136 quota/req)');
   });
 
@@ -707,11 +694,9 @@ describe('RoutingTierCard', () => {
         created_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard
-        {...makeProps({ tier: () => tier, customProviders: () => customProviders })}
-      />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, customProviders: customProviders })} />,
+    );
     expect(container.querySelector('.provider-card__logo-letter')?.textContent).toBe('G');
   });
 
@@ -731,9 +716,7 @@ describe('RoutingTierCard', () => {
         provider_display_name: 'OpenAI',
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ models: () => modelsWithDisplay })} />
-    ));
+    const { container } = render(<RoutingTierCard {...makeProps({ models: modelsWithDisplay })} />);
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('OpenAI / GPT-4o');
   });
 
@@ -747,7 +730,7 @@ describe('RoutingTierCard', () => {
       effectAllowed: '',
       setData,
     };
-    const { container } = render(() => <RoutingTierCard {...makeProps()} />);
+    const { container } = render(<RoutingTierCard {...makeProps()} />);
     const chip = container.querySelector('.routing-card__model-chip') as HTMLElement;
     fireEvent.dragStart(chip, { dataTransfer });
     // dataTransfer payload + effectAllowed set
@@ -766,7 +749,7 @@ describe('RoutingTierCard', () => {
     // dragOver is gated by `fallbackDragging() !== null`, so first signal a
     // fallback drag-start from FallbackList. Then dragOver should set the
     // `--drop-target` class, and dragLeave should clear it.
-    const { container, getByTestId } = render(() => <RoutingTierCard {...makeProps()} />);
+    const { container, getByTestId } = render(<RoutingTierCard {...makeProps()} />);
     const chip = container.querySelector('.routing-card__model-chip') as HTMLElement;
     fireEvent.click(getByTestId('trigger-fb-drag-start-1'));
     fireEvent.dragOver(chip, {
@@ -786,16 +769,16 @@ describe('RoutingTierCard', () => {
       ...baseTier,
       fallback_routes: [{ provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' }],
     };
-    const { getByTestId } = render(() => (
+    const { getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
+          tier: tier,
           getFallbacksFor: () => ['gpt-4o-mini', 'claude'],
           onFallbackUpdate,
           onOverride,
         })}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('trigger-primary-drop-2'));
     await waitFor(() => {
       // The optimistic update on length mismatch passes routes=null.
@@ -822,15 +805,15 @@ describe('RoutingTierCard', () => {
         { provider: 'anthropic', authType: 'api_key', model: 'claude' },
       ],
     };
-    const { container, getByTestId } = render(() => (
+    const { container, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
+          tier: tier,
           getFallbacksFor: () => tier.fallback_routes!.map((r) => r.model),
           onFallbackUpdate,
         })}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('trigger-fb-drag-start-1'));
     fireEvent.dragOver(container.querySelector('.routing-card__model-chip') as HTMLElement, {
       dataTransfer: { dropEffect: '' },
@@ -864,9 +847,7 @@ describe('RoutingTierCard', () => {
         display_name: undefined as unknown as string,
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ models: () => noDisplayModels })} />
-    ));
+    const { container } = render(<RoutingTierCard {...makeProps({ models: noDisplayModels })} />);
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('gpt-4o');
   });
 
@@ -891,14 +872,14 @@ describe('RoutingTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          activeProviders: () => subProviders,
+          tier: tier,
+          activeProviders: subProviders,
         })}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-subscription"]')).not.toBeNull();
   });
 
@@ -921,14 +902,14 @@ describe('RoutingTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          activeProviders: () => apiOnly,
+          tier: tier,
+          activeProviders: apiOnly,
         })}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-api_key"]')).not.toBeNull();
   });
 
@@ -951,14 +932,14 @@ describe('RoutingTierCard', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          activeProviders: () => otherProviders,
+          tier: tier,
+          activeProviders: otherProviders,
         })}
-      />
-    ));
+      />,
+    );
     expect(container.querySelector('[data-testid="auth-api_key"]')).toBeNull();
     expect(container.querySelector('[data-testid="auth-subscription"]')).toBeNull();
   });
@@ -976,14 +957,14 @@ describe('RoutingTierCard', () => {
         model: 'gpt-4o-tiny', // "gpt-4o" is in PROVIDERS, prefix matches via "gpt-4o-"
       },
     };
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          models: () => [], // Force the apiModels.find branches to fail.
+          tier: tier,
+          models: [], // Force the apiModels.find branches to fail.
         })}
-      />
-    ));
+      />,
+    );
     // The chip still renders without crashing (helper resolved "openai" via PROVIDERS scan).
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('gpt-4o-tiny');
   });
@@ -1014,14 +995,14 @@ describe('RoutingTierCard', () => {
         display_name: 'GPT-4o mini',
       },
     ];
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
-          models: () => onlyMini,
+          tier: tier,
+          models: onlyMini,
         })}
-      />
-    ));
+      />,
+    );
     // The chip label resolves through the startsWith match in apiModels, so we
     // see the sibling display_name.
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('GPT-4o mini');
@@ -1053,9 +1034,9 @@ describe('RoutingTierCard', () => {
         display_name: 'Mistral Large',
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, models: () => mistralModels })} />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, models: mistralModels })} />,
+    );
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('Mistral Large');
   });
 
@@ -1072,9 +1053,7 @@ describe('RoutingTierCard', () => {
       },
       auto_assigned_route: null,
     };
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, models: () => [] })} />
-    ));
+    const { container } = render(<RoutingTierCard {...makeProps({ tier: tier, models: [] })} />);
     // The PROVIDERS scan resolves "qwen2.5" via the catalog (id: "qwen-cloud").
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('qwen2.5');
   });
@@ -1089,9 +1068,7 @@ describe('RoutingTierCard', () => {
       },
       auto_assigned_route: null,
     };
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, models: () => [] })} />
-    ));
+    const { container } = render(<RoutingTierCard {...makeProps({ tier: tier, models: [] })} />);
     // The helper returns undefined → no override-icon, but the label still renders.
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('totally-unknown');
   });
@@ -1112,11 +1089,9 @@ describe('RoutingTierCard', () => {
         created_at: '2025-01-01',
       },
     ];
-    const { container, queryByTestId } = render(() => (
-      <RoutingTierCard
-        {...makeProps({ tier: () => tier, customProviders: () => customProviders })}
-      />
-    ));
+    const { container, queryByTestId } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, customProviders: customProviders })} />,
+    );
     expect(queryByTestId('custom-logo')).not.toBeNull();
     // The letter span should NOT render when logo is present.
     expect(container.querySelector('.provider-card__logo-letter')).toBeNull();
@@ -1148,9 +1123,9 @@ describe('RoutingTierCard', () => {
         // No display_name → labelFor goes into the prefix→catalog→resolveProviderId path.
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, models: () => mistralModels })} />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, models: mistralModels })} />,
+    );
     // Mock getModelLabel returns the model name as label.
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('mistral-small');
   });
@@ -1163,16 +1138,16 @@ describe('RoutingTierCard', () => {
       // Names list has entries but fallback_routes is null — line 212 branch.
       fallback_routes: null,
     };
-    const { container, getByTestId } = render(() => (
+    const { container, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => tier,
+          tier: tier,
           getFallbacksFor: () => ['gpt-4o-mini', 'claude'],
           onFallbackUpdate,
           onOverride,
         })}
-      />
-    ));
+      />,
+    );
     fireEvent.click(getByTestId('trigger-fb-drag-start-1'));
     fireEvent.dragOver(container.querySelector('.routing-card__model-chip') as HTMLElement, {
       dataTransfer: { dropEffect: '' },
@@ -1220,23 +1195,24 @@ describe('RoutingTierCard', () => {
         display_name: 'Llama 3',
       },
     ];
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, models: () => ollamaModels })} />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, models: ollamaModels })} />,
+    );
     expect(container.querySelector('.routing-card__main')?.textContent).toBe('Llama 3');
   });
 
   it('dismisses the confirm modal on Escape key', () => {
     const onReset = vi.fn();
-    const { container } = render(() => <RoutingTierCard {...makeProps({ onReset })} />);
+    const { container } = render(<RoutingTierCard {...makeProps({ onReset })} />);
     fireEvent.click(
       Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Reset'),
       ) as HTMLButtonElement,
     );
-    const overlay = container.querySelector('.modal-overlay') as HTMLElement;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    expect(document.querySelector('.overlay')).not.toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
     // Modal closes (overlay element is removed) — no reset triggered.
+    expect(document.querySelector('.overlay')).toBeNull();
     expect(onReset).not.toHaveBeenCalled();
   });
 
@@ -1246,9 +1222,9 @@ describe('RoutingTierCard', () => {
       override_route: { provider: 'custom:cp-1', authType: 'api_key' as const, model: 'x' },
     };
     // No customProviders entry → cp() returns undefined → letter falls back to "C".
-    const { container } = render(() => (
-      <RoutingTierCard {...makeProps({ tier: () => tier, customProviders: () => [] })} />
-    ));
+    const { container } = render(
+      <RoutingTierCard {...makeProps({ tier: tier, customProviders: [] })} />,
+    );
     expect(container.querySelector('.provider-card__logo-letter')?.textContent).toBe('C');
   });
 
@@ -1277,18 +1253,18 @@ describe('RoutingTierCard', () => {
     ];
 
     it('does NOT render the key chip when only one connected key matches the provider/auth', () => {
-      const { container } = render(() => <RoutingTierCard {...makeProps()} />);
+      const { container } = render(<RoutingTierCard {...makeProps()} />);
       expect(container.querySelector('.routing-card__key-chip')).toBeNull();
     });
 
     it("renders the key chip when 2+ keys are connected for the primary's provider", () => {
-      const { container } = render(() => (
+      const { container } = render(
         <RoutingTierCard
           {...makeProps({
-            connectedProviders: () => multiKeyProviders,
+            connectedProviders: multiKeyProviders,
           })}
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.routing-card__key-chip') as HTMLButtonElement | null;
       expect(chip).not.toBeNull();
       // displayLabel falls back to the first key's label when keyLabel is null
@@ -1305,28 +1281,28 @@ describe('RoutingTierCard', () => {
           keyLabel: 'Personal',
         },
       };
-      const { container } = render(() => (
+      const { container } = render(
         <RoutingTierCard
           {...makeProps({
-            tier: () => tier,
-            connectedProviders: () => multiKeyProviders,
+            tier: tier,
+            connectedProviders: multiKeyProviders,
           })}
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.routing-card__key-chip');
       expect(chip?.textContent).toContain('Personal');
     });
 
     it('emits onPinKey with the chosen label when a list option is clicked', async () => {
       const onPinKey = vi.fn();
-      const { container } = render(() => (
+      const { container } = render(
         <RoutingTierCard
           {...makeProps({
-            connectedProviders: () => multiKeyProviders,
+            connectedProviders: multiKeyProviders,
             onPinKey,
           })}
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.routing-card__key-chip') as HTMLButtonElement;
       fireEvent.click(chip);
       await waitFor(() => {
@@ -1351,14 +1327,14 @@ describe('RoutingTierCard', () => {
           model: 'gpt-4o',
         },
       };
-      const { container } = render(() => (
+      const { container } = render(
         <RoutingTierCard
           {...makeProps({
-            tier: () => tier,
-            connectedProviders: () => multiKeyProviders,
+            tier: tier,
+            connectedProviders: multiKeyProviders,
           })}
-        />
-      ));
+        />,
+      );
       expect(container.querySelector('.routing-card__key-chip')).toBeNull();
     });
   });
@@ -1424,9 +1400,8 @@ describe('providerIdForModel route-provider attribution', () => {
     expect(id).toBe('openai');
   });
 
-  // Exercise the save path with a provider that has a registered param spec.
-  // Solid lazily evaluates each JSX prop expression, so `setParams` is only
-  // read after the affordance opens and the dialog saves.
+  // Exercise the save path with a provider that has a registered param spec:
+  // the affordance opens its dialog and saves through `setModelParams`.
   it('renders the params affordance on the primary chip and forwards saves through setModelParams', async () => {
     const setModelParams = vi.fn().mockResolvedValue(undefined);
     const deepseekTier = {
@@ -1445,18 +1420,18 @@ describe('providerIdForModel route-provider attribution', () => {
     const deepseekProviders = [
       { provider: 'deepseek', auth_type: 'api_key' as const, is_active: true } as any,
     ];
-    const { container, getByRole } = render(() => (
+    const { container, getByRole } = render(
       <RoutingTierCard
         {...makeProps({
-          tier: () => deepseekTier,
-          models: () => deepseekModels,
-          activeProviders: () => deepseekProviders,
-          connectedProviders: () => deepseekProviders,
+          tier: deepseekTier,
+          models: deepseekModels,
+          activeProviders: deepseekProviders,
+          connectedProviders: deepseekProviders,
           getModelParams: () => null,
           setModelParams,
         })}
-      />
-    ));
+      />,
+    );
     vi.mocked(getModelParamSpecs).mockResolvedValue(modelParamSpecs[0].params);
     const btn = container.querySelector(
       '[aria-label="Configure model parameters for DeepSeek V4"]',

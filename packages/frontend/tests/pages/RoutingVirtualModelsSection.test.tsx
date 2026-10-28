@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@solidjs/testing-library';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 
 const mockList = vi.fn();
 const mockToggle = vi.fn();
@@ -106,14 +106,14 @@ function vm(name: string, id = name, extra: Partial<VirtualModel> = {}): Virtual
 }
 
 function renderSection() {
-  return render(() => (
+  return render(
     <RoutingVirtualModelsSection
-      agentName={() => 'demo'}
-      models={() => []}
-      customProviders={() => []}
-      connectedProviders={() => []}
-    />
-  ));
+      agentName="demo"
+      models={[]}
+      customProviders={[]}
+      connectedProviders={[]}
+    />,
+  );
 }
 
 const order = () =>

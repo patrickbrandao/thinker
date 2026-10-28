@@ -1,12 +1,7 @@
-import { Show, Suspense, createSignal, lazy, type Accessor, type Component } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { Suspense, lazy, useState } from 'react';
+import { useNavigate } from 'react-router';
 import RoutingInstructionModal from './RoutingInstructionModal.js';
 import KeyPickerModal from './KeyPickerModal.js';
-
-// These modals only mount behind a `<Show>` (dropdown open / provider modal
-// open). Lazy-load them so the heavy model picker and the ~130 kB
-// provider-select chunk stay out of the Routing route's initial bundle.
-const ModelPickerModal = lazy(() => import('./ModelPickerModal.js'));
 import { PROVIDERS } from '../services/providers.js';
 import type {
   TierAssignment,
@@ -25,11 +20,15 @@ import {
   routeKeySelectionForModel,
 } from '../services/routing-utils.js';
 
+// These modals only mount while a picker is open. Lazy-load them so the heavy
+// model picker stays out of the Routing route's initial bundle.
+const ModelPickerModal = lazy(() => import('./ModelPickerModal.js'));
+
 interface RoutingModalsProps {
-  agentName: () => string;
-  dropdownTier: Accessor<string | null>;
+  agentName: string;
+  dropdownTier: string | null;
   onDropdownClose: () => void;
-  specificityDropdown?: Accessor<string | null>;
+  specificityDropdown?: string | null;
   onSpecificityDropdownClose?: () => void;
   onSpecificityOverride?: (
     category: string,
@@ -37,20 +36,21 @@ interface RoutingModalsProps {
     provider: string,
     authType?: AuthType,
   ) => void;
-  fallbackPickerTier: Accessor<string | null>;
+  fallbackPickerTier: string | null;
   onFallbackPickerClose: () => void;
-  showProviderModal: Accessor<boolean>;
+  /** Inert: provider connection moved to the sidebar provider pages. */
+  showProviderModal: boolean;
   onProviderModalClose: () => void;
   customProviderPrefill?: CustomProviderPrefill | null;
   providerDeepLink?: ProviderDeepLink | null;
-  instructionModal: Accessor<'enable' | 'disable' | null>;
-  instructionProvider: Accessor<string | null>;
+  instructionModal: 'enable' | 'disable' | null;
+  instructionProvider: string | null;
   onInstructionClose: () => void;
-  models: () => AvailableModel[];
-  tiers: () => TierAssignment[];
-  specificityAssignments?: () => SpecificityAssignment[];
-  customProviders: () => CustomProviderData[];
-  connectedProviders: () => RoutingProvider[];
+  models: AvailableModel[];
+  tiers: TierAssignment[];
+  specificityAssignments?: SpecificityAssignment[];
+  customProviders: CustomProviderData[];
+  connectedProviders: RoutingProvider[];
   getTier: (tierId: string) => TierAssignment | undefined;
   onOverride: (
     tierId: string,
@@ -89,17 +89,19 @@ function providerDisplayName(providerId: string, customProviders: CustomProvider
   return PROVIDERS.find((p) => p.id === providerId)?.name ?? providerId;
 }
 
-const RoutingModals: Component<RoutingModalsProps> = (props) => {
+const requiredCapabilityForResponseMode = (
+  responseMode: ResponseMode | undefined,
+): ModelCapability | undefined => (responseMode === 'stream' ? 'stream' : undefined);
+
+export default function RoutingModals(props: RoutingModalsProps) {
   const navigate = useNavigate();
-  const [pendingOverride, setPendingOverride] = createSignal<PendingOverride | null>(null);
-  const requiredCapabilityForResponseMode = (
-    responseMode: ResponseMode | undefined,
-  ): ModelCapability | undefined => (responseMode === 'stream' ? 'stream' : undefined);
+  const [pendingOverride, setPendingOverride] = useState<PendingOverride | null>(null);
+
   const requiredCapabilityForTier = (tierId: string): ModelCapability | undefined =>
     requiredCapabilityForResponseMode(props.getTier(tierId)?.response_mode);
   const requiredCapabilityForSpecificity = (category: string): ModelCapability | undefined =>
     requiredCapabilityForResponseMode(
-      props.specificityAssignments?.().find((assignment) => assignment.category === category)
+      props.specificityAssignments?.find((assignment) => assignment.category === category)
         ?.response_mode,
     );
   const openProviders = () => {
@@ -107,7 +109,7 @@ const RoutingModals: Component<RoutingModalsProps> = (props) => {
       props.onOpenProviderModal();
       return;
     }
-    navigate(`/harnesses/${encodeURIComponent(props.agentName())}/providers`);
+    navigate(`/harnesses/${encodeURIComponent(props.agentName)}/providers`);
   };
 
   const handleSelect = (
@@ -118,7 +120,7 @@ const RoutingModals: Component<RoutingModalsProps> = (props) => {
   ) => {
     const effectiveAuth = authType ?? 'api_key';
     const selection = routeKeySelectionForModel({
-      providers: props.connectedProviders(),
+      providers: props.connectedProviders,
       tier: props.getTier(tierId),
       modelName,
       providerId,
@@ -134,7 +136,7 @@ const RoutingModals: Component<RoutingModalsProps> = (props) => {
   };
 
   const resolvePending = (label: string | null) => {
-    const p = pendingOverride();
+    const p = pendingOverride;
     if (!p) return;
     if (p.isFallback) {
       // Close the fallback picker so the user must re-open it — this ensures
@@ -147,193 +149,184 @@ const RoutingModals: Component<RoutingModalsProps> = (props) => {
     setPendingOverride(null);
   };
 
+  const dropdownTier = props.dropdownTier;
+  const category = props.specificityDropdown ?? null;
+  const fallbackTier = props.fallbackPickerTier;
+
+  const renderFallbackPicker = (tierId: string) => {
+    const tier = props.getTier(tierId);
+    const filteredModels = props.models.filter((m) => {
+      // Find how many keys exist for this model's provider
+      const providerId = m.provider;
+      const authType = m.auth_type ?? 'api_key';
+      const keys = activeRouteKeys(props.connectedProviders, providerId, authType);
+      if (keys.length <= 1) {
+        // Single-key model: hide if already used as primary or fallback
+        // (matched on the full route tuple — same model on a different
+        // (provider, auth) is intentionally NOT filtered).
+        const primaryRoute = tier?.override_route ?? null;
+        if (
+          primaryRoute &&
+          primaryRoute.model === m.model_name &&
+          primaryRoute.provider.toLowerCase() === providerId.toLowerCase() &&
+          primaryRoute.authType === authType
+        ) {
+          return false;
+        }
+        const routes = tier?.fallback_routes ?? [];
+        return !routes.some(
+          (r) =>
+            r.model === m.model_name &&
+            r.provider.toLowerCase() === providerId.toLowerCase() &&
+            r.authType === authType,
+        );
+      }
+      // Multi-key model: hide only if ALL keys are already used
+      return (
+        availableRouteKeysForModel(
+          props.connectedProviders,
+          tier,
+          m.model_name,
+          providerId,
+          authType,
+        ).length > 0
+      );
+    });
+
+    const handleFallbackSelect = (
+      tid: string,
+      modelName: string,
+      providerId: string,
+      authType?: AuthType,
+    ) => {
+      const effectiveAuth = authType ?? 'api_key';
+      const allKeys = activeRouteKeys(props.connectedProviders, providerId, effectiveAuth);
+      if (allKeys.length <= 1) {
+        // Single-key (or no-key) provider: add fallback without key selection
+        props.onFallbackPickerClose();
+        props.onAddFallback(tid, modelName, providerId, authType);
+        return;
+      }
+      const selection = routeKeySelectionForModel({
+        providers: props.connectedProviders,
+        tier: props.getTier(tierId),
+        modelName,
+        providerId,
+        authType: effectiveAuth,
+        slot: 'fallback',
+      });
+      if (selection.exhausted) {
+        // All keys exhausted — shouldn't happen since filteredModels hides it
+        return;
+      }
+      if (selection.autoLabel) {
+        // Only one key left — auto-select it, close picker for fresh data
+        props.onFallbackPickerClose();
+        props.onAddFallback(tid, modelName, providerId, authType, selection.autoLabel);
+        return;
+      }
+      // 2+ keys available → ask which one
+      setPendingOverride({
+        tierId: tid,
+        modelName,
+        providerId,
+        authType,
+        keys: selection.keys,
+        isFallback: true,
+      });
+    };
+
+    return (
+      <Suspense fallback={null}>
+        <ModelPickerModal
+          tierId={tierId}
+          agentName={props.agentName}
+          models={filteredModels}
+          tiers={props.tiers}
+          customProviders={props.customProviders}
+          connectedProviders={props.connectedProviders}
+          requiredCapability={requiredCapabilityForTier(tierId)}
+          onSelect={handleFallbackSelect}
+          onClose={props.onFallbackPickerClose}
+          onConnectProviders={() => {
+            props.onFallbackPickerClose();
+            openProviders();
+          }}
+          onProviderRefreshed={props.onProviderUpdate}
+        />
+      </Suspense>
+    );
+  };
+
   return (
     <>
-      <Show when={props.dropdownTier()}>
-        {(tierId) => (
-          <Suspense fallback={null}>
-            <ModelPickerModal
-              tierId={tierId()}
-              agentName={props.agentName()}
-              models={props.models()}
-              tiers={props.tiers()}
-              customProviders={props.customProviders()}
-              connectedProviders={props.connectedProviders()}
-              requiredCapability={requiredCapabilityForTier(tierId())}
-              onSelect={handleSelect}
-              onClose={props.onDropdownClose}
-              onConnectProviders={() => {
-                props.onDropdownClose();
-                openProviders();
-              }}
-              onProviderRefreshed={props.onProviderUpdate}
-            />
-          </Suspense>
-        )}
-      </Show>
-
-      <Show when={props.specificityDropdown?.()}>
-        {(category) => {
-          const specificityTiers = (): TierAssignment[] =>
-            (props.specificityAssignments?.() ?? [])
-              .filter((a) => a.is_active)
-              .map((a) => ({ ...a, tier: a.category }));
-          return (
-            <Suspense fallback={null}>
-              <ModelPickerModal
-                tierId={category()}
-                agentName={props.agentName()}
-                models={props.models()}
-                tiers={specificityTiers()}
-                customProviders={props.customProviders()}
-                connectedProviders={props.connectedProviders()}
-                requiredCapability={requiredCapabilityForSpecificity(category())}
-                onSelect={(_, model, provider, authType) =>
-                  props.onSpecificityOverride?.(category(), model, provider, authType)
-                }
-                onClose={() => props.onSpecificityDropdownClose?.()}
-                onConnectProviders={() => {
-                  props.onSpecificityDropdownClose?.();
-                  openProviders();
-                }}
-                onProviderRefreshed={props.onProviderUpdate}
-              />
-            </Suspense>
-          );
-        }}
-      </Show>
-
-      <Show when={props.fallbackPickerTier()}>
-        {(tierId) => {
-          const filteredModels = () => {
-            return props.models().filter((m) => {
-              // Find how many keys exist for this model's provider
-              const providerId = m.provider;
-              const authType = m.auth_type ?? 'api_key';
-              const keys = activeRouteKeys(props.connectedProviders(), providerId, authType);
-              if (keys.length <= 1) {
-                // Single-key model: hide if already used as primary or fallback
-                // (matched on the full route tuple — same model on a different
-                // (provider, auth) is intentionally NOT filtered).
-                const tier = props.getTier(tierId());
-                const primaryRoute = tier?.override_route ?? null;
-                if (
-                  primaryRoute &&
-                  primaryRoute.model === m.model_name &&
-                  primaryRoute.provider.toLowerCase() === providerId.toLowerCase() &&
-                  primaryRoute.authType === authType
-                ) {
-                  return false;
-                }
-                const routes = tier?.fallback_routes ?? [];
-                return !routes.some(
-                  (r) =>
-                    r.model === m.model_name &&
-                    r.provider.toLowerCase() === providerId.toLowerCase() &&
-                    r.authType === authType,
-                );
-              }
-              // Multi-key model: hide only if ALL keys are already used
-              return (
-                availableRouteKeysForModel(
-                  props.connectedProviders(),
-                  props.getTier(tierId()),
-                  m.model_name,
-                  providerId,
-                  authType,
-                ).length > 0
-              );
-            });
-          };
-
-          const handleFallbackSelect = (
-            tid: string,
-            modelName: string,
-            providerId: string,
-            authType?: AuthType,
-          ) => {
-            const effectiveAuth = authType ?? 'api_key';
-            const allKeys = activeRouteKeys(props.connectedProviders(), providerId, effectiveAuth);
-            if (allKeys.length <= 1) {
-              // Single-key (or no-key) provider: add fallback without key selection
-              props.onFallbackPickerClose();
-              props.onAddFallback(tid, modelName, providerId, authType);
-              return;
-            }
-            const selection = routeKeySelectionForModel({
-              providers: props.connectedProviders(),
-              tier: props.getTier(tierId()),
-              modelName,
-              providerId,
-              authType: effectiveAuth,
-              slot: 'fallback',
-            });
-            if (selection.exhausted) {
-              // All keys exhausted — shouldn't happen since filteredModels hides it
-              return;
-            }
-            if (selection.autoLabel) {
-              // Only one key left — auto-select it, close picker for fresh data
-              props.onFallbackPickerClose();
-              props.onAddFallback(tid, modelName, providerId, authType, selection.autoLabel);
-              return;
-            }
-            // 2+ keys available → ask which one
-            setPendingOverride({
-              tierId: tid,
-              modelName,
-              providerId,
-              authType,
-              keys: selection.keys,
-              isFallback: true,
-            });
-          };
-          return (
-            <Suspense fallback={null}>
-              <ModelPickerModal
-                tierId={tierId()}
-                agentName={props.agentName()}
-                models={filteredModels()}
-                tiers={props.tiers()}
-                customProviders={props.customProviders()}
-                connectedProviders={props.connectedProviders()}
-                requiredCapability={requiredCapabilityForTier(tierId())}
-                onSelect={handleFallbackSelect}
-                onClose={props.onFallbackPickerClose}
-                onConnectProviders={() => {
-                  props.onFallbackPickerClose();
-                  openProviders();
-                }}
-                onProviderRefreshed={props.onProviderUpdate}
-              />
-            </Suspense>
-          );
-        }}
-      </Show>
-
-      <Show when={pendingOverride()}>
-        {(p) => (
-          <KeyPickerModal
-            providerName={providerDisplayName(p().providerId, props.customProviders())}
-            modelName={p().modelName}
-            keys={p().keys}
-            onPick={resolvePending}
-            onClose={() => setPendingOverride(null)}
+      {dropdownTier ? (
+        <Suspense fallback={null}>
+          <ModelPickerModal
+            tierId={dropdownTier}
+            agentName={props.agentName}
+            models={props.models}
+            tiers={props.tiers}
+            customProviders={props.customProviders}
+            connectedProviders={props.connectedProviders}
+            requiredCapability={requiredCapabilityForTier(dropdownTier)}
+            onSelect={handleSelect}
+            onClose={props.onDropdownClose}
+            onConnectProviders={() => {
+              props.onDropdownClose();
+              openProviders();
+            }}
+            onProviderRefreshed={props.onProviderUpdate}
           />
-        )}
-      </Show>
+        </Suspense>
+      ) : null}
+
+      {category ? (
+        <Suspense fallback={null}>
+          <ModelPickerModal
+            tierId={category}
+            agentName={props.agentName}
+            models={props.models}
+            tiers={(props.specificityAssignments ?? [])
+              .filter((a) => a.is_active)
+              .map((a) => ({ ...a, tier: a.category }))}
+            customProviders={props.customProviders}
+            connectedProviders={props.connectedProviders}
+            requiredCapability={requiredCapabilityForSpecificity(category)}
+            onSelect={(_, model, provider, authType) =>
+              props.onSpecificityOverride?.(category, model, provider, authType)
+            }
+            onClose={() => props.onSpecificityDropdownClose?.()}
+            onConnectProviders={() => {
+              props.onSpecificityDropdownClose?.();
+              openProviders();
+            }}
+            onProviderRefreshed={props.onProviderUpdate}
+          />
+        </Suspense>
+      ) : null}
+
+      {fallbackTier ? renderFallbackPicker(fallbackTier) : null}
+
+      {pendingOverride ? (
+        <KeyPickerModal
+          providerName={providerDisplayName(pendingOverride.providerId, props.customProviders)}
+          modelName={pendingOverride.modelName}
+          keys={pendingOverride.keys}
+          onPick={resolvePending}
+          onClose={() => setPendingOverride(null)}
+        />
+      ) : null}
 
       {/* ProviderSelectModal removed — provider connection now via sidebar pages */}
 
       <RoutingInstructionModal
-        open={props.instructionModal() !== null}
-        mode={props.instructionModal() ?? 'enable'}
-        agentName={props.agentName()}
-        connectedProvider={props.instructionProvider()}
+        open={props.instructionModal !== null}
+        mode={props.instructionModal ?? 'enable'}
+        agentName={props.agentName}
+        connectedProvider={props.instructionProvider}
         onClose={props.onInstructionClose}
       />
     </>
   );
-};
-
-export default RoutingModals;
+}

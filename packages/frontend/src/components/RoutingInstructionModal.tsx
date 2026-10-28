@@ -1,12 +1,15 @@
-import { type Component, Show, createResource, createSignal } from 'solid-js';
+import { useState } from 'react';
 import CopyButton from './CopyButton.jsx';
 import ModelSelectDropdown from './ModelSelectDropdown.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
-import { createActiveVirtualModelNames } from './VirtualModelsHint.jsx';
 import { getAgentKey } from '../services/api.js';
+import { listVirtualModels } from '../services/api/virtual-models.js';
 import { installOrigin } from '../services/install-endpoints.js';
-import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
+import { agentPlatformSignal } from '../services/agent-platform-store.js';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { platformIcon } from 'thinker-shared';
+import { Button, Modal } from './ui.js';
 import { t } from '../i18n/index.js';
 
 interface Props {
@@ -17,174 +20,107 @@ interface Props {
   onClose: () => void;
 }
 
-const RoutingInstructionModal: Component<Props> = (props) => {
-  const [selectedModel, setSelectedModel] = createSignal<string | null>(null);
-  const isEnable = () => props.mode === 'enable';
-  const modelOrPlaceholder = () => selectedModel() ?? '<provider/model>';
+const DISABLE_LINES = (model: string) => [
+  'openclaw config unset models.providers.thinker',
+  'openclaw config unset agents.defaults.models.thinker/auto',
+  `openclaw config set agents.defaults.model.primary ${model}`,
+  'openclaw gateway restart',
+];
 
-  const [apiKeyData] = createResource(
-    () => (props.open && isEnable() ? props.agentName : null),
-    (n) => getAgentKey(n),
+export default function RoutingInstructionModal(props: Props) {
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const { platform, category } = useSignal(agentPlatformSignal);
+  const isEnable = props.mode === 'enable';
+  const loadEnable = props.open && isEnable;
+  const modelOrPlaceholder = selectedModel ?? '<provider/model>';
+
+  const apiKeyData = useResource(() => getAgentKey(props.agentName), [props.agentName], {
+    enabled: loadEnable,
+  });
+  // Active virtual model names (ADR 0004), loaded quietly: setup still works
+  // without them.
+  const virtualModels = useResource(
+    async () => {
+      try {
+        const list = await listVirtualModels(props.agentName);
+        return list.filter((v) => v.enabled).map((v) => v.name);
+      } catch {
+        return [];
+      }
+    },
+    [props.agentName],
+    { enabled: loadEnable },
   );
-  const virtualModels = createActiveVirtualModelNames(() =>
-    props.open && isEnable() ? props.agentName : null,
+
+  const baseUrl = `${installOrigin()}/v1`;
+  const disableLines = DISABLE_LINES(modelOrPlaceholder);
+  const icon = isEnable ? platformIcon(platform, category) : undefined;
+
+  const title = isEnable ? (
+    <span className="inline-flex items-center gap-2">
+      {icon ? <img src={icon} alt="" width={24} height={24} className="platform-icon" /> : null}
+      <span>
+        {t('routing.instructions.setUpHarness')} <em>{props.agentName}</em>
+      </span>
+    </span>
+  ) : (
+    t('routing.instructions.deactivate')
   );
-
-  const baseUrl = () => {
-    return `${installOrigin()}/v1`;
-  };
-
-  const disableCmd = () =>
-    `openclaw config unset models.providers.thinker\nopenclaw config unset agents.defaults.models.thinker/auto\nopenclaw config set agents.defaults.model.primary ${modelOrPlaceholder()}\nopenclaw gateway restart`;
-
-  const handleModelSelect = (cliValue: string) => {
-    setSelectedModel(cliValue);
-  };
 
   return (
-    <Show when={props.open}>
-      <div
-        class="modal-overlay"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) props.onClose();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') props.onClose();
-        }}
-      >
-        <div
-          class="modal-card"
-          style="max-width: 640px;"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="routing-instruction-title"
-        >
-          <div class="setup-modal__header">
-            <div class="modal-card__title" id="routing-instruction-title">
-              <Show when={isEnable()}>
-                <Show when={platformIcon(agentPlatform(), agentCategory())}>
-                  <img
-                    src={platformIcon(agentPlatform(), agentCategory())}
-                    alt=""
-                    width="28"
-                    height="28"
-                    class="platform-icon setup-modal__platform-icon"
-                  />
-                </Show>
-              </Show>
-              <Show when={isEnable()} fallback={<>{t('routing.instructions.deactivate')}</>}>
-                {t('routing.instructions.setUpHarness')} <em>{props.agentName}</em>
-              </Show>
-            </div>
-            <button
-              class="modal__close"
-              onClick={() => props.onClose()}
-              aria-label={t('common.close')}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
-          </div>
-          <Show when={isEnable()}>
-            <p class="modal-card__desc">{t('routing.instructions.connectDesc')}</p>
-          </Show>
-
-          <Show
-            when={isEnable()}
-            fallback={
-              <>
-                <p style="margin: 0 0 14px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); line-height: 1.5;">
-                  {t('routing.instructions.disableDesc')}
-                </p>
-
-                <p style="margin: 0 0 8px; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); line-height: 1.5;">
-                  {t('routing.instructions.pickModel')}
-                </p>
-
-                <ModelSelectDropdown selectedValue={selectedModel()} onSelect={handleModelSelect} />
-
-                <p style="margin: 14px 0; font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); line-height: 1.5;">
-                  {t('routing.instructions.runCommands')}
-                </p>
-
-                <div class="modal-terminal">
-                  <div class="modal-terminal__header">
-                    <div class="modal-terminal__dots">
-                      <span class="modal-terminal__dot modal-terminal__dot--red" />
-                      <span class="modal-terminal__dot modal-terminal__dot--yellow" />
-                      <span class="modal-terminal__dot modal-terminal__dot--green" />
-                    </div>
-                    <div class="modal-terminal__tabs">
-                      <span class="modal-terminal__tab modal-terminal__tab--active">
-                        {t('routing.instructions.terminal')}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="modal-terminal__body">
-                    <CopyButton text={disableCmd()} />
-                    <div>
-                      <span class="modal-terminal__prompt">$</span>
-                      <span class="modal-terminal__code">
-                        {/* i18n-ignore */}
-                        openclaw config unset models.providers.thinker
-                      </span>
-                    </div>
-                    <div style="margin-top: 8px;">
-                      <span class="modal-terminal__prompt">$</span>
-                      <span class="modal-terminal__code">
-                        {/* i18n-ignore */}
-                        openclaw config unset agents.defaults.models.thinker/auto
-                      </span>
-                    </div>
-                    <div style="margin-top: 8px;">
-                      <span class="modal-terminal__prompt">$</span>
-                      <span class="modal-terminal__code">
-                        {/* i18n-ignore */}
-                        openclaw config set agents.defaults.model.primary {modelOrPlaceholder()}
-                      </span>
-                    </div>
-                    <div style="margin-top: 8px;">
-                      <span class="modal-terminal__prompt">$</span>
-                      <span class="modal-terminal__code">
-                        {/* i18n-ignore */}
-                        openclaw gateway restart
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </>
-            }
-          >
+    <Modal
+      open={props.open}
+      wide
+      title={title}
+      label={isEnable ? undefined : t('routing.instructions.deactivate')}
+      onClose={props.onClose}
+    >
+      <div className="flex flex-col gap-3">
+        {isEnable ? (
+          <>
+            <p className="text-sm text-dim">{t('routing.instructions.connectDesc')}</p>
             <SetupStepAddProvider
-              apiKey={apiKeyData()?.apiKey ?? null}
-              keyPrefix={apiKeyData()?.keyPrefix ?? null}
-              baseUrl={baseUrl()}
-              platform={agentPlatform()}
-              virtualModels={virtualModels()}
+              apiKey={apiKeyData.data?.apiKey ?? null}
+              keyPrefix={apiKeyData.data?.keyPrefix ?? null}
+              baseUrl={baseUrl}
+              platform={platform}
+              virtualModels={virtualModels.data ?? []}
             />
-          </Show>
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-            <button class="btn btn--primary btn--sm" onClick={() => props.onClose()}>
-              {t('common.done')}
-            </button>
-          </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-dim">{t('routing.instructions.disableDesc')}</p>
+            <p className="text-sm text-dim">{t('routing.instructions.pickModel')}</p>
+            <div className="routing-modal__inline-picker">
+              <ModelSelectDropdown
+                selectedValue={selectedModel}
+                onSelect={(cliValue) => setSelectedModel(cliValue)}
+              />
+            </div>
+            <p className="text-sm text-dim">{t('routing.instructions.runCommands')}</p>
+            <div className="modal-terminal overflow-hidden rounded-control border border-line bg-sunken">
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-xs text-muted">{t('routing.instructions.terminal')}</span>
+                <CopyButton text={disableLines.join('\n')} />
+              </div>
+              <div className="flex flex-col gap-2 overflow-x-auto px-3 py-2.5 font-mono text-xs text-dim">
+                {disableLines.map((line) => (
+                  <div key={line} className="whitespace-nowrap">
+                    <span className="mr-2 select-none text-faint">$</span>
+                    {/* i18n-ignore */}
+                    <span className="text-ink">{line}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <div className="actions">
+          <Button size="sm" onClick={() => props.onClose()}>
+            {t('common.done')}
+          </Button>
         </div>
       </div>
-    </Show>
+    </Modal>
   );
-};
-
-export default RoutingInstructionModal;
+}

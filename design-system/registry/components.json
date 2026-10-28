@@ -437,18 +437,6 @@
         "agents.css"
       ]
     },
-    "anthropic-detail": {
-      "classes": [
-        "anthropic-detail__alt",
-        "anthropic-detail__alt-divider",
-        "anthropic-detail__alt-hint",
-        "anthropic-detail__btn",
-        "anthropic-detail__primary"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
     "api-key-display": {
       "classes": [
         "api-key-display__code",
@@ -621,8 +609,6 @@
         "layout.css",
         "limits.css",
         "modals.css",
-        "routing-providers.css",
-        "routing.css",
         "skeleton.css",
         "theme.css"
       ]
@@ -669,16 +655,6 @@
         "theme.css"
       ]
     },
-    "complexity-empty": {
-      "classes": [
-        "complexity-empty",
-        "complexity-empty__desc",
-        "complexity-empty__title"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
     "confirm-modal": {
       "classes": [
         "confirm-modal__confirm-row",
@@ -687,41 +663,6 @@
       ],
       "files": [
         "limits.css"
-      ]
-    },
-    "connection-delete-confirmation": {
-      "classes": [
-        "connection-delete-confirmation",
-        "connection-delete-confirmation__copy",
-        "connection-delete-confirmation__footer",
-        "connection-delete-confirmation__label",
-        "connection-delete-confirmation__title",
-        "connection-delete-confirmation__warning"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "connection-label-cell": {
-      "classes": [
-        "connection-label-cell",
-        "connection-label-cell__edit"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "connections-panel": {
-      "classes": [
-        "connections-panel",
-        "connections-panel--collapsed",
-        "connections-panel__body",
-        "connections-panel__chevron",
-        "connections-panel__toggle",
-        "connections-panel__viewport"
-      ],
-      "files": [
-        "routing-providers.css"
       ]
     },
     "container": {
@@ -733,21 +674,7 @@
       ],
       "files": [
         "layout.css",
-        "routing.css",
         "theme.css"
-      ]
-    },
-    "copilot-device-login": {
-      "classes": [
-        "copilot-device-login__code",
-        "copilot-device-login__code-box",
-        "copilot-device-login__code-row",
-        "copilot-device-login__copy-btn",
-        "copilot-device-login__open-btn",
-        "copilot-device-login__waiting"
-      ],
-      "files": [
-        "routing-providers.css"
       ]
     },
     "count-link": {
@@ -756,44 +683,6 @@
       ],
       "files": [
         "theme.css"
-      ]
-    },
-    "custom-provider-item": {
-      "classes": [
-        "custom-provider-item",
-        "custom-provider-item__delete",
-        "custom-provider-item__icon",
-        "custom-provider-item__info",
-        "custom-provider-item__meta",
-        "custom-provider-item__name"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "custom-provider-model-row": {
-      "classes": [
-        "custom-provider-model-row",
-        "custom-provider-model-row__name",
-        "custom-provider-model-row__price",
-        "custom-provider-model-row__remove"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "custom-provider-models": {
-      "classes": [
-        "custom-provider-models",
-        "custom-provider-models__column",
-        "custom-provider-models__column--name",
-        "custom-provider-models__column--price",
-        "custom-provider-models__column-spacer",
-        "custom-provider-models__columns",
-        "custom-provider-models__label"
-      ],
-      "files": [
-        "routing-providers.css"
       ]
     },
     "custom-select": {
@@ -815,8 +704,7 @@
         "custom-select__value"
       ],
       "files": [
-        "custom-select.css",
-        "routing-providers.css"
+        "custom-select.css"
       ]
     },
     "dark": {
@@ -831,9 +719,6 @@
         "data.css",
         "modals.css",
         "platform-icons.css",
-        "routing-deprecation.css",
-        "routing-providers.css",
-        "routing.css",
         "tokens.css",
         "wizard.css"
       ]
@@ -921,32 +806,6 @@
       ],
       "files": [
         "data.css"
-      ]
-    },
-    "fallback-list": {
-      "classes": [
-        "fallback-list",
-        "fallback-list__add",
-        "fallback-list__card",
-        "fallback-list__card--dragging",
-        "fallback-list__card--skipped",
-        "fallback-list__card--swapping",
-        "fallback-list__drag-handle",
-        "fallback-list__drop-indicator",
-        "fallback-list__drop-indicator--active",
-        "fallback-list__empty",
-        "fallback-list__empty-desc",
-        "fallback-list__empty-icon",
-        "fallback-list__empty-title",
-        "fallback-list__icon",
-        "fallback-list__items",
-        "fallback-list__model",
-        "fallback-list__params",
-        "fallback-list__rank",
-        "fallback-list__remove"
-      ],
-      "files": [
-        "routing.css"
       ]
     },
     "feed-item": {
@@ -1057,25 +916,6 @@
         "theme.css"
       ]
     },
-    "header-combo": {
-      "classes": [
-        "header-combo",
-        "header-combo--invalid",
-        "header-combo__error",
-        "header-combo__input",
-        "header-combo__menu",
-        "header-combo__option",
-        "header-combo__option--free",
-        "header-combo__option--hover",
-        "header-combo__option-group",
-        "header-combo__option-label",
-        "header-combo__option-row",
-        "header-combo__option-sublabel"
-      ],
-      "files": [
-        "routing-header-tiers.css"
-      ]
-    },
     "header-controls": {
       "classes": [
         "header-controls"
@@ -1083,82 +923,6 @@
       "files": [
         "layout.css",
         "theme.css"
-      ]
-    },
-    "header-tier-card": {
-      "classes": [
-        "header-tier-card__actions",
-        "header-tier-card__icon-btn",
-        "header-tier-card__kebab",
-        "header-tier-card__kebab-btn",
-        "header-tier-card__menu",
-        "header-tier-card__menu-item",
-        "header-tier-card__menu-item--danger",
-        "header-tier-card__name",
-        "header-tier-card__ordinal",
-        "header-tier-card__rule",
-        "header-tier-card__title"
-      ],
-      "files": [
-        "routing-header-tiers.css"
-      ]
-    },
-    "header-tier-manage": {
-      "classes": [
-        "header-tier-manage__create-btn",
-        "header-tier-manage__footer"
-      ],
-      "files": [
-        "routing-header-tiers.css"
-      ]
-    },
-    "header-tier-manage-modal": {
-      "classes": [
-        "header-tier-manage-modal"
-      ],
-      "files": [
-        "routing-header-tiers.css"
-      ]
-    },
-    "header-tier-modal": {
-      "classes": [
-        "header-tier-modal",
-        "header-tier-modal__back",
-        "header-tier-modal__close",
-        "header-tier-modal__delete-btn",
-        "header-tier-modal__error",
-        "header-tier-modal__footer",
-        "header-tier-modal__footer-right",
-        "header-tier-modal__swatch",
-        "header-tier-modal__swatch--active",
-        "header-tier-modal__swatch--amber",
-        "header-tier-modal__swatch--blue",
-        "header-tier-modal__swatch--brown",
-        "header-tier-modal__swatch--coral",
-        "header-tier-modal__swatch--cyan",
-        "header-tier-modal__swatch--emerald",
-        "header-tier-modal__swatch--fuchsia",
-        "header-tier-modal__swatch--gray",
-        "header-tier-modal__swatch--green",
-        "header-tier-modal__swatch--indigo",
-        "header-tier-modal__swatch--lime",
-        "header-tier-modal__swatch--navy",
-        "header-tier-modal__swatch--orange",
-        "header-tier-modal__swatch--pink",
-        "header-tier-modal__swatch--purple",
-        "header-tier-modal__swatch--red",
-        "header-tier-modal__swatch--rose",
-        "header-tier-modal__swatch--sky",
-        "header-tier-modal__swatch--slate",
-        "header-tier-modal__swatch--stone",
-        "header-tier-modal__swatch--teal",
-        "header-tier-modal__swatch--violet",
-        "header-tier-modal__swatch--yellow",
-        "header-tier-modal__swatch--zinc",
-        "header-tier-modal__swatches"
-      ],
-      "files": [
-        "routing-header-tiers.css"
       ]
     },
     "info-tooltip": {
@@ -1343,9 +1107,7 @@
       "files": [
         "limits.css",
         "modals.css",
-        "notifications.css",
-        "routing-header-tiers.css",
-        "routing.css"
+        "notifications.css"
       ]
     },
     "modal-key-box": {
@@ -1421,84 +1183,20 @@
         "theme.css"
       ]
     },
-    "model-capability-badge": {
-      "classes": [
-        "model-capability-badge",
-        "model-capability-badge--icon-only",
-        "model-capability-badge--unknown",
-        "model-capability-badge__icon"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "model-capability-badges": {
-      "classes": [
-        "model-capability-badges",
-        "model-capability-badges--compact",
-        "model-capability-badges--empty"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "model-modality-badges": {
-      "classes": [
-        "model-modality-badges"
-      ],
-      "files": [
-        "routing-modal.css"
-      ]
-    },
     "model-params": {
       "classes": [
-        "model-params__body",
-        "model-params__default-hint",
-        "model-params__dialog",
-        "model-params__empty",
-        "model-params__field",
-        "model-params__footer",
-        "model-params__footer-actions",
         "model-params__group",
         "model-params__group-card",
         "model-params__group-header",
-        "model-params__help",
-        "model-params__help-tooltip",
         "model-params__label-hint",
         "model-params__label-title",
-        "model-params__number",
-        "model-params__number--slider",
-        "model-params__param-key",
-        "model-params__reset",
         "model-params__row",
-        "model-params__row--disabled",
         "model-params__row-control",
         "model-params__row-text",
-        "model-params__separator",
-        "model-params__slider",
-        "model-params__slider-bound",
-        "model-params__slider-bounds",
-        "model-params__slider-control",
-        "model-params__slider-field",
-        "model-params__slider-field--disabled",
-        "model-params__slider-tick",
-        "model-params__slider-track-bg",
-        "model-params__slider-track-wrapper",
-        "model-params__status",
-        "model-params__toggle"
+        "model-params__separator"
       ],
       "files": [
-        "params-card.css",
-        "routing.css"
-      ]
-    },
-    "model-params-modal": {
-      "classes": [
-        "model-params-modal",
-        "model-params-modal--empty"
-      ],
-      "files": [
-        "routing.css"
+        "params-card.css"
       ]
     },
     "msg-detail": {
@@ -1552,22 +1250,6 @@
       ],
       "files": [
         "data.css"
-      ]
-    },
-    "no-connections-prompt": {
-      "classes": [
-        "no-connections-prompt",
-        "no-connections-prompt__card",
-        "no-connections-prompt__card-desc",
-        "no-connections-prompt__card-icon",
-        "no-connections-prompt__card-title",
-        "no-connections-prompt__cards",
-        "no-connections-prompt__desc",
-        "no-connections-prompt__header",
-        "no-connections-prompt__title"
-      ],
-      "files": [
-        "routing.css"
       ]
     },
     "not-found": {
@@ -1629,20 +1311,6 @@
         "notifications.css"
       ]
     },
-    "output-controls": {
-      "classes": [
-        "output-controls",
-        "output-controls--compact",
-        "output-controls__field",
-        "output-controls__label",
-        "output-controls__segment",
-        "output-controls__segment--active",
-        "output-controls__segments"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
     "overview": {
       "classes": [
         "overview__platform-icon"
@@ -1688,8 +1356,6 @@
         "cards.css",
         "charts.css",
         "limits.css",
-        "routing-providers.css",
-        "routing-tabs.css",
         "theme.css",
         "wizard.css"
       ]
@@ -1700,18 +1366,6 @@
       ],
       "files": [
         "platform-icons.css"
-      ]
-    },
-    "provider-auth-badge": {
-      "classes": [
-        "provider-auth-badge",
-        "provider-auth-badge--key",
-        "provider-auth-badge--local",
-        "provider-auth-badge--overlay",
-        "provider-auth-badge--sub"
-      ],
-      "files": [
-        "routing.css"
       ]
     },
     "provider-card": {
@@ -1727,92 +1381,13 @@
         "provider-card__key",
         "provider-card__label",
         "provider-card__logo",
-        "provider-card__logo-letter",
         "provider-card__menu",
         "provider-card__menu-btn",
         "provider-card__meta",
         "provider-card__name"
       ],
       "files": [
-        "notifications.css",
-        "routing-providers.css"
-      ]
-    },
-    "provider-detail": {
-      "classes": [
-        "provider-detail",
-        "provider-detail__action",
-        "provider-detail__beta-badge",
-        "provider-detail__disconnect",
-        "provider-detail__disconnect-icon",
-        "provider-detail__error",
-        "provider-detail__field",
-        "provider-detail__footer",
-        "provider-detail__format",
-        "provider-detail__format-help",
-        "provider-detail__format-legend",
-        "provider-detail__format-option",
-        "provider-detail__format-option--active",
-        "provider-detail__format-option--disabled",
-        "provider-detail__format-option-path",
-        "provider-detail__format-option-title",
-        "provider-detail__format-options",
-        "provider-detail__header",
-        "provider-detail__header-actions",
-        "provider-detail__hint",
-        "provider-detail__icon",
-        "provider-detail__input",
-        "provider-detail__input--disabled",
-        "provider-detail__input--error",
-        "provider-detail__input--masked",
-        "provider-detail__key-help",
-        "provider-detail__key-help-link",
-        "provider-detail__key-row",
-        "provider-detail__label",
-        "provider-detail__label-muted",
-        "provider-detail__models-bar",
-        "provider-detail__name",
-        "provider-detail__no-key",
-        "provider-detail__refresh-btn",
-        "provider-detail__refresh-icon--spinning",
-        "provider-detail__signin-btn",
-        "provider-detail__subtitle",
-        "provider-detail__title-group"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "provider-icon": {
-      "classes": [
-        "provider-icon--opencode-go-dark",
-        "provider-icon--opencode-go-light",
-        "provider-icon--opencode-zen-dark",
-        "provider-icon--opencode-zen-light"
-      ],
-      "files": [
-        "routing-providers.css"
-      ]
-    },
-    "provider-modal": {
-      "classes": [
-        "provider-modal__add-custom",
-        "provider-modal__add-custom-chip",
-        "provider-modal__disclaimer",
-        "provider-modal__disclaimer-label",
-        "provider-modal__footer",
-        "provider-modal__list",
-        "provider-modal__request-sub",
-        "provider-modal__request-sub-btn",
-        "provider-modal__tab-hint",
-        "provider-modal__tab-icon",
-        "provider-modal__tabs-wrapper",
-        "provider-modal__view",
-        "provider-modal__view--from-left",
-        "provider-modal__view--from-right"
-      ],
-      "files": [
-        "routing-providers.css"
+        "notifications.css"
       ]
     },
     "provider-modal-option": {
@@ -1861,35 +1436,6 @@
         "notifications.css"
       ]
     },
-    "provider-toggle": {
-      "classes": [
-        "provider-toggle",
-        "provider-toggle--action",
-        "provider-toggle__actions",
-        "provider-toggle__add-btn",
-        "provider-toggle__add-tooltip",
-        "provider-toggle__badge",
-        "provider-toggle__badge--connected",
-        "provider-toggle__disconnect-btn",
-        "provider-toggle__expand",
-        "provider-toggle__icon",
-        "provider-toggle__info",
-        "provider-toggle__key-input",
-        "provider-toggle__key-row",
-        "provider-toggle__local-only",
-        "provider-toggle__name",
-        "provider-toggle__name--action",
-        "provider-toggle__subtitle",
-        "provider-toggle__switch",
-        "provider-toggle__switch--on",
-        "provider-toggle__switch-thumb",
-        "provider-toggle__tag"
-      ],
-      "files": [
-        "routing-providers.css",
-        "routing.css"
-      ]
-    },
     "recovery-card": {
       "classes": [
         "recovery-card",
@@ -1927,362 +1473,6 @@
         "theme.css"
       ]
     },
-    "response-mode-btn": {
-      "classes": [
-        "response-mode-btn",
-        "response-mode-btn__icon"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "response-mode-modal": {
-      "classes": [
-        "response-mode-modal",
-        "response-mode-modal__blocker",
-        "response-mode-modal__blocker-list",
-        "response-mode-modal__blocker-meta",
-        "response-mode-modal__blocker-model",
-        "response-mode-modal__blocker-row",
-        "response-mode-modal__blocker-text",
-        "response-mode-modal__body",
-        "response-mode-modal__desc",
-        "response-mode-modal__field-header",
-        "response-mode-modal__field-title"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-action": {
-      "classes": [
-        "routing-action",
-        "routing-action--danger"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-card": {
-      "classes": [
-        "routing-card",
-        "routing-card--cta",
-        "routing-card--disabled",
-        "routing-card--header-tier",
-        "routing-card--virtual-model",
-        "routing-card--virtual-model-inactive",
-        "routing-card__actions",
-        "routing-card__auto-tag",
-        "routing-card__body",
-        "routing-card__change-btn",
-        "routing-card__change-icon",
-        "routing-card__change-label",
-        "routing-card__chip-action",
-        "routing-card__chip-action--active",
-        "routing-card__chip-action--configured",
-        "routing-card__chip-action--dialog-open",
-        "routing-card__chip-footer",
-        "routing-card__chip-main",
-        "routing-card__chip-meta",
-        "routing-card__chip-price",
-        "routing-card__chip-reset",
-        "routing-card__desc",
-        "routing-card__disabled-desc",
-        "routing-card__disabled-text",
-        "routing-card__empty",
-        "routing-card__empty-link",
-        "routing-card__empty-text",
-        "routing-card__fallbacks",
-        "routing-card__fallbacks-label",
-        "routing-card__header",
-        "routing-card__header-action",
-        "routing-card__header-action--danger",
-        "routing-card__header-add",
-        "routing-card__main",
-        "routing-card__model-chip",
-        "routing-card__model-chip--dragging",
-        "routing-card__model-chip--drop-target",
-        "routing-card__model-chip--skipped",
-        "routing-card__model-row",
-        "routing-card__override",
-        "routing-card__override-icon",
-        "routing-card__reset-btn",
-        "routing-card__right",
-        "routing-card__skipped-badge",
-        "routing-card__sub",
-        "routing-card__sub--subscription",
-        "routing-card__tier"
-      ],
-      "files": [
-        "routing-header-tiers.css",
-        "routing-specificity.css",
-        "routing-virtual-models.css",
-        "routing.css"
-      ]
-    },
-    "routing-cards": {
-      "classes": [
-        "routing-cards",
-        "routing-cards--centered",
-        "routing-cards--unified-compact",
-        "routing-cards--wide"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-cards-backdrop": {
-      "classes": [
-        "routing-cards-backdrop"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-complexity": {
-      "classes": [
-        "routing-complexity__disable"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-deprecation": {
-      "classes": [
-        "routing-deprecation",
-        "routing-deprecation__body",
-        "routing-deprecation__icon",
-        "routing-deprecation__title"
-      ],
-      "files": [
-        "routing-deprecation.css"
-      ]
-    },
-    "routing-disable-btn": {
-      "classes": [
-        "routing-disable-btn"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-enable-card": {
-      "classes": [
-        "routing-enable-card",
-        "routing-enable-card__desc",
-        "routing-enable-card__icon",
-        "routing-enable-card__title"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-footer": {
-      "classes": [
-        "routing-footer",
-        "routing-footer__instructions",
-        "routing-footer__sep"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-modal": {
-      "classes": [
-        "routing-modal__cap-pill",
-        "routing-modal__cap-pill--active",
-        "routing-modal__card",
-        "routing-modal__empty",
-        "routing-modal__filter-bar",
-        "routing-modal__filter-check",
-        "routing-modal__filter-left",
-        "routing-modal__filter-pill",
-        "routing-modal__filter-pill--active",
-        "routing-modal__filter-pill-icon",
-        "routing-modal__filter-right",
-        "routing-modal__group",
-        "routing-modal__group-header",
-        "routing-modal__group-icon",
-        "routing-modal__group-name",
-        "routing-modal__group-refresh",
-        "routing-modal__group-refresh-icon--spinning",
-        "routing-modal__header",
-        "routing-modal__inline-picker",
-        "routing-modal__list",
-        "routing-modal__model",
-        "routing-modal__model--disabled",
-        "routing-modal__model-cell",
-        "routing-modal__model-cell--price",
-        "routing-modal__model-cell-label",
-        "routing-modal__model-disabled-reason",
-        "routing-modal__model-id",
-        "routing-modal__model-id--subscription",
-        "routing-modal__model-label",
-        "routing-modal__model-left",
-        "routing-modal__model-meta",
-        "routing-modal__model-price",
-        "routing-modal__recommended",
-        "routing-modal__role-tag",
-        "routing-modal__search",
-        "routing-modal__search-icon",
-        "routing-modal__search-wrap",
-        "routing-modal__selected-display",
-        "routing-modal__selected-hint",
-        "routing-modal__selected-label",
-        "routing-modal__subtitle",
-        "routing-modal__table-head",
-        "routing-modal__title"
-      ],
-      "files": [
-        "routing-modal.css",
-        "routing.css"
-      ]
-    },
-    "routing-no-providers": {
-      "classes": [
-        "routing-no-providers",
-        "routing-no-providers__desc",
-        "routing-no-providers__icon",
-        "routing-no-providers__title"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-page-header": {
-      "classes": [
-        "routing-page-header"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-pipeline-help": {
-      "classes": [
-        "routing-pipeline-help",
-        "routing-pipeline-help__label"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-pipeline-help-step": {
-      "classes": [
-        "routing-pipeline-help-step",
-        "routing-pipeline-help-step__desc",
-        "routing-pipeline-help-step__head",
-        "routing-pipeline-help-step__num",
-        "routing-pipeline-help-step__tag"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-pipeline-help-steps": {
-      "classes": [
-        "routing-pipeline-help-steps"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-pipeline-help-summary": {
-      "classes": [
-        "routing-pipeline-help-summary"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-priority-legend": {
-      "classes": [
-        "routing-priority-legend"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-providers-info": {
-      "classes": [
-        "routing-providers-info",
-        "routing-providers-info__icon",
-        "routing-providers-info__icon--has-tooltip",
-        "routing-providers-info__icons",
-        "routing-providers-info__label",
-        "routing-providers-info__tooltip"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-section": {
-      "classes": [
-        "routing-section",
-        "routing-section--dimmed",
-        "routing-section--virtual-models",
-        "routing-section__controls",
-        "routing-section__cta",
-        "routing-section__empty",
-        "routing-section__empty-desc",
-        "routing-section__empty-title",
-        "routing-section__header",
-        "routing-section__header--header-tiers",
-        "routing-section__header--with-control",
-        "routing-section__subtitle",
-        "routing-section__title"
-      ],
-      "files": [
-        "routing-header-tiers.css",
-        "routing-specificity.css",
-        "routing-tabs.css",
-        "routing-virtual-models.css",
-        "routing.css"
-      ]
-    },
-    "routing-switch": {
-      "classes": [
-        "routing-switch",
-        "routing-switch--disabled",
-        "routing-switch--on",
-        "routing-switch__label",
-        "routing-switch__thumb",
-        "routing-switch__track"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-tabs": {
-      "classes": [
-        "routing-tabs",
-        "routing-tabs__arrow",
-        "routing-tabs__dot",
-        "routing-tabs__dot--off",
-        "routing-tabs__dot--on",
-        "routing-tabs__header",
-        "routing-tabs__header-right",
-        "routing-tabs__panel"
-      ],
-      "files": [
-        "routing-tabs.css"
-      ]
-    },
-    "routing-tooltip": {
-      "classes": [
-        "routing-tooltip"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
-    "routing-unified-add-card": {
-      "classes": [
-        "routing-unified-add-card"
-      ],
-      "files": [
-        "routing.css"
-      ]
-    },
     "rule-menu": {
       "classes": [
         "rule-menu__btn",
@@ -2292,14 +1482,6 @@
       ],
       "files": [
         "limits.css"
-      ]
-    },
-    "scroll-panel": {
-      "classes": [
-        "scroll-panel--at-bottom"
-      ],
-      "files": [
-        "routing-providers.css"
       ]
     },
     "security-event": {
@@ -2580,61 +1762,6 @@
         "layout.css"
       ]
     },
-    "specificity-cards": {
-      "classes": [
-        "specificity-cards"
-      ],
-      "files": [
-        "routing-specificity.css"
-      ]
-    },
-    "specificity-empty": {
-      "classes": [
-        "specificity-empty",
-        "specificity-empty__desc",
-        "specificity-empty__title"
-      ],
-      "files": [
-        "routing-specificity.css"
-      ]
-    },
-    "specificity-header": {
-      "classes": [
-        "specificity-header",
-        "specificity-header__left"
-      ],
-      "files": [
-        "routing-specificity.css"
-      ]
-    },
-    "specificity-modal": {
-      "classes": [
-        "specificity-modal",
-        "specificity-modal__desc",
-        "specificity-modal__footer",
-        "specificity-modal__icon",
-        "specificity-modal__info",
-        "specificity-modal__list",
-        "specificity-modal__name",
-        "specificity-modal__row",
-        "specificity-modal__stage-desc",
-        "specificity-modal__title",
-        "specificity-modal__toggle",
-        "specificity-modal__toggle--on",
-        "specificity-modal__toggle-thumb"
-      ],
-      "files": [
-        "routing-specificity.css"
-      ]
-    },
-    "specificity-output-controls": {
-      "classes": [
-        "specificity-output-controls"
-      ],
-      "files": [
-        "routing-specificity.css"
-      ]
-    },
     "spinner": {
       "classes": [
         "spinner"
@@ -2673,18 +1800,6 @@
       ],
       "files": [
         "data.css"
-      ]
-    },
-    "subscription-detail": {
-      "classes": [
-        "subscription-detail__alt",
-        "subscription-detail__alt-divider",
-        "subscription-detail__alt-hint",
-        "subscription-detail__btn",
-        "subscription-detail__primary"
-      ],
-      "files": [
-        "routing-providers.css"
       ]
     },
     "summary-card": {
@@ -2938,75 +2053,6 @@
       ],
       "files": [
         "cards.css"
-      ]
-    },
-    "virtual-model-card": {
-      "classes": [
-        "virtual-model-card__details",
-        "virtual-model-card__drag",
-        "virtual-model-card__inactive",
-        "virtual-model-card__model",
-        "virtual-model-card__switch",
-        "virtual-model-card__switch-spinner",
-        "virtual-model-card__switches"
-      ],
-      "files": [
-        "routing-virtual-models.css"
-      ]
-    },
-    "virtual-model-modal": {
-      "classes": [
-        "virtual-model-modal",
-        "virtual-model-modal__chain",
-        "virtual-model-modal__close",
-        "virtual-model-modal__hint",
-        "virtual-model-modal__name",
-        "virtual-model-modal__route",
-        "virtual-model-modal__route--invalid",
-        "virtual-model-modal__route-model",
-        "virtual-model-modal__route-position",
-        "virtual-model-modal__route-provider",
-        "virtual-model-modal__route-remove",
-        "virtual-model-modal__server-error",
-        "virtual-model-modal__switch-row"
-      ],
-      "files": [
-        "routing-virtual-models.css"
-      ]
-    },
-    "virtual-model-shadow": {
-      "classes": [
-        "virtual-model-shadow",
-        "virtual-model-shadow__desc",
-        "virtual-model-shadow__icon",
-        "virtual-model-shadow__list",
-        "virtual-model-shadow__title"
-      ],
-      "files": [
-        "routing-virtual-models.css"
-      ]
-    },
-    "virtual-model-slot": {
-      "classes": [
-        "virtual-model-slot",
-        "virtual-model-slot--dragging",
-        "virtual-model-slot--drop-target"
-      ],
-      "files": [
-        "routing-virtual-models.css"
-      ]
-    },
-    "virtual-model-snippet-modal": {
-      "classes": [
-        "virtual-model-snippet-modal",
-        "virtual-model-snippet-modal__desc",
-        "virtual-model-snippet-modal__footer",
-        "virtual-model-snippet-modal__header",
-        "virtual-model-snippet-modal__inactive",
-        "virtual-model-snippet-modal__title"
-      ],
-      "files": [
-        "routing-virtual-models.css"
       ]
     },
     "workspace-table": {
@@ -3461,33 +2507,7 @@
       "losesTo": "theme.css:1138"
     }
   ],
-  "componentSheets": {
-    "routing-deprecation.css": [
-      "components/RoutingDeprecationNotice.tsx"
-    ],
-    "routing-header-tiers.css": [
-      "pages/RoutingHeaderTiersSection.tsx",
-      "pages/RoutingVirtualModelsSection.tsx"
-    ],
-    "routing-specificity.css": [
-      "pages/RoutingSpecificitySection.tsx"
-    ],
-    "routing-virtual-models.css": [
-      "pages/RoutingVirtualModelsSection.tsx"
-    ],
-    "routing-providers.css": [
-      "(via @import)"
-    ],
-    "routing-modal.css": [
-      "(via @import)"
-    ],
-    "routing-tabs.css": [
-      "(via @import)"
-    ],
-    "routing.css": [
-      "pages/Routing.tsx"
-    ]
-  },
+  "componentSheets": {},
   "orphanStylesheets": [
     "agent-chart-tooltip.css",
     "analytics-overview.css",
@@ -3499,14 +2519,22 @@
     "playground.css",
     "reliability-card.css",
     "request-drawer.css",
+    "routing-deprecation.css",
+    "routing-header-tiers.css",
+    "routing-modal.css",
+    "routing-providers.css",
+    "routing-specificity.css",
+    "routing-tabs.css",
+    "routing-virtual-models.css",
+    "routing.css",
     "welcome.css"
   ],
   "tokensOutsideSource": [],
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 218,
-    "classes": 1113,
+    "blocks": 155,
+    "classes": 622,
     "canonicalRules": 29,
     "ghostRules": 29
   },

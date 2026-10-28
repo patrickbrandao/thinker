@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
+import { render, screen, fireEvent } from '@testing-library/react';
 import {
   RoutingFooter,
   ActiveProviderIcons,
@@ -42,103 +42,103 @@ describe('RoutingFooter', () => {
   it('renders setup instructions but no Disable routing button', () => {
     const onResetAll = vi.fn();
     const onShowInstructions = vi.fn();
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => false}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={false}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={onResetAll}
         onShowInstructions={onShowInstructions}
-      />
-    ));
+      />,
+    );
     expect(screen.getByRole('button', { name: 'Setup instructions' })).toBeDefined();
     expect(screen.queryByRole('button', { name: /disable routing/i })).toBeNull();
   });
 
   it('shows the reset-all button when there are overrides', () => {
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => true}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={true}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={vi.fn()}
         onShowInstructions={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(screen.getByRole('button', { name: 'Reset all to auto' })).toBeDefined();
   });
 
   it('disables reset-all while resettingAll is true and shows a spinner', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingFooter
-        hasOverrides={() => true}
-        resettingAll={() => true}
-        resettingTier={() => null}
+        hasOverrides={true}
+        resettingAll={true}
+        resettingTier={null}
         onResetAll={vi.fn()}
         onShowInstructions={vi.fn()}
-      />
-    ));
-    const btn = container.querySelector('.btn--outline') as HTMLButtonElement;
+      />,
+    );
+    const btn = screen.getByRole('button', { name: 'Reset all to auto' }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.spinner')).not.toBeNull();
   });
 
   it('disables reset-all when an individual tier is being reset', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <RoutingFooter
-        hasOverrides={() => true}
-        resettingAll={() => false}
-        resettingTier={() => 'simple'}
+        hasOverrides={true}
+        resettingAll={false}
+        resettingTier="simple"
         onResetAll={vi.fn()}
         onShowInstructions={vi.fn()}
-      />
-    ));
-    const btn = container.querySelector('.btn--outline') as HTMLButtonElement;
+      />,
+    );
+    const btn = screen.getByRole('button', { name: 'Reset all to auto' }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
   it('fires onResetAll when reset-all is clicked', () => {
     const onResetAll = vi.fn();
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => true}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={true}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={onResetAll}
         onShowInstructions={vi.fn()}
-      />
-    ));
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Reset all to auto' }));
     expect(onResetAll).toHaveBeenCalled();
   });
 
   it('fires onShowInstructions when the setup link is clicked', () => {
     const onShowInstructions = vi.fn();
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => false}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={false}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={vi.fn()}
         onShowInstructions={onShowInstructions}
-      />
-    ));
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Setup instructions' }));
     expect(onShowInstructions).toHaveBeenCalled();
   });
 
   it('renders and fires onShowHowRoutingWorks when provided', () => {
     const onShowHowRoutingWorks = vi.fn();
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => false}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={false}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={vi.fn()}
         onShowInstructions={vi.fn()}
         onShowHowRoutingWorks={onShowHowRoutingWorks}
-      />
-    ));
+      />,
+    );
     const btn = screen.getByRole('button', { name: 'How routing works' });
     expect(btn).toBeDefined();
     fireEvent.click(btn);
@@ -146,23 +146,23 @@ describe('RoutingFooter', () => {
   });
 
   it('does not render How routing works button when handler is not provided', () => {
-    render(() => (
+    render(
       <RoutingFooter
-        hasOverrides={() => false}
-        resettingAll={() => false}
-        resettingTier={() => null}
+        hasOverrides={false}
+        resettingAll={false}
+        resettingTier={null}
         onResetAll={vi.fn()}
         onShowInstructions={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(screen.queryByRole('button', { name: 'How routing works' })).toBeNull();
   });
 });
 
 describe('RoutingLoadingSkeleton', () => {
-  it('renders skeleton placeholder divs with the pulse animation', () => {
-    const { container } = render(() => <RoutingLoadingSkeleton />);
-    const pulseDivs = container.querySelectorAll('[style*="skeleton-pulse"]');
+  it('renders skeleton placeholder blocks', () => {
+    const { container } = render(<RoutingLoadingSkeleton />);
+    const pulseDivs = container.querySelectorAll('.skel');
     expect(pulseDivs.length).toBeGreaterThan(0);
   });
 });
@@ -187,9 +187,9 @@ describe('ActiveProviderIcons', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => []} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={[]} />,
+    );
     expect(container.querySelector('[data-testid="prov-icon-openai"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="prov-icon-anthropic"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="auth-api_key"]')).not.toBeNull();
@@ -207,19 +207,16 @@ describe('ActiveProviderIcons', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container, unmount } = render(() => (
-      <ActiveProviderIcons activeProviders={() => single} customProviders={() => []} />
-    ));
+    const { container, unmount } = render(
+      <ActiveProviderIcons activeProviders={single} customProviders={[]} />,
+    );
     expect(container.textContent).toMatch(/1 connection(?!s)/);
     unmount();
 
-    const multi: RoutingProvider[] = [
-      ...single,
-      { ...single[0], id: 'p2', provider: 'anthropic' },
-    ];
-    const { container: c2 } = render(() => (
-      <ActiveProviderIcons activeProviders={() => multi} customProviders={() => []} />
-    ));
+    const multi: RoutingProvider[] = [...single, { ...single[0], id: 'p2', provider: 'anthropic' }];
+    const { container: c2 } = render(
+      <ActiveProviderIcons activeProviders={multi} customProviders={[]} />,
+    );
     expect(c2.textContent).toMatch(/2 connections/);
   });
 
@@ -245,9 +242,9 @@ describe('ActiveProviderIcons', () => {
         created_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => customProviders} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={customProviders} />,
+    );
     const letter = container.querySelector('.provider-card__logo-letter');
     expect(letter?.textContent).toBe('G');
   });
@@ -263,9 +260,9 @@ describe('ActiveProviderIcons', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => []} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={[]} />,
+    );
     expect(container.querySelector('.provider-card__logo-letter')?.textContent).toBe('C');
   });
 
@@ -293,9 +290,9 @@ describe('ActiveProviderIcons', () => {
         created_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => customProviders} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={customProviders} />,
+    );
     expect(container.querySelector('[data-testid="custom-logo"]')).not.toBeNull();
     expect(container.querySelector('.provider-card__logo-letter')).toBeNull();
   });
@@ -323,9 +320,9 @@ describe('ActiveProviderIcons', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => []} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={[]} />,
+    );
     const tooltip = container.querySelector('.routing-providers-info__tooltip');
     expect(tooltip).not.toBeNull();
     expect(tooltip?.textContent).toContain('2 API Key keys');
@@ -356,9 +353,9 @@ describe('ActiveProviderIcons', () => {
         connected_at: '2025-01-01',
       },
     ];
-    const { container } = render(() => (
-      <ActiveProviderIcons activeProviders={() => providers} customProviders={() => []} />
-    ));
+    const { container } = render(
+      <ActiveProviderIcons activeProviders={providers} customProviders={[]} />,
+    );
     const tooltip = container.querySelector('.routing-providers-info__tooltip');
     expect(tooltip?.textContent).toContain('Default');
   });

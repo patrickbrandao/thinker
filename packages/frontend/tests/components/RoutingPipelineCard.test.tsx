@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@solidjs/testing-library';
+import { render, screen } from '@testing-library/react';
 import { buildPipelineHelp } from '../../src/components/RoutingPipelineCard';
 
 function renderHelp(specificity: boolean, custom: boolean, complexity: boolean) {
   const content = buildPipelineHelp(specificity, custom, complexity);
-  render(() => <div>{content}</div>);
+  render(<div>{content}</div>);
   return true;
 }
 
 describe('buildPipelineHelp', () => {
   it('always shows Default routing even when no opt-in layers are enabled', () => {
     renderHelp(false, false, false);
-    expect(screen.getByText('Default routing:')).toBeNull
+    expect(screen.getByText('Default routing:')).toBeNull;
     expect(screen.queryByText('Complexity routing')).toBeNull();
     expect(screen.queryByText('Task-specific routing')).toBeNull();
     expect(screen.queryByText('Custom routing')).toBeNull();

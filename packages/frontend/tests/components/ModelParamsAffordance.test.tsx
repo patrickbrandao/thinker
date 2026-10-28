@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, screen, waitFor, configure } from '@solidjs/testing-library';
+import { render, fireEvent, screen, waitFor, configure } from '@testing-library/react';
 import type { ProviderParamSpec } from 'thinker-shared';
-
-vi.mock('solid-js/web', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('solid-js/web')>();
-  return { ...mod, Portal: (props: any) => props.children };
-});
 
 import ModelParamsAffordance from '../../src/components/ModelParamsAffordance';
 import { getModelParamSpecs } from '../../src/services/api/model-params.js';
@@ -57,15 +52,15 @@ describe('ModelParamsAffordance', () => {
   });
 
   it('renders the button for non-local routes', () => {
-    const { container } = render(() => <ModelParamsAffordance {...baseProps} />);
+    const { container } = render(<ModelParamsAffordance {...baseProps} />);
     expect(findButton(container)).not.toBeNull();
   });
 
   it('opens a model with no parameters without any outbound report link', async () => {
     mockGetSpecs.mockResolvedValue([]);
-    const { container } = render(() => (
-      <ModelParamsAffordance {...baseProps} provider="openai" model="gpt-4o" slotLabel="gpt-4o" />
-    ));
+    const { container } = render(
+      <ModelParamsAffordance {...baseProps} provider="openai" model="gpt-4o" slotLabel="gpt-4o" />,
+    );
     fireEvent.click(
       container.querySelector(
         'button[aria-label="Configure model parameters for gpt-4o"]',
@@ -80,9 +75,7 @@ describe('ModelParamsAffordance', () => {
   });
 
   it('does not render the button when authType is missing', () => {
-    // Explicit props (no spread): Solid's mergeProps skips `undefined`
-    // overrides, so spreading baseProps would keep the truthy value.
-    const { container } = render(() => (
+    const { container } = render(
       <ModelParamsAffordance
         agentName="demo"
         provider="deepseek"
@@ -92,13 +85,13 @@ describe('ModelParamsAffordance', () => {
         scope="tier:default"
         getParams={() => null}
         setParams={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(findButton(container)).toBeNull();
   });
 
   it('does not render the button when provider is undefined', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ModelParamsAffordance
         agentName="demo"
         provider={undefined}
@@ -108,32 +101,32 @@ describe('ModelParamsAffordance', () => {
         scope="tier:default"
         getParams={() => null}
         setParams={vi.fn()}
-      />
-    ));
+      />,
+    );
     expect(findButton(container)).toBeNull();
   });
 
   it('does not render the button for local routes', () => {
-    const { container } = render(() => <ModelParamsAffordance {...baseProps} authType="local" />);
+    const { container } = render(<ModelParamsAffordance {...baseProps} authType="local" />);
     expect(container.querySelector('button[aria-label^="Configure model parameters"]')).toBeNull();
   });
 
   it('flips the configured class when getParams returns a non-null value', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <ModelParamsAffordance
         {...baseProps}
         getParams={() => ({ thinking: { type: 'disabled' } })}
-      />
-    ));
+      />,
+    );
     const btn = findButton(container) as HTMLButtonElement;
     expect(btn.classList.contains('routing-card__chip-action--configured')).toBe(true);
   });
 
   it('fetches specs on open and saves through the scoped params callback', async () => {
     const setParams = vi.fn().mockResolvedValue(undefined);
-    const { container, getByRole } = render(() => (
-      <ModelParamsAffordance {...baseProps} setParams={setParams} />
-    ));
+    const { container, getByRole } = render(
+      <ModelParamsAffordance {...baseProps} setParams={setParams} />,
+    );
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     fireEvent.click(await waitFor(() => getByRole('button', { name: /Thinking mode/ })));
@@ -149,13 +142,13 @@ describe('ModelParamsAffordance', () => {
 
   it('saves null when the user resets the only stored param', async () => {
     const setParams = vi.fn().mockResolvedValue(undefined);
-    const { container, getByRole } = render(() => (
+    const { container, getByRole } = render(
       <ModelParamsAffordance
         {...baseProps}
         getParams={() => ({ thinking: { type: 'disabled' } })}
         setParams={setParams}
-      />
-    ));
+      />,
+    );
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     fireEvent.click(await waitFor(() => getByRole('button', { name: 'Reset Thinking mode' })));
@@ -174,29 +167,23 @@ describe('ModelParamsAffordance', () => {
 
   it('shows an empty state when the model has no configurable params', async () => {
     mockGetSpecs.mockResolvedValue([]);
-    const { container, findByText, queryByRole } = render(() => (
-      <ModelParamsAffordance {...baseProps} />
-    ));
+    const { container, findByText, queryByRole } = render(<ModelParamsAffordance {...baseProps} />);
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
-    expect(
-      await findByText('No parameter controls are available for deepseek-v4.'),
-    ).toBeTruthy();
+    expect(await findByText('No parameter controls are available for deepseek-v4.')).toBeTruthy();
     expect(queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
   it('swallows a fetch error and shows the empty state', async () => {
     mockGetSpecs.mockRejectedValue(new Error('boom'));
-    const { container, findByText } = render(() => <ModelParamsAffordance {...baseProps} />);
+    const { container, findByText } = render(<ModelParamsAffordance {...baseProps} />);
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
-    expect(
-      await findByText('No parameter controls are available for deepseek-v4.'),
-    ).toBeTruthy();
+    expect(await findByText('No parameter controls are available for deepseek-v4.')).toBeTruthy();
   });
 
   it('button is disabled when the parent says so', () => {
-    const { container } = render(() => <ModelParamsAffordance {...baseProps} disabled />);
+    const { container } = render(<ModelParamsAffordance {...baseProps} disabled />);
     const btn = findButton(container) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });

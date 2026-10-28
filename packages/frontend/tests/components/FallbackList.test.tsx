@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ProviderParamSpecCatalog } from 'thinker-shared';
-
-vi.mock('solid-js/web', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('solid-js/web')>();
-  return { ...mod, Portal: (props: any) => props.children };
-});
 
 import { getModelParamSpecs } from '../../src/services/api/model-params.js';
 
@@ -101,7 +96,7 @@ describe('FallbackList', () => {
   });
 
   it('renders empty state when no fallbacks', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={[]} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={[]} />);
 
     expect(screen.getByText('No fallbacks')).toBeDefined();
     expect(container.querySelector('.fallback-list__empty')).not.toBeNull();
@@ -109,9 +104,9 @@ describe('FallbackList', () => {
   });
 
   it('renders fallback items with model labels', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const modelLabels = container.querySelectorAll('.fallback-list__model');
     expect(modelLabels.length).toBe(2);
@@ -131,7 +126,7 @@ describe('FallbackList', () => {
       },
     ] as any[];
 
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         responseMode="stream"
@@ -141,8 +136,8 @@ describe('FallbackList', () => {
           { provider: 'custom:local', authType: 'api_key', model: 'legacy-model' },
         ]}
         models={streamModeModels}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     expect(cards[0]?.classList.contains('fallback-list__card--skipped')).toBe(false);
@@ -153,7 +148,7 @@ describe('FallbackList', () => {
   });
 
   it('falls back to model-name matching when a structured route is stale', () => {
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         responseMode="stream"
@@ -168,14 +163,14 @@ describe('FallbackList', () => {
             },
           ] as any[]
         }
-      />
-    ));
+      />,
+    );
 
     expect(container.querySelector('.fallback-list__card--skipped')).toBeNull();
   });
 
   it('closes a fallback key picker when clicking outside it', async () => {
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a']}
@@ -199,8 +194,8 @@ describe('FallbackList', () => {
             },
           ] as any[]
         }
-      />
-    ));
+      />,
+    );
 
     fireEvent.click(container.querySelector('.fallback-list__key-chip') as HTMLButtonElement);
     expect(container.querySelector('[role="listbox"]')).not.toBeNull();
@@ -212,9 +207,9 @@ describe('FallbackList', () => {
 
   it('calls onAddFallback when add button in empty state clicked', () => {
     const onAddFallback = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={[]} onAddFallback={onAddFallback} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={[]} onAddFallback={onAddFallback} />,
+    );
 
     const addBtn = container.querySelector(
       '.fallback-list__empty .fallback-list__add',
@@ -225,16 +220,16 @@ describe('FallbackList', () => {
 
   it('hides add button when 5 fallbacks exist', () => {
     const fiveFallbacks = ['m1', 'm2', 'm3', 'm4', 'm5'];
-    render(() => <FallbackList {...defaultProps} fallbacks={fiveFallbacks} />);
+    render(<FallbackList {...defaultProps} fallbacks={fiveFallbacks} />);
 
     expect(screen.queryByText('Add fallback')).toBeNull();
   });
 
   it('calls setFallbacks on remove with remaining items', async () => {
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     expect(removeButtons.length).toBe(2);
@@ -251,9 +246,9 @@ describe('FallbackList', () => {
 
   it('calls clearFallbacks on remove of last item', async () => {
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a']} onUpdate={onUpdate} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     expect(removeButtons.length).toBe(1);
@@ -270,9 +265,9 @@ describe('FallbackList', () => {
   it('reverts optimistic removal when setFallbacks rejects', async () => {
     mockSetFallbacks.mockRejectedValue(new Error('API error'));
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -290,9 +285,9 @@ describe('FallbackList', () => {
   it('reverts optimistic removal when clearFallbacks rejects', async () => {
     mockClearFallbacks.mockRejectedValue(new Error('API error'));
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a']} onUpdate={onUpdate} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -311,9 +306,9 @@ describe('FallbackList', () => {
     const modelsWithDisplay = [
       { model_name: 'model-a', provider: 'OpenAI', display_name: 'Model Alpha' },
     ] as any[];
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsWithDisplay} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsWithDisplay} />,
+    );
 
     const modelLabel = container.querySelector('.fallback-list__model');
     expect(modelLabel?.textContent).toBe('Model Alpha');
@@ -321,9 +316,9 @@ describe('FallbackList', () => {
 
   it('falls back to getModelLabel when model has no display_name but has provider', () => {
     const modelsNoDisplay = [{ model_name: 'model-a', provider: 'OpenAI' }] as any[];
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsNoDisplay} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsNoDisplay} />,
+    );
 
     const modelLabel = container.querySelector('.fallback-list__model');
     // getModelLabel mock returns model as-is
@@ -331,9 +326,9 @@ describe('FallbackList', () => {
   });
 
   it('falls back to stripCustomPrefix when model not found in models list', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['custom:prov/unknown-model']} models={[]} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['custom:prov/unknown-model']} models={[]} />,
+    );
 
     const modelLabel = container.querySelector('.fallback-list__model');
     expect(modelLabel?.textContent).toBe('unknown-model');
@@ -342,14 +337,14 @@ describe('FallbackList', () => {
   it('shows custom provider icon letter for custom provider models', () => {
     const customProviders = [{ id: 'cp-1', name: 'Groq' }] as any[];
     const modelsWithCustom = [{ model_name: 'custom-model', provider: 'custom:cp-1' }] as any[];
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['custom-model']}
         models={modelsWithCustom}
         customProviders={customProviders}
-      />
-    ));
+      />,
+    );
 
     const letterIcon = container.querySelector('.provider-card__logo-letter');
     expect(letterIcon).not.toBeNull();
@@ -357,9 +352,7 @@ describe('FallbackList', () => {
   });
 
   it('shows custom provider logo when customProviderLogo returns an element', () => {
-    const fakeImg = document.createElement('img');
-    fakeImg.src = '/icons/kilocode.svg';
-    fakeImg.alt = 'Kilo Code';
+    const fakeImg = <img src="/icons/kilocode.svg" alt="Kilo Code" />;
     mockCustomProviderLogo.mockReturnValueOnce(fakeImg as any);
     const customProviders = [
       { id: 'cp-1', name: 'Kilo Code', base_url: 'https://api.kilo.ai' },
@@ -367,14 +360,14 @@ describe('FallbackList', () => {
     const modelsWithCustom = [
       { model_name: 'qwen/qwen3.6-plus:free', provider: 'custom:cp-1' },
     ] as any[];
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['qwen/qwen3.6-plus:free']}
         models={modelsWithCustom}
         customProviders={customProviders}
-      />
-    ));
+      />,
+    );
 
     const iconSpan = container.querySelector('.fallback-list__icon');
     expect(iconSpan).not.toBeNull();
@@ -385,14 +378,14 @@ describe('FallbackList', () => {
     const modelsWithCustom = [
       { model_name: 'custom-model', provider: 'custom:unknown-id' },
     ] as any[];
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['custom-model']}
         models={modelsWithCustom}
         customProviders={[]}
-      />
-    ));
+      />,
+    );
 
     const letterIcon = container.querySelector('.provider-card__logo-letter');
     expect(letterIcon).not.toBeNull();
@@ -400,7 +393,7 @@ describe('FallbackList', () => {
   });
 
   it('shows provider icon for non-custom providers', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={['model-a']} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={['model-a']} />);
 
     // Provider icon renders in .fallback-list__icon span (providerIcon returns null in mock,
     // but the wrapper span should exist since provId() is defined and not custom)
@@ -409,7 +402,7 @@ describe('FallbackList', () => {
   });
 
   it('shows add button when fewer than 5 fallbacks', () => {
-    render(() => <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />);
+    render(<FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />);
 
     expect(screen.getByText('Add fallback')).toBeDefined();
   });
@@ -418,32 +411,30 @@ describe('FallbackList', () => {
     const modelsWithDisplay = [
       { model_name: 'model-a', provider: 'OpenAI', display_name: 'Model Alpha' },
     ] as any[];
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsWithDisplay} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a']} models={modelsWithDisplay} />,
+    );
 
     const removeBtn = container.querySelector('.fallback-list__remove');
     expect(removeBtn?.getAttribute('aria-label')).toBe('Remove Model Alpha');
   });
 
   it('empty state uses fallback-list__empty class for consistent styling', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={[]} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={[]} />);
 
     const emptyBtn = container.querySelector('.fallback-list__empty');
     expect(emptyBtn).not.toBeNull();
   });
 
   it('shows add button with fallback-list__add class when fallbacks exist', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={['model-a']} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={['model-a']} />);
 
     const addBtn = container.querySelector('.fallback-list__add');
     expect(addBtn).not.toBeNull();
   });
 
   it('disables add button in empty state when adding prop is true', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={[]} adding={true} />
-    ));
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={[]} adding={true} />);
 
     const addBtn = container.querySelector(
       '.fallback-list__empty .fallback-list__add',
@@ -452,9 +443,7 @@ describe('FallbackList', () => {
   });
 
   it('enables add button in empty state when adding is false', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={[]} adding={false} />
-    ));
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={[]} adding={false} />);
 
     const addBtn = container.querySelector(
       '.fallback-list__empty .fallback-list__add',
@@ -469,9 +458,9 @@ describe('FallbackList', () => {
         resolveRemove = r;
       }),
     );
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -503,9 +492,9 @@ describe('FallbackList', () => {
         resolveRemove = r;
       }),
     );
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -519,7 +508,7 @@ describe('FallbackList', () => {
   });
 
   it('renders auth badge on fallback icon via authBadgeFor', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={['model-a']} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={['model-a']} />);
 
     const iconSpan = container.querySelector('.fallback-list__icon');
     expect(iconSpan).not.toBeNull();
@@ -528,7 +517,7 @@ describe('FallbackList', () => {
   });
 
   it('renders subscription title on fallback icon', () => {
-    const { container } = render(() => <FallbackList {...defaultProps} fallbacks={['model-b']} />);
+    const { container } = render(<FallbackList {...defaultProps} fallbacks={['model-b']} />);
 
     const iconSpan = container.querySelector('.fallback-list__icon');
     expect(iconSpan?.getAttribute('title')).toBe('Anthropic (Subscription)');
@@ -536,14 +525,14 @@ describe('FallbackList', () => {
 
   it('returns null auth type when provider not in connectedProviders', () => {
     const modelsUnknown = [{ model_name: 'model-x', provider: 'Unknown' }] as any[];
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-x']}
         models={modelsUnknown}
         connectedProviders={[]}
-      />
-    ));
+      />,
+    );
 
     const iconSpan = container.querySelector('.fallback-list__icon');
     // Provider "unknown" not in PROVIDERS mock, so providerTitle falls back to providerId
@@ -553,9 +542,9 @@ describe('FallbackList', () => {
   // ── Drag and Drop Tests ──
 
   it('sets dragIndex on dragStart and clears on dragEnd', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const dataTransfer = { effectAllowed: '', setData: vi.fn() };
@@ -573,9 +562,9 @@ describe('FallbackList', () => {
   });
 
   it('handles dragStart without dataTransfer gracefully', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     // Fire dragStart without dataTransfer property
@@ -584,9 +573,9 @@ describe('FallbackList', () => {
   });
 
   it('shows drop indicator on dragOver and computes slot from cursor position', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -623,9 +612,9 @@ describe('FallbackList', () => {
   });
 
   it('computes no-op slot when dragOver fires at dragged item position', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const list = container.querySelector('.fallback-list__items')!;
     const cards = list.querySelectorAll<HTMLElement>('.fallback-list__card');
@@ -649,9 +638,9 @@ describe('FallbackList', () => {
   });
 
   it('handles dragOver without dataTransfer', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -677,9 +666,9 @@ describe('FallbackList', () => {
   });
 
   it('clears drop slot on dragLeave when leaving container', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -713,28 +702,32 @@ describe('FallbackList', () => {
     });
 
     // Create a drop indicator after the final card
-    list.dispatchEvent(
-      new MouseEvent('dragover', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 90,
-      }),
-    );
+    act(() => {
+      list.dispatchEvent(
+        new MouseEvent('dragover', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 90,
+        }),
+      );
+    });
 
     expect(
       container.querySelectorAll('.fallback-list__drop-indicator--active').length,
     ).toBeGreaterThan(0);
 
     // DragLeave with no related target and a cursor outside the list
-    list.dispatchEvent(
-      new MouseEvent('dragleave', {
-        bubbles: true,
-        clientX: 100,
-        clientY: 120,
-        relatedTarget: null,
-      }),
-    );
+    act(() => {
+      list.dispatchEvent(
+        new MouseEvent('dragleave', {
+          bubbles: true,
+          clientX: 100,
+          clientY: 120,
+          relatedTarget: null,
+        }),
+      );
+    });
 
     // No active indicators
     const activeIndicators = container.querySelectorAll('.fallback-list__drop-indicator--active');
@@ -742,9 +735,9 @@ describe('FallbackList', () => {
   });
 
   it('preserves drop slot on dragLeave when relatedTarget is inside list', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />,
+    );
 
     const list = container.querySelector('.fallback-list__items')!;
     const cards = list.querySelectorAll<HTMLElement>('.fallback-list__card');
@@ -776,13 +769,13 @@ describe('FallbackList', () => {
   it('reorders the second fallback after a null-related dragLeave inside the list', async () => {
     mockSetFallbacks.mockResolvedValueOnce(undefined);
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b', 'model-c', 'model-d']}
         onUpdate={onUpdate}
-      />
-    ));
+      />,
+    );
 
     const list = container.querySelector<HTMLElement>('.fallback-list__items')!;
     const cards = list.querySelectorAll<HTMLElement>('.fallback-list__card');
@@ -816,22 +809,26 @@ describe('FallbackList', () => {
       toJSON: () => {},
     });
 
-    list.dispatchEvent(
-      new MouseEvent('dragover', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 110,
-      }),
-    );
-    list.dispatchEvent(
-      new MouseEvent('dragleave', {
-        bubbles: true,
-        clientX: 100,
-        clientY: 110,
-        relatedTarget: null,
-      }),
-    );
+    act(() => {
+      list.dispatchEvent(
+        new MouseEvent('dragover', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 110,
+        }),
+      );
+    });
+    act(() => {
+      list.dispatchEvent(
+        new MouseEvent('dragleave', {
+          bubbles: true,
+          clientX: 100,
+          clientY: 110,
+          relatedTarget: null,
+        }),
+      );
+    });
     fireEvent.drop(list, { preventDefault: vi.fn() });
 
     await waitFor(() => {
@@ -848,13 +845,13 @@ describe('FallbackList', () => {
   it('reorders fallbacks on drop and calls setFallbacks', async () => {
     mockSetFallbacks.mockResolvedValueOnce(undefined);
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b', 'model-c']}
         onUpdate={onUpdate}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -902,13 +899,13 @@ describe('FallbackList', () => {
   it('reverts reorder on setFallbacks failure', async () => {
     mockSetFallbacks.mockRejectedValueOnce(new Error('fail'));
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b', 'model-c']}
         onUpdate={onUpdate}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -946,9 +943,9 @@ describe('FallbackList', () => {
 
   it('ignores drop when dragIndex or dropSlot is null', () => {
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />,
+    );
 
     const list = container.querySelector('.fallback-list__items')!;
     // Drop without prior dragStart → dragIndex is null
@@ -960,13 +957,13 @@ describe('FallbackList', () => {
 
   it('ignores drop when insertAt equals fromIndex (no-op reorder)', async () => {
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b', 'model-c']}
         onUpdate={onUpdate}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -1005,9 +1002,9 @@ describe('FallbackList', () => {
 
   it('clears removingIndex after failed removal', async () => {
     mockSetFallbacks.mockRejectedValueOnce(new Error('API error'));
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -1026,14 +1023,14 @@ describe('FallbackList', () => {
   it('uses persistFallbacks prop when provided (for remove)', async () => {
     const customPersist = vi.fn().mockResolvedValue(undefined);
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b']}
         onUpdate={onUpdate}
         persistFallbacks={customPersist}
-      />
-    ));
+      />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -1049,14 +1046,14 @@ describe('FallbackList', () => {
   it('uses persistClearFallbacks prop when provided (for remove last item)', async () => {
     const customClear = vi.fn().mockResolvedValue(undefined);
     const onUpdate = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a']}
         onUpdate={onUpdate}
         persistClearFallbacks={customClear}
-      />
-    ));
+      />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -1070,9 +1067,9 @@ describe('FallbackList', () => {
 
   it('falls back to default setFallbacks when persistFallbacks is undefined', async () => {
     const onUpdate = vi.fn();
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} onUpdate={onUpdate} />,
+    );
 
     const removeButtons = container.querySelectorAll('.fallback-list__remove');
     fireEvent.click(removeButtons[0]);
@@ -1084,9 +1081,9 @@ describe('FallbackList', () => {
   });
 
   it('primaryDragging prop shows drop zone even with empty fallbacks', () => {
-    const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={[]} primaryDragging={true} />
-    ));
+    const { container } = render(
+      <FallbackList {...defaultProps} fallbacks={[]} primaryDragging={true} />,
+    );
 
     // When primaryDragging is true, fallback-list__items container should render
     // even though fallbacks is empty (Show when={props.fallbacks.length > 0 || props.primaryDragging})
@@ -1096,13 +1093,13 @@ describe('FallbackList', () => {
 
   it('onFallbackDragStart callback is called', () => {
     const onFallbackDragStart = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b']}
         onFallbackDragStart={onFallbackDragStart}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     fireEvent.dragStart(cards[0], { dataTransfer: { effectAllowed: '', setData: vi.fn() } });
@@ -1112,13 +1109,13 @@ describe('FallbackList', () => {
 
   it('onFallbackDragEnd callback is called', () => {
     const onFallbackDragEnd = vi.fn();
-    const { container } = render(() => (
+    const { container } = render(
       <FallbackList
         {...defaultProps}
         fallbacks={['model-a', 'model-b']}
         onFallbackDragEnd={onFallbackDragEnd}
-      />
-    ));
+      />,
+    );
 
     const cards = container.querySelectorAll('.fallback-list__card');
     const list = container.querySelector('.fallback-list__items')!;
@@ -1157,63 +1154,61 @@ describe('FallbackList', () => {
     };
 
     it('hides the chip when only one key is connected', () => {
-      const { queryByLabelText } = render(() => (
-        <FallbackList {...defaultProps} fallbacks={['model-a']} />
-      ));
+      const { queryByLabelText } = render(
+        <FallbackList {...defaultProps} fallbacks={['model-a']} />,
+      );
       expect(queryByLabelText(/API key for/i)).toBeNull();
     });
 
     it('renders the chip on the row when 2+ keys exist for the resolved provider', () => {
-      const { getByLabelText } = render(() => (
-        <FallbackList {...multiKeyProps} fallbacks={['model-a']} />
-      ));
+      const { getByLabelText } = render(
+        <FallbackList {...multiKeyProps} fallbacks={['model-a']} />,
+      );
       expect(getByLabelText(/API key for/i)).toBeDefined();
     });
 
     it('shows the pinned label from the structured fallbackRoutes entry', () => {
       // Multi-key pin now lives in the structured `fallbackRoutes[i].keyLabel`
       // rather than the legacy `||<label>` suffix on the model string.
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...multiKeyProps}
           fallbacks={['model-a']}
           fallbackRoutes={
             [{ provider: 'openai', authType: 'api_key', model: 'model-a', keyLabel: 'Work' }] as any
           }
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLElement;
       expect(chip).not.toBeNull();
       expect(chip.textContent).toContain('Work');
     });
 
     it("falls back to the first key's label when nothing is pinned", () => {
-      const { container } = render(() => (
-        <FallbackList {...multiKeyProps} fallbacks={['model-a']} />
-      ));
+      const { container } = render(<FallbackList {...multiKeyProps} fallbacks={['model-a']} />);
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLElement;
       expect(chip.textContent).toContain('Personal');
     });
 
     it('renders a Clear pin option when the row is currently pinned', () => {
-      const { container, getByText } = render(() => (
+      const { container, getByText } = render(
         <FallbackList
           {...multiKeyProps}
           fallbacks={['model-a']}
           fallbackRoutes={
             [{ provider: 'openai', authType: 'api_key', model: 'model-a', keyLabel: 'Work' }] as any
           }
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLButtonElement;
       fireEvent.click(chip);
       expect(getByText('Clear pin')).toBeDefined();
     });
 
     it('does not render Clear pin when no label is currently set', () => {
-      const { container, queryByText } = render(() => (
-        <FallbackList {...multiKeyProps} fallbacks={['model-a']} />
-      ));
+      const { container, queryByText } = render(
+        <FallbackList {...multiKeyProps} fallbacks={['model-a']} />,
+      );
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLButtonElement;
       fireEvent.click(chip);
       expect(queryByText('Clear pin')).toBeNull();
@@ -1227,14 +1222,14 @@ describe('FallbackList', () => {
       const initialRoutes = [
         { provider: 'openai', authType: 'api_key', model: 'model-a', keyLabel: 'Work' },
       ];
-      const { container, getByText } = render(() => (
+      const { container, getByText } = render(
         <FallbackList
           {...multiKeyProps}
           fallbacks={['model-a']}
           fallbackRoutes={initialRoutes as any}
           onUpdate={onUpdate}
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLButtonElement;
       fireEvent.click(chip);
       fireEvent.click(getByText('Clear pin'));
@@ -1259,14 +1254,14 @@ describe('FallbackList', () => {
       const initialRoutes = [
         { provider: 'openai', authType: 'api_key', model: 'model-a', keyLabel: null },
       ];
-      const { container, getByText } = render(() => (
+      const { container, getByText } = render(
         <FallbackList
           {...multiKeyProps}
           fallbacks={['model-a']}
           fallbackRoutes={initialRoutes as any}
           onUpdate={onUpdate}
-        />
-      ));
+        />,
+      );
       const chip = container.querySelector('.fallback-list__key-chip') as HTMLButtonElement;
       fireEvent.click(chip);
       // Listbox is now visible.
@@ -1305,15 +1300,15 @@ describe('FallbackList', () => {
       vi.mocked(getModelParamSpecs).mockResolvedValue(modelParamSpecs[0].params);
       const setModelParams = vi.fn().mockResolvedValue(undefined);
       const getModelParams = vi.fn().mockReturnValue(null);
-      const { container, getByRole } = render(() => (
+      const { container, getByRole } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['deepseek-v4-flash']}
           fallbackRoutes={[deepseekRoute] as any}
           getModelParams={getModelParams}
           setModelParams={setModelParams}
-        />
-      ));
+        />,
+      );
       const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
         b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
       );
@@ -1332,15 +1327,15 @@ describe('FallbackList', () => {
 
     it('renders the affordance and shows the request empty state for a model with no params', async () => {
       vi.mocked(getModelParamSpecs).mockResolvedValue([]);
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['gpt-4o']}
           fallbackRoutes={[openaiRoute] as any}
           getModelParams={vi.fn().mockReturnValue(null)}
           setModelParams={vi.fn()}
-        />
-      ));
+        />,
+      );
       const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
         b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
       );
@@ -1348,20 +1343,18 @@ describe('FallbackList', () => {
       fireEvent.click(btn!);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('No parameter controls are available for gpt-4o.'),
-        ).toBeTruthy();
+        expect(screen.getByText('No parameter controls are available for gpt-4o.')).toBeTruthy();
       });
     });
 
     it('does NOT render the affordance when the params callbacks are undefined', () => {
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['deepseek-v4-flash']}
           fallbackRoutes={[deepseekRoute] as any}
-        />
-      ));
+        />,
+      );
       const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
         b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
       );
@@ -1387,7 +1380,7 @@ describe('FallbackList', () => {
           connected_at: '2025-01-01',
         },
       ] as any[];
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           models={modelsWithDeepseek}
@@ -1396,8 +1389,8 @@ describe('FallbackList', () => {
           fallbackRoutes={null}
           getModelParams={vi.fn().mockReturnValue(null)}
           setModelParams={vi.fn()}
-        />
-      ));
+        />,
+      );
       const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
         b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
       );
@@ -1432,13 +1425,13 @@ describe('FallbackList', () => {
         }),
       );
       const onReorderingChange = vi.fn();
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['model-a', 'model-b']}
           onReorderingChange={onReorderingChange}
-        />
-      ));
+        />,
+      );
 
       dropFirstCardLast(container);
 
@@ -1466,14 +1459,14 @@ describe('FallbackList', () => {
       mockSetFallbacks.mockRejectedValueOnce(new Error('nope'));
       const onReorderingChange = vi.fn();
       const onUpdate = vi.fn();
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['model-a', 'model-b']}
           onUpdate={onUpdate}
           onReorderingChange={onReorderingChange}
-        />
-      ));
+        />,
+      );
 
       dropFirstCardLast(container);
 
@@ -1486,9 +1479,9 @@ describe('FallbackList', () => {
     });
 
     it('reorders without a parent listener when onReorderingChange is omitted', async () => {
-      const { container } = render(() => (
-        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />
-      ));
+      const { container } = render(
+        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} />,
+      );
 
       dropFirstCardLast(container);
 
@@ -1504,9 +1497,9 @@ describe('FallbackList', () => {
     });
 
     it('locks every row while the parent reports a primary swap in flight', () => {
-      const { container } = render(() => (
-        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} swappingIndex={0} />
-      ));
+      const { container } = render(
+        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b']} swappingIndex={0} />,
+      );
 
       const cards = container.querySelectorAll<HTMLElement>('.fallback-list__card');
       expect(cards.length).toBe(2);
@@ -1523,9 +1516,9 @@ describe('FallbackList', () => {
     // for the duration of a pending reorder, not just dragging.
     it('disables the remove button on other rows while a reorder is pending', async () => {
       mockSetFallbacks.mockReturnValueOnce(new Promise(() => {})); // never resolves
-      const { container } = render(() => (
-        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />
-      ));
+      const { container } = render(
+        <FallbackList {...defaultProps} fallbacks={['model-a', 'model-b', 'model-c']} />,
+      );
 
       dropFirstCardLast(container);
 
@@ -1551,13 +1544,13 @@ describe('FallbackList', () => {
     it('disables the Add fallback button while a reorder is pending', async () => {
       mockSetFallbacks.mockReturnValueOnce(new Promise(() => {}));
       const onAddFallback = vi.fn();
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['model-a', 'model-b']}
           onAddFallback={onAddFallback}
-        />
-      ));
+        />,
+      );
 
       dropFirstCardLast(container);
 
@@ -1601,13 +1594,13 @@ describe('FallbackList', () => {
       // for a 2-row list) flags a row pending. Put the multi-key model
       // ('model-a', OpenAI) at index 0 so it stays a *non-pending* row,
       // exactly the row the bug left clickable mid-reorder.
-      const { container } = render(() => (
+      const { container } = render(
         <FallbackList
           {...defaultProps}
           fallbacks={['model-a', 'model-b']}
           connectedProviders={multiKeyConnectedProviders}
-        />
-      ));
+        />,
+      );
 
       dropFirstCardLast(container);
 

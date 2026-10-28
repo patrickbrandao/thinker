@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@solidjs/testing-library";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, fireEvent } from '@testing-library/react';
 
 const mockGetAgentKey = vi.fn();
-vi.mock("../../src/services/api.js", () => ({
+vi.mock('../../src/services/api.js', () => ({
   getAgentKey: (...args: unknown[]) => mockGetAgentKey(...args),
 }));
 
-vi.mock("../../src/components/FrameworkSnippets.jsx", () => ({
+vi.mock('../../src/components/FrameworkSnippets.jsx', () => ({
   default: (props: {
     customHeaders?: Record<string, string>;
     baseUrl: string;
@@ -15,193 +15,195 @@ vi.mock("../../src/components/FrameworkSnippets.jsx", () => ({
   }) => (
     <div data-testid="framework-snippets">
       <div data-testid="snippets-base-url">{props.baseUrl}</div>
-      <div data-testid="snippets-custom-headers">
-        {JSON.stringify(props.customHeaders ?? null)}
-      </div>
-      <div data-testid="snippets-api-key">{props.apiKey ?? "null"}</div>
-      <div data-testid="snippets-key-prefix">{props.keyPrefix ?? "null"}</div>
+      <div data-testid="snippets-custom-headers">{JSON.stringify(props.customHeaders ?? null)}</div>
+      <div data-testid="snippets-api-key">{props.apiKey ?? 'null'}</div>
+      <div data-testid="snippets-key-prefix">{props.keyPrefix ?? 'null'}</div>
     </div>
   ),
 }));
 
-import HeaderTierSnippetModal from "../../src/components/HeaderTierSnippetModal";
-import type { HeaderTier } from "../../src/services/api/header-tiers";
+import HeaderTierSnippetModal from '../../src/components/HeaderTierSnippetModal';
+import type { HeaderTier } from '../../src/services/api/header-tiers';
 
 const baseTier: HeaderTier = {
-  id: "ht-1",
-  agent_id: "agent-1",
-  name: "Premium",
-  header_key: "x-thinker-tier",
-  header_value: "premium",
-  badge_color: "indigo",
+  id: 'ht-1',
+  agent_id: 'agent-1',
+  name: 'Premium',
+  header_key: 'x-thinker-tier',
+  header_value: 'premium',
+  badge_color: 'indigo',
   sort_order: 0,
   enabled: true,
-  override_route: { provider: "openai", authType: "api_key", model: "gpt-4o" },
+  override_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
   fallback_routes: null,
-  created_at: "2025-01-01",
-  updated_at: "2025-01-01",
+  created_at: '2025-01-01',
+  updated_at: '2025-01-01',
 };
 
-describe("HeaderTierSnippetModal", () => {
+describe('HeaderTierSnippetModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentKey.mockResolvedValue({ apiKey: "thk_abc", keyPrefix: "thk_abc" });
-    Object.defineProperty(window, "location", {
+    mockGetAgentKey.mockResolvedValue({ apiKey: 'thk_abc', keyPrefix: 'thk_abc' });
+    Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { hostname: "localhost", origin: "http://localhost:3001" },
+      value: { hostname: 'localhost', origin: 'http://localhost:3001' },
     });
   });
 
-  it("renders the tier name in the modal title", () => {
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    const title = container.querySelector("#header-tier-snippet-title");
-    expect(title?.textContent).toContain("Premium");
+  it('renders the tier name in the modal title', () => {
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    const title = container.querySelector('#header-tier-snippet-title');
+    expect(title?.textContent).toContain('Premium');
   });
 
-  it("renders the override_route.model in the description", () => {
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    const code = container.querySelector(".modal-card__desc code");
-    expect(code?.textContent).toBe("gpt-4o");
+  it('renders the override_route.model in the description', () => {
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    const code = container.querySelector('.header-tier-snippet__desc code');
+    expect(code?.textContent).toBe('gpt-4o');
   });
 
   it("shows a custom provider's model by its public id", () => {
     const route = {
-      provider: "custom:cp-1",
-      authType: "api_key" as const,
-      model: "custom:cp-1/llama",
+      provider: 'custom:cp-1',
+      authType: 'api_key' as const,
+      model: 'custom:cp-1/llama',
     };
-    const desc = (alias: string | null) =>
-      render(() => (
+    const desc = (alias: string | null) => {
+      // The modal portals into document.body: read it, then unmount it.
+      const view = render(
         <HeaderTierSnippetModal
           agentName="demo"
           tier={{ ...baseTier, override_route: route }}
-          customProviders={[{ id: "cp-1", alias } as never]}
+          customProviders={[{ id: 'cp-1', alias } as never]}
           onClose={vi.fn()}
-        />
-      )).container.querySelector(".modal-card__desc code")?.textContent;
-    expect(desc("local")).toBe("local/llama");
-    expect(desc(null)).toBe("custom:cp-1/llama");
+        />,
+      );
+      const text = view.baseElement.querySelector('.header-tier-snippet__desc code')?.textContent;
+      view.unmount();
+      return text;
+    };
+    expect(desc('local')).toBe('local/llama');
+    expect(desc(null)).toBe('custom:cp-1/llama');
   });
 
-  it("falls back to placeholder text when override_route is null", () => {
+  it('falls back to placeholder text when override_route is null', () => {
     const tier = { ...baseTier, override_route: null };
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={tier} onClose={vi.fn()} />
-    ));
-    const code = container.querySelector(".modal-card__desc code");
-    expect(code?.textContent).toContain("no model assigned");
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={tier} onClose={vi.fn()} />,
+    );
+    const code = container.querySelector('.header-tier-snippet__desc code');
+    expect(code?.textContent).toContain('no model assigned');
   });
 
   it("passes the tier's header_key/header_value as customHeaders to FrameworkSnippets", () => {
-    const { getByTestId } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    const headers = JSON.parse(getByTestId("snippets-custom-headers").textContent ?? "{}") as Record<
-      string,
-      string
-    >;
-    expect(headers).toEqual({ "x-thinker-tier": "premium" });
+    const { getByTestId } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    const headers = JSON.parse(
+      getByTestId('snippets-custom-headers').textContent ?? '{}',
+    ) as Record<string, string>;
+    expect(headers).toEqual({ 'x-thinker-tier': 'premium' });
   });
 
-  it("uses window.location.origin + /v1 as the base URL on a self-hosted origin", () => {
-    const { getByTestId } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    expect(getByTestId("snippets-base-url").textContent).toBe("http://localhost:3001/v1");
+  it('uses window.location.origin + /v1 as the base URL on a self-hosted origin', () => {
+    const { getByTestId } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    expect(getByTestId('snippets-base-url').textContent).toBe('http://localhost:3001/v1');
   });
 
-  it("uses the app URL on gateway.thinker.example", () => {
-    Object.defineProperty(window, "location", {
+  it('uses the app URL on gateway.thinker.example', () => {
+    Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { hostname: "thinker.example.com", origin: "https://thinker.example.com" },
+      value: { hostname: 'thinker.example.com', origin: 'https://thinker.example.com' },
     });
-    const { getByTestId } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    expect(getByTestId("snippets-base-url").textContent).toBe("https://thinker.example.com/v1");
+    const { getByTestId } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    expect(getByTestId('snippets-base-url').textContent).toBe('https://thinker.example.com/v1');
   });
 
-  it("calls onClose when the close button is clicked", () => {
+  it('calls onClose when the close button is clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const closeBtn = container.querySelector(".modal__close") as HTMLButtonElement;
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const closeBtn = container.querySelector('[aria-label="Close"]') as HTMLButtonElement;
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onClose when the Done button is clicked", () => {
+  it('calls onClose when the Done button is clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const doneBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "Done",
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const doneBtn = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Done',
     ) as HTMLButtonElement;
     fireEvent.click(doneBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onClose when the overlay is clicked but not the modal card", () => {
+  it('calls onClose when the overlay is clicked but not the modal card', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const overlay = container.querySelector(".modal-overlay") as HTMLElement;
-    // simulate click on the overlay itself (target === currentTarget)
-    fireEvent.click(overlay);
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const overlay = container.querySelector('.overlay') as HTMLElement;
+    // simulate a press on the overlay itself (target === currentTarget)
+    fireEvent.mouseDown(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call onClose when clicking inside the modal card", () => {
+  it('does not call onClose when clicking inside the modal card', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const card = container.querySelector(".modal-card") as HTMLElement;
-    fireEvent.click(card);
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const card = container.querySelector('.modal') as HTMLElement;
+    fireEvent.mouseDown(card);
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("calls onClose on Escape key press", () => {
+  it('calls onClose on Escape key press', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const overlay = container.querySelector(".modal-overlay") as HTMLElement;
-    fireEvent.keyDown(overlay, { key: "Escape" });
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const overlay = container.querySelector('.overlay') as HTMLElement;
+    fireEvent.keyDown(overlay, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call onClose for non-Escape keys", () => {
+  it('does not call onClose for non-Escape keys', () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />
-    ));
-    const overlay = container.querySelector(".modal-overlay") as HTMLElement;
-    fireEvent.keyDown(overlay, { key: "Enter" });
+    const { baseElement: container } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={onClose} />,
+    );
+    const overlay = container.querySelector('.overlay') as HTMLElement;
+    fireEvent.keyDown(overlay, { key: 'Enter' });
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("threads apiKey and keyPrefix from getAgentKey through to FrameworkSnippets", async () => {
-    const { findByTestId } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    expect((await findByTestId("snippets-api-key")).textContent).toBe("thk_abc");
-    expect((await findByTestId("snippets-key-prefix")).textContent).toBe("thk_abc");
+  it('threads apiKey and keyPrefix from getAgentKey through to FrameworkSnippets', async () => {
+    const { findByTestId } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    expect((await findByTestId('snippets-api-key')).textContent).toBe('thk_abc');
+    expect((await findByTestId('snippets-key-prefix')).textContent).toBe('thk_abc');
   });
 
-  it("threads null apiKey when getAgentKey resolves with no keys", async () => {
+  it('threads null apiKey when getAgentKey resolves with no keys', async () => {
     mockGetAgentKey.mockResolvedValue({ apiKey: null, keyPrefix: null });
-    const { findByTestId } = render(() => (
-      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />
-    ));
-    expect((await findByTestId("snippets-api-key")).textContent).toBe("null");
-    expect((await findByTestId("snippets-key-prefix")).textContent).toBe("null");
+    const { findByTestId } = render(
+      <HeaderTierSnippetModal agentName="demo" tier={baseTier} onClose={vi.fn()} />,
+    );
+    expect((await findByTestId('snippets-api-key')).textContent).toBe('null');
+    expect((await findByTestId('snippets-key-prefix')).textContent).toBe('null');
   });
 });

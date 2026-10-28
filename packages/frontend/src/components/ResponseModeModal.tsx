@@ -1,4 +1,3 @@
-import { For, Show, type Accessor, type Component } from 'solid-js';
 import type {
   AvailableModel,
   ModelCapability,
@@ -7,6 +6,7 @@ import type {
 } from '../services/api.js';
 import { STAGES, DEFAULT_STAGE } from '../services/providers.js';
 import { positionLabel, stageLabel } from '../services/routing.js';
+import { Button, Modal } from './ui.js';
 import { t } from '../i18n/index.js';
 
 export interface IncompatibleModel {
@@ -17,9 +17,9 @@ export interface IncompatibleModel {
 }
 
 interface Props {
-  responseMode: Accessor<ResponseMode>;
+  responseMode: ResponseMode;
   onResponseModeChange: (mode: ResponseMode) => void | Promise<void>;
-  disabled?: Accessor<boolean>;
+  disabled?: boolean;
   tiers: TierAssignment[];
   models: AvailableModel[];
   onClose: () => void;
@@ -70,125 +70,84 @@ function getIncompatibleModels(
   return result;
 }
 
-const ResponseModeModal: Component<Props> = (props) => {
-  const isStream = () => props.responseMode() === 'stream';
-  const incompatible = () => getIncompatibleModels(props.tiers, props.models);
-  const canEnableStream = () => incompatible().length === 0;
+/**
+ * Stream / buffered switch for the default tier, blocked while any routed
+ * model lacks streaming. `response-mode-modal*` classes are stable test hooks.
+ */
+export default function ResponseModeModal(props: Props) {
+  const isStream = props.responseMode === 'stream';
+  const incompatible = getIncompatibleModels(props.tiers, props.models);
+  const canEnableStream = incompatible.length === 0;
+  const blocked = !isStream && !canEnableStream;
 
   const handleToggle = () => {
-    if (isStream()) {
+    if (isStream) {
       void props.onResponseModeChange('buffered');
-    } else if (canEnableStream()) {
+    } else if (canEnableStream) {
       void props.onResponseModeChange('stream');
     }
   };
 
   return (
-    <div
-      class="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-      }}
-    >
-      <div
-        class="modal-card response-mode-modal"
-        style="max-width: 520px;"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div class="routing-modal__header">
-          <div class="routing-modal__title">{t('routing.responseMode.title')}</div>
+    <Modal open title={t('routing.responseMode.title')} onClose={props.onClose}>
+      <div className="response-mode-modal flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-ink">
+            {t('routing.responseMode.streamMode')}
+          </span>
           <button
-            class="modal__close"
-            onClick={() => props.onClose()}
-            aria-label={t('common.close')}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
+            type="button"
+            role="switch"
+            aria-checked={isStream}
+            aria-label={t('routing.responseMode.streamMode')}
+            className="switch response-mode-modal__switch"
+            disabled={props.disabled || blocked}
+            onClick={handleToggle}
+          />
         </div>
+        <p className="text-sm text-dim">
+          {isStream
+            ? t('routing.responseMode.streamDescOnly')
+            : t('routing.responseMode.bufferedDescAll')}
+        </p>
 
-        <div class="response-mode-modal__body">
-          <div class="response-mode-modal__field-header">
-            <span class="response-mode-modal__field-title">
-              {t('routing.responseMode.streamMode')}
-            </span>
-            <button
-              class="routing-switch"
-              classList={{
-                'routing-switch--on': isStream(),
-                'routing-switch--disabled': !isStream() && !canEnableStream(),
-              }}
-              disabled={props.disabled?.() || (!isStream() && !canEnableStream())}
-              onClick={handleToggle}
-            >
-              <span class="routing-switch__track">
-                <span class="routing-switch__thumb" />
-              </span>
-            </button>
-          </div>
-          <Show
-            when={isStream()}
-            fallback={
-              <p class="response-mode-modal__desc">{t('routing.responseMode.bufferedDescAll')}</p>
-            }
-          >
-            <p class="response-mode-modal__desc">{t('routing.responseMode.streamDescOnly')}</p>
-          </Show>
-
-          <Show when={!isStream() && incompatible().length > 0}>
-            <div class="response-mode-modal__blocker">
-              <p class="response-mode-modal__blocker-text">
-                {t('routing.responseMode.unavailable', incompatible().length)}
-              </p>
-              <div class="response-mode-modal__blocker-list">
-                <For each={incompatible()}>
-                  {(item) => (
-                    <div class="response-mode-modal__blocker-row">
-                      <span class="response-mode-modal__blocker-model">{item.model}</span>
-                      <span class="response-mode-modal__blocker-meta">
-                        {item.tierLabel} · {positionLabel(item.position)}
-                      </span>
-                      <button
-                        class="btn btn--outline btn--sm"
-                        onClick={() =>
-                          props.onReplace?.(
-                            item.tier,
-                            item.position === 'Primary'
-                              ? 'primary'
-                              : parseInt(item.position.replace('Fallback ', '')) - 1,
-                            'stream',
-                          )
-                        }
-                      >
-                        {t('routing.change')}
-                      </button>
-                    </div>
-                  )}
-                </For>
-              </div>
+        {!isStream && incompatible.length > 0 ? (
+          <div className="response-mode-modal__blocker notice is-warn flex flex-col gap-2">
+            <p className="text-sm">{t('routing.responseMode.unavailable', incompatible.length)}</p>
+            <div className="flex flex-col divide-y divide-line rounded-control border border-line bg-elev">
+              {incompatible.map((item) => (
+                <div
+                  key={`${item.tier}-${item.position}-${item.model}`}
+                  className="response-mode-modal__blocker-row flex items-center gap-3 px-3 py-2"
+                >
+                  <span className="response-mode-modal__blocker-model min-w-0 flex-1 truncate font-mono text-sm text-ink">
+                    {item.model}
+                  </span>
+                  <span className="response-mode-modal__blocker-meta shrink-0 text-xs text-muted">
+                    {item.tierLabel} · {positionLabel(item.position)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="response-mode-modal__change"
+                    onClick={() =>
+                      props.onReplace?.(
+                        item.tier,
+                        item.position === 'Primary'
+                          ? 'primary'
+                          : parseInt(item.position.replace('Fallback ', '')) - 1,
+                        'stream',
+                      )
+                    }
+                  >
+                    {t('routing.change')}
+                  </Button>
+                </div>
+              ))}
             </div>
-          </Show>
-        </div>
+          </div>
+        ) : null}
       </div>
-    </div>
+    </Modal>
   );
-};
-
-export default ResponseModeModal;
+}

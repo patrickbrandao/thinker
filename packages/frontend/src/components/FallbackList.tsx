@@ -1,4 +1,5 @@
-import { createSignal, For, Show, type Component } from 'solid-js';
+import { Fragment, useRef, useState, type DragEvent } from 'react';
+import { X } from 'lucide-react';
 import {
   clearFallbacks,
   setFallbacks,
@@ -25,12 +26,13 @@ import { authBadgeFor } from './AuthBadge.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
 import RouteKeyChip from './RouteKeyChip.js';
+import { cx } from './ui.js';
 import { modelParamsScopeForTier } from 'thinker-shared';
 
 interface FallbackListProps {
   agentName: string;
   tier: string;
-  tierData?: () => RouteSlots | undefined;
+  tierData?: RouteSlots;
   fallbacks: string[];
   // Optional structured route per fallback. When present (length matches
   // fallbacks), each row renders provider/auth from the route instead of
@@ -91,26 +93,42 @@ interface FallbackListProps {
   modelParamsScope?: string;
 }
 
-const FallbackUndoIcon: Component<{ size: 20 | 16; class?: string }> = (p) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={p.size}
-    height={p.size}
-    class={p.class}
-    fill="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path d="M9 10h6c2.21 0 4 1.79 4 4s-1.79 4-4 4h-3v2h3c3.31 0 6-2.69 6-6s-2.69-6-6-6H9V4L3 9l6 5z" />
-  </svg>
-);
+function FallbackUndoIcon({ size, className }: { size: 20 | 16; className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      className={className}
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M9 10h6c2.21 0 4 1.79 4 4s-1.79 4-4 4h-3v2h3c3.31 0 6-2.69 6-6s-2.69-6-6-6H9V4L3 9l6 5z" />
+    </svg>
+  );
+}
 
-const FallbackList: Component<FallbackListProps> = (props) => {
-  const [removingIndex, setRemovingIndex] = createSignal<number | null>(null);
-  const [dragIndex, setDragIndex] = createSignal<number | null>(null);
-  const [dropSlot, setDropSlot] = createSignal<number | null>(null);
-  const [reorderingIndex, setReorderingIndex] = createSignal<number | null>(null);
-  let listRef: HTMLDivElement | undefined;
+const addButtonClass = 'btn btn-ghost btn-sm fallback-list__add self-start';
+
+export default function FallbackList(props: FallbackListProps) {
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  const [dragIndex, setDragIndexState] = useState<number | null>(null);
+  const [dropSlot, setDropSlotState] = useState<number | null>(null);
+  const [reorderingIndex, setReorderingIndex] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Drag handlers read the latest drag state synchronously (dragover fires
+  // before React re-renders), so mirror it in refs.
+  const dragIndexRef = useRef<number | null>(null);
+  const dropSlotRef = useRef<number | null>(null);
+  const setDragIndex = (value: number | null) => {
+    dragIndexRef.current = value;
+    setDragIndexState(value);
+  };
+  const setDropSlot = (value: number | null) => {
+    dropSlotRef.current = value;
+    setDropSlotState(value);
+  };
 
   /**
    * A row whose new position is still being persisted. Covers both the
@@ -118,7 +136,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
    * reorder inside this list, which used to persist with no feedback at all.
    */
   const isPending = (index: number): boolean =>
-    props.swappingIndex === index || reorderingIndex() === index;
+    props.swappingIndex === index || reorderingIndex === index;
 
   /**
    * True while any drag-initiated update for this tier is in flight. Rows stay
@@ -129,7 +147,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
    * reorder's `persistSet` is still in flight is a race, and whichever
    * response lands last silently overwrites the other's write.
    */
-  const dragLocked = (): boolean => props.swappingIndex != null || reorderingIndex() !== null;
+  const dragLocked = props.swappingIndex != null || reorderingIndex !== null;
 
   const modelLabel = (model: string): string => {
     const info = props.models.find((m) => m.model_name === model);
@@ -140,7 +158,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     }
     return stripCustomPrefix(model);
   };
-  const modelParamsScope = () => props.modelParamsScope ?? modelParamsScopeForTier(props.tier);
+  const modelParamsScope = props.modelParamsScope ?? modelParamsScopeForTier(props.tier);
 
   const modelInfoFor = (model: string, index: number): AvailableModel | undefined => {
     const route = props.fallbackRoutes?.[index];
@@ -188,6 +206,9 @@ const FallbackList: Component<FallbackListProps> = (props) => {
       .slice()
       .sort((a, b) => a.priority - b.priority);
   };
+
+  const persistSet = props.persistFallbacks ?? setFallbacks;
+  const persistClear = props.persistClearFallbacks ?? clearFallbacks;
 
   /**
    * Update the keyLabel pin on a single fallback row. Reads/writes through the
@@ -252,9 +273,6 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     return `${name} (${method})`;
   };
 
-  const persistSet = props.persistFallbacks ?? setFallbacks;
-  const persistClear = props.persistClearFallbacks ?? clearFallbacks;
-
   const reorderRoutes = (
     routes: ModelRoute[] | null | undefined,
     transform: (r: ModelRoute[]) => ModelRoute[],
@@ -303,12 +321,13 @@ const FallbackList: Component<FallbackListProps> = (props) => {
    * the gaps between cards or the indicator divs.
    */
   const computeSlot = (clientY: number): number | null => {
-    if (!listRef) return null;
-    const from = dragIndex();
+    const list = listRef.current;
+    if (!list) return null;
+    const from = dragIndexRef.current;
     const isPrimaryDrag = props.primaryDragging && from === null;
     if (from === null && !isPrimaryDrag) return null;
 
-    const cards = listRef.querySelectorAll<HTMLElement>('.fallback-list__card');
+    const cards = list.querySelectorAll<HTMLElement>('.fallback-list__card');
     if (cards.length === 0) return isPrimaryDrag ? 0 : null;
 
     // Find which slot the cursor is closest to.
@@ -339,9 +358,9 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     // to the pointer coordinates so an internal transition does not erase the
     // pending drop slot before the browser dispatches drop.
     const related = e.relatedTarget;
-    if (related instanceof Node && listRef?.contains(related)) return;
+    if (related instanceof Node && listRef.current?.contains(related)) return;
 
-    const bounds = listRef?.getBoundingClientRect();
+    const bounds = listRef.current?.getBoundingClientRect();
     const pointerIsOutside =
       !bounds ||
       e.clientX < bounds.left ||
@@ -355,8 +374,8 @@ const FallbackList: Component<FallbackListProps> = (props) => {
 
   const handleDrop = async (e: DragEvent) => {
     e.preventDefault();
-    const fromIndex = dragIndex();
-    const toSlot = dropSlot();
+    const fromIndex = dragIndexRef.current;
+    const toSlot = dropSlotRef.current;
     setDragIndex(null);
     setDropSlot(null);
 
@@ -402,250 +421,204 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     props.onFallbackDragEnd?.();
   };
 
+  const indicatorClass = (active: boolean) =>
+    cx(
+      'fallback-list__drop-indicator h-0.5 rounded-full transition-colors',
+      active ? 'fallback-list__drop-indicator--active bg-accent' : 'bg-transparent',
+    );
+
+  const renderCustomIcon = (provId: string | undefined, model: string) => {
+    const cp = props.customProviders.find((c) => `custom:${c.id}` === provId);
+    const logo = customProviderLogo(cp?.name ?? '', 14, cp?.base_url, model);
+    const title = cp?.name ?? t('routing.fallbacks.custom');
+    if (logo) {
+      return (
+        <span className="fallback-list__icon inline-flex shrink-0" title={title}>
+          {logo}
+        </span>
+      );
+    }
+    return (
+      <span
+        className="provider-card__logo-letter fallback-list__icon inline-flex size-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold text-on-accent"
+        title={title}
+        style={{ background: customProviderColor(cp?.name ?? '') }}
+      >
+        {(cp?.name ?? 'C').charAt(0).toUpperCase()}
+      </span>
+    );
+  };
+
+  const addLabel = (
+    <>
+      <FallbackUndoIcon size={16} />
+      {t('routing.fallbacks.add')}
+    </>
+  );
+
   return (
-    <div class="fallback-list">
-      <Show when={props.fallbacks.length > 0 || props.primaryDragging}>
+    <div className="fallback-list flex flex-col gap-2">
+      {props.fallbacks.length > 0 || props.primaryDragging ? (
         <div
           ref={listRef}
-          class="fallback-list__items"
+          className="fallback-list__items flex flex-col gap-1"
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
         >
-          <For each={props.fallbacks}>
-            {(entry, i) => {
-              // Each fallback row reads its model + (optional) keyLabel pin
-              // from the structured `fallbackRoutes`, which is the canonical
-              // location for the pin now that `||<label>` encoding has been
-              // dropped. The bare `entry` string carries only the model name.
-              const model = () => entry;
-              const route = () => props.fallbackRoutes?.[i()];
-              const pinnedLabel = () => route()?.keyLabel ?? null;
-              const provId = () => providerIdFor(model(), i());
-              const isCustom = () => provId()?.startsWith('custom:');
-              const auth = () => authTypeFor(provId(), i());
-              const title = () => providerTitle(provId(), auth());
-              const keys = () => keysForFallback(provId(), auth());
-              return (
-                <>
-                  <div
-                    class="fallback-list__drop-indicator"
-                    classList={{
-                      'fallback-list__drop-indicator--active': dropSlot() === i(),
-                    }}
-                  />
-                  <div
-                    class="fallback-list__card"
-                    classList={{
-                      'fallback-list__card--dragging': dragIndex() === i(),
-                      'fallback-list__card--swapping': isPending(i()),
-                      'fallback-list__card--skipped': skippedInStream(model(), i()),
-                    }}
-                    title={
-                      skippedInStream(model(), i()) ? t('routing.skippedWhileStream') : undefined
-                    }
-                    draggable={!dragLocked()}
-                    onDragStart={(e) => handleDragStart(i(), e)}
-                    // Bind dragend on the draggable row itself rather than
-                    // only on the container. When a fallback row is dropped
-                    // onto the primary slot (outside this container), the
-                    // container's onDragEnd doesn't always fire — the row
-                    // gets re-rendered with a new model name as part of the
-                    // optimistic swap, the drag source unmounts, and the
-                    // container loses the bubbled event. Result: dragIndex
-                    // stays set and the row keeps the --dragging class with
-                    // opacity 0.3 until the next refetch. Resetting on the
-                    // row itself catches every drop target.
-                    onDragEnd={handleDragEnd}
-                  >
-                    <Show
-                      when={!isPending(i())}
-                      fallback={
-                        <>
-                          <div
-                            class="skeleton"
-                            style="width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;"
-                          />
-                          <div class="skeleton skeleton--text" style="width: 100px;" />
-                        </>
-                      }
-                    >
-                      <Show when={provId() && !isCustom()}>
-                        <span class="fallback-list__icon" title={title()}>
-                          {providerIcon(provId()!, 14)}
-                          {authBadgeFor(auth(), 8)}
+          {props.fallbacks.map((entry, i) => {
+            // Each fallback row reads its model + (optional) keyLabel pin
+            // from the structured `fallbackRoutes`, which is the canonical
+            // location for the pin now that `||<label>` encoding has been
+            // dropped. The bare `entry` string carries only the model name.
+            const model = entry;
+            const route = props.fallbackRoutes?.[i];
+            const pinnedLabel = route?.keyLabel ?? null;
+            const provId = providerIdFor(model, i);
+            const isCustom = provId?.startsWith('custom:');
+            const auth = authTypeFor(provId, i);
+            const title = providerTitle(provId, auth);
+            const keys = keysForFallback(provId, auth);
+            const skipped = skippedInStream(model, i);
+            const pending = isPending(i);
+            const label = modelLabel(model);
+            return (
+              <Fragment key={`${i}-${entry}`}>
+                <div className={indicatorClass(dropSlot === i)} />
+                <div
+                  className={cx(
+                    'fallback-list__card flex min-h-9 items-center gap-2 rounded-control border border-line bg-elev px-2.5 py-1.5 text-sm',
+                    !dragLocked && 'cursor-grab',
+                    dragIndex === i && 'fallback-list__card--dragging opacity-30',
+                    pending && 'fallback-list__card--swapping',
+                    skipped && 'fallback-list__card--skipped opacity-60',
+                  )}
+                  title={skipped ? t('routing.skippedWhileStream') : undefined}
+                  draggable={!dragLocked}
+                  onDragStart={(e) => handleDragStart(i, e)}
+                  // Bind dragend on the draggable row itself rather than only
+                  // on the container. When a fallback row is dropped onto the
+                  // primary slot (outside this container), the container's
+                  // onDragEnd doesn't always fire — the row gets re-rendered
+                  // with a new model name as part of the optimistic swap, the
+                  // drag source unmounts, and the container loses the bubbled
+                  // event. Result: dragIndex stays set and the row keeps the
+                  // --dragging class until the next refetch. Resetting on the
+                  // row itself catches every drop target.
+                  onDragEnd={handleDragEnd}
+                >
+                  {pending ? (
+                    <>
+                      <span className="skel size-3.5 shrink-0 rounded-full" />
+                      <span className="skel h-3 w-[100px]" />
+                    </>
+                  ) : (
+                    <>
+                      {provId && !isCustom ? (
+                        <span
+                          className="fallback-list__icon relative inline-flex shrink-0"
+                          title={title}
+                        >
+                          {providerIcon(provId, 14)}
+                          {authBadgeFor(auth, 8)}
                         </span>
-                      </Show>
-                      <Show when={isCustom()}>
-                        {(() => {
-                          const cp = props.customProviders.find(
-                            (c) => `custom:${c.id}` === provId(),
-                          );
-                          const logo = customProviderLogo(
-                            cp?.name ?? '',
-                            14,
-                            cp?.base_url,
-                            model(),
-                          );
-                          if (logo) {
-                            return (
-                              <span
-                                class="fallback-list__icon"
-                                title={cp?.name ?? t('routing.fallbacks.custom')}
-                              >
-                                {logo}
-                              </span>
-                            );
-                          }
-                          const letter = (cp?.name ?? 'C').charAt(0).toUpperCase();
-                          return (
-                            <span
-                              class="provider-card__logo-letter fallback-list__icon"
-                              title={cp?.name ?? t('routing.fallbacks.custom')}
-                              style={{
-                                background: customProviderColor(cp?.name ?? ''),
-                                width: '14px',
-                                height: '14px',
-                                'font-size': '8px',
-                                'border-radius': '50%',
-                              }}
-                            >
-                              {letter}
-                            </span>
-                          );
-                        })()}
-                      </Show>
-                      <span class="fallback-list__model">{modelLabel(model())}</span>
-                      <Show when={skippedInStream(model(), i())}>
-                        <span class="routing-card__skipped-badge">
+                      ) : null}
+                      {isCustom ? renderCustomIcon(provId, model) : null}
+                      <span className="fallback-list__model min-w-0 flex-1 truncate text-ink">
+                        {label}
+                      </span>
+                      {skipped ? (
+                        <span className="routing-card__skipped-badge badge is-warn">
                           {t('routing.skippedInStream')}
                         </span>
-                      </Show>
-                      <Show when={keys().length > 1}>
+                      ) : null}
+                      {keys.length > 1 ? (
                         <RouteKeyChip
-                          keys={keys()}
-                          currentLabel={pinnedLabel() ?? undefined}
-                          modelLabel={modelLabel(model())}
-                          usedLabels={() =>
-                            usedKeyLabelsForModelInTier(
-                              (props.tierData ?? (() => undefined))(),
-                              model(),
-                              i(),
-                              keys()[0]?.label,
-                            )
-                          }
+                          keys={keys}
+                          currentLabel={pinnedLabel ?? undefined}
+                          modelLabel={label}
+                          usedLabels={usedKeyLabelsForModelInTier(
+                            props.tierData,
+                            model,
+                            i,
+                            keys[0]?.label,
+                          )}
                           buttonClass="fallback-list__key-chip"
                           allowClear
-                          disabled={dragLocked()}
-                          onPick={(label) => setLabelAt(i(), label)}
+                          disabled={dragLocked}
+                          onPick={(picked) => setLabelAt(i, picked)}
                         />
-                      </Show>
-                      <Show
-                        when={
-                          props.getModelParams &&
-                          props.setModelParams &&
-                          provId() &&
-                          auth() &&
-                          auth() !== 'local'
-                        }
-                      >
+                      ) : null}
+                      {props.getModelParams &&
+                      props.setModelParams &&
+                      provId &&
+                      auth &&
+                      auth !== 'local' ? (
                         <ModelParamsAffordance
-                          provider={provId()}
-                          authType={(auth() as AuthType) ?? undefined}
-                          model={model()}
-                          slotLabel={modelLabel(model())}
-                          scope={modelParamsScope()}
+                          provider={provId}
+                          authType={(auth as AuthType) ?? undefined}
+                          model={model}
+                          slotLabel={label}
+                          scope={modelParamsScope}
                           agentName={props.agentName}
-                          getParams={props.getModelParams!}
-                          setParams={props.setModelParams!}
+                          getParams={props.getModelParams}
+                          setParams={props.setModelParams}
                         />
-                      </Show>
+                      ) : null}
                       <button
-                        class="fallback-list__remove"
-                        onClick={() => handleRemove(i())}
+                        type="button"
+                        className="fallback-list__remove icon-btn size-6 shrink-0"
+                        onClick={() => handleRemove(i)}
                         title={t('routing.fallbacks.removeTitle')}
-                        aria-label={t('routing.fallbacks.removeModel', {
-                          model: modelLabel(model()),
-                        })}
-                        disabled={removingIndex() !== null || dragLocked()}
+                        aria-label={t('routing.fallbacks.removeModel', { model: label })}
+                        disabled={removingIndex !== null || dragLocked}
                       >
-                        {removingIndex() === i() ? (
-                          <span class="spinner" style="width: 10px; height: 10px;" />
+                        {removingIndex === i ? (
+                          <span className="spinner size-2.5" />
                         ) : (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2.5"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
+                          <X className="size-3" aria-hidden="true" />
                         )}
                       </button>
-                    </Show>
-                  </div>
-                </>
-              );
-            }}
-          </For>
-          <div
-            class="fallback-list__drop-indicator"
-            classList={{
-              'fallback-list__drop-indicator--active': dropSlot() === props.fallbacks.length,
-            }}
-          />
+                    </>
+                  )}
+                </div>
+              </Fragment>
+            );
+          })}
+          <div className={indicatorClass(dropSlot === props.fallbacks.length)} />
         </div>
-      </Show>
-      <Show
-        when={props.fallbacks.length > 0}
-        fallback={
-          <div class="fallback-list__empty">
-            <FallbackUndoIcon size={20} class="fallback-list__empty-icon" />
-            <span class="fallback-list__empty-title">{t('routing.fallbacks.emptyTitle')}</span>
-            <span class="fallback-list__empty-desc">{t('routing.fallbacks.emptyDesc')}</span>
-            <button
-              class="btn btn--outline btn--sm fallback-list__add"
-              onClick={props.onAddFallback}
-              disabled={props.adding}
-            >
-              {props.adding ? (
-                <span class="spinner" />
-              ) : (
-                <>
-                  <FallbackUndoIcon size={16} />
-                  {t('routing.fallbacks.add')}
-                </>
-              )}
-            </button>
-          </div>
-        }
-      >
-        <Show when={props.fallbacks.length < 5}>
+      ) : null}
+      {props.fallbacks.length > 0 ? (
+        props.fallbacks.length < 5 ? (
           <button
-            class="btn btn--outline btn--sm fallback-list__add"
+            type="button"
+            className={addButtonClass}
             onClick={props.onAddFallback}
-            disabled={props.adding || removingIndex() !== null || dragLocked()}
+            disabled={props.adding || removingIndex !== null || dragLocked}
           >
-            {props.adding ? (
-              <span class="spinner" />
-            ) : (
-              <>
-                <FallbackUndoIcon size={16} />
-                {t('routing.fallbacks.add')}
-              </>
-            )}
+            {props.adding ? <span className="spinner" /> : addLabel}
           </button>
-        </Show>
-      </Show>
+        ) : null
+      ) : (
+        <div className="fallback-list__empty flex flex-col items-start gap-1 rounded-control border border-dashed border-line px-3 py-3 text-sm">
+          <FallbackUndoIcon size={20} className="fallback-list__empty-icon text-faint" />
+          <span className="fallback-list__empty-title font-medium text-ink">
+            {t('routing.fallbacks.emptyTitle')}
+          </span>
+          <span className="fallback-list__empty-desc text-xs text-muted">
+            {t('routing.fallbacks.emptyDesc')}
+          </span>
+          <button
+            type="button"
+            className={cx(addButtonClass, 'mt-1')}
+            onClick={props.onAddFallback}
+            disabled={props.adding}
+          >
+            {props.adding ? <span className="spinner" /> : addLabel}
+          </button>
+        </div>
+      )}
     </div>
   );
-};
-
-export default FallbackList;
+}

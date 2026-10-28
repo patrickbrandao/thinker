@@ -1,13 +1,5 @@
-import {
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  Show,
-  startTransition,
-  type Component,
-} from 'solid-js';
+import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
+import { KeyRound, RefreshCw, Search, Server, User } from 'lucide-react';
 import {
   refreshModels,
   refreshProviderModels,
@@ -31,6 +23,7 @@ import ModelCapabilityBadges, {
   ModelModalityBadges,
 } from './ModelCapabilityBadges.js';
 import VirtualList from './VirtualList.js';
+import { Button, Modal, Tabs, cx, type TabItem } from './ui.js';
 
 const PICKER_NARROW_QUERY = '(max-width: 640px)';
 const PICKER_GROUP_HEADER_HEIGHT = 32;
@@ -108,54 +101,74 @@ const unavailableCapabilityLabel = (capability: ModelCapability): string => {
   return t('models.picker.unavailable', { capability: CAPABILITY_LABELS[capability] });
 };
 
-const ModelPickerModal: Component<Props> = (props) => {
-  const isUsable = (p: { is_active: boolean; has_api_key: boolean; cached_model_count?: number }) =>
-    p.is_active && (p.has_api_key || (p.cached_model_count ?? 0) > 0);
-  const hasSubscription = () =>
-    (props.connectedProviders ?? []).some((p) => isUsable(p) && p.auth_type === 'subscription');
-  const hasApiKey = () =>
-    (props.connectedProviders ?? []).some((p) => isUsable(p) && p.auth_type === 'api_key');
-  const hasLocal = () =>
-    (props.connectedProviders ?? []).some((p) => isUsable(p) && p.auth_type === 'local');
+const isUsable = (p: { is_active: boolean; has_api_key: boolean; cached_model_count?: number }) =>
+  p.is_active && (p.has_api_key || (p.cached_model_count ?? 0) > 0);
+
+/** Column template shared by the table head and each model row (stacks under 640px). */
+const ROW_COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_92px_72px_56px_128px] sm:items-center sm:gap-3';
+const ROW_GRID = `grid grid-cols-1 gap-1 ${ROW_COLUMNS}`;
+
+const pillClass = (active: boolean) =>
+  cx(
+    'routing-modal__cap-pill inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors',
+    active
+      ? 'routing-modal__cap-pill--active border-accent bg-accent-tint text-accent'
+      : 'border-line text-muted hover:bg-s2 hover:text-ink',
+  );
+
+export default function ModelPickerModal(props: Props) {
+  const connected = props.connectedProviders ?? [];
+  const hasSubscription = connected.some((p) => isUsable(p) && p.auth_type === 'subscription');
+  const hasApiKey = connected.some((p) => isUsable(p) && p.auth_type === 'api_key');
+  const hasLocal = connected.some((p) => isUsable(p) && p.auth_type === 'local');
   // Show the tab strip whenever the user has models in more than one auth
   // category — otherwise the picker is single-category and the tabs add
   // noise. Local counts as its own category alongside subscription/api_key.
-  const showTabs = () => [hasSubscription(), hasApiKey(), hasLocal()].filter(Boolean).length > 1;
+  const showTabs = [hasSubscription, hasApiKey, hasLocal].filter(Boolean).length > 1;
 
   // Default to the first connected category (subscription > api_key > local)
   // so the picker opens on something the user actually has. When nothing is
   // connected the default is 'api_key' — matches the pre-local behavior so
   // existing snapshots / tests that assume the free-only pill is visible
   // (only shown for api_key) don't start failing.
-  const resolveInitialTab = (): AuthType => {
-    if (hasSubscription()) return 'subscription';
-    if (hasLocal() && !hasApiKey()) return 'local';
+  const [activeTab, setActiveTab] = useState<AuthType>(() => {
+    if (hasSubscription) return 'subscription';
+    if (hasLocal && !hasApiKey) return 'local';
     return 'api_key';
-  };
-  const [activeTab, setActiveTab] = createSignal<AuthType>(resolveInitialTab());
-  const [search, setSearch] = createSignal('');
-  const [showFreeOnly, setShowFreeOnly] = createSignal(false);
+  });
+  const [search, setSearch] = useState('');
+  const [showFreeOnly, setShowFreeOnly] = useState(false);
   /** Required capabilities: only show models that have ALL of these. */
-  const [requiredCapabilities, setRequiredCapabilities] = createSignal<Set<ModelCapability>>(
+  const [requiredCapabilities, setRequiredCapabilities] = useState<Set<ModelCapability>>(() =>
     props.requiredCapability ? new Set([props.requiredCapability]) : new Set(),
   );
-  const [refreshingProvId, setRefreshingProvId] = createSignal<string | null>(null);
-  const [isNarrow, setIsNarrow] = createSignal(false);
-  // Parent callbacks refetch resources read inside this modal's Suspense
-  // boundary. Keep the current picker visible until those resources settle.
-  const notifyProviderRefreshed = () => startTransition(() => props.onProviderRefreshed?.());
+  const [refreshingProvId, setRefreshingProvId] = useState<string | null>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const latest = useRef(props);
+  latest.current = props;
 
-  onMount(() => {
+  // Parent callbacks refetch the data this modal reads. Keep the current
+  // picker visible (as a transition) while those settle.
+  const notifyProviderRefreshed = (): Promise<void> =>
+    new Promise((resolve) => {
+      startTransition(() => {
+        void Promise.resolve(latest.current.onProviderRefreshed?.()).finally(resolve);
+      });
+    });
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
     if (typeof window.matchMedia === 'function') {
       const media = window.matchMedia(PICKER_NARROW_QUERY);
       const sync = () => setIsNarrow(media.matches);
       sync();
       media.addEventListener('change', sync);
-      onCleanup(() => media.removeEventListener('change', sync));
+      cleanup = () => media.removeEventListener('change', sync);
     }
 
     const agentName = props.agentName;
-    if (!agentName) return;
+    if (!agentName) return cleanup;
     const now = new Date();
     const needsRefresh = (props.connectedProviders ?? []).some(
       (provider) =>
@@ -163,42 +176,43 @@ const ModelPickerModal: Component<Props> = (props) => {
         !provider.provider.startsWith('custom:') &&
         !wasFetchedToday(provider.models_fetched_at, now),
     );
-    if (!needsRefresh) return;
+    if (!needsRefresh) return cleanup;
 
     const refreshKey = `thinker:routing-model-refresh:${agentName}`;
     const today = now.toDateString();
-    if (sessionStorage.getItem(refreshKey) === today) return;
+    if (sessionStorage.getItem(refreshKey) === today) return cleanup;
     sessionStorage.setItem(refreshKey, today);
 
     void refreshModels(agentName)
       .then(() => notifyProviderRefreshed())
       .catch(() => undefined);
-  });
+    return cleanup;
+    // Runs once on open, like Solid's onMount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleCapability = (cap: ModelCapability) => {
-    const current = new Set(requiredCapabilities());
+    const current = new Set(requiredCapabilities);
     if (current.has(cap)) current.delete(cap);
     else current.add(cap);
     setRequiredCapabilities(current);
   };
 
-  const isCapabilityRequired = (cap: ModelCapability) => requiredCapabilities().has(cap);
-
   /** Action capabilities that exist on at least one model in the current tab. */
-  const availableCapabilities = (): ModelCapability[] => {
+  const availableCapabilities = useMemo((): ModelCapability[] => {
     const found = new Set<ModelCapability>();
     for (const m of props.models) {
       for (const c of m.capabilities ?? []) found.add(c);
     }
     return ACTION_CAPABILITIES.filter((c) => found.has(c));
-  };
+  }, [props.models]);
 
   const handleRefreshGroup = async (provId: string, displayName: string) => {
     if (!props.agentName) return;
     if (provId.startsWith('custom:')) return;
     setRefreshingProvId(provId);
     try {
-      const result = await refreshProviderModels(props.agentName, provId, activeTab());
+      const result = await refreshProviderModels(props.agentName, provId, activeTab);
       if (result.ok) {
         toast.success(t('models.picker.refreshed', displayName, result.model_count));
       } else {
@@ -212,62 +226,46 @@ const ModelPickerModal: Component<Props> = (props) => {
     }
   };
 
-  const providerLabelMap = (): Map<string, string> => {
-    const map = new Map<string, string>();
+  const groupedModels = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const labels = new Map<string, string>();
     for (const prov of PROVIDERS) {
-      for (const m of prov.models) map.set(m.value, m.label);
+      for (const m of prov.models) labels.set(m.value, m.label);
     }
-    return map;
-  };
+    const providerIds = new Set(PROVIDERS.map((p) => p.id.toLowerCase()));
+    const cpNames = new Map<string, string>();
+    for (const cp of props.customProviders ?? []) cpNames.set(`custom:${cp.id}`, cp.name);
+    const tab = activeTab;
+    const connectedList = props.connectedProviders ?? [];
+    const hasConnectedProviders = connectedList.length > 0;
 
-  const providerIdSet = (): Set<string> => new Set(PROVIDERS.map((p) => p.id.toLowerCase()));
-
-  const customProviderNameMap = (): Map<string, string> => {
-    const map = new Map<string, string>();
-    for (const cp of props.customProviders ?? []) {
-      map.set(`custom:${cp.id}`, cp.name);
-    }
-    return map;
-  };
-
-  /** Provider IDs that have an active connection of the given auth type. */
-  const providerIdsForTab = (authType: AuthType): Set<string> => {
-    const ids = new Set<string>();
-    for (const p of props.connectedProviders ?? []) {
-      if (p.is_active && p.auth_type === authType) {
-        ids.add(p.provider.toLowerCase());
-        const resolved = resolveProviderId(p.provider);
-        if (resolved) ids.add(resolved);
+    /** Provider IDs that have an active connection of the current auth type. */
+    let allowedProviders: Set<string> | undefined;
+    if (hasConnectedProviders) {
+      allowedProviders = new Set<string>();
+      for (const p of connectedList) {
+        if (p.is_active && p.auth_type === tab) {
+          allowedProviders.add(p.provider.toLowerCase());
+          const resolved = resolveProviderId(p.provider);
+          if (resolved) allowedProviders.add(resolved);
+        }
       }
     }
-    return ids;
-  };
-
-  const groupedModels = createMemo(() => {
-    const q = search().toLowerCase().trim();
-    const labels = providerLabelMap();
-    const providerIds = providerIdSet();
-    const cpNames = customProviderNameMap();
-    const tab = activeTab();
-    const hasConnectedProviders = (props.connectedProviders ?? []).length > 0;
 
     const groupMap = new Map<string, { provId: string; name: string; models: ModalModel[] }>();
-
-    const freeOnly = tab === 'api_key' && showFreeOnly();
-    const allowedProviders = hasConnectedProviders ? providerIdsForTab(tab) : undefined;
+    const freeOnly = tab === 'api_key' && showFreeOnly;
 
     for (const m of props.models) {
       // Filter by the model's own auth_type to prevent subscription models
       // from leaking into the API Keys tab and vice versa (e.g. when the
       // same provider is connected with both auth types and they have
       // different model access levels).
-      if (showTabs() && m.auth_type && m.auth_type !== tab) continue;
+      if (showTabs && m.auth_type && m.auth_type !== tab) continue;
       if (freeOnly && !isFreeModel(m)) continue;
-      const required = requiredCapabilities();
-      if (required.size > 0) {
+      if (requiredCapabilities.size > 0) {
         const caps = m.capabilities ?? [];
         let pass = true;
-        for (const r of required) {
+        for (const r of requiredCapabilities) {
           if (!caps.includes(r)) {
             pass = false;
             break;
@@ -304,11 +302,7 @@ const ModelPickerModal: Component<Props> = (props) => {
         m.display_name && m.display_name !== m.model_name
           ? m.display_name
           : labelForModel(m.model_name, labels, providerIds);
-      groupMap.get(provId)!.models.push({
-        value: m.model_name,
-        label,
-        pricing: m,
-      });
+      groupMap.get(provId)!.models.push({ value: m.model_name, label, pricing: m });
     }
 
     const groups: { provId: string; name: string; models: ModalModel[] }[] = [];
@@ -332,37 +326,36 @@ const ModelPickerModal: Component<Props> = (props) => {
     }
     groups.sort((a, b) => a.name.localeCompare(b.name));
     return groups;
-  });
+  }, [
+    search,
+    activeTab,
+    showFreeOnly,
+    requiredCapabilities,
+    showTabs,
+    props.models,
+    props.customProviders,
+    props.connectedProviders,
+  ]);
 
-  const pickerItems = createMemo((): PickerItem[] => {
+  const pickerItems = useMemo((): PickerItem[] => {
     const items: PickerItem[] = [];
-    for (const group of groupedModels()) {
-      items.push({
-        kind: 'header',
-        provId: group.provId,
-        name: group.name,
-      });
+    for (const group of groupedModels) {
+      items.push({ kind: 'header', provId: group.provId, name: group.name });
       for (const model of group.models) {
-        items.push({
-          kind: 'model',
-          provId: group.provId,
-          name: group.name,
-          model,
-        });
+        items.push({ kind: 'model', provId: group.provId, name: group.name, model });
       }
     }
     return items;
-  });
+  }, [groupedModels]);
 
   const pickerItemHeight = (item: PickerItem) =>
     item.kind === 'header'
       ? PICKER_GROUP_HEADER_HEIGHT
-      : isNarrow()
+      : isNarrow
         ? PICKER_MODEL_ROW_HEIGHT_NARROW
         : PICKER_MODEL_ROW_HEIGHT;
 
-  const pickerResetKey = () =>
-    `${activeTab()}\0${search()}\0${showFreeOnly()}\0${[...requiredCapabilities()].sort().join(',')}`;
+  const pickerResetKey = `${activeTab}\0${search}\0${showFreeOnly}\0${[...requiredCapabilities].sort().join(',')}`;
 
   /** Returns the role of a model in the current tier: "Primary", "Fallback 1", etc. or null */
   const modelRole = (
@@ -396,19 +389,20 @@ const ModelPickerModal: Component<Props> = (props) => {
     return null;
   };
 
-  const totalVisibleModels = () => groupedModels().reduce((sum, g) => sum + g.models.length, 0);
-
+  const totalVisibleModels = groupedModels.reduce((sum, g) => sum + g.models.length, 0);
   /** Total models available (ignoring search) — used to decide whether to show search bar */
-  const totalAvailableModels = () => {
-    const saved = search();
-    if (!saved) return totalVisibleModels();
-    // Count all models without applying search filter
-    return props.models.length;
-  };
+  const totalAvailableModels = search ? props.models.length : totalVisibleModels;
+  const showSearch = totalAvailableModels > 5;
 
-  const isSub = () => activeTab() === 'subscription';
-  const isLocal = () => activeTab() === 'local';
-  const isPaid = () => !isSub() && !isLocal();
+  useEffect(() => {
+    if (!showSearch) return;
+    const id = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [showSearch]);
+
+  const isSub = activeTab === 'subscription';
+  const isLocal = activeTab === 'local';
+  const isPaid = !isSub && !isLocal;
   const missingRequiredCapability = (model: AvailableModel): string | null => {
     const required = props.requiredCapability;
     if (!required) return null;
@@ -416,11 +410,8 @@ const ModelPickerModal: Component<Props> = (props) => {
       ? null
       : unavailableCapabilityLabel(required);
   };
-  const actionCapabilitiesFor = (model: AvailableModel): readonly ModelCapability[] => {
-    return ACTION_CAPABILITIES.filter((capability) =>
-      (model.capabilities ?? []).includes(capability),
-    );
-  };
+  const actionCapabilitiesFor = (model: AvailableModel): readonly ModelCapability[] =>
+    ACTION_CAPABILITIES.filter((capability) => (model.capabilities ?? []).includes(capability));
   const inputModalitiesFor = (model: AvailableModel): readonly ModelModality[] => {
     if (model.input_modalities && model.input_modalities.length > 0) return model.input_modalities;
     const caps = new Set(model.capabilities ?? []);
@@ -437,283 +428,254 @@ const ModelPickerModal: Component<Props> = (props) => {
   // Resolve the routing-tier label for the subtitle. Callers outside the
   // routing context (e.g. the Playground) pass a non-tier id, so there is no
   // matching stage — render no subtitle instead of a bare "tier".
-  const tierLabel = () =>
-    [DEFAULT_STAGE, ...STAGES, ...SPECIFICITY_STAGES].find((s) => s.id === props.tierId)?.label;
+  const tierLabel = [DEFAULT_STAGE, ...STAGES, ...SPECIFICITY_STAGES].find(
+    (s) => s.id === props.tierId,
+  )?.label;
+
+  const tabItems: TabItem<AuthType>[] = [];
+  if (hasSubscription)
+    tabItems.push({
+      key: 'subscription',
+      label: t('models.picker.subscription'),
+      icon: <User className="size-3.5" aria-hidden="true" />,
+    });
+  if (hasApiKey)
+    tabItems.push({
+      key: 'api_key',
+      label: t('models.picker.usageBased'),
+      icon: <KeyRound className="size-3.5" aria-hidden="true" />,
+    });
+  if (hasLocal)
+    tabItems.push({
+      key: 'local',
+      label: t('models.picker.local'),
+      icon: <Server className="size-3.5" aria-hidden="true" />,
+    });
+
+  const emptyMessage = search.trim()
+    ? t('models.noSearchMatch')
+    : showFreeOnly
+      ? t('models.picker.noFree')
+      : isSub
+        ? t('models.picker.noSubscription')
+        : isLocal
+          ? t('models.picker.noLocal')
+          : t('models.picker.noApiKey');
+
+  const renderGroupIcon = (provId: string, name: string) => {
+    if (!provId.startsWith('custom:')) return providerIcon(provId, 16);
+    const cp = (props.customProviders ?? []).find((c) => `custom:${c.id}` === provId);
+    return (
+      customProviderLogo(name, 16, cp?.base_url) ?? (
+        <span
+          className="provider-card__logo-letter inline-flex size-4 items-center justify-center rounded-full text-[9px] font-semibold text-on-accent"
+          style={{ background: customProviderColor(name) }}
+        >
+          {name.charAt(0).toUpperCase()}
+        </span>
+      )
+    );
+  };
+
+  const renderModelRow = (provId: string, model: ModalModel) => {
+    const disabledReason = missingRequiredCapability(model.pricing);
+    const disabled = disabledReason !== null;
+    // The label cell truncates with an ellipsis, so the hover tooltip carries
+    // the full name (and the model id when it differs) ahead of any disabled
+    // reason.
+    const tooltip = [model.label, model.value !== model.label ? model.value : null, disabledReason]
+      .filter(Boolean)
+      .join('\n');
+    const role = modelRole(model.value, provId, activeTab);
+    const actionCaps = actionCapabilitiesFor(model.pricing);
+    const cellLabel = 'routing-modal__model-cell-label text-xs text-faint sm:hidden';
+    return (
+      <button
+        type="button"
+        className={cx(
+          'routing-modal__model w-full rounded-control px-3 py-2 text-left text-sm sm:h-10 sm:py-0',
+          ROW_GRID,
+          disabled
+            ? 'routing-modal__model--disabled cursor-not-allowed opacity-50'
+            : 'cursor-pointer hover:bg-s2',
+        )}
+        disabled={disabled}
+        title={tooltip}
+        onClick={() => props.onSelect(props.tierId, model.value, provId, activeTab)}
+      >
+        <span className="routing-modal__model-left flex min-w-0 items-center">
+          <span className="routing-modal__model-label flex min-w-0 items-center gap-2 font-medium text-ink">
+            <span className="truncate">{model.label}</span>
+            {role ? (
+              <span className="routing-modal__role-tag badge is-accent shrink-0">{role}</span>
+            ) : null}
+          </span>
+        </span>
+        <span className="routing-modal__model-cell flex items-center justify-between gap-2 sm:justify-start">
+          <span className={cellLabel}>{t('models.picker.colCapabilities')}</span>
+          {actionCaps.length > 0 ? (
+            <ModelCapabilityBadges capabilities={actionCaps} compact iconOnly />
+          ) : (
+            <span
+              className="model-capability-badges model-capability-badges--compact"
+              aria-label={t('models.picker.noStreamOrTools')}
+            />
+          )}
+        </span>
+        <span className="routing-modal__model-cell flex items-center justify-between gap-2 sm:justify-start">
+          <span className={cellLabel}>{t('models.picker.colInput')}</span>
+          <ModelModalityBadges
+            modalities={inputModalitiesFor(model.pricing)}
+            direction="input"
+            compact
+            iconOnly
+          />
+        </span>
+        <span className="routing-modal__model-cell flex items-center justify-between gap-2 sm:justify-start">
+          <span className={cellLabel}>{t('models.picker.colOutput')}</span>
+          <ModelModalityBadges
+            modalities={outputModalitiesFor(model.pricing)}
+            direction="output"
+            compact
+            iconOnly
+          />
+        </span>
+        <span className="routing-modal__model-cell routing-modal__model-cell--price flex items-center justify-between gap-2 sm:justify-end">
+          <span className={cellLabel}>{t('models.picker.colPrice')}</span>
+          <span className="routing-modal__model-price font-mono text-xs text-muted">
+            {isPaid
+              ? model.pricing
+                ? t('models.picker.priceInOut', {
+                    input: pricePerM(model.pricing.input_price_per_token),
+                    output: pricePerM(model.pricing.output_price_per_token),
+                  })
+                : null
+              : isLocal
+                ? t('models.picker.runsLocally')
+                : (formatPerRequestCost(model.pricing.cost_per_request) ??
+                  t('models.picker.included'))}
+          </span>
+        </span>
+      </button>
+    );
+  };
 
   return (
-    <div
-      class="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') props.onClose();
-      }}
+    <Modal
+      open
+      wide
+      onClose={props.onClose}
+      label={t('models.picker.title')}
+      title={
+        <span className="flex flex-col gap-0.5">
+          <span id="model-picker-title">{t('models.picker.title')}</span>
+          {tierLabel ? (
+            <span className="routing-modal__subtitle text-xs font-normal text-muted">
+              {t('models.picker.tierSubtitle', { label: tierLabel })}
+            </span>
+          ) : null}
+        </span>
+      }
     >
-      <div
-        class="modal-card routing-modal__card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="model-picker-title"
-      >
-        <div class="routing-modal__header">
-          <div>
-            <div class="routing-modal__title" id="model-picker-title">
-              {t('models.picker.title')}
-            </div>
-            <Show when={tierLabel()}>
-              {(label) => (
-                <div class="routing-modal__subtitle">
-                  {t('models.picker.tierSubtitle', { label: label() })}
-                </div>
-              )}
-            </Show>
-          </div>
-          <button
-            class="modal__close"
-            onClick={() => props.onClose()}
-            aria-label={t('common.close')}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
-        </div>
+      <div className="routing-modal flex flex-col gap-3">
+        {showTabs ? (
+          <Tabs
+            className="!mb-0"
+            items={tabItems}
+            value={activeTab}
+            onChange={(key) => {
+              setActiveTab(key);
+              if (key !== 'api_key') setShowFreeOnly(false);
+            }}
+          />
+        ) : null}
 
-        <Show when={showTabs()}>
-          <div class="provider-modal__tabs-wrapper">
-            <div class="panel__tabs" role="tablist">
-              <Show when={hasSubscription()}>
-                <button
-                  role="tab"
-                  aria-selected={activeTab() === 'subscription'}
-                  class="panel__tab"
-                  classList={{ 'panel__tab--active': activeTab() === 'subscription' }}
-                  onClick={() => {
-                    setActiveTab('subscription');
-                    setShowFreeOnly(false);
-                  }}
-                >
-                  <svg
-                    class="provider-modal__tab-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                    style="color: #1cc4bf"
-                  >
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  {t('models.picker.subscription')}
-                </button>
-              </Show>
-              <Show when={hasApiKey()}>
-                <button
-                  role="tab"
-                  aria-selected={activeTab() === 'api_key'}
-                  class="panel__tab"
-                  classList={{ 'panel__tab--active': activeTab() === 'api_key' }}
-                  onClick={() => setActiveTab('api_key')}
-                >
-                  <svg
-                    class="provider-modal__tab-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                    style="color: #e59d55"
-                  >
-                    <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                  </svg>
-                  {t('models.picker.usageBased')}
-                </button>
-              </Show>
-              <Show when={hasLocal()}>
-                <button
-                  role="tab"
-                  aria-selected={activeTab() === 'local'}
-                  class="panel__tab"
-                  classList={{ 'panel__tab--active': activeTab() === 'local' }}
-                  onClick={() => {
-                    setActiveTab('local');
-                    setShowFreeOnly(false);
-                  }}
-                >
-                  <svg
-                    class="provider-modal__tab-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
-                    style="color: #F72585"
-                  >
-                    <path d="m13.18 6.75 2.66-4.22-1.69-1.07L12 4.87 9.85 1.46 8.16 2.53l2.66 4.22-8.67 13.72A1.006 1.006 0 0 0 3 22.01h18c.36 0 .7-.2.88-.52s.16-.71-.03-1.02zM10.24 20 12 16.98 13.76 20zm5.83 0-3.21-5.5c-.36-.62-1.37-.62-1.73 0L7.92 20H4.81L12 8.62 19.19 20h-3.11Z" />
-                  </svg>
-                  {t('models.picker.local')}
-                </button>
-              </Show>
-            </div>
-          </div>
-        </Show>
-
-        <Show when={totalAvailableModels() > 5}>
-          <div class="routing-modal__search-wrap">
-            <svg
-              class="routing-modal__search-icon"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
+        {showSearch ? (
+          <div className="routing-modal__search-wrap search-bar">
+            <Search aria-hidden="true" />
             <input
-              ref={(el) => requestAnimationFrame(() => el.focus())}
-              class="routing-modal__search"
+              ref={searchRef}
+              className="routing-modal__search field !w-full"
               type="text"
               placeholder={t('models.searchPlaceholder')}
               aria-label={t('models.searchLabel')}
-              value={search()}
-              onInput={(e) => setSearch(e.currentTarget.value)}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
             />
           </div>
-        </Show>
+        ) : null}
 
-        <div class="routing-modal__filter-bar">
-          <div class="routing-modal__filter-left">
-            <Show when={isPaid()}>
+        <div className="routing-modal__filter-bar flex flex-wrap items-center justify-between gap-2">
+          <div className="routing-modal__filter-left flex items-center gap-2">
+            {isPaid ? (
               <button
                 type="button"
-                class="routing-modal__cap-pill"
-                classList={{ 'routing-modal__cap-pill--active': showFreeOnly() }}
-                onClick={() => setShowFreeOnly(!showFreeOnly())}
+                className={pillClass(showFreeOnly)}
+                aria-pressed={showFreeOnly}
+                onClick={() => setShowFreeOnly(!showFreeOnly)}
               >
                 {t('models.picker.freeOnly')}
               </button>
-            </Show>
+            ) : null}
           </div>
-          <div class="routing-modal__filter-right">
-            <For each={availableCapabilities()}>
-              {(cap) => (
-                <button
-                  type="button"
-                  class="routing-modal__cap-pill"
-                  classList={{
-                    'routing-modal__cap-pill--active': isCapabilityRequired(cap),
-                  }}
-                  onClick={() => toggleCapability(cap)}
-                >
-                  <span class="routing-modal__filter-pill-icon" innerHTML={CAPABILITY_ICONS[cap]} />
-                  {CAPABILITY_LABELS[cap]}
-                </button>
-              )}
-            </For>
+          <div className="routing-modal__filter-right flex flex-wrap items-center gap-2">
+            {availableCapabilities.map((cap) => (
+              <button
+                key={cap}
+                type="button"
+                className={pillClass(requiredCapabilities.has(cap))}
+                aria-pressed={requiredCapabilities.has(cap)}
+                onClick={() => toggleCapability(cap)}
+              >
+                <span
+                  className="routing-modal__filter-pill-icon inline-flex"
+                  dangerouslySetInnerHTML={{ __html: CAPABILITY_ICONS[cap] }}
+                />
+                {CAPABILITY_LABELS[cap]}
+              </button>
+            ))}
           </div>
         </div>
 
-        <Show when={groupedModels().length > 0}>
-          <div class="routing-modal__table-head" aria-hidden="true">
+        {groupedModels.length > 0 ? (
+          <div
+            className={cx(
+              'routing-modal__table-head hidden border-b border-line px-3 pb-2 text-xs font-medium uppercase tracking-wide text-faint',
+              'sm:grid',
+              ROW_COLUMNS,
+            )}
+            aria-hidden="true"
+          >
             <span>{t('models.picker.colModel')}</span>
             <span>{t('models.picker.colCapabilities')}</span>
             <span>{t('models.picker.colInput')}</span>
             <span>{t('models.picker.colOutput')}</span>
-            <span>{t('models.picker.colPrice')}</span>
+            <span className="sm:text-right">{t('models.picker.colPrice')}</span>
           </div>
-        </Show>
-        <Show
-          when={pickerItems().length > 0}
-          fallback={
-            <div class="routing-modal__list">
-              <div class="routing-modal__empty">
-                {search().trim()
-                  ? t('models.noSearchMatch')
-                  : showFreeOnly()
-                    ? t('models.picker.noFree')
-                    : isSub()
-                      ? t('models.picker.noSubscription')
-                      : isLocal()
-                        ? t('models.picker.noLocal')
-                        : t('models.picker.noApiKey')}
-                <Show when={!search().trim() && !showFreeOnly() && props.onConnectProviders}>
-                  <button
-                    class="btn btn--primary btn--sm"
-                    onClick={() => props.onConnectProviders?.()}
-                  >
-                    {t('models.picker.connectProvider')}
-                  </button>
-                </Show>
-              </div>
-            </div>
-          }
-        >
+        ) : null}
+
+        {pickerItems.length > 0 ? (
           <VirtualList
-            class="routing-modal__list"
-            items={pickerItems()}
+            // Remount on a filter change: VirtualList's shrink-clamp reads the
+            // pre-reset offset and would undo the resetKey jump to the top.
+            key={pickerResetKey}
+            className="routing-modal__list -mx-1 max-h-[55vh] overflow-y-auto px-1"
+            items={pickerItems}
             itemHeight={pickerItemHeight}
-            resetKey={pickerResetKey()}
+            resetKey={pickerResetKey}
           >
             {(item) =>
               item.kind === 'header' ? (
-                <div class="routing-modal__group-header">
-                  <span class="routing-modal__group-icon">
-                    {item.provId.startsWith('custom:')
-                      ? (() => {
-                          const cp = (props.customProviders ?? []).find(
-                            (c) => `custom:${c.id}` === item.provId,
-                          );
-                          return (
-                            customProviderLogo(item.name, 16, cp?.base_url) ?? (
-                              <span
-                                class="provider-card__logo-letter"
-                                style={{
-                                  background: customProviderColor(item.name),
-                                  width: '16px',
-                                  height: '16px',
-                                  'font-size': '9px',
-                                  'border-radius': '50%',
-                                }}
-                              >
-                                {item.name.charAt(0).toUpperCase()}
-                              </span>
-                            )
-                          );
-                        })()
-                      : providerIcon(item.provId, 16)}
+                <div className="routing-modal__group-header flex h-8 items-center gap-2 px-3 text-xs font-semibold text-muted">
+                  <span className="routing-modal__group-icon inline-flex shrink-0">
+                    {renderGroupIcon(item.provId, item.name)}
                   </span>
-                  <span class="routing-modal__group-name">{item.name}</span>
-                  <Show when={props.agentName && !item.provId.startsWith('custom:')}>
+                  <span className="routing-modal__group-name truncate">{item.name}</span>
+                  {props.agentName && !item.provId.startsWith('custom:') ? (
                     <button
-                      class="routing-modal__group-refresh"
-                      disabled={refreshingProvId() !== null}
+                      type="button"
+                      className="routing-modal__group-refresh icon-btn ml-auto size-6"
+                      disabled={refreshingProvId !== null}
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRefreshGroup(item.provId, item.name);
@@ -721,140 +683,35 @@ const ModelPickerModal: Component<Props> = (props) => {
                       aria-label={t('models.picker.refreshModels', { name: item.name })}
                       title={t('models.picker.refreshModels', { name: item.name })}
                     >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                      <RefreshCw
                         aria-hidden="true"
-                        classList={{
-                          'routing-modal__group-refresh-icon--spinning':
-                            refreshingProvId() === item.provId,
-                        }}
-                      >
-                        <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
-                        <path d="M21 3v5h-5" />
-                      </svg>
+                        className={cx(
+                          'size-3',
+                          refreshingProvId === item.provId &&
+                            'routing-modal__group-refresh-icon--spinning animate-spin',
+                        )}
+                      />
                     </button>
-                  </Show>
+                  ) : null}
                 </div>
               ) : (
-                (() => {
-                  const model = item.model;
-                  const disabledReason = () => missingRequiredCapability(model.pricing);
-                  const disabled = () => disabledReason() !== null;
-                  // The label cell truncates with an ellipsis, so the hover
-                  // tooltip carries the full name (and the model id when it
-                  // differs) ahead of any disabled reason.
-                  const tooltip = () =>
-                    [
-                      model.label,
-                      model.value !== model.label ? model.value : null,
-                      disabledReason(),
-                    ]
-                      .filter(Boolean)
-                      .join('\n');
-                  return (
-                    <button
-                      class="routing-modal__model"
-                      classList={{ 'routing-modal__model--disabled': disabled() }}
-                      disabled={disabled()}
-                      title={tooltip()}
-                      onClick={() =>
-                        props.onSelect(props.tierId, model.value, item.provId, activeTab())
-                      }
-                    >
-                      <span class="routing-modal__model-left">
-                        <span class="routing-modal__model-label">
-                          {model.label}
-                          <Show when={modelRole(model.value, item.provId, activeTab())}>
-                            {(role) => <span class="routing-modal__role-tag">{role()}</span>}
-                          </Show>
-                        </span>
-                      </span>
-                      <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">
-                          {t('models.picker.colCapabilities')}
-                        </span>
-                        <Show
-                          when={actionCapabilitiesFor(model.pricing).length > 0}
-                          fallback={
-                            <span
-                              class="model-capability-badges model-capability-badges--compact"
-                              aria-label={t('models.picker.noStreamOrTools')}
-                            />
-                          }
-                        >
-                          <ModelCapabilityBadges
-                            capabilities={actionCapabilitiesFor(model.pricing)}
-                            compact
-                            iconOnly
-                          />
-                        </Show>
-                      </span>
-                      <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">
-                          {t('models.picker.colInput')}
-                        </span>
-                        <ModelModalityBadges
-                          modalities={inputModalitiesFor(model.pricing)}
-                          direction="input"
-                          compact
-                          iconOnly
-                        />
-                      </span>
-                      <span class="routing-modal__model-cell">
-                        <span class="routing-modal__model-cell-label">
-                          {t('models.picker.colOutput')}
-                        </span>
-                        <ModelModalityBadges
-                          modalities={outputModalitiesFor(model.pricing)}
-                          direction="output"
-                          compact
-                          iconOnly
-                        />
-                      </span>
-                      <span class="routing-modal__model-cell routing-modal__model-cell--price">
-                        <span class="routing-modal__model-cell-label">
-                          {t('models.picker.colPrice')}
-                        </span>
-                        <Show
-                          when={isPaid()}
-                          fallback={
-                            <span class="routing-modal__model-price">
-                              {isLocal()
-                                ? t('models.picker.runsLocally')
-                                : (formatPerRequestCost(model.pricing.cost_per_request) ??
-                                  t('models.picker.included'))}
-                            </span>
-                          }
-                        >
-                          <Show when={model.pricing}>
-                            {(p) => (
-                              <span class="routing-modal__model-price">
-                                {t('models.picker.priceInOut', {
-                                  input: pricePerM(p().input_price_per_token),
-                                  output: pricePerM(p().output_price_per_token),
-                                })}
-                              </span>
-                            )}
-                          </Show>
-                        </Show>
-                      </span>
-                    </button>
-                  );
-                })()
+                renderModelRow(item.provId, item.model)
               )
             }
           </VirtualList>
-        </Show>
+        ) : (
+          <div className="routing-modal__list">
+            <div className="routing-modal__empty empty">
+              <p className="text-sm">{emptyMessage}</p>
+              {!search.trim() && !showFreeOnly && props.onConnectProviders ? (
+                <Button size="sm" onClick={() => props.onConnectProviders?.()}>
+                  {t('models.picker.connectProvider')}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
-};
-
-export default ModelPickerModal;
+}
