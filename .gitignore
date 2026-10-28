@@ -45,3 +45,6 @@ docs/plans/
 
 # Local scratch area (not part of the project)
 /tmp/
+
+# Local-only docs (production runbook, not published)
+*.local.md
