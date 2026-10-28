@@ -1,6 +1,6 @@
+import { useSyncExternalStore } from 'react';
 import { t } from '../i18n/index.js';
-import { createRoot, createSignal } from 'solid-js';
-import { createStore, produce } from 'solid-js/store';
+import { signal } from '../lib/signal.js';
 import type { AuthType, AvailableModel, RoutingProvider } from './api.js';
 import {
   streamPlayground,
@@ -56,6 +56,13 @@ export interface PlaygroundStore {
   /** Toggle a column as the best answer (clicking the marked one clears it). */
   markBest: (column: PlaygroundColumn) => Promise<void>;
   reset: () => void;
+  /**
+   * Notifies `listener` after any change (columns, prompt, best pick). Lets
+   * React re-render through `usePlaygroundStore`; returns the unsubscribe.
+   */
+  subscribe: (listener: () => void) => () => void;
+  /** Bumps on every change; the snapshot `usePlaygroundStore` compares. */
+  version: () => number;
 }
 
 export const MAX_COLUMNS = 6;
@@ -127,12 +134,36 @@ function modelBrandId(modelName: string): string | undefined {
 }
 
 export function createPlaygroundStore(agentName: string): PlaygroundStore {
-  const [columns, setColumns] = createStore<PlaygroundColumn[]>([]);
-  const [prompt, setPrompt] = createSignal('');
-  const [history, setHistory] = createSignal<string[]>([]);
+  // Plain module state with immutable updates: every write replaces the
+  // columns array (and the changed column object), so React sees new values.
+  const columnsSig = signal<PlaygroundColumn[]>([]);
+  const promptSig = signal('');
+  const history = signal<string[]>([]);
   // The run currently shown (live submit or a loaded history run). The "best
   // answer" pick is per-run, so marking best PATCHes this run.
-  const [bestColumnId, setBestColumnId] = createSignal<string | null>(null);
+  const bestSig = signal<string | null>(null);
+  const versionSig = signal(0);
+  const bump = () => versionSig.set((v) => v + 1);
+  columnsSig.subscribe(bump);
+  promptSig.subscribe(bump);
+  bestSig.subscribe(bump);
+
+  const columns = (): PlaygroundColumn[] => columnsSig();
+  const setColumns = (
+    next: PlaygroundColumn[] | ((prev: PlaygroundColumn[]) => PlaygroundColumn[]),
+  ) => columnsSig.set(next);
+  /** Applies `patch` to the column with `id` (no-op when it is gone). */
+  const patchColumn = (
+    id: string,
+    patch: (col: PlaygroundColumn) => Partial<PlaygroundColumn>,
+  ): void => {
+    setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch(c) } : c)));
+  };
+  const prompt = (): string => promptSig();
+  const setPrompt = (value: string): void => promptSig.set(value);
+  const bestColumnId = (): string | null => bestSig();
+  const setBestColumnId = (value: string | null): void => bestSig.set(value);
+  const setHistory = history.set;
   let currentRunId: string | null = null;
   // Per-column AbortController. Set when a column starts loading, cleared
   // when it settles. Lives outside the store so it doesn't trigger reactivity.
@@ -146,7 +177,7 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
   };
 
   const addColumn: PlaygroundStore['addColumn'] = (model, provider, authType, displayName) => {
-    if (columns.length >= MAX_COLUMNS) return;
+    if (columns().length >= MAX_COLUMNS) return;
     setColumns((prev) => [
       ...prev,
       {
@@ -173,21 +204,17 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
     displayName,
   ) => {
     abortColumn(id);
-    setColumns(
-      produce((cols) => {
-        const col = cols.find((c) => c.id === id);
-        if (!col) return;
-        col.model = model;
-        col.provider = provider;
-        col.authType = authType;
-        col.displayName = displayName;
-        col.status = 'idle';
-        col.response = undefined;
-        col.metrics = undefined;
-        col.headers = undefined;
-        col.error = undefined;
-      }),
-    );
+    patchColumn(id, () => ({
+      model,
+      provider,
+      authType,
+      displayName,
+      status: 'idle',
+      response: undefined,
+      metrics: undefined,
+      headers: undefined,
+      error: undefined,
+    }));
   };
 
   const runSingle = async (
@@ -197,22 +224,19 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
     position: number,
     requestHeaders: Record<string, string> | undefined,
   ): Promise<void> => {
-    const col = columns.find((c) => c.id === colId);
+    const col = columns().find((c) => c.id === colId);
     if (!col) return;
     abortColumn(colId);
     const ctrl = new AbortController();
     inflight.set(colId, ctrl);
-    setColumns(
-      (c) => c.id === colId,
-      produce((c) => {
-        c.status = 'loading';
-        c.response = undefined;
-        c.metrics = undefined;
-        c.headers = undefined;
-        c.error = undefined;
-        c.columnDbId = undefined;
-      }),
-    );
+    patchColumn(colId, () => ({
+      status: 'loading',
+      response: undefined,
+      metrics: undefined,
+      headers: undefined,
+      error: undefined,
+      columnDbId: undefined,
+    }));
     try {
       const result = await streamPlayground(
         {
@@ -230,41 +254,27 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
           onDelta: (text) => {
             // Drop late deltas if the column was removed/replaced mid-stream.
             if (inflight.get(colId) !== ctrl) return;
-            setColumns(
-              (c) => c.id === colId,
-              produce((c) => {
-                c.response = (c.response ?? '') + text;
-              }),
-            );
+            patchColumn(colId, (c) => ({ response: (c.response ?? '') + text }));
           },
         },
       );
       // The user may have removed/replaced the column while we were waiting;
       // drop the result silently rather than re-instate a column that's gone.
       if (inflight.get(colId) !== ctrl) return;
-      setColumns(
-        (c) => c.id === colId,
-        produce((c) => {
-          c.status = 'success';
-          c.response = result.content;
-          c.metrics = result.metrics;
-          c.headers = result.headers;
-          c.columnDbId = result.columnId;
-        }),
-      );
+      patchColumn(colId, () => ({
+        status: 'success',
+        response: result.content,
+        metrics: result.metrics,
+        headers: result.headers,
+        columnDbId: result.columnId,
+      }));
     } catch (err) {
       if (inflight.get(colId) !== ctrl) return;
       // AbortError is the user's intent (cancel/replace/remove) — don't paint
       // an error state, just leave the column where the abort path put it.
       if (err instanceof DOMException && err.name === 'AbortError') return;
       const message = err instanceof Error ? err.message : t('playground.requestFailed');
-      setColumns(
-        (c) => c.id === colId,
-        produce((c) => {
-          c.status = 'error';
-          c.error = message;
-        }),
-      );
+      patchColumn(colId, () => ({ status: 'error', error: message }));
     } finally {
       if (inflight.get(colId) === ctrl) inflight.delete(colId);
     }
@@ -272,14 +282,14 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
 
   const runAll: PlaygroundStore['runAll'] = (options) => {
     const promptText = prompt().trim();
-    if (!promptText || columns.length === 0) return undefined;
+    if (!promptText || columns().length === 0) return undefined;
     setHistory((prev) => (prev[0] === promptText ? prev : [promptText, ...prev].slice(0, 20)));
     const runId = newRunId();
     // New submit = a fresh run with no best pick yet.
     currentRunId = runId;
     setBestColumnId(null);
     void Promise.allSettled(
-      columns.map((c, i) => runSingle(c.id, promptText, runId, i, options?.requestHeaders)),
+      columns().map((c, i) => runSingle(c.id, promptText, runId, i, options?.requestHeaders)),
     );
     return runId;
   };
@@ -287,18 +297,13 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
   const retryColumn: PlaygroundStore['retryColumn'] = async (id, options) => {
     const promptText = prompt().trim() || history()[0];
     if (!promptText) return;
-    const position = columns.findIndex((c) => c.id === id);
+    const position = columns().findIndex((c) => c.id === id);
     await runSingle(id, promptText, newRunId(), Math.max(position, 0), options?.requestHeaders);
   };
 
   const cancelColumn: PlaygroundStore['cancelColumn'] = (id) => {
     abortColumn(id);
-    setColumns(
-      (c) => c.id === id,
-      produce((c) => {
-        if (c.status === 'loading') c.status = 'idle';
-      }),
-    );
+    patchColumn(id, (c) => (c.status === 'loading' ? { status: 'idle' } : {}));
   };
 
   const cancelAll: PlaygroundStore['cancelAll'] = () => {
@@ -337,10 +342,10 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
   };
 
   const isAnyRunning: PlaygroundStore['isAnyRunning'] = () =>
-    columns.some((c) => c.status === 'loading');
+    columns().some((c) => c.status === 'loading');
 
   const pickDefaults: PlaygroundStore['pickDefaults'] = (available, connected) => {
-    if (columns.length > 0) return;
+    if (columns().length > 0) return;
 
     const activeProviderIds = new Set<string>();
     for (const p of connected) {
@@ -457,7 +462,7 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
 
   return {
     get columns() {
-      return columns;
+      return columnsSig();
     },
     prompt,
     setPrompt,
@@ -475,22 +480,31 @@ export function createPlaygroundStore(agentName: string): PlaygroundStore {
     bestColumnId,
     markBest,
     reset,
+    subscribe: versionSig.subscribe,
+    version: versionSig,
   };
 }
 
 /**
- * Cache stores by agent name so they survive navigation.
- * Signals are kept alive via createRoot (no owner disposal on unmount).
+ * Cache stores by agent name so they survive navigation: the state lives at
+ * module level, outside any component, so unmounting the page keeps it.
  */
 const storeCache = new Map<string, PlaygroundStore>();
 
 export function getOrCreatePlaygroundStore(agentName: string): PlaygroundStore {
   let store = storeCache.get(agentName);
   if (!store) {
-    createRoot(() => {
-      store = createPlaygroundStore(agentName);
-      storeCache.set(agentName, store!);
-    });
+    store = createPlaygroundStore(agentName);
+    storeCache.set(agentName, store);
   }
-  return store!;
+  return store;
+}
+
+/**
+ * Re-renders the calling component whenever `store` changes and returns it.
+ * Read `store.columns`, `store.prompt()`, etc. during render as usual.
+ */
+export function usePlaygroundStore(store: PlaygroundStore): PlaygroundStore {
+  useSyncExternalStore(store.subscribe, store.version, store.version);
+  return store;
 }

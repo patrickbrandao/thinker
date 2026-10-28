@@ -1,6 +1,8 @@
-import { createSignal, For, Show, type Component } from 'solid-js';
+import { useState, type MouseEvent } from 'react';
+import { EllipsisVertical, PanelRight, Plus, Star } from 'lucide-react';
 import type { PlaygroundHistoryRunSummary } from '../../services/api.js';
 import { togglePlaygroundRunStar } from '../../services/api.js';
+import { Kbd, cx } from '../ui.jsx';
 import { t } from '../../i18n/index.js';
 
 interface Group {
@@ -29,49 +31,6 @@ function groupRuns(runs: PlaygroundHistoryRunSummary[]): Group[] {
   return out;
 }
 
-const SidebarPanelIcon: Component<{ size?: number }> = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={props.size ?? 20}
-    height={props.size ?? 20}
-    fill="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2M4 6h8v12H4zm10 12V6h6v12z" />
-    <path d="M16 12h2v2h-2zm0-4h2v2h-2z" />
-  </svg>
-);
-
-const StarIcon: Component<{ size?: number; filled?: boolean }> = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={props.size ?? 14}
-    height={props.size ?? 14}
-    viewBox="0 0 24 24"
-    fill={props.filled ? 'currentColor' : 'none'}
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  >
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-  </svg>
-);
-
-const MoreIcon: Component<{ size?: number }> = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={props.size ?? 16}
-    height={props.size ?? 16}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-  >
-    <circle cx="12" cy="5" r="2" />
-    <circle cx="12" cy="12" r="2" />
-    <circle cx="12" cy="19" r="2" />
-  </svg>
-);
-
 interface Props {
   open: boolean;
   loading: boolean;
@@ -88,22 +47,29 @@ function truncate(text: string, max: number): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
-const RunItem: Component<{
+const isMac = () => typeof navigator !== 'undefined' && !!navigator.platform?.includes('Mac');
+
+function RunItem({
+  run,
+  isActive,
+  onSelect,
+  onStarToggle,
+}: {
   run: PlaygroundHistoryRunSummary;
   isActive: boolean;
   onSelect: () => void;
   onStarToggle?: (runId: string, starred: boolean) => void;
-}> = (props) => {
-  const [menuOpen, setMenuOpen] = createSignal(false);
-  const [starred, setStarred] = createSignal(props.run.starred);
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [starred, setStarred] = useState(run.starred);
 
   const handleStar = async (e: MouseEvent) => {
     e.stopPropagation();
     setMenuOpen(false);
     try {
-      const newVal = await togglePlaygroundRunStar(props.run.id);
+      const newVal = await togglePlaygroundRunStar(run.id);
       setStarred(newVal);
-      props.onStarToggle?.(props.run.id, newVal);
+      onStarToggle?.(run.id, newVal);
     } catch {
       // silent
     }
@@ -111,150 +77,193 @@ const RunItem: Component<{
 
   return (
     <li
-      class="playground-recent__item-wrapper"
-      classList={{ 'playground-recent__item--active': props.isActive }}
+      className={cx(
+        'playground-recent__item-wrapper group relative flex items-center rounded-control',
+        isActive ? 'playground-recent__item--active bg-accent-tint' : 'hover:bg-s2',
+      )}
     >
-      <button type="button" class="playground-recent__item" onClick={props.onSelect}>
-        <span class="playground-recent__prompt">{truncate(props.run.prompt, 50)}</span>
+      <button
+        type="button"
+        className={cx(
+          'playground-recent__item min-w-0 flex-1 truncate py-1.5 pl-2 pr-1 text-left text-[13px]',
+          isActive ? 'text-accent' : 'text-dim',
+        )}
+        onClick={onSelect}
+      >
+        <span className="playground-recent__prompt">{truncate(run.prompt, 50)}</span>
       </button>
-      <div class="playground-recent__fade" />
-      <div class="playground-recent__menu-anchor">
+      <div className="relative shrink-0">
         <button
           type="button"
-          class="playground-recent__more"
+          className={cx(
+            'playground-recent__more icon-btn h-7 w-7',
+            !menuOpen && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+          )}
           onClick={(e) => {
             e.stopPropagation();
             setMenuOpen((v) => !v);
           }}
           aria-label={t('playground.history.options')}
         >
-          <MoreIcon size={14} />
+          <EllipsisVertical size={14} aria-hidden="true" />
         </button>
-        <Show when={menuOpen()}>
-          <div class="playground-recent__menu-backdrop" onClick={() => setMenuOpen(false)} />
-          <div class="playground-recent__menu">
-            <button type="button" class="playground-recent__menu-item" onClick={handleStar}>
-              <StarIcon size={14} filled={starred()} />
-              {starred() ? t('playground.history.unstar') : t('playground.history.star')}
-            </button>
-          </div>
-        </Show>
+        {menuOpen ? (
+          <>
+            <div
+              className="playground-recent__menu-backdrop fixed inset-0 z-40"
+              onClick={() => setMenuOpen(false)}
+            />
+            <div className="playground-recent__menu menu right-0 top-full z-50 mt-1 min-w-36">
+              <button
+                type="button"
+                className="playground-recent__menu-item menu-item"
+                onClick={handleStar}
+              >
+                <Star size={14} fill={starred ? 'currentColor' : 'none'} aria-hidden="true" />
+                {starred ? t('playground.history.unstar') : t('playground.history.star')}
+              </button>
+            </div>
+          </>
+        ) : null}
       </div>
     </li>
   );
-};
+}
 
-const PlaygroundRecentSidebar: Component<Props> = (props) => {
-  const starredRuns = () => props.runs.filter((r) => r.starred);
+function RunGroup({
+  label,
+  runs,
+  activeRunId,
+  onSelect,
+  onStarToggle,
+}: {
+  label: string;
+  runs: PlaygroundHistoryRunSummary[];
+  activeRunId: string | null;
+  onSelect: (runId: string) => void;
+  onStarToggle?: (runId: string, starred: boolean) => void;
+}) {
+  return (
+    <section className="playground-recent__group mb-3">
+      <h3 className="playground-recent__group-label eyebrow px-2 pb-1">{label}</h3>
+      <ul className="playground-recent__list flex flex-col gap-px">
+        {runs.map((run) => (
+          <RunItem
+            key={run.id}
+            run={run}
+            isActive={run.id === activeRunId}
+            onSelect={() => onSelect(run.id)}
+            onStarToggle={onStarToggle}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Playground run history, docked in the shell's right sidebar. */
+export default function PlaygroundRecentSidebar({
+  open,
+  loading,
+  runs,
+  activeRunId,
+  onToggle,
+  onSelect,
+  onStarToggle,
+  onNewPlayground,
+}: Props) {
+  if (!open) {
+    return (
+      <div className="playground-recent--collapsed flex shrink-0 flex-col items-center border-l border-line bg-elev px-1.5 py-3">
+        <button
+          type="button"
+          className="playground-recent__toggle icon-btn"
+          onClick={onToggle}
+          aria-label={t('playground.history.showRecent')}
+          title={t('playground.history.showRecent')}
+        >
+          <PanelRight size={18} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const starredRuns = runs.filter((r) => r.starred);
   // Starred runs render in their own section, so exclude them from the date
   // groups — otherwise a starred run shows up twice.
-  const timeGroups = () => groupRuns(props.runs.filter((r) => !r.starred));
+  const timeGroups = groupRuns(runs.filter((r) => !r.starred));
+  const mac = isMac();
 
   return (
-    <>
-      <Show when={!props.open}>
-        <div class="playground-recent--collapsed">
-          <button
-            type="button"
-            class="playground-recent__toggle"
-            onClick={props.onToggle}
-            aria-label={t('playground.history.showRecent')}
-            title={t('playground.history.showRecent')}
-          >
-            <SidebarPanelIcon size={18} />
-          </button>
-        </div>
-      </Show>
-      <Show when={props.open}>
-        <aside class="playground-recent" aria-label={t('playground.history.runHistory')}>
-          <header class="playground-recent__header">
-            <h2 class="playground-recent__title">{t('playground.history.myRuns')}</h2>
-            <button
-              type="button"
-              class="playground-recent__collapse"
-              onClick={props.onToggle}
-              aria-label={t('playground.history.hideRuns')}
-            >
-              <SidebarPanelIcon size={18} />
-            </button>
-          </header>
+    <aside
+      className="playground-recent flex w-64 shrink-0 flex-col self-stretch border-l border-line bg-elev max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 max-md:w-[min(18rem,85vw)] max-md:shadow-[var(--shadow-float)] md:sticky md:top-0 md:h-full"
+      aria-label={t('playground.history.runHistory')}
+    >
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+        <h2 className="playground-recent__title text-sm font-semibold text-ink">
+          {t('playground.history.myRuns')}
+        </h2>
+        <button
+          type="button"
+          className="playground-recent__collapse icon-btn"
+          onClick={onToggle}
+          aria-label={t('playground.history.hideRuns')}
+        >
+          <PanelRight size={18} aria-hidden="true" />
+        </button>
+      </header>
 
-          <button
-            type="button"
-            class="playground-recent__new"
-            onClick={() => props.onNewPlayground?.()}
-          >
-            <span class="playground-recent__new-left">
-              <span class="playground-recent__new-icon">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M3 13h8v8h2v-8h8v-2h-8V3h-2v8H3z" />
-                </svg>
-              </span>
-              <span class="playground-recent__new-label">{t('playground.history.newRun')}</span>
-            </span>
-            <kbd class="playground-recent__new-shortcut">
-              <span>{navigator.platform?.includes('Mac') ? '⇧' : 'Shift'}</span>
-              <span>{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}</span>
-              <span>O</span>
-            </kbd>
-          </button>
+      <div className="px-2 pt-2">
+        <button
+          type="button"
+          className="playground-recent__new flex w-full items-center justify-between gap-2 rounded-control px-2 py-1.5 text-[13px] font-medium text-ink hover:bg-s2"
+          onClick={() => onNewPlayground?.()}
+        >
+          <span className="flex items-center gap-2">
+            <Plus size={14} aria-hidden="true" />
+            <span className="playground-recent__new-label">{t('playground.history.newRun')}</span>
+          </span>
+          <span className="flex gap-0.5 max-md:hidden" aria-hidden="true">
+            <Kbd>{mac ? '⇧' : 'Shift' /* i18n-ignore: key name */}</Kbd>
+            <Kbd>{mac ? '⌘' : 'Ctrl' /* i18n-ignore: key name */}</Kbd>
+            <Kbd>O</Kbd>
+          </span>
+        </button>
+      </div>
 
-          <div class="playground-recent__body">
-            <Show when={!props.loading && props.runs.length === 0}>
-              <p class="playground-recent__empty">{t('playground.history.empty')}</p>
-            </Show>
-            <Show when={props.loading}>
-              <p class="playground-recent__empty">{t('playground.history.loading')}</p>
-            </Show>
+      <div className="playground-recent__body flex-1 overflow-y-auto px-2 py-3">
+        {!loading && runs.length === 0 ? (
+          <p className="playground-recent__empty px-2 text-xs text-faint">
+            {t('playground.history.empty')}
+          </p>
+        ) : null}
+        {loading ? (
+          <p className="playground-recent__empty px-2 text-xs text-faint">
+            {t('playground.history.loading')}
+          </p>
+        ) : null}
 
-            <Show when={starredRuns().length > 0}>
-              <section class="playground-recent__group">
-                <h3 class="playground-recent__group-label">{t('playground.history.starred')}</h3>
-                <ul class="playground-recent__list">
-                  <For each={starredRuns()}>
-                    {(run) => (
-                      <RunItem
-                        run={run}
-                        isActive={run.id === props.activeRunId}
-                        onSelect={() => props.onSelect(run.id)}
-                        onStarToggle={props.onStarToggle}
-                      />
-                    )}
-                  </For>
-                </ul>
-              </section>
-            </Show>
+        {starredRuns.length > 0 ? (
+          <RunGroup
+            label={t('playground.history.starred')}
+            runs={starredRuns}
+            activeRunId={activeRunId}
+            onSelect={onSelect}
+            onStarToggle={onStarToggle}
+          />
+        ) : null}
 
-            <For each={timeGroups()}>
-              {(group) => (
-                <section class="playground-recent__group">
-                  <h3 class="playground-recent__group-label">{group.label}</h3>
-                  <ul class="playground-recent__list">
-                    <For each={group.runs}>
-                      {(run) => (
-                        <RunItem
-                          run={run}
-                          isActive={run.id === props.activeRunId}
-                          onSelect={() => props.onSelect(run.id)}
-                          onStarToggle={props.onStarToggle}
-                        />
-                      )}
-                    </For>
-                  </ul>
-                </section>
-              )}
-            </For>
-          </div>
-        </aside>
-      </Show>
-    </>
+        {timeGroups.map((group) => (
+          <RunGroup
+            key={group.label}
+            label={group.label}
+            runs={group.runs}
+            activeRunId={activeRunId}
+            onSelect={onSelect}
+            onStarToggle={onStarToggle}
+          />
+        ))}
+      </div>
+    </aside>
   );
-};
-
-export default PlaygroundRecentSidebar;
+}

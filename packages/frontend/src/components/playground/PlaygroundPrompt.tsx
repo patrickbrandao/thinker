@@ -1,12 +1,13 @@
 import {
-  Show,
-  createEffect,
-  createSignal,
-  onMount,
-  onCleanup,
-  type Component,
-  type JSX,
-} from 'solid-js';
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { ArrowUp } from 'lucide-react';
+import { cx } from '../ui.jsx';
 import { t } from '../../i18n/index.js';
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
   onRecallPrevious: () => void;
   disabled: boolean;
   running: boolean;
-  headersSlot?: JSX.Element;
+  headersSlot?: ReactNode;
   historyOpen?: boolean;
   onHeightChange?: (height: number) => void;
   ref?: (el: HTMLTextAreaElement) => void;
@@ -25,45 +26,64 @@ interface Props {
 const MAX_PROMPT_LINES = 15;
 const PROMPT_LINE_HEIGHT_PX = 22;
 
-const PlaygroundPrompt: Component<Props> = (props) => {
-  const [ref, setRef] = createSignal<HTMLTextAreaElement | undefined>();
-  let wrapperRef: HTMLDivElement | undefined;
+/** The prompt box pinned under the comparison columns. */
+export default function PlaygroundPrompt({
+  value,
+  onChange,
+  onSubmit,
+  onRecallPrevious,
+  disabled,
+  running,
+  headersSlot,
+  historyOpen,
+  onHeightChange,
+  ref,
+}: Props) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const forwardRef = useRef(ref);
+  forwardRef.current = ref;
+  const heightRef = useRef(onHeightChange);
+  heightRef.current = onHeightChange;
+  const observeHeight = !!onHeightChange;
 
-  onMount(() => {
-    if (!wrapperRef || !props.onHeightChange) return;
+  useEffect(() => {
+    if (!observeHeight || !wrapperRef.current) return;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        props.onHeightChange?.(entry.contentRect.height);
-      }
+      for (const entry of entries) heightRef.current?.(entry.contentRect.height);
     });
-    ro.observe(wrapperRef);
-    onCleanup(() => ro.disconnect());
-  });
+    ro.observe(wrapperRef.current);
+    return () => ro.disconnect();
+  }, [observeHeight]);
 
-  const autoGrow = () => {
-    const el = ref();
+  const autoGrow = useCallback(() => {
+    const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, MAX_PROMPT_LINES * PROMPT_LINE_HEIGHT_PX)}px`;
-  };
+  }, []);
 
   // Recalled / history-loaded prompts set `value` programmatically without an
-  // input event, so resize whenever the value changes. autoGrow() reads ref()
-  // internally, so the effect also re-runs once the textarea mounts.
-  createEffect(() => {
-    void props.value;
+  // input event, so resize whenever the value changes.
+  useLayoutEffect(() => {
     autoGrow();
-  });
+  }, [value, autoGrow]);
+
+  // Stable callback ref: hands the textarea to the parent once on mount.
+  const setTextarea = useCallback((el: HTMLTextAreaElement | null) => {
+    textareaRef.current = el;
+    if (el) forwardRef.current?.(el);
+  }, []);
 
   const submit = () => {
-    if (props.disabled || props.running) return;
-    if (props.value.trim().length === 0) return;
-    props.onSubmit();
+    if (disabled || running) return;
+    if (value.trim().length === 0) return;
+    onSubmit();
   };
 
-  const handleKeyDown = (event: KeyboardEvent) => {
-    const composing =
-      (event as KeyboardEvent & { isComposing?: boolean }).isComposing || event.keyCode === 229;
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const native = event.nativeEvent as globalThis.KeyboardEvent;
+    const composing = native.isComposing || event.keyCode === 229;
     if (composing) return;
 
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -76,95 +96,59 @@ const PlaygroundPrompt: Component<Props> = (props) => {
       submit();
       return;
     }
-    if (event.key === 'ArrowUp' && props.value.length === 0) {
+    if (event.key === 'ArrowUp' && value.length === 0) {
       event.preventDefault();
-      props.onRecallPrevious();
+      onRecallPrevious();
     }
   };
 
   return (
     <div
       ref={wrapperRef}
-      class="playground-prompt-wrapper"
-      classList={{ 'playground-prompt-wrapper--history-open': props.historyOpen }}
+      className={cx(
+        'playground-prompt-wrapper',
+        historyOpen && 'playground-prompt-wrapper--history-open',
+      )}
     >
       <form
-        class="playground-prompt"
+        className="playground-prompt rounded-surface border border-line-strong bg-elev focus-within:border-accent"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
         }}
       >
         <textarea
-          ref={(el) => {
-            setRef(el);
-            props.ref?.(el);
-          }}
-          class="playground-prompt__textarea"
+          ref={setTextarea}
+          className="playground-prompt__textarea block w-full resize-none bg-transparent px-3.5 pt-3 text-sm leading-[22px] text-ink outline-none placeholder:text-faint disabled:cursor-not-allowed"
           placeholder={t('playground.prompt.placeholder')}
-          value={props.value}
+          value={value}
           rows={1}
-          disabled={props.disabled && !props.running}
-          onInput={(event) => {
-            props.onChange(event.currentTarget.value);
+          disabled={disabled && !running}
+          onChange={(event) => {
+            onChange(event.currentTarget.value);
             autoGrow();
           }}
           onKeyDown={handleKeyDown}
           aria-label={t('playground.prompt.label')}
         />
-        <div class="playground-prompt__toolbar">
-          <div class="playground-prompt__toolbar-left">
-            <Show when={props.headersSlot}>{props.headersSlot}</Show>
+        <div className="playground-prompt__toolbar flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+          <div className="playground-prompt__toolbar-left flex items-center gap-1">
+            {headersSlot}
           </div>
           <button
             type="submit"
-            class="playground-prompt__send"
-            disabled={props.disabled || props.value.trim().length === 0}
-            aria-label={
-              props.running ? t('playground.prompt.running') : t('playground.prompt.send')
-            }
+            className="playground-prompt__send inline-flex h-8 w-8 items-center justify-center rounded-control bg-accent text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled || value.trim().length === 0}
+            aria-label={running ? t('playground.prompt.running') : t('playground.prompt.send')}
           >
-            <Show
-              when={!props.running}
-              fallback={
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-dasharray="28"
-                    stroke-dashoffset="8"
-                  >
-                    <animateTransform
-                      attributeName="transform"
-                      type="rotate"
-                      from="0 8 8"
-                      to="360 8 8"
-                      dur="0.8s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                </svg>
-              }
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path
-                  d="M8 3L8 13M8 3L4 7M8 3L12 7"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  fill="none"
-                />
-              </svg>
-            </Show>
+            {running ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <ArrowUp size={16} aria-hidden="true" />
+            )}
           </button>
         </div>
       </form>
     </div>
   );
-};
-
-export default PlaygroundPrompt;
+}

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, waitFor } from '@solidjs/testing-library';
+import { render, waitFor } from '@testing-library/react';
 import MarkdownContent from '../../src/components/playground/MarkdownContent';
 
 describe('MarkdownContent', () => {
   it('shows raw text while markdown libraries load, then renders HTML', async () => {
-    const { container } = render(() => <MarkdownContent text={'## Title'} />);
+    const { container } = render(<MarkdownContent text={'## Title'} />);
     // marked + dompurify load lazily, so the first synchronous paint is the
     // raw-text fallback (avoids a layout flash before the chunk arrives).
     const loading = container.querySelector('pre.markdown-loading');
@@ -18,9 +18,9 @@ describe('MarkdownContent', () => {
   });
 
   it('renders headings, bold, and lists as HTML', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'## Title\n\nSome **bold** text.\n\n- one\n- two\n- three'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'## Title\n\nSome **bold** text.\n\n- one\n- two\n- three'} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('h2')?.textContent).toBe('Title');
     });
@@ -28,17 +28,17 @@ describe('MarkdownContent', () => {
     expect(container.querySelectorAll('li')).toHaveLength(3);
   });
 
-  it('forwards the class prop to the rendered container', async () => {
-    const { container } = render(() => <MarkdownContent text={'hi'} class="custom-md" />);
+  it('forwards the className prop to the rendered container', async () => {
+    const { container } = render(<MarkdownContent text={'hi'} className="custom-md" />);
     await waitFor(() => {
       expect(container.querySelector('div.custom-md')).not.toBeNull();
     });
   });
 
   it('renders inline code and highlights fenced blocks for supported languages', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'use `foo` then:\n\n```typescript\nconst x = 1;\n```'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'use `foo` then:\n\n```typescript\nconst x = 1;\n```'} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('pre code')).not.toBeNull();
     });
@@ -52,9 +52,7 @@ describe('MarkdownContent', () => {
   });
 
   it('highlights javascript fences (js alias is registered)', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'```js\nconst x = 1;\n```'} />
-    ));
+    const { container } = render(<MarkdownContent text={'```js\nconst x = 1;\n```'} />);
     await waitFor(() => {
       expect(container.querySelector('pre code')).not.toBeNull();
     });
@@ -62,9 +60,7 @@ describe('MarkdownContent', () => {
   });
 
   it('escapes a fenced code block that has no language', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'```\n<b>&"\' not html\n```'} />
-    ));
+    const { container } = render(<MarkdownContent text={'```\n<b>&"\' not html\n```'} />);
     await waitFor(() => {
       expect(container.querySelector('pre code')).not.toBeNull();
     });
@@ -76,9 +72,7 @@ describe('MarkdownContent', () => {
   });
 
   it('escapes fenced blocks for unsupported languages instead of highlighting', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'```rust\nlet x = "<i>";\n```'} />
-    ));
+    const { container } = render(<MarkdownContent text={'```rust\nlet x = "<i>";\n```'} />);
     await waitFor(() => {
       expect(container.querySelector('pre code')).not.toBeNull();
     });
@@ -91,9 +85,9 @@ describe('MarkdownContent', () => {
   });
 
   it('strips embedded <script> tags from untrusted model output', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'hello\n\n<script>alert(1)</script>\n\nbye'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'hello\n\n<script>alert(1)</script>\n\nbye'} />,
+    );
     await waitFor(() => {
       expect(container.textContent).toContain('hello');
     });
@@ -102,9 +96,9 @@ describe('MarkdownContent', () => {
   });
 
   it('strips event handlers like onerror from inline HTML', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'<img src=x onerror="alert(1)" alt="x">'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'<img src=x onerror="alert(1)" alt="x">'} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('img')).not.toBeNull();
     });
@@ -112,9 +106,9 @@ describe('MarkdownContent', () => {
   });
 
   it('forces rel="noopener noreferrer" on links that open a new tab', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'<a href="https://evil.example" target="_blank">click</a>'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'<a href="https://evil.example" target="_blank">click</a>'} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('a')).not.toBeNull();
     });
@@ -126,9 +120,7 @@ describe('MarkdownContent', () => {
   });
 
   it('renders an empty container when text is nullish', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={undefined as unknown as string} />
-    ));
+    const { container } = render(<MarkdownContent text={undefined as unknown as string} />);
     await waitFor(() => {
       expect(container.querySelector('div')).not.toBeNull();
     });
@@ -136,9 +128,9 @@ describe('MarkdownContent', () => {
   });
 
   it('renders plain text without markdown gracefully', async () => {
-    const { container } = render(() => (
-      <MarkdownContent text={'Just a plain sentence with no formatting.'} />
-    ));
+    const { container } = render(
+      <MarkdownContent text={'Just a plain sentence with no formatting.'} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('div')).not.toBeNull();
     });

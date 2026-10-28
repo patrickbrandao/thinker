@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@solidjs/testing-library';
-import type { JSX } from 'solid-js';
+import { render, fireEvent, waitFor } from '@testing-library/react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 
 // ─── API mocks (incl. the streaming primitive the real store calls) ─────────
 const mockGetAvailableModels = vi.fn();
@@ -29,29 +29,49 @@ vi.mock('../../src/services/toast-store.js', () => ({
 }));
 
 // ─── Router primitives ──────────────────────────────────────────────────────
-const setSearchParamsFn = vi.fn((p: { run?: string }) => {
-  if ('run' in p) searchParamsState.run = p.run;
-});
+// The page writes `?run=` through setSearchParams(updater). The mock applies
+// the updater to the current params and records each resulting run value
+// (undefined = the param was cleared).
 const searchParamsState: { run?: string } = {};
-vi.mock('@solidjs/router', () => ({
-  useSearchParams: () => [searchParamsState, setSearchParamsFn],
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <>{props.children as unknown as Element}</>,
-  Meta: () => null,
+const runWrites: (string | undefined)[] = [];
+const currentParams = () =>
+  new URLSearchParams(searchParamsState.run ? { run: searchParamsState.run } : {});
+const setSearchParamsFn = vi.fn(
+  (init: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams)) => {
+    const next = typeof init === 'function' ? init(currentParams()) : new URLSearchParams(init);
+    searchParamsState.run = next.get('run') ?? undefined;
+    runWrites.push(searchParamsState.run);
+  },
+);
+vi.mock('react-router', async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
+  useSearchParams: () => [currentParams(), setSearchParamsFn],
 }));
 
 // ─── Right sidebar — capture the history-sidebar content ─────────────────────
-let sidebarContent: JSX.Element | null = null;
+let sidebarContent: ReactNode = null;
+const sidebarListeners = new Set<() => void>();
 vi.mock('../../src/services/right-sidebar.jsx', () => ({
   useRightSidebar: () => ({
-    content: () => sidebarContent,
-    setContent: (c: JSX.Element | null) => {
+    content: sidebarContent,
+    setContent: (c: ReactNode) => {
       sidebarContent = c;
+      for (const listener of [...sidebarListeners]) listener();
     },
   }),
 }));
+
+/** Renders whatever the page last docked in the right sidebar, live. */
+function SidebarHost() {
+  const content = useSyncExternalStore(
+    (listener) => {
+      sidebarListeners.add(listener);
+      return () => sidebarListeners.delete(listener);
+    },
+    () => sidebarContent,
+  );
+  return <>{content}</>;
+}
 
 // ─── Leaf component stubs (keep the page + real store logic exercised) ───────
 let lastColProps: Record<string, unknown>[] = [];
@@ -105,10 +125,9 @@ vi.mock('../../src/components/playground/PlaygroundPrompt.jsx', () => ({
     return (
       <div data-testid="prompt">
         <span data-testid="prompt-disabled">{String(props.disabled)}</span>
-        {/* Touch every prop so SolidJS evaluates each accessor (coverage). */}
         <span data-testid="prompt-value">{String(props.value)}</span>
         <span data-testid="prompt-running">{String(props.running)}</span>
-        {props.headersSlot as JSX.Element}
+        {props.headersSlot as ReactNode}
         <button data-testid="prompt-submit" onClick={() => (props.onSubmit as () => void)()}>
           submit
         </button>
@@ -213,7 +232,7 @@ vi.mock('../../src/components/playground/PlaygroundHistoryDrawer.jsx', () => ({
         star
       </button>
       {props.runs.map((r) => (
-        <button data-testid={`pick-${r.id}`} onClick={() => props.onSelect(r.id)}>
+        <button key={r.id} data-testid={`pick-${r.id}`} onClick={() => props.onSelect(r.id)}>
           pick {r.id}
         </button>
       ))}
@@ -366,6 +385,7 @@ const lsStore: Record<string, string> = {};
 const ssStore: Record<string, string> = {};
 
 let agentSeq = 0;
+let sidebarMounted = false;
 
 describe('Playground page', () => {
   beforeEach(() => {
@@ -376,6 +396,9 @@ describe('Playground page', () => {
     lastSummaryProps = null;
     providerModalProps = null;
     sidebarContent = null;
+    sidebarListeners.clear();
+    sidebarMounted = false;
+    runWrites.length = 0;
     mockPromptTextarea = null;
     searchParamsState.run = undefined;
     for (const k of Object.keys(lsStore)) delete lsStore[k];
@@ -422,8 +445,11 @@ describe('Playground page', () => {
     });
   });
 
+  // Mounted once per test; it follows every setContent from the page.
   function renderSidebar() {
-    return render(() => <>{sidebarContent}</>);
+    if (sidebarMounted) return;
+    sidebarMounted = true;
+    render(<SidebarHost />);
   }
 
   async function find(testId: string): Promise<HTMLElement> {
@@ -435,7 +461,7 @@ describe('Playground page', () => {
   }
 
   it('renders the header and seeds two default columns from connected providers', async () => {
-    const { getByText } = render(() => <Playground />);
+    const { getByText } = render(<Playground />);
     expect(getByText('Playground')).toBeDefined();
     // pickDefaults runs against the real store → two columns appear.
     await waitFor(() => {
@@ -447,7 +473,7 @@ describe('Playground page', () => {
     // Provider connection now lives on the sidebar provider pages, so the
     // empty state is purely informational here — no comparison columns render.
     mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
-    render(() => <Playground />);
+    render(<Playground />);
     expect(await find('empty-connect')).toBeDefined();
     expect(document.querySelectorAll('[data-testid^="col-"]').length).toBe(0);
   });
@@ -456,7 +482,7 @@ describe('Playground page', () => {
     // The page passes a placeholder onConnect to PlaygroundEmptyState; firing
     // it must execute cleanly (no columns, no crash). Exercises the callback.
     mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
-    render(() => <Playground />);
+    render(<Playground />);
     const connectBtn = await find('empty-connect');
     expect(() => fireEvent.click(connectBtn)).not.toThrow();
     // Still in the empty state — the placeholder handler is a no-op for now.
@@ -465,7 +491,7 @@ describe('Playground page', () => {
 
   describe('submit → streaming run → history', () => {
     it('streams a run, finalizes the column, pushes an optimistic history entry, persists last run', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() =>
         expect(document.querySelectorAll('[data-testid^="col-"]').length).toBeGreaterThan(0),
       );
@@ -485,20 +511,18 @@ describe('Playground page', () => {
     });
 
     it('does nothing when the prompt is empty (runAll returns no id)', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-submit');
-      setSearchParamsFn.mockClear();
+      runWrites.length = 0;
       fireEvent.click(await find('prompt-submit'));
       // No prompt set → runAll() returns undefined → no run param written.
       await new Promise((r) => setTimeout(r, 20));
-      expect(setSearchParamsFn.mock.calls.some((c) => c[0] && 'run' in c[0] && c[0].run)).toBe(
-        false,
-      );
+      expect(runWrites.some(Boolean)).toBe(false);
     });
 
     it('toasts when the streamed run fails for a column', async () => {
       mockStreamPlayground.mockRejectedValue(new Error('upstream down'));
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -520,7 +544,7 @@ describe('Playground page', () => {
               metrics: { cost: 0.005, inputTokens: 1, outputTokens: 2, durationMs: 300 },
             }),
       );
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -546,7 +570,7 @@ describe('Playground page', () => {
   describe('best answer wiring (real store.markBest)', () => {
     it('marks a column best and reflects it in the column + summary props', async () => {
       const onBestModelChange = vi.fn();
-      render(() => <Playground onBestModelChange={onBestModelChange} />);
+      render(<Playground onBestModelChange={onBestModelChange} />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -582,7 +606,7 @@ describe('Playground page', () => {
 
     it('toasts the error when persisting the best pick fails', async () => {
       mockSetPlaygroundRunBest.mockRejectedValue(new Error('persist failed'));
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -596,7 +620,7 @@ describe('Playground page', () => {
     });
 
     it('marks best from the summary table row click too', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -613,7 +637,7 @@ describe('Playground page', () => {
 
   describe('history selection', () => {
     it('replaces the store when no run is in progress and providers are connected', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('pick-r-42'));
       await waitFor(() => expect(mockGetPlaygroundRun).toHaveBeenCalledWith('r-42'));
@@ -630,7 +654,7 @@ describe('Playground page', () => {
       // Make the stream hang so isAnyRunning() stays true.
       mockStreamPlayground.mockReturnValue(new Promise(() => {}));
       mockGetPlaygroundRun.mockResolvedValue(makeRunDetail({ bestColumnId: 'dbcol-h1' }));
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -655,7 +679,7 @@ describe('Playground page', () => {
 
     it('shows the "Connect a provider to get started" bar when overlaying history without active providers', async () => {
       mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
-      const { getByText } = render(() => <Playground />);
+      const { getByText } = render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('pick-r-42'));
       await waitFor(() => expect(mockGetPlaygroundRun).toHaveBeenCalled());
@@ -664,7 +688,7 @@ describe('Playground page', () => {
 
     it('toasts an error when getPlaygroundRun fails', async () => {
       mockGetPlaygroundRun.mockRejectedValueOnce(new Error('boom'));
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('pick-r-42'));
       await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('boom'));
@@ -672,7 +696,7 @@ describe('Playground page', () => {
 
     it('toasts a generic message when getPlaygroundRun fails with a non-Error', async () => {
       mockGetPlaygroundRun.mockRejectedValueOnce('weird');
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('pick-r-42'));
       await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to load run'));
@@ -680,7 +704,7 @@ describe('Playground page', () => {
 
     it('clicking the live (running) run shows live columns without refetching', async () => {
       mockStreamPlayground.mockReturnValue(new Promise(() => {}));
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -701,7 +725,7 @@ describe('Playground page', () => {
 
   describe('column actions', () => {
     it('forwards remove / retry / change-model (with real header record) to the store', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       const colId = (await waitFor(() => {
         if (!lastColProps[0]) throw new Error('no column');
         return lastColProps[0];
@@ -731,7 +755,7 @@ describe('Playground page', () => {
     });
 
     it('opens the add-model picker via the Add button and adds a column', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       const addBtn = (await find('add-or-toolbar').catch(
         () => document.querySelector('[aria-label="Add model column"]') as HTMLElement,
       )) as HTMLElement;
@@ -752,7 +776,7 @@ describe('Playground page', () => {
 
   describe('request headers (real helpers)', () => {
     it('opens/closes the popover, counts active headers and persists names only', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       const trigger = document.querySelector('[aria-label="Request headers"]') as HTMLElement;
       fireEvent.click(trigger);
@@ -783,7 +807,7 @@ describe('Playground page', () => {
 
     it('restores saved header names on mount, with empty values', async () => {
       lsStore['thinker.playground.requestHeaderNames'] = JSON.stringify(['X-A', 'X-B']);
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('2');
       // No values are restored, so nothing is active yet.
@@ -798,7 +822,7 @@ describe('Playground page', () => {
         { id: 'h3', key: 'X-B', value: 'tok-secret' },
         'not-an-entry',
       ]);
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('2');
       expect(lsStore['manifest.playground.requestHeaders']).toBeUndefined();
@@ -810,7 +834,7 @@ describe('Playground page', () => {
     it('falls back to no entries when stored headers JSON is malformed', async () => {
       lsStore['manifest.playground.requestHeaders'] = '{not json';
       lsStore['thinker.playground.requestHeaderNames'] = '{not json';
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
       expect(lsStore['manifest.playground.requestHeaders']).toBeUndefined();
@@ -819,7 +843,7 @@ describe('Playground page', () => {
 
     it('falls back to no entries when stored headers is not an array', async () => {
       lsStore['thinker.playground.requestHeaderNames'] = JSON.stringify({ not: 'array' });
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
     });
@@ -838,7 +862,7 @@ describe('Playground page', () => {
       };
       vi.stubGlobal('localStorage', blocked);
       vi.stubGlobal('sessionStorage', blocked);
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       expect(document.querySelector('[data-testid="headers-entrycount"]')?.textContent).toBe('0');
       // Writes swallow the error too: the history toggle (recentOpen) and the
@@ -853,7 +877,7 @@ describe('Playground page', () => {
     });
 
     it('silently ignores a localStorage write failure when persisting headers', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       const trigger = document.querySelector('[aria-label="Request headers"]') as HTMLElement;
       fireEvent.click(trigger);
@@ -878,28 +902,28 @@ describe('Playground page', () => {
   describe('history refresh failure', () => {
     it('toasts the error message when listPlaygroundRuns rejects', async () => {
       mockListPlaygroundRuns.mockRejectedValue(new Error('history boom'));
-      render(() => <Playground />);
+      render(<Playground />);
       // historyOpen() defaults true → refreshHistory() runs on mount.
       await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('history boom'));
     });
 
     it('toasts a generic message when listPlaygroundRuns rejects with a non-Error', async () => {
       mockListPlaygroundRuns.mockRejectedValue('weird');
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to load history'));
     });
   });
 
   describe('new playground + keyboard shortcuts', () => {
     it('resets everything when "New run" is clicked', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() =>
         expect(document.querySelectorAll('[data-testid^="col-"]').length).toBeGreaterThan(0),
       );
       renderSidebar();
       fireEvent.click(await find('sidebar-new'));
       // Store reset clears columns; pickDefaults reseeds afterwards.
-      expect(setSearchParamsFn).toHaveBeenCalledWith({ run: undefined });
+      expect(runWrites).toContain(undefined);
     });
 
     it('schedules focus on the prompt textarea via requestAnimationFrame when starting a new playground', async () => {
@@ -908,7 +932,7 @@ describe('Playground page', () => {
         return 0;
       });
       const focusSpy = vi.fn();
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() =>
         expect(document.querySelectorAll('[data-testid^="col-"]').length).toBeGreaterThan(0),
       );
@@ -923,15 +947,15 @@ describe('Playground page', () => {
     });
 
     it('Ctrl+Shift+O starts a new playground', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
-      setSearchParamsFn.mockClear();
+      runWrites.length = 0;
       fireEvent.keyDown(window, { key: 'O', ctrlKey: true, shiftKey: true });
-      await waitFor(() => expect(setSearchParamsFn).toHaveBeenCalledWith({ run: undefined }));
+      await waitFor(() => expect(runWrites).toContain(undefined));
     });
 
     it('Ctrl+K opens the add-model picker when idle and under the cap', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt');
       fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
       await find('picker-new');
@@ -939,7 +963,7 @@ describe('Playground page', () => {
 
     it('Ctrl+K is suppressed while a playground is running', async () => {
       mockStreamPlayground.mockReturnValue(new Promise(() => {}));
-      render(() => <Playground />);
+      render(<Playground />);
       await find('prompt-set');
       fireEvent.click(await find('prompt-set'));
       fireEvent.click(await find('prompt-submit'));
@@ -949,7 +973,7 @@ describe('Playground page', () => {
     });
 
     it('toggles the sidebar open state and persists the preference', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('sidebar-toggle'));
       expect(lsStore['thinker.playground.recentOpen']).toBe('false');
@@ -957,7 +981,7 @@ describe('Playground page', () => {
 
     it('starts collapsed when the stored sidebar preference is "false"', async () => {
       lsStore['thinker.playground.recentOpen'] = 'false';
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       await waitFor(() =>
         expect(document.querySelector('[data-testid="sidebar-open"]')?.textContent).toBe('false'),
@@ -965,7 +989,7 @@ describe('Playground page', () => {
     });
 
     it('updates a run star flag from the sidebar without throwing', async () => {
-      render(() => <Playground />);
+      render(<Playground />);
       renderSidebar();
       fireEvent.click(await find('sidebar-star'));
       await waitFor(() => expect(mockListPlaygroundRuns).toHaveBeenCalled());
@@ -979,7 +1003,7 @@ describe('Playground page', () => {
       mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
       searchParamsState.run = 'r-99';
       mockGetPlaygroundRun.mockResolvedValue(makeRunDetail({ id: 'r-99' }));
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() => expect(mockGetPlaygroundRun).toHaveBeenCalledWith('r-99'));
     });
 
@@ -987,7 +1011,7 @@ describe('Playground page', () => {
       mockGetProviders.mockResolvedValue([{ ...ACTIVE_PROVIDER, is_active: false }]);
       ssStore['thinker.playground.lastRun'] = 'r-ss';
       mockGetPlaygroundRun.mockResolvedValue(makeRunDetail({ id: 'r-ss' }));
-      render(() => <Playground />);
+      render(<Playground />);
       await waitFor(() => expect(mockGetPlaygroundRun).toHaveBeenCalledWith('r-ss'));
     });
 
@@ -996,14 +1020,14 @@ describe('Playground page', () => {
       searchParamsState.run = 'r-bad';
       ssStore['thinker.playground.lastRun'] = 'r-bad';
       mockGetPlaygroundRun.mockRejectedValue(new Error('gone'));
-      render(() => <Playground />);
-      await waitFor(() => expect(setSearchParamsFn).toHaveBeenCalledWith({ run: undefined }));
+      render(<Playground />);
+      await waitFor(() => expect(runWrites).toContain(undefined));
       await waitFor(() => expect(ssStore['thinker.playground.lastRun']).toBeUndefined());
     });
   });
 
   it('wires the prompt recall handler to the store (ArrowUp history recall)', async () => {
-    render(() => <Playground />);
+    render(<Playground />);
     await find('prompt-set');
     // Submit once so there is a prompt in history to recall.
     fireEvent.click(await find('prompt-set'));
@@ -1019,7 +1043,7 @@ describe('Playground page', () => {
   });
 
   it('announces a model response for screen readers once metrics arrive', async () => {
-    render(() => <Playground />);
+    render(<Playground />);
     await find('prompt-set');
     fireEvent.click(await find('prompt-set'));
     fireEvent.click(await find('prompt-submit'));

@@ -2202,174 +2202,6 @@
         "platform-icons.css"
       ]
     },
-    "playground": {
-      "classes": [
-        "playground",
-        "playground--embedded",
-        "playground__add",
-        "playground__add-plus",
-        "playground__add-shortcut",
-        "playground__add-shortcut-plus",
-        "playground__columns"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-column": {
-      "classes": [
-        "playground-column",
-        "playground-column__best",
-        "playground-column__best--on",
-        "playground-column__best--static",
-        "playground-column__body",
-        "playground-column__chip",
-        "playground-column__edit-icon",
-        "playground-column__error",
-        "playground-column__error-text",
-        "playground-column__header",
-        "playground-column__headers",
-        "playground-column__headers-caret",
-        "playground-column__headers-caret--open",
-        "playground-column__headers-list",
-        "playground-column__headers-toggle",
-        "playground-column__icon",
-        "playground-column__metric",
-        "playground-column__metric-label",
-        "playground-column__metric-value",
-        "playground-column__metric-value-row",
-        "playground-column__metrics",
-        "playground-column__name",
-        "playground-column__placeholder",
-        "playground-column__remove",
-        "playground-column__response",
-        "playground-column__skeleton",
-        "playground-column__title",
-        "playground-column__title--readonly",
-        "playground-column__title-left",
-        "playground-column__win-badge"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-empty": {
-      "classes": [
-        "playground-empty",
-        "playground-empty__body",
-        "playground-empty__cta",
-        "playground-empty__title"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-headers": {
-      "classes": [
-        "playground-headers",
-        "playground-headers__add",
-        "playground-headers__backdrop",
-        "playground-headers__clear",
-        "playground-headers__close",
-        "playground-headers__empty",
-        "playground-headers__footer",
-        "playground-headers__header",
-        "playground-headers__hint",
-        "playground-headers__input",
-        "playground-headers__input--key",
-        "playground-headers__input--value",
-        "playground-headers__remove",
-        "playground-headers__row",
-        "playground-headers__row--blocked",
-        "playground-headers__row--invalid-name",
-        "playground-headers__row--invalid-value",
-        "playground-headers__rows",
-        "playground-headers__title",
-        "playground-headers__warning"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-prompt": {
-      "classes": [
-        "playground-prompt",
-        "playground-prompt--info",
-        "playground-prompt__headers",
-        "playground-prompt__headers-badge",
-        "playground-prompt__headers-slot",
-        "playground-prompt__info-text",
-        "playground-prompt__send",
-        "playground-prompt__textarea",
-        "playground-prompt__toolbar",
-        "playground-prompt__toolbar-left"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-prompt-wrapper": {
-      "classes": [
-        "playground-prompt-wrapper",
-        "playground-prompt-wrapper--history-open"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-recent": {
-      "classes": [
-        "playground-recent",
-        "playground-recent--collapsed",
-        "playground-recent__body",
-        "playground-recent__collapse",
-        "playground-recent__empty",
-        "playground-recent__fade",
-        "playground-recent__group-label",
-        "playground-recent__header",
-        "playground-recent__item",
-        "playground-recent__item--active",
-        "playground-recent__item-wrapper",
-        "playground-recent__list",
-        "playground-recent__menu",
-        "playground-recent__menu-anchor",
-        "playground-recent__menu-backdrop",
-        "playground-recent__menu-item",
-        "playground-recent__more",
-        "playground-recent__new",
-        "playground-recent__new-icon",
-        "playground-recent__new-label",
-        "playground-recent__new-left",
-        "playground-recent__new-shortcut",
-        "playground-recent__prompt",
-        "playground-recent__title",
-        "playground-recent__toggle"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
-    "playground-summary": {
-      "classes": [
-        "playground-summary",
-        "playground-summary__best-cell",
-        "playground-summary__best-star",
-        "playground-summary__best-star--on",
-        "playground-summary__delta",
-        "playground-summary__provider",
-        "playground-summary__provider-icon",
-        "playground-summary__provider-name",
-        "playground-summary__row--best",
-        "playground-summary__row--clickable",
-        "playground-summary__table",
-        "playground-summary__title",
-        "playground-summary__value",
-        "playground-summary__winner-icon"
-      ],
-      "files": [
-        "playground.css"
-      ]
-    },
     "provider-auth-badge": {
       "classes": [
         "provider-auth-badge",
@@ -3417,7 +3249,6 @@
         "sr-only"
       ],
       "files": [
-        "playground.css",
         "skeleton.css"
       ]
     },
@@ -4639,9 +4470,6 @@
       "pages/MessageLog.tsx",
       "pages/Overview.tsx"
     ],
-    "playground.css": [
-      "pages/Playground.tsx"
-    ],
     "reliability-card.css": [
       "components/ReliabilityChart.tsx"
     ],
@@ -4675,7 +4503,6 @@
       "pages/GlobalOverview.tsx",
       "pages/MessageLog.tsx",
       "pages/Overview.tsx",
-      "pages/Playground.tsx",
       "pages/Routing.tsx",
       "pages/Welcome.tsx",
       "pages/providers/ConnectionDetail.tsx",
@@ -4691,18 +4518,19 @@
   "orphanStylesheets": [
     "agent-chart-tooltip.css",
     "filter-select.css",
-    "organization.css"
+    "organization.css",
+    "playground.css"
   ],
   "tokensOutsideSource": [],
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 281,
-    "classes": 1534,
+    "blocks": 273,
+    "classes": 1422,
     "canonicalRules": 47,
     "ghostRules": 47
   },
   "missingImports": [
-    "/Users/patrickbrandao/Projects/thinker/.claude/worktrees/agent-a1fef8f9eec32d4ed/packages/frontend/src/styles/canvas.css"
+    "/Users/patrickbrandao/Projects/thinker/packages/frontend/src/styles/canvas.css"
   ]
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@solidjs/testing-library';
+import { render, fireEvent } from '@testing-library/react';
 
 /* ── Mock ResizeObserver ─────────────────────────────────────── */
 
@@ -40,7 +40,7 @@ function setup(o: PropsOverride = {}) {
   const onSubmit = o.onSubmit ?? vi.fn();
   const onChange = o.onChange ?? vi.fn();
   const onRecallPrevious = o.onRecallPrevious ?? vi.fn();
-  const utils = render(() => (
+  const utils = render(
     <PlaygroundPrompt
       value={o.value ?? 'hello'}
       disabled={o.disabled ?? false}
@@ -51,12 +51,10 @@ function setup(o: PropsOverride = {}) {
       onHeightChange={o.onHeightChange}
       historyOpen={o.historyOpen}
       ref={o.ref}
-    />
-  ));
+    />,
+  );
   const textarea = utils.container.querySelector('textarea') as HTMLTextAreaElement;
-  const button = utils.container.querySelector(
-    '.playground-prompt__send'
-  ) as HTMLButtonElement;
+  const button = utils.container.querySelector('.playground-prompt__send') as HTMLButtonElement;
   return { ...utils, textarea, button, onSubmit, onChange, onRecallPrevious };
 }
 

@@ -609,9 +609,7 @@ describe('createPlaygroundStore', () => {
       store.setPrompt('hi');
 
       let resolveFirst: ((v: unknown) => void) | null = null;
-      streamPlaygroundMock.mockImplementationOnce(
-        () => new Promise((res) => (resolveFirst = res)),
-      );
+      streamPlaygroundMock.mockImplementationOnce(() => new Promise((res) => (resolveFirst = res)));
       streamPlaygroundMock.mockImplementationOnce(async () => okResult({ content: 'second' }));
 
       const colId = store.columns[0]!.id;
@@ -941,7 +939,7 @@ describe('createPlaygroundStore', () => {
       expect(c).not.toBe(a);
     });
 
-    it('returns a usable store (signals survive createRoot)', () => {
+    it('returns a usable store (state survives outside any component)', () => {
       const store = getOrCreatePlaygroundStore('agent-usable-test');
       store.setPrompt('persisted');
       expect(store.prompt()).toBe('persisted');
@@ -955,9 +953,7 @@ describe('createPlaygroundStore', () => {
       store.addColumn('openai/gpt-4o-mini', 'openai', 'api_key', 'A');
       store.setPrompt('hi');
       let resolveStream: ((v: unknown) => void) | null = null;
-      streamPlaygroundMock.mockImplementation(
-        () => new Promise((res) => (resolveStream = res)),
-      );
+      streamPlaygroundMock.mockImplementation(() => new Promise((res) => (resolveStream = res)));
       const p = store.runAll();
       await Promise.resolve();
       expect(store.isAnyRunning()).toBe(true);
