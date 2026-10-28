@@ -1,22 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@solidjs/testing-library';
+import { render } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
-let mockAgentName = 'test-agent';
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: mockAgentName }),
-  useLocation: () => ({ pathname: `/harnesses/${mockAgentName}`, state: null }),
-  useNavigate: () => vi.fn(),
-  A: (props: any) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
+function renderOverview() {
+  return render(
+    <MemoryRouter initialEntries={['/harnesses/test-agent']}>
+      <Routes>
+        <Route path="/harnesses/:agentName" element={<Overview />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const mockGetOverview = vi.fn();
 const mockGetOverviewDetails = vi.fn();
@@ -30,12 +24,25 @@ vi.mock('../../src/services/toast-store.js', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-vi.mock('../../src/services/sse.js', () => ({
-  pingCount: () => 0,
-  messagePing: () => 0,
-  analyticsPing: () => 0,
-  agentPing: () => 0,
-  routingPing: () => 0,
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return {
+    pingCount: signal(0),
+    messagePing: signal(0),
+    analyticsPing: signal(0),
+    agentPing: signal(0),
+    routingPing: signal(0),
+  };
+});
+
+// MessageTable belongs to the Requests area and has its own suite: stub it and
+// assert the rows the page hands it.
+const messageTableProps = vi.hoisted(() => ({ last: null as any }));
+vi.mock('../../src/components/MessageTable.jsx', () => ({
+  default: (props: any) => {
+    messageTableProps.last = props;
+    return <div data-testid="message-table" />;
+  },
 }));
 
 vi.mock('../../src/services/formatters.js', () => ({
@@ -116,7 +123,9 @@ vi.mock('../../src/components/Select.jsx', () => ({
       onChange={(e: any) => props.onChange(e.target.value)}
     >
       {props.options?.map((o: any) => (
-        <option value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   ),
@@ -162,8 +171,8 @@ describe('Overview - trend badges and status display', () => {
     vi.clearAllMocks();
     localStorage.clear();
     localStorage.setItem('thinker_global_group', 'provider');
-    mockAgentName = 'test-agent';
     mockGetOverviewDetails.mockResolvedValue({});
+    messageTableProps.last = null;
   });
 
   it('does not render trend badge when trend_pct is 0', async () => {
@@ -177,7 +186,7 @@ describe('Overview - trend badges and status display', () => {
       },
     };
     mockGetOverview.mockResolvedValue(zeroTrendData);
-    const { container } = render(() => <Overview />);
+    const { container } = renderOverview();
     await vi.waitFor(() => {
       expect(container.textContent).toContain('$3.50');
     });
@@ -185,7 +194,9 @@ describe('Overview - trend badges and status display', () => {
     expect(trendBadges.length).toBe(0);
   });
 
-  it('renders a provider rate_limited row as a plain error, not a limits-page link', async () => {
+  it('hands a provider rate_limited row to the table as a plain row', async () => {
+    // Rendering it as a binary "Failed" pill (no limits-page link) is the
+    // MessageTable suite's business; the page passes the row through as is.
     const rateLimitedData = {
       ...overviewData,
       recent_activity: [
@@ -207,20 +218,17 @@ describe('Overview - trend badges and status display', () => {
       recent_activity: rateLimitedData.recent_activity,
       cost_by_model: [],
     });
-    const { container } = render(() => <Overview />);
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      // Binary status: a provider rate limit is just a "Failed" pill now.
-      const badge = container.querySelector('.status-badge--error');
-      expect(badge).not.toBeNull();
-      expect(badge!.textContent).toContain('Failed');
+      expect(messageTableProps.last?.items?.[0]).toMatchObject({
+        id: 'msg-ratelimit1',
+        status: 'rate_limited',
+      });
     });
     expect(container.textContent).not.toContain('rate_limited');
-    // A provider rate limit is a plain error — it must not link to the Thinker
-    // spend-limits page (that page is for the user's own software limits).
-    expect(container.querySelector('.status-badge--error a')).toBeNull();
   });
 
-  it('renders routing tier badge when routing_tier is set', async () => {
+  it('hands the routing tier to the recent requests table', async () => {
     const routedData = {
       ...overviewData,
       recent_activity: [
@@ -235,11 +243,9 @@ describe('Overview - trend badges and status display', () => {
       recent_activity: routedData.recent_activity,
       cost_by_model: [],
     });
-    const { container } = render(() => <Overview />);
+    renderOverview();
     await vi.waitFor(() => {
-      const tierBadge = container.querySelector('.tier-badge--complex');
-      expect(tierBadge).not.toBeNull();
-      expect(tierBadge?.textContent).toBe('complex');
+      expect(messageTableProps.last?.items?.[0]).toMatchObject({ routing_tier: 'complex' });
     });
   });
 
@@ -247,31 +253,32 @@ describe('Overview - trend badges and status display', () => {
     // ProviderChartCard renders neutral trend badges (no inverted up-bad /
     // down-good styling).
     mockGetOverview.mockResolvedValue(overviewData);
-    const { container } = render(() => <Overview />);
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      const badges = Array.from(container.querySelectorAll('.trend--neutral'));
+      const badges = Array.from(container.querySelectorAll('.trend'));
       expect(badges.some((b) => b.textContent?.includes('-5%'))).toBe(true);
     });
   });
 
   it('renders the positive token trend badge on the chart card', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
-    const { container } = render(() => <Overview />);
+    const { container } = renderOverview();
     await vi.waitFor(() => {
-      const badges = Array.from(container.querySelectorAll('.trend--neutral'));
+      const badges = Array.from(container.querySelectorAll('.trend'));
       expect(badges.some((b) => b.textContent?.includes('+12%'))).toBe(true);
     });
   });
 
-  it('renders status-specific class on status badge', async () => {
+  it('prefers the details payload rows once they load', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
     mockGetOverviewDetails.mockResolvedValue({
-      recent_activity: overviewData.recent_activity,
+      recent_activity: [{ ...overviewData.recent_activity[0], id: 'msg-from-details' }],
       cost_by_model: [],
     });
-    const { container } = render(() => <Overview />);
+    renderOverview();
     await vi.waitFor(() => {
-      expect(container.querySelector('.status-badge--ok')).not.toBeNull();
+      expect(messageTableProps.last?.items?.[0]?.id).toBe('msg-from-details');
+      expect(messageTableProps.last?.items?.[0]?.status).toBe('ok');
     });
   });
 });

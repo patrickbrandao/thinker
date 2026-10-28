@@ -1,25 +1,16 @@
-import { Meta, Title } from '@solidjs/meta';
-import { A, useLocation, useNavigate, useParams } from '@solidjs/router';
-import {
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  on,
-  Show,
-  type Component,
-} from 'solid-js';
-import UnifiedChartCard from '../components/UnifiedChartCard.jsx';
-import ReliabilityKpiCards from '../components/ReliabilityKpiCards.jsx';
-
-import FilterSelect from '../components/FilterSelect.jsx';
-import { AGENT_COLORS } from '../components/MultiAgentTokenChart.jsx';
-import CostByModelTable from '../components/CostByModelTable.jsx';
-import ErrorState from '../components/ErrorState.jsx';
-import MessageTable from '../components/MessageTable.jsx';
-import OverviewSkeleton from '../components/OverviewSkeleton.jsx';
-import Select from '../components/Select.jsx';
-import SetupModal from '../components/SetupModal.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import UnifiedChartCard, { type ChartTab } from '../components/UnifiedChartCard.js';
+import ReliabilityKpiCards from '../components/ReliabilityKpiCards.js';
+import FilterSelect from '../components/FilterSelect.js';
+import { AGENT_COLORS } from '../components/MultiAgentTokenChart.js';
+import CostByModelTable from '../components/CostByModelTable.js';
+import ErrorState from '../components/ErrorState.js';
+import MessageTable from '../components/MessageTable.js';
+import OverviewSkeleton from '../components/OverviewSkeleton.js';
+import Select from '../components/Select.js';
+import SetupModal from '../components/SetupModal.js';
+import { Button, EmptyState, Panel } from '../components/ui.js';
 import { type MessageRow } from '../components/message-table-types.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
 import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
@@ -43,10 +34,9 @@ import {
   rangeOptions,
   useOverviewRange,
 } from '../services/use-overview-range.js';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
-import '../styles/overview.css';
-import '../styles/charts.css';
-import '../styles/routing.css';
 
 interface OverviewData {
   summary: {
@@ -106,208 +96,210 @@ type KeyedTimeseries = {
   timeseries: Array<Record<string, number | string>>;
 };
 
-type ProviderView = 'requests' | 'recovered' | 'cost' | 'tokens';
-type TimeseriesKey = { range: string; agent: string; _ping: number };
+/** A fetched value tagged with the scope (range + harness visit) it belongs to. */
+type Scoped<T> = { scope: object; data: T };
 
-const Overview: Component = () => {
+const SMART_RANGES = ['30d', '7d', '24h'];
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: the flag lasts for this page only.
+  }
+}
+
+function loadSavedProviders(key: string): Set<string> {
+  try {
+    const saved = sessionStorage.getItem(key);
+    if (saved) return new Set(JSON.parse(saved) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+function filterTs(raw: KeyedTimeseries | undefined, sel: Set<string>): KeyedTimeseries | undefined {
+  if (!raw) return undefined;
+  if (sel.size === 0) return raw;
+  return {
+    agents: raw.agents.filter((a) => sel.has(a)),
+    timeseries: raw.timeseries.map((row) => {
+      const out: Record<string, number | string> = {};
+      for (const [k, v] of Object.entries(row)) {
+        if (k === 'hour' || k === 'date' || sel.has(k)) out[k] = v;
+      }
+      return out;
+    }),
+  };
+}
+
+const providerDisplayName = (provId: string): string =>
+  PROVIDERS.find((p) => p.id === provId)?.name ?? provId;
+
+/** The Overview tab of a harness: reliability KPIs, the chart card, recent requests, model usage. */
+export default function Overview() {
   const params = useParams<{ agentName: string }>();
-  const location = useLocation<{ newApiKey?: string }>();
+  const agentName = safeDecode(params.agentName ?? '');
+  const location = useLocation();
   const navigate = useNavigate();
-  preloadModelDisplayNames();
+  const ping = useSignal(analyticsPing);
   const { columns } = useOverviewColumns();
+
+  useEffect(() => {
+    preloadModelDisplayNames();
+  }, []);
+
   // Only treat the stored value as a user selection when it is actually valid.
   // An invalid stored range falls through to the smart-range cascade.
-  const [userSelectedRange, setUserSelectedRange] = createSignal(
-    VALID_RANGES.has(localStorage.getItem(RANGE_STORAGE_KEY) ?? ''),
+  const [userSelectedRange, setUserSelectedRange] = useState(() =>
+    VALID_RANGES.has(readStorage(RANGE_STORAGE_KEY) ?? ''),
   );
   const { range, setRange, handleRangeChange } = useOverviewRange({
     markUserSelected: () => setUserSelectedRange(true),
   });
-  const [activeView, setActiveViewRaw] = createSignal<ProviderView>('requests');
-  const [tokenChartRequested, setTokenChartRequested] = createSignal(false);
-  const [costChartRequested, setCostChartRequested] = createSignal(false);
-  const setActiveView = (view: ProviderView) => {
+
+  const [activeView, setActiveViewRaw] = useState<ChartTab>('requests');
+  const [tokenChartRequested, setTokenChartRequested] = useState(false);
+  const [costChartRequested, setCostChartRequested] = useState(false);
+  const setActiveView = (view: ChartTab) => {
     if (view === 'tokens') setTokenChartRequested(true);
     if (view === 'cost') setCostChartRequested(true);
     setActiveViewRaw(view);
   };
+
   // Open gate keys off a persistent "setup pending" flag (localStorage) so the
   // modal reliably reopens after a page refresh until the user dismisses or
   // completes it; `isRecentlyCreated` is an in-session OR that need not survive
   // reloads. The completed/dismissed flags are the backstop against re-opening.
-  const [setupOpen, setSetupOpen] = createSignal(
-    (isSetupPending(decodeURIComponent(params.agentName)) ||
-      isRecentlyCreated(decodeURIComponent(params.agentName))) &&
-      !localStorage.getItem(`setup_completed_${params.agentName}`) &&
-      !localStorage.getItem(`setup_dismissed_${params.agentName}`),
+  const [setupOpen, setSetupOpen] = useState(
+    () =>
+      (isSetupPending(agentName) || isRecentlyCreated(agentName)) &&
+      !readStorage(`setup_completed_${agentName}`) &&
+      !readStorage(`setup_dismissed_${agentName}`),
   );
-  const [setupCompleted, setSetupCompleted] = createSignal(
-    !!localStorage.getItem(`setup_completed_${params.agentName}`),
+  const [setupCompleted, setSetupCompleted] = useState(
+    () => !!readStorage(`setup_completed_${agentName}`),
   );
 
-  // The memo's identity changes on every range/agent transition (including
-  // A → B → A) but stays stable across same-scope SSE refreshes.
-  const overviewScope = createMemo(() => ({
-    range: range(),
-    agentName: params.agentName,
-  }));
-  const [overviewResult, { refetch }] = createResource(
-    () => ({ scope: overviewScope(), _ping: analyticsPing() }),
-    async (p) => ({
-      scope: p.scope,
-      data: (await getOverview(p.scope.range, p.scope.agentName, true)) as OverviewData,
-    }),
-  );
-  const data = () => overviewResult()?.data;
-  const [overviewDetailsResult] = createResource(
-    () => {
-      const result = overviewResult();
-      if (!result || result.scope !== overviewScope()) return false;
-      return result.scope;
-    },
-    async (scope) => ({
+  // One token per range/agent visit: its identity changes on every transition
+  // (A → B → A included) but stays stable across same-scope SSE refreshes, so
+  // a result from an earlier visit never passes for the current one.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scope = useMemo(() => ({}), [range, agentName]);
+
+  // ── Critical overview ────────────────────────────────────────────────
+  // Refetches on range, agent and every SSE ping. The skeleton shows only
+  // while the visible data belongs to another range/agent — a background ping
+  // refetch updates in place instead.
+  const overviewRes = useResource(
+    async (): Promise<Scoped<OverviewData>> => ({
       scope,
-      data: (await getOverviewDetails(scope.range, scope.agentName)) as OverviewDetails,
+      data: (await getOverview(range, agentName, true)) as OverviewData,
     }),
+    [range, agentName, ping],
   );
-  const overviewDetails = () => {
-    const result = overviewDetailsResult();
-    return result?.scope === overviewScope() ? result.data : undefined;
-  };
+  const overviewMatches = overviewRes.data?.scope === scope;
+  const data = overviewMatches ? overviewRes.data!.data : undefined;
 
-  // The resource re-fetches on range, agent, and every SSE `_ping`. We only want
-  // the loading skeleton on a range change or agent switch — not on the frequent
-  // background ping refetches (which should update in place). Track the range
-  // and agent the visible data belongs to; while a newer range/agent is loading,
-  // treat it as a change that should show the skeleton instead of stale data.
-  const [loadedScope, setLoadedScope] = createSignal(overviewScope());
+  // Secondary details load once the critical overview for this scope is in.
+  const detailsRes = useResource(
+    async (): Promise<Scoped<OverviewDetails>> => ({
+      scope,
+      data: (await getOverviewDetails(range, agentName)) as OverviewDetails,
+    }),
+    [scope, overviewMatches],
+    { enabled: overviewMatches },
+  );
+  const overviewDetails = detailsRes.data?.scope === scope ? detailsRes.data.data : undefined;
 
-  const showDashboard = () => {
-    const d = data();
-    return !!d && (d.has_data !== false || d.has_providers === true);
-  };
+  const showDashboard = !!data && (data.has_data !== false || data.has_providers === true);
+  const showEmptyState = !!data && data.has_data === false && !data.has_providers;
 
-  const showEmptyState = () => {
-    const d = data();
-    return !!d && d.has_data === false && !d.has_providers;
-  };
-
-  createEffect(() => {
-    if (
-      showEmptyState() &&
-      !setupCompleted() &&
-      !localStorage.getItem(`setup_dismissed_${params.agentName}`)
-    ) {
+  useEffect(() => {
+    if (showEmptyState && !setupCompleted && !readStorage(`setup_dismissed_${agentName}`)) {
       setSetupOpen(true);
     }
-  });
-
-  const SMART_RANGES: string[] = ['30d', '7d', '24h'];
+  }, [showEmptyState, setupCompleted, agentName]);
 
   // Step the chart range down to the next bucket while it has no data, but only
-  // after a fetch resolves — `defer: true` skips the no-op run at mount where
-  // `data()` is still undefined. Both `data` and `range` are tracked so the
-  // cascade keeps re-firing as it steps 30d → 7d → 24h.
-  createEffect(
-    on(
-      [data, range],
-      ([d, currentRange]) => {
-        if (userSelectedRange()) return;
-        if (!d || (d.has_data === false && !d.has_providers)) return;
-        const hasData =
-          (d.token_usage?.length ?? 0) > 0 ||
-          (d.cost_usage?.length ?? 0) > 0 ||
-          (d.message_usage?.length ?? 0) > 0;
-        if (hasData) return;
-        const currentIdx = SMART_RANGES.indexOf(currentRange);
-        if (currentIdx < 0 || currentIdx >= SMART_RANGES.length - 1) return;
-        setRange(SMART_RANGES[currentIdx + 1]!);
-      },
-      { defer: true },
-    ),
-  );
+  // once a fetch for the current range resolved. Both `data` and `range` are
+  // tracked so the cascade keeps re-firing as it steps 30d → 7d → 24h.
+  useEffect(() => {
+    if (userSelectedRange) return;
+    if (!data || (data.has_data === false && !data.has_providers)) return;
+    const hasData =
+      (data.token_usage?.length ?? 0) > 0 ||
+      (data.cost_usage?.length ?? 0) > 0 ||
+      (data.message_usage?.length ?? 0) > 0;
+    if (hasData) return;
+    const currentIdx = SMART_RANGES.indexOf(range);
+    if (currentIdx < 0 || currentIdx >= SMART_RANGES.length - 1) return;
+    setRange(SMART_RANGES[currentIdx + 1]!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, range]);
 
   // ── Provider breakdown (per-agent, grouped by provider) ─────────────
-  const providerFilterKey = () => `agent-overview-providers:${params.agentName}`;
-  const loadSavedProviders = (): Set<string> => {
-    try {
-      const saved = sessionStorage.getItem(providerFilterKey());
-      if (saved) return new Set(JSON.parse(saved) as string[]);
-    } catch {
-      /* ignore */
-    }
-    return new Set();
-  };
-  const [selectedProviders, setSelectedProviders] = createSignal<Set<string>>(loadSavedProviders());
+  const providerFilterKey = `agent-overview-providers:${agentName}`;
+  const [selectedProviders, setSelectedProviders] = useState<Set<string>>(() =>
+    loadSavedProviders(providerFilterKey),
+  );
+  useEffect(() => {
+    setSelectedProviders(loadSavedProviders(providerFilterKey));
+  }, [providerFilterKey]);
 
-  const tsKey = (): TimeseriesKey => ({
-    range: range(),
-    agent: params.agentName,
-    _ping: analyticsPing(),
-  });
-  const [providerTokenTs] = createResource(
-    () => (tokenChartRequested() ? tsKey() : false),
-    (p) => getPerProviderTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
+  const providerTokenTs = useResource(
+    () => getPerProviderTimeseries(agentName, range) as Promise<KeyedTimeseries>,
+    [agentName, range, ping],
+    { enabled: tokenChartRequested },
   );
-  const [providerMessageTs] = createResource(
-    () => tsKey(),
-    (p) => getPerProviderMessageTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
+  const providerMessageTs = useResource(
+    () => getPerProviderMessageTimeseries(agentName, range) as Promise<KeyedTimeseries>,
+    [agentName, range, ping],
   );
-  const [providerCostTs] = createResource(
-    () => (costChartRequested() ? tsKey() : false),
-    (p) => getPerProviderCostTimeseries(p.agent, p.range) as Promise<KeyedTimeseries>,
+  const providerCostTs = useResource(
+    () => getPerProviderCostTimeseries(agentName, range) as Promise<KeyedTimeseries>,
+    [agentName, range, ping],
+    { enabled: costChartRequested },
   );
 
-  // ── Reliability resources ─────────────────────────────
-  const reliabilityScope = createMemo(() => ({
-    range: range(),
-    agent: decodeURIComponent(params.agentName),
-  }));
-  const [reliabilityStatsResult] = createResource(
-    () => ({ scope: reliabilityScope(), _ping: analyticsPing() }),
-    async (p) => ({
-      scope: p.scope,
-      data: await getReliabilityStats(p.scope.range, p.scope.agent),
-    }),
+  // ── Reliability ──────────────────────────────────────────────────────
+  const reliabilityRes = useResource(
+    async () => ({ scope, data: await getReliabilityStats(range, agentName) }),
+    [range, agentName, ping],
   );
-  const currentReliabilityStats = () => {
-    const result = reliabilityStatsResult();
-    return result?.scope === reliabilityScope() ? result.data : undefined;
-  };
+  const reliabilityStats =
+    reliabilityRes.data?.scope === scope ? reliabilityRes.data.data : undefined;
   // Request-status timeseries: the Requests chart's ONLY view on this page (an
   // agent is the harness, and a request may touch several providers, so no
   // other grouping is meaningful) + the Recovered requests tab subset.
-  const [statusTimeseries] = createResource(
-    () => ({
-      range: range(),
-      agent: decodeURIComponent(params.agentName),
-      _ping: analyticsPing(),
-    }),
-    (p) => getRequestStatusTimeseries(p.range, p.agent),
+  const statusTs = useResource(
+    () => getRequestStatusTimeseries(range, agentName),
+    [range, agentName, ping],
   );
-  const [modelReliability] = createResource(
-    () => ({
-      range: range(),
-      agent: decodeURIComponent(params.agentName),
-      _ping: analyticsPing(),
-    }),
-    (p) => getPerModelReliability(p.range, p.agent),
+  const modelReliability = useResource(
+    () => getPerModelReliability(range, agentName),
+    [range, agentName, ping],
   );
 
-  createEffect(() => {
-    if (overviewResult.loading) return;
-    if (overviewResult.error === undefined) {
-      const result = overviewResult();
-      if (result === undefined || result.scope !== overviewScope()) return;
-      setLoadedScope(result.scope);
-      return;
-    }
-    setLoadedScope(overviewScope());
-  });
-  const scopeChanging = () => loadedScope() !== overviewScope();
-
-  const recoveredTs = () => {
-    const ts = statusTimeseries();
+  const recoveredTs = useMemo(() => {
+    const ts = statusTs.data;
     if (!ts) return undefined;
     const picked = ts.keys.map((k, i) => ({ k, i })).filter(({ k }) => k === 'fallback');
     return {
@@ -318,289 +310,236 @@ const Overview: Component = () => {
         counts: picked.map(({ i }) => b.counts[i] ?? 0),
       })),
     };
-  };
+  }, [statusTs.data]);
 
-  const allProviders = createMemo(() => {
+  const allProviders = useMemo(() => {
     const set = new Set<string>([
-      ...(providerTokenTs()?.agents ?? []),
-      ...(providerMessageTs()?.agents ?? []),
-      ...(providerCostTs()?.agents ?? []),
+      ...(providerTokenTs.data?.agents ?? []),
+      ...(providerMessageTs.data?.agents ?? []),
+      ...(providerCostTs.data?.agents ?? []),
     ]);
     return [...set].sort();
-  });
+  }, [providerTokenTs.data, providerMessageTs.data, providerCostTs.data]);
 
-  const providerColorMap = createMemo(() => {
+  const providerColorMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const list = allProviders();
-    for (let i = 0; i < list.length; i++) map[list[i]!] = AGENT_COLORS[i % AGENT_COLORS.length]!;
+    allProviders.forEach((p, i) => {
+      map[p] = AGENT_COLORS[i % AGENT_COLORS.length]!;
+    });
     return map;
-  });
+  }, [allProviders]);
 
-  const effectiveSelected = () => {
-    const sel = selectedProviders();
-    if (sel.size === 0 && allProviders().length > 0) return new Set(allProviders());
-    return sel;
-  };
+  const effectiveSelected = useMemo(
+    () =>
+      selectedProviders.size === 0 && allProviders.length > 0
+        ? new Set(allProviders)
+        : selectedProviders,
+    [selectedProviders, allProviders],
+  );
   const persistProviders = (next: Set<string>) => {
     setSelectedProviders(next);
     try {
-      sessionStorage.setItem(providerFilterKey(), JSON.stringify([...next]));
+      sessionStorage.setItem(providerFilterKey, JSON.stringify([...next]));
     } catch {
       /* ignore */
     }
   };
   const toggleProvider = (provider: string) => {
-    const next = new Set(effectiveSelected());
+    const next = new Set(effectiveSelected);
     if (next.has(provider)) next.delete(provider);
     else next.add(provider);
     persistProviders(next);
   };
   const setAllProviders = (on: boolean) =>
-    persistProviders(on ? new Set(allProviders()) : new Set<string>());
+    persistProviders(on ? new Set(allProviders) : new Set<string>());
 
-  const filterTs = (raw: KeyedTimeseries | undefined): KeyedTimeseries | undefined => {
-    if (!raw) return undefined;
-    const sel = effectiveSelected();
-    if (sel.size === 0) return raw;
-    return {
-      agents: raw.agents.filter((a) => sel.has(a)),
-      timeseries: raw.timeseries.map((row) => {
-        const out: Record<string, number | string> = {};
-        for (const [k, v] of Object.entries(row)) {
-          if (k === 'hour' || k === 'date' || sel.has(k)) out[k] = v;
-        }
-        return out;
-      }),
-    };
+  // Memoized so the charts see a new array only when the series really change.
+  const filteredTokenTs = useMemo(
+    () => filterTs(providerTokenTs.data, effectiveSelected),
+    [providerTokenTs.data, effectiveSelected],
+  );
+  const filteredCostTs = useMemo(
+    () => filterTs(providerCostTs.data, effectiveSelected),
+    [providerCostTs.data, effectiveSelected],
+  );
+
+  const recoveredTrendPct = (() => {
+    const s = reliabilityStats;
+    if (!s) return 0;
+    const cur = s.fallback_saves?.value ?? 0;
+    const prev = s.fallback_saves?.previous ?? 0;
+    if (prev === 0) return 0;
+    return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
+  })();
+
+  const encodedAgent = encodeURIComponent(agentName);
+  const goToRouting = () =>
+    navigate(`/harnesses/${encodedAgent}/routing`, { state: { openProviders: true } });
+  const name = agentDisplayName() ?? agentName;
+  const newApiKey = (location.state as { newApiKey?: string } | null)?.newApiKey ?? null;
+
+  const content = () => {
+    if (overviewRes.error && !overviewRes.loading) {
+      return <ErrorState error={overviewRes.error} onRetry={() => void overviewRes.reload()} />;
+    }
+    if (!data) return <OverviewSkeleton />;
+    if (showEmptyState) {
+      return (
+        <Panel>
+          <EmptyState
+            title={t('overview.empty.noActivity')}
+            description={
+              setupCompleted ? t('overview.empty.agentConnect') : t('overview.empty.agentSetup')
+            }
+            action={
+              <>
+                {setupCompleted ? (
+                  <Button size="sm" className="mt-2" onClick={goToRouting}>
+                    {t('overview.empty.connectProvider')}
+                  </Button>
+                ) : (
+                  <Button size="sm" className="mt-2" onClick={() => setSetupOpen(true)}>
+                    {t('overview.empty.setupHarness')}
+                  </Button>
+                )}
+                <img
+                  src="/example-overview.svg"
+                  alt={t('overview.empty.exampleAlt')}
+                  className="mt-4 w-full max-w-2xl opacity-60"
+                  loading="lazy"
+                />
+              </>
+            }
+          />
+        </Panel>
+      );
+    }
+    if (!showDashboard) return null;
+
+    const recent =
+      overviewDetails?.recent_activity?.slice(0, 5) ?? data.recent_activity?.slice(0, 5) ?? [];
+    return (
+      <>
+        {data.has_data === false ? (
+          <div className="waiting-banner notice is-info">
+            <p>{t('overview.empty.waiting')}</p>
+          </div>
+        ) : null}
+
+        <ReliabilityKpiCards stats={reliabilityStats} agentName={agentName} range={range} />
+
+        <UnifiedChartCard
+          activeTab={activeView}
+          onTabChange={setActiveView}
+          requestsValue={data.summary?.messages?.value ?? 0}
+          requestsTrendPct={data.summary?.messages?.trend_pct ?? 0}
+          recoveredValue={reliabilityStats?.fallback_saves?.value ?? 0}
+          recoveredTrendPct={recoveredTrendPct}
+          recoveredTimeseries={recoveredTs}
+          costValue={data.summary?.cost_today?.value ?? 0}
+          costTrendPct={data.summary?.cost_today?.trend_pct ?? 0}
+          costInfoTooltip={t('overview.costInfo')}
+          tokensValue={data.summary?.tokens_today?.value ?? 0}
+          tokensTrendPct={data.summary?.tokens_today?.trend_pct ?? 0}
+          range={range}
+          requestStatusTimeseries={statusTs.data}
+          agentTimeseries={filteredTokenTs}
+          agentCostTimeseries={filteredCostTs}
+          colorMap={providerColorMap}
+          seriesFilters={
+            activeView !== 'requests' && allProviders.length > 1 ? (
+              <FilterSelect
+                noun={t('overview.nounProviders')}
+                items={allProviders}
+                selected={effectiveSelected}
+                colorMap={providerColorMap}
+                displayName={providerDisplayName}
+                onToggle={toggleProvider}
+                onSelectAll={() => setAllProviders(true)}
+                onUnselectAll={() => setAllProviders(false)}
+              />
+            ) : undefined
+          }
+        />
+
+        {/* "Error classes by frequency" stays unmounted until the backend has
+            real error_class data (preservation spec). */}
+
+        <Panel
+          title={t('overview.recentRequests')}
+          actions={
+            <Link
+              to={`/harnesses/${encodedAgent}/messages`}
+              className="view-more-link link-action text-sm"
+            >
+              {t('overview.viewMore')}
+            </Link>
+          }
+          bodyClassName="p-0"
+        >
+          <MessageTable
+            items={recent}
+            columns={columns}
+            agentName={agentName}
+            customProviderName={() => undefined}
+            // No inline accordion here: a click lands on the Requests page
+            // with the request opened in the side panel. (`expandable` keeps
+            // the rows clickable; `onRowSelect` switches them to drawer mode.)
+            expandable
+            onRowSelect={(id: string) =>
+              navigate(`/harnesses/${encodedAgent}/messages?request=${id}`)
+            }
+          />
+        </Panel>
+
+        <CostByModelTable
+          rows={overviewDetails?.cost_by_model ?? data.cost_by_model ?? []}
+          reliability={modelReliability.data}
+        />
+      </>
+    );
   };
-  const filteredTokenTs = createMemo(() => filterTs(providerTokenTs()));
-  const filteredMessageTs = createMemo(() => filterTs(providerMessageTs()));
-  const filteredCostTs = createMemo(() => filterTs(providerCostTs()));
-
-  const providerDisplayName = (provId: string): string =>
-    PROVIDERS.find((p) => p.id === provId)?.name ?? provId;
 
   return (
-    <div class="container--lg">
-      <Title>
-        {t('overview.agentPageTitle', {
-          name: agentDisplayName() ?? decodeURIComponent(params.agentName),
-        })}
-      </Title>
-      <Meta
-        name="description"
-        content={t('overview.agentMetaDescription', {
-          name: agentDisplayName() ?? decodeURIComponent(params.agentName),
-        })}
-      />
-      <div
-        class="page-header"
-        style="justify-content: flex-end; border-bottom: none; padding-bottom: 0;"
-      >
-        <div class="header-controls">
-          <Show when={showDashboard()}>
-            <Select value={range()} onChange={handleRangeChange} options={rangeOptions()} />
-          </Show>
-          <Show when={showEmptyState() && !setupCompleted()}>
-            <button class="btn btn--primary btn--sm" onClick={() => setSetupOpen(true)}>
+    <div className="flex flex-col gap-4">
+      <title>{t('overview.agentPageTitle', { name })}</title>
+      <meta name="description" content={t('overview.agentMetaDescription', { name })} />
+
+      {showDashboard || (showEmptyState && !setupCompleted) ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {showDashboard ? (
+            <div className="w-44">
+              <Select value={range} onChange={handleRangeChange} options={rangeOptions()} />
+            </div>
+          ) : null}
+          {showEmptyState && !setupCompleted ? (
+            <Button size="sm" onClick={() => setSetupOpen(true)}>
               {t('overview.empty.setupHarness')}
-            </button>
-          </Show>
+            </Button>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <Show
-        when={(data() !== undefined || !overviewResult.loading) && !scopeChanging()}
-        fallback={<OverviewSkeleton />}
-      >
-        <Show
-          when={!overviewResult.error}
-          fallback={<ErrorState error={overviewResult.error} onRetry={refetch} />}
-        >
-          <Show when={showEmptyState()}>
-            <Show
-              when={setupCompleted()}
-              fallback={
-                <div class="empty-state">
-                  <div class="empty-state__title">{t('overview.empty.noActivity')}</div>
-                  <p>{t('overview.empty.agentSetup')}</p>
-                  <button
-                    class="btn btn--primary btn--sm"
-                    style="margin-top: var(--gap-md);"
-                    onClick={() => setSetupOpen(true)}
-                  >
-                    {t('overview.empty.setupHarness')}
-                  </button>
-                  <div class="empty-state__img-wrapper">
-                    <img
-                      src="/example-overview.svg"
-                      alt={t('overview.empty.exampleAlt')}
-                      class="empty-state__img"
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              }
-            >
-              <div class="empty-state">
-                <div class="empty-state__title">{t('overview.empty.noActivity')}</div>
-                <p>{t('overview.empty.agentConnect')}</p>
-                <button
-                  class="btn btn--primary btn--sm"
-                  style="margin-top: var(--gap-md);"
-                  onClick={() =>
-                    navigate(`/harnesses/${encodeURIComponent(params.agentName)}/routing`, {
-                      state: { openProviders: true },
-                    })
-                  }
-                >
-                  {t('overview.empty.connectProvider')}
-                </button>
-                <div class="empty-state__img-wrapper">
-                  <img
-                    src="/example-overview.svg"
-                    alt={t('overview.empty.exampleAlt')}
-                    class="empty-state__img"
-                    loading="lazy"
-                  />
-                </div>
-              </div>
-            </Show>
-          </Show>
-          <Show when={showDashboard()}>
-            {(_summary) => {
-              const d = () => data() as OverviewData;
-              return (
-                <>
-                  <Show when={d().has_data === false}>
-                    <div class="waiting-banner">
-                      <i class="bxd bx-florist" />
-                      <p>{t('overview.empty.waiting')}</p>
-                    </div>
-                  </Show>
-                  <ReliabilityKpiCards
-                    stats={currentReliabilityStats()}
-                    agentName={decodeURIComponent(params.agentName)}
-                    range={range()}
-                  />
-                  {(() => {
-                    return (
-                      <UnifiedChartCard
-                        activeTab={activeView()}
-                        onTabChange={setActiveView}
-                        requestsValue={d().summary?.messages?.value ?? 0}
-                        requestsTrendPct={d().summary?.messages?.trend_pct ?? 0}
-                        recoveredValue={currentReliabilityStats()?.fallback_saves?.value ?? 0}
-                        recoveredTrendPct={(() => {
-                          const s = currentReliabilityStats();
-                          if (!s) return 0;
-                          const cur = s.fallback_saves?.value ?? 0;
-                          const prev = s.fallback_saves?.previous ?? 0;
-                          if (prev === 0) return 0;
-                          return Math.max(
-                            -999,
-                            Math.min(999, Math.round(((cur - prev) / prev) * 100)),
-                          );
-                        })()}
-                        recoveredTimeseries={recoveredTs()}
-                        costValue={d().summary?.cost_today?.value ?? 0}
-                        costTrendPct={d().summary?.cost_today?.trend_pct ?? 0}
-                        costInfoTooltip={t('overview.costInfo')}
-                        tokensValue={d().summary?.tokens_today?.value ?? 0}
-                        tokensTrendPct={d().summary?.tokens_today?.trend_pct ?? 0}
-                        range={range()}
-                        requestStatusTimeseries={statusTimeseries()}
-                        agentTimeseries={filteredTokenTs() ?? undefined}
-                        agentCostTimeseries={filteredCostTs() ?? undefined}
-                        colorMap={providerColorMap()}
-                        seriesFilters={
-                          <Show when={activeView() !== 'requests' && allProviders().length > 1}>
-                            <FilterSelect
-                              noun={t('overview.nounProviders')}
-                              items={allProviders()}
-                              selected={effectiveSelected()}
-                              colorMap={providerColorMap()}
-                              displayName={providerDisplayName}
-                              onToggle={toggleProvider}
-                              onSelectAll={() => setAllProviders(true)}
-                              onUnselectAll={() => setAllProviders(false)}
-                            />
-                          </Show>
-                        }
-                      />
-                    );
-                  })()}
-
-                  {/* "Error classes by frequency" stays unmounted until the
-                      backend has real error_class data (preservation spec). */}
-
-                  {/* Recent Requests */}
-                  <div class="panel">
-                    <div
-                      class="panel__title"
-                      style="display: flex; justify-content: space-between; align-items: center;"
-                    >
-                      {t('overview.recentRequests')}
-                      <A href={`/harnesses/${params.agentName}/messages`} class="view-more-link">
-                        {t('overview.viewMore')}
-                      </A>
-                    </div>
-                    <MessageTable
-                      items={
-                        overviewDetails()?.recent_activity?.slice(0, 5) ??
-                        d().recent_activity?.slice(0, 5) ??
-                        []
-                      }
-                      columns={columns()}
-                      agentName={params.agentName}
-                      customProviderName={() => undefined}
-                      // No inline accordion here: a click lands on the Requests
-                      // page with the request opened in the side panel.
-                      // (`expandable` keeps the rows clickable; `onRowSelect`
-                      // switches them to drawer mode, which we point at the
-                      // Requests page.)
-                      expandable
-                      onRowSelect={(id) =>
-                        navigate(`/harnesses/${params.agentName}/messages?request=${id}`)
-                      }
-                    />
-                  </div>
-
-                  <CostByModelTable
-                    rows={overviewDetails()?.cost_by_model ?? d().cost_by_model ?? []}
-                    reliability={modelReliability()}
-                  />
-                </>
-              );
-            }}
-          </Show>
-        </Show>
-      </Show>
+      {content()}
 
       <SetupModal
-        open={setupOpen()}
-        agentName={decodeURIComponent(params.agentName)}
-        apiKey={(location.state as { newApiKey?: string } | undefined)?.newApiKey ?? null}
+        open={setupOpen}
+        agentName={agentName}
+        apiKey={newApiKey}
         agentPlatform={agentPlatform()}
         agentCategory={agentCategory()}
         onClose={() => {
-          localStorage.setItem(`setup_dismissed_${params.agentName}`, '1');
-          clearSetupPending(decodeURIComponent(params.agentName));
+          writeStorage(`setup_dismissed_${agentName}`, '1');
+          clearSetupPending(agentName);
           setSetupOpen(false);
         }}
         onDone={() => {
-          localStorage.setItem(`setup_completed_${params.agentName}`, '1');
-          clearSetupPending(decodeURIComponent(params.agentName));
+          writeStorage(`setup_completed_${agentName}`, '1');
+          clearSetupPending(agentName);
           setSetupCompleted(true);
         }}
-        onGoToRouting={() => {
-          navigate(`/harnesses/${encodeURIComponent(params.agentName)}/routing`, {
-            state: { openProviders: true },
-          });
-        }}
+        onGoToRouting={goToRouting}
       />
     </div>
   );
-};
-
-export default Overview;
+}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@solidjs/testing-library';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 /**
  * Targeted coverage for GlobalOverview's harness/provider multi-select
@@ -36,16 +37,8 @@ let filterSelectProps: {
 } | null = null;
 let providerChartProps: Record<string, unknown> | null = null;
 
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children}</title>,
-}));
-
-vi.mock('@solidjs/router', () => ({
-  A: (props: { href: string; children: unknown; class?: string }) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => apiMocks.navigate,
 }));
 
@@ -123,7 +116,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => ({
+    useSession: () => ({
       data: { user: { id: 'u1', name: 'Test User', email: 'test@test.com' } },
       isPending: false,
     }),
@@ -167,7 +160,7 @@ vi.mock('../../src/components/Select.jsx', () => ({
   }) => (
     <select value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)}>
       {props.options.map((option) => (
-        <option value={option.value} disabled={option.disabled}>
+        <option key={option.value} value={option.value} disabled={option.disabled}>
           {option.description ? `${option.label} · ${option.description}` : option.label}
         </option>
       ))}
@@ -198,6 +191,11 @@ vi.mock('../../src/components/FilterSelect.jsx', () => ({
   },
 }));
 
+// MessageTable belongs to the Requests area (own suite): a stub is enough here.
+vi.mock('../../src/components/MessageTable.jsx', () => ({
+  default: () => <div data-testid="message-table" />,
+}));
+
 vi.mock('../../src/components/AddAgentModal.jsx', () => ({
   default: () => null,
 }));
@@ -212,20 +210,21 @@ vi.mock('../../src/components/GlobalOverviewSkeleton.jsx', () => ({
 }));
 
 vi.mock('../../src/services/sse.js', async () => {
-  const { createSignal } = await vi.importActual<typeof import('solid-js')>('solid-js');
-  const [agentPing, setAgentPing] = createSignal(0);
-  const [analyticsPing, setAnalyticsPing] = createSignal(0);
-  const [routingPing, setRoutingPing] = createSignal(0);
-  const [messagePing, setMessagePing] = createSignal(0);
-  sseMocks.bumpAgent = () => setAgentPing((n) => n + 1);
-  sseMocks.bumpAnalytics = () => setAnalyticsPing((n) => n + 1);
-  sseMocks.bumpRouting = () => setRoutingPing((n) => n + 1);
-  sseMocks.bumpMessage = () => setMessagePing((n) => n + 1);
+  const { signal } = await import('../../src/lib/signal');
+  const agentPing = signal(0);
+  const analyticsPing = signal(0);
+  const routingPing = signal(0);
+  const messagePing = signal(0);
+  const bump = (sig: typeof agentPing) => () => act(() => sig.set((n) => n + 1));
+  sseMocks.bumpAgent = bump(agentPing);
+  sseMocks.bumpAnalytics = bump(analyticsPing);
+  sseMocks.bumpRouting = bump(routingPing);
+  sseMocks.bumpMessage = bump(messagePing);
   sseMocks.reset = () => {
-    setAgentPing(0);
-    setAnalyticsPing(0);
-    setRoutingPing(0);
-    setMessagePing(0);
+    agentPing.set(0);
+    analyticsPing.set(0);
+    routingPing.set(0);
+    messagePing.set(0);
   };
   return { agentPing, analyticsPing, messagePing, routingPing };
 });
@@ -255,6 +254,14 @@ vi.mock('thinker-shared', () => ({
 }));
 
 import GlobalOverview from '../../src/pages/GlobalOverview';
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <GlobalOverview />
+    </MemoryRouter>,
+  );
+}
 
 const overviewResponse = {
   summary: {
@@ -346,7 +353,7 @@ afterEach(() => {
 
 describe('GlobalOverview filter onUnselectAll', () => {
   it('refetches global usage data when an analytics SSE ping lands', async () => {
-    render(() => <GlobalOverview />);
+    renderPage();
 
     await waitFor(() => expect(apiMocks.getOverview).toHaveBeenCalledTimes(1));
     expect(apiMocks.getAgents).toHaveBeenCalledTimes(1);
@@ -370,7 +377,7 @@ describe('GlobalOverview filter onUnselectAll', () => {
   });
 
   it('refetches only Recent Requests when a message SSE ping lands', async () => {
-    render(() => <GlobalOverview />);
+    renderPage();
     await waitFor(() => expect(apiMocks.getRecentRequests).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledTimes(1));
 
@@ -383,14 +390,14 @@ describe('GlobalOverview filter onUnselectAll', () => {
 
   it('loads Recent Requests and Model usage without waiting for the overview', async () => {
     apiMocks.getOverview.mockReturnValue(new Promise(() => {}));
-    render(() => <GlobalOverview />);
+    renderPage();
 
     await waitFor(() => expect(apiMocks.getRecentRequests).toHaveBeenCalledWith('7d'));
     await waitFor(() => expect(apiMocks.getModelUsage).toHaveBeenCalledWith('7d'));
   });
 
   it('shows the skeleton on a range change but not on a background ping refetch', async () => {
-    const { container, queryByTestId } = render(() => <GlobalOverview />);
+    const { container, queryByTestId } = renderPage();
 
     // Wait for the initial load to paint the dashboard (skeleton gone).
     await waitFor(() => expect(container.querySelector('.chart-card')).not.toBeNull());
@@ -407,13 +414,12 @@ describe('GlobalOverview filter onUnselectAll', () => {
     const rangeSelect = [...container.querySelectorAll('select')].find((s) =>
       [...s.options].some((o) => o.value === '365d'),
     ) as HTMLSelectElement;
-    rangeSelect.value = '24h';
-    fireEvent.change(rangeSelect);
+    fireEvent.change(rangeSelect, { target: { value: '24h' } });
     await waitFor(() => expect(queryByTestId('global-overview-skeleton')).not.toBeNull());
   });
 
   it('links the harness total-requests count to the agent-scoped Requests log', async () => {
-    const { container } = render(() => <GlobalOverview />);
+    const { container } = renderPage();
     await waitFor(() => {
       const link = [...container.querySelectorAll('a')].find(
         (a) => a.getAttribute('href') === '/messages?agent=demo-agent&range=7d',
@@ -423,7 +429,7 @@ describe('GlobalOverview filter onUnselectAll', () => {
   });
 
   it('links the recovered-requests count to the scoped Requests log', async () => {
-    const { container } = render(() => <GlobalOverview />);
+    const { container } = renderPage();
     const href = '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback';
     const link = await waitFor(() => {
       const found = [...container.querySelectorAll('a')].find(
@@ -439,7 +445,7 @@ describe('GlobalOverview filter onUnselectAll', () => {
   });
 
   it('links the connection failed-attempts count to the scoped Requests log', async () => {
-    const { container } = render(() => <GlobalOverview />);
+    const { container } = renderPage();
     await waitFor(() => {
       const link = [...container.querySelectorAll('a')].find((a) =>
         a.getAttribute('href')?.includes('attempts=has_failed'),

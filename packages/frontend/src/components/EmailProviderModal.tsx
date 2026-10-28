@@ -1,10 +1,10 @@
-import { createSignal, createEffect, Show, type Component } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { setEmailProvider, testEmailProvider, testSavedEmailProvider } from '../services/api.js';
 import { authClient } from '../services/auth-client.js';
 import { getEmailProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
+import { Button, Modal, cx } from './ui.js';
 
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
@@ -13,6 +13,11 @@ const PROVIDER_NAMES: Record<string, string> = {
   mailgun: 'Mailgun',
   sendgrid: 'SendGrid',
 };
+
+const PROVIDER_ORDER = ['resend', 'mailgun', 'sendgrid'] as const;
+
+/** Masks the key like a password field while keeping autocomplete off. */
+const MASKED_INPUT_STYLE = { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as CSSProperties;
 
 interface Props {
   open: boolean;
@@ -25,50 +30,65 @@ interface Props {
   onSaved: () => void;
 }
 
-const EmailProviderModal: Component<Props> = (props) => {
-  const [provider, setProvider] = createSignal('resend');
-  const [apiKey, setApiKey] = createSignal('');
-  const [domain, setDomain] = createSignal('');
-  const [notificationEmail, setNotificationEmail] = createSignal('');
-  const [saving, setSaving] = createSignal(false);
-  const [testing, setTesting] = createSignal(false);
-  const [keyError, setKeyError] = createSignal('');
-  const [domainError, setDomainError] = createSignal('');
-  const [editingKey, setEditingKey] = createSignal(false);
-
+export default function EmailProviderModal(props: Props) {
+  const {
+    open,
+    initialProvider,
+    editMode,
+    existingKeyPrefix,
+    existingDomain,
+    existingNotificationEmail,
+    onClose,
+    onSaved,
+  } = props;
   const session = authClient.useSession();
+  const sessionEmail = session.data?.user?.email ?? null;
 
-  const hasExistingKey = () =>
-    props.editMode && !!props.existingKeyPrefix && provider() === props.initialProvider;
+  const [provider, setProvider] = useState(initialProvider);
+  const [apiKey, setApiKey] = useState('');
+  const [domain, setDomain] = useState(existingDomain ?? '');
+  const [notificationEmail, setNotificationEmail] = useState(
+    existingNotificationEmail ?? sessionEmail ?? '',
+  );
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [keyError, setKeyError] = useState('');
+  const [domainError, setDomainError] = useState('');
+  const [editingKey, setEditingKey] = useState(!(editMode && !!existingKeyPrefix));
 
-  const maskedKey = () => {
-    const prefix = props.existingKeyPrefix ?? '';
-    return prefix + '••••••••';
-  };
+  // Opening the modal (or new saved values arriving while open) resets the form.
+  useEffect(() => {
+    if (!open) return;
+    setProvider(initialProvider);
+    setApiKey('');
+    setEditingKey(!(editMode && !!existingKeyPrefix));
+    setDomain(existingDomain ?? '');
+    setNotificationEmail(existingNotificationEmail ?? sessionEmail ?? '');
+    setKeyError('');
+    setDomainError('');
+  }, [
+    open,
+    initialProvider,
+    editMode,
+    existingKeyPrefix,
+    existingDomain,
+    existingNotificationEmail,
+    sessionEmail,
+  ]);
 
-  createEffect(() => {
-    if (props.open) {
-      setProvider(props.initialProvider);
-      setApiKey('');
-      const hasKey = props.editMode && !!props.existingKeyPrefix;
-      setEditingKey(!hasKey);
-      setDomain(props.existingDomain ?? '');
-      const defaultEmail = props.existingNotificationEmail ?? session()?.data?.user?.email ?? '';
-      setNotificationEmail(defaultEmail);
-      setKeyError('');
-      setDomainError('');
-    }
-  });
-
-  const needsDomain = () => provider() === 'mailgun';
+  const hasExistingKey = !!editMode && !!existingKeyPrefix && provider === initialProvider;
+  const keepingExistingKey = !editingKey && hasExistingKey;
+  const maskedKey = (existingKeyPrefix ?? '') + '••••••••';
+  const needsDomain = provider === 'mailgun';
+  const busy = saving || testing;
 
   const validateFields = (): boolean => {
     let valid = true;
-    const key = apiKey().trim();
-    const dom = domain().trim().toLowerCase();
+    const key = apiKey.trim();
+    const dom = domain.trim().toLowerCase();
 
     // Skip API key validation when keeping the existing key
-    if (!editingKey() && hasExistingKey()) {
+    if (keepingExistingKey) {
       setKeyError('');
     } else if (!key) {
       setKeyError(t('harnesses.email.keyRequired'));
@@ -76,64 +96,47 @@ const EmailProviderModal: Component<Props> = (props) => {
     } else if (key.length < 8) {
       setKeyError(t('harnesses.email.keyTooShort'));
       valid = false;
-    } else if (provider() === 'resend' && !key.startsWith('re_')) {
+    } else if (provider === 'resend' && !key.startsWith('re_')) {
       setKeyError(t('harnesses.email.resendPrefix'));
       valid = false;
-    } else if (provider() === 'sendgrid' && !key.startsWith('SG.')) {
+    } else if (provider === 'sendgrid' && !key.startsWith('SG.')) {
       setKeyError(t('harnesses.email.sendgridPrefix'));
       valid = false;
     } else {
       setKeyError('');
     }
 
-    if (needsDomain()) {
-      if (!dom) {
-        setDomainError(t('harnesses.email.domainRequired'));
-        valid = false;
-      } else if (!DOMAIN_RE.test(dom)) {
-        setDomainError(t('harnesses.email.domainInvalid'));
-        valid = false;
-      } else {
-        setDomainError('');
-      }
+    if (needsDomain && !dom) {
+      setDomainError(t('harnesses.email.domainRequired'));
+      valid = false;
+    } else if (dom && !DOMAIN_RE.test(dom)) {
+      setDomainError(t('harnesses.email.domainInvalid'));
+      valid = false;
     } else {
-      if (dom && !DOMAIN_RE.test(dom)) {
-        setDomainError(t('harnesses.email.domainInvalid'));
-        valid = false;
-      } else {
-        setDomainError('');
-      }
+      setDomainError('');
     }
 
     return valid;
   };
 
-  const getTestRecipient = () => {
-    const notif = notificationEmail().trim();
-    if (notif) return notif;
-    return session()?.data?.user?.email ?? null;
-  };
+  const getTestRecipient = () => notificationEmail.trim() || sessionEmail;
 
   const runTest = async (): Promise<boolean> => {
-    const trimmedKey = apiKey().trim();
-    const trimmedDomain = domain().trim().toLowerCase();
     const recipient = getTestRecipient();
-
     if (!recipient) {
       toast.error(t('harnesses.email.needRecipient'));
       return false;
     }
-
     setTesting(true);
     try {
+      const trimmedDomain = domain.trim().toLowerCase();
       const testData: { provider: string; apiKey: string; domain?: string; to: string } = {
-        provider: provider(),
-        apiKey: trimmedKey,
+        provider,
+        apiKey: apiKey.trim(),
         to: recipient,
       };
       if (trimmedDomain) testData.domain = trimmedDomain;
       const result = await testEmailProvider(testData);
-
       if (!result.success) {
         toast.error(result.error ?? t('harnesses.email.testFailed'));
         return false;
@@ -152,7 +155,6 @@ const EmailProviderModal: Component<Props> = (props) => {
       toast.error(t('harnesses.email.needRecipient'));
       return false;
     }
-
     setTesting(true);
     try {
       const result = await testSavedEmailProvider(recipient);
@@ -170,22 +172,17 @@ const EmailProviderModal: Component<Props> = (props) => {
 
   const handleTestOnly = async () => {
     if (!validateFields()) return;
-    if (busy()) return;
-    const keepingExistingKey = !editingKey() && hasExistingKey();
+    if (busy) return;
     const ok = keepingExistingKey ? await runTestSaved() : await runTest();
     if (ok) toast.success(t('harnesses.email.testSent', { to: getTestRecipient() ?? '' }));
   };
 
   const handleSave = async () => {
     if (!validateFields()) return;
-    if (saving() || testing()) return;
-
-    const keepingExistingKey = !editingKey() && hasExistingKey();
+    if (busy) return;
 
     const ok = keepingExistingKey ? await runTestSaved() : await runTest();
     if (!ok) return;
-
-    const trimmedDomain = domain().trim().toLowerCase();
 
     setSaving(true);
     try {
@@ -194,18 +191,18 @@ const EmailProviderModal: Component<Props> = (props) => {
         apiKey?: string;
         domain?: string;
         notificationEmail?: string;
-      } = {
-        provider: provider(),
-      };
-      if (!keepingExistingKey) saveData.apiKey = apiKey().trim();
+      } = { provider };
+      if (!keepingExistingKey) saveData.apiKey = apiKey.trim();
+      const trimmedDomain = domain.trim().toLowerCase();
       if (trimmedDomain) saveData.domain = trimmedDomain;
-      const trimmedEmail = notificationEmail().trim();
+      const trimmedEmail = notificationEmail.trim();
       if (trimmedEmail) saveData.notificationEmail = trimmedEmail;
       await setEmailProvider(saveData);
-      const name = PROVIDER_NAMES[provider()] ?? provider();
-      toast.success(t('harnesses.email.connected', { provider: name }));
-      props.onSaved();
-      props.onClose();
+      toast.success(
+        t('harnesses.email.connected', { provider: PROVIDER_NAMES[provider] ?? provider }),
+      );
+      onSaved();
+      onClose();
     } catch {
       // error toast from fetchMutate
     } finally {
@@ -213,226 +210,173 @@ const EmailProviderModal: Component<Props> = (props) => {
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') handleSave();
-    if (e.key === 'Escape') props.onClose();
-  };
+  const isDisabled = keepingExistingKey
+    ? needsDomain && !domain.trim()
+    : !apiKey.trim() || (needsDomain && !domain.trim());
 
-  const busy = () => saving() || testing();
+  const buttonLabel = testing
+    ? t('harnesses.email.testing')
+    : saving
+      ? t('common.saving')
+      : editMode
+        ? t('harnesses.email.testAndSave')
+        : t('harnesses.email.testAndConnect');
 
-  const isDisabled = () => {
-    // When keeping existing key, only domain matters
-    if (!editingKey() && hasExistingKey()) {
-      if (needsDomain() && !domain().trim()) return true;
-      return false;
-    }
-    if (!apiKey().trim()) return true;
-    if (needsDomain() && !domain().trim()) return true;
-    return false;
-  };
-
-  const buttonLabel = () => {
-    if (testing()) return t('harnesses.email.testing');
-    if (saving()) return t('common.saving');
-    return props.editMode ? t('harnesses.email.testAndSave') : t('harnesses.email.testAndConnect');
-  };
-
-  const keyDocsUrl = () => getEmailProviderApiKeyUrl(provider());
-
-  const keyPlaceholder = () => {
-    switch (provider()) {
-      case 'resend':
-        return 're_xxxx...';
-      case 'sendgrid':
-        return 'SG.xxxx...';
-      default:
-        return 'key-xxxx...';
-    }
-  };
+  const keyDocsUrl = getEmailProviderApiKeyUrl(provider);
+  const keyPlaceholder =
+    provider === 'resend' ? 're_xxxx...' : provider === 'sendgrid' ? 'SG.xxxx...' : 'key-xxxx...';
 
   return (
-    <Portal>
-      <Show when={props.open}>
-        <div class="modal-overlay" onClick={() => props.onClose()}>
-          <div
-            class="modal-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="provider-modal-title"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
-                e.preventDefault();
-                handleSave();
-              }
-              if (e.key === 'Escape') props.onClose();
-            }}
-          >
-            <h2 class="modal-card__title" id="provider-modal-title">
-              {props.editMode
-                ? t('harnesses.email.editTitle')
-                : t('harnesses.email.configureTitle')}
-            </h2>
-            <p class="modal-card__desc">{t('harnesses.email.modalDesc')}</p>
+    <Modal
+      open={open}
+      title={editMode ? t('harnesses.email.editTitle') : t('harnesses.email.configureTitle')}
+      onClose={onClose}
+    >
+      <div
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+            e.preventDefault();
+            void handleSave();
+          }
+        }}
+      >
+        <p className="mb-4 text-sm text-muted">{t('harnesses.email.modalDesc')}</p>
 
-            <label class="modal-card__field-label">{t('harnesses.email.provider')}</label>
-            <div class="provider-modal-picker">
-              <button
-                class="provider-modal-option"
-                classList={{ 'provider-modal-option--active': provider() === 'resend' }}
-                onClick={() => {
-                  setProvider('resend');
-                  setKeyError('');
-                }}
-                type="button"
-              >
-                <img src="/logos/resend.svg" alt="" class="provider-modal-option__logo" />
-                <span>Resend</span>
-              </button>
-              <button
-                class="provider-modal-option"
-                classList={{ 'provider-modal-option--active': provider() === 'mailgun' }}
-                onClick={() => {
-                  setProvider('mailgun');
-                  setKeyError('');
-                }}
-                type="button"
-              >
-                <img src="/logos/mailgun.svg" alt="" class="provider-modal-option__logo" />
-                <span>Mailgun</span>
-              </button>
-              <button
-                class="provider-modal-option"
-                classList={{ 'provider-modal-option--active': provider() === 'sendgrid' }}
-                onClick={() => {
-                  setProvider('sendgrid');
-                  setKeyError('');
-                }}
-                type="button"
-              >
-                <img src="/logos/sendgrid.svg" alt="" class="provider-modal-option__logo" />
-                <span>SendGrid</span>
-              </button>
-            </div>
+        <span className="label">{t('harnesses.email.provider')}</span>
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          {PROVIDER_ORDER.map((id) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={provider === id}
+              className={cx(
+                'provider-modal-option flex items-center justify-center gap-2 rounded-control border px-2 py-2 text-sm',
+                provider === id
+                  ? 'is-active border-accent bg-accent-tint text-ink'
+                  : 'border-line bg-elev text-dim hover:bg-s2',
+              )}
+              onClick={() => {
+                setProvider(id);
+                setKeyError('');
+              }}
+            >
+              <img src={`/logos/${id}.svg`} alt="" className="size-4" />
+              <span>{PROVIDER_NAMES[id]}</span>
+            </button>
+          ))}
+        </div>
 
-            <label class="modal-card__field-label" for="email-provider-api-key">
+        <div className="grid gap-4">
+          <div>
+            <label className="label" htmlFor="email-provider-api-key">
               {t('harnesses.email.apiKey')}
             </label>
-            <Show
-              when={editingKey() || !hasExistingKey()}
-              fallback={
-                <div class="masked-key">
-                  <span class="masked-key__value">{maskedKey()}</span>
-                  <button
-                    class="btn btn--ghost btn--sm masked-key__edit"
-                    type="button"
-                    onClick={() => {
-                      setEditingKey(true);
-                      setApiKey('');
-                    }}
-                  >
-                    {t('harnesses.email.change')}
-                  </button>
-                </div>
-              }
-            >
+            {editingKey || !hasExistingKey ? (
               <input
-                ref={(el) => requestAnimationFrame(() => el.focus())}
                 id="email-provider-api-key"
-                class="modal-card__input"
-                classList={{ 'modal-card__input--error': !!keyError() }}
+                className="field"
+                aria-invalid={keyError ? true : undefined}
                 type="text"
-                autocomplete="off"
-                style="-webkit-text-security: disc; text-security: disc;"
-                placeholder={keyPlaceholder()}
-                value={apiKey()}
-                onInput={(e) => {
+                autoComplete="off"
+                autoFocus
+                style={MASKED_INPUT_STYLE}
+                placeholder={keyPlaceholder}
+                value={apiKey}
+                onChange={(e) => {
                   setApiKey(e.currentTarget.value);
                   setKeyError('');
                 }}
               />
-            </Show>
-            <Show when={keyError()}>
-              <p class="modal-card__field-error" role="alert">
-                {keyError()}
+            ) : (
+              <div className="masked-key field flex items-center justify-between gap-2">
+                <span className="truncate font-mono text-dim">{maskedKey}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingKey(true);
+                    setApiKey('');
+                  }}
+                >
+                  {t('harnesses.email.change')}
+                </Button>
+              </div>
+            )}
+            {keyError ? (
+              <p className="form-error mt-1" role="alert">
+                {keyError}
               </p>
-            </Show>
-            <Show when={keyDocsUrl()}>
-              <p class="modal-card__field-hint">
+            ) : null}
+            {keyDocsUrl ? (
+              <p className="hint">
                 <a
-                  class="modal-card__field-link"
-                  href={keyDocsUrl()!}
+                  className="link-action"
+                  href={keyDocsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {t('harnesses.email.getKey', {
-                    provider: PROVIDER_NAMES[provider()] ?? provider(),
-                  })}
+                  {t('harnesses.email.getKey', { provider: PROVIDER_NAMES[provider] ?? provider })}
                 </a>
               </p>
-            </Show>
+            ) : null}
+          </div>
 
-            <Show when={needsDomain()}>
-              <label class="modal-card__field-label" for="email-provider-domain">
+          {needsDomain ? (
+            <div>
+              <label className="label" htmlFor="email-provider-domain">
                 {t('harnesses.email.domain')}
               </label>
               <input
                 id="email-provider-domain"
-                class="modal-card__input"
-                classList={{ 'modal-card__input--error': !!domainError() }}
+                className="field"
+                aria-invalid={domainError ? true : undefined}
                 type="text"
                 placeholder={t('harnesses.email.domainPlaceholder')}
-                value={domain()}
-                onInput={(e) => {
+                value={domain}
+                onChange={(e) => {
                   setDomain(e.currentTarget.value);
                   setDomainError('');
                 }}
               />
-              <Show when={domainError()}>
-                <p class="modal-card__field-error" role="alert">
-                  {domainError()}
+              {domainError ? (
+                <p className="form-error mt-1" role="alert">
+                  {domainError}
                 </p>
-              </Show>
-            </Show>
+              ) : null}
+            </div>
+          ) : null}
 
-            <label class="modal-card__field-label" for="email-provider-notification">
+          <div>
+            <label className="label" htmlFor="email-provider-notification">
               {t('harnesses.email.notificationEmail')}
             </label>
             <input
               id="email-provider-notification"
-              class="modal-card__input"
+              className="field"
               type="email"
-              placeholder={
-                session()?.data?.user?.email ?? t('harnesses.email.notificationPlaceholder')
-              }
-              value={notificationEmail()}
-              onInput={(e) => setNotificationEmail(e.currentTarget.value)}
-              onKeyDown={handleKeyDown}
+              placeholder={sessionEmail ?? t('harnesses.email.notificationPlaceholder')}
+              value={notificationEmail}
+              onChange={(e) => setNotificationEmail(e.currentTarget.value)}
             />
-            <p class="modal-card__field-hint">{t('harnesses.email.notificationHint')}</p>
-
-            <div class="modal-card__footer modal-card__footer--split">
-              <button
-                class="btn btn--ghost btn--sm"
-                onClick={handleTestOnly}
-                disabled={busy() || isDisabled()}
-                type="button"
-              >
-                {testing() ? <span class="spinner" /> : t('harnesses.email.sendTest')}
-              </button>
-              <button
-                class="btn btn--primary btn--sm"
-                onClick={handleSave}
-                disabled={busy() || isDisabled()}
-              >
-                {buttonLabel()}
-              </button>
-            </div>
+            <p className="hint">{t('harnesses.email.notificationHint')}</p>
           </div>
         </div>
-      </Show>
-    </Portal>
-  );
-};
 
-export default EmailProviderModal;
+        <div className="actions justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            busy={testing}
+            disabled={busy || isDisabled}
+            onClick={() => void handleTestOnly()}
+          >
+            {t('harnesses.email.sendTest')}
+          </Button>
+          <Button size="sm" disabled={busy || isDisabled} onClick={() => void handleSave()}>
+            {buttonLabel}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

@@ -1,7 +1,7 @@
-import { For, Show, type Component } from 'solid-js';
 import type { NotificationLog } from '../services/api.js';
 import { intlLocale, t } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
+import { EmptyState, Panel, Skel } from './ui.js';
 
 function formatValue(log: NotificationLog, field: 'actual_value' | 'threshold_value'): string {
   const val = Number(log[field]);
@@ -25,77 +25,66 @@ interface Props {
   loading: boolean;
 }
 
-const LimitHistoryTable: Component<Props> = (props) => (
-  <div class="panel">
-    <div class="panel__title">{t('limits.history.title')}</div>
-    <Show
-      when={!props.loading}
-      fallback={
-        <table class="notif-table notif-table--flush">
-          <thead>
-            <tr>
-              <th>{t('limits.history.date')}</th>
-              <th>{t('limits.history.usage')}</th>
-              <th>{t('limits.history.threshold')}</th>
-              <th>{t('limits.history.resetsAt')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={[1, 2, 3]}>
-              {() => (
-                <tr>
-                  <td>
-                    <div class="skeleton skeleton--text" style="width: 100px;" />
-                  </td>
-                  <td>
-                    <div class="skeleton skeleton--text" style="width: 60px;" />
-                  </td>
-                  <td>
-                    <div class="skeleton skeleton--text" style="width: 60px;" />
-                  </td>
-                  <td>
-                    <div class="skeleton skeleton--text" style="width: 100px;" />
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      }
-    >
-      <Show
-        when={(props.logs ?? []).length > 0}
-        fallback={
-          <div class="empty-state">
-            <div class="empty-state__title">{t('limits.history.empty')}</div>
-          </div>
-        }
-      >
-        <table class="notif-table notif-table--flush">
-          <thead>
-            <tr>
-              <th>{t('limits.history.date')}</th>
-              <th>{t('limits.history.usage')}</th>
-              <th>{t('limits.history.threshold')}</th>
-              <th>{t('limits.history.resetsAt')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={props.logs}>
-              {(log) => (
-                <tr>
-                  <td class="notif-table__mono">{formatDate(log.sent_at)}</td>
-                  <td class="notif-table__mono">{formatValue(log, 'actual_value')}</td>
-                  <td class="notif-table__mono">{formatValue(log, 'threshold_value')}</td>
-                  <td class="notif-table__mono">{formatDate(log.period_end)}</td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </Show>
-    </Show>
-  </div>
-);
+function Head() {
+  return (
+    <thead>
+      <tr>
+        <th>{t('limits.history.date')}</th>
+        <th>{t('limits.history.usage')}</th>
+        <th>{t('limits.history.threshold')}</th>
+        <th>{t('limits.history.resetsAt')}</th>
+      </tr>
+    </thead>
+  );
+}
 
-export default LimitHistoryTable;
+export default function LimitHistoryTable({ logs, loading }: Props) {
+  const list = logs ?? [];
+  return (
+    <Panel title={t('limits.history.title')} bodyClassName="p-0">
+      {loading ? (
+        <div className="overflow-x-auto">
+          <table className="data">
+            <Head />
+            <tbody>
+              {[1, 2, 3].map((i) => (
+                <tr key={i}>
+                  <td>
+                    <Skel width={100} height={12} />
+                  </td>
+                  <td>
+                    <Skel width={60} height={12} />
+                  </td>
+                  <td>
+                    <Skel width={60} height={12} />
+                  </td>
+                  <td>
+                    <Skel width={100} height={12} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : list.length === 0 ? (
+        <EmptyState title={t('limits.history.empty')} />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data">
+            <Head />
+            <tbody>
+              {list.map((log) => (
+                <tr key={log.id}>
+                  <td className="font-mono">{formatDate(log.sent_at)}</td>
+                  <td className="font-mono">{formatValue(log, 'actual_value')}</td>
+                  <td className="font-mono">{formatValue(log, 'threshold_value')}</td>
+                  <td className="font-mono">{formatDate(log.period_end)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}

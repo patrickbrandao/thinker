@@ -1,6 +1,8 @@
-import { createMemo, For, type Component } from 'solid-js';
+import type { ReactNode } from 'react';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
-import { providerIcon, customProviderLogo } from './ProviderIcon.jsx';
+import { providerIcon, customProviderLogo } from './ProviderIcon.js';
+import InfoTooltip from './InfoTooltip.js';
+import { Panel } from './ui.js';
 import { customProviderColor, formatCost, formatNumber } from '../services/formatters.js';
 import { getModelDisplayName } from '../services/model-display.js';
 import {
@@ -10,7 +12,6 @@ import {
   stripCustomPrefix,
 } from '../services/routing-utils.js';
 import { PROVIDERS } from '../services/providers.js';
-import InfoTooltip from './InfoTooltip.jsx';
 import { attemptSuccessRate, type ModelReliabilityRow } from '../services/api/analytics.js';
 import { formatRate } from '../services/overview-format.js';
 import { intlLocale, t } from '../i18n/index.js';
@@ -28,7 +29,7 @@ interface CostByModelRow {
 
 interface CostByModelTableProps {
   rows: CostByModelRow[];
-  /** Per-model reliability (Total attempts · Success rate). The three columns
+  /** Per-model reliability (Total attempts · Success rate). The two columns
       render only when reliability data is provided. */
   reliability?: ModelReliabilityRow[];
 }
@@ -50,150 +51,129 @@ function resolveRowProviderName(row: CostByModelRow): string | undefined {
   );
 }
 
-const CostByModelTable: Component<CostByModelTableProps> = (props) => {
-  const sortedRows = createMemo(() =>
-    [...props.rows].sort((a, b) => b.estimated_cost - a.estimated_cost),
-  );
+function RowIcon({ row }: { row: CostByModelRow }): ReactNode {
+  const provId = resolveRowProvider(row);
+  const isCustom = provId === 'custom' || provId?.startsWith('custom:') === true;
+  if (row.model && isCustom) {
+    const provName = row.custom_provider_name ?? undefined;
+    const logo = customProviderLogo(provName ?? '', 16, undefined, row.model ?? undefined);
+    if (logo) return logo;
+    const letter = (provName ?? stripCustomPrefix(row.model)).charAt(0).toUpperCase();
+    return (
+      <span
+        className="provider-card__logo-letter inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-on-accent"
+        title={provName}
+        // Custom providers get a generated color derived from their name.
+        style={{ background: customProviderColor(provName ?? '') }}
+      >
+        {letter}
+      </span>
+    );
+  }
+  if (provId) {
+    const provName = resolveRowProviderName(row);
+    return (
+      <span
+        className="relative inline-flex size-3.5 shrink-0"
+        title={`${provName ?? provId} (${authLabel(row.auth_type)})`}
+      >
+        {providerIcon(provId, 14)}
+        {authBadgeFor(row.auth_type, 8)}
+      </span>
+    );
+  }
+  return null;
+}
 
-  const relFor = (model: string) => props.reliability?.find((r) => r.model === model);
+export default function CostByModelTable({ rows, reliability }: CostByModelTableProps) {
+  const sortedRows = [...rows].sort((a, b) => b.estimated_cost - a.estimated_cost);
+  const relFor = (model: string) => reliability?.find((r) => r.model === model);
 
   return (
-    <div class="panel" style="margin-top: var(--gap-lg);">
-      <div class="panel__title">{t('overview.modelUsage.title')}</div>
-      <p style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground)); margin: -8px 0 12px;">
-        {t('overview.modelUsage.subtitle')}
-      </p>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>{t('overview.modelUsage.model')}</th>
-            <th>{t('overview.modelUsage.tokens')}</th>
-            <th>{t('overview.modelUsage.pctOfTotal')}</th>
-            <th>{t('overview.modelUsage.cost')}</th>
-            {props.reliability && (
-              <>
-                <th class="rel-col">
-                  {t('overview.totalAttempts')}
-                  <InfoTooltip text={t('overview.tips.totalAttempts')} />
-                </th>
-                <th class="rel-col">
-                  {t('overview.successRate')}
-                  <InfoTooltip text={t('overview.tips.modelSuccessRate')} />
-                </th>
-              </>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          <For each={sortedRows()}>
-            {(row) => (
-              <tr>
-                <td style="font-family: var(--font-mono); font-size: var(--font-size-sm);">
-                  <span style="display: inline-flex; align-items: center; gap: 4px;">
-                    {(() => {
-                      const provId = resolveRowProvider(row);
-                      const isCustom =
-                        provId === 'custom' || provId?.startsWith('custom:') === true;
-                      if (row.model && isCustom) {
-                        const provName = row.custom_provider_name ?? undefined;
-                        const logo = customProviderLogo(
-                          provName ?? '',
-                          16,
-                          undefined,
-                          row.model ?? undefined,
-                        );
-                        if (logo) return logo;
-                        const letter = (provName ?? stripCustomPrefix(row.model))
-                          .charAt(0)
-                          .toUpperCase();
-                        return (
-                          <span
-                            class="provider-card__logo-letter"
-                            title={provName}
-                            style={{
-                              background: customProviderColor(provName ?? ''),
-                              width: '16px',
-                              height: '16px',
-                              'font-size': '9px',
-                              'flex-shrink': '0',
-                              'border-radius': '50%',
-                            }}
-                          >
-                            {letter}
-                          </span>
-                        );
-                      }
-                      if (provId) {
-                        const provName = resolveRowProviderName(row);
-                        return (
-                          <span
-                            title={`${provName ?? provId} (${authLabel(row.auth_type)})`}
-                            style="display: inline-flex; flex-shrink: 0; position: relative; width: 14px; height: 14px;"
-                          >
-                            {providerIcon(provId, 14)}
-                            {authBadgeFor(row.auth_type, 8)}
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                    {row.model
-                      ? row.model.startsWith('custom:')
-                        ? stripCustomPrefix(row.model)
-                        : row.display_name || getModelDisplayName(row.model)
-                      : row.model}
-                  </span>
-                </td>
-                <td>{formatNumber(row.tokens)}</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 40px; height: 4px; border-radius: 2px; background: hsl(var(--muted)); overflow: hidden;">
-                      <div
-                        style={`width: ${row.share_pct}%; height: 100%; background: hsl(var(--chart-1)); border-radius: 2px;`}
-                      />
-                    </div>
-                    <span style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                      {Math.round(row.share_pct)}%
+    <Panel
+      title={t('overview.modelUsage.title')}
+      actions={<span className="panel-hint">{t('overview.modelUsage.subtitle')}</span>}
+      bodyClassName="p-0"
+    >
+      <div className="overflow-x-auto">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>{t('overview.modelUsage.model')}</th>
+              <th>{t('overview.modelUsage.tokens')}</th>
+              <th>{t('overview.modelUsage.pctOfTotal')}</th>
+              <th>{t('overview.modelUsage.cost')}</th>
+              {reliability ? (
+                <>
+                  <th>
+                    <span className="inline-flex items-center gap-1">
+                      {t('overview.totalAttempts')}
+                      <InfoTooltip text={t('overview.tips.totalAttempts')} />
                     </span>
-                  </div>
-                </td>
-                <td
-                  title={
-                    row.estimated_cost > 0 && row.estimated_cost < 0.01
-                      ? new Intl.NumberFormat(intlLocale(), {
-                          style: 'currency',
-                          currency: 'USD',
-                          minimumFractionDigits: 6,
-                        }).format(row.estimated_cost)
-                      : undefined
-                  }
-                >
-                  {formatCost(row.estimated_cost) ?? '\u2014'}
-                </td>
-                {props.reliability && (
-                  <>
-                    <td class="rel-col">
-                      {(() => {
-                        const rel = relFor(row.model);
-                        return rel ? formatNumber(rel.attempts) : '\u2014';
-                      })()}
-                    </td>
-                    <td class="rel-col">
-                      {(() => {
-                        const rel = relFor(row.model);
-                        const rate = rel ? attemptSuccessRate(rel) : null;
-                        return rate == null ? '\u2014' : formatRate(rate);
-                      })()}
-                    </td>
-                  </>
-                )}
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
-    </div>
+                  </th>
+                  <th>
+                    <span className="inline-flex items-center gap-1">
+                      {t('overview.successRate')}
+                      <InfoTooltip text={t('overview.tips.modelSuccessRate')} />
+                    </span>
+                  </th>
+                </>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.map((row, i) => {
+              const rel = reliability ? relFor(row.model) : undefined;
+              const rate = rel ? attemptSuccessRate(rel) : null;
+              return (
+                <tr key={`${row.model}-${i}`}>
+                  <td className="font-mono text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      <RowIcon row={row} />
+                      {row.model
+                        ? row.model.startsWith('custom:')
+                          ? stripCustomPrefix(row.model)
+                          : row.display_name || getModelDisplayName(row.model)
+                        : row.model}
+                    </span>
+                  </td>
+                  <td>{formatNumber(row.tokens)}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1 w-10 overflow-hidden rounded-sm bg-s3">
+                        <div
+                          className="h-full rounded-sm bg-accent"
+                          style={{ width: `${row.share_pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted">{Math.round(row.share_pct)}%</span>
+                    </div>
+                  </td>
+                  <td
+                    title={
+                      row.estimated_cost > 0 && row.estimated_cost < 0.01
+                        ? new Intl.NumberFormat(intlLocale(), {
+                            style: 'currency',
+                            currency: 'USD',
+                            minimumFractionDigits: 6,
+                          }).format(row.estimated_cost)
+                        : undefined
+                    }
+                  >
+                    {formatCost(row.estimated_cost) ?? '—'}
+                  </td>
+                  {reliability ? (
+                    <>
+                      <td>{rel ? formatNumber(rel.attempts) : '—'}</td>
+                      <td>{rate == null ? '—' : formatRate(rate)}</td>
+                    </>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
-};
-
-export default CostByModelTable;
+}

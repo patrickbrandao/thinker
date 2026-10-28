@@ -1,20 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@solidjs/testing-library";
-
-vi.mock("@solidjs/router", () => ({
-  useParams: () => ({ agentName: "test-agent" }),
-  A: (props: any) => <a href={props.href}>{props.children}</a>,
-}));
-
-vi.mock("@solidjs/meta", () => ({
-  Title: (props: any) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 let mockRules: any[] = [];
 let mockRoutingStatus = { enabled: false };
 
-vi.mock("../../src/services/api.js", () => ({
+vi.mock('../../src/services/api.js', () => ({
   getNotificationRules: vi.fn(() => Promise.resolve(mockRules)),
   getNotificationLogs: vi.fn(() => Promise.resolve([])),
   createNotificationRule: vi.fn(() => Promise.resolve({})),
@@ -25,166 +16,212 @@ vi.mock("../../src/services/api.js", () => ({
   getRoutingStatus: vi.fn(() => Promise.resolve(mockRoutingStatus)),
 }));
 
-vi.mock("../../src/services/setup-status.js", () => ({
+vi.mock('../../src/services/setup-status.js', () => ({
   checkSignupEnabled: () => Promise.resolve(false),
   checkEmailConfigured: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock("../../src/services/toast-store.js", () => ({
+vi.mock('../../src/services/toast-store.js', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("../../src/components/LimitRuleModal.js", () => ({
+vi.mock('../../src/components/LimitRuleModal.js', () => ({
   default: (props: any) => (
     <div data-testid="limit-modal" data-open={props.open}>
-      <button data-testid="mock-save" onClick={() => props.onSave({ metric_type: "tokens", threshold: 100, period: "day", action: "notify" })}>
+      <button
+        data-testid="mock-save"
+        onClick={() =>
+          props.onSave({ metric_type: 'tokens', threshold: 100, period: 'day', action: 'notify' })
+        }
+      >
         Save
       </button>
     </div>
   ),
 }));
 
-
-vi.mock("../../src/services/auth-client.js", () => ({
+vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
-    useSession: () => () => ({ data: { user: { email: "user@example.com" } } }),
+    useSession: () => ({ data: { user: { email: 'user@example.com' } }, isPending: false }),
   },
 }));
 
-import Limits from "../../src/pages/Limits";
+import Limits from '../../src/pages/Limits';
 
-describe("Limits page interactions", () => {
+/** Limits reads :agentName from the route, so render it under one. */
+function render(ui: () => React.ReactElement) {
+  return rtlRender(
+    <MemoryRouter initialEntries={['/harnesses/test-agent/guardrails']}>
+      <Routes>
+        <Route path="/harnesses/:agentName/guardrails" element={ui()} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe('Limits page interactions', () => {
   beforeEach(() => {
     mockRules = [];
     mockRoutingStatus = { enabled: false };
     vi.clearAllMocks();
   });
 
-  it("calls createNotificationRule and shows toast on save", async () => {
-    const { createNotificationRule } = await import("../../src/services/api.js");
-    const { toast } = await import("../../src/services/toast-store.js");
+  it('calls createNotificationRule and shows toast on save', async () => {
+    const { createNotificationRule } = await import('../../src/services/api.js');
+    const { toast } = await import('../../src/services/toast-store.js');
 
     render(() => <Limits />);
-    fireEvent.click(screen.getByText("Create rule"));
-    fireEvent.click(screen.getByTestId("mock-save"));
+    fireEvent.click(screen.getByText('Create rule'));
+    fireEvent.click(screen.getByTestId('mock-save'));
 
     await vi.waitFor(() => {
-      expect(createNotificationRule).toHaveBeenCalledWith(expect.objectContaining({
-        agent_name: "test-agent",
-        metric_type: "tokens",
-        threshold: 100,
-      }));
-      expect(toast.success).toHaveBeenCalledWith("Rule created");
+      expect(createNotificationRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agent_name: 'test-agent',
+          metric_type: 'tokens',
+          threshold: 100,
+        }),
+      );
+      expect(toast.success).toHaveBeenCalledWith('Rule created');
     });
   });
 
-  it("calls deleteNotificationRule via kebab menu and confirmation modal", async () => {
-    const { deleteNotificationRule } = await import("../../src/services/api.js");
-    const { toast } = await import("../../src/services/toast-store.js");
-    mockRules = [{
-      id: "r1", agent_name: "test-agent", metric_type: "tokens",
-      threshold: 50000, period: "day", action: "notify",
-      is_active: true, trigger_count: 0, created_at: "2026-01-01",
-    }];
+  it('calls deleteNotificationRule via kebab menu and confirmation modal', async () => {
+    const { deleteNotificationRule } = await import('../../src/services/api.js');
+    const { toast } = await import('../../src/services/toast-store.js');
+    mockRules = [
+      {
+        id: 'r1',
+        agent_name: 'test-agent',
+        metric_type: 'tokens',
+        threshold: 50000,
+        period: 'day',
+        action: 'notify',
+        is_active: true,
+        trigger_count: 0,
+        created_at: '2026-01-01',
+      },
+    ];
 
     render(() => <Limits />);
 
     // Open kebab menu
     await vi.waitFor(() => {
-      expect(screen.getByLabelText("Rule options")).toBeDefined();
+      expect(screen.getByLabelText('Rule options')).toBeDefined();
     });
-    fireEvent.click(screen.getByLabelText("Rule options"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
 
     // Click Delete in dropdown
     await vi.waitFor(() => {
-      expect(screen.getByText("Delete")).toBeDefined();
+      expect(screen.getByText('Delete')).toBeDefined();
     });
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText('Delete'));
 
     // Confirm deletion: check the checkbox then click Delete rule
     await vi.waitFor(() => {
-      expect(document.querySelector(".confirm-modal__confirm-row")).not.toBeNull();
+      expect(document.querySelector('.modal label.check')).not.toBeNull();
     });
 
-    const checkbox = document.querySelector('.confirm-modal__confirm-row input[type="checkbox"]') as HTMLInputElement;
+    const checkbox = document.querySelector(
+      '.modal label.check input[type="checkbox"]',
+    ) as HTMLInputElement;
     fireEvent.click(checkbox);
 
-    const deleteBtn = document.querySelector(".btn--danger") as HTMLButtonElement;
+    const deleteBtn = document.querySelector('.btn-danger') as HTMLButtonElement;
     fireEvent.click(deleteBtn);
 
     await vi.waitFor(() => {
-      expect(deleteNotificationRule).toHaveBeenCalledWith("r1");
-      expect(toast.success).toHaveBeenCalledWith("Rule deleted");
+      expect(deleteNotificationRule).toHaveBeenCalledWith('r1');
+      expect(toast.success).toHaveBeenCalledWith('Rule deleted');
     });
   });
 
-  it("closes kebab menu when clicking the same kebab button again", async () => {
-    mockRules = [{
-      id: "r1", agent_name: "test-agent", metric_type: "tokens",
-      threshold: 50000, period: "day", action: "notify",
-      is_active: true, trigger_count: 0, created_at: "2026-01-01",
-    }];
+  it('closes kebab menu when clicking the same kebab button again', async () => {
+    mockRules = [
+      {
+        id: 'r1',
+        agent_name: 'test-agent',
+        metric_type: 'tokens',
+        threshold: 50000,
+        period: 'day',
+        action: 'notify',
+        is_active: true,
+        trigger_count: 0,
+        created_at: '2026-01-01',
+      },
+    ];
 
     render(() => <Limits />);
 
     await vi.waitFor(() => {
-      expect(screen.getByLabelText("Rule options")).toBeDefined();
+      expect(screen.getByLabelText('Rule options')).toBeDefined();
     });
 
     // First click opens menu
-    fireEvent.click(screen.getByLabelText("Rule options"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
     await vi.waitFor(() => {
-      expect(document.querySelector(".rule-menu__dropdown")).not.toBeNull();
+      expect(document.querySelector('.rule-menu__dropdown')).not.toBeNull();
     });
 
     // Second click on same button closes menu
-    fireEvent.click(screen.getByLabelText("Rule options"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
     await vi.waitFor(() => {
-      expect(document.querySelector(".rule-menu__dropdown")).toBeNull();
+      expect(document.querySelector('.rule-menu__dropdown')).toBeNull();
     });
   });
 
-  it("calls updateNotificationRule when saving an edited rule", async () => {
-    const { updateNotificationRule } = await import("../../src/services/api.js");
-    const { toast } = await import("../../src/services/toast-store.js");
-    mockRules = [{
-      id: "r1", agent_name: "test-agent", metric_type: "tokens",
-      threshold: 50000, period: "day", action: "notify",
-      is_active: true, trigger_count: 0, created_at: "2026-01-01",
-    }];
+  it('calls updateNotificationRule when saving an edited rule', async () => {
+    const { updateNotificationRule } = await import('../../src/services/api.js');
+    const { toast } = await import('../../src/services/toast-store.js');
+    mockRules = [
+      {
+        id: 'r1',
+        agent_name: 'test-agent',
+        metric_type: 'tokens',
+        threshold: 50000,
+        period: 'day',
+        action: 'notify',
+        is_active: true,
+        trigger_count: 0,
+        created_at: '2026-01-01',
+      },
+    ];
 
     render(() => <Limits />);
 
     // Open kebab menu and click Edit
     await vi.waitFor(() => {
-      expect(screen.getByLabelText("Rule options")).toBeDefined();
+      expect(screen.getByLabelText('Rule options')).toBeDefined();
     });
-    fireEvent.click(screen.getByLabelText("Rule options"));
-    await vi.waitFor(() => expect(screen.getByText("Edit")).toBeDefined());
-    fireEvent.click(screen.getByText("Edit"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
+    await vi.waitFor(() => expect(screen.getByText('Edit')).toBeDefined());
+    fireEvent.click(screen.getByText('Edit'));
 
     // Now editRule is set — clicking save should call updateNotificationRule
     await vi.waitFor(() => {
-      expect(screen.getByTestId("limit-modal").getAttribute("data-open")).toBe("true");
+      expect(screen.getByTestId('limit-modal').getAttribute('data-open')).toBe('true');
     });
-    fireEvent.click(screen.getByTestId("mock-save"));
+    fireEvent.click(screen.getByTestId('mock-save'));
 
     await vi.waitFor(() => {
-      expect(updateNotificationRule).toHaveBeenCalledWith("r1", expect.objectContaining({
-        metric_type: "tokens",
-        threshold: 100,
-      }));
-      expect(toast.success).toHaveBeenCalledWith("Rule updated");
+      expect(updateNotificationRule).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({
+          metric_type: 'tokens',
+          threshold: 100,
+        }),
+      );
+      expect(toast.success).toHaveBeenCalledWith('Rule updated');
     });
   });
 
-  it("handles error in handleSave gracefully", async () => {
-    const { createNotificationRule } = await import("../../src/services/api.js");
-    (createNotificationRule as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("fail"));
+  it('handles error in handleSave gracefully', async () => {
+    const { createNotificationRule } = await import('../../src/services/api.js');
+    (createNotificationRule as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('fail'));
 
     render(() => <Limits />);
-    fireEvent.click(screen.getByText("Create rule"));
-    fireEvent.click(screen.getByTestId("mock-save"));
+    fireEvent.click(screen.getByText('Create rule'));
+    fireEvent.click(screen.getByTestId('mock-save'));
 
     // Should not throw — error is caught
     await vi.waitFor(() => {
@@ -192,79 +229,100 @@ describe("Limits page interactions", () => {
     });
   });
 
-  it("handles error in handleDelete gracefully", async () => {
-    const { deleteNotificationRule } = await import("../../src/services/api.js");
-    (deleteNotificationRule as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("fail"));
-    mockRules = [{
-      id: "r1", agent_name: "test-agent", metric_type: "tokens",
-      threshold: 50000, period: "day", action: "notify",
-      is_active: true, trigger_count: 0, created_at: "2026-01-01",
-    }];
+  it('handles error in handleDelete gracefully', async () => {
+    const { deleteNotificationRule } = await import('../../src/services/api.js');
+    (deleteNotificationRule as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('fail'));
+    mockRules = [
+      {
+        id: 'r1',
+        agent_name: 'test-agent',
+        metric_type: 'tokens',
+        threshold: 50000,
+        period: 'day',
+        action: 'notify',
+        is_active: true,
+        trigger_count: 0,
+        created_at: '2026-01-01',
+      },
+    ];
 
     render(() => <Limits />);
 
     await vi.waitFor(() => {
-      expect(screen.getByLabelText("Rule options")).toBeDefined();
+      expect(screen.getByLabelText('Rule options')).toBeDefined();
     });
-    fireEvent.click(screen.getByLabelText("Rule options"));
-    await vi.waitFor(() => expect(screen.getByText("Delete")).toBeDefined());
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
+    await vi.waitFor(() => expect(screen.getByText('Delete')).toBeDefined());
+    fireEvent.click(screen.getByText('Delete'));
 
     await vi.waitFor(() => {
-      expect(document.querySelector(".confirm-modal__confirm-row")).not.toBeNull();
+      expect(document.querySelector('.modal label.check')).not.toBeNull();
     });
 
-    const checkbox = document.querySelector('.confirm-modal__confirm-row input[type="checkbox"]') as HTMLInputElement;
+    const checkbox = document.querySelector(
+      '.modal label.check input[type="checkbox"]',
+    ) as HTMLInputElement;
     fireEvent.click(checkbox);
-    const deleteBtn = document.querySelector(".btn--danger") as HTMLButtonElement;
+    const deleteBtn = document.querySelector('.btn-danger') as HTMLButtonElement;
     fireEvent.click(deleteBtn);
 
     // Should not throw — error is caught
     await vi.waitFor(() => {
-      expect(deleteNotificationRule).toHaveBeenCalledWith("r1");
+      expect(deleteNotificationRule).toHaveBeenCalledWith('r1');
     });
   });
 
-  it("disables delete button and shows Deleting... during deletion", async () => {
+  it('disables delete button and shows Deleting... during deletion', async () => {
     let resolveDelete: () => void;
-    const { deleteNotificationRule } = await import("../../src/services/api.js");
+    const { deleteNotificationRule } = await import('../../src/services/api.js');
     (deleteNotificationRule as ReturnType<typeof vi.fn>).mockReturnValue(
-      new Promise<void>((r) => { resolveDelete = r; }),
+      new Promise<void>((r) => {
+        resolveDelete = r;
+      }),
     );
-    mockRules = [{
-      id: "r1", agent_name: "test-agent", metric_type: "tokens",
-      threshold: 50000, period: "day", action: "notify",
-      is_active: true, trigger_count: 0, created_at: "2026-01-01",
-    }];
+    mockRules = [
+      {
+        id: 'r1',
+        agent_name: 'test-agent',
+        metric_type: 'tokens',
+        threshold: 50000,
+        period: 'day',
+        action: 'notify',
+        is_active: true,
+        trigger_count: 0,
+        created_at: '2026-01-01',
+      },
+    ];
 
     render(() => <Limits />);
 
     await vi.waitFor(() => {
-      expect(screen.getByLabelText("Rule options")).toBeDefined();
+      expect(screen.getByLabelText('Rule options')).toBeDefined();
     });
-    fireEvent.click(screen.getByLabelText("Rule options"));
-    await vi.waitFor(() => expect(screen.getByText("Delete")).toBeDefined());
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByLabelText('Rule options'));
+    await vi.waitFor(() => expect(screen.getByText('Delete')).toBeDefined());
+    fireEvent.click(screen.getByText('Delete'));
 
     await vi.waitFor(() => {
-      expect(document.querySelector(".confirm-modal__confirm-row")).not.toBeNull();
+      expect(document.querySelector('.modal label.check')).not.toBeNull();
     });
 
-    const checkbox = document.querySelector('.confirm-modal__confirm-row input[type="checkbox"]') as HTMLInputElement;
+    const checkbox = document.querySelector(
+      '.modal label.check input[type="checkbox"]',
+    ) as HTMLInputElement;
     fireEvent.click(checkbox);
 
-    const deleteBtn = document.querySelector(".btn--danger") as HTMLButtonElement;
+    const deleteBtn = document.querySelector('.btn-danger') as HTMLButtonElement;
     fireEvent.click(deleteBtn);
 
     await vi.waitFor(() => {
-      expect(deleteBtn.querySelector(".spinner")).not.toBeNull();
+      expect(deleteBtn.querySelector('.spinner')).not.toBeNull();
       expect(deleteBtn.disabled).toBe(true);
     });
 
     resolveDelete!();
     await vi.waitFor(() => {
-      expect(deleteBtn.textContent).toBe("Delete rule");
+      expect(deleteBtn.textContent).toBe('Delete rule');
     });
   });
-
 });

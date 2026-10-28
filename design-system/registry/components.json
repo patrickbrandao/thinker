@@ -364,17 +364,6 @@
         "modals.css"
       ]
     },
-    "afx-kpi-line": {
-      "classes": [
-        "afx-kpi-line",
-        "afx-kpi-line__primary",
-        "afx-kpi-line__sep",
-        "afx-kpi-line__stat"
-      ],
-      "files": [
-        "analytics-overview.css"
-      ]
-    },
     "agent-card": {
       "classes": [
         "agent-card",
@@ -837,12 +826,10 @@
       "files": [
         "agent-type-select.css",
         "agents.css",
-        "analytics-overview.css",
         "auth.css",
         "controls.css",
         "data.css",
         "modals.css",
-        "overview.css",
         "platform-icons.css",
         "routing-deprecation.css",
         "routing-providers.css",
@@ -870,14 +857,6 @@
         "data.css"
       ]
     },
-    "demo-dashboard": {
-      "classes": [
-        "demo-dashboard"
-      ],
-      "files": [
-        "overview.css"
-      ]
-    },
     "duplicate-agent": {
       "classes": [
         "duplicate-agent__badge",
@@ -899,22 +878,6 @@
       "files": [
         "data.css",
         "theme.css"
-      ]
-    },
-    "error-class-card": {
-      "classes": [
-        "error-class-card",
-        "error-class-card__bar",
-        "error-class-card__bar-wrap",
-        "error-class-card__count",
-        "error-class-card__empty",
-        "error-class-card__label",
-        "error-class-card__list",
-        "error-class-card__row",
-        "error-class-card__title"
-      ],
-      "files": [
-        "analytics-overview.css"
       ]
     },
     "error-recovery-row": {
@@ -1381,7 +1344,6 @@
         "limits.css",
         "modals.css",
         "notifications.css",
-        "overview.css",
         "routing-header-tiers.css",
         "routing.css"
       ]
@@ -1689,47 +1651,13 @@
         "agents.css"
       ]
     },
-    "overview-split": {
-      "classes": [
-        "overview-split"
-      ],
-      "files": [
-        "analytics-overview.css"
-      ]
-    },
-    "overview-stat-card": {
-      "classes": [
-        "overview-stat-card",
-        "overview-stat-card--destructive",
-        "overview-stat-card--fallback",
-        "overview-stat-card__label",
-        "overview-stat-card__value",
-        "overview-stat-card__value-row"
-      ],
-      "files": [
-        "analytics-overview.css"
-      ]
-    },
-    "overview-stats": {
-      "classes": [
-        "overview-stats",
-        "overview-stats--3",
-        "overview-stats--5"
-      ],
-      "files": [
-        "analytics-overview.css"
-      ]
-    },
     "page-header": {
       "classes": [
         "page-header",
         "page-header--wrap",
-        "page-header__intro",
-        "page-header__subtitle",
-        "page-header__title"
+        "page-header__intro"
       ],
       "files": [
-        "analytics-overview.css",
         "layout.css",
         "theme.css"
       ]
@@ -1757,7 +1685,6 @@
         "panel__title"
       ],
       "files": [
-        "analytics-overview.css",
         "cards.css",
         "charts.css",
         "limits.css",
@@ -1885,7 +1812,6 @@
         "provider-modal__view--from-right"
       ],
       "files": [
-        "overview.css",
         "routing-providers.css"
       ]
     },
@@ -1991,16 +1917,6 @@
       ],
       "files": [
         "data.css"
-      ]
-    },
-    "rel-chart": {
-      "classes": [
-        "rel-chart__legend",
-        "rel-chart__legend-dot",
-        "rel-chart__legend-item"
-      ],
-      "files": [
-        "reliability-card.css"
       ]
     },
     "rel-col": {
@@ -2380,12 +2296,9 @@
     },
     "scroll-panel": {
       "classes": [
-        "scroll-panel",
-        "scroll-panel--at-bottom",
-        "scroll-panel__body"
+        "scroll-panel--at-bottom"
       ],
       "files": [
-        "analytics-overview.css",
         "routing-providers.css"
       ]
     },
@@ -2550,14 +2463,11 @@
         "setup-modal__header",
         "setup-modal__nav",
         "setup-modal__next",
-        "setup-modal__next-hint",
-        "setup-modal__overlay",
         "setup-modal__platform-icon",
         "setup-modal__title-text"
       ],
       "files": [
-        "modals.css",
-        "overview.css"
+        "modals.css"
       ]
     },
     "setup-model-hint": {
@@ -2598,14 +2508,6 @@
       ],
       "files": [
         "wizard.css"
-      ]
-    },
-    "setup-step-providers": {
-      "classes": [
-        "setup-step-providers"
-      ],
-      "files": [
-        "overview.css"
       ]
     },
     "setup-steps": {
@@ -2833,8 +2735,7 @@
         "tier-badge--virtual"
       ],
       "files": [
-        "data.css",
-        "overview.css"
+        "data.css"
       ]
     },
     "tier-badge-tooltip": {
@@ -2940,7 +2841,6 @@
         "trend--up-bad"
       ],
       "files": [
-        "analytics-overview.css",
         "cards.css",
         "theme.css"
       ]
@@ -3037,7 +2937,6 @@
         "view-more-link"
       ],
       "files": [
-        "analytics-overview.css",
         "cards.css"
       ]
     },
@@ -3110,15 +3009,6 @@
         "routing-virtual-models.css"
       ]
     },
-    "waiting-banner": {
-      "classes": [
-        "waiting-banner",
-        "waiting-banner--success"
-      ],
-      "files": [
-        "overview.css"
-      ]
-    },
     "workspace-table": {
       "classes": [
         "workspace-table__actions",
@@ -3134,13 +3024,6 @@
   "migrationMap": {},
   "canonicalRules": [
     {
-      "selector": ".view-more-link",
-      "prop": "color",
-      "value": "hsl(var(--foreground))",
-      "file": "analytics-overview.css",
-      "line": 183
-    },
-    {
       "selector": ".custom-select__option--top > svg",
       "prop": "margin-top",
       "value": "calc((18px - 14px) / 2)",
@@ -3153,55 +3036,6 @@
       "value": "calc((18px - 14px) / 2)",
       "file": "custom-select.css",
       "line": 142
-    },
-    {
-      "selector": ".setup-modal__header",
-      "prop": "align-items",
-      "value": "center",
-      "file": "overview.css",
-      "line": 15
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "padding",
-      "value": "0 1rem",
-      "file": "overview.css",
-      "line": 42
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "background",
-      "value": "hsl(var(--foreground))",
-      "file": "overview.css",
-      "line": 45
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "color",
-      "value": "hsl(var(--background))",
-      "file": "overview.css",
-      "line": 46
-    },
-    {
-      "selector": ".setup-modal__next:hover",
-      "prop": "opacity",
-      "value": "0.85",
-      "file": "overview.css",
-      "line": 55
-    },
-    {
-      "selector": ".tier-badge--fallback",
-      "prop": "background",
-      "value": "hsl(38 92% 50% / 0.15)",
-      "file": "overview.css",
-      "line": 105
-    },
-    {
-      "selector": ".tier-badge--fallback",
-      "prop": "color",
-      "value": "hsl(38 92% 40%)",
-      "file": "overview.css",
-      "line": 106
     },
     {
       "selector": ".summary-card",
@@ -3443,14 +3277,6 @@
       "losesTo": "theme.css:268"
     },
     {
-      "selector": ".view-more-link",
-      "prop": "color",
-      "value": "hsl(var(--muted-foreground))",
-      "file": "cards.css",
-      "line": 72,
-      "losesTo": "analytics-overview.css:183"
-    },
-    {
       "selector": ".chart-card",
       "prop": "box-shadow",
       "value": "var(--card-shadow)",
@@ -3571,22 +3397,6 @@
       "losesTo": "custom-select.css:142"
     },
     {
-      "selector": ".tier-badge--fallback",
-      "prop": "background",
-      "value": "hsl(var(--muted-foreground) / 0.1)",
-      "file": "data.css",
-      "line": 264,
-      "losesTo": "overview.css:105"
-    },
-    {
-      "selector": ".tier-badge--fallback",
-      "prop": "color",
-      "value": "hsl(var(--muted-foreground))",
-      "file": "data.css",
-      "line": 265,
-      "losesTo": "overview.css:106"
-    },
-    {
       "selector": ".feed-item",
       "prop": "align-items",
       "value": "flex-start",
@@ -3649,60 +3459,9 @@
       "file": "modals.css",
       "line": 48,
       "losesTo": "theme.css:1138"
-    },
-    {
-      "selector": ".setup-modal__header",
-      "prop": "align-items",
-      "value": "flex-start",
-      "file": "modals.css",
-      "line": 64,
-      "losesTo": "overview.css:15"
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "padding",
-      "value": "8px 20px",
-      "file": "modals.css",
-      "line": 97,
-      "losesTo": "overview.css:42"
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "color",
-      "value": "hsl(var(--primary-foreground))",
-      "file": "modals.css",
-      "line": 101,
-      "losesTo": "overview.css:46"
-    },
-    {
-      "selector": ".setup-modal__next",
-      "prop": "background",
-      "value": "hsl(var(--primary))",
-      "file": "modals.css",
-      "line": 102,
-      "losesTo": "overview.css:45"
-    },
-    {
-      "selector": ".setup-modal__next:hover",
-      "prop": "opacity",
-      "value": "0.9",
-      "file": "modals.css",
-      "line": 110,
-      "losesTo": "overview.css:55"
     }
   ],
   "componentSheets": {
-    "analytics-overview.css": [
-      "components/ReliabilityKpiCards.tsx",
-      "pages/GlobalOverview.tsx"
-    ],
-    "overview.css": [
-      "pages/GlobalOverview.tsx",
-      "pages/Overview.tsx"
-    ],
-    "reliability-card.css": [
-      "components/ReliabilityChart.tsx"
-    ],
     "routing-deprecation.css": [
       "components/RoutingDeprecationNotice.tsx"
     ],
@@ -3726,18 +3485,19 @@
       "(via @import)"
     ],
     "routing.css": [
-      "pages/GlobalOverview.tsx",
-      "pages/Overview.tsx",
       "pages/Routing.tsx"
     ]
   },
   "orphanStylesheets": [
     "agent-chart-tooltip.css",
+    "analytics-overview.css",
     "connection-detail.css",
     "filter-select.css",
     "model-filter.css",
     "organization.css",
+    "overview.css",
     "playground.css",
+    "reliability-card.css",
     "request-drawer.css",
     "welcome.css"
   ],
@@ -3745,10 +3505,10 @@
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 227,
-    "classes": 1149,
-    "canonicalRules": 37,
-    "ghostRules": 37
+    "blocks": 218,
+    "classes": 1113,
+    "canonicalRules": 29,
+    "ghostRules": 29
   },
   "missingImports": [
     "/Users/patrickbrandao/Projects/thinker/packages/frontend/src/styles/canvas.css",

@@ -1,8 +1,10 @@
-import { createResource, For, Show, type Component } from 'solid-js';
 import { formatErrorClass, formatNumber } from '../services/formatters.js';
 import { messagePing } from '../services/sse.js';
 import { getErrorBreakdown } from '../services/api/analytics.js';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { locale, t } from '../i18n/index.js';
+import { Panel } from './ui.js';
 
 function label(key: string): string {
   // Other languages use the translated error-class labels; English keeps the
@@ -16,51 +18,45 @@ export interface ErrorClassCardProps {
   agentName?: string;
 }
 
-const ErrorClassCard: Component<ErrorClassCardProps> = (props) => {
-  const [data] = createResource(
-    () => ({ range: props.range, agent: props.agentName, _ping: messagePing() }),
-    (p) => getErrorBreakdown(p.range, p.agent),
-  );
+/**
+ * "Error classes by frequency". Not mounted on any dashboard until the backend
+ * aggregates real error_class data (see its preservation spec).
+ */
+export default function ErrorClassCard({ range, agentName }: ErrorClassCardProps) {
+  const ping = useSignal(messagePing);
+  const { data } = useResource(() => getErrorBreakdown(range, agentName), [range, agentName, ping]);
 
-  const sorted = () => {
-    const d = data();
-    if (!d) return [];
-    return Object.entries(d.by_class)
-      .filter(([, count]) => count > 0)
-      .sort(([, a], [, b]) => b - a);
-  };
-
-  const maxCount = () => {
-    const s = sorted();
-    return s.length > 0 ? s[0]![1] : 1;
-  };
+  const sorted = data
+    ? Object.entries(data.by_class)
+        .filter(([, count]) => count > 0)
+        .sort(([, a], [, b]) => b - a)
+    : [];
+  const maxCount = sorted.length > 0 ? sorted[0]![1] : 1;
 
   return (
-    <div class="error-class-card">
-      <div class="error-class-card__title">{t('overview.errorClasses.title')}</div>
-      <Show
-        when={sorted().length > 0}
-        fallback={<p class="error-class-card__empty">{t('overview.errorClasses.empty')}</p>}
-      >
-        <div class="error-class-card__list">
-          <For each={sorted()}>
-            {([key, count]) => (
-              <div class="error-class-card__row">
-                <span class="error-class-card__label">{label(key)}</span>
-                <div class="error-class-card__bar-wrap">
-                  <div
-                    class="error-class-card__bar"
-                    style={{ width: `${(count / maxCount()) * 100}%` }}
-                  />
-                </div>
-                <span class="error-class-card__count">{formatNumber(count)}</span>
+    <Panel title={t('overview.errorClasses.title')}>
+      {sorted.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {sorted.map(([key, count]) => (
+            <div key={key} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3">
+              <span className="error-class-card__label truncate text-sm text-dim">
+                {label(key)}
+              </span>
+              <div className="h-1.5 overflow-hidden rounded-full bg-s3">
+                <div
+                  className="h-full rounded-full bg-danger"
+                  style={{ width: `${(count / maxCount) * 100}%` }}
+                />
               </div>
-            )}
-          </For>
+              <span className="font-mono text-xs tabular-nums text-muted">
+                {formatNumber(count)}
+              </span>
+            </div>
+          ))}
         </div>
-      </Show>
-    </div>
+      ) : (
+        <p className="text-sm text-muted">{t('overview.errorClasses.empty')}</p>
+      )}
+    </Panel>
   );
-};
-
-export default ErrorClassCard;
+}

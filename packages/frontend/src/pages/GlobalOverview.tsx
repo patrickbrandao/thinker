@@ -1,17 +1,8 @@
-import { Title } from '@solidjs/meta';
-import { toggleScrollFade } from '../services/scroll-fade.js';
-import { A, useNavigate } from '@solidjs/router';
-import {
-  createResource,
-  createSignal,
-  createMemo,
-  createEffect,
-  on,
-  For,
-  Show,
-  type Component,
-} from 'solid-js';
-import AddAgentModal from '../components/AddAgentModal.jsx';
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { BarChart3 } from 'lucide-react';
+import { platformIcon } from 'thinker-shared';
+import AddAgentModal from '../components/AddAgentModal.js';
 import {
   getAgents,
   getGlobalProviders,
@@ -19,41 +10,14 @@ import {
   getRecentRequests,
   mergeUsage,
 } from '../services/api.js';
-import { customProviderColor } from '../services/formatters.js';
-import { customProviderLogo } from '../components/ProviderIcon.jsx';
+import { customProviderColor, formatNumber, formatCost } from '../services/formatters.js';
+import { customProviderLogo, providerIcon } from '../components/ProviderIcon.js';
 import { stripCustomPrefix } from '../services/routing-utils.js';
 import {
   getOverview,
   getModelUsage,
   getOverviewAgentUsage,
   getOverviewProviderUsage,
-} from '../services/api/analytics.js';
-import { formatNumber, formatCost } from '../services/formatters.js';
-import { providerIcon } from '../components/ProviderIcon.jsx';
-import { preloadModelDisplayNames } from '../services/model-display.js';
-import { PROVIDERS } from '../services/providers.js';
-import { AGENT_COLORS } from '../components/MultiAgentTokenChart.jsx';
-import InfoTooltip from '../components/InfoTooltip.jsx';
-import UnifiedChartCard from '../components/UnifiedChartCard.jsx';
-import ReliabilityKpiCards from '../components/ReliabilityKpiCards.jsx';
-import Sparkline from '../components/Sparkline.jsx';
-import FilterSelect from '../components/FilterSelect.jsx';
-import Select from '../components/Select.jsx';
-import { authLabel, authBadgeFor } from '../components/AuthBadge.jsx';
-import { platformIcon } from 'thinker-shared';
-import GlobalOverviewSkeleton from '../components/GlobalOverviewSkeleton.jsx';
-import MessageTable from '../components/MessageTable.jsx';
-import {
-  COMPACT_COLUMNS,
-  type MessageColumnKey,
-  type MessageRow,
-} from '../components/message-table-types.js';
-import { agentPing, analyticsPing, messagePing, routingPing } from '../services/sse.js';
-import '../styles/overview.css';
-import '../styles/charts.css';
-import '../styles/analytics-overview.css';
-import '../styles/routing.css';
-import {
   getReliabilityStats,
   getRequestStatusTimeseries,
   getPerProviderReliability,
@@ -63,8 +27,29 @@ import {
   successRate,
   attemptSuccessRate,
 } from '../services/api/analytics.js';
+import { preloadModelDisplayNames } from '../services/model-display.js';
+import { PROVIDERS } from '../services/providers.js';
+import { AGENT_COLORS } from '../components/MultiAgentTokenChart.js';
+import InfoTooltip from '../components/InfoTooltip.js';
+import UnifiedChartCard, { type ChartTab } from '../components/UnifiedChartCard.js';
+import ReliabilityKpiCards from '../components/ReliabilityKpiCards.js';
+import Sparkline from '../components/Sparkline.js';
+import FilterSelect from '../components/FilterSelect.js';
+import Select from '../components/Select.js';
+import { authLabel, authBadgeFor } from '../components/AuthBadge.js';
+import GlobalOverviewSkeleton from '../components/GlobalOverviewSkeleton.js';
+import MessageTable from '../components/MessageTable.js';
+import { Badge, Button, ButtonLink, EmptyState, Panel, Skel } from '../components/ui.js';
+import {
+  COMPACT_COLUMNS,
+  type MessageColumnKey,
+  type MessageRow,
+} from '../components/message-table-types.js';
+import { agentPing, analyticsPing, messagePing, routingPing } from '../services/sse.js';
 import { formatRate } from '../services/overview-format.js';
 import { rangeOptions } from '../services/use-overview-range.js';
+import { useSignal } from '../lib/signal.js';
+import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 
 interface ProviderGroup {
@@ -123,8 +108,12 @@ interface AgentRow {
   sparkline: number[];
 }
 
+type TSResult = { agents: string[]; timeseries: Array<Record<string, number | string>> };
+type UsageTSResult = { tokenUsage: TSResult; messageUsage: TSResult; costUsage: TSResult };
+
 const RANGE_STORAGE_KEY = 'thinker_global_range';
 const GROUP_STORAGE_KEY = 'thinker_global_group';
+const ONBOARDING_DISMISSED_KEY = 'overview_onboarding_dismissed';
 
 function loadRange(): string {
   try {
@@ -136,189 +125,247 @@ function loadRange(): string {
   return '7d';
 }
 
+function loadGroup(): string {
+  try {
+    const v = localStorage.getItem(GROUP_STORAGE_KEY);
+    if (v === 'status' || v === 'provider' || v === 'agent') return v;
+  } catch {
+    /* ignore */
+  }
+  return 'status';
+}
+
+function loadSavedAgents(key: string): Set<string> {
+  try {
+    const saved = sessionStorage.getItem(key);
+    if (saved) return new Set(JSON.parse(saved) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+function persist(storage: 'local' | 'session', key: string, value: string): void {
+  try {
+    (storage === 'local' ? localStorage : sessionStorage).setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function filterSeries(raw: TSResult | undefined, sel: Set<string>): TSResult | undefined {
+  if (!raw) return undefined;
+  if (sel.size === 0) return raw;
+  return {
+    agents: raw.agents.filter((a) => sel.has(a)),
+    timeseries: raw.timeseries.map((row) => {
+      const filtered: Record<string, number | string> = {};
+      for (const [k, v] of Object.entries(row)) {
+        if (k === 'hour' || k === 'date' || sel.has(k)) filtered[k] = v;
+      }
+      return filtered;
+    }),
+  };
+}
+
 /** Placeholder rows for a panel whose own data is still loading. */
-const PanelRowsSkeleton = () => (
-  <div data-testid="panel-rows-skeleton">
-    <For each={[1, 2, 3]}>
-      {() => (
-        <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
-          <div class="skeleton skeleton--text" style="width: 140px;" />
-          <div class="skeleton skeleton--text" style="width: 100px;" />
-          <div class="skeleton skeleton--text" style="width: 50px;" />
+function PanelRowsSkeleton() {
+  return (
+    <div data-testid="panel-rows-skeleton" className="flex flex-col gap-3 p-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skel width={140} height={12} />
+          <Skel width={100} height={12} />
+          <Skel width={50} height={12} />
         </div>
-      )}
-    </For>
-  </div>
-);
+      ))}
+    </div>
+  );
+}
 
-const GlobalOverview: Component = () => {
+/** A count that drills into the Requests log without triggering the row's own link. */
+function CountLink({
+  to,
+  title,
+  onGo,
+  children,
+}: {
+  to: string;
+  title: string;
+  onGo: (to: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      className="link-action"
+      href={to}
+      title={title}
+      onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onGo(to);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+function HeadTip({ label, tip }: { label: string; tip?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {tip ? <InfoTooltip text={tip} /> : null}
+    </span>
+  );
+}
+
+function CustomLetter({ name, size }: { name: string; size: 16 | 20 }) {
+  return (
+    <span
+      className={
+        size === 16
+          ? 'provider-card__logo-letter inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-on-accent'
+          : 'inline-flex size-5 shrink-0 items-center justify-center rounded-control text-[11px] font-semibold text-on-accent'
+      }
+      // Custom providers get a generated color derived from their name.
+      style={{ background: customProviderColor(name) }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/** The workspace dashboard: every harness and provider over one time range. */
+export default function GlobalOverview() {
   const navigate = useNavigate();
-  preloadModelDisplayNames();
+  const aPing = useSignal(analyticsPing);
+  const mPing = useSignal(messagePing);
+  const agPing = useSignal(agentPing);
+  const rPing = useSignal(routingPing);
 
-  // ── Range state (persisted in localStorage) ──────────────────────────
-  const [chartRange, setChartRangeRaw] = createSignal(loadRange());
+  useEffect(() => {
+    preloadModelDisplayNames();
+  }, []);
+
+  // ── Range and grouping (persisted in localStorage) ───────────────────
+  const [chartRange, setChartRangeRaw] = useState(loadRange);
   const setChartRange = (v: string) => {
     setChartRangeRaw(v);
-    try {
-      localStorage.setItem(RANGE_STORAGE_KEY, v);
-    } catch {
-      /* ignore */
-    }
+    persist('local', RANGE_STORAGE_KEY, v);
   };
-
-  // ── Group by state (persisted in localStorage) ───────────────────────
-  const loadGroup = (): string => {
-    try {
-      const v = localStorage.getItem(GROUP_STORAGE_KEY);
-      if (v === 'status' || v === 'provider' || v === 'agent') return v;
-    } catch {
-      /* ignore */
-    }
-    return 'status';
-  };
-  const [groupBy, setGroupByRaw] = createSignal(loadGroup());
+  const [groupBy, setGroupByRaw] = useState(loadGroup);
   const setGroupBy = (v: string) => {
     setGroupByRaw(v);
-    try {
-      localStorage.setItem(GROUP_STORAGE_KEY, v);
-    } catch {
-      /* ignore */
-    }
+    persist('local', GROUP_STORAGE_KEY, v);
   };
+  const [chartView, setChartView] = useState<ChartTab>('requests');
 
-  // ── Chart view state ─────────────────────────────────────────────────
-  const [chartView, setChartView] = createSignal<'requests' | 'recovered' | 'tokens' | 'cost'>(
-    'requests',
-  );
-
-  // ── Data resources (5 parallel) ──────────────────────────────────────
-  const [overviewResult] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    async (p) => ({
-      range: p.range,
-      data: (await getOverview(p.range, undefined, true)) as OverviewResponse,
+  // ── Data ─────────────────────────────────────────────────────────────
+  const overviewRes = useResource(
+    async () => ({
+      range: chartRange,
+      data: (await getOverview(chartRange, undefined, true)) as OverviewResponse,
     }),
+    [chartRange, aPing],
   );
-  const overview = () => overviewResult()?.data;
+  const overview = overviewRes.data?.data;
+  // Skeleton on a range change, not on the frequent background SSE refetches
+  // (those update in place): the visible overview belongs to another range.
+  const rangeChanging = overviewRes.loading && overviewRes.data?.range !== chartRange;
 
-  // Show the skeleton on a range change, but not on the frequent background SSE
-  // `_ping` refetches (those update in place). Track the range the visible
-  // overview belongs to; while a newer range is loading, treat it as changing.
-  const [loadedRange, setLoadedRange] = createSignal<string>();
-  createEffect(() => {
-    const result = overviewResult();
-    if (!overviewResult.loading && result !== undefined) setLoadedRange(result.range);
-  });
   // Recent Requests and Model usage load on their own, in parallel with the
   // overview. Recent Requests follows the live message feed (messagePing);
   // Model usage is an aggregate and refreshes at the analytics cadence. Each
   // result keeps the range it was loaded for, so a range change never shows
   // the previous range's rows.
-  const [recentRequestsResult] = createResource(
-    () => ({ range: chartRange(), _ping: messagePing() }),
-    async (p) => ({
-      range: p.range,
-      data: ((await getRecentRequests(p.range)) as { items: MessageRow[] }).items,
+  const recentRes = useResource(
+    async () => ({
+      range: chartRange,
+      data: ((await getRecentRequests(chartRange)) as { items: MessageRow[] }).items,
     }),
+    [chartRange, mPing],
   );
-  const recentRequests = () => {
-    const result = recentRequestsResult();
-    return result?.range === chartRange() ? result.data : undefined;
-  };
-  const [modelUsageResult] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    async (p) => ({
-      range: p.range,
-      data: ((await getModelUsage(p.range)) as { cost_by_model: CostByModelRow[] }).cost_by_model,
+  const recentRequests = recentRes.data?.range === chartRange ? recentRes.data.data : undefined;
+  const modelUsageRes = useResource(
+    async () => ({
+      range: chartRange,
+      data: ((await getModelUsage(chartRange)) as { cost_by_model: CostByModelRow[] })
+        .cost_by_model,
     }),
+    [chartRange, aPing],
   );
-  const modelUsage = () => {
-    const result = modelUsageResult();
-    return result?.range === chartRange() ? result.data : undefined;
-  };
-  const rangeChanging = () => overviewResult.loading && loadedRange() !== chartRange();
+  const modelUsage = modelUsageRes.data?.range === chartRange ? modelUsageRes.data.data : undefined;
 
-  const [agents] = createResource(
-    () => ({ _agentPing: agentPing(), _analyticsPing: analyticsPing() }),
-    async () => {
-      try {
-        const data = (await getAgents()) as { agents?: AgentRow[] } | AgentRow[] | null;
-        return Array.isArray(data) ? data : (data?.agents ?? []);
-      } catch {
-        return [] as AgentRow[];
-      }
-    },
-  );
+  const agentsRes = useResource(async () => {
+    try {
+      const data = (await getAgents()) as { agents?: AgentRow[] } | AgentRow[] | null;
+      return Array.isArray(data) ? data : (data?.agents ?? []);
+    } catch {
+      return [] as AgentRow[];
+    }
+  }, [agPing, aPing]);
+  const agents = agentsRes.data;
 
-  // CONFIG resource — paints the provider table immediately (cheap endpoint).
   // Provider rows/status are routing-domain state: a connect/disconnect/rename
-  // emits a `routing` SSE event (→ routingPing), so the config list must key on
-  // routingPing to stay fresh. agentPing is kept because a new/removed agent can
-  // also change which providers appear in the global view.
-  const [providerConfig] = createResource(
-    () => ({ a: agentPing(), r: routingPing() }),
-    async () => {
-      try {
-        return (await getGlobalProviders()).providers;
-      } catch {
-        return [];
-      }
-    },
-  );
+  // emits a `routing` SSE event, so the config list keys on routingPing. A new
+  // or removed agent can also change which providers appear.
+  const providerConfigRes = useResource(async () => {
+    try {
+      return (await getGlobalProviders()).providers;
+    } catch {
+      return [];
+    }
+  }, [agPing, rPing]);
+  // The expensive 30d usage aggregation, fetched independently.
+  const providerUsageRes = useResource(async () => {
+    try {
+      return (await getGlobalProviderUsage()).providers;
+    } catch {
+      return [];
+    }
+  }, [aPing, rPing]);
 
-  // USAGE resource — the expensive 30d aggregation, fetched independently. Its
-  // source carries the SSE ping signals (new message activity → analyticsPing,
-  // a provider connect/disconnect/rename → routingPing) so stats refresh live.
-  const [providerUsage] = createResource(
-    () => ({ m: analyticsPing(), r: routingPing() }),
-    async () => {
-      try {
-        return (await getGlobalProviderUsage()).providers;
-      } catch {
-        return [];
-      }
-    },
+  // One token per range: a reliability result from another range never shows.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const reliabilityScope = useMemo(() => ({}), [chartRange]);
+  const reliabilityRes = useResource(
+    async () => ({ scope: reliabilityScope, data: await getReliabilityStats(chartRange) }),
+    [reliabilityScope, aPing],
   );
-
-  // ── Reliability resources ─────────────────────────────
-  const reliabilityScope = createMemo(() => ({ range: chartRange() }));
-  const [reliabilityStatsResult] = createResource(
-    () => ({ scope: reliabilityScope(), _ping: analyticsPing() }),
-    async (p) => ({ scope: p.scope, data: await getReliabilityStats(p.scope.range) }),
-  );
-  const reliabilityStats = () => {
-    const result = reliabilityStatsResult();
-    return result?.scope === reliabilityScope() ? result.data : undefined;
-  };
+  const reliabilityStats =
+    reliabilityRes.data?.scope === reliabilityScope ? reliabilityRes.data.data : undefined;
 
   // Request-status timeseries: feeds the "By request status" chart view AND
   // the Recovered requests tab (the fallback series alone).
-  const [requestStatusTs] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getRequestStatusTimeseries(p.range),
+  const requestStatusRes = useResource(
+    () => getRequestStatusTimeseries(chartRange),
+    [chartRange, aPing],
   );
-  const recoveredTs = () => {
-    const ts = requestStatusTs();
-    if (!ts) return undefined;
-    const picked = ts.keys.map((k, i) => ({ k, i })).filter(({ k }) => k === 'fallback');
+  const requestStatusTs = requestStatusRes.data;
+  const recoveredTs = useMemo(() => {
+    if (!requestStatusTs) return undefined;
+    const picked = requestStatusTs.keys
+      .map((k, i) => ({ k, i }))
+      .filter(({ k }) => k === 'fallback');
     return {
-      ...ts,
+      ...requestStatusTs,
       keys: picked.map(({ k }) => k),
-      buckets: ts.buckets.map((b) => ({
+      buckets: requestStatusTs.buckets.map((b) => ({
         bucket: b.bucket,
         counts: picked.map(({ i }) => b.counts[i] ?? 0),
       })),
     };
-  };
+  }, [requestStatusTs]);
 
-  // Harness table usage, driven by the page range selector (the workspace
-  // agents endpoint is a fixed window; this table must follow the filter).
-  const [harnessUsage] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getOverviewAgentUsage(p.range) as Promise<UsageTSResult>,
+  // Harness table usage follows the page range selector (the workspace agents
+  // endpoint is a fixed window).
+  const harnessUsageRes = useResource(
+    () => getOverviewAgentUsage(chartRange) as Promise<UsageTSResult>,
+    [chartRange, aPing],
   );
   const harnessUsageFor = (agentName: string) => {
-    const ts = harnessUsage()?.tokenUsage;
+    const ts = harnessUsageRes.data?.tokenUsage;
     if (!ts || !ts.agents.includes(agentName)) return null;
     const spark: number[] = [];
     let total = 0;
@@ -330,943 +377,657 @@ const GlobalOverview: Component = () => {
     return { total, spark };
   };
 
-  const [agentReliability] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getPerAgentReliability(p.range),
+  const agentReliability = useResource(
+    () => getPerAgentReliability(chartRange),
+    [chartRange, aPing],
+  );
+  const providerReliability = useResource(
+    () => getPerProviderReliability(chartRange),
+    [chartRange, aPing],
+  );
+  const modelReliability = useResource(
+    () => getPerModelReliability(chartRange),
+    [chartRange, aPing],
   );
 
-  const [providerReliability] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getPerProviderReliability(p.range),
+  // Merged groups (config + usage by provider+auth_type) drive the table;
+  // undefined until the config resolves.
+  const providers = useMemo(
+    () =>
+      providerConfigRes.data === undefined
+        ? undefined
+        : (mergeUsage(providerConfigRes.data, providerUsageRes.data) as unknown as ProviderGroup[]),
+    [providerConfigRes.data, providerUsageRes.data],
   );
 
-  const [modelReliability] = createResource(
-    () => ({ range: chartRange(), _ping: analyticsPing() }),
-    (p) => getPerModelReliability(p.range),
-  );
-
-  // Shimmer the usage cells until the first usage load resolves; SSE refetches
-  // keep the prior numbers on screen so the table doesn't flicker.
-
-  // Merged groups (config + usage by provider+auth_type) drive the table.
-  // `providers()` stays `undefined` until config resolves so the existing
-  // `providers() !== undefined` "has loaded" checks keep working.
-  const providers = () => {
-    const config = providerConfig();
-    if (config === undefined) return undefined;
-    return mergeUsage(config, providerUsage()) as unknown as ProviderGroup[];
-  };
-
-  type TSResult = { agents: string[]; timeseries: Array<Record<string, number | string>> };
-  type UsageTSResult = { tokenUsage: TSResult; messageUsage: TSResult; costUsage: TSResult };
-  const usageFetcher = (range: string, group: string): Promise<UsageTSResult> => {
-    if (group === 'provider') return getOverviewProviderUsage(range) as Promise<UsageTSResult>;
-    return getOverviewAgentUsage(range) as Promise<UsageTSResult>;
-  };
-
-  const [usageTimeseries] = createResource(
-    () => ({ range: chartRange(), group: groupBy(), _ping: analyticsPing() }),
-    (p) => usageFetcher(p.range, p.group),
+  const usageRes = useResource(
+    () =>
+      (groupBy === 'provider'
+        ? getOverviewProviderUsage(chartRange)
+        : getOverviewAgentUsage(chartRange)) as Promise<UsageTSResult>,
+    [chartRange, groupBy, aPing],
   );
 
   // Provider-grouped series key custom providers as 'custom:<uuid>'. Remap
-  // those keys to the provider's display name so the filter, legend, and
-  // tooltip read like every other provider. Reactive to customProviderData,
-  // so names fill in once that resource resolves.
-  const displaySeriesName = (key: string) => {
-    const name = key.startsWith('custom:')
-      ? (providers()?.find((g) => g.provider === key)?.display_name ?? null)
-      : null;
-    // 'hour'/'date' are the row's bucket columns — never let a custom
-    // provider named like them clobber the axis.
-    return name && name !== 'hour' && name !== 'date' ? name : key;
-  };
-  const remapCustomSeries = (raw: TSResult | undefined): TSResult | undefined => {
-    if (!raw || !raw.agents.some((a) => a.startsWith('custom:'))) return raw;
-    return {
-      agents: raw.agents.map(displaySeriesName),
-      timeseries: raw.timeseries.map((row) =>
-        Object.fromEntries(Object.entries(row).map(([k, v]) => [displaySeriesName(k), v])),
-      ),
+  // those keys to the provider's display name so the filter, legend and
+  // tooltip read like every other provider.
+  const { tokenSeries, messageSeries, costSeries } = useMemo(() => {
+    const displaySeriesName = (key: string) => {
+      const name = key.startsWith('custom:')
+        ? (providers?.find((g) => g.provider === key)?.display_name ?? null)
+        : null;
+      // 'hour'/'date' are the row's bucket columns — never let a custom
+      // provider named like them clobber the axis.
+      return name && name !== 'hour' && name !== 'date' ? name : key;
     };
-  };
-  const tokenSeries = createMemo(() => remapCustomSeries(usageTimeseries()?.tokenUsage));
-  const messageSeries = createMemo(() => remapCustomSeries(usageTimeseries()?.messageUsage));
-  const costSeries = createMemo(() => remapCustomSeries(usageTimeseries()?.costUsage));
+    const remap = (raw: TSResult | undefined): TSResult | undefined => {
+      if (!raw || !raw.agents.some((a) => a.startsWith('custom:'))) return raw;
+      return {
+        agents: raw.agents.map(displaySeriesName),
+        timeseries: raw.timeseries.map((row) =>
+          Object.fromEntries(Object.entries(row).map(([k, v]) => [displaySeriesName(k), v])),
+        ),
+      };
+    };
+    return {
+      tokenSeries: remap(usageRes.data?.tokenUsage),
+      messageSeries: remap(usageRes.data?.messageUsage),
+      costSeries: remap(usageRes.data?.costUsage),
+    };
+  }, [usageRes.data, providers]);
 
-  // ── Harness filter state (sessionStorage) ────────────────────────────
-  // Scope the persisted selection by groupBy(): the provider grouping and the
-  // harness grouping list completely different series, so a single shared set
-  // would carry harness names into provider mode (and vice versa), filtering
-  // out every series and blanking the chart. A per-grouping key keeps each
-  // mode's selection independent.
-  const storageKey = () => `global-agent-filter:${groupBy()}`;
-  const loadSavedAgents = (key: string): Set<string> => {
-    try {
-      const saved = sessionStorage.getItem(key);
-      if (saved) return new Set(JSON.parse(saved) as string[]);
-    } catch {
-      /* ignore */
-    }
-    return new Set();
-  };
-  const [selectedAgents, setSelectedAgents] = createSignal<Set<string>>(
-    loadSavedAgents(storageKey()),
+  // ── Series filter (sessionStorage) ───────────────────────────────────
+  // Scoped by grouping: provider and harness groupings list different series,
+  // so a shared set would filter out every series when switching modes.
+  const storageKey = `global-agent-filter:${groupBy}`;
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(() =>
+    loadSavedAgents(storageKey),
   );
-  // When the grouping changes, reload the selection persisted for that grouping
-  // (defaulting to "all selected" when none was saved for it).
-  createEffect(
-    on(
-      () => groupBy(),
-      () => setSelectedAgents(loadSavedAgents(storageKey())),
-      { defer: true },
-    ),
-  );
-  const allAgents = createMemo(() => {
-    const tokenAgents = tokenSeries()?.agents ?? [];
-    const msgAgents = messageSeries()?.agents ?? [];
-    const costAgents = costSeries()?.agents ?? [];
-    const set = new Set([...tokenAgents, ...msgAgents, ...costAgents]);
+  useEffect(() => {
+    setSelectedAgents(loadSavedAgents(storageKey));
+  }, [storageKey]);
+
+  const allAgents = useMemo(() => {
+    const set = new Set([
+      ...(tokenSeries?.agents ?? []),
+      ...(messageSeries?.agents ?? []),
+      ...(costSeries?.agents ?? []),
+    ]);
     return [...set].sort();
-  });
+  }, [tokenSeries, messageSeries, costSeries]);
 
-  const agentColorMap = createMemo(() => {
+  const agentColorMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const list = allAgents();
-    for (let i = 0; i < list.length; i++) {
-      map[list[i]!] = AGENT_COLORS[i % AGENT_COLORS.length]!;
-    }
+    allAgents.forEach((a, i) => {
+      map[a] = AGENT_COLORS[i % AGENT_COLORS.length]!;
+    });
     return map;
-  });
+  }, [allAgents]);
 
-  const effectiveSelected = () => {
-    const sel = selectedAgents();
-    const all = allAgents();
-    if (all.length === 0) return sel;
-    // Prune the persisted selection against the series actually present for the
-    // current grouping. If nothing intersects (e.g. a stale set left over from
-    // the other grouping, or an empty selection), fall back to "all selected"
-    // so the chart never renders blank.
-    const pruned = new Set(all.filter((a) => sel.has(a)));
-    if (pruned.size === 0) return new Set(all);
-    return pruned;
+  // Prune the persisted selection against the series present for the current
+  // grouping; when nothing intersects, fall back to "all selected" so the
+  // chart never renders blank.
+  const effectiveSelected = useMemo(() => {
+    if (allAgents.length === 0) return selectedAgents;
+    const pruned = new Set(allAgents.filter((a) => selectedAgents.has(a)));
+    return pruned.size === 0 ? new Set(allAgents) : pruned;
+  }, [allAgents, selectedAgents]);
+
+  const saveSelection = (next: Set<string>) => {
+    setSelectedAgents(next);
+    persist('session', storageKey, JSON.stringify([...next]));
   };
-
   const toggleAgent = (agent: string) => {
-    const current = effectiveSelected();
-    const next = new Set(current);
-    if (next.has(agent)) {
-      next.delete(agent);
-    } else {
-      next.add(agent);
-    }
-    setSelectedAgents(next);
-    try {
-      sessionStorage.setItem(storageKey(), JSON.stringify([...next]));
-    } catch {
-      /* ignore */
-    }
+    const next = new Set(effectiveSelected);
+    if (next.has(agent)) next.delete(agent);
+    else next.add(agent);
+    saveSelection(next);
   };
-  const setAllAgents = (on: boolean) => {
-    const next = on ? new Set(allAgents()) : new Set<string>();
-    setSelectedAgents(next);
-    try {
-      sessionStorage.setItem(storageKey(), JSON.stringify([...next]));
-    } catch {
-      /* ignore */
-    }
-  };
+  const setAllAgents = (on: boolean) => saveSelection(on ? new Set(allAgents) : new Set());
 
-  const filteredAgentTimeseries = createMemo(() => {
-    const raw = tokenSeries();
-    if (!raw) return undefined;
-    const sel = effectiveSelected();
-    if (sel.size === 0) return raw;
-    const filtered_agents = raw.agents.filter((a) => sel.has(a));
-    const timeseries = raw.timeseries.map((row) => {
-      const filtered: Record<string, number | string> = {};
-      for (const [k, v] of Object.entries(row)) {
-        if (k === 'hour' || k === 'date' || sel.has(k)) filtered[k] = v;
-      }
-      return filtered;
-    });
-    return { agents: filtered_agents, timeseries };
-  });
+  const filteredTokenTs = useMemo(
+    () => filterSeries(tokenSeries, effectiveSelected),
+    [tokenSeries, effectiveSelected],
+  );
+  const filteredMessageTs = useMemo(
+    () => filterSeries(messageSeries, effectiveSelected),
+    [messageSeries, effectiveSelected],
+  );
+  const filteredCostTs = useMemo(
+    () => filterSeries(costSeries, effectiveSelected),
+    [costSeries, effectiveSelected],
+  );
 
-  const filteredAgentMessageTimeseries = createMemo(() => {
-    const raw = messageSeries();
-    if (!raw) return undefined;
-    const sel = effectiveSelected();
-    if (sel.size === 0) return raw;
-    const filtered_agents = raw.agents.filter((a) => sel.has(a));
-    const timeseries = raw.timeseries.map((row) => {
-      const filtered: Record<string, number | string> = {};
-      for (const [k, v] of Object.entries(row)) {
-        if (k === 'hour' || k === 'date' || sel.has(k)) filtered[k] = v;
-      }
-      return filtered;
-    });
-    return { agents: filtered_agents, timeseries };
-  });
+  // ── Derived ──────────────────────────────────────────────────────────
+  const agentList = agents ?? [];
+  const providerList = providers ?? [];
+  const sortedAgents = [...agentList].sort((a, b) => (b.total_tokens ?? 0) - (a.total_tokens ?? 0));
+  const hasNoAgents = agents !== undefined && agentList.length === 0;
+  const hasNoProviders = providers !== undefined && providerList.length === 0;
 
-  const filteredAgentCostTimeseries = createMemo(() => {
-    const raw = costSeries();
-    if (!raw) return undefined;
-    const sel = effectiveSelected();
-    if (sel.size === 0) return raw;
-    const filtered_agents = raw.agents.filter((a: string) => sel.has(a));
-    const timeseries = raw.timeseries.map((row: Record<string, number | string>) => {
-      const filtered: Record<string, number | string> = {};
-      for (const [k, v] of Object.entries(row)) {
-        if (k === 'hour' || k === 'date' || sel.has(k)) filtered[k] = v;
-      }
-      return filtered;
-    });
-    return { agents: filtered_agents, timeseries };
-  });
-
-  // ── Derived data ─────────────────────────────────────────────────────
-  const agentList = () => (agents() ?? []) as AgentRow[];
-  const providerList = () => (providers() ?? []) as ProviderGroup[];
-
-  const sortedAgents = createMemo(() => {
-    return [...agentList()].sort((a, b) => (b.total_tokens ?? 0) - (a.total_tokens ?? 0));
-  });
-
-  // Onboarding: detect empty states
-  const hasNoAgents = () => agents() !== undefined && agentList().length === 0;
-  const hasNoProviders = () => providers() !== undefined && providerList().length === 0;
-
-  // Auto-open the Create Harness modal for first-time users (once per session)
-  const ONBOARDING_DISMISSED_KEY = 'overview_onboarding_dismissed';
-  const [addAgentOpen, setAddAgentOpen] = createSignal(false);
+  // Auto-open the Create Harness modal for first-time users (once per session).
+  const [addAgentOpen, setAddAgentOpen] = useState(false);
   const dismissAddAgent = () => {
     setAddAgentOpen(false);
+    persist('session', ONBOARDING_DISMISSED_KEY, '1');
+  };
+  useEffect(() => {
+    if (!hasNoAgents) return;
+    let dismissed: string | null = null;
     try {
-      sessionStorage.setItem(ONBOARDING_DISMISSED_KEY, '1');
+      dismissed = sessionStorage.getItem(ONBOARDING_DISMISSED_KEY);
     } catch {
       /* ignore */
     }
-  };
-  createEffect(
-    on(
-      () => hasNoAgents(),
-      (empty) => {
-        if (empty && !sessionStorage.getItem(ONBOARDING_DISMISSED_KEY)) {
-          setAddAgentOpen(true);
-        }
-      },
-      { defer: true },
-    ),
+    if (!dismissed) setAddAgentOpen(true);
+  }, [hasNoAgents]);
+
+  const recentColumns = useMemo((): MessageColumnKey[] => {
+    const at = COMPACT_COLUMNS.indexOf('model');
+    return [...COMPACT_COLUMNS.slice(0, at), 'agent', ...COMPACT_COLUMNS.slice(at)];
+  }, []);
+
+  const showDashboard =
+    !hasNoAgents &&
+    !hasNoProviders &&
+    !rangeChanging &&
+    overview !== undefined &&
+    agents !== undefined &&
+    providers !== undefined;
+
+  const requestsGroup = groupBy === 'agent' ? 'agent' : 'status';
+  const usageGroup = groupBy === 'provider' ? 'provider' : 'agent';
+  const recoveredTrendPct = (() => {
+    const s = reliabilityStats;
+    if (!s) return 0;
+    const cur = s.fallback_saves?.value ?? 0;
+    const prev = s.fallback_saves?.previous ?? 0;
+    if (prev === 0) return 0;
+    return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
+  })();
+
+  const segmented = (options: Array<{ key: string; label: string; active: boolean }>) => (
+    <div className="segmented" role="group">
+      {options.map((o) => (
+        <button key={o.key} type="button" aria-pressed={o.active} onClick={() => setGroupBy(o.key)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 
-  return (
-    <div class="container--lg">
-      <Title>{t('overview.pageTitle')}</Title>
+  const dashboard = () => {
+    const o = overview!;
+    return (
+      <>
+        <ReliabilityKpiCards stats={reliabilityStats} range={chartRange} />
 
-      {/* Add Harness Modal */}
-      <AddAgentModal open={addAgentOpen()} onClose={dismissAddAgent} />
-
-      {/* ── 1. Page Header ──────────────────────────────────────────── */}
-      <div class="page-header" style="border-bottom: none; padding-bottom: 0;">
-        <div>
-          <h1 class="page-header__title">{t('overview.title')}</h1>
-          <p class="page-header__subtitle">{t('overview.subtitle')}</p>
-        </div>
-        <Show when={!hasNoAgents() || !hasNoProviders()}>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <Select value={chartRange()} onChange={setChartRange} options={rangeOptions()} />
-          </div>
-        </Show>
-      </div>
-
-      {/* Onboarding empty state: replaces all dashboard content */}
-      <Show when={hasNoAgents() && hasNoProviders()}>
-        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 24px; gap: 8px; width: 100%; background: hsl(var(--muted) / 0.45); border-radius: var(--radius);">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="32"
-            height="32"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            style="color: hsl(var(--muted-foreground)); margin-bottom: 4px;"
-            aria-hidden="true"
-          >
-            <path d="M4 2H2v19c0 .55.45 1 1 1h19v-2H4z" />
-            <path d="M11 18c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v11c0 .55.45 1 1 1zm-1-2H8v-2h2zm0-9v5H8V7zm9 11c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1v14c0 .55.45 1 1 1zm-1-2h-2v-6h2zM16 4h2v4h-2z" />
-          </svg>
-          <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground));">
-            {t('overview.empty.noActivity')}
-          </div>
-          <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-            {t('overview.empty.setupAndConnect')}
-          </div>
-          <button class="btn btn--primary btn--sm" onClick={() => setAddAgentOpen(true)}>
-            {t('overview.empty.setupHarness')}
-          </button>
-        </div>
-      </Show>
-
-      <Show when={!hasNoAgents() && hasNoProviders()}>
-        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 24px; gap: 8px; width: 100%; background: hsl(var(--muted) / 0.45); border-radius: var(--radius);">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="32"
-            height="32"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            style="color: hsl(var(--muted-foreground)); margin-bottom: 4px;"
-            aria-hidden="true"
-          >
-            <path d="M4 2H2v19c0 .55.45 1 1 1h19v-2H4z" />
-            <path d="M11 18c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v11c0 .55.45 1 1 1zm-1-2H8v-2h2zm0-9v5H8V7zm9 11c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1v14c0 .55.45 1 1 1zm-1-2h-2v-6h2zM16 4h2v4h-2z" />
-          </svg>
-          <div style="font-size: var(--font-size-base); font-weight: 600; color: hsl(var(--foreground));">
-            {t('overview.empty.noProviders')}
-          </div>
-          <div style="font-size: var(--font-size-sm); color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-            {t('overview.empty.connectToRoute')}
-          </div>
-          <A
-            href="/providers/subscriptions"
-            class="btn btn--primary btn--sm"
-            style="text-decoration: none;"
-          >
-            {t('overview.empty.connectProvider')}
-          </A>
-        </div>
-      </Show>
-
-      {/* Dashboard content: hidden when fully empty */}
-      <Show
-        when={
-          !hasNoAgents() &&
-          !hasNoProviders() &&
-          !rangeChanging() &&
-          overview() !== undefined &&
-          agents() !== undefined &&
-          providers() !== undefined
-        }
-        fallback={
-          <Show when={!hasNoAgents() && !hasNoProviders()}>
-            <GlobalOverviewSkeleton />
-          </Show>
-        }
-      >
-        {/* ── Reliability KPI cards ── */}
-        <ReliabilityKpiCards stats={reliabilityStats()} range={chartRange()} />
-
-        {/* ── 2. Unified Chart Card ─────────────────────────────────── */}
-        {(() => {
-          const o = () => overview()!;
+        <UnifiedChartCard
+          activeTab={chartView}
+          onTabChange={setChartView}
+          requestsValue={o.summary.messages.value}
+          requestsTrendPct={o.summary.messages.trend_pct}
+          recoveredValue={reliabilityStats?.fallback_saves?.value ?? 0}
+          recoveredTrendPct={recoveredTrendPct}
+          recoveredTimeseries={recoveredTs}
+          costValue={o.summary.cost_today.value}
+          costTrendPct={o.summary.cost_today.trend_pct}
+          costInfoTooltip={t('overview.costInfo')}
+          tokensValue={o.summary.tokens_today.value}
+          tokensTrendPct={o.summary.tokens_today.trend_pct}
+          range={chartRange}
           // A request can touch several providers, so the Requests tab only
-          // groups by status or harness; usage tabs (tokens/cost) only group
-          // by provider or harness. One stored groupBy, coerced per tab.
-          const requestsGroup = () => (groupBy() === 'agent' ? 'agent' : 'status');
-          const usageGroup = () => (groupBy() === 'provider' ? 'provider' : 'agent');
-          return (
-            <UnifiedChartCard
-              activeTab={chartView()}
-              onTabChange={setChartView}
-              requestsValue={o().summary.messages.value}
-              requestsTrendPct={o().summary.messages.trend_pct}
-              recoveredValue={reliabilityStats()?.fallback_saves?.value ?? 0}
-              recoveredTrendPct={(() => {
-                const s = reliabilityStats();
-                if (!s) return 0;
-                const cur = s.fallback_saves?.value ?? 0;
-                const prev = s.fallback_saves?.previous ?? 0;
-                if (prev === 0) return 0;
-                return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
-              })()}
-              recoveredTimeseries={recoveredTs()}
-              costValue={o().summary.cost_today.value}
-              costTrendPct={o().summary.cost_today.trend_pct}
-              costInfoTooltip={t('overview.costInfo')}
-              tokensValue={o().summary.tokens_today.value}
-              tokensTrendPct={o().summary.tokens_today.trend_pct}
-              range={chartRange()}
-              requestStatusTimeseries={requestsGroup() === 'status' ? requestStatusTs() : undefined}
-              agentRequestTimeseries={
-                requestsGroup() === 'agent'
-                  ? (filteredAgentMessageTimeseries() ?? undefined)
-                  : undefined
-              }
-              agentTimeseries={filteredAgentTimeseries() ?? undefined}
-              agentCostTimeseries={filteredAgentCostTimeseries() ?? undefined}
-              colorMap={agentColorMap()}
-              seriesFilters={
-                <>
-                  <Show when={chartView() === 'requests'}>
-                    <button
-                      class="chart-card__filter-btn"
-                      classList={{
-                        'chart-card__filter-btn--active': requestsGroup() === 'status',
-                      }}
-                      onClick={() => setGroupBy('status')}
-                    >
-                      {t('overview.groupBy.status')}
-                    </button>
-                    <button
-                      class="chart-card__filter-btn"
-                      classList={{ 'chart-card__filter-btn--active': requestsGroup() === 'agent' }}
-                      onClick={() => setGroupBy('agent')}
-                    >
-                      {t('overview.groupBy.harness')}
-                    </button>
-                  </Show>
-                  <Show when={chartView() !== 'requests'}>
-                    <button
-                      class="chart-card__filter-btn"
-                      classList={{
-                        'chart-card__filter-btn--active': usageGroup() === 'provider',
-                      }}
-                      onClick={() => setGroupBy('provider')}
-                    >
-                      {t('overview.groupBy.provider')}
-                    </button>
-                    <button
-                      class="chart-card__filter-btn"
-                      classList={{ 'chart-card__filter-btn--active': usageGroup() === 'agent' }}
-                      onClick={() => setGroupBy('agent')}
-                    >
-                      {t('overview.groupBy.harness')}
-                    </button>
-                  </Show>
-                  <Show when={chartView() !== 'requests' || requestsGroup() === 'agent'}>
-                    <div style="min-width: 140px;">
-                      <FilterSelect
-                        noun={
-                          groupBy() === 'provider'
-                            ? t('overview.nounProviders')
-                            : t('overview.nounHarnesses')
-                        }
-                        items={allAgents()}
-                        selected={effectiveSelected()}
-                        colorMap={agentColorMap()}
-                        onToggle={toggleAgent}
-                        onSelectAll={() => setAllAgents(true)}
-                        onUnselectAll={() => setAllAgents(false)}
-                      />
-                    </div>
-                  </Show>
-                </>
-              }
-            />
-          );
-        })()}
+          // groups by status or harness; usage tabs only group by provider or
+          // harness. One stored groupBy, coerced per tab.
+          requestStatusTimeseries={requestsGroup === 'status' ? requestStatusTs : undefined}
+          agentRequestTimeseries={requestsGroup === 'agent' ? filteredMessageTs : undefined}
+          agentTimeseries={filteredTokenTs}
+          agentCostTimeseries={filteredCostTs}
+          colorMap={agentColorMap}
+          seriesFilters={
+            <>
+              {chartView === 'requests'
+                ? segmented([
+                    {
+                      key: 'status',
+                      label: t('overview.groupBy.status'),
+                      active: requestsGroup === 'status',
+                    },
+                    {
+                      key: 'agent',
+                      label: t('overview.groupBy.harness'),
+                      active: requestsGroup === 'agent',
+                    },
+                  ])
+                : segmented([
+                    {
+                      key: 'provider',
+                      label: t('overview.groupBy.provider'),
+                      active: usageGroup === 'provider',
+                    },
+                    {
+                      key: 'agent',
+                      label: t('overview.groupBy.harness'),
+                      active: usageGroup === 'agent',
+                    },
+                  ])}
+              {chartView !== 'requests' || requestsGroup === 'agent' ? (
+                <div className="min-w-36">
+                  <FilterSelect
+                    noun={
+                      groupBy === 'provider'
+                        ? t('overview.nounProviders')
+                        : t('overview.nounHarnesses')
+                    }
+                    items={allAgents}
+                    selected={effectiveSelected}
+                    colorMap={agentColorMap}
+                    onToggle={toggleAgent}
+                    onSelectAll={() => setAllAgents(true)}
+                    onUnselectAll={() => setAllAgents(false)}
+                  />
+                </div>
+              ) : null}
+            </>
+          }
+        />
 
         {/* "Error classes by frequency" stays unmounted until the backend has
             real error_class data (see the preservation spec in tests/components). */}
 
-        {/* Stat cards removed — info is in Provider connections + Harnesses tables below */}
-
-        {/* ── 4. Recent Requests (full width) ──────────────────────────── */}
-        <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div
-            class="panel__title"
-            style="display: flex; justify-content: space-between; align-items: center;"
-          >
-            {t('overview.recentRequests')}
-            <A href="/messages" class="view-more-link">
+        <Panel
+          title={t('overview.recentRequests')}
+          actions={
+            <Link to="/messages" className="view-more-link link-action text-sm">
               {t('overview.viewMore')}
-            </A>
-          </div>
-          <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-            {(() => {
-              const cols = (): MessageColumnKey[] => {
-                const at = COMPACT_COLUMNS.indexOf('model');
-                return [
-                  ...COMPACT_COLUMNS.slice(0, at),
-                  'agent' as const,
-                  ...COMPACT_COLUMNS.slice(at),
-                ];
-              };
-              return (
-                <Show when={recentRequests()} fallback={<PanelRowsSkeleton />}>
-                  {(items) => (
-                    <MessageTable
-                      items={items()}
-                      columns={cols()}
-                      customProviderName={() => undefined}
-                      expandable
-                      onRowSelect={(id) => navigate(`/messages?request=${id}`)}
-                    />
-                  )}
-                </Show>
-              );
-            })()}
-          </div>
-        </div>
+            </Link>
+          }
+          bodyClassName="max-h-[420px] overflow-auto p-0"
+        >
+          {recentRequests ? (
+            <MessageTable
+              items={recentRequests}
+              columns={recentColumns}
+              customProviderName={() => undefined}
+              expandable
+              onRowSelect={(id: string) => navigate(`/messages?request=${id}`)}
+            />
+          ) : (
+            <PanelRowsSkeleton />
+          )}
+        </Panel>
 
-        {/* ── 5. Model usage (full width) ────────────────────────────── */}
-        <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">{t('overview.modelUsage.title')}</div>
-          <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-            <table class="data-table">
-              <thead>
+        <Panel
+          title={t('overview.modelUsage.title')}
+          bodyClassName="max-h-[420px] overflow-auto p-0"
+        >
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('overview.modelUsage.model')}</th>
+                <th className="num">{t('overview.modelUsage.tokens')}</th>
+                <th className="num">{t('overview.modelUsage.share')}</th>
+                <th className="num">{t('overview.modelUsage.estCost')}</th>
+                <th>
+                  <HeadTip
+                    label={t('overview.totalAttempts')}
+                    tip={t('overview.tips.totalAttempts')}
+                  />
+                </th>
+                <th>
+                  <HeadTip
+                    label={t('overview.successRate')}
+                    tip={t('overview.tips.modelSuccessRate')}
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {modelUsage === undefined ? (
                 <tr>
-                  <th>{t('overview.modelUsage.model')}</th>
-                  <th style="text-align: right;">{t('overview.modelUsage.tokens')}</th>
-                  <th style="text-align: right;">{t('overview.modelUsage.share')}</th>
-                  <th style="text-align: right;">{t('overview.modelUsage.estCost')}</th>
-                  <th class="rel-col">
-                    {t('overview.totalAttempts')}
-                    <InfoTooltip text={t('overview.tips.totalAttempts')} />
-                  </th>
-                  <th class="rel-col">
-                    {t('overview.successRate')}
-                    <InfoTooltip text={t('overview.tips.modelSuccessRate')} />
-                  </th>
+                  <td colSpan={6} className="p-0">
+                    <PanelRowsSkeleton />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                <Show when={modelUsage() === undefined}>
-                  <tr>
-                    <td colspan="6">
-                      <PanelRowsSkeleton />
-                    </td>
-                  </tr>
-                </Show>
-                <For each={(modelUsage() ?? []).slice(0, 10)}>
-                  {(row) => (
-                    <tr>
-                      <td>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                          {(() => {
-                            const isCustom = row.provider?.startsWith('custom:') === true;
-                            if (isCustom) {
-                              const name = row.custom_provider_name ?? undefined;
-                              return (
-                                customProviderLogo(name ?? '', 16, undefined, row.model) ?? (
-                                  <span
-                                    class="provider-card__logo-letter"
-                                    title={name}
-                                    style={{
-                                      background: customProviderColor(name ?? ''),
-                                      width: '16px',
-                                      height: '16px',
-                                      'font-size': '9px',
-                                      'flex-shrink': '0',
-                                      'border-radius': '50%',
-                                    }}
-                                  >
-                                    {(name ?? stripCustomPrefix(row.model)).charAt(0).toUpperCase()}
-                                  </span>
-                                )
-                              );
-                            }
-                            return row.provider ? (
-                              <span style="position: relative; flex-shrink: 0; display: flex; align-items: center; width: 14px; height: 14px;">
-                                {providerIcon(row.provider, 16)}
-                                {authBadgeFor(row.auth_type, 12)}
-                              </span>
-                            ) : null;
-                          })()}
-                          <span style="font-weight: 500; color: hsl(var(--foreground));">
-                            {row.model.startsWith('custom:')
-                              ? stripCustomPrefix(row.model)
-                              : row.display_name || row.model}
-                          </span>
-                        </div>
-                      </td>
-                      <td style="text-align: right; font-variant-numeric: tabular-nums;">
-                        {formatNumber(row.tokens)}
-                      </td>
-                      <td style="text-align: right;">
-                        <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
-                          <div style="width: 60px; height: 6px; background: hsl(var(--muted)); border-radius: 3px; overflow: hidden;">
-                            <div
-                              style={{
-                                width: `${row.share_pct}%`,
-                                height: '100%',
-                                background: 'hsl(var(--success))',
-                                'border-radius': '3px',
-                              }}
-                            />
-                          </div>
-                          <span style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs);">
-                            {row.share_pct}%
-                          </span>
-                        </div>
-                      </td>
-                      <td style="text-align: right; font-variant-numeric: tabular-nums;">
-                        {formatCost(row.estimated_cost) ?? formatCost(0)}
-                      </td>
-                      {(() => {
-                        const rel = () => modelReliability()?.find((r) => r.model === row.model);
-                        return (
-                          <>
-                            <td class="rel-col">
-                              <Show when={rel()} fallback="—">
-                                {formatNumber(rel()!.attempts)}
-                              </Show>
-                            </td>
-                            <td class="rel-col">
-                              {(() => {
-                                const rate = rel() ? attemptSuccessRate(rel()!) : null;
-                                return rate == null ? '—' : formatRate(rate);
-                              })()}
-                            </td>
-                          </>
-                        );
-                      })()}
-                    </tr>
-                  )}
-                </For>
-                <Show when={modelUsage()?.length === 0}>
-                  <tr>
-                    <td
-                      colspan="3"
-                      style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
-                    >
-                      {t('overview.modelUsage.empty')}
-                    </td>
-                  </tr>
-                </Show>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── 6. Provider connections (full width) ────────────────────── */}
-        <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">{t('overview.connections.title')}</div>
-          <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>{t('overview.connections.provider')}</th>
-                  <th>{t('overview.connections.name')}</th>
-                  <th>{t('overview.connections.type')}</th>
-                  <th>{t('overview.connections.status')}</th>
-                  <th class="rel-col">
-                    {t('overview.totalAttempts')}
-                    <InfoTooltip text={t('overview.tips.totalAttempts')} />
-                  </th>
-                  <th class="rel-col">
-                    {t('overview.connections.failedAttempts')}
-                    <InfoTooltip text={t('overview.connections.failedAttemptsTip')} />
-                  </th>
-                  <th class="rel-col">
-                    {t('overview.successRate')}
-                    <InfoTooltip text={t('overview.tips.connectionSuccessRate')} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <For
-                  each={providerList().flatMap((group) =>
-                    (group.connections.length
-                      ? group.connections
-                      : [{ id: '', label: 'Default', is_active: false }]
-                    ).map((connection) => ({ group, connection })),
-                  )}
-                >
-                  {({ group, connection }) => {
-                    const isActive = () => connection.is_active;
-                    return (
-                      <tr
-                        style="cursor: pointer;"
-                        onClick={() => {
-                          if (connection.id) navigate(`/providers/connections/${connection.id}`);
-                        }}
-                      >
-                        <td>
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                            {(() => {
-                              const isCustom = group.provider.startsWith('custom:');
-                              const customName = isCustom ? (group.display_name ?? null) : null;
-                              const prov = PROVIDERS.find((p) => p.id === group.provider);
-                              const displayName = prov?.name ?? customName ?? group.provider;
-                              return (
-                                <>
-                                  <span style="flex-shrink: 0; display: flex; align-items: center;">
-                                    {providerIcon(group.provider, 20) ??
-                                      (isCustom
-                                        ? customProviderLogo(customName ?? '', 20)
-                                        : null) ??
-                                      (isCustom ? (
-                                        <span
-                                          style={{
-                                            display: 'inline-flex',
-                                            'align-items': 'center',
-                                            'justify-content': 'center',
-                                            width: '20px',
-                                            height: '20px',
-                                            'border-radius': '4px',
-                                            'font-size': '11px',
-                                            'font-weight': '600',
-                                            color: 'white',
-                                            background: customProviderColor(customName ?? ''),
-                                          }}
-                                        >
-                                          {(customName ?? displayName).charAt(0).toUpperCase()}
-                                        </span>
-                                      ) : null)}
-                                  </span>
-                                  <span style="font-weight: 500; color: hsl(var(--foreground));">
-                                    {displayName}
-                                  </span>
-                                  {isCustom && (
-                                    <span style="font-size: 10px; font-weight: 500; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); padding: 1px 6px; border-radius: var(--radius-sm);">
-                                      {t('overview.connections.custom')}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                        <td style="color: hsl(var(--muted-foreground));">
-                          {connection.label || t('overview.connections.defaultLabel')}
-                        </td>
-                        <td>
-                          <span
-                            style={{
-                              'font-size': 'var(--font-size-xs)',
-                              'font-weight': '500',
-                              color: 'hsl(var(--muted-foreground))',
-                            }}
-                          >
-                            {authLabel(group.auth_type)}
-                          </span>
-                        </td>
-                        <td>
-                          <Show
-                            when={isActive()}
-                            fallback={
-                              <span style="display: inline-flex; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--font-size-xs); font-weight: 500;">
-                                {t('overview.connections.inactive')}
-                              </span>
-                            }
-                          >
-                            <span style="display: inline-flex; padding: 2px 8px; border-radius: var(--radius-sm); background: hsl(var(--success)); color: white; font-size: var(--font-size-xs); font-weight: 600;">
-                              {t('overview.connections.active')}
-                            </span>
-                          </Show>
-                        </td>
-                        {(() => {
-                          const pKey = group.provider.startsWith('custom:')
-                            ? 'custom'
-                            : group.provider;
-                          const wantedLabel = (connection.label || 'Default').toLowerCase();
-                          const rel = () =>
-                            providerReliability()?.find(
-                              (r) =>
-                                r.provider === pKey &&
-                                r.auth_type === group.auth_type &&
-                                (r.key_label ?? 'Default').toLowerCase() === wantedLabel,
-                            );
-                          return (
-                            <>
-                              <td class="rel-col">
-                                <Show when={rel()} fallback="—">
-                                  {formatNumber(rel()!.attempts)}
-                                </Show>
-                              </td>
-                              <td class="rel-col">
-                                {(() => {
-                                  const r = rel();
-                                  const failed =
-                                    r && r.succeeded != null ? r.attempts - r.succeeded : null;
-                                  if (failed == null) return '—';
-                                  if (failed === 0 || !connection.id) return formatNumber(failed);
-                                  return (
-                                    <a
-                                      class="count-link"
-                                      href={`/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange()}&attempts=has_failed`}
-                                      title={t('overview.connections.failedLinkTitle')}
-                                      onClick={(e) => {
-                                        // The row navigates to the connection; this cell
-                                        // drills into the Requests log instead.
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        navigate(
-                                          `/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange()}&attempts=has_failed`,
-                                        );
-                                      }}
-                                    >
-                                      {formatNumber(failed)}
-                                    </a>
-                                  );
-                                })()}
-                              </td>
-                              <td class="rel-col">
-                                {(() => {
-                                  const rate = rel() ? attemptSuccessRate(rel()!) : null;
-                                  return rate == null ? '—' : formatRate(rate);
-                                })()}
-                              </td>
-                            </>
-                          );
-                        })()}
-                      </tr>
-                    );
-                  }}
-                </For>
-                <Show when={providerList().length === 0}>
-                  <tr>
-                    <td
-                      colspan="7"
-                      style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
-                    >
-                      {t('overview.connections.empty')}
-                    </td>
-                  </tr>
-                </Show>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── 7. Harnesses (full width) ──────────────────────────────── */}
-        <div class="panel scroll-panel" style="margin-bottom: 24px;">
-          <div class="panel__title">{t('overview.harnesses.title')}</div>
-          <div class="scroll-panel__body" onScroll={toggleScrollFade}>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>{t('overview.harnesses.harness')}</th>
-                  <th>{t('overview.harnesses.usage')}</th>
-                  <th class="rel-col">
-                    {t('overview.harnesses.totalRequests')}
-                    <InfoTooltip text={t('overview.tips.harnessTotalRequests')} />
-                  </th>
-                  <th class="rel-col">{t('overview.harnesses.recoveredRequests')}</th>
-                  <th class="rel-col">
-                    {t('overview.successRate')}
-                    <InfoTooltip text={t('overview.tips.harnessSuccessRate')} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={sortedAgents()}>
-                  {(agent) => {
-                    const icon = platformIcon(agent.agent_platform, agent.agent_category);
-                    return (
-                      <tr
-                        style="cursor: pointer;"
-                        onClick={() =>
-                          navigate(`/harnesses/${encodeURIComponent(agent.agent_name)}`)
-                        }
-                      >
-                        <td>
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                            <Show when={icon}>
-                              <img
-                                src={icon!}
-                                alt=""
-                                width="20"
-                                height="20"
-                                class="platform-icon"
-                                style="flex-shrink: 0;"
+              ) : null}
+              {(modelUsage ?? []).slice(0, 10).map((row) => {
+                const isCustom = row.provider?.startsWith('custom:') === true;
+                const customName = row.custom_provider_name ?? undefined;
+                const rel = modelReliability.data?.find((r) => r.model === row.model);
+                const rate = rel ? attemptSuccessRate(rel) : null;
+                return (
+                  <tr key={`${row.provider ?? ''}:${row.model}`}>
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        {isCustom ? (
+                          (customProviderLogo(customName ?? '', 16, undefined, row.model) ?? (
+                            <span title={customName} className="inline-flex">
+                              <CustomLetter
+                                name={customName ?? stripCustomPrefix(row.model)}
+                                size={16}
                               />
-                            </Show>
-                            <span style="font-weight: 500; color: hsl(var(--foreground));">
-                              {agent.display_name || agent.agent_name}
                             </span>
-                          </div>
-                        </td>
-                        <td>
-                          {(() => {
-                            const usage = () => harnessUsageFor(agent.agent_name);
-                            return (
-                              <div style="display: flex; align-items: center; gap: 8px;">
-                                <Show when={(usage()?.spark ?? []).length > 0}>
-                                  <span style="flex-shrink: 0;">
-                                    <Sparkline data={usage()!.spark} width={60} height={24} />
-                                  </span>
-                                </Show>
-                                <span style="font-variant-numeric: tabular-nums;">
-                                  {t('overview.harnesses.tokens', {
-                                    n: formatNumber(usage()?.total ?? 0),
-                                  })}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td class="rel-col">
-                          {(() => {
-                            const rel = agentReliability()?.find(
-                              (r) => r.agent_name === agent.agent_name,
-                            );
-                            const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}`;
-                            return (
-                              <a
-                                class="count-link"
-                                href={link}
-                                title={t('overview.harnesses.requestsLinkTitle')}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  navigate(link);
-                                }}
-                              >
-                                {formatNumber(rel?.requests ?? 0)}
-                              </a>
-                            );
-                          })()}
-                        </td>
-                        {(() => {
-                          const rel = () =>
-                            agentReliability()?.find((r) => r.agent_name === agent.agent_name);
-                          return (
-                            <>
-                              <td class="rel-col">
-                                <Show when={rel()} fallback="—">
-                                  {(() => {
-                                    // Recovered = successful requests holding a
-                                    // fallback attempt.
-                                    const link = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange()}&status=ok&trigger=fallback`;
-                                    return (
-                                      <a
-                                        class="count-link"
-                                        href={link}
-                                        title={t('overview.harnesses.recoveredLinkTitle')}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          navigate(link);
-                                        }}
-                                      >
-                                        {formatNumber(recoveredCount(rel()!))}
-                                      </a>
-                                    );
-                                  })()}
-                                </Show>
-                              </td>
-                              <td class="rel-col">
-                                {(() => {
-                                  const rate = rel() ? successRate(rel()!) : null;
-                                  return rate == null ? '—' : formatRate(rate);
-                                })()}
-                              </td>
-                            </>
-                          );
-                        })()}
-                      </tr>
-                    );
-                  }}
-                </For>
-                <Show when={agentList().length === 0}>
-                  <tr>
-                    <td
-                      colspan="5"
-                      style="text-align: center; color: hsl(var(--muted-foreground)); padding: 24px 0;"
-                    >
-                      {t('overview.harnesses.empty')}
+                          ))
+                        ) : row.provider ? (
+                          <span className="relative flex size-3.5 shrink-0 items-center">
+                            {providerIcon(row.provider, 16)}
+                            {authBadgeFor(row.auth_type, 12)}
+                          </span>
+                        ) : null}
+                        <span className="row-title">
+                          {row.model.startsWith('custom:')
+                            ? stripCustomPrefix(row.model)
+                            : row.display_name || row.model}
+                        </span>
+                      </div>
                     </td>
+                    <td className="num">{formatNumber(row.tokens)}</td>
+                    <td className="num">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="h-1.5 w-15 overflow-hidden rounded-full bg-s3">
+                          <div
+                            className="h-full rounded-full bg-ok"
+                            style={{ width: `${row.share_pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted">{row.share_pct}%</span>
+                      </div>
+                    </td>
+                    <td className="num">{formatCost(row.estimated_cost) ?? formatCost(0)}</td>
+                    <td>{rel ? formatNumber(rel.attempts) : '—'}</td>
+                    <td>{rate == null ? '—' : formatRate(rate)}</td>
                   </tr>
-                </Show>
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+              {modelUsage?.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-muted">
+                    {t('overview.modelUsage.empty')}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Panel>
+
+        <Panel
+          title={t('overview.connections.title')}
+          bodyClassName="max-h-[420px] overflow-auto p-0"
+        >
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('overview.connections.provider')}</th>
+                <th>{t('overview.connections.name')}</th>
+                <th>{t('overview.connections.type')}</th>
+                <th>{t('overview.connections.status')}</th>
+                <th>
+                  <HeadTip
+                    label={t('overview.totalAttempts')}
+                    tip={t('overview.tips.totalAttempts')}
+                  />
+                </th>
+                <th>
+                  <HeadTip
+                    label={t('overview.connections.failedAttempts')}
+                    tip={t('overview.connections.failedAttemptsTip')}
+                  />
+                </th>
+                <th>
+                  <HeadTip
+                    label={t('overview.successRate')}
+                    tip={t('overview.tips.connectionSuccessRate')}
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {providerList
+                .flatMap((group) =>
+                  (group.connections.length
+                    ? group.connections
+                    : [{ id: '', label: 'Default', is_active: false }]
+                  ).map((connection) => ({ group, connection })),
+                )
+                .map(({ group, connection }, i) => {
+                  const isCustom = group.provider.startsWith('custom:');
+                  const customName = isCustom ? (group.display_name ?? null) : null;
+                  const prov = PROVIDERS.find((p) => p.id === group.provider);
+                  const displayName = prov?.name ?? customName ?? group.provider;
+                  const pKey = isCustom ? 'custom' : group.provider;
+                  const wantedLabel = (connection.label || 'Default').toLowerCase();
+                  const rel = providerReliability.data?.find(
+                    (r) =>
+                      r.provider === pKey &&
+                      r.auth_type === group.auth_type &&
+                      (r.key_label ?? 'Default').toLowerCase() === wantedLabel,
+                  );
+                  const failed = rel && rel.succeeded != null ? rel.attempts - rel.succeeded : null;
+                  const rate = rel ? attemptSuccessRate(rel) : null;
+                  const failedLink = `/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange}&attempts=has_failed`;
+                  return (
+                    <tr
+                      key={`${group.provider}:${group.auth_type}:${connection.id || i}`}
+                      className={connection.id ? 'cursor-pointer' : undefined}
+                      onClick={() => {
+                        if (connection.id) navigate(`/providers/connections/${connection.id}`);
+                      }}
+                    >
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <span className="flex shrink-0 items-center">
+                            {providerIcon(group.provider, 20) ??
+                              (isCustom ? customProviderLogo(customName ?? '', 20) : null) ??
+                              (isCustom ? (
+                                <CustomLetter name={customName ?? displayName} size={20} />
+                              ) : null)}
+                          </span>
+                          <span className="row-title">{displayName}</span>
+                          {isCustom ? <Badge>{t('overview.connections.custom')}</Badge> : null}
+                        </div>
+                      </td>
+                      <td className="text-muted">
+                        {connection.label || t('overview.connections.defaultLabel')}
+                      </td>
+                      <td>
+                        <span className="text-xs font-medium text-muted">
+                          {authLabel(group.auth_type)}
+                        </span>
+                      </td>
+                      <td>
+                        {connection.is_active ? (
+                          <Badge tone="ok">{t('overview.connections.active')}</Badge>
+                        ) : (
+                          <Badge>{t('overview.connections.inactive')}</Badge>
+                        )}
+                      </td>
+                      <td>{rel ? formatNumber(rel.attempts) : '—'}</td>
+                      <td>
+                        {failed == null ? (
+                          '—'
+                        ) : failed === 0 || !connection.id ? (
+                          formatNumber(failed)
+                        ) : (
+                          // The row navigates to the connection; this cell
+                          // drills into the Requests log instead.
+                          <CountLink
+                            to={failedLink}
+                            title={t('overview.connections.failedLinkTitle')}
+                            onGo={navigate}
+                          >
+                            {formatNumber(failed)}
+                          </CountLink>
+                        )}
+                      </td>
+                      <td>{rate == null ? '—' : formatRate(rate)}</td>
+                    </tr>
+                  );
+                })}
+              {providerList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-muted">
+                    {t('overview.connections.empty')}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Panel>
+
+        <Panel
+          title={t('overview.harnesses.title')}
+          bodyClassName="max-h-[420px] overflow-auto p-0"
+        >
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('overview.harnesses.harness')}</th>
+                <th>{t('overview.harnesses.usage')}</th>
+                <th>
+                  <HeadTip
+                    label={t('overview.harnesses.totalRequests')}
+                    tip={t('overview.tips.harnessTotalRequests')}
+                  />
+                </th>
+                <th>{t('overview.harnesses.recoveredRequests')}</th>
+                <th>
+                  <HeadTip
+                    label={t('overview.successRate')}
+                    tip={t('overview.tips.harnessSuccessRate')}
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedAgents.map((agent) => {
+                const icon = platformIcon(agent.agent_platform, agent.agent_category);
+                const usage = harnessUsageFor(agent.agent_name);
+                const rel = agentReliability.data?.find((r) => r.agent_name === agent.agent_name);
+                const rate = rel ? successRate(rel) : null;
+                const scope = `/messages?agent=${encodeURIComponent(agent.agent_name)}&range=${chartRange}`;
+                return (
+                  <tr
+                    key={agent.agent_name}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/harnesses/${encodeURIComponent(agent.agent_name)}`)}
+                  >
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {icon ? (
+                          <img src={icon} alt="" width={20} height={20} className="shrink-0" />
+                        ) : null}
+                        <span className="row-title">{agent.display_name || agent.agent_name}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {(usage?.spark ?? []).length > 0 ? (
+                          <span className="shrink-0 text-accent">
+                            <Sparkline data={usage!.spark} width={60} height={24} />
+                          </span>
+                        ) : null}
+                        <span className="tabular-nums">
+                          {t('overview.harnesses.tokens', { n: formatNumber(usage?.total ?? 0) })}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <CountLink
+                        to={scope}
+                        title={t('overview.harnesses.requestsLinkTitle')}
+                        onGo={navigate}
+                      >
+                        {formatNumber(rel?.requests ?? 0)}
+                      </CountLink>
+                    </td>
+                    <td>
+                      {rel ? (
+                        // Recovered = successful requests holding a fallback attempt.
+                        <CountLink
+                          to={`${scope}&status=ok&trigger=fallback`}
+                          title={t('overview.harnesses.recoveredLinkTitle')}
+                          onGo={navigate}
+                        >
+                          {formatNumber(recoveredCount(rel))}
+                        </CountLink>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>{rate == null ? '—' : formatRate(rate)}</td>
+                  </tr>
+                );
+              })}
+              {agentList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-muted">
+                    {t('overview.harnesses.empty')}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Panel>
+      </>
+    );
+  };
+
+  return (
+    <div className="page wide">
+      <title>{t('overview.pageTitle')}</title>
+      <AddAgentModal open={addAgentOpen} onClose={dismissAddAgent} />
+
+      <div className="page-head">
+        <div>
+          <h1>{t('overview.title')}</h1>
+          <p className="sub">{t('overview.subtitle')}</p>
         </div>
-      </Show>
+        {!hasNoAgents || !hasNoProviders ? (
+          <div className="page-actions">
+            <div className="w-44">
+              <Select value={chartRange} onChange={setChartRange} options={rangeOptions()} />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {hasNoAgents && hasNoProviders ? (
+          <Panel>
+            <EmptyState
+              icon={<BarChart3 aria-hidden="true" />}
+              title={t('overview.empty.noActivity')}
+              description={t('overview.empty.setupAndConnect')}
+              action={
+                <Button size="sm" className="mt-2" onClick={() => setAddAgentOpen(true)}>
+                  {t('overview.empty.setupHarness')}
+                </Button>
+              }
+            />
+          </Panel>
+        ) : null}
+
+        {!hasNoAgents && hasNoProviders ? (
+          <Panel>
+            <EmptyState
+              icon={<BarChart3 aria-hidden="true" />}
+              title={t('overview.empty.noProviders')}
+              description={t('overview.empty.connectToRoute')}
+              action={
+                <ButtonLink to="/providers/subscriptions" size="sm" className="mt-2">
+                  {t('overview.empty.connectProvider')}
+                </ButtonLink>
+              }
+            />
+          </Panel>
+        ) : null}
+
+        {showDashboard ? (
+          dashboard()
+        ) : !hasNoAgents && !hasNoProviders ? (
+          <GlobalOverviewSkeleton />
+        ) : null}
+      </div>
     </div>
   );
-};
-
-export default GlobalOverview;
+}

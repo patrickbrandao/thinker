@@ -1,39 +1,41 @@
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@solidjs/testing-library";
+import { describe, it, expect } from 'vitest';
+import { render } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
-let mockAgentName = "demo-agent";
-let mockSearch = "";
-vi.mock("@solidjs/router", () => ({
-  useParams: () => ({ agentName: mockAgentName }),
-  useLocation: () => ({ search: mockSearch }),
-  Navigate: (props: any) => <div data-testid="navigate" data-href={props.href} />,
-}));
+import AgentMessagesRedirect from '../../src/pages/AgentMessagesRedirect.jsx';
 
-import AgentMessagesRedirect from "../../src/pages/AgentMessagesRedirect.jsx";
+/** Where the redirect landed (pathname + search). */
+function Landing() {
+  const location = useLocation();
+  return <div data-testid="navigate" data-href={`${location.pathname}${location.search}`} />;
+}
 
-describe("AgentMessagesRedirect", () => {
-  it("redirects to the global log pre-scoped to the harness via ?agent=", () => {
-    mockAgentName = "demo-agent";
-    mockSearch = "";
-    const { getByTestId } = render(() => <AgentMessagesRedirect />);
-    expect(getByTestId("navigate").getAttribute("data-href")).toBe("/messages?agent=demo-agent");
+function renderAt(url: string) {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route path="/harnesses/:agentName/messages" element={<AgentMessagesRedirect />} />
+        <Route path="/messages" element={<Landing />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe('AgentMessagesRedirect', () => {
+  it('redirects to the global log pre-scoped to the harness via ?agent=', () => {
+    const { getByTestId } = renderAt('/harnesses/demo-agent/messages');
+    expect(getByTestId('navigate').getAttribute('data-href')).toBe('/messages?agent=demo-agent');
   });
 
-  it("URL-encodes the agent name", () => {
-    mockAgentName = "my agent/v2";
-    mockSearch = "";
-    const { getByTestId } = render(() => <AgentMessagesRedirect />);
-    expect(getByTestId("navigate").getAttribute("data-href")).toBe(
-      "/messages?agent=my+agent%2Fv2",
-    );
+  it('URL-encodes the agent name', () => {
+    const { getByTestId } = renderAt(`/harnesses/${encodeURIComponent('my agent/v2')}/messages`);
+    expect(getByTestId('navigate').getAttribute('data-href')).toBe('/messages?agent=my+agent%2Fv2');
   });
 
-  it("carries extra query params through (the ?request= drawer deep-link)", () => {
-    mockAgentName = "demo-agent";
-    mockSearch = "?request=msg-1";
-    const { getByTestId } = render(() => <AgentMessagesRedirect />);
-    expect(getByTestId("navigate").getAttribute("data-href")).toBe(
-      "/messages?request=msg-1&agent=demo-agent",
+  it('carries extra query params through (the ?request= drawer deep-link)', () => {
+    const { getByTestId } = renderAt('/harnesses/demo-agent/messages?request=msg-1');
+    expect(getByTestId('navigate').getAttribute('data-href')).toBe(
+      '/messages?request=msg-1&agent=demo-agent',
     );
   });
 });

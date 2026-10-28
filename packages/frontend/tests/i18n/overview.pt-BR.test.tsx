@@ -1,34 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@solidjs/testing-library';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { resetLocaleForTests } from '../../src/i18n';
 
 // The global and per-harness Overview pages rendered in Brazilian Portuguese.
 // Only the network, the router and the uPlot charts are stubbed; the catalogs,
 // formatters and components are real.
 
-vi.mock('@solidjs/router', () => ({
-  useParams: () => ({ agentName: 'demo-agent' }),
-  useLocation: () => ({ pathname: '/harnesses/demo-agent', state: null }),
-  useNavigate: () => vi.fn(),
-  A: (props: { href: string; class?: string; children: unknown }) => (
-    <a href={props.href} class={props.class}>
-      {props.children}
-    </a>
-  ),
-}));
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children: unknown }) => <title>{props.children}</title>,
-  Meta: () => null,
-}));
-
-vi.mock('../../src/services/sse.js', () => ({
-  agentPing: () => 0,
-  analyticsPing: () => 0,
-  messagePing: () => 0,
-  routingPing: () => 0,
-  pingCount: () => 0,
-}));
+vi.mock('../../src/services/sse.js', async () => {
+  const { signal } = await import('../../src/lib/signal');
+  return {
+    agentPing: signal(0),
+    analyticsPing: signal(0),
+    messagePing: signal(0),
+    routingPing: signal(0),
+    pingCount: signal(0),
+  };
+});
 
 const overview = {
   summary: {
@@ -121,8 +109,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
     Promise.resolve({ range: '7d', by: 'disposition', keys: [], buckets: [] }),
   getPerAgentReliability: () => Promise.resolve([]),
   getPerProviderReliability: () => Promise.resolve([]),
-  getPerModelReliability: () =>
-    Promise.resolve([{ model: 'gpt-4o', attempts: 40, succeeded: 38 }]),
+  getPerModelReliability: () => Promise.resolve([{ model: 'gpt-4o', attempts: 40, succeeded: 38 }]),
   getPerProviderTimeseries: () => Promise.resolve({ agents: [], timeseries: [] }),
   getPerProviderMessageTimeseries: () => Promise.resolve({ agents: [], timeseries: [] }),
   getPerProviderCostTimeseries: () => Promise.resolve({ agents: [], timeseries: [] }),
@@ -151,6 +138,16 @@ import Overview from '../../src/pages/Overview';
 import { createFormatLegendTimestamp, formatLegendTokens } from '../../src/services/chart-utils';
 import { formatRate } from '../../src/services/overview-format';
 
+function renderAt(element: React.ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={['/harnesses/demo-agent']}>
+      <Routes>
+        <Route path="/harnesses/:agentName" element={element} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('Overview in pt-BR', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -159,7 +156,7 @@ describe('Overview in pt-BR', () => {
   });
 
   it('renders the global overview in Portuguese', async () => {
-    render(() => <GlobalOverview />);
+    renderAt(<GlobalOverview />);
     expect(await screen.findByText('Visão geral')).toBeDefined();
     expect(screen.getByText('Todos os seus harnesses e provedores')).toBeDefined();
     await waitFor(() => expect(screen.getByText('Requisições recentes')).toBeDefined());
@@ -167,7 +164,7 @@ describe('Overview in pt-BR', () => {
     expect(screen.getByText('Nome da conexão')).toBeDefined();
     expect(screen.getByText('Inativa')).toBeDefined();
     expect(screen.getByText('Padrão')).toBeDefined();
-    expect(screen.getByText('Taxa de sucesso', { selector: '.overview-stat-card__label' })).toBeDefined();
+    expect(screen.getByText('Taxa de sucesso', { selector: '.stat-label' })).toBeDefined();
     expect(screen.getByText('Recuperadas por fallback')).toBeDefined();
     expect(screen.getByText('Últimos 7 dias')).toBeDefined();
     // Intl percent in pt-BR: decimal comma.
@@ -175,15 +172,13 @@ describe('Overview in pt-BR', () => {
   });
 
   it('renders the harness overview in Portuguese', async () => {
-    render(() => <Overview />);
+    renderAt(<Overview />);
     await waitFor(() => expect(screen.getByText('Uso por modelo')).toBeDefined());
     expect(screen.getByText('Os modelos usados e quanto custaram')).toBeDefined();
     expect(screen.getByText('% do total')).toBeDefined();
     expect(screen.getAllByText('Uso de tokens').length).toBeGreaterThan(0);
     expect(screen.getAllByText('US$ 3,50').length).toBeGreaterThan(0);
-    expect(document.title || document.querySelector('title')?.textContent).toContain(
-      'Visão geral de demo-agent',
-    );
+    expect(document.title).toContain('Visão geral de demo-agent');
   });
 
   it('formats chart labels and rates with the pt-BR locale', () => {

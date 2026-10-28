@@ -1,5 +1,5 @@
-import { createSignal, createEffect, Show, type Component } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { useEffect, useState } from 'react';
+import { Button, Modal, Switch } from './ui.js';
 import { t } from '../i18n/index.js';
 
 export interface LimitRuleData {
@@ -17,13 +17,12 @@ interface Props {
   hasProvider?: boolean;
 }
 
-const LimitRuleModal: Component<Props> = (props) => {
-  const [blockEnabled, setBlockEnabled] = createSignal(false);
-  const [metricType, setMetricType] = createSignal<string>('tokens');
-  const [threshold, setThreshold] = createSignal<string>('');
-  const [period, setPeriod] = createSignal<string>('day');
-
-  const actionValue = () => (blockEnabled() ? 'both' : 'notify');
+export default function LimitRuleModal({ open, onClose, onSave, editData }: Props) {
+  const [blockEnabled, setBlockEnabled] = useState(false);
+  const [metricType, setMetricType] = useState('tokens');
+  const [threshold, setThreshold] = useState('');
+  const [period, setPeriod] = useState('day');
+  const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setBlockEnabled(false);
@@ -32,31 +31,35 @@ const LimitRuleModal: Component<Props> = (props) => {
     setPeriod('day');
   };
 
-  createEffect(() => {
-    if (props.open && props.editData) {
-      const d = props.editData;
-      setMetricType(d.metric_type);
-      setThreshold(String(d.threshold));
-      setPeriod(d.period);
-      setBlockEnabled(d.action === 'block' || d.action === 'both');
-    } else if (props.open) {
+  // The parent rebuilds `editData` on every render, so key the prefill on its
+  // fields: opening (or switching the edited rule) fills the form once.
+  const editKey = editData
+    ? `${editData.metric_type}|${editData.threshold}|${editData.period}|${editData.action}`
+    : null;
+  useEffect(() => {
+    if (!open) return;
+    if (editData) {
+      setMetricType(editData.metric_type);
+      setThreshold(String(editData.threshold));
+      setPeriod(editData.period);
+      setBlockEnabled(editData.action === 'block' || editData.action === 'both');
+    } else {
       reset();
     }
-  });
-
-  const [saving, setSaving] = createSignal(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editKey]);
 
   const handleSave = async () => {
-    if (saving()) return;
-    const val = Number(threshold());
+    if (saving) return;
+    const val = Number(threshold);
     if (isNaN(val) || val <= 0) return;
     setSaving(true);
     try {
-      await props.onSave({
-        metric_type: metricType(),
+      await onSave({
+        metric_type: metricType,
         threshold: val,
-        period: period(),
-        action: actionValue(),
+        period,
+        action: blockEnabled ? 'both' : 'notify',
       });
       reset();
     } finally {
@@ -66,121 +69,106 @@ const LimitRuleModal: Component<Props> = (props) => {
 
   const handleClose = () => {
     reset();
-    props.onClose();
+    onClose();
   };
 
-  const isEdit = () => !!props.editData;
+  const isEdit = !!editData;
 
   return (
-    <Portal>
-      <Show when={props.open}>
-        <div class="modal-overlay" onClick={() => handleClose()}>
-          <div
-            class="modal-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="limit-modal-title"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (
-                e.key === 'Enter' &&
-                (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement)
-              ) {
-                e.preventDefault();
-                handleSave();
-              }
-              if (e.key === 'Escape') handleClose();
-            }}
-          >
-            <h2 class="modal-card__title" id="limit-modal-title">
-              {isEdit() ? t('limits.editRule') : t('limits.createRule')}
-            </h2>
-            <p class="modal-card__desc">{t('limits.modal.desc')}</p>
+    <Modal
+      open={open}
+      title={isEdit ? t('limits.editRule') : t('limits.createRule')}
+      onClose={handleClose}
+    >
+      <div
+        onKeyDown={(e) => {
+          if (
+            e.key === 'Enter' &&
+            (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement)
+          ) {
+            e.preventDefault();
+            void handleSave();
+          }
+        }}
+      >
+        <p className="mb-4 text-sm text-muted">{t('limits.modal.desc')}</p>
 
-            <label class="modal-card__field-label" for="limit-metric-select" style="margin-top: 0;">
+        <div className="grid gap-4">
+          <div>
+            <label className="label" htmlFor="limit-metric-select">
               {t('limits.modal.metric')}
             </label>
             <select
               id="limit-metric-select"
-              class="select notification-modal__select"
-              value={metricType()}
+              className="field"
+              value={metricType}
               onChange={(e) => setMetricType(e.currentTarget.value)}
-              ref={(el) => requestAnimationFrame(() => el.focus())}
+              autoFocus
             >
               <option value="tokens">{t('limits.modal.tokens')}</option>
               <option value="cost">{t('limits.modal.costUsd')}</option>
             </select>
+          </div>
 
-            <div class="limit-modal__row">
-              <div class="limit-modal__col">
-                <label class="modal-card__field-label" for="limit-threshold-input">
-                  {t('limits.modal.threshold')}
-                </label>
-                <input
-                  id="limit-threshold-input"
-                  class="modal-card__input"
-                  type="number"
-                  min="0"
-                  step={metricType() === 'cost' ? '0.01' : '1'}
-                  placeholder={
-                    metricType() === 'cost'
-                      ? t('limits.modal.costPlaceholder')
-                      : t('limits.modal.tokensPlaceholder')
-                  }
-                  value={threshold()}
-                  onInput={(e) => setThreshold(e.currentTarget.value)}
-                />
-              </div>
-              <div class="limit-modal__col">
-                <label class="modal-card__field-label" for="limit-period-select">
-                  {t('limits.modal.period')}
-                </label>
-                <select
-                  id="limit-period-select"
-                  class="select notification-modal__select"
-                  value={period()}
-                  onChange={(e) => setPeriod(e.currentTarget.value)}
-                >
-                  <option value="hour">{t('limits.period.hour')}</option>
-                  <option value="day">{t('limits.period.day')}</option>
-                  <option value="week">{t('limits.period.week')}</option>
-                  <option value="month">{t('limits.period.month')}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="limit-block-toggle">
-              <span class="limit-block-toggle__label">{t('limits.modal.blockWhenExceeded')}</span>
-              <label class="notification-toggle">
-                <input
-                  type="checkbox"
-                  checked={blockEnabled()}
-                  onChange={(e) => setBlockEnabled(e.currentTarget.checked)}
-                />
-                <span class="notification-toggle__slider" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="limit-threshold-input">
+                {t('limits.modal.threshold')}
               </label>
+              <input
+                id="limit-threshold-input"
+                className="field"
+                type="number"
+                min="0"
+                step={metricType === 'cost' ? '0.01' : '1'}
+                placeholder={
+                  metricType === 'cost'
+                    ? t('limits.modal.costPlaceholder')
+                    : t('limits.modal.tokensPlaceholder')
+                }
+                value={threshold}
+                onChange={(e) => setThreshold(e.currentTarget.value)}
+              />
             </div>
-
-            <div class="modal-card__footer">
-              <button
-                class="btn btn--primary btn--sm"
-                disabled={!threshold() || Number(threshold()) <= 0 || saving()}
-                onClick={handleSave}
+            <div>
+              <label className="label" htmlFor="limit-period-select">
+                {t('limits.modal.period')}
+              </label>
+              <select
+                id="limit-period-select"
+                className="field"
+                value={period}
+                onChange={(e) => setPeriod(e.currentTarget.value)}
               >
-                {saving() ? (
-                  <span class="spinner" />
-                ) : isEdit() ? (
-                  t('common.saveChanges')
-                ) : (
-                  t('limits.createRule')
-                )}
-              </button>
+                <option value="hour">{t('limits.period.hour')}</option>
+                <option value="day">{t('limits.period.day')}</option>
+                <option value="week">{t('limits.period.week')}</option>
+                <option value="month">{t('limits.period.month')}</option>
+              </select>
             </div>
           </div>
-        </div>
-      </Show>
-    </Portal>
-  );
-};
 
-export default LimitRuleModal;
+          <div className="limit-block-toggle well flex items-center justify-between gap-3">
+            <span className="text-sm text-ink">{t('limits.modal.blockWhenExceeded')}</span>
+            <Switch
+              checked={blockEnabled}
+              onChange={setBlockEnabled}
+              label={t('limits.modal.blockWhenExceeded')}
+            />
+          </div>
+        </div>
+
+        <div className="actions">
+          <Button
+            size="sm"
+            disabled={!threshold || Number(threshold) <= 0}
+            busy={saving}
+            onClick={() => void handleSave()}
+          >
+            {isEdit ? t('common.saveChanges') : t('limits.createRule')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

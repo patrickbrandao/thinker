@@ -1,119 +1,76 @@
-import { A, useLocation, useParams } from '@solidjs/router';
-import { type ParentComponent, Show } from 'solid-js';
-import { Title } from '@solidjs/meta';
+import { Link, Outlet, useLocation, useParams } from 'react-router';
+import { Tabs, type TabItem } from '../components/ui.js';
 import { agentPath } from '../services/routing.js';
-import { agentDisplayName } from '../services/agent-display-name.js';
-import { agentPlatformIcon } from '../services/agent-platform-store.js';
+import { agentDisplayName, agentDisplayNameSignal } from '../services/agent-display-name.js';
+import { agentPlatformIcon, agentPlatformSignal } from '../services/agent-platform-store.js';
+import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
 
+type TabKey = 'overview' | 'routing' | 'providers' | 'guardrails' | 'settings';
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /**
- * AgentDetail — horizontal-tabbed shell for the agent detail view.
- *
- * Renders a header (back-link to /harnesses + platform icon + agent display name)
- * and a horizontal tab bar (Overview / Routing / Providers / Limits / Settings).
- * Child routes render in the body via props.children (SolidJS nested <Route>).
+ * AgentDetail — the tabbed shell of a harness: back-link, platform icon and
+ * name, then Overview / Routing / Providers / Limits / Settings tabs. The tab
+ * content is the nested route, rendered through <Outlet />.
  */
-const AgentDetail: ParentComponent = (props) => {
+export default function AgentDetail() {
   const params = useParams<{ agentName: string }>();
   const location = useLocation();
+  // Re-render when the guard resolves the display name or the platform.
+  useSignal(agentDisplayNameSignal);
+  useSignal(agentPlatformSignal);
 
-  const agentName = () => decodeURIComponent(params.agentName);
-  const path = (sub: string) => agentPath(params.agentName, sub);
+  const agentName = safeDecode(params.agentName ?? '');
+  const path = (sub: string) => agentPath(agentName, sub);
+  const name = agentDisplayName() ?? agentName;
+  const icon = agentPlatformIcon();
 
-  const isActive = (sub: string) => {
-    const p = path(sub);
-    if (sub === '' || sub === '/overview') {
-      return location.pathname === path('') || location.pathname === path('/overview');
-    }
-    if (sub === '/routing') {
-      return location.pathname === path('/routing');
-    }
-    return location.pathname.startsWith(p);
-  };
+  const pathname = location.pathname;
+  const active: TabKey =
+    pathname === path('/routing')
+      ? 'routing'
+      : pathname.startsWith(path('/providers'))
+        ? 'providers'
+        : pathname.startsWith(path('/guardrails'))
+          ? 'guardrails'
+          : pathname.startsWith(path('/settings'))
+            ? 'settings'
+            : 'overview';
+
+  const tabs: TabItem<TabKey>[] = [
+    { key: 'overview', label: t('harnesses.detail.overview'), to: path('') },
+    { key: 'routing', label: t('harnesses.detail.routing'), to: path('/routing') },
+    { key: 'providers', label: t('harnesses.detail.providers'), to: path('/providers') },
+    { key: 'guardrails', label: t('harnesses.detail.limits'), to: path('/guardrails') },
+    { key: 'settings', label: t('harnesses.detail.settings'), to: path('/settings') },
+  ];
 
   return (
-    <div class="container--lg">
-      <Title>{agentDisplayName() ?? agentName()} | Thinker</Title>
+    <div className="page wide">
+      <title>{`${name} | Thinker`}</title>
 
-      <div style="margin-bottom: 8px;">
-        <A
-          href="/harnesses"
-          style="color: hsl(var(--muted-foreground)); font-size: var(--font-size-sm); text-decoration: none;"
-        >
-          {t('harnesses.detail.back')}
-        </A>
+      <Link to="/harnesses" className="text-sm text-muted hover:text-ink">
+        {t('harnesses.detail.back')}
+      </Link>
+
+      <div className="mt-2 flex min-w-0 items-center gap-3">
+        {icon ? (
+          <img src={icon} alt="" width={28} height={28} className="shrink-0 rounded-control" />
+        ) : null}
+        <h1 className="truncate">{name}</h1>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0;">
-        <Show when={agentPlatformIcon()}>
-          <img
-            src={agentPlatformIcon()!}
-            alt=""
-            width="28"
-            height="28"
-            class="platform-icon"
-            style="flex-shrink: 0;"
-          />
-        </Show>
-        <h1 class="page-header__title" style="margin: 0;">
-          {agentDisplayName() ?? agentName()}
-        </h1>
-      </div>
+      <Tabs items={tabs} value={active} label={name} className="mb-5 mt-3" />
 
-      {/* Horizontal tabs */}
-      <div class="panel__tabs" role="tablist" style="margin-top: 12px; margin-bottom: 0;">
-        <A
-          href={path('')}
-          role="tab"
-          aria-selected={isActive('/overview')}
-          class="panel__tab"
-          classList={{ 'panel__tab--active': isActive('/overview') }}
-        >
-          {t('harnesses.detail.overview')}
-        </A>
-        <A
-          href={path('/routing')}
-          role="tab"
-          aria-selected={isActive('/routing')}
-          class="panel__tab"
-          classList={{ 'panel__tab--active': isActive('/routing') }}
-        >
-          {t('harnesses.detail.routing')}
-        </A>
-        <A
-          href={path('/providers')}
-          role="tab"
-          aria-selected={isActive('/providers')}
-          class="panel__tab"
-          classList={{ 'panel__tab--active': isActive('/providers') }}
-        >
-          {t('harnesses.detail.providers')}
-        </A>
-        <A
-          href={path('/guardrails')}
-          role="tab"
-          aria-selected={isActive('/guardrails')}
-          class="panel__tab"
-          classList={{ 'panel__tab--active': isActive('/guardrails') }}
-        >
-          {t('harnesses.detail.limits')}
-        </A>
-        <A
-          href={path('/settings')}
-          role="tab"
-          aria-selected={isActive('/settings')}
-          class="panel__tab"
-          classList={{ 'panel__tab--active': isActive('/settings') }}
-        >
-          {t('harnesses.detail.settings')}
-        </A>
-      </div>
-      <hr style="border: none; border-top: 1px solid hsl(var(--border)); margin: 8px 0 24px;" />
-
-      {/* Tab content from child routes */}
-      {props.children}
+      <Outlet />
     </div>
   );
-};
-
-export default AgentDetail;
+}
