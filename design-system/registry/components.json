@@ -656,7 +656,6 @@
         "layout.css",
         "limits.css",
         "modals.css",
-        "organization.css",
         "routing-providers.css",
         "routing.css",
         "skeleton.css",
@@ -2092,75 +2091,6 @@
         "notifications.css"
       ]
     },
-    "org-error": {
-      "classes": [
-        "org-error"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-form": {
-      "classes": [
-        "org-form",
-        "org-form__actions",
-        "org-form__field",
-        "org-form__field--inline"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-gate": {
-      "classes": [
-        "org-gate",
-        "org-gate__text",
-        "org-gate__title"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-select": {
-      "classes": [
-        "org-select"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-switcher": {
-      "classes": [
-        "org-switcher",
-        "org-switcher__label",
-        "org-switcher__name",
-        "org-switcher__role",
-        "org-switcher__row",
-        "org-switcher__select"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-table": {
-      "classes": [
-        "org-table",
-        "org-table__actions",
-        "org-table__muted",
-        "org-table__orgs"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "org-table-wrap": {
-      "classes": [
-        "org-table-wrap"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
     "output-controls": {
       "classes": [
         "output-controls",
@@ -2630,22 +2560,6 @@
         "welcome.css"
       ]
     },
-    "readonly-notice": {
-      "classes": [
-        "readonly-notice"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
-    "readonly-region": {
-      "classes": [
-        "readonly-region"
-      ],
-      "files": [
-        "organization.css"
-      ]
-    },
     "recovery-card": {
       "classes": [
         "recovery-card",
@@ -2791,16 +2705,6 @@
       ],
       "files": [
         "routing.css"
-      ]
-    },
-    "role-badge": {
-      "classes": [
-        "role-badge",
-        "role-badge--accent",
-        "role-badge--warning"
-      ],
-      "files": [
-        "organization.css"
       ]
     },
     "routing-action": {
@@ -3563,19 +3467,6 @@
       "files": [
         "cards.css",
         "theme.css"
-      ]
-    },
-    "temp-password": {
-      "classes": [
-        "temp-password",
-        "temp-password__actions",
-        "temp-password__row",
-        "temp-password__title",
-        "temp-password__value",
-        "temp-password__warning"
-      ],
-      "files": [
-        "organization.css"
       ]
     },
     "theme-picker": {
@@ -4743,11 +4634,6 @@
       "components/ModelPricesFilterBar.tsx",
       "pages/MessageLog.tsx"
     ],
-    "organization.css": [
-      "components/TemporaryPasswordBox.tsx",
-      "pages/AdminUsers.tsx",
-      "pages/Organization.tsx"
-    ],
     "overview.css": [
       "pages/GlobalOverview.tsx",
       "pages/MessageLog.tsx",
@@ -4804,18 +4690,19 @@
   },
   "orphanStylesheets": [
     "agent-chart-tooltip.css",
-    "filter-select.css"
+    "filter-select.css",
+    "organization.css"
   ],
   "tokensOutsideSource": [],
   "stats": {
     "tokens": 79,
     "darkOverrides": 38,
-    "blocks": 292,
-    "classes": 1565,
+    "blocks": 281,
+    "classes": 1534,
     "canonicalRules": 47,
     "ghostRules": 47
   },
   "missingImports": [
-    "/Users/patrickbrandao/Projects/thinker/.claude/worktrees/agent-a3813cd0d61b2a1d2/packages/frontend/src/styles/canvas.css"
+    "/Users/patrickbrandao/Projects/thinker/.claude/worktrees/agent-a1fef8f9eec32d4ed/packages/frontend/src/styles/canvas.css"
   ]
 }

@@ -52,6 +52,27 @@ vi.mock('../../src/services/api/organizations.js', async (orig) => ({
         { id: 'org-2', name: 'Beta', role: 'viewer' },
       ],
     }),
+  listMembers: () =>
+    Promise.resolve({
+      members: [
+        { userId: 'u-me', email: 'me@x.io', name: 'Me', role: 'owner', mustChangePassword: false },
+        { userId: 'u-v', email: 'v@x.io', name: 'Vic', role: 'viewer', mustChangePassword: true },
+      ],
+    }),
+  listAdminUsers: () =>
+    Promise.resolve({
+      users: [
+        {
+          id: 'u-me',
+          email: 'me@x.io',
+          name: 'Me',
+          isInstanceAdmin: true,
+          mustChangePassword: false,
+          createdAt: new Date().toISOString(),
+          organizations: [{ id: 'org-1', name: 'Acme', role: 'owner' }],
+        },
+      ],
+    }),
 }));
 
 import { resetLocaleForTests } from '../../src/i18n';
@@ -60,6 +81,8 @@ import Sidebar from '../../src/components/shell/Sidebar';
 import Topbar from '../../src/components/shell/Topbar';
 import CommandPalette from '../../src/components/shell/CommandPalette';
 import AlertsMenu from '../../src/components/shell/AlertsMenu';
+import Organization from '../../src/pages/Organization';
+import AdminUsers from '../../src/pages/AdminUsers';
 
 function inRouter(node: React.ReactNode, path = '/overview') {
   return render(<MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>);
@@ -77,11 +100,25 @@ describe('shell, auth and organization screens in pt-BR', () => {
     } as never);
   });
 
-  // Login, Organization and AdminUsers are not ported to React yet; their
-  // pt-BR cases come back when those pages are.
+  // Login is not ported to React yet; its pt-BR case comes back when it is.
   it.todo('renders the sign-in page in Portuguese');
-  it.todo('renders the Organization page in Portuguese');
-  it.todo('renders the Users admin page in Portuguese');
+
+  it('renders the Organization page in Portuguese', async () => {
+    render(<Organization />);
+    await screen.findByText('v@x.io');
+    expect(screen.getByText('Membros')).toBeTruthy();
+    expect(screen.getByText('Troca de senha pendente')).toBeTruthy();
+    expect(screen.getByLabelText('Papel de v@x.io')).toBeTruthy();
+    expect(screen.getByText('Zona de perigo')).toBeTruthy();
+  });
+
+  it('renders the Users admin page in Portuguese', async () => {
+    render(<AdminUsers />);
+    await screen.findByText('Acme · Proprietário');
+    expect(screen.getByText('Todos os usuários')).toBeTruthy();
+    expect(screen.getAllByText('Criar usuário').length).toBeGreaterThan(0);
+    expect(screen.getByText('Redefinir senha')).toBeTruthy();
+  });
 
   it('renders the sidebar in Portuguese', () => {
     inRouter(<Sidebar collapsed={false} onToggleCollapsed={() => {}} onNavigate={() => {}} />);

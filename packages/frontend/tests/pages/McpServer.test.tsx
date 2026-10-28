@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, waitFor } from '@solidjs/testing-library';
-
-vi.mock('@solidjs/meta', () => ({
-  Title: (props: { children?: unknown }) => <title>{String(props.children ?? '')}</title>,
-  Meta: () => null,
-}));
+import { act, render, fireEvent, waitFor } from '@testing-library/react';
 
 // MCP is on unless the backend says otherwise — an install served over plain
 // HTTP from a non-loopback host runs without the endpoint entirely.
@@ -30,22 +25,27 @@ describe('install-endpoints', () => {
 describe('MCP server page', () => {
   // The panels wait for the setup status, so render and let it resolve.
   async function renderReady() {
-    const result = render(() => <McpServer />);
-    await waitFor(() => expect(result.container.querySelector('.panel__tab')).not.toBeNull());
+    const result = render(<McpServer />);
+    await waitFor(() => expect(result.container.querySelector('.tab')).not.toBeNull());
     return result;
   }
+
+  const byLabel = (container: HTMLElement, label: string) =>
+    Array.from(container.querySelectorAll('.tab')).find(
+      (t) => t.textContent?.trim() === label,
+    ) as HTMLElement;
 
   it('shows neither panel until the status is known', async () => {
     let settle!: (enabled: boolean) => void;
     mockCheckMcpEnabled = () => new Promise<boolean>((resolve) => (settle = resolve));
     try {
-      const { container } = render(() => <McpServer />);
+      const { container } = render(<McpServer />);
       // Pending: no endpoint, no client snippets, and no "not available" notice.
-      expect(container.querySelector('.panel__tab')).toBeNull();
+      expect(container.querySelector('.tab')).toBeNull();
       expect(container.textContent).not.toContain('/api/v1/mcp');
       expect(container.textContent).not.toContain('Not available on this install');
-      settle(true);
-      await waitFor(() => expect(container.querySelector('.panel__tab')).not.toBeNull());
+      await act(async () => settle(true));
+      await waitFor(() => expect(container.querySelector('.tab')).not.toBeNull());
       expect(container.textContent).toContain(`${window.location.origin}/api/v1/mcp`);
     } finally {
       mockCheckMcpEnabled = () => Promise.resolve(mockMcpEnabled);
@@ -55,11 +55,11 @@ describe('MCP server page', () => {
   it('explains why the page is empty when the backend runs without MCP', async () => {
     mockMcpEnabled = false;
     try {
-      const { container } = render(() => <McpServer />);
+      const { container } = render(<McpServer />);
       await waitFor(() => expect(container.textContent).toContain('Not available on this install'));
       // No endpoint and no client snippets are offered.
       expect(container.textContent).not.toContain(`${window.location.origin}/api/v1/mcp`);
-      expect(container.querySelectorAll('.panel__tab')).toHaveLength(0);
+      expect(container.querySelectorAll('.tab')).toHaveLength(0);
       expect(container.textContent).toContain('MCP_ENABLED=false');
     } finally {
       mockMcpEnabled = true;
@@ -74,34 +74,28 @@ describe('MCP server page', () => {
 
   it('offers a tab per supported client, with Claude Code selected first', async () => {
     const { container } = await renderReady();
-    const tabs = Array.from(container.querySelectorAll('.panel__tab')).map((t) =>
-      t.textContent?.trim(),
-    );
+    const tabs = Array.from(container.querySelectorAll('.tab')).map((t) => t.textContent?.trim());
     expect(tabs).toEqual(['Claude Code', 'Codex', 'OpenCode', 'Other']);
-    const active = container.querySelector('.panel__tab--active');
+    const active = container.querySelector('.tab.is-active');
     expect(active?.textContent?.trim()).toBe('Claude Code');
     expect(container.textContent).toContain('claude mcp add --transport http thinker');
   });
 
   it('swaps the snippet when another client tab is selected', async () => {
     const { container } = await renderReady();
-    const byLabel = (label: string) =>
-      Array.from(container.querySelectorAll('.panel__tab')).find(
-        (t) => t.textContent?.trim() === label,
-      ) as HTMLElement;
 
-    fireEvent.click(byLabel('Codex'));
+    fireEvent.click(byLabel(container, 'Codex'));
     expect(container.textContent).toContain('codex mcp add thinker --url');
     expect(container.textContent).not.toContain('claude mcp add --transport http');
-    expect(byLabel('Codex').getAttribute('aria-selected')).toBe('true');
+    expect(byLabel(container, 'Codex').getAttribute('aria-selected')).toBe('true');
 
-    fireEvent.click(byLabel('OpenCode'));
+    fireEvent.click(byLabel(container, 'OpenCode'));
     expect(container.textContent).toContain('opencode.ai/config.json');
   });
 
   it('shows each client logo, sourced from the shared platform map', async () => {
     const { container } = await renderReady();
-    const icons = Array.from(container.querySelectorAll('.panel__tab .panel__tab-icon')).map((i) =>
+    const icons = Array.from(container.querySelectorAll('.tab .tab-icon')).map((i) =>
       i.getAttribute('src'),
     );
     expect(icons).toEqual([
@@ -111,19 +105,15 @@ describe('MCP server page', () => {
       '/icons/other.svg',
     ]);
     // Decorative: the label beside it already names the client.
-    for (const i of container.querySelectorAll('.panel__tab-icon')) {
+    for (const i of container.querySelectorAll('.tab-icon')) {
       expect(i.getAttribute('alt')).toBe('');
     }
   });
 
   it('carries a generic mcpServers block for any other client', async () => {
     const { container } = await renderReady();
-    const byLabel = (label: string) =>
-      Array.from(container.querySelectorAll('.panel__tab')).find(
-        (t) => t.textContent?.trim() === label,
-      ) as HTMLElement;
 
-    fireEvent.click(byLabel('Other'));
+    fireEvent.click(byLabel(container, 'Other'));
     expect(container.textContent).toContain('mcpServers');
     expect(container.textContent).toContain(`"url": "${window.location.origin}/api/v1/mcp"`);
   });

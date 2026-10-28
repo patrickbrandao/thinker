@@ -1,6 +1,6 @@
-import type { Component } from 'solid-js';
-import CopyButton from './CopyButton.jsx';
-import '../styles/organization.css';
+import { KeyRound } from 'lucide-react';
+import CopyButton from './CopyButton.js';
+import { Button } from './ui.js';
 import { t } from '../i18n/index.js';
 
 interface TemporaryPasswordBoxProps {
@@ -14,22 +14,32 @@ interface TemporaryPasswordBoxProps {
  * Shows a server-generated temporary password exactly once. The caller drops
  * it from state on dismiss; nothing is persisted.
  */
-const TemporaryPasswordBox: Component<TemporaryPasswordBoxProps> = (props) => (
-  <div class="temp-password" role="status">
-    <span class="temp-password__title">{t('org.tempPassword.title', { email: props.email })}</span>
-    <span class="temp-password__warning">{t('org.tempPassword.warning')}</span>
-    <div class="temp-password__row">
-      <code class="temp-password__value" data-testid="temporary-password">
-        {props.password}
-      </code>
-      <CopyButton text={props.password} />
+export default function TemporaryPasswordBox({
+  email,
+  password,
+  onDismiss,
+}: TemporaryPasswordBoxProps) {
+  return (
+    <div className="well flex flex-col gap-2" role="status">
+      <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+        <KeyRound className="size-[15px] text-accent" aria-hidden="true" />
+        {t('org.tempPassword.title', { email })}
+      </span>
+      <span className="text-xs text-warn">{t('org.tempPassword.warning')}</span>
+      <div className="flex items-center gap-2 rounded-control border border-line bg-elev px-2.5 py-1.5">
+        <code
+          className="min-w-0 flex-1 break-all font-mono text-[13px] text-ink"
+          data-testid="temporary-password"
+        >
+          {password}
+        </code>
+        <CopyButton text={password} />
+      </div>
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" onClick={onDismiss}>
+          {t('org.tempPassword.saved')}
+        </Button>
+      </div>
     </div>
-    <div class="temp-password__actions">
-      <button type="button" class="btn btn--outline btn--sm" onClick={() => props.onDismiss()}>
-        {t('org.tempPassword.saved')}
-      </button>
-    </div>
-  </div>
-);
-
-export default TemporaryPasswordBox;
+  );
+}
