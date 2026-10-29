@@ -999,3 +999,52 @@
     }
   }
 }
+
+/* Tool cards in the request drawer: Manifest's amber card and JSON token colors. */
+.tool-card {
+  border: 1px solid hsl(36 80% 50% / 0.24);
+  background: hsl(36 80% 50% / 0.04);
+}
+.tool-card__details {
+  border-top: 1px solid hsl(36 80% 50% / 0.2);
+}
+.tool-card__details tr {
+  border-bottom: 1px solid hsl(36 80% 50% / 0.12);
+}
+.tool-key {
+  color: hsl(187 60% 38%);
+  font-weight: 500;
+}
+.tool-str,
+.tool-card .language-json .hljs-string {
+  color: hsl(24 80% 44%);
+}
+.tool-card .hljs-attr {
+  color: hsl(187 60% 38%);
+  font-weight: 500;
+}
+.tool-card .language-json .hljs-number {
+  color: hsl(260 60% 52%);
+}
+.tool-card .language-json .hljs-literal {
+  color: hsl(340 65% 45%);
+  font-weight: 500;
+}
+.tool-card .json-block {
+  border: 0;
+  background: hsl(36 80% 50% / 0.04);
+}
+.dark .tool-key,
+.dark .tool-card .hljs-attr {
+  color: hsl(187 70% 58%);
+}
+.dark .tool-str,
+.dark .tool-card .language-json .hljs-string {
+  color: hsl(24 90% 65%);
+}
+.dark .tool-card .language-json .hljs-number {
+  color: hsl(260 80% 75%);
+}
+.dark .tool-card .language-json .hljs-literal {
+  color: hsl(340 75% 68%);
+}
