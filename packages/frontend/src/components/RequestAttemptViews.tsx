@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, SquareFunction } from 'lucide-react';
 import { extractRequestMessages, extractRequestTools, type ChatTool } from 'thinker-shared';
 import type { AttemptRecording } from '../services/api/messages.js';
 import { parseResponse, type ResponsePart, type StreamEvent } from '../lib/response-parts.js';
@@ -8,7 +8,6 @@ import {
   ConversationSplit,
   Empty,
   MarkdownContent,
-  ToolIcon,
   TruncatedId,
   toolArguments,
 } from './RequestMessages.js';
@@ -334,8 +333,12 @@ export function toolParams(parameters: unknown): ParamInfo[] {
 /** `function name(string query, number limit?)` with required args orange, optional gray. */
 function Signature({ kind, name, params }: { kind: string; name: string; params: ParamInfo[] }) {
   return (
-    <code className="font-mono text-sm">
-      <span className="text-muted">{kind} </span>
+    <code className="inline-flex flex-wrap items-center font-mono text-sm">
+      {kind === 'function' ? (
+        <SquareFunction className="mr-1.5 size-4 shrink-0 text-muted" aria-label={kind} />
+      ) : (
+        <span className="text-muted">{kind}&nbsp;</span>
+      )}
       <strong className="text-ink">{name}</strong>
       <span className="text-faint">(</span>
       {params.map((p, i) => (
@@ -357,7 +360,7 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
   const params = toolParams(tool.function?.parameters);
   const name = tool.function?.name ?? t('messages.recording.unknownTool');
   return (
-    <article className="rounded-control border border-line bg-elev">
+    <article className="tool-card rounded-control">
       <button
         type="button"
         className="flex w-full cursor-pointer flex-wrap items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left"
@@ -378,9 +381,9 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
         ) : null}
       </button>
       {open ? (
-        <div className="border-t border-line px-3 py-2">
+        <div className="tool-card__details py-2 pr-3 pl-[75px]">
           {tool.function?.description ? (
-            <p className="m-0 mb-2 whitespace-pre-wrap font-mono text-xs text-dim">
+            <p className="m-0 mb-2 whitespace-pre-wrap font-mono text-xs leading-normal text-muted">
               {tool.function.description}
             </p>
           ) : null}
@@ -388,19 +391,15 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
             <table className="w-full text-xs">
               <tbody>
                 {params.map((p) => (
-                  <tr key={p.name} className="border-b border-line align-baseline">
-                    <td
-                      className={cx('py-1 pr-3 font-mono', p.required ? 'text-warn' : 'text-muted')}
-                    >
-                      {p.name}
-                    </td>
-                    <td className="py-1 pr-3 font-mono text-dim">{p.type}</td>
+                  <tr key={p.name} className="align-baseline">
+                    <td className="tool-key py-1 pr-3 font-mono">{p.name}</td>
+                    <td className="tool-str py-1 pr-3 font-mono">{p.type}</td>
                     <td className="py-1 pr-3 text-muted">
                       {p.required
                         ? t('messages.recording.required')
                         : t('messages.recording.optional')}
                     </td>
-                    <td className="py-1 font-mono text-dim">{p.description ?? ''}</td>
+                    <td className="py-1 font-mono text-muted">{p.description ?? ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -466,9 +465,8 @@ export function ToolsView({
             {calls.map((call, i) => {
               const params = toolParams(declaredByName.get(call.name)?.function?.parameters);
               return (
-                <article key={call.id ?? i} className="rounded-control border border-line bg-elev">
+                <article key={call.id ?? i} className="tool-card rounded-control">
                   <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-                    <ToolIcon />
                     <Signature
                       kind="function"
                       name={call.name ?? t('messages.recording.unknownTool')}
@@ -476,7 +474,7 @@ export function ToolsView({
                     />
                     {call.id ? <TruncatedId id={call.id} /> : null}
                   </div>
-                  <div className="border-t border-line px-3 py-2">
+                  <div className="tool-card__details px-3 py-2">
                     <ArgsView args={call.arguments} />
                   </div>
                 </article>

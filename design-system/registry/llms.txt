@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (196 BEM blocks, 208 classes)
+## Blocks (201 BEM blocks, 214 classes)
 actions (shell.css): actions
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
@@ -130,21 +130,21 @@ gate (shell.css): gate
 hint (base.css): hint
 hljs (syntax-highlight.css): hljs
 hljs-addition (syntax-highlight.css): hljs-addition
-hljs-attr (syntax-highlight.css): hljs-attr
+hljs-attr (shell.css, syntax-highlight.css): hljs-attr
 hljs-built_in (syntax-highlight.css): hljs-built_in
 hljs-comment (syntax-highlight.css): hljs-comment
 hljs-deletion (syntax-highlight.css): hljs-deletion
 hljs-keyword (syntax-highlight.css): hljs-keyword
-hljs-literal (syntax-highlight.css): hljs-literal
+hljs-literal (shell.css, syntax-highlight.css): hljs-literal
 hljs-meta (syntax-highlight.css): hljs-meta
-hljs-number (syntax-highlight.css): hljs-number
+hljs-number (shell.css, syntax-highlight.css): hljs-number
 hljs-operator (syntax-highlight.css): hljs-operator
 hljs-params (syntax-highlight.css): hljs-params
 hljs-property (syntax-highlight.css): hljs-property
 hljs-punctuation (syntax-highlight.css): hljs-punctuation
 hljs-regexp (syntax-highlight.css): hljs-regexp
 hljs-section (syntax-highlight.css): hljs-section
-hljs-string (syntax-highlight.css): hljs-string
+hljs-string (shell.css, syntax-highlight.css): hljs-string
 hljs-symbol (syntax-highlight.css): hljs-symbol
 hljs-template-tag (syntax-highlight.css): hljs-template-tag
 hljs-title (syntax-highlight.css): hljs-title
@@ -167,9 +167,11 @@ is-success (shell.css): is-success
 is-unseen (shell.css): is-unseen
 is-warn (base.css, shell.css): is-warn
 is-warning (shell.css): is-warning
+json-block (shell.css): json-block
 kbd (base.css): kbd
 kv (shell.css): kv
 label (base.css): label
+language-json (shell.css): language-json
 link-action (base.css): link-action
 logo-dark (shell.css): logo-dark
 logo-light (shell.css): logo-light
@@ -260,6 +262,9 @@ toast (shell.css): toast
 toast-close (shell.css): toast-close
 toast-msg (shell.css): toast-msg
 toasts (shell.css): toasts
+tool-card (shell.css): tool-card tool-card__details
+tool-key (shell.css): tool-key
+tool-str (shell.css): tool-str
 topbar (shell.css): topbar
 topbar-actions (shell.css): topbar-actions
 topbar-version (shell.css): topbar-version

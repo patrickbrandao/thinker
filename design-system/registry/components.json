@@ -708,6 +708,7 @@
         "hljs-attr"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -748,6 +749,7 @@
         "hljs-literal"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -764,6 +766,7 @@
         "hljs-number"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -820,6 +823,7 @@
         "hljs-string"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -1003,6 +1007,14 @@
         "shell.css"
       ]
     },
+    "json-block": {
+      "classes": [
+        "json-block"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "kbd": {
       "classes": [
         "kbd"
@@ -1025,6 +1037,14 @@
       ],
       "files": [
         "base.css"
+      ]
+    },
+    "language-json": {
+      "classes": [
+        "language-json"
+      ],
+      "files": [
+        "shell.css"
       ]
     },
     "link-action": {
@@ -1757,6 +1777,31 @@
         "shell.css"
       ]
     },
+    "tool-card": {
+      "classes": [
+        "tool-card",
+        "tool-card__details"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "tool-key": {
+      "classes": [
+        "tool-key"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "tool-str": {
+      "classes": [
+        "tool-str"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "topbar": {
       "classes": [
         "topbar"
@@ -1979,8 +2024,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 196,
-    "classes": 208,
+    "blocks": 201,
+    "classes": 214,
     "canonicalRules": 3,
     "ghostRules": 3
   }
