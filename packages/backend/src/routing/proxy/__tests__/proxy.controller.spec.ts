@@ -864,8 +864,12 @@ describe('ProxyController', () => {
     );
 
     expect(res.json).toHaveBeenCalledWith(retryResponse);
-    expect(attemptRecording.save).toHaveBeenCalledTimes(2);
-    const [originalSave, retrySave] = attemptRecording.save.mock.calls;
+    // Request-only saves land early; the complete recordings are the final ones.
+    const finalSaves = attemptRecording.save.mock.calls.filter(
+      (call: unknown[]) => (call[3] as { response_body: unknown }).response_body !== null,
+    );
+    expect(finalSaves).toHaveLength(2);
+    const [originalSave, retrySave] = finalSaves;
     expect(originalSave[1]).toBe(retrySave[1]);
     expect(originalSave[2]).not.toBe(retrySave[2]);
     expect(originalSave[3]).toEqual({
@@ -935,7 +939,10 @@ describe('ProxyController', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(responseBody);
-    expect(attemptRecording.save).toHaveBeenCalledTimes(1);
+    const finalSaves = attemptRecording.save.mock.calls.filter(
+      (call: unknown[]) => (call[3] as { response_body: unknown }).response_body !== null,
+    );
+    expect(finalSaves).toHaveLength(1);
   });
 
   it('keeps routing when pending Request recording fails and tracks the provider attempt', async () => {

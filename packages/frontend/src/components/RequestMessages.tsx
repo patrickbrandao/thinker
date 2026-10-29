@@ -28,7 +28,7 @@ import { cx } from './ui.js';
 
 // MarkdownContent belongs to the playground area; typed here by its props
 // contract so this file does not depend on how that component is written.
-const MarkdownContent = MarkdownContentImpl as unknown as ComponentType<{
+export const MarkdownContent = MarkdownContentImpl as unknown as ComponentType<{
   text: string;
   class?: string;
 }>;
@@ -58,7 +58,7 @@ interface OutlineRow {
   tokens: number;
 }
 
-function toolArguments(value: unknown): unknown {
+export function toolArguments(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   try {
     return JSON.parse(value);
@@ -76,7 +76,7 @@ function approxTokens(text: string): number {
   return Math.max(1, Math.round(text.length / 4));
 }
 
-function TruncatedId({ id }: { id: string }) {
+export function TruncatedId({ id }: { id: string }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLElement>(null);
 
@@ -111,7 +111,7 @@ function TruncatedId({ id }: { id: string }) {
   );
 }
 
-const ToolIcon = () => (
+export const ToolIcon = () => (
   <span className="request-messages__tool-icon inline-flex text-muted" aria-hidden="true">
     <Settings className="size-4" />
   </span>
@@ -252,7 +252,7 @@ function MessageTurn({
   );
 }
 
-function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
+export function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
   const [activeTurnIndex, setActiveTurnIndex] = useState(-1);
   const [visibleRoles, setVisibleRoles] = useState(() => new Set<Role>(ALL_ROLES));
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
@@ -416,7 +416,7 @@ function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
   );
 }
 
-function Empty({ children, small }: { children: ReactNode; small?: boolean }) {
+export function Empty({ children, small }: { children: ReactNode; small?: boolean }) {
   return (
     <div
       className={cx(

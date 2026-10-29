@@ -360,11 +360,24 @@ export class ProxyController {
       if (start.providerCallStarted === false) return attempt;
 
       let recordingFinished = false;
+      // The request half is stored as soon as it is known, so the dashboard
+      // shows the request while the provider is still answering. The final
+      // save waits for it, so the complete recording always lands last.
+      let requestSaved: Promise<void> = Promise.resolve();
       attempt.startRecording = ({ requestBody, wireFormat }) => {
         if (!recordingEnabled || !this.attemptRecording || attempt.recordingCapture) {
           return;
         }
-        attempt.recordingCapture = createAttemptRecordingCapture(requestBody, wireFormat);
+        const capture = createAttemptRecordingCapture(requestBody, wireFormat);
+        attempt.recordingCapture = capture;
+        const recordingService = this.attemptRecording;
+        requestSaved = attempt.pendingWrite
+          .catch(() => false)
+          .then(async (written) => {
+            if (!written || recordingFinished) return;
+            await recordingService.save(tenantId, requestId, attempt.id, capture.buildRecording());
+          })
+          .catch((e) => this.logger.warn(`Failed to save Provider Attempt request: ${e}`));
       };
       attempt.finishRecording = async (response) => {
         if (recordingFinished) return;
@@ -376,6 +389,7 @@ export class ProxyController {
           capture.setJson(response.body);
         }
         recordingFinished = true;
+        await requestSaved;
         if (!(await attempt.pendingWrite.catch(() => false))) return;
         await this.attemptRecording
           .save(tenantId, requestId, attempt.id, capture.buildRecording())

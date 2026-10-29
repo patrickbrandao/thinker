@@ -136,12 +136,15 @@ describe('RequestDrawer', () => {
     expect(container.textContent).not.toMatch(/autofix/i);
     expect(container.textContent).not.toContain('rename: old → new');
 
-    fireEvent.click(screen.getByText('Request headers'));
+    // Request headers are a card on the Details tab, not a tab of their own.
+    expect(screen.getByText('Request headers')).toBeDefined();
     expect(screen.getByText('alpha')).toBeDefined();
     expect(screen.getByText('zeta')).toBeDefined();
-    fireEvent.click(screen.getByText('Model params'));
+    // Without a recording, the Request tab shows the parameters Thinker parsed.
+    fireEvent.click(screen.getByRole('tab', { name: 'Request' }));
     expect(screen.getByText('temperature')).toBeDefined();
     expect(screen.getByText('0.2')).toBeDefined();
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
 
     const attempts = container.querySelectorAll('.attempt-item');
     fireEvent.click(attempts[1]!);
@@ -270,25 +273,21 @@ describe('RequestDrawer', () => {
     });
     const { container } = render(<RequestDrawer messageId="recorded-request" onClose={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText('Messages')).toBeDefined());
-    expect(screen.getByText('Tools')).toBeDefined();
-    fireEvent.click(screen.getByText('Messages'));
-
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Response' })).toBeDefined());
+    expect(screen.getByRole('tab', { name: 'Tools' })).toBeDefined();
+    fireEvent.click(screen.getByRole('tab', { name: 'Request' }));
     expect(
       screen.getByText('Recorded user turn', {
         selector: '.request-message__content',
       }),
     ).toBeDefined();
-    expect(
-      screen.getByText('Recorded assistant turn', {
-        selector: '.request-message__content',
-      }),
-    ).toBeDefined();
+    fireEvent.click(screen.getByRole('tab', { name: 'Response' }));
+    expect(screen.getByText('Recorded assistant turn')).toBeDefined();
 
-    // Switch to attempt 1 — no recording, so Messages/Tools/Raw tabs do not appear.
+    // Switch to attempt 1 — no recording, so Response/Tools/Raw tabs do not appear.
     fireEvent.click(container.querySelectorAll('.attempt-item')[1]!);
-    expect(screen.queryByText('Messages')).toBeNull();
-    expect(screen.queryByText('Tools')).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Response' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Tools' })).toBeNull();
     expect(
       screen.queryByText('Recorded user turn', {
         selector: '.request-message__content',

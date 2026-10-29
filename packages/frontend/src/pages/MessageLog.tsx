@@ -684,6 +684,8 @@ export default function MessageLog() {
     const target = e.target as HTMLElement;
     // If clicking inside the drawer itself, ignore
     if (target.closest('.drawer')) return;
+    // A popped-out window stays open while the user browses the table.
+    if (document.querySelector('.drawer--floating')) return;
     // If clicking on a message row, the row handler will switch content
     if (target.closest('.msg-row--clickable')) return;
     closeDrawer();

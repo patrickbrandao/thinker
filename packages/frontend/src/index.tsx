@@ -62,6 +62,7 @@ const Organization = lazyReload(() => import('./pages/Organization.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
+const RequestPage = lazyReload(() => import('./pages/RequestPage.jsx'));
 
 const Lazy = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="page" aria-busy="true" />}>{children}</Suspense>
@@ -350,6 +351,9 @@ function AppRoutes() {
       </Route>
       <Route path="cli/auth" element={<GuardedOutlet />}>
         <Route index element={<CliAuth />} />
+      </Route>
+      <Route path="requests/:requestId" element={<GuardedOutlet />}>
+        <Route index element={<RequestPage />} />
       </Route>
       <Route path="consent" element={<GuardedOutlet />}>
         <Route index element={<Consent />} />

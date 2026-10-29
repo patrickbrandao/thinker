@@ -618,6 +618,32 @@
   .drawer .sec + .sec {
     margin-top: 20px;
   }
+  /* Request details popped out: a movable, resizable window. */
+  .drawer.drawer--floating {
+    right: auto;
+    bottom: auto;
+    min-width: 420px;
+    min-height: 260px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    overflow: hidden;
+    resize: both;
+    z-index: 70;
+  }
+  .drawer.drawer--floating.drawer--minimized {
+    min-height: 0;
+    resize: none;
+  }
+  /* Request details in a dedicated browser tab. */
+  .drawer.drawer--page {
+    position: static;
+    width: 100%;
+    height: 100vh;
+    border-left: 0;
+    box-shadow: none;
+  }
 
   /* Command palette */
   .palette {

@@ -194,7 +194,12 @@ export function getMessageFilterOptions(
 }
 
 export function getMessageDetails(id: string) {
-  return fetchJson<MessageDetailResponse>(`/messages/${encodeURIComponent(id)}/details`);
+  // Live data: a pending request changes while the drawer polls it.
+  return fetchJson<MessageDetailResponse>(
+    `/messages/${encodeURIComponent(id)}/details`,
+    undefined,
+    { cache: false },
+  );
 }
 
 export function setMessageFeedback(
