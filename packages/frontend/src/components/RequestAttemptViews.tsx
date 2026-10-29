@@ -360,10 +360,14 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
     <article className="rounded-control border border-line bg-elev">
       <button
         type="button"
-        className="flex w-full cursor-pointer flex-wrap items-center gap-2 border-0 bg-transparent px-3 py-2 text-left"
+        className="flex w-full cursor-pointer flex-wrap items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
+        <ChevronDown
+          className={cx('size-3.5 shrink-0 text-faint transition-transform', !open && '-rotate-90')}
+          aria-hidden="true"
+        />
         <Signature kind={tool.type ?? 'function'} name={name} params={params} />
         {calls != null ? (
           <span className={cx('badge ml-auto', calls > 0 ? 'is-ok' : '')}>
@@ -373,13 +377,13 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
           </span>
         ) : null}
       </button>
-      {tool.function?.description ? (
-        <p className="m-0 whitespace-pre-wrap px-3 pb-2 font-mono text-xs text-dim">
-          {tool.function.description}
-        </p>
-      ) : null}
       {open ? (
         <div className="border-t border-line px-3 py-2">
+          {tool.function?.description ? (
+            <p className="m-0 mb-2 whitespace-pre-wrap font-mono text-xs text-dim">
+              {tool.function.description}
+            </p>
+          ) : null}
           {params.length > 0 ? (
             <table className="w-full text-xs">
               <tbody>
@@ -489,7 +493,7 @@ export function ToolsView({
         {declared.length === 0 ? (
           <Empty small>{t('messages.recording.noToolsOffered')}</Empty>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {declared.map((tool, i) => (
               <DeclaredTool
                 key={i}
