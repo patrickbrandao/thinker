@@ -1,12 +1,29 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, X } from 'lucide-react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
+import {
+  ArrowRight,
+  ExternalLink,
+  Maximize2,
+  Minus,
+  PanelRight,
+  PictureInPicture2,
+  X,
+} from 'lucide-react';
 import { getMessageDetails, type AttemptRecording } from '../services/api/messages.js';
 import { isFailedStatus, isSuccessStatus } from 'thinker-shared';
 import { formatParamValue } from './MessageDetailsSections.js';
 import { providerIcon } from './ProviderIcon.js';
 import { FallbackIcon } from './message-table-cells.js';
 import { authBadgeFor } from './AuthBadge.js';
-import RequestMessages, { type RecordingView } from './RequestMessages.js';
+import { RawView, RequestView, ResponseView, ToolsView } from './RequestAttemptViews.js';
+import { RequestTimelineChart } from './RequestTimelineChart.js';
 import { useResource } from '../lib/use-resource.js';
 import { intlLocale, t } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
@@ -15,9 +32,38 @@ import { IconButton, Tabs, cx } from './ui.js';
 export interface RequestDrawerProps {
   messageId: string | null;
   onClose: () => void;
+  /** `page` fills a dedicated browser tab: no side panel, float or close controls. */
+  variant?: 'panel' | 'page';
 }
 
-type AttemptTab = 'details' | 'messages' | 'tools' | 'raw' | 'headers' | 'params';
+type AttemptTab = 'details' | 'request' | 'response' | 'tools' | 'raw';
+type Layout = 'docked' | 'floating';
+
+interface FloatRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const PENDING_POLL_MS = 1500;
+
+function initialFloatRect(): FloatRect {
+  const width = Math.min(960, window.innerWidth - 48);
+  const height = Math.min(720, window.innerHeight - 48);
+  return {
+    left: Math.max(16, window.innerWidth - width - 32),
+    top: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+    width,
+    height,
+  };
+}
+
+function formatPeer(ip: string | undefined, port: number | undefined): string | undefined {
+  if (!ip) return undefined;
+  if (port == null) return ip;
+  return ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;
+}
 
 interface Attempt {
   id: string;
@@ -368,12 +414,38 @@ function KvList({ entries, mono }: { entries: Array<[string, unknown]>; mono?: b
 const sortedEntries = (obj: Record<string, unknown>) =>
   Object.entries(obj).sort(([a], [b]) => a.localeCompare(b));
 
-export default function RequestDrawer({ messageId, onClose }: RequestDrawerProps) {
+function DetailCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="drawer-card mt-5">
+      <h4 className="eyebrow mb-2">{title}</h4>
+      {children}
+    </section>
+  );
+}
+
+interface CallerOrigin {
+  clientIp?: string;
+  clientIpSource?: string;
+  peerIp?: string;
+  peerPort?: number;
+}
+
+export default function RequestDrawer({
+  messageId,
+  onClose,
+  variant = 'panel',
+}: RequestDrawerProps) {
   const [selectedAttempt, setSelectedAttempt] = useState(0);
   const [tab, setTab] = useState<AttemptTab>('details');
+  const [layout, setLayout] = useState<Layout>('docked');
+  const [minimized, setMinimized] = useState(false);
+  const [rect, setRect] = useState<FloatRect | null>(null);
+  const boxRef = useRef<HTMLElement>(null);
   const open = messageId !== null;
+  const isPage = variant === 'page';
+  const floating = !isPage && layout === 'floating';
 
-  const { data } = useResource(() => getMessageDetails(messageId as string), [messageId], {
+  const { data, reload } = useResource(() => getMessageDetails(messageId as string), [messageId], {
     enabled: !!messageId,
   });
 
@@ -385,26 +457,32 @@ export default function RequestDrawer({ messageId, onClose }: RequestDrawerProps
 
   const attempts = useMemo(() => (m ? buildAttempts(m) : []), [m]);
   const currentAttempt = attempts[selectedAttempt] ?? null;
+  const requestPending = m?.status === 'pending';
+
+  // A pending request keeps changing (attempts, recordings, outcome): refetch
+  // until it settles.
+  useEffect(() => {
+    if (!requestPending) return;
+    const timer = setInterval(() => void reload(), PENDING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [requestPending, reload]);
 
   const visibleTabs: Array<{ key: AttemptTab; label: string }> = [
     { key: 'details', label: t('messages.drawer.tabs.details') },
   ];
-  if (currentAttempt?.recording) {
-    visibleTabs.push({ key: 'messages', label: t('messages.drawer.tabs.messages') });
-    visibleTabs.push({ key: 'tools', label: t('messages.drawer.tabs.tools') });
-    visibleTabs.push({ key: 'raw', label: t('messages.drawer.tabs.raw') });
-  }
-  if (currentAttempt?.request_headers && Object.keys(currentAttempt.request_headers).length > 0) {
-    visibleTabs.push({ key: 'headers', label: t('messages.drawer.tabs.headers') });
-  }
-  if (currentAttempt?.request_params && Object.keys(currentAttempt.request_params).length > 0) {
-    visibleTabs.push({ key: 'params', label: t('messages.drawer.tabs.params') });
+  if (currentAttempt) {
+    visibleTabs.push({ key: 'request', label: t('messages.drawer.tabs.request') });
+    if (currentAttempt.recording || currentAttempt.status === 'pending') {
+      visibleTabs.push({ key: 'response', label: t('messages.drawer.tabs.response') });
+    }
+    if (currentAttempt.recording) {
+      visibleTabs.push({ key: 'tools', label: t('messages.drawer.tabs.tools') });
+      visibleTabs.push({ key: 'raw', label: t('messages.drawer.tabs.raw') });
+    }
   }
   // A tab that disappears (another attempt has no recording) falls back to the first.
   const activeTab = visibleTabs.some((x) => x.key === tab) ? tab : visibleTabs[0]!.key;
-  const recordingView: RecordingView =
-    activeTab === 'tools' ? 'tools' : activeTab === 'raw' ? 'raw' : 'messages';
-  const isRecordingTab = activeTab === 'messages' || activeTab === 'tools' || activeTab === 'raw';
+  const attemptPending = currentAttempt?.status === 'pending' || requestPending;
 
   // Reset attempt + tab when the message changes
   useEffect(() => {
@@ -414,145 +492,293 @@ export default function RequestDrawer({ messageId, onClose }: RequestDrawerProps
     }
   }, [messageId]);
 
-  // Close on Escape
+  // Close on Escape (the floating window and the dedicated page stay open).
   useEffect(() => {
-    if (!open) return;
+    if (!open || floating || isPage) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  }, [open, floating, isPage, onClose]);
 
   if (!open) return null;
+
+  const popOut = () => {
+    setRect((prev) => prev ?? initialFloatRect());
+    setMinimized(false);
+    setLayout('floating');
+  };
+  const dock = () => {
+    setLayout('docked');
+    setMinimized(false);
+  };
+  const openInTab = () => {
+    window.open(`/requests/${encodeURIComponent(messageId)}`, '_blank', 'noopener');
+  };
+
+  // Drag the floating window by its header.
+  const startDrag = (e: ReactMouseEvent) => {
+    if (!floating || !rect || (e.target as HTMLElement).closest('button')) return;
+    const box = boxRef.current?.getBoundingClientRect();
+    const start = {
+      x: e.clientX,
+      y: e.clientY,
+      left: box?.left ?? rect.left,
+      top: box?.top ?? rect.top,
+    };
+    const move = (ev: MouseEvent) => {
+      setRect((prev) =>
+        prev
+          ? {
+              ...prev,
+              left: Math.min(
+                window.innerWidth - 80,
+                Math.max(0, start.left + ev.clientX - start.x),
+              ),
+              top: Math.min(window.innerHeight - 40, Math.max(0, start.top + ev.clientY - start.y)),
+            }
+          : prev,
+      );
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    e.preventDefault();
+  };
 
   const requestStatus: string = m?.status ?? 'error';
   const headerProvider: string | undefined = currentAttempt?.provider ?? m?.provider;
   const headerAuthType: string | undefined = currentAttempt?.auth_type ?? m?.auth_type;
   const headerModel: string | undefined = currentAttempt?.model ?? m?.model ?? m?.model_id;
+  const origin: CallerOrigin | null = m?.caller_attribution ?? null;
+  const headers: Record<string, string> | undefined =
+    currentAttempt?.request_headers ?? m?.request_headers ?? undefined;
+
+  const floatStyle: CSSProperties | undefined =
+    floating && rect
+      ? minimized
+        ? { left: rect.left, top: 'auto', bottom: 16, width: 380, height: 'auto' }
+        : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      : undefined;
+
+  const controls = isPage ? null : (
+    <div className="drawer__controls flex shrink-0 items-center gap-0.5">
+      {floating ? (
+        <>
+          <IconButton
+            label={minimized ? t('messages.drawer.restore') : t('messages.drawer.minimize')}
+            onClick={() => setMinimized((v) => !v)}
+          >
+            {minimized ? <Maximize2 /> : <Minus />}
+          </IconButton>
+          <IconButton label={t('messages.drawer.dock')} onClick={dock}>
+            <PanelRight />
+          </IconButton>
+        </>
+      ) : (
+        <IconButton label={t('messages.drawer.float')} onClick={popOut}>
+          <PictureInPicture2 />
+        </IconButton>
+      )}
+      <IconButton label={t('messages.drawer.openInTab')} onClick={openInTab}>
+        <ExternalLink />
+      </IconButton>
+      <IconButton label={t('messages.drawer.close')} onClick={onClose}>
+        <X />
+      </IconButton>
+    </div>
+  );
 
   return (
     <aside
-      className="drawer drawer--open w-[min(880px,100vw)]"
+      ref={boxRef}
+      className={cx(
+        'drawer drawer--open',
+        isPage ? 'drawer--page' : floating ? 'drawer--floating' : 'w-[min(880px,100vw)]',
+        floating && minimized && 'drawer--minimized',
+      )}
+      style={floatStyle}
       aria-label={m ? t('messages.drawer.title', { id: m.id?.slice(0, 12) ?? '' }) : undefined}
     >
       {m ? (
         <>
           {/* Request header (full width) */}
-          <div className="dh drawer__header flex-col items-stretch gap-2">
+          <div
+            className={cx(
+              'dh drawer__header flex-col items-stretch gap-2',
+              floating && 'cursor-move select-none',
+            )}
+            onMouseDown={startDrag}
+          >
             <div className="drawer__title-row flex items-center justify-between gap-3">
               <h3 className="drawer__title truncate font-mono text-sm font-semibold text-ink">
                 {t('messages.drawer.title', { id: m.id?.slice(0, 12) ?? '' })}
               </h3>
-              <IconButton label={t('messages.drawer.close')} onClick={onClose}>
-                <X />
-              </IconButton>
+              {controls}
             </div>
-            <div className="drawer__meta-row flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <span className={cx('drawer-status', requestStatusClass(requestStatus))}>
-                {statusLabel(requestStatus)}
-              </span>
-              {headerProvider ? (
-                <>
-                  <span className="drawer__meta-sep text-faint">{'·'}</span>
-                  <span className="drawer__meta-text inline-flex items-center gap-1 text-dim">
-                    <span className="relative inline-flex size-3.5 shrink-0">
-                      {providerIcon(headerProvider, 14)}
-                      {authBadgeFor(headerAuthType, 8)}
-                    </span>
-                    {headerModel}
-                  </span>
-                </>
-              ) : null}
-              {m.virtual_model_name ? (
-                <span
-                  className="tier-badge tier-badge--virtual badge is-accent"
-                  title={t('messages.table.virtualModel', { name: m.virtual_model_name })}
-                >
-                  {m.virtual_model_name}
+            {minimized && floating ? null : (
+              <div className="drawer__meta-row flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                <span className={cx('drawer-status', requestStatusClass(requestStatus))}>
+                  {statusLabel(requestStatus)}
                 </span>
-              ) : null}
-              {m.timestamp ? (
-                <>
-                  <span className="drawer__meta-sep text-faint">{'·'}</span>
-                  <span className="drawer__meta-text">{fmtDate(m.timestamp)}</span>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="drawer__split flex min-h-0 flex-1 flex-col sm:flex-row">
-            {/* Attempts sidebar — hidden when no attempts */}
-            {attempts.length > 0 ? (
-              <div className="drawer__sidebar shrink-0 overflow-y-auto border-b border-line p-2 sm:w-52 sm:border-b-0 sm:border-r">
-                <div className="drawer__sidebar-title eyebrow px-1.5 pb-1.5">
-                  {t('messages.drawer.attempts')}
-                </div>
-                {attempts.map((att, idx) => (
-                  <button
-                    key={att.id ?? idx}
-                    type="button"
-                    className={cx(
-                      'attempt-item flex w-full cursor-pointer items-center gap-1.5 rounded-control border-0 bg-transparent px-1.5 py-1.5 text-left text-xs text-dim hover:bg-s2',
-                      selectedAttempt === idx && 'attempt-item--active bg-accent-tint text-ink',
-                    )}
-                    aria-pressed={selectedAttempt === idx}
-                    onClick={() => {
-                      setSelectedAttempt(idx);
-                      setTab('details');
-                    }}
+                {requestPending ? (
+                  <span className="spinner" aria-label={t('messages.drawer.autoRefresh')} />
+                ) : null}
+                {headerProvider ? (
+                  <>
+                    <span className="drawer__meta-sep text-faint">{'·'}</span>
+                    <span className="drawer__meta-text inline-flex items-center gap-1 text-dim">
+                      <span className="relative inline-flex size-3.5 shrink-0">
+                        {providerIcon(headerProvider, 14)}
+                        {authBadgeFor(headerAuthType, 8)}
+                      </span>
+                      {headerModel}
+                    </span>
+                  </>
+                ) : null}
+                {m.virtual_model_name ? (
+                  <span
+                    className="tier-badge tier-badge--virtual badge is-accent"
+                    title={t('messages.table.virtualModel', { name: m.virtual_model_name })}
                   >
-                    <span className="attempt-item__num font-mono text-faint">{att.index}</span>
-                    <span className="attempt-item__icon inline-flex text-muted">
-                      {att.type === 'fallback' ? (
-                        <FallbackIcon />
-                      ) : (
-                        <ArrowRight aria-hidden="true" className="size-3.5" />
-                      )}
-                    </span>
-                    <span className="attempt-item__model min-w-0 flex-1 truncate">
-                      {att.model ?? t('messages.drawer.noProvider')}
-                    </span>
-                    <span className={cx('attempt-code', attemptStatusClass(att.status))}>
-                      {attemptCode(att)}
-                    </span>
-                  </button>
-                ))}
+                    {m.virtual_model_name}
+                  </span>
+                ) : null}
+                {origin?.clientIp ? (
+                  <>
+                    <span className="drawer__meta-sep text-faint">{'·'}</span>
+                    <span className="drawer__meta-text font-mono">{origin.clientIp}</span>
+                  </>
+                ) : null}
+                {m.timestamp ? (
+                  <>
+                    <span className="drawer__meta-sep text-faint">{'·'}</span>
+                    <span className="drawer__meta-text">{fmtDate(m.timestamp)}</span>
+                  </>
+                ) : null}
               </div>
-            ) : null}
-
-            {/* Attempt content */}
-            <div className="drawer__content flex min-h-0 min-w-0 flex-1 flex-col">
-              <Tabs
-                className="drawer__tabs-full mb-0 shrink-0 px-3"
-                items={visibleTabs}
-                value={activeTab}
-                onChange={setTab}
-              />
-              {currentAttempt && isRecordingTab ? (
-                <div className="drawer__messages-pane min-h-0 flex-1 overflow-hidden">
-                  <RequestMessages
-                    recording={currentAttempt.recording ?? null}
-                    view={recordingView}
-                  />
-                </div>
-              ) : (
-                <div className="db drawer__body">
-                  {!currentAttempt ? (
-                    activeTab === 'details' ? (
-                      <div className="text-sm text-muted">{t('messages.drawer.rejected')}</div>
-                    ) : null
-                  ) : activeTab === 'details' ? (
-                    <AttemptDetails att={currentAttempt} attempts={attempts} />
-                  ) : activeTab === 'headers' && currentAttempt.request_headers ? (
-                    <KvList entries={sortedEntries(currentAttempt.request_headers)} />
-                  ) : activeTab === 'params' && currentAttempt.request_params ? (
-                    <KvList entries={sortedEntries(currentAttempt.request_params)} mono />
-                  ) : null}
-                </div>
-              )}
-            </div>
+            )}
           </div>
+
+          {minimized && floating ? null : (
+            <div className="drawer__split flex min-h-0 flex-1 flex-col sm:flex-row">
+              {/* Attempts sidebar — hidden when no attempts */}
+              {attempts.length > 0 ? (
+                <div className="drawer__sidebar shrink-0 overflow-y-auto border-b border-line p-2 sm:w-52 sm:border-b-0 sm:border-r">
+                  <div className="drawer__sidebar-title eyebrow px-1.5 pb-1.5">
+                    {t('messages.drawer.attempts')}
+                  </div>
+                  {attempts.map((att, idx) => (
+                    <button
+                      key={att.id ?? idx}
+                      type="button"
+                      className={cx(
+                        'attempt-item flex w-full cursor-pointer items-center gap-1.5 rounded-control border-0 bg-transparent px-1.5 py-1.5 text-left text-xs text-dim hover:bg-s2',
+                        selectedAttempt === idx && 'attempt-item--active bg-accent-tint text-ink',
+                      )}
+                      aria-pressed={selectedAttempt === idx}
+                      onClick={() => {
+                        setSelectedAttempt(idx);
+                        setTab('details');
+                      }}
+                    >
+                      <span className="attempt-item__num font-mono text-faint">{att.index}</span>
+                      <span className="attempt-item__icon inline-flex text-muted">
+                        {att.type === 'fallback' ? (
+                          <FallbackIcon />
+                        ) : (
+                          <ArrowRight aria-hidden="true" className="size-3.5" />
+                        )}
+                      </span>
+                      <span className="attempt-item__model min-w-0 flex-1 truncate">
+                        {att.model ?? t('messages.drawer.noProvider')}
+                      </span>
+                      <span className={cx('attempt-code', attemptStatusClass(att.status))}>
+                        {attemptCode(att)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Attempt content */}
+              <div className="drawer__content flex min-h-0 min-w-0 flex-1 flex-col">
+                <Tabs
+                  className="drawer__tabs-full mb-0 shrink-0 px-3"
+                  items={visibleTabs}
+                  value={activeTab}
+                  onChange={setTab}
+                />
+                {activeTab === 'details' ? (
+                  <div className="db drawer__body">
+                    {currentAttempt ? (
+                      <AttemptDetails att={currentAttempt} attempts={attempts} />
+                    ) : (
+                      <div className="text-sm text-muted">{t('messages.drawer.rejected')}</div>
+                    )}
+                    {origin?.clientIp || origin?.peerIp ? (
+                      <DetailCard title={t('messages.drawer.origin_section')}>
+                        <div className="drawer-metadata">
+                          {origin.clientIp ? (
+                            <Kv label={t('messages.details.field.clientIp')}>
+                              <span className="font-mono">{origin.clientIp}</span>
+                            </Kv>
+                          ) : null}
+                          {origin.clientIpSource ? (
+                            <Kv label={t('messages.details.field.clientIpSource')}>
+                              <span className="font-mono">{origin.clientIpSource}</span>
+                            </Kv>
+                          ) : null}
+                          {origin.peerIp ? (
+                            <Kv label={t('messages.details.field.peer')}>
+                              <span className="font-mono">
+                                {formatPeer(origin.peerIp, origin.peerPort)}
+                              </span>
+                            </Kv>
+                          ) : null}
+                        </div>
+                      </DetailCard>
+                    ) : null}
+                    {m.timeline?.events?.length > 0 ? (
+                      <DetailCard title={t('messages.drawer.timeline')}>
+                        <RequestTimelineChart timeline={m.timeline} />
+                      </DetailCard>
+                    ) : null}
+                    {headers && Object.keys(headers).length > 0 ? (
+                      <DetailCard title={t('messages.drawer.requestHeaders')}>
+                        <KvList entries={sortedEntries(headers)} />
+                      </DetailCard>
+                    ) : null}
+                  </div>
+                ) : currentAttempt ? (
+                  <div className="drawer__messages-pane min-h-0 flex-1 overflow-hidden">
+                    {activeTab === 'request' ? (
+                      <RequestView
+                        recording={currentAttempt.recording ?? null}
+                        fallbackParams={currentAttempt.request_params}
+                      />
+                    ) : activeTab === 'response' ? (
+                      <ResponseView
+                        recording={currentAttempt.recording ?? null}
+                        pending={attemptPending}
+                      />
+                    ) : activeTab === 'tools' ? (
+                      <ToolsView
+                        recording={currentAttempt.recording ?? null}
+                        pending={attemptPending}
+                      />
+                    ) : (
+                      <RawView recording={currentAttempt.recording ?? null} />
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="db drawer__body flex h-[200px] items-center justify-center text-sm text-muted">
