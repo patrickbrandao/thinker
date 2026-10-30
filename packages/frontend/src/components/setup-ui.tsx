@@ -15,7 +15,7 @@ import { cx } from './ui.jsx';
  * stay visible. Filter only, no color.
  */
 export function monoIconClass(src: string | null | undefined): string | undefined {
-  return src && /openai|anthropic|vercel|opencode|hermes|codex|other/.test(src)
+  return src && /openai|anthropic|vercel|opencode|hermes|codex|other|github/.test(src)
     ? '[.dark_&]:invert'
     : undefined;
 }

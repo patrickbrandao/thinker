@@ -4,6 +4,7 @@ import { type AgentCategory, type AgentPlatform, PLATFORM_ICONS } from 'thinker-
 import { platformLabel } from '../services/agent-type-labels.js';
 import { t } from '../i18n/index.js';
 import AgentTypeGrid from './AgentTypeGrid.js';
+import { monoIconClass } from './setup-ui.js';
 import { cx } from './ui.js';
 
 interface Props {
@@ -67,7 +68,7 @@ export default function AgentTypeSelect(props: Props) {
             alt=""
             width="18"
             height="18"
-            className="agent-type-select__trigger-icon shrink-0"
+            className={cx('agent-type-select__trigger-icon shrink-0', monoIconClass(selectedIcon))}
           />
         ) : null}
         <span className="agent-type-select__trigger-label flex-1 truncate">{label}</span>
