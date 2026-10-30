@@ -50,7 +50,7 @@ vi.mock('../../src/services/sse', async () => {
   };
 });
 
-vi.mock('../../src/components/AgentTypeSelect', () => ({
+vi.mock('../../src/components/AgentTypeGrid', () => ({
   default: (props: any) => (
     <div
       data-testid="agent-type-picker"
@@ -89,7 +89,7 @@ vi.mock('thinker-shared', () => ({
   PLATFORMS_BY_CATEGORY: {
     personal: ['openclaw', 'hermes', 'other'],
     app: ['openai-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
-    coding: ['claude-code', 'other'],
+    coding: ['opencode', 'claude-code', 'other'],
   },
   platformIcon: () => undefined,
 }));
@@ -115,7 +115,7 @@ const openModal = () => {
   fireEvent.click(screen.getAllByText('Connect Harness')[0]);
   const input = document.querySelector('#agent-name-input') as HTMLInputElement;
   const createBtn = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .actions button'),
+    document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .floating-window-foot button'),
   ).pop() as HTMLButtonElement;
   return { ...result, input, createBtn };
 };
@@ -210,8 +210,8 @@ describe('Workspace AddAgentModal - name validation', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({
         name: 'spaced-out',
-        agent_category: 'personal',
-        agent_platform: 'openclaw',
+        agent_category: 'coding',
+        agent_platform: 'opencode',
         record_messages: true,
         log_retention_days: null,
       });
@@ -228,8 +228,8 @@ describe('Workspace AddAgentModal - name validation', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({
         name: longName,
-        agent_category: 'personal',
-        agent_platform: 'openclaw',
+        agent_category: 'coding',
+        agent_platform: 'opencode',
         record_messages: true,
         log_retention_days: null,
       });
@@ -252,8 +252,8 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({
         name: 'Demo Agent',
-        agent_category: 'personal',
-        agent_platform: 'openclaw',
+        agent_category: 'coding',
+        agent_platform: 'opencode',
         record_messages: true,
         log_retention_days: null,
       });

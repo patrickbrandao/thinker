@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import AgentTypeSelect from './AgentTypeSelect.js';
+import AgentTypeGrid from './AgentTypeGrid.js';
 import { createAgent, getGlobalProviders } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
@@ -13,7 +13,7 @@ import { getLogRetention } from '../services/api/organizations.js';
 import { me } from '../services/session-store.js';
 import { useResource } from '../lib/use-resource.js';
 
-const DEFAULT_CATEGORY: AgentCategory = 'personal';
+const DEFAULT_CATEGORY: AgentCategory = 'coding';
 const defaultPlatform = (): AgentPlatform | null =>
   PLATFORMS_BY_CATEGORY[DEFAULT_CATEGORY][0] ?? null;
 
@@ -178,7 +178,22 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
   };
 
   return (
-    <FloatingWindow open={open} onClose={dismiss} title={t('harnesses.add.title')}>
+    <FloatingWindow
+      open={open}
+      onClose={dismiss}
+      title={t('harnesses.add.title')}
+      className="floating-window--wide"
+      footer={
+        <Button
+          size="sm"
+          onClick={() => void handleCreate()}
+          disabled={!name.trim()}
+          busy={creating}
+        >
+          {creating ? null : t('common.create')}
+        </Button>
+      }
+    >
       <Tabs
         items={[
           { key: 'harness', label: t('harnesses.add.tabHarness') },
@@ -193,36 +208,32 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
       <div role="tabpanel" hidden={tab !== 'harness'}>
         <p className="mb-4 text-sm text-muted">{t('harnesses.add.desc')}</p>
 
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,200px)_1fr]">
-          <div>
-            <span className="label">{t('harnesses.add.type')}</span>
-            <AgentTypeSelect
-              category={category}
-              platform={platform}
-              onCategoryChange={handleCategoryChange}
-              onPlatformChange={setPlatform}
-              disabled={creating}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="agent-name-input">
-              {t('harnesses.add.name')}
-            </label>
-            <input
-              ref={inputRef}
-              id="agent-name-input"
-              className="field"
-              type="text"
-              placeholder={t('harnesses.add.namePlaceholder')}
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleCreate();
-              }}
-              disabled={creating}
-            />
-          </div>
-        </div>
+        <label className="label" htmlFor="agent-name-input">
+          {t('harnesses.add.name')}
+        </label>
+        <input
+          ref={inputRef}
+          id="agent-name-input"
+          className="field"
+          type="text"
+          placeholder={t('harnesses.add.namePlaceholder')}
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleCreate();
+          }}
+          disabled={creating}
+        />
+
+        <span className="label mt-4">{t('harnesses.add.type')}</span>
+        <AgentTypeGrid
+          category={category}
+          platform={platform}
+          onCategoryChange={handleCategoryChange}
+          onPlatformChange={setPlatform}
+          disabled={creating}
+          iconSize={32}
+        />
       </div>
       <div role="tabpanel" hidden={tab !== 'settings'}>
         <div className="flex flex-col gap-3">
@@ -250,17 +261,6 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
             />
           </div>
         </div>
-      </div>
-
-      <div className="actions">
-        <Button
-          size="sm"
-          onClick={() => void handleCreate()}
-          disabled={!name.trim()}
-          busy={creating}
-        >
-          {creating ? null : t('common.create')}
-        </Button>
       </div>
     </FloatingWindow>
   );

@@ -463,17 +463,23 @@ export function Modal({
 
 /**
  * A non-modal window: no backdrop, the page behind stays usable and a click
- * outside never closes it. Dragged by its title bar; closed by its X or Escape.
+ * outside never closes it. Dragged by its title bar; resized from its corner;
+ * closed by its X or Escape. The title bar and `footer` stay put while the
+ * body scrolls.
  */
 export function FloatingWindow({
   open,
   title,
   onClose,
+  footer,
+  className,
   children,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
+  footer?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -515,7 +521,7 @@ export function FloatingWindow({
   return createPortal(
     <div
       ref={ref}
-      className="floating-window"
+      className={cx('floating-window', className)}
       role="dialog"
       aria-modal="false"
       aria-label={title}
@@ -532,7 +538,8 @@ export function FloatingWindow({
           <X />
         </IconButton>
       </div>
-      <div className="modal-body">{children}</div>
+      <div className="modal-body floating-window-body">{children}</div>
+      {footer ? <div className="floating-window-foot">{footer}</div> : null}
     </div>,
     document.body,
   );
