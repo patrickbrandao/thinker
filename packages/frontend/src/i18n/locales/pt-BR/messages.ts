@@ -18,7 +18,6 @@ const ptBR: Catalog<typeof en> = {
     goToHarnesses: 'Ir para Harnesses',
     emptyAgent:
       'Configure seu harness e envie uma requisição. Toda requisição recebida aparece aqui.',
-    exampleAlt: 'Exemplo de log mostrando o histórico de requisições a LLMs',
     connectProviderHint: 'Conecte um provedor para começar a rotear chamadas a LLMs.',
     connectProvider: 'Conectar provedor',
     zeroResults: '0 resultados',

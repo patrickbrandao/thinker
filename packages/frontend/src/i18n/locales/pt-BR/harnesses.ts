@@ -194,7 +194,6 @@ const ptBR: Catalog<typeof en> = {
   },
   add: {
     title: 'Conectar harness',
-    titleNamed: 'Harness {{ name }}',
     desc: 'Dê um nome ao harness para acompanhar o uso de LLM, os custos e as mensagens em tempo real.',
     type: 'Tipo',
     name: 'Nome do harness',
@@ -205,14 +204,12 @@ const ptBR: Catalog<typeof en> = {
     enableLogs: 'Ativar logs',
     logsHint:
       'Veja exatamente o que o seu agente envia em cada tentativa e depure mais rápido. Os logs ficam no seu próprio banco de dados.',
-    connected: 'Harness "{{ name }}" conectado',
     tabHarness: 'Harness',
     tabSettings: 'Configurações',
   },
   retention: {
     control: 'Controle de retenção',
     daysLabel: 'Dias de retenção',
-    suggested: 'Sugestões',
     label: 'Retenção de logs',
     hint: 'Por quanto tempo as requisições mantêm os logs (corpos, cabeçalhos, parâmetros). Tokens, custos e status são mantidos.',
     global: 'Global',

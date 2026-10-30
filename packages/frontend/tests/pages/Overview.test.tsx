@@ -140,29 +140,6 @@ vi.mock('../../src/components/FeedbackModal.jsx', () => ({
   ),
 }));
 
-vi.mock('../../src/components/SetupModal.jsx', () => ({
-  default: (props: any) => (
-    <div
-      data-testid="setup-modal"
-      data-open={props.open ? 'true' : 'false'}
-      data-agent={props.agentName ?? ''}
-      data-api-key={props.apiKey ?? ''}
-      data-platform={props.agentPlatform ?? ''}
-      data-category={props.agentCategory ?? ''}
-    >
-      <button data-testid="setup-close" onClick={() => props.onClose?.()}>
-        Close
-      </button>
-      <button data-testid="setup-done" onClick={() => props.onDone?.()}>
-        Done
-      </button>
-      <button data-testid="setup-go-routing" onClick={() => props.onGoToRouting?.()}>
-        Go to routing
-      </button>
-    </div>
-  ),
-}));
-
 vi.mock('../../src/components/InfoTooltip.jsx', () => ({
   default: () => <span data-testid="info-tooltip" />,
 }));
@@ -181,15 +158,6 @@ vi.mock('../../src/components/Select.jsx', () => ({
       ))}
     </select>
   ),
-}));
-
-const mockIsRecentlyCreated = vi.fn(() => false);
-const mockIsSetupPending = vi.fn(() => false);
-const mockClearSetupPending = vi.fn();
-vi.mock('../../src/services/recent-agents.js', () => ({
-  isRecentlyCreated: (...args: unknown[]) => mockIsRecentlyCreated(...args),
-  isSetupPending: (...args: unknown[]) => mockIsSetupPending(...args),
-  clearSetupPending: (...args: unknown[]) => mockClearSetupPending(...args),
 }));
 
 import Overview from '../../src/pages/Overview';
@@ -254,8 +222,6 @@ describe('Overview', () => {
     localStorage.setItem('thinker_global_group', 'provider');
     sessionStorage.clear();
     analyticsPing.set(0);
-    mockIsRecentlyCreated.mockReturnValue(false);
-    mockIsSetupPending.mockReturnValue(false);
     mockLocationState = null;
     mockGetReliabilityStats.mockResolvedValue({
       success_rate: { value: 0.9, previous: 0.8 },
@@ -834,94 +800,6 @@ describe('Overview', () => {
     });
   });
 
-  describe('setup modal callbacks', () => {
-    it('closes setup modal and sets dismissed flag', async () => {
-      mockGetOverview.mockResolvedValue(emptyOverviewData);
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('true');
-      });
-
-      const closeBtn = container.querySelector('[data-testid="setup-close"]') as HTMLButtonElement;
-      fireEvent.click(closeBtn);
-
-      await vi.waitFor(() => {
-        expect(localStorage.getItem('setup_dismissed_test-agent')).toBe('1');
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('false');
-      });
-      expect(mockClearSetupPending).toHaveBeenCalledWith('test-agent');
-    });
-
-    it('marks setup as completed when onDone is called', async () => {
-      mockGetOverview.mockResolvedValue(emptyOverviewData);
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('true');
-      });
-
-      const doneBtn = container.querySelector('[data-testid="setup-done"]') as HTMLButtonElement;
-      fireEvent.click(doneBtn);
-
-      await vi.waitFor(() => {
-        expect(localStorage.getItem('setup_completed_test-agent')).toBe('1');
-      });
-      expect(mockClearSetupPending).toHaveBeenCalledWith('test-agent');
-    });
-
-    it('opens the setup modal on mount when setup is pending (survives a refresh)', async () => {
-      // has_data true → showEmptyState() is false, so the empty-state effect
-      // does NOT open the modal. The persistent pending flag is the only thing
-      // that opens it here, proving the gate survives a refresh.
-      mockIsSetupPending.mockReturnValue(true);
-      mockGetOverview.mockResolvedValue({
-        ...overviewData,
-        has_data: true,
-        has_providers: true,
-      });
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('true');
-      });
-      expect(mockIsSetupPending).toHaveBeenCalledWith('test-agent');
-    });
-
-    it('keeps the setup modal closed on mount when pending but already dismissed', async () => {
-      mockIsSetupPending.mockReturnValue(true);
-      localStorage.setItem('setup_dismissed_test-agent', '1');
-      mockGetOverview.mockResolvedValue({
-        ...overviewData,
-        has_data: true,
-        has_providers: true,
-      });
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        expect(container.querySelector('[data-testid="setup-modal"]')).not.toBeNull();
-      });
-      const modal = container.querySelector('[data-testid="setup-modal"]');
-      expect(modal?.getAttribute('data-open')).toBe('false');
-    });
-
-    it('keeps the setup modal closed on mount when pending but already completed', async () => {
-      mockIsSetupPending.mockReturnValue(true);
-      localStorage.setItem('setup_completed_test-agent', '1');
-      mockGetOverview.mockResolvedValue({
-        ...overviewData,
-        has_data: true,
-        has_providers: true,
-      });
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        expect(container.querySelector('[data-testid="setup-modal"]')).not.toBeNull();
-      });
-      const modal = container.querySelector('[data-testid="setup-modal"]');
-      expect(modal?.getAttribute('data-open')).toBe('false');
-    });
-  });
-
   it('shows waiting banner when has_providers is true but has_data is false', async () => {
     mockGetOverview.mockResolvedValue({ ...emptyOverviewData, has_providers: true });
     const { container } = renderOverview();
@@ -958,77 +836,20 @@ describe('Overview', () => {
     });
   });
 
-  it('shows Connect provider button when setupCompleted but no providers and no data', async () => {
-    localStorage.setItem('setup_completed_test-agent', '1');
+  it('shows only the overview for a new harness: no setup window and no buttons', async () => {
+    // Even with old setup flags around, the overview never opens the setup window.
+    localStorage.setItem('setup_pending_test-agent', '1');
     mockGetOverview.mockResolvedValue(emptyOverviewData);
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Connect provider');
-      expect(container.textContent).toContain('Connect a provider to start routing LLM calls');
-      expect(container.textContent).not.toContain('Enable routing');
-      const btn = container.querySelector('.empty button.btn');
-      expect(btn).not.toBeNull();
+      expect(container.textContent).toContain('No activity yet');
     });
-  });
-
-  it('navigates to routing with openProviders state when Connect provider clicked', async () => {
-    localStorage.setItem('setup_completed_test-agent', '1');
-    mockGetOverview.mockResolvedValue(emptyOverviewData);
-    const { container } = renderOverview();
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Connect provider');
-    });
-    const btn = container.querySelector('.empty button.btn') as HTMLButtonElement;
-    fireEvent.click(btn);
-    expect(mockNavigate).toHaveBeenCalledWith('/harnesses/test-agent/routing', {
-      state: { openProviders: true },
-    });
-  });
-
-  it('shows Set up harness button when not setupCompleted and no providers', async () => {
-    mockGetOverview.mockResolvedValue(emptyOverviewData);
-    const { container } = renderOverview();
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Set up harness');
-      expect(container.textContent).not.toContain('Enable routing');
-      expect(container.textContent).not.toContain('Connect provider');
-    });
-  });
-
-  describe('SetupModal callbacks', () => {
-    it('sets localStorage and closes modal on onClose', async () => {
-      mockGetOverview.mockResolvedValue(emptyOverviewData);
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('true');
-      });
-      fireEvent.click(screen.getByTestId('setup-close'));
-      expect(localStorage.getItem('setup_dismissed_test-agent')).toBe('1');
-    });
-
-    it('sets localStorage on onDone', async () => {
-      mockGetOverview.mockResolvedValue(emptyOverviewData);
-      const { container } = renderOverview();
-      await vi.waitFor(() => {
-        const modal = container.querySelector('[data-testid="setup-modal"]');
-        expect(modal?.getAttribute('data-open')).toBe('true');
-      });
-      fireEvent.click(screen.getByTestId('setup-done'));
-      expect(localStorage.getItem('setup_completed_test-agent')).toBe('1');
-    });
-
-    it('navigates to routing page on onGoToRouting', async () => {
-      mockGetOverview.mockResolvedValue(emptyOverviewData);
-      renderOverview();
-      await vi.waitFor(() => {
-        expect(screen.getByTestId('setup-go-routing')).toBeDefined();
-      });
-      fireEvent.click(screen.getByTestId('setup-go-routing'));
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/test-agent/routing', {
-        state: { openProviders: true },
-      });
-    });
+    expect(container.textContent).toContain('Connect a provider to start routing LLM calls');
+    expect(container.querySelectorAll('button').length).toBe(0);
+    expect(container.querySelector('img[src="/example-overview.svg"]')).toBeNull();
+    expect(container.textContent).not.toContain('Set up harness');
+    expect(container.textContent).not.toContain('Connect provider');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   describe('range persistence', () => {

@@ -1,4 +1,23 @@
+import { signal } from '../lib/signal.js';
+
 const recentlyCreated = new Set<string>();
+
+/**
+ * The harness just created from the Connect Harness window. The harness list
+ * rings it in liquid metal and clears this when the ring's fade ends; the
+ * timer only covers a list that never showed it.
+ */
+export const highlightedAgent = signal<string | null>(null);
+const HIGHLIGHT_FALLBACK_MS = 15_000;
+
+export function highlightAgent(slug: string): void {
+  highlightedAgent.set(slug);
+  setTimeout(() => clearHighlight(slug), HIGHLIGHT_FALLBACK_MS);
+}
+
+export function clearHighlight(slug: string): void {
+  highlightedAgent.set((current) => (current === slug ? null : current));
+}
 
 export function markAgentCreated(slug: string): void {
   recentlyCreated.add(slug);

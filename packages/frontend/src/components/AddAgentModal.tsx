@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import AgentTypeGrid from './AgentTypeGrid.js';
-import { createAgent, getGlobalProviders } from '../services/api.js';
-import { toast } from '../services/toast-store.js';
-import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
+import { createAgent } from '../services/api.js';
+import { highlightAgent } from '../services/recent-agents.js';
 import { refreshAgents } from '../services/sse.js';
 import {
   type AgentCategory,
@@ -11,10 +10,12 @@ import {
   AGENT_NAME_MAX_LENGTH,
   AGENT_NAME_PATTERN,
   PLATFORMS_BY_CATEGORY,
+  platformIcon,
   toAgentName,
 } from 'thinker-shared';
+import { themedIcon, useDarkTheme } from './setup-ui.js';
 import { t } from '../i18n/index.js';
-import { Button, FloatingWindow, Switch, Tabs } from './ui.js';
+import { Button, FloatingWindow, Switch, Tabs, cx } from './ui.js';
 import LogRetentionSelect from './LogRetentionSelect.js';
 import { getLogRetention } from '../services/api/organizations.js';
 import { me } from '../services/session-store.js';
@@ -28,14 +29,12 @@ const defaultPlatform = (): AgentPlatform | null =>
  * "Connect Harness" modal extracted from Workspace so it can be reused by other
  * onboarding surfaces (e.g. an empty-state CTA, the sidebar "+" or a deep-link).
  *
- * Onboarding navigation: a freshly created agent inherits access to every
- * connected provider, so Routing is the most useful first stop.
- * If the tenant has *no* providers yet, we additionally pass
- * `state.openProviders` so Routing opens the provider-connect flow immediately —
- * the new user's very next action is to connect their first provider.
+ * After a create there is no success screen: the user lands on (or stays on)
+ * the harness list, where the new harness is ringed for a few seconds.
  */
 export default function AddAgentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [name, setName] = useState('');
   const [category, setCategory] = useState<AgentCategory | null>(DEFAULT_CATEGORY);
   const [platform, setPlatform] = useState<AgentPlatform | null>(defaultPlatform);
@@ -46,6 +45,9 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
   // null = Global (follows the organization's retention).
   const [retentionDays, setRetentionDays] = useState<number | null>(null);
   const [tab, setTab] = useState<'harness' | 'settings'>('harness');
+  const dark = useDarkTheme();
+  const typeIcon = platformIcon(platform, category);
+  const titleIcon = typeIcon ? themedIcon(typeIcon, dark) : null;
   const orgId = me()?.organization?.id;
   const orgRetention = useResource(() => getLogRetention(orgId!), [orgId, open], {
     enabled: open && !!orgId,
@@ -59,9 +61,8 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
 
   // Tracks whether the user dismissed the modal (overlay click / Escape) while a
   // create request was still in flight. A dismissed create must NOT run its
-  // post-success side effects (toast, markAgentCreated) or navigate afterwards —
-  // otherwise closing the modal mid-request still yanks the user to Routing once
-  // the request resolves.
+  // post-success side effects (highlight) or navigate afterwards — otherwise
+  // closing the modal mid-request still moves the user once the request resolves.
   const cancelled = useRef(false);
   // Monotonic id of the current create attempt. Each async hop re-checks the
   // token it started with, so a dismissed or superseded attempt drops its
@@ -73,11 +74,7 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
   };
   const isStale = (token: number): boolean => cancelled.current || token !== attemptToken.current;
 
-  // Reopening invalidates whatever the previous session left in flight. The
-  // success path closes the modal *before* awaiting the providers lookup, and
-  // closing is not a dismissal — so a user who immediately reopens to add a
-  // second harness would otherwise be yanked to the first one the moment that
-  // lookup lands, mid-typing.
+  // Reopening invalidates whatever the previous session left in flight.
   useEffect(() => {
     if (!open) return;
     attemptToken.current++;
@@ -136,38 +133,10 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
       // The user dismissed the modal while the request was in flight — honour
       // that dismissal and skip every success side effect + the navigation.
       if (isStale(token)) return;
-      toast.success(t('harnesses.add.connected', { name: agentName }));
       onClose();
       resetForm();
-      const slug = result?.agent?.name ?? agentName;
-      markAgentCreated(slug);
-      // Persistent flag so the setup modal reopens after a page refresh until
-      // the user dismisses or completes it (the in-memory mark above is dropped
-      // on reload / cleared by AgentGuard once the agent appears in the list).
-      markSetupPending(slug);
-
-      // Decide whether to nudge the user into connecting a provider. A brand-new
-      // tenant has nothing routed yet, so we open the provider flow on landing.
-      // A failed lookup must not block the redirect — fall back to "has none".
-      let hasProviders = false;
-      try {
-        const res = await getGlobalProviders();
-        hasProviders = (res?.providers?.length ?? 0) > 0;
-      } catch {
-        // Treat a failed providers lookup as "no providers" so onboarding still
-        // surfaces the connect flow rather than silently skipping it.
-      }
-
-      // A dismissal during the providers lookup must also skip the redirect.
-      if (isStale(token)) return;
-
-      // Land on Routing either way; the new agent's API key is surfaced there.
-      navigate(`/harnesses/${encodeURIComponent(slug)}/routing`, {
-        state: {
-          newApiKey: result?.apiKey,
-          ...(hasProviders ? {} : { openProviders: true }),
-        },
-      });
+      highlightAgent(result?.agent?.name ?? agentName);
+      if (pathname !== '/harnesses') navigate('/harnesses');
     } catch {
       // error toast already shown by fetchMutate
     } finally {
@@ -190,7 +159,18 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
     <FloatingWindow
       open={open}
       onClose={dismiss}
-      title={name ? t('harnesses.add.titleNamed', { name }) : t('harnesses.add.title')}
+      title={name || t('harnesses.add.title')}
+      icon={
+        titleIcon ? (
+          <img
+            src={titleIcon.src}
+            alt=""
+            width={20}
+            height={20}
+            className={cx('add-agent__title-icon shrink-0 object-contain', titleIcon.className)}
+          />
+        ) : null
+      }
       className="floating-window--wide"
       footer={
         <Button size="sm" onClick={() => void handleCreate()} disabled={!nameValid} busy={creating}>

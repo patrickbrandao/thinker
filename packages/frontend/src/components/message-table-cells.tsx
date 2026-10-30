@@ -23,6 +23,7 @@ import { authBadgeFor, authLabel } from './AuthBadge.js';
 import { platformIcon, isSuccessStatus } from 'thinker-shared';
 import { tMaybe, t } from '../i18n/index.js';
 import { cx } from './ui.js';
+import { ThemedIcon } from './setup-ui.js';
 
 const MONO = 'font-mono';
 const MONO_XS = 'font-mono text-xs text-muted';
@@ -298,9 +299,7 @@ export function AgentCell(
   return (
     <td className="whitespace-nowrap text-xs font-medium text-ink">
       <span className="inline-flex items-center gap-1.5">
-        {icon ? (
-          <img src={icon} alt="" width="14" height="14" className="platform-icon shrink-0" />
-        ) : null}
+        {icon ? <ThemedIcon src={icon} size={14} className="platform-icon shrink-0" /> : null}
         {item.agent_name ?? DASH}
       </span>
     </td>

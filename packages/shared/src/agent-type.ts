@@ -28,6 +28,10 @@ export const AGENT_PLATFORMS = [
   'craft',
   'claude-app',
   'n8n',
+  'zapier',
+  'langflow',
+  'chatwoot',
+  'open-webui',
   'claude-code',
   'opencode',
   'codex',
@@ -74,6 +78,10 @@ export const PLATFORM_API_SURFACES: Readonly<Record<AgentPlatform, ApiSurface>> 
   craft: 'chat_completions',
   'claude-app': 'messages',
   n8n: 'chat_completions',
+  zapier: 'chat_completions',
+  langflow: 'chat_completions',
+  chatwoot: 'chat_completions',
+  'open-webui': 'chat_completions',
   'claude-code': 'messages',
   opencode: 'chat_completions',
   codex: 'responses',
@@ -96,6 +104,10 @@ export const PLATFORM_LABELS: Readonly<Record<AgentPlatform, string>> = {
   craft: 'Craft Agent',
   'claude-app': 'Claude (APP)',
   n8n: 'n8n',
+  zapier: 'Zapier',
+  langflow: 'Langflow',
+  chatwoot: 'Chatwoot',
+  'open-webui': 'Open WebUI',
   'claude-code': 'Claude Code',
   opencode: 'OpenCode',
   codex: 'Codex',
@@ -115,7 +127,7 @@ export const PLATFORM_LABELS: Readonly<Record<AgentPlatform, string>> = {
 // another category and "other" keep working, they just are not offered.
 export const PLATFORMS_BY_CATEGORY: Readonly<Record<AgentCategory, readonly AgentPlatform[]>> = {
   personal: ['openclaw', 'hermes', 'nanobot', 'craft', 'claude-app'],
-  automation: ['n8n'],
+  automation: ['n8n', 'zapier', 'langflow', 'chatwoot', 'open-webui'],
   app: ['openai-sdk', 'anthropic-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
   coding: ['opencode', 'claude-code', 'codex', 'deepseek-harness', 'pi', 'cline', 'copilot-cli'],
 };
@@ -127,6 +139,10 @@ export const PLATFORM_ICONS: Readonly<Partial<Record<AgentPlatform, string>>> = 
   craft: '/icons/craft.png',
   'claude-app': '/icons/claude-app.svg',
   n8n: '/icons/n8n.svg',
+  zapier: '/icons/zapier.svg',
+  langflow: '/icons/langflow.svg',
+  chatwoot: '/icons/chatwoot.svg',
+  'open-webui': '/icons/open-webui.svg',
   'claude-code': '/icons/providers/claude-code.svg',
   opencode: '/icons/providers/opencode.svg',
   codex: '/icons/codex.svg',
@@ -147,6 +163,7 @@ export const PLATFORM_ICONS: Readonly<Partial<Record<AgentPlatform, string>>> = 
  */
 export const DARK_ICON_VARIANTS: Readonly<Record<string, string>> = {
   '/icons/copilot.svg': '/icons/copilot-dark.svg',
+  '/icons/open-webui.svg': '/icons/open-webui-dark.svg',
 };
 
 export function platformIcon(

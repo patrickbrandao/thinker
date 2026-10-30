@@ -1092,7 +1092,8 @@
     },
     "liquid-metal": {
       "classes": [
-        "liquid-metal"
+        "liquid-metal",
+        "liquid-metal--flash"
       ],
       "files": [
         "shell.css"
@@ -2039,14 +2040,14 @@
       "prop": "inset",
       "value": "-5px",
       "file": "shell.css",
-      "line": 1180
+      "line": 1183
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "5px",
       "file": "shell.css",
-      "line": 1181
+      "line": 1184
     }
   ],
   "ghostRules": [
@@ -2086,7 +2087,7 @@
       "value": "-2px",
       "file": "shell.css",
       "line": 1139,
-      "losesTo": "shell.css:1180"
+      "losesTo": "shell.css:1183"
     },
     {
       "selector": ".liquid-metal::after",
@@ -2094,7 +2095,7 @@
       "value": "2px",
       "file": "shell.css",
       "line": 1141,
-      "losesTo": "shell.css:1181"
+      "losesTo": "shell.css:1184"
     }
   ],
   "componentSheets": {
@@ -2111,7 +2112,7 @@
     "tokens": 58,
     "darkOverrides": 50,
     "blocks": 207,
-    "classes": 222,
+    "classes": 223,
     "canonicalRules": 5,
     "ghostRules": 5
   }
