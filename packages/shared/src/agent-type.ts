@@ -1,11 +1,32 @@
 export const AGENT_CATEGORIES = ['personal', 'automation', 'app', 'coding'] as const;
 export type AgentCategory = (typeof AGENT_CATEGORIES)[number];
 
+/**
+ * Harness names are DNS labels: lowercase letters, digits and inner hyphens,
+ * at most 63 characters. Names saved before this rule keep working.
+ */
+export const AGENT_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+export const AGENT_NAME_MAX_LENGTH = 63;
+
+/** Turns typed text into a DNS-label name as the user types. */
+export function toAgentName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-+/, '')
+    .replace(/-{2,}/g, '-')
+    .slice(0, AGENT_NAME_MAX_LENGTH);
+}
+
 export const AGENT_PLATFORMS = [
   'openclaw',
   'hermes',
   'nanobot',
   'craft',
+  'claude-app',
   'n8n',
   'claude-code',
   'opencode',
@@ -51,6 +72,7 @@ export const PLATFORM_API_SURFACES: Readonly<Record<AgentPlatform, ApiSurface>> 
   hermes: 'chat_completions',
   nanobot: 'chat_completions',
   craft: 'chat_completions',
+  'claude-app': 'messages',
   n8n: 'chat_completions',
   'claude-code': 'messages',
   opencode: 'chat_completions',
@@ -72,6 +94,7 @@ export const PLATFORM_LABELS: Readonly<Record<AgentPlatform, string>> = {
   hermes: 'Hermes Agent',
   nanobot: 'Nanobot',
   craft: 'Craft Agent',
+  'claude-app': 'Claude (APP)',
   n8n: 'n8n',
   'claude-code': 'Claude Code',
   opencode: 'OpenCode',
@@ -91,7 +114,7 @@ export const PLATFORM_LABELS: Readonly<Record<AgentPlatform, string>> = {
 // "Other" is offered only under App AI SDK; agents saved earlier with
 // another category and "other" keep working, they just are not offered.
 export const PLATFORMS_BY_CATEGORY: Readonly<Record<AgentCategory, readonly AgentPlatform[]>> = {
-  personal: ['openclaw', 'hermes', 'nanobot', 'craft'],
+  personal: ['openclaw', 'hermes', 'nanobot', 'craft', 'claude-app'],
   automation: ['n8n'],
   app: ['openai-sdk', 'anthropic-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
   coding: ['opencode', 'claude-code', 'codex', 'deepseek-harness', 'pi', 'cline', 'copilot-cli'],
@@ -102,19 +125,28 @@ export const PLATFORM_ICONS: Readonly<Partial<Record<AgentPlatform, string>>> = 
   hermes: '/icons/hermes.svg',
   nanobot: '/icons/nanobot.png',
   craft: '/icons/craft.png',
+  'claude-app': '/icons/claude-app.svg',
   n8n: '/icons/n8n.svg',
   'claude-code': '/icons/providers/claude-code.svg',
   opencode: '/icons/providers/opencode.svg',
-  codex: '/icons/providers/codex.svg',
+  codex: '/icons/codex.svg',
   'deepseek-harness': '/icons/providers/deepseek.svg',
   pi: '/icons/pi.svg',
   cline: '/icons/providers/cline-pass.png',
-  'copilot-cli': '/icons/github.svg',
+  'copilot-cli': '/icons/copilot.svg',
   'openai-sdk': '/icons/providers/openai.svg',
   'anthropic-sdk': '/icons/providers/anthropic.svg',
-  'vercel-ai-sdk': '/icons/vercel.svg',
+  'vercel-ai-sdk': '/icons/vercel-ai-sdk.svg',
   langchain: '/icons/langchain.svg',
   other: '/icons/other.svg',
+};
+
+/**
+ * Variants drawn for the dark theme, keyed by the light icon. Icons without
+ * one are used as is (monochrome marks are inverted by the dashboard).
+ */
+export const DARK_ICON_VARIANTS: Readonly<Record<string, string>> = {
+  '/icons/copilot.svg': '/icons/copilot-dark.svg',
 };
 
 export function platformIcon(

@@ -7,6 +7,9 @@ import {
   PLATFORM_ICONS,
   coerceAgentPlatform,
   platformIcon,
+  DARK_ICON_VARIANTS,
+  AGENT_NAME_PATTERN,
+  toAgentName,
 } from '../src/agent-type';
 
 describe('agent-type', () => {
@@ -17,6 +20,7 @@ describe('agent-type', () => {
       'hermes',
       'nanobot',
       'craft',
+      'claude-app',
       'n8n',
       'claude-code',
       'opencode',
@@ -175,8 +179,20 @@ describe('agent-type', () => {
       expect(platformIcon('opencode', 'coding')).toBe('/icons/providers/opencode.svg');
     });
 
-    it('codex resolves to the providers/codex.svg mark', () => {
-      expect(platformIcon('codex', 'coding')).toBe('/icons/providers/codex.svg');
+    it('codex resolves to its own color mark, apart from the OpenAI SDK', () => {
+      expect(platformIcon('codex', 'coding')).toBe('/icons/codex.svg');
+      expect(platformIcon('openai-sdk', 'app')).toBe('/icons/providers/openai.svg');
+    });
+
+    it('offers Claude (APP) as an AI agent with its own mark', () => {
+      expect(PLATFORMS_BY_CATEGORY.personal).toContain('claude-app');
+      expect(PLATFORM_LABELS['claude-app']).toBe('Claude (APP)');
+      expect(platformIcon('claude-app', 'personal')).toBe('/icons/claude-app.svg');
+    });
+
+    it('draws Copilot with a white variant on the dark theme', () => {
+      expect(platformIcon('copilot-cli', 'coding')).toBe('/icons/copilot.svg');
+      expect(DARK_ICON_VARIANTS['/icons/copilot.svg']).toBe('/icons/copilot-dark.svg');
     });
 
     it('returns the platform icon regardless of the category passed (icon is keyed by platform)', () => {
@@ -203,6 +219,33 @@ describe('agent-type', () => {
       for (const path of Object.values(PLATFORM_ICONS)) {
         expect(path).toMatch(/^\/icons\//);
       }
+    });
+  });
+
+  describe('harness names', () => {
+    it('accepts DNS labels only', () => {
+      for (const ok of ['a', 'my-agent', 'agent-01', 'x'.repeat(63)]) {
+        expect(AGENT_NAME_PATTERN.test(ok)).toBe(true);
+      }
+      for (const bad of [
+        '',
+        'My Agent',
+        'my_agent',
+        '-agent',
+        'agent-',
+        'ag.ent',
+        'x'.repeat(64),
+      ]) {
+        expect(AGENT_NAME_PATTERN.test(bad)).toBe(false);
+      }
+    });
+
+    it('normalizes typed text into a DNS label', () => {
+      expect(toAgentName('My Agent_2')).toBe('my-agent-2');
+      expect(toAgentName('--Ação!!')).toBe('acao');
+      expect(toAgentName('Meu Bot_Ação 1')).toBe('meu-bot-acao-1');
+      expect(toAgentName('a  -  b')).toBe('a-b');
+      expect(toAgentName('x'.repeat(80))).toHaveLength(63);
     });
   });
 });

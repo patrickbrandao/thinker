@@ -100,7 +100,8 @@ vi.mock('../../src/services/recent-agents', () => ({
   markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
 }));
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   AGENT_CATEGORIES: ['personal', 'app', 'coding'],
   platformIcon: (plat: string | null, cat: string | null) => {
     if (!plat) return undefined;

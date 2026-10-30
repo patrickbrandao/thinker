@@ -106,7 +106,8 @@ const { MOCK_FREE_PLAN_REQUESTS_PER_MONTH } = vi.hoisted(() => ({
   MOCK_FREE_PLAN_REQUESTS_PER_MONTH: 10_000,
 }));
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   AGENT_CATEGORIES: ['personal', 'app', 'coding'],
   FREE_PLAN_REQUESTS_PER_MONTH: MOCK_FREE_PLAN_REQUESTS_PER_MONTH,
   PLAN_LIMITS: {

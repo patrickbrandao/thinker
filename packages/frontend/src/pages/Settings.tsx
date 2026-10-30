@@ -4,8 +4,10 @@ import { Eye, EyeOff } from 'lucide-react';
 import {
   type AgentCategory,
   type AgentPlatform,
+  AGENT_NAME_PATTERN,
   PLATFORMS_BY_CATEGORY,
   platformIcon,
+  toAgentName,
 } from 'thinker-shared';
 import CopyButton from '../components/CopyButton.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
@@ -142,7 +144,7 @@ export default function Settings() {
     }
   };
 
-  const nameChanged = name.trim() !== agentName && name.trim() !== '';
+  const nameChanged = name.trim() !== agentName && AGENT_NAME_PATTERN.test(name.trim());
 
   const handleSaveName = async () => {
     if (!nameChanged) return;
@@ -200,7 +202,7 @@ export default function Settings() {
                 type="text"
                 aria-label={t('harnesses.settings.nameTitle')}
                 value={name}
-                onChange={(e) => setName(e.currentTarget.value)}
+                onChange={(e) => setName(toAgentName(e.currentTarget.value))}
               />
               <Button
                 size="sm"

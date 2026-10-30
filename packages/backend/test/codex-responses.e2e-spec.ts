@@ -113,7 +113,7 @@ describe('Codex Responses tool loop (e2e)', () => {
       .post('/api/v1/agents')
       .set('x-api-key', TEST_API_KEY)
       .send({
-        name: 'Codex E2E',
+        name: 'codex-e2e',
         agent_category: 'coding',
         agent_platform: 'codex',
       })

@@ -5,7 +5,7 @@ import { RenameAgentDto } from './rename-agent.dto';
 
 describe('RenameAgentDto', () => {
   it('accepts valid agent names', async () => {
-    for (const name of ['my-agent', 'agent_1', 'TestBot', 'a', 'My Cool Agent']) {
+    for (const name of ['my-agent', 'agent-1', 'testbot', 'a', 'x'.repeat(63)]) {
       const dto = plainToInstance(RenameAgentDto, { name });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
@@ -24,10 +24,12 @@ describe('RenameAgentDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('accepts names with spaces', async () => {
-    const dto = plainToInstance(RenameAgentDto, { name: 'has spaces' });
-    const errors = await validate(dto);
-    expect(errors).toHaveLength(0);
+  it('rejects names that are not DNS labels', async () => {
+    for (const name of ['has spaces', 'TestBot', 'agent_1', '-agent', 'agent-']) {
+      const dto = plainToInstance(RenameAgentDto, { name });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    }
   });
 
   it('rejects names with special characters', async () => {
@@ -36,8 +38,8 @@ describe('RenameAgentDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('rejects names longer than 100 characters', async () => {
-    const dto = plainToInstance(RenameAgentDto, { name: 'a'.repeat(101) });
+  it('rejects names longer than 63 characters', async () => {
+    const dto = plainToInstance(RenameAgentDto, { name: 'a'.repeat(64) });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });

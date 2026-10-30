@@ -5,7 +5,14 @@ import { createAgent, getGlobalProviders } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
 import { refreshAgents } from '../services/sse.js';
-import { type AgentCategory, type AgentPlatform, PLATFORMS_BY_CATEGORY } from 'thinker-shared';
+import {
+  type AgentCategory,
+  type AgentPlatform,
+  AGENT_NAME_MAX_LENGTH,
+  AGENT_NAME_PATTERN,
+  PLATFORMS_BY_CATEGORY,
+  toAgentName,
+} from 'thinker-shared';
 import { t } from '../i18n/index.js';
 import { Button, FloatingWindow, Switch, Tabs } from './ui.js';
 import LogRetentionSelect from './LogRetentionSelect.js';
@@ -112,7 +119,7 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
    */
   const createAgentNow = async (token: number) => {
     const agentName = name.trim();
-    if (!agentName) return;
+    if (!AGENT_NAME_PATTERN.test(agentName)) return;
     creatingRef.current = true;
     setCreating(true);
     try {
@@ -169,8 +176,10 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
     }
   };
 
+  const nameValid = AGENT_NAME_PATTERN.test(name);
+
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!nameValid) return;
     // A second submit while the create is already running would issue a
     // duplicate agent-creation request.
     if (creatingRef.current) return;
@@ -181,15 +190,10 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
     <FloatingWindow
       open={open}
       onClose={dismiss}
-      title={t('harnesses.add.title')}
+      title={name ? t('harnesses.add.titleNamed', { name }) : t('harnesses.add.title')}
       className="floating-window--wide"
       footer={
-        <Button
-          size="sm"
-          onClick={() => void handleCreate()}
-          disabled={!name.trim()}
-          busy={creating}
-        >
+        <Button size="sm" onClick={() => void handleCreate()} disabled={!nameValid} busy={creating}>
           {creating ? null : t('common.create')}
         </Button>
       }
@@ -218,12 +222,21 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
           type="text"
           placeholder={t('harnesses.add.namePlaceholder')}
           value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
+          maxLength={AGENT_NAME_MAX_LENGTH}
+          autoCapitalize="none"
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={name !== '' && !nameValid}
+          aria-describedby="agent-name-hint"
+          onChange={(e) => setName(toAgentName(e.currentTarget.value))}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void handleCreate();
           }}
           disabled={creating}
         />
+        <p id="agent-name-hint" className="hint">
+          {name !== '' && !nameValid ? t('harnesses.add.nameInvalid') : t('harnesses.add.nameHint')}
+        </p>
 
         <span className="label mt-4">{t('harnesses.add.type')}</span>
         <AgentTypeGrid

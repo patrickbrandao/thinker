@@ -4,7 +4,7 @@ import { type AgentCategory, type AgentPlatform, PLATFORM_ICONS } from 'thinker-
 import { platformLabel } from '../services/agent-type-labels.js';
 import { t } from '../i18n/index.js';
 import AgentTypeGrid from './AgentTypeGrid.js';
-import { monoIconClass } from './setup-ui.js';
+import { themedIcon, useDarkTheme } from './setup-ui.js';
 import { cx } from './ui.js';
 
 interface Props {
@@ -24,11 +24,13 @@ const iconFor = (plat: AgentPlatform, cat: AgentCategory): string | undefined =>
 export default function AgentTypeSelect(props: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const dark = useDarkTheme();
 
   const selectedIcon =
     !props.platform || !props.category
       ? '/icons/other.svg'
       : iconFor(props.platform, props.category);
+  const trigger = selectedIcon ? themedIcon(selectedIcon, dark) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -62,13 +64,13 @@ export default function AgentTypeSelect(props: Props) {
         aria-expanded={open}
         aria-label={t('harnesses.typeSelect.aria', { type: label })}
       >
-        {selectedIcon ? (
+        {trigger ? (
           <img
-            src={selectedIcon}
+            src={trigger.src}
             alt=""
             width="18"
             height="18"
-            className={cx('agent-type-select__trigger-icon shrink-0', monoIconClass(selectedIcon))}
+            className={cx('agent-type-select__trigger-icon shrink-0', trigger.className)}
           />
         ) : null}
         <span className="agent-type-select__trigger-label flex-1 truncate">{label}</span>

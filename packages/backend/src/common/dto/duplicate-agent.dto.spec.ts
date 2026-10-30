@@ -5,17 +5,14 @@ import { DuplicateAgentDto } from './duplicate-agent.dto';
 
 /**
  * DuplicateAgentDto guards the POST body for the duplicate-agent endpoint.
- * Validators (read off the source): @IsString, @IsNotEmpty, @MinLength(1),
- * @MaxLength(100), @Matches(/^[a-zA-Z0-9 _-]+$/). The regex deliberately allows
- * spaces — rejecting whitespace-only names is the controller's slug guard, NOT
- * the DTO. The final test pins that two-layer contract so a future "tighten the
- * regex to also forbid blank names" change can't silently move responsibility.
+ * Names are DNS labels (AGENT_NAME_PATTERN): lowercase letters, digits and
+ * inner hyphens, at most 63 characters.
  */
 describe('DuplicateAgentDto', () => {
   const buildErrors = (name: unknown) => validate(plainToInstance(DuplicateAgentDto, { name }));
 
   it('accepts valid agent names', async () => {
-    for (const name of ['my-agent', 'agent_1', 'TestBot', 'a', 'Bot Copy', 'a'.repeat(100)]) {
+    for (const name of ['my-agent', 'agent-1', 'testbot', 'a', 'bot-copy', 'a'.repeat(63)]) {
       const errors = await buildErrors(name);
       expect(errors).toHaveLength(0);
     }
@@ -31,8 +28,8 @@ describe('DuplicateAgentDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('rejects names longer than 100 characters', async () => {
-    const errors = await buildErrors('a'.repeat(101));
+  it('rejects names longer than 63 characters', async () => {
+    const errors = await buildErrors('a'.repeat(64));
     expect(errors.some((e) => e.constraints?.['maxLength'])).toBe(true);
   });
 
@@ -58,13 +55,10 @@ describe('DuplicateAgentDto', () => {
     expect(errors.some((e) => e.constraints?.['isString'])).toBe(true);
   });
 
-  // Two-layer contract pin: the @Matches regex allows spaces, so a whitespace-
-  // only string is a VALID DTO. The controller's slug guard (slugify → empty →
-  // BadRequestException) is what rejects it, not the DTO. If someone tightens the
-  // regex to forbid blanks here, this assertion flips and forces a conscious
-  // decision about where the guard lives.
-  it('PASSES a whitespace-only name (rejection is the controller slug guard, not the DTO)', async () => {
-    const errors = await buildErrors('   ');
-    expect(errors).toHaveLength(0);
+  it('rejects uppercase, spaces, underscores and edge hyphens', async () => {
+    for (const name of ['TestBot', 'Bot Copy', 'agent_1', '-agent', 'agent-', '   ']) {
+      const errors = await buildErrors(name);
+      expect(errors.some((e) => e.constraints?.['matches'])).toBe(true);
+    }
   });
 });

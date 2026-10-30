@@ -54,7 +54,8 @@ vi.mock('../../src/components/AgentTypeGrid', () => ({
   ),
 }));
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   PLATFORMS_BY_CATEGORY: {
     personal: ['openclaw', 'hermes', 'other'],
     app: ['openai-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
@@ -242,13 +243,22 @@ describe('AddAgentModal', () => {
     fireEvent.change(input, { target: { value: 'Typed Name' } });
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
-      expect(mockMarkAgentCreated).toHaveBeenCalledWith('Typed Name');
-      expect(mockMarkSetupPending).toHaveBeenCalledWith('Typed Name');
+      expect(mockMarkAgentCreated).toHaveBeenCalledWith('typed-name');
+      expect(mockMarkSetupPending).toHaveBeenCalledWith('typed-name');
       expect(mockNavigate).toHaveBeenCalledWith(
-        `/harnesses/${encodeURIComponent('Typed Name')}/routing`,
+        `/harnesses/${encodeURIComponent('typed-name')}/routing`,
         expect.anything(),
       );
     });
+  });
+
+  it('titles the window with the typed name', () => {
+    const { input } = renderOpen();
+    const title = () => document.querySelector('.floating-window-head')!.textContent;
+    expect(title()).toContain('Connect Harness');
+    fireEvent.change(input, { target: { value: 'my-bot' } });
+    expect(title()).toContain('Harness my-bot');
+    expect(title()).not.toContain('Connect');
   });
 
   it('sends the selected category and platform in the createAgent payload', async () => {

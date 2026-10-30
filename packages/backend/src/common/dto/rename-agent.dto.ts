@@ -7,16 +7,22 @@ import {
   IsOptional,
   IsIn,
 } from 'class-validator';
-import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'thinker-shared';
+import {
+  AGENT_CATEGORIES,
+  AGENT_PLATFORMS,
+  AGENT_NAME_MAX_LENGTH,
+  AGENT_NAME_PATTERN,
+} from 'thinker-shared';
 
 export class RenameAgentDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MinLength(1)
-  @MaxLength(100)
-  @Matches(/^[a-zA-Z0-9 _-]+$/, {
-    message: 'Agent name must contain only letters, numbers, spaces, dashes, and underscores',
+  @MaxLength(AGENT_NAME_MAX_LENGTH)
+  @Matches(AGENT_NAME_PATTERN, {
+    message:
+      'Agent name must be a DNS label: lowercase letters, numbers and inner hyphens (a-z, 0-9, -)',
   })
   name?: string;
 

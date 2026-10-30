@@ -250,6 +250,14 @@
         "shell.css"
       ]
     },
+    "agent-type-select": {
+      "classes": [
+        "agent-type-select__option"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "alert-row": {
       "classes": [
         "alert-row"
@@ -2102,8 +2110,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 206,
-    "classes": 221,
+    "blocks": 207,
+    "classes": 222,
     "canonicalRules": 5,
     "ghostRules": 5
   }

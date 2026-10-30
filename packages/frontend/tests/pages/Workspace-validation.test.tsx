@@ -78,7 +78,8 @@ const { MOCK_FREE_PLAN_REQUESTS_PER_MONTH } = vi.hoisted(() => ({
   MOCK_FREE_PLAN_REQUESTS_PER_MONTH: 10_000,
 }));
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   AGENT_CATEGORIES: ['personal', 'app', 'coding'],
   FREE_PLAN_REQUESTS_PER_MONTH: MOCK_FREE_PLAN_REQUESTS_PER_MONTH,
   PLAN_LIMITS: {
@@ -190,49 +191,29 @@ describe('Workspace AddAgentModal - name validation', () => {
     });
   });
 
-  it('accepts a unicode emoji name and url-encodes the navigation target', async () => {
-    mockCreateAgent.mockResolvedValue({ agent: { name: 'bot-🚀' }, apiKey: 'k' });
+  it('turns typed text into a DNS name (a-z, 0-9, -)', () => {
+    const { input } = openModal();
+    fireEvent.change(input, { target: { value: 'My Bot_🚀 1' } });
+    expect(input.value).toBe('my-bot-1');
+  });
+
+  it('keeps create disabled while the name ends with a hyphen', () => {
     const { input, createBtn } = openModal();
-    fireEvent.change(input, { target: { value: 'bot-🚀' } });
+    fireEvent.change(input, { target: { value: 'spaced-out ' } });
+    expect(input.value).toBe('spaced-out-');
+    expect(createBtn.disabled).toBe(true);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('caps the name at 63 characters, the DNS label limit', async () => {
+    const { input, createBtn } = openModal();
+    fireEvent.change(input, { target: { value: 'a'.repeat(256) } });
+    expect(input.value).toBe('a'.repeat(63));
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        `/harnesses/${encodeURIComponent('bot-🚀')}/routing`,
-        expect.anything(),
+      expect(mockCreateAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'a'.repeat(63) }),
       );
-    });
-  });
-
-  it('trims surrounding whitespace before submitting the name', async () => {
-    const { input, createBtn } = openModal();
-    fireEvent.change(input, { target: { value: '  spaced-out  ' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockCreateAgent).toHaveBeenCalledWith({
-        name: 'spaced-out',
-        agent_category: 'coding',
-        agent_platform: 'opencode',
-        record_messages: true,
-        log_retention_days: null,
-      });
-    });
-  });
-
-  it('accepts a very long name (256 chars) without truncating client-side', async () => {
-    const longName = 'a'.repeat(256);
-    mockCreateAgent.mockResolvedValue({ agent: { name: longName }, apiKey: 'k' });
-    const { input, createBtn } = openModal();
-    fireEvent.change(input, { target: { value: longName } });
-    expect(createBtn.disabled).toBe(false);
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockCreateAgent).toHaveBeenCalledWith({
-        name: longName,
-        agent_category: 'coding',
-        agent_platform: 'opencode',
-        record_messages: true,
-        log_retention_days: null,
-      });
     });
   });
 });
@@ -251,7 +232,7 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({
-        name: 'Demo Agent',
+        name: 'demo-agent',
         agent_category: 'coding',
         agent_platform: 'opencode',
         record_messages: true,
@@ -306,11 +287,11 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     fireEvent.click(createBtn);
     await vi.waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
-        `/harnesses/${encodeURIComponent('Fallback Agent')}/routing`,
+        `/harnesses/${encodeURIComponent('fallback-agent')}/routing`,
         { state: { newApiKey: 'k' } },
       );
     });
-    expect(mockMarkAgentCreated).toHaveBeenCalledWith('Fallback Agent');
+    expect(mockMarkAgentCreated).toHaveBeenCalledWith('fallback-agent');
   });
 
   it('does not call markAgentCreated or navigate when createAgent rejects', async () => {

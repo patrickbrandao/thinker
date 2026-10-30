@@ -22,6 +22,7 @@ import {
 import { THINKER_DOCS_URL, THINKER_PROVIDERS_DOCS_URL } from '../../services/thinker-links.js';
 import { effectiveTheme, themePreference, toggleTheme } from '../../lib/theme.js';
 import { useSignal } from '../../lib/signal.js';
+import { themedIcon } from '../setup-ui.js';
 import { t } from '../../i18n/index.js';
 import { IconButton, Menu, MenuItem } from '../ui.jsx';
 import { providerIcon } from '../ProviderIcon.jsx';
@@ -47,6 +48,7 @@ export default function Topbar({
   const docsUrl = pathname.startsWith('/providers') ? THINKER_PROVIDERS_DOCS_URL : THINKER_DOCS_URL;
   const dark = effectiveTheme() === 'dark';
   const platformIcon = agentPlatformIcon();
+  const crumbIcon = platformIcon ? themedIcon(platformIcon, dark) : null;
   const version = __THINKER_VERSION__;
 
   return (
@@ -65,7 +67,15 @@ export default function Topbar({
           <>
             <Link to="/harnesses">{t('nav.harnesses')}</Link>
             <ChevronRight aria-hidden="true" />
-            {platformIcon ? <img src={platformIcon} alt="" width={14} height={14} /> : null}
+            {crumbIcon ? (
+              <img
+                src={crumbIcon.src}
+                alt=""
+                width={14}
+                height={14}
+                className={crumbIcon.className}
+              />
+            ) : null}
             <span className="crumb-current">{displayName ?? agentName}</span>
             <Menu
               label={t('nav.harnessActions')}

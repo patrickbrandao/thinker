@@ -9,6 +9,10 @@ export {
   platformIcon,
   API_SURFACES,
   PLATFORM_API_SURFACES,
+  DARK_ICON_VARIANTS,
+  AGENT_NAME_PATTERN,
+  AGENT_NAME_MAX_LENGTH,
+  toAgentName,
 } from './agent-type';
 export type { AgentCategory, AgentPlatform, ApiSurface } from './agent-type';
 export {

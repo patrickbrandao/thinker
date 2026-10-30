@@ -72,8 +72,9 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (206 BEM blocks, 221 classes)
+## Blocks (207 BEM blocks, 222 classes)
 actions (shell.css): actions
+agent-type-select (shell.css): agent-type-select__option
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
 alerts (shell.css): alerts

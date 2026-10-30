@@ -207,7 +207,7 @@ describe('removed Autofix surface', () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/agents')
       .set('x-api-key', TEST_API_KEY)
-      .send({ name: 'Flagged Harness', autofix_enabled: false })
+      .send({ name: 'flagged-harness', autofix_enabled: false })
       .expect(400);
 
     expect(JSON.stringify(res.body)).toContain('autofix_enabled');
