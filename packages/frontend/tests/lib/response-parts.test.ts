@@ -117,9 +117,9 @@ describe('toolParams', () => {
         },
       }),
     ).toEqual([
-      { name: 'query', type: 'string', required: true, description: 'What to search' },
-      { name: 'limit', type: 'integer', required: false, description: undefined },
-      { name: 'tags', type: 'string[]', required: false, description: undefined },
+      { name: 'query', type: 'str', required: true, description: 'What to search' },
+      { name: 'limit', type: 'int', required: false, description: undefined },
+      { name: 'tags', type: 'arr', required: false, description: undefined },
       { name: 'mode', type: '"a" | "b"', required: false, description: undefined },
     ]);
   });
