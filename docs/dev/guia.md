@@ -280,7 +280,8 @@ Um tier pontuado sem modelo cai no tier `default`; se o `default` também não t
 Gravação do corpo das tentativas ao provedor, por harness (ligada em harnesses novos). Variáveis `THINKER_RECORDING_*`:
 
 - `THINKER_RECORDING_STORAGE` (`auto|s3|filesystem|disabled`): em `auto`, credenciais S3 completas ganham; senão usa `THINKER_RECORDING_FILESYSTEM_PATH` (`/data/request-recordings` em produção).
-- **Retenção**: `THINKER_RECORDING_RETENTION_DAYS`, padrão **30** (`config/recording-retention.ts`); valor que não seja inteiro positivo derruba o boot. Limpeza diária às 02:00 (`database/request-recording-retention.service.ts`, trava advisory).
+- **Retenção de logs** em três níveis: harness (`agents.log_retention_days`, "Personalizada") > organização (`tenants.log_retention_days`, editável em Organização, `GET|PATCH /api/v1/organizations/:id/log-retention`) > `THINKER_RECORDING_RETENTION_DAYS`, padrão **30** (`config/recording-retention.ts`; valor que não seja inteiro positivo derruba o boot). `NULL` segue o nível de cima ("Global" no harness). O harness lê e grava a sua em `GET|PATCH /api/v1/routing/:agent/recording` (`retention_days`, `global_retention_days`) e na criação (`log_retention_days`).
+- **Limpeza** diária às 02:00 (`database/request-recording-retention.service.ts`, trava advisory): apaga os corpos gravados e zera `request_headers`, `request_params` e `timeline` de `requests` e `agent_messages` expirados, em lotes de 5000. As linhas ficam (status, tokens, custo), então gráficos e totais não mudam.
 - Cifradas com a chave **atual**; a re-cifragem de `PREVIOUS` não as toca. Imagens base64 embutidas são removidas.
 - Código: `common/services/request-recording-storage.service.ts`, `common/utils/request-recording-codec.ts` e `routing/proxy/attempt-recording*.ts`.
 

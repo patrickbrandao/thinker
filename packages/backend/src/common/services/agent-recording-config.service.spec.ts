@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Agent } from '../../entities/agent.entity';
 import { AgentRecordingConfigService } from './agent-recording-config.service';
@@ -13,6 +14,7 @@ describe('AgentRecordingConfigService', () => {
       providers: [
         AgentRecordingConfigService,
         { provide: getRepositoryToken(Agent), useValue: { findOne } },
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile();
     service = module.get(AgentRecordingConfigService);

@@ -68,6 +68,7 @@ import { AddStreamWarmupMs1803900000000 } from './migrations/1803900000000-AddSt
 import { AddAgentModelListing1804000000000 } from './migrations/1804000000000-AddAgentModelListing';
 import { DropHeaderTiers1804100000000 } from './migrations/1804100000000-DropHeaderTiers';
 import { AddRequestTimeline1804200000000 } from './migrations/1804200000000-AddRequestTimeline';
+import { AddLogRetentionDays1804300000000 } from './migrations/1804300000000-AddLogRetentionDays';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -382,4 +383,5 @@ export const migrations = [
   AddAgentModelListing1804000000000,
   DropHeaderTiers1804100000000,
   AddRequestTimeline1804200000000,
+  AddLogRetentionDays1804300000000,
 ];

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -455,6 +456,83 @@ export function Modal({
         ) : null}
         <div className="modal-body">{children}</div>
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * A non-modal window: no backdrop, the page behind stays usable and a click
+ * outside never closes it. Dragged by its title bar; closed by its X or Escape.
+ */
+export function FloatingWindow({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!d || !rect) return;
+    // Keep the title bar on screen so the window can always be grabbed again.
+    const x = Math.min(Math.max(event.clientX - d.dx, 0), window.innerWidth - rect.width);
+    const y = Math.min(Math.max(event.clientY - d.dy, 0), window.innerHeight - 48);
+    setPos({ x, y });
+  };
+  const onPointerUp = () => {
+    drag.current = null;
+  };
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="floating-window"
+      role="dialog"
+      aria-modal="false"
+      aria-label={title}
+      style={pos ? { left: pos.x, top: pos.y, transform: 'none' } : undefined}
+    >
+      <div
+        className="modal-head floating-window-head"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <h2>{title}</h2>
+        <IconButton label={t('common.close')} onClick={onClose}>
+          <X />
+        </IconButton>
+      </div>
+      <div className="modal-body">{children}</div>
     </div>,
     document.body,
   );

@@ -36,4 +36,4 @@ Telemetria, verificação de atualização, Sentry ou relatórios de erro, servi
 
 ## Seus dados
 
-Chaves de provedores, tokens OAuth e gravações ficam no seu PostgreSQL e no seu volume (ou bucket S3), cifrados com `THINKER_ENCRYPTION_KEY`. As gravações contêm os prompts e as respostas completos e são apagadas após `THINKER_RECORDING_RETENTION_DAYS` (30 por padrão). Para não gravar nada, desligue a gravação no harness ou use `THINKER_RECORDING_STORAGE=disabled`.
+Chaves de provedores, tokens OAuth e gravações ficam no seu PostgreSQL e no seu volume (ou bucket S3), cifrados com `THINKER_ENCRYPTION_KEY`. As gravações contêm os prompts e as respostas completos e são apagadas após a retenção de logs (a do harness, senão a da organização, senão `THINKER_RECORDING_RETENTION_DAYS`, 30 por padrão), junto com os cabeçalhos e parâmetros capturados das requisições. Para não gravar nada, desligue a gravação no harness ou use `THINKER_RECORDING_STORAGE=disabled`.

@@ -15,12 +15,54 @@ const TRY_LOCK_SQL = `
 
 const UNLOCK_SQL = `SELECT pg_advisory_unlock(${RETENTION_LOCK_KEY}::bigint)`;
 
+/**
+ * Effective retention of a row, in days: the harness override, then the
+ * organization's value, then the environment default ($1).
+ */
+const RETENTION_DAYS_SQL = `COALESCE(a.log_retention_days, t.log_retention_days, $1)`;
+
 const SELECT_ALL_EXPIRED_SQL = `
-  SELECT id AS attempt_id, recording_key AS storage_key
-  FROM agent_messages
-  WHERE recording_key IS NOT NULL
-    AND timestamp < CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
-  ORDER BY timestamp ASC
+  SELECT m.id AS attempt_id, m.recording_key AS storage_key
+  FROM agent_messages m
+  LEFT JOIN agents a ON a.id = m.agent_id
+  LEFT JOIN tenants t ON t.id = m.tenant_id
+  WHERE m.recording_key IS NOT NULL
+    AND m.timestamp < CURRENT_TIMESTAMP - (${RETENTION_DAYS_SQL} * INTERVAL '1 day')
+  ORDER BY m.timestamp ASC
+`;
+
+const LOG_PURGE_BATCH = 5000;
+
+/**
+ * Expired logs are stripped, not deleted: the row keeps its status, tokens and
+ * cost so dashboards and totals stay whole, and loses the captured headers,
+ * parameters and timeline. Batched so a first run over a long history never
+ * holds one huge transaction.
+ */
+const STRIP_REQUEST_LOGS_SQL = `
+  UPDATE requests SET request_headers = NULL, request_params = NULL, timeline = NULL
+  WHERE id IN (
+    SELECT r.id FROM requests r
+    LEFT JOIN agents a ON a.id = r.agent_id
+    LEFT JOIN tenants t ON t.id = r.tenant_id
+    WHERE (r.request_headers IS NOT NULL OR r.request_params IS NOT NULL OR r.timeline IS NOT NULL)
+      AND r.timestamp < CURRENT_TIMESTAMP - (${RETENTION_DAYS_SQL} * INTERVAL '1 day')
+    LIMIT ${LOG_PURGE_BATCH}
+  )
+  RETURNING id
+`;
+
+const STRIP_ATTEMPT_LOGS_SQL = `
+  UPDATE agent_messages SET request_headers = NULL, request_params = NULL
+  WHERE id IN (
+    SELECT m.id FROM agent_messages m
+    LEFT JOIN agents a ON a.id = m.agent_id
+    LEFT JOIN tenants t ON t.id = m.tenant_id
+    WHERE (m.request_headers IS NOT NULL OR m.request_params IS NOT NULL)
+      AND m.timestamp < CURRENT_TIMESTAMP - (${RETENTION_DAYS_SQL} * INTERVAL '1 day')
+    LIMIT ${LOG_PURGE_BATCH}
+  )
+  RETURNING id
 `;
 
 const DELETE_METADATA_SQL = `
@@ -33,6 +75,13 @@ const DELETE_METADATA_SQL = `
 interface ExpiredRecording {
   attempt_id: string;
   storage_key: string;
+}
+
+/** Rows returned by an UPDATE ... RETURNING, whichever shape the driver uses. */
+function affectedRows(result: unknown): number {
+  if (!Array.isArray(result)) return 0;
+  const rows: unknown = Array.isArray(result[0]) ? result[0] : result;
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 @Injectable()
@@ -79,6 +128,13 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
       if (deleted > 0) {
         this.logger.log(`Deleted ${deleted} expired Provider Attempt recording(s)`);
       }
+      const requests = await this.stripLogs(queryRunner, STRIP_REQUEST_LOGS_SQL);
+      const attempts = await this.stripLogs(queryRunner, STRIP_ATTEMPT_LOGS_SQL);
+      if (requests + attempts > 0) {
+        this.logger.log(
+          `Cleared expired logs of ${requests} Request(s) and ${attempts} Provider Attempt(s)`,
+        );
+      }
       return deleted;
     } catch (error) {
       this.logger.error(
@@ -102,6 +158,15 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
     >;
   }
 
+  private async stripLogs(queryRunner: QueryRunner, sql: string): Promise<number> {
+    let total = 0;
+    for (;;) {
+      const count = affectedRows(await queryRunner.query(sql, [this.retentionDays]));
+      total += count;
+      if (count < LOG_PURGE_BATCH) return total;
+    }
+  }
+
   private async deleteRecordings(
     queryRunner: QueryRunner,
     recordings: ExpiredRecording[],
@@ -110,12 +175,12 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
     for (const recording of recordings) {
       try {
         await this.storage.delete(recording.storage_key);
-        const result = (await queryRunner.query(DELETE_METADATA_SQL, [
-          recording.attempt_id,
-          recording.storage_key,
-        ])) as Array<{ id: string }> | [Array<{ id: string }>, number];
-        const rows = Array.isArray(result[0]) ? result[0] : result;
-        deleted += rows.length;
+        deleted += affectedRows(
+          await queryRunner.query(DELETE_METADATA_SQL, [
+            recording.attempt_id,
+            recording.storage_key,
+          ]),
+        );
       } catch (error) {
         this.logger.warn(
           `Could not delete Provider Attempt recording ${recording.attempt_id}: ${

@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (201 BEM blocks, 215 classes)
+## Blocks (203 BEM blocks, 217 classes)
 actions (shell.css): actions
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
@@ -120,6 +120,8 @@ edge-saving (canvas.css): edge-saving
 empty (base.css): empty
 eyebrow (base.css): eyebrow
 field (base.css, shell.css): field
+floating-window (shell.css): floating-window
+floating-window-head (shell.css): floating-window-head
 flow-edge (canvas.css): flow-edge
 flow-node (canvas.css): flow-node
 form-error (shell.css): form-error
@@ -275,13 +277,14 @@ user-trigger (shell.css): user-trigger
 well (base.css): well
 wide (shell.css): wide
 
-## Primitives (18)
+## Primitives (19)
 Avatar: src/components/ui.tsx
 Badge: src/components/ui.tsx
 Button: src/components/ui.tsx
 ButtonLink: src/components/ui.tsx
 EmptyState: src/components/ui.tsx
 Field: src/components/ui.tsx
+FloatingWindow: src/components/ui.tsx
 IconButton: src/components/ui.tsx
 Kbd: src/components/ui.tsx
 Menu: src/components/ui.tsx
@@ -299,14 +302,14 @@ Tabs: src/components/ui.tsx
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (3)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:965  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:965  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:974  [@media (max-width: 900px)]
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:984  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:984  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:993  [@media (max-width: 900px)]
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (3)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:958 loses to shell.css:965
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:958 loses to shell.css:965
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:970 loses to shell.css:974
+.app.is-collapsed .nav-action { display: revert }  at shell.css:977 loses to shell.css:984
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:977 loses to shell.css:984
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:989 loses to shell.css:993
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

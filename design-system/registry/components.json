@@ -623,6 +623,22 @@
         "shell.css"
       ]
     },
+    "floating-window": {
+      "classes": [
+        "floating-window"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "floating-window-head": {
+      "classes": [
+        "floating-window-head"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "flow-edge": {
       "classes": [
         "flow-edge"
@@ -1904,6 +1920,10 @@
       "file": "src/components/ui.tsx"
     },
     {
+      "name": "FloatingWindow",
+      "file": "src/components/ui.tsx"
+    },
+    {
       "name": "IconButton",
       "file": "src/components/ui.tsx"
     },
@@ -1961,7 +1981,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 965
+      "line": 984
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -1970,7 +1990,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 965
+      "line": 984
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -1979,7 +1999,7 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 974
+      "line": 993
     }
   ],
   "ghostRules": [
@@ -1990,8 +2010,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 958,
-      "losesTo": "shell.css:965"
+      "line": 977,
+      "losesTo": "shell.css:984"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2000,8 +2020,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 958,
-      "losesTo": "shell.css:965"
+      "line": 977,
+      "losesTo": "shell.css:984"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2010,8 +2030,8 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 970,
-      "losesTo": "shell.css:974"
+      "line": 989,
+      "losesTo": "shell.css:993"
     }
   ],
   "componentSheets": {
@@ -2027,8 +2047,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 201,
-    "classes": 215,
+    "blocks": 203,
+    "classes": 217,
     "canonicalRules": 3,
     "ghostRules": 3
   }

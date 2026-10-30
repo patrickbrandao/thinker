@@ -47,6 +47,8 @@ export class ApiKeyGeneratorService {
     agentPlatform?: string;
     /** Explicit recording choice. Undefined → column default (true for new agents). */
     recordMessages?: boolean;
+    /** Harness log retention in days; null/undefined follows the organization. */
+    logRetentionDays?: number | null;
   }): Promise<{ tenantId: string; agentId: string; apiKey: string }> {
     let tenantId: string;
     if (params.tenantId) {
@@ -69,6 +71,7 @@ export class ApiKeyGeneratorService {
       // Only set when the caller made an explicit choice. Leaving it out lets
       // the column default apply (recording ON for new agents).
       ...(params.recordMessages !== undefined ? { record_messages: params.recordMessages } : {}),
+      log_retention_days: params.logRetentionDays ?? null,
       is_active: true,
       tenant_id: tenantId,
     });

@@ -223,13 +223,20 @@ export function toggleComplexity(agentName: string) {
 
 export interface RecordingConfig {
   enabled: boolean;
+  /** Harness log retention in days; null follows the organization. */
+  retention_days: number | null;
+  /** The organization's retention (or the instance default) in days. */
+  global_retention_days: number;
 }
 
 export function getRecording(agentName: string) {
   return fetchJson<RecordingConfig>(routingPath(agentName, 'recording'));
 }
 
-export function updateRecording(agentName: string, body: { enabled?: boolean }) {
+export function updateRecording(
+  agentName: string,
+  body: { enabled?: boolean; retention_days?: number | null },
+) {
   return fetchMutate<RecordingConfig>(routingPath(agentName, 'recording'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

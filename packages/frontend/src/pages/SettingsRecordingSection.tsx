@@ -4,6 +4,7 @@ import { toast } from '../services/toast-store.js';
 import { useResource } from '../lib/use-resource.js';
 import { Panel, Switch } from '../components/ui.js';
 import SettingsRow from './SettingsRow.js';
+import LogRetentionSelect from '../components/LogRetentionSelect.js';
 import { t } from '../i18n/index.js';
 
 export default function SettingsRecordingSection({ agentName }: { agentName: string }) {
@@ -38,6 +39,23 @@ export default function SettingsRecordingSection({ agentName }: { agentName: str
     }
   };
 
+  const changeRetention = async (days: number | null) => {
+    if (busy) return;
+    const target = agentName;
+    setSaving(true);
+    try {
+      const next = await updateRecording(target, { retention_days: days });
+      if (currentAgent.current === target) {
+        config.setData(next);
+        toast.success(t('harnesses.retention.savedToast'));
+      }
+    } catch {
+      // fetchMutate already shows the backend error.
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Panel title={t('harnesses.recording.title')}>
       <SettingsRow
@@ -50,6 +68,20 @@ export default function SettingsRecordingSection({ agentName }: { agentName: str
           label={t('harnesses.recording.enable')}
           disabled={busy}
         />
+      </SettingsRow>
+      <SettingsRow
+        title={t('harnesses.retention.label')}
+        description={t('harnesses.retention.hint')}
+      >
+        <div className="w-[260px] max-w-full">
+          <LogRetentionSelect
+            value={ready ? (config.data?.retention_days ?? null) : null}
+            globalDays={ready ? (config.data?.global_retention_days ?? null) : null}
+            onChange={(days) => void changeRetention(days)}
+            disabled={busy}
+            idPrefix="settings-retention"
+          />
+        </div>
       </SettingsRow>
     </Panel>
   );

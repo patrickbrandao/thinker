@@ -24,7 +24,7 @@ describe('TierController', () => {
   };
   let agentRepo: jest.Mocked<Partial<Repository<Agent>>>;
   let controller: TierController;
-  let recordingConfig: { isRecording: jest.Mock };
+  let recordingConfig: { isRecording: jest.Mock; logSettings: jest.Mock };
   beforeEach(() => {
     tierService = {
       getTiers: jest.fn().mockResolvedValue([]),
@@ -43,7 +43,12 @@ describe('TierController', () => {
     agentRepo = {
       update: jest.fn().mockResolvedValue(undefined),
     };
-    recordingConfig = { isRecording: jest.fn().mockResolvedValue(false) };
+    recordingConfig = {
+      isRecording: jest.fn().mockResolvedValue(false),
+      logSettings: jest
+        .fn()
+        .mockResolvedValue({ enabled: false, retention_days: null, global_retention_days: 30 }),
+    };
     controller = new TierController(
       tierService as unknown as TierService,
       resolveAgentService as unknown as ResolveAgentService,
@@ -138,23 +143,32 @@ describe('TierController', () => {
     expect(resolveAgentService.invalidate).toHaveBeenCalledWith('tenant-1', 'demo');
   });
 
-  it('GET recording returns the per-agent opt-in flag', async () => {
-    expect(await controller.getRecording(ctx, 'demo')).toEqual({ enabled: false });
-    expect(recordingConfig.isRecording).toHaveBeenCalledWith('agent-1');
+  it('GET recording returns the log settings of the agent', async () => {
+    expect(await controller.getRecording(ctx, 'demo')).toEqual({
+      enabled: false,
+      retention_days: null,
+      global_retention_days: 30,
+    });
+    expect(recordingConfig.logSettings).toHaveBeenCalledWith('agent-1');
   });
 
   it('PATCH recording updates the flag and invalidates the agent lookup', async () => {
-    expect(await controller.updateRecording(ctx, 'demo', { enabled: true })).toEqual({
-      enabled: true,
-    });
+    await controller.updateRecording(ctx, 'demo', { enabled: true });
     expect(agentRepo.update).toHaveBeenCalledWith('agent-1', { record_messages: true });
     expect(resolveAgentService.invalidate).toHaveBeenCalledWith('tenant-1', 'demo');
   });
 
-  it('PATCH recording with no boolean is a no-op', async () => {
-    expect(await controller.updateRecording(ctx, 'demo', {})).toEqual({ enabled: false });
+  it('PATCH recording sets or clears the harness log retention', async () => {
+    await controller.updateRecording(ctx, 'demo', { retention_days: 7 });
+    expect(agentRepo.update).toHaveBeenCalledWith('agent-1', { log_retention_days: 7 });
+    await controller.updateRecording(ctx, 'demo', { retention_days: null });
+    expect(agentRepo.update).toHaveBeenLastCalledWith('agent-1', { log_retention_days: null });
+  });
+
+  it('PATCH recording with an empty body is a no-op', async () => {
+    await controller.updateRecording(ctx, 'demo', {});
     expect(agentRepo.update).not.toHaveBeenCalled();
-    expect(recordingConfig.isRecording).toHaveBeenCalledWith('agent-1');
+    expect(recordingConfig.logSettings).toHaveBeenCalledWith('agent-1');
   });
 
   it('PATCH response-mode sets the mode for a valid tier', async () => {

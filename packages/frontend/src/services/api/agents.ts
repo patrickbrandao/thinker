@@ -62,6 +62,8 @@ export interface CreateAgentParams {
   agent_category?: string;
   agent_platform?: string;
   record_messages?: boolean;
+  /** Harness log retention in days; null follows the organization. */
+  log_retention_days?: number | null;
 }
 
 export interface DuplicateAgentPreview {

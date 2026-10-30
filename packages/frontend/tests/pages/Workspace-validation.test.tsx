@@ -213,6 +213,7 @@ describe('Workspace AddAgentModal - name validation', () => {
         agent_category: 'personal',
         agent_platform: 'openclaw',
         record_messages: true,
+        log_retention_days: null,
       });
     });
   });
@@ -230,6 +231,7 @@ describe('Workspace AddAgentModal - name validation', () => {
         agent_category: 'personal',
         agent_platform: 'openclaw',
         record_messages: true,
+        log_retention_days: null,
       });
     });
   });
@@ -253,6 +255,7 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
         agent_category: 'personal',
         agent_platform: 'openclaw',
         record_messages: true,
+        log_retention_days: null,
       });
     });
     // Strict: nothing else was sneaked in (e.g. recordMessages, displayName).
@@ -260,6 +263,7 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     expect(Object.keys(call).sort()).toEqual([
       'agent_category',
       'agent_platform',
+      'log_retention_days',
       'name',
       'record_messages',
     ]);
@@ -277,6 +281,7 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
         agent_category: 'app',
         agent_platform: 'langchain',
         record_messages: true,
+        log_retention_days: null,
       });
     });
   });

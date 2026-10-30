@@ -7,7 +7,11 @@ import {
   IsOptional,
   IsIn,
   IsBoolean,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
+import { MAX_LOG_RETENTION_DAYS } from '../../config/recording-retention';
 import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'thinker-shared';
 
 export class CreateAgentDto {
@@ -34,4 +38,11 @@ export class CreateAgentDto {
   @IsOptional()
   @IsBoolean()
   record_messages?: boolean;
+
+  /** Days to keep this harness's logs. Omit or null to follow the organization. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_LOG_RETENTION_DAYS)
+  log_retention_days?: number | null;
 }

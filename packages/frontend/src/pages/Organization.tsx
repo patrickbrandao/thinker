@@ -2,6 +2,7 @@ import { useCallback, useState, type FormEvent } from 'react';
 import ErrorState from '../components/ErrorState.js';
 import TemporaryPasswordBox from '../components/TemporaryPasswordBox.js';
 import { Badge, Button, Field, Modal, Panel } from '../components/ui.js';
+import { retentionOptions } from '../components/LogRetentionSelect.js';
 import {
   addMember,
   deleteOrganization,
@@ -10,6 +11,8 @@ import {
   renameOrganization,
   updateMemberRole,
   type OrgRole,
+  getLogRetention,
+  updateLogRetention,
 } from '../services/api/organizations.js';
 import { setActiveOrganizationId } from '../services/org-context.js';
 import { assignableRoles, canEditMember, roleLabel } from '../services/permissions.js';
@@ -53,6 +56,22 @@ export default function Organization() {
       // toasted by fetchMutate
     } finally {
       setRenaming(false);
+    }
+  };
+
+  // ── Log retention ────────────────────────────────────
+  const retention = useResource(() => getLogRetention(orgId!), [orgId], { enabled: !!orgId });
+  const [savingRetention, setSavingRetention] = useState(false);
+  const changeRetention = async (days: number | null) => {
+    if (!orgId) return;
+    setSavingRetention(true);
+    try {
+      retention.setData(await updateLogRetention(orgId, days));
+      toast.success(t('harnesses.retention.savedToast'));
+    } catch {
+      // toasted by fetchMutate
+    } finally {
+      setSavingRetention(false);
     }
   };
 
@@ -185,6 +204,39 @@ export default function Organization() {
               </Button>
             ) : null}
           </form>
+        </Panel>
+
+        <Panel title={t('org.page.logRetention')}>
+          <Field
+            className="max-w-[320px]"
+            label={t('org.page.logRetention')}
+            hint={
+              canManageOrg ? t('org.page.logRetentionDesc') : t('org.page.logRetentionReadOnly')
+            }
+            htmlFor="org-log-retention"
+          >
+            <select
+              id="org-log-retention"
+              className="field"
+              value={retention.data?.retention_days ?? ''}
+              disabled={!canManageOrg || savingRetention || !retention.data}
+              onChange={(e) =>
+                void changeRetention(e.currentTarget.value ? Number(e.currentTarget.value) : null)
+              }
+            >
+              <option value="">
+                {t('org.page.logRetentionDefault')}
+                {retention.data
+                  ? ` (${t('harnesses.retention.days', retention.data.default_days)})`
+                  : ''}
+              </option>
+              {retentionOptions(retention.data?.retention_days).map((days) => (
+                <option key={days} value={days}>
+                  {t('harnesses.retention.days', days)}
+                </option>
+              ))}
+            </select>
+          </Field>
         </Panel>
 
         <Panel title={t('org.page.members')} bodyClassName="flex flex-col gap-4">

@@ -367,15 +367,13 @@ describe('Workspace', () => {
     expect(document.querySelector('#agent-name-input')).toBeNull();
   });
 
-  it('closes modal on overlay click', () => {
-    const { container } = render(() => <Workspace />);
+  it('opens Connect Harness as a floating window that closes on its close button', () => {
+    render(() => <Workspace />);
     const btn = screen.getAllByText('Connect Harness')[0];
     fireEvent.click(btn);
-    expect(document.querySelector('.overlay')).not.toBeNull();
-    const overlay = document.querySelector('.overlay')!;
-    // The shared Modal closes on a backdrop mousedown.
-    fireEvent.mouseDown(overlay);
-    // Modal should be closed after overlay click
+    expect(document.querySelector('.floating-window')).not.toBeNull();
+    expect(document.querySelector('.overlay')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(document.querySelector('#agent-name-input')).toBeNull();
   });
 

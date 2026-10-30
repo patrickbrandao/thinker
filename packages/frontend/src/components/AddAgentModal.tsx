@@ -7,7 +7,11 @@ import { markAgentCreated, markSetupPending } from '../services/recent-agents.js
 import { refreshAgents } from '../services/sse.js';
 import { type AgentCategory, type AgentPlatform, PLATFORMS_BY_CATEGORY } from 'thinker-shared';
 import { t } from '../i18n/index.js';
-import { Button, Modal, Switch } from './ui.js';
+import { Button, FloatingWindow, Switch, Tabs } from './ui.js';
+import LogRetentionSelect from './LogRetentionSelect.js';
+import { getLogRetention } from '../services/api/organizations.js';
+import { me } from '../services/session-store.js';
+import { useResource } from '../lib/use-resource.js';
 
 const DEFAULT_CATEGORY: AgentCategory = 'personal';
 const defaultPlatform = (): AgentPlatform | null =>
@@ -32,6 +36,16 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
   // Defaults ON — explicit so create always sends a choice rather than
   // relying on the server-side default.
   const [recordingEnabled, setRecordingEnabled] = useState(true);
+  // null = Global (follows the organization's retention).
+  const [retentionDays, setRetentionDays] = useState<number | null>(null);
+  const [tab, setTab] = useState<'harness' | 'settings'>('harness');
+  const orgId = me()?.organization?.id;
+  const orgRetention = useResource(() => getLogRetention(orgId!), [orgId, open], {
+    enabled: open && !!orgId,
+  });
+  const globalDays = orgRetention.data
+    ? (orgRetention.data.retention_days ?? orgRetention.data.default_days)
+    : null;
   const inputRef = useRef<HTMLInputElement>(null);
   // Synchronous guard: two clicks in the same tick both see `creating` false.
   const creatingRef = useRef(false);
@@ -78,6 +92,8 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
     setCategory(DEFAULT_CATEGORY);
     setPlatform(defaultPlatform());
     setRecordingEnabled(true);
+    setRetentionDays(null);
+    setTab('harness');
   };
 
   const dismiss = () => {
@@ -105,6 +121,7 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
         ...(category ? { agent_category: category } : {}),
         ...(platform ? { agent_platform: platform } : {}),
         record_messages: recordingEnabled,
+        log_retention_days: retentionDays,
       });
       // Local creates do not wait for the asynchronous server-sent event. This
       // immediately reruns the sidebar's harness-list resource with fresh data.
@@ -161,53 +178,77 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
   };
 
   return (
-    <Modal open={open} onClose={dismiss} title={t('harnesses.add.title')}>
-      <p className="mb-4 text-sm text-muted">{t('harnesses.add.desc')}</p>
+    <FloatingWindow open={open} onClose={dismiss} title={t('harnesses.add.title')}>
+      <Tabs
+        items={[
+          { key: 'harness', label: t('harnesses.add.tabHarness') },
+          { key: 'settings', label: t('harnesses.add.tabSettings') },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label={t('harnesses.add.title')}
+      />
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,200px)_1fr]">
-        <div>
-          <span className="label">{t('harnesses.add.type')}</span>
-          <AgentTypeSelect
-            category={category}
-            platform={platform}
-            onCategoryChange={handleCategoryChange}
-            onPlatformChange={setPlatform}
-            disabled={creating}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="agent-name-input">
-            {t('harnesses.add.name')}
-          </label>
-          <input
-            ref={inputRef}
-            id="agent-name-input"
-            className="field"
-            type="text"
-            placeholder={t('harnesses.add.namePlaceholder')}
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleCreate();
-            }}
-            disabled={creating}
-          />
+      {/* Both tabs stay mounted so the name field keeps its element and focus. */}
+      <div role="tabpanel" hidden={tab !== 'harness'}>
+        <p className="mb-4 text-sm text-muted">{t('harnesses.add.desc')}</p>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,200px)_1fr]">
+          <div>
+            <span className="label">{t('harnesses.add.type')}</span>
+            <AgentTypeSelect
+              category={category}
+              platform={platform}
+              onCategoryChange={handleCategoryChange}
+              onPlatformChange={setPlatform}
+              disabled={creating}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="agent-name-input">
+              {t('harnesses.add.name')}
+            </label>
+            <input
+              ref={inputRef}
+              id="agent-name-input"
+              className="field"
+              type="text"
+              placeholder={t('harnesses.add.namePlaceholder')}
+              value={name}
+              onChange={(e) => setName(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleCreate();
+              }}
+              disabled={creating}
+            />
+          </div>
         </div>
       </div>
-
-      <div className="mt-4">
-        <span className="label">{t('harnesses.add.settings')}</span>
-        <div className="well flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-ink">{t('harnesses.add.enableLogs')}</div>
-            <div className="hint mt-0.5">{t('harnesses.add.logsHint')}</div>
+      <div role="tabpanel" hidden={tab !== 'settings'}>
+        <div className="flex flex-col gap-3">
+          <div className="well flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-ink">{t('harnesses.add.enableLogs')}</div>
+              <div className="hint mt-0.5">{t('harnesses.add.logsHint')}</div>
+            </div>
+            <Switch
+              checked={recordingEnabled}
+              onChange={setRecordingEnabled}
+              label={t('harnesses.add.enableLogs')}
+              disabled={creating}
+            />
           </div>
-          <Switch
-            checked={recordingEnabled}
-            onChange={setRecordingEnabled}
-            label={t('harnesses.add.enableLogs')}
-            disabled={creating}
-          />
+          <div className="well">
+            <div className="text-sm font-medium text-ink">{t('harnesses.retention.label')}</div>
+            <div className="hint mb-2 mt-0.5">{t('harnesses.retention.hint')}</div>
+            <LogRetentionSelect
+              value={retentionDays}
+              globalDays={globalDays}
+              onChange={setRetentionDays}
+              disabled={creating}
+              idPrefix="add-agent-retention"
+            />
+          </div>
         </div>
       </div>
 
@@ -221,6 +262,6 @@ export default function AddAgentModal({ open, onClose }: { open: boolean; onClos
           {creating ? null : t('common.create')}
         </Button>
       </div>
-    </Modal>
+    </FloatingWindow>
   );
 }

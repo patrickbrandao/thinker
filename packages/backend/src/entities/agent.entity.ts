@@ -43,6 +43,10 @@ export class Agent {
   @Column('boolean', { default: true })
   record_messages!: boolean;
 
+  // Log retention in days for this harness; NULL follows the organization's.
+  @Column('integer', { nullable: true, default: null })
+  log_retention_days!: number | null;
+
   // Reserved Playground agent (the per-tenant "Playground" agent). Hidden
   // from the agent list / switcher / counts and not user-creatable/renamable.
   @Column('boolean', { default: false })

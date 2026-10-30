@@ -37,6 +37,11 @@ const ptBR: Catalog<typeof en> = {
     renamed: 'Organização renomeada',
     existingAdded: '{{ email }} já tinha uma conta e foi adicionado',
     general: 'Geral',
+    logRetention: 'Retenção de logs',
+    logRetentionDesc:
+      'Padrão de todo harness configurado como Global. Requisições expiradas perdem os logs diariamente às 02:00; tokens, custos e status são mantidos.',
+    logRetentionDefault: 'Padrão da instância',
+    logRetentionReadOnly: 'Só proprietários podem alterar a retenção de logs.',
     nameDesc: 'Aparece no seletor de organização.',
     nameReadOnly: 'Só proprietários podem renomear a organização.',
     members: 'Membros',

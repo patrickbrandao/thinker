@@ -91,6 +91,7 @@ export class AgentsController {
         agentCategory: body.agent_category,
         agentPlatform: body.agent_platform,
         recordMessages: body.record_messages,
+        logRetentionDays: body.log_retention_days ?? null,
       });
     } catch (error) {
       if (error instanceof QueryFailedError && /unique|duplicate/i.test(error.message)) {

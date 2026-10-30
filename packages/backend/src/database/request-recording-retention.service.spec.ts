@@ -57,7 +57,7 @@ describe('RequestRecordingRetentionService', () => {
 
     const select = query.mock.calls.find(([sql]) => String(sql).includes('FROM agent_messages'));
     expect(select).toBeDefined();
-    expect(select![0]).not.toMatch(/subscription|tenants|plan/i);
+    expect(select![0]).toContain('COALESCE(a.log_retention_days, t.log_retention_days, $1)');
     expect(select![1]).toEqual([30]);
     expect(storage.delete).toHaveBeenCalledWith(expired.storage_key);
     const deleteCall = query.mock.calls.findIndex(([sql]) =>
@@ -116,6 +116,34 @@ describe('RequestRecordingRetentionService', () => {
     );
   });
 
+  it('strips expired request and attempt logs in batches, keeping the rows', async () => {
+    let requestBatches = 0;
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('pg_try_advisory_lock')) return [{ acquired: true }];
+      if (sql.includes('UPDATE requests')) {
+        requestBatches++;
+        const size = requestBatches === 1 ? 5000 : 3;
+        return [Array.from({ length: size }, (_, i) => ({ id: `r${i}` })), size];
+      }
+      return [];
+    });
+
+    await service.deleteExpiredRecordings();
+
+    expect(requestBatches).toBe(2);
+    const strip = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE requests'));
+    expect(strip![0]).toContain(
+      'SET request_headers = NULL, request_params = NULL, timeline = NULL',
+    );
+    expect(strip![0]).not.toMatch(/DELETE/);
+    expect(strip![1]).toEqual([30]);
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes('UPDATE agent_messages SET request_headers = NULL'),
+      ),
+    ).toBe(true);
+  });
+
   it('does no work when another replica owns the advisory lock', async () => {
     query.mockResolvedValueOnce([{ acquired: false }]);
 
@@ -142,7 +170,7 @@ describe('RequestRecordingRetentionService', () => {
 
     await expect(service.deleteExpiredRecordings()).resolves.toBe(0);
 
-    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE agent_messages'))).toBe(
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('SET recording_key = NULL'))).toBe(
       false,
     );
   });
