@@ -36,7 +36,7 @@ vi.mock('../../src/services/sse', () => ({
   refreshAgents: (...args: unknown[]) => mockRefreshAgents(...args),
 }));
 
-vi.mock('../../src/components/AgentTypeSelect', () => ({
+vi.mock('../../src/components/AgentTypeGrid', () => ({
   default: (props: any) => (
     <div
       data-testid="agent-type-picker"
@@ -58,7 +58,7 @@ vi.mock('thinker-shared', () => ({
   PLATFORMS_BY_CATEGORY: {
     personal: ['openclaw', 'hermes', 'other'],
     app: ['openai-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
-    coding: ['claude-code', 'other'],
+    coding: ['opencode', 'claude-code', 'other'],
   },
 }));
 
@@ -282,7 +282,7 @@ describe('AddAgentModal', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalledWith({
         name: 'typed',
-        agent_category: 'personal',
+        agent_category: 'coding',
         agent_platform: expect.any(String),
         record_messages: false,
         log_retention_days: null,
@@ -470,10 +470,8 @@ describe('AddAgentModal', () => {
   it('sends a custom log retention chosen in the Settings tab', async () => {
     const { input, createBtn } = renderOpen();
     openSettingsTab();
-    fireEvent.change(document.querySelector('#add-agent-retention-mode')!, {
-      target: { value: 'custom' },
-    });
-    fireEvent.change(document.querySelector('#add-agent-retention-days')!, {
+    fireEvent.click(document.querySelector('#add-agent-retention-custom')!);
+    fireEvent.change(document.querySelector('#add-agent-retention-suggested')!, {
       target: { value: '7' },
     });
     fireEvent.click(screen.getByRole('tab', { name: 'Harness' }));

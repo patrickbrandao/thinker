@@ -78,7 +78,7 @@ vi.mock('../../src/services/sse', async () => {
   };
 });
 
-vi.mock('../../src/components/AgentTypeSelect', () => ({
+vi.mock('../../src/components/AgentTypeGrid', () => ({
   default: (props: any) => (
     <div
       data-testid="agent-type-picker"
@@ -125,7 +125,7 @@ vi.mock('thinker-shared', () => ({
   PLATFORMS_BY_CATEGORY: {
     personal: ['openclaw', 'hermes', 'other'],
     app: ['openai-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
-    coding: ['claude-code', 'other'],
+    coding: ['opencode', 'claude-code', 'other'],
   },
   platformIcon: (plat: string | null, cat: string | null) => {
     if (!plat) return undefined;
@@ -303,7 +303,7 @@ describe('Workspace', () => {
     fireEvent.change(input, { target: { value: 'new-agent' } });
     fireEvent.click(screen.getByText('Create'));
     await vi.waitFor(() => {
-      const btns = document.querySelectorAll('[role="dialog"] .actions button');
+      const btns = document.querySelectorAll('[role="dialog"] .floating-window-foot button');
       const createBtn = btns[btns.length - 1] as HTMLButtonElement;
       expect(createBtn.querySelector('.spinner')).not.toBeNull();
       expect(createBtn.disabled).toBe(true);

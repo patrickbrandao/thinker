@@ -198,6 +198,9 @@ export default {
     tabSettings: 'Settings',
   },
   retention: {
+    control: 'Retention control',
+    daysLabel: 'Retention days',
+    suggested: 'Suggested',
     label: 'Log retention',
     hint: 'How long requests keep their logs (bodies, headers, parameters). Tokens, costs and status are kept.',
     global: 'Global',

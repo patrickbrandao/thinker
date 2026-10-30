@@ -73,7 +73,7 @@ export default function SettingsRecordingSection({ agentName }: { agentName: str
         title={t('harnesses.retention.label')}
         description={t('harnesses.retention.hint')}
       >
-        <div className="w-[260px] max-w-full">
+        <div className="w-[440px] max-w-full">
           <LogRetentionSelect
             value={ready ? (config.data?.retention_days ?? null) : null}
             globalDays={ready ? (config.data?.global_retention_days ?? null) : null}

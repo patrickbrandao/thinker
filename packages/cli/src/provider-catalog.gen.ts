@@ -241,6 +241,22 @@ export const PLATFORM_CATALOG: readonly PlatformCatalogEntry[] = [
     surface: 'responses',
   },
   {
+    id: 'deepseek-harness',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'pi',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'cline',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'copilot-cli',
+    surface: 'chat_completions',
+  },
+  {
     id: 'openai-sdk',
     surface: 'chat_completions',
   },

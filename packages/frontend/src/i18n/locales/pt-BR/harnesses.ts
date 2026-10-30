@@ -207,6 +207,9 @@ const ptBR: Catalog<typeof en> = {
     tabSettings: 'Configurações',
   },
   retention: {
+    control: 'Controle de retenção',
+    daysLabel: 'Dias de retenção',
+    suggested: 'Sugestões',
     label: 'Retenção de logs',
     hint: 'Por quanto tempo as requisições mantêm os logs (corpos, cabeçalhos, parâmetros). Tokens, custos e status são mantidos.',
     global: 'Global',

@@ -15,6 +15,8 @@ interface Props {
   onPlatformChange: (p: AgentPlatform) => void;
   disabled?: boolean;
   inline?: boolean;
+  /** Option icon size in px (18 by default). */
+  iconSize?: number;
 }
 
 const iconFor = (plat: AgentPlatform, cat: AgentCategory): string | undefined => {
@@ -74,9 +76,9 @@ export default function AgentTypeGrid(props: Props) {
                     <img
                       src={icon}
                       alt=""
-                      width="18"
-                      height="18"
-                      className="agent-type-select__option-icon shrink-0"
+                      width={props.iconSize ?? 18}
+                      height={props.iconSize ?? 18}
+                      className="agent-type-select__option-icon shrink-0 object-contain"
                     />
                   ) : null}
                   <span className="truncate">{platformLabel(plat)}</span>
