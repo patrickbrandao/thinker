@@ -569,6 +569,25 @@
   .modal.wide {
     max-width: 760px;
   }
+  .floating-window {
+    position: fixed;
+    z-index: 70;
+    top: 10vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-float);
+  }
+  .floating-window-head {
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+  }
   .modal-head {
     display: flex;
     align-items: center;

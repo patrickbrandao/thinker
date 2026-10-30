@@ -30,6 +30,11 @@ export class Tenant {
   @Column('boolean', { default: true })
   is_active!: boolean;
 
+  // Organization-wide log retention in days; NULL follows
+  // THINKER_RECORDING_RETENTION_DAYS. Harnesses may override it.
+  @Column('integer', { nullable: true, default: null })
+  log_retention_days!: number | null;
+
   @OneToMany(() => Agent, (a) => a.tenant, { cascade: true })
   agents!: Agent[];
 

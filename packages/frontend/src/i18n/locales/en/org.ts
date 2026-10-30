@@ -33,6 +33,11 @@ export default {
     renamed: 'Organization renamed',
     existingAdded: '{{ email }} already had an account and was added',
     general: 'General',
+    logRetention: 'Log retention',
+    logRetentionDesc:
+      'Default for every harness set to Global. Expired requests lose their logs daily at 02:00; tokens, costs and status are kept.',
+    logRetentionDefault: 'Instance default',
+    logRetentionReadOnly: 'Only owners can change the log retention.',
     nameDesc: 'Shown in the organization switcher.',
     nameReadOnly: 'Only owners can rename the organization.',
     members: 'Members',

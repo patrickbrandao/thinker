@@ -203,6 +203,16 @@ const ptBR: Catalog<typeof en> = {
     logsHint:
       'Veja exatamente o que o seu agente envia em cada tentativa e depure mais rápido. Os logs ficam no seu próprio banco de dados.',
     connected: 'Harness "{{ name }}" conectado',
+    tabHarness: 'Harness',
+    tabSettings: 'Configurações',
+  },
+  retention: {
+    label: 'Retenção de logs',
+    hint: 'Por quanto tempo as requisições mantêm os logs (corpos, cabeçalhos, parâmetros). Tokens, custos e status são mantidos.',
+    global: 'Global',
+    custom: 'Personalizada',
+    days: (n: number) => `${n} dia${n === 1 ? '' : 's'}`,
+    savedToast: 'Retenção de logs salva',
   },
   duplicateModal: {
     title: 'Duplicar "{{ name }}"',

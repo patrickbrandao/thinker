@@ -45,7 +45,7 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
-| `THINKER_RECORDING_RETENTION_DAYS` | `30` | Retenção, em dias, única para a instância. Precisa ser um inteiro positivo, senão o boot falha. Uma tarefa diária apaga o que passou do prazo. `365` mantém o comportamento antigo. |
+| `THINKER_RECORDING_RETENTION_DAYS` | `30` | Retenção padrão de logs, em dias. A organização pode trocá-la em Organização → Retenção de logs, e cada harness em Configurações (Global ou Personalizada). Precisa ser um inteiro positivo, senão o boot falha. Uma tarefa diária às 02:00 apaga os corpos gravados e os cabeçalhos/parâmetros das requisições expiradas; tokens, custos e status ficam. |
 | `THINKER_RECORDING_STORAGE` | `auto` | `auto`, `s3`, `filesystem` ou `disabled`. Em `auto`, credenciais S3 completas têm prioridade; senão usa o disco. |
 | `THINKER_RECORDING_FILESYSTEM_PATH` | `/data/request-recordings` | Diretório local (o compose monta o volume `thinker_request_recordings` ali). |
 | `THINKER_RECORDING_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | vazio | Armazenamento compatível com S3. Use-o em deploy com mais de uma réplica. |

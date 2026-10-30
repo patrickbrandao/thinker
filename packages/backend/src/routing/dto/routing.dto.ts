@@ -18,6 +18,7 @@ import {
   Max,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { MAX_LOG_RETENTION_DAYS } from '../../config/recording-retention';
 import { MODEL_LISTING_MODES, type ModelListingMode } from '../../entities/agent.entity';
 
 import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'thinker-shared';
@@ -277,6 +278,13 @@ export class UpdateRecordingDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  /** Days to keep this harness's logs; null follows the organization. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_LOG_RETENTION_DAYS)
+  retention_days?: number | null;
 }
 
 export class UpdateModelListingDto {

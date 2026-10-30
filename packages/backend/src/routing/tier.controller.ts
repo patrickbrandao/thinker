@@ -162,7 +162,7 @@ export class TierController {
   @Get(':agentName/recording')
   async getRecording(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return { enabled: await this.recordingConfig.isRecording(agent.id) };
+    return this.recordingConfig.logSettings(agent.id);
   }
 
   @Patch(':agentName/recording')
@@ -172,13 +172,14 @@ export class TierController {
     @Body() body: UpdateRecordingDto,
   ) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    if (typeof body.enabled !== 'boolean') {
-      return { enabled: await this.recordingConfig.isRecording(agent.id) };
+    const patch: Partial<Agent> = {};
+    if (typeof body.enabled === 'boolean') patch.record_messages = body.enabled;
+    if (body.retention_days !== undefined) patch.log_retention_days = body.retention_days;
+    if (Object.keys(patch).length > 0) {
+      await this.agentRepo.update(agent.id, patch);
+      this.resolveAgentService.invalidate(agent.tenant_id, agentName);
     }
-
-    await this.agentRepo.update(agent.id, { record_messages: body.enabled });
-    this.resolveAgentService.invalidate(agent.tenant_id, agentName);
-    return { enabled: body.enabled };
+    return this.recordingConfig.logSettings(agent.id);
   }
 
   @Get(':agentName/model-listing')

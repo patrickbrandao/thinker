@@ -82,6 +82,20 @@ export function deleteOrganization(id: string): Promise<{ ok: true }> {
   return fetchMutate(orgPath(id), { method: 'DELETE' });
 }
 
+export interface LogRetention {
+  /** Organization log retention in days; null follows the instance default. */
+  retention_days: number | null;
+  default_days: number;
+}
+
+export function getLogRetention(id: string): Promise<LogRetention> {
+  return fetchJson(orgPath(id, '/log-retention'), undefined, { cache: false });
+}
+
+export function updateLogRetention(id: string, days: number | null): Promise<LogRetention> {
+  return fetchMutate(orgPath(id, '/log-retention'), json({ retention_days: days }, 'PATCH'));
+}
+
 /* ── Members ──────────────────────────────────────────── */
 
 export function listMembers(orgId: string): Promise<{ members: OrganizationMember[] }> {

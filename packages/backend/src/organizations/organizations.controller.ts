@@ -68,6 +68,20 @@ export class OrganizationsController {
     return { ok: true };
   }
 
+  @Get(':id/log-retention')
+  logRetention(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
+    return this.organizations.getLogRetention(requireUser(ctx), id);
+  }
+
+  @Patch(':id/log-retention')
+  setLogRetention(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: { retention_days?: number | null },
+  ) {
+    return this.organizations.setLogRetention(requireUser(ctx), id, body?.retention_days ?? null);
+  }
+
   @Get(':id/members')
   async members(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
     return { members: await this.organizations.listMembers(requireUser(ctx), id) };

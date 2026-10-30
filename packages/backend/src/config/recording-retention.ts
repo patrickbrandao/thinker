@@ -48,3 +48,18 @@ export function legacyRecordingEnvWarning(env: NodeJS.ProcessEnv = process.env):
     '.'
   );
 }
+
+/** Upper bound for an organization or harness log retention, about ten years. */
+export const MAX_LOG_RETENTION_DAYS = 3650;
+
+/**
+ * Validates a log retention sent by the dashboard: `null` means "follow the
+ * level above" (harness → organization → environment), anything else must be
+ * an integer number of days between 1 and {@link MAX_LOG_RETENTION_DAYS}.
+ * Returns undefined for a value that is not valid.
+ */
+export function parseLogRetentionDays(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
+  return value >= 1 && value <= MAX_LOG_RETENTION_DAYS ? value : undefined;
+}

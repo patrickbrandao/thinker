@@ -1,3 +1,9 @@
+import { ConfigService } from '@nestjs/config';
+import {
+  DEFAULT_RECORDING_RETENTION_DAYS,
+  MAX_LOG_RETENTION_DAYS,
+  parseLogRetentionDays,
+} from '../config/recording-retention';
 import {
   BadRequestException,
   ConflictException,
@@ -44,6 +50,11 @@ export function assertRole(value: unknown): OrganizationRole {
   throw new BadRequestException(`role must be one of ${ORGANIZATION_ROLES.join(', ')}`);
 }
 
+export interface LogRetentionView {
+  retention_days: number | null;
+  default_days: number;
+}
+
 /** Organizations and their members (ADR 0006). */
 @Injectable()
 export class OrganizationsService {
@@ -55,6 +66,7 @@ export class OrganizationsService {
     private readonly memberRepo: Repository<OrganizationMember>,
     private readonly tenantCache: TenantCacheService,
     private readonly accounts: AccountsService,
+    private readonly config: ConfigService,
   ) {}
 
   /** The caller's organizations; the instance admin sees every active one. */
@@ -111,6 +123,41 @@ export class OrganizationsService {
     if (!label) throw new BadRequestException('name is required');
     await this.tenantRepo.update({ id: tenantId }, { organization_name: label });
     return { id: tenantId, name: label };
+  }
+
+  /**
+   * Organization-wide log retention: `retention_days` is the stored value
+   * (null follows THINKER_RECORDING_RETENTION_DAYS, reported as `default_days`).
+   */
+  async getLogRetention(userId: string, tenantId: string): Promise<LogRetentionView> {
+    await this.require(userId, tenantId, 'viewer');
+    const tenant = await this.get(tenantId);
+    return this.logRetentionView(tenant.log_retention_days ?? null);
+  }
+
+  async setLogRetention(
+    userId: string,
+    tenantId: string,
+    days: unknown,
+  ): Promise<LogRetentionView> {
+    await this.require(userId, tenantId, 'owner');
+    const parsed = parseLogRetentionDays(days);
+    if (parsed === undefined) {
+      throw new BadRequestException(
+        `retention_days must be null or an integer from 1 to ${MAX_LOG_RETENTION_DAYS}`,
+      );
+    }
+    await this.tenantRepo.update({ id: tenantId }, { log_retention_days: parsed });
+    return this.logRetentionView(parsed);
+  }
+
+  private logRetentionView(days: number | null): LogRetentionView {
+    return {
+      retention_days: days,
+      default_days:
+        this.config.get<number>('app.requestRecordingRetentionDays') ??
+        DEFAULT_RECORDING_RETENTION_DAYS,
+    };
   }
 
   /** Deactivates the organization; its data stays, nobody can select it. */
