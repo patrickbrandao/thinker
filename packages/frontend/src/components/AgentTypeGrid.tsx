@@ -6,6 +6,7 @@ import {
   PLATFORM_ICONS,
 } from 'thinker-shared';
 import { categoryLabel, platformLabel } from '../services/agent-type-labels.js';
+import { monoIconClass } from './setup-ui.js';
 import { cx } from './ui.js';
 
 interface Props {
@@ -25,12 +26,15 @@ const iconFor = (plat: AgentPlatform, cat: AgentCategory): string | undefined =>
 };
 
 /**
- * Harness type picker: one column per category, one option per platform.
- * Inline by default; AgentTypeSelect renders it as a floating dropdown.
- * The `agent-type-select__*` classes are stable test hooks.
+ * Harness type picker. Inline (the default) it is one borderless row per
+ * category: the category title, then its platforms left to right, the chosen
+ * one ringed in liquid metal. AgentTypeSelect renders it as a dropdown with
+ * one column per category. The `agent-type-select__*` classes are stable test
+ * hooks.
  */
 export default function AgentTypeGrid(props: Props) {
   const inline = props.inline !== false;
+  const iconSize = props.iconSize ?? 18;
   const handleSelect = (cat: AgentCategory, plat: AgentPlatform) => {
     props.onCategoryChange(cat);
     props.onPlatformChange(plat);
@@ -39,52 +43,73 @@ export default function AgentTypeGrid(props: Props) {
   return (
     <div
       className={cx(
-        'agent-type-select__dropdown rounded-surface border border-line bg-elev p-2',
+        'agent-type-select__dropdown',
         inline
           ? 'agent-type-select__dropdown--inline'
-          : 'absolute left-0 top-full z-20 mt-1 w-[min(640px,calc(100vw-32px))]',
+          : 'absolute left-0 top-full z-20 mt-1 w-[min(640px,calc(100vw-32px))] rounded-surface border border-line bg-elev p-2',
       )}
       style={inline ? undefined : { boxShadow: 'var(--shadow-float)' }}
       role="listbox"
     >
-      <div className="agent-type-select__groups grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div
+        className={cx(
+          'agent-type-select__groups',
+          inline ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-2 sm:grid-cols-4',
+        )}
+      >
         {[...AGENT_CATEGORIES].map((cat) => (
-          <div key={cat} className="agent-type-select__column flex min-w-0 flex-col gap-0.5">
+          <div
+            key={cat}
+            className={cx(
+              'agent-type-select__column flex min-w-0 flex-col',
+              inline ? 'gap-2' : 'gap-0.5',
+            )}
+          >
             <div
-              className="agent-type-select__group-label eyebrow px-2 pb-1 pt-1"
+              className={cx(
+                'agent-type-select__group-label',
+                inline ? 'text-sm font-medium text-ink' : 'eyebrow px-2 pb-1 pt-1',
+              )}
               role="presentation"
             >
               {categoryLabel(cat)}
             </div>
-            {[...PLATFORMS_BY_CATEGORY[cat]].map((plat) => {
-              const isSelected = props.category === cat && props.platform === plat;
-              const icon = iconFor(plat, cat);
-              return (
-                <button
-                  key={plat}
-                  className={cx(
-                    'agent-type-select__option flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm text-dim hover:bg-s2 disabled:cursor-not-allowed disabled:opacity-50',
-                    isSelected && 'agent-type-select__option--selected bg-accent-tint text-ink',
-                  )}
-                  onClick={() => handleSelect(cat, plat)}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  disabled={props.disabled}
-                >
-                  {icon ? (
-                    <img
-                      src={icon}
-                      alt=""
-                      width={props.iconSize ?? 18}
-                      height={props.iconSize ?? 18}
-                      className="agent-type-select__option-icon shrink-0 object-contain"
-                    />
-                  ) : null}
-                  <span className="truncate">{platformLabel(plat)}</span>
-                </button>
-              );
-            })}
+            <div className={inline ? 'flex flex-wrap gap-2' : 'contents'}>
+              {[...PLATFORMS_BY_CATEGORY[cat]].map((plat) => {
+                const isSelected = props.category === cat && props.platform === plat;
+                const icon = iconFor(plat, cat);
+                return (
+                  <button
+                    key={plat}
+                    className={cx(
+                      'agent-type-select__option flex items-center gap-2 rounded-control text-left text-sm text-dim hover:bg-s2 disabled:cursor-not-allowed disabled:opacity-50',
+                      inline ? 'px-3 py-2' : 'w-full px-2 py-1.5',
+                      isSelected && 'agent-type-select__option--selected text-ink',
+                      isSelected && (inline ? 'liquid-metal' : 'bg-accent-tint'),
+                    )}
+                    onClick={() => handleSelect(cat, plat)}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={props.disabled}
+                  >
+                    {icon ? (
+                      <img
+                        src={icon}
+                        alt=""
+                        width={iconSize}
+                        height={iconSize}
+                        className={cx(
+                          'agent-type-select__option-icon shrink-0 object-contain',
+                          monoIconClass(icon),
+                        )}
+                      />
+                    ) : null}
+                    <span className="truncate">{platformLabel(plat)}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>

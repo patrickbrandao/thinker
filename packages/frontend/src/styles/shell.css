@@ -1103,3 +1103,91 @@
 .dark .tool-str {
   color: hsl(24 90% 65%);
 }
+
+/*
+ * Liquid metal border: an animated metallic ring around the chosen control,
+ * after metal.jakubantalik.com (a WebGL shader there, plain CSS here). Two
+ * conic gradients of silver with faint chromatic tints turn at different
+ * speeds and directions, so the highlights drift like liquid; a mask keeps
+ * only a 2px ring, and a blurred copy behind it is the glow.
+ */
+@property --lm-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --lm-b {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 180deg;
+}
+@keyframes liquid-metal-flow {
+  to {
+    --lm-a: 360deg;
+    --lm-b: -180deg;
+  }
+}
+.liquid-metal {
+  position: relative;
+  isolation: isolate;
+  background: var(--bg-elev);
+}
+.liquid-metal::before,
+.liquid-metal::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--lm-a),
+      #7d8188,
+      #f5f7fa 9%,
+      #9aa0a8 17%,
+      #c7d2ff 24%,
+      #ffffff 30%,
+      #6c7078 40%,
+      #e9ecf1 52%,
+      #ffd9f2 58%,
+      #b7f0ff 63%,
+      #858a92 74%,
+      #f2f4f7 86%,
+      #7d8188
+    ),
+    conic-gradient(
+      from var(--lm-b),
+      transparent,
+      rgb(255 255 255 / 0.85) 12%,
+      transparent 26%,
+      transparent 50%,
+      rgb(255 255 255 / 0.6) 62%,
+      transparent 76%
+    );
+  background-blend-mode: overlay, normal;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: liquid-metal-flow 6s linear infinite;
+}
+.liquid-metal::after {
+  z-index: -1;
+  inset: -5px;
+  padding: 5px;
+  filter: blur(6px);
+  opacity: 0.35;
+}
+.dark .liquid-metal::after {
+  opacity: 0.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-metal::before,
+  .liquid-metal::after {
+    animation: none;
+  }
+}

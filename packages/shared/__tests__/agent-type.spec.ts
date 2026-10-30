@@ -86,9 +86,9 @@ describe('agent-type', () => {
     expect(PLATFORMS_BY_CATEGORY.coding).not.toContain('n8n');
   });
 
-  it('keeps "other" available in every category for the unknown-platform fallback', () => {
+  it('offers "other" only under App AI SDK', () => {
     for (const category of AGENT_CATEGORIES) {
-      expect(PLATFORMS_BY_CATEGORY[category]).toContain('other');
+      expect(PLATFORMS_BY_CATEGORY[category].includes('other')).toBe(category === 'app');
     }
   });
 

@@ -100,7 +100,7 @@ describe('harness screens in pt-BR', () => {
     await vi.waitFor(() => {
       // "Other" platform and the category label are translated too.
       expect(container.textContent).toContain('Outro');
-      expect(container.textContent).toContain('Agente de IA');
+      expect(container.textContent).toContain('Agentes de IA');
     });
   });
 });

@@ -3,9 +3,9 @@ import type { Catalog } from '../../types.js';
 
 const ptBR: Catalog<typeof en> = {
   category: {
-    personal: 'Agente de IA',
+    personal: 'Agentes de IA',
     automation: 'Automação',
-    app: 'App com SDK de IA',
+    app: 'APP com SDK de IA',
     coding: 'Assistente de código',
   },
   platformOther: 'Outro',

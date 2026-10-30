@@ -88,20 +88,13 @@ export const PLATFORM_LABELS: Readonly<Record<AgentPlatform, string>> = {
   other: 'Other',
 };
 
+// "Other" is offered only under App AI SDK; agents saved earlier with
+// another category and "other" keep working, they just are not offered.
 export const PLATFORMS_BY_CATEGORY: Readonly<Record<AgentCategory, readonly AgentPlatform[]>> = {
-  personal: ['openclaw', 'hermes', 'nanobot', 'craft', 'other'],
-  automation: ['n8n', 'other'],
+  personal: ['openclaw', 'hermes', 'nanobot', 'craft'],
+  automation: ['n8n'],
   app: ['openai-sdk', 'anthropic-sdk', 'vercel-ai-sdk', 'langchain', 'other'],
-  coding: [
-    'opencode',
-    'claude-code',
-    'codex',
-    'deepseek-harness',
-    'pi',
-    'cline',
-    'copilot-cli',
-    'other',
-  ],
+  coding: ['opencode', 'claude-code', 'codex', 'deepseek-harness', 'pi', 'cline', 'copilot-cli'],
 };
 
 export const PLATFORM_ICONS: Readonly<Partial<Record<AgentPlatform, string>>> = {

@@ -1082,6 +1082,14 @@
         "base.css"
       ]
     },
+    "liquid-metal": {
+      "classes": [
+        "liquid-metal"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "logo-dark": {
       "classes": [
         "logo-dark"
@@ -2017,6 +2025,20 @@
       "value": "6px 8px",
       "file": "shell.css",
       "line": 1017
+    },
+    {
+      "selector": ".liquid-metal::after",
+      "prop": "inset",
+      "value": "-5px",
+      "file": "shell.css",
+      "line": 1180
+    },
+    {
+      "selector": ".liquid-metal::after",
+      "prop": "padding",
+      "value": "5px",
+      "file": "shell.css",
+      "line": 1181
     }
   ],
   "ghostRules": [
@@ -2049,6 +2071,22 @@
       "file": "shell.css",
       "line": 1013,
       "losesTo": "shell.css:1017"
+    },
+    {
+      "selector": ".liquid-metal::after",
+      "prop": "inset",
+      "value": "-2px",
+      "file": "shell.css",
+      "line": 1139,
+      "losesTo": "shell.css:1180"
+    },
+    {
+      "selector": ".liquid-metal::after",
+      "prop": "padding",
+      "value": "2px",
+      "file": "shell.css",
+      "line": 1141,
+      "losesTo": "shell.css:1181"
     }
   ],
   "componentSheets": {
@@ -2064,9 +2102,9 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 205,
-    "classes": 220,
-    "canonicalRules": 3,
-    "ghostRules": 3
+    "blocks": 206,
+    "classes": 221,
+    "canonicalRules": 5,
+    "ghostRules": 5
   }
 }
