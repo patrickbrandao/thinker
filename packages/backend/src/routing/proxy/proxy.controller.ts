@@ -32,7 +32,7 @@ import { classifyCaller } from './caller-classifier';
 import { clientIpInfo } from '../../common/utils/client-ip';
 import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
-import { sanitizeRequestHeaders } from './request-headers';
+import { receivedHeaders, sanitizeRequestHeaders } from './request-headers';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -286,7 +286,7 @@ export class ProxyController {
       peerIp,
       peerPort: req.socket?.remotePort,
     };
-    const requestHeaders = sanitizeRequestHeaders(req.headers);
+    const requestHeaders = sanitizeRequestHeaders(receivedHeaders(req));
     const isStream = body.stream === true;
     let routingBody = body;
     let headersSent = false;

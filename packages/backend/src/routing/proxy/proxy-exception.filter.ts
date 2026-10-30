@@ -6,7 +6,7 @@ import { THINKER_CODE_TO_REASON } from '../../common/errors/thinker-error';
 import type { RequestWithThinkerErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { CONFLICTING_API_KEY_HEADERS } from '../../otlp/guards/agent-key-auth.guard';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
-import { sanitizeRequestHeaders } from './request-headers';
+import { receivedHeaders, sanitizeRequestHeaders } from './request-headers';
 import { getDashboardUrl, sendFriendlyResponse } from './proxy-friendly-response';
 
 /** Guard-thrown messages that should become friendly chat responses. */
@@ -74,7 +74,7 @@ export class ProxyExceptionFilter implements ExceptionFilter {
         errorCode: 'M004',
         reason: THINKER_CODE_TO_REASON.M004,
         model,
-        requestHeaders: sanitizeRequestHeaders(req.headers),
+        requestHeaders: sanitizeRequestHeaders(receivedHeaders(req)),
       })
       .catch(() => undefined);
   }
