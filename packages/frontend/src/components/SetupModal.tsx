@@ -10,7 +10,7 @@ import ErrorState from './ErrorState.jsx';
 import SetupStepAddProvider from './SetupStepAddProvider.jsx';
 import { useActiveVirtualModelNames } from './VirtualModelsHint.jsx';
 import RichText from './RichText.jsx';
-import { monoIconClass } from './setup-ui.jsx';
+import { ThemedIcon } from './setup-ui.jsx';
 import { Button, cx, IconButton } from './ui.jsx';
 import { t } from '../i18n/index.js';
 
@@ -77,15 +77,7 @@ export default function SetupModal({
       >
         <div className="modal-head">
           <h2 id="setup-modal-title" className="flex min-w-0 items-center gap-2">
-            {icon ? (
-              <img
-                src={icon}
-                alt=""
-                width="24"
-                height="24"
-                className={cx('shrink-0', monoIconClass(icon))}
-              />
-            ) : null}
+            {icon ? <ThemedIcon src={icon} size={24} className="shrink-0" /> : null}
             <span className="truncate">
               <RichText
                 text={t('harnesses.setupModal.title')}

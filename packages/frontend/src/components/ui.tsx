@@ -465,11 +465,12 @@ export function Modal({
  * A non-modal window: no backdrop, the page behind stays usable and a click
  * outside never closes it. Dragged by its title bar; resized from its corner;
  * closed by its X or Escape. The title bar and `footer` stay put while the
- * body scrolls.
+ * body scrolls. `icon` sits left of the title.
  */
 export function FloatingWindow({
   open,
   title,
+  icon,
   onClose,
   footer,
   className,
@@ -477,6 +478,7 @@ export function FloatingWindow({
 }: {
   open: boolean;
   title: string;
+  icon?: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
   className?: string;
@@ -533,7 +535,10 @@ export function FloatingWindow({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
-        <h2>{title}</h2>
+        <h2 className="flex min-w-0 items-center gap-2">
+          {icon}
+          <span className="truncate">{title}</span>
+        </h2>
         <IconButton label={t('common.close')} onClick={onClose}>
           <X />
         </IconButton>

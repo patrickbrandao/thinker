@@ -11,6 +11,7 @@ import { useResource } from '../lib/use-resource.js';
 import { platformIcon } from 'thinker-shared';
 import { Button, Modal } from './ui.js';
 import { t } from '../i18n/index.js';
+import { ThemedIcon } from './setup-ui.js';
 
 interface Props {
   open: boolean;
@@ -58,7 +59,7 @@ export default function RoutingInstructionModal(props: Props) {
 
   const title = isEnable ? (
     <span className="inline-flex items-center gap-2">
-      {icon ? <img src={icon} alt="" width={24} height={24} className="platform-icon" /> : null}
+      {icon ? <ThemedIcon src={icon} size={24} className="platform-icon" /> : null}
       <span>
         {t('routing.instructions.setUpHarness')} <em>{props.agentName}</em>
       </span>

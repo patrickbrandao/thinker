@@ -41,6 +41,28 @@ export function themedIcon(src: string, dark: boolean): { src: string; className
   return variant ? { src: variant } : { src, className: monoIconClass(src) };
 }
 
+/** A harness or brand icon drawn for the current theme (see {@link themedIcon}). */
+export function ThemedIcon({
+  src,
+  size,
+  className,
+}: {
+  src: string;
+  size: number;
+  className?: string;
+}) {
+  const icon = themedIcon(src, useDarkTheme());
+  return (
+    <img
+      src={icon.src}
+      alt=""
+      width={size}
+      height={size}
+      className={cx(className, icon.className)}
+    />
+  );
+}
+
 /**
  * Class for an inline `<code>` chip in setup copy (`auto`, file paths,
  * commands). A plain `<code>` (not a wrapper component) so check:i18n sees

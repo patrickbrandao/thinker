@@ -14,7 +14,7 @@ export function retentionOptions(current: number | null | undefined): number[] {
 /**
  * Harness log retention. "Retention control" picks Global (follows the
  * organization, `value` null) or Custom; Custom adds a "Retention days" row
- * with a whole-number field and a list of suggested values.
+ * with a whole-number field.
  */
 export default function LogRetentionSelect({
   value,
@@ -80,44 +80,25 @@ export default function LogRetentionSelect({
           <label htmlFor={`${idPrefix}-days`} className="text-sm text-dim">
             {t('harnesses.retention.daysLabel')}
           </label>
-          <div className="flex gap-2">
-            <input
-              id={`${idPrefix}-days`}
-              className="field w-[110px]"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_DAYS}
-              step={1}
-              value={draft}
-              disabled={disabled}
-              onChange={(e) => setDraft(e.currentTarget.value)}
-              onBlur={commit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commit();
-                }
-              }}
-            />
-            <select
-              id={`${idPrefix}-suggested`}
-              className="field w-[150px]"
-              aria-label={t('harnesses.retention.suggested')}
-              value={value !== null && PRESET_DAYS.includes(value) ? value : ''}
-              disabled={disabled}
-              onChange={(e) => {
-                if (e.currentTarget.value) onChange(Number(e.currentTarget.value));
-              }}
-            >
-              <option value="">{t('harnesses.retention.suggested')}</option>
-              {PRESET_DAYS.map((days) => (
-                <option key={days} value={days}>
-                  {t('harnesses.retention.days', days)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <input
+            id={`${idPrefix}-days`}
+            className="field w-[110px]"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_DAYS}
+            step={1}
+            value={draft}
+            disabled={disabled}
+            onChange={(e) => setDraft(e.currentTarget.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+              }
+            }}
+          />
         </>
       ) : null}
     </div>

@@ -39,6 +39,7 @@ import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import { Button, ButtonLink, Skel } from '../components/ui.js';
 import { t, tMaybe } from '../i18n/index.js';
+import { ThemedIcon } from '../components/setup-ui.js';
 
 // SetupModal belongs to the harness-setup area; typed here by its props
 // contract so this page does not depend on how that component is written.
@@ -180,17 +181,6 @@ function TableSkeleton() {
   );
 }
 
-function ExampleImage() {
-  return (
-    <img
-      src="/example-messages.svg"
-      alt={t('messages.log.exampleAlt')}
-      className="mt-6 w-full max-w-2xl rounded-surface border border-line"
-      loading="lazy"
-    />
-  );
-}
-
 export default function MessageLog() {
   const params = useParams<{ agentName?: string }>();
   const routeAgent = params.agentName ?? '';
@@ -274,13 +264,7 @@ export default function MessageLog() {
           label: a,
           value: a,
           icon: iconPath ? (
-            <img
-              src={iconPath}
-              alt=""
-              width="14"
-              height="14"
-              className="platform-icon shrink-0 rounded-[3px]"
-            />
+            <ThemedIcon src={iconPath} size={14} className="platform-icon shrink-0 rounded-[3px]" />
           ) : (
             <span className="inline-block size-3.5 shrink-0" />
           ),
@@ -733,7 +717,6 @@ export default function MessageLog() {
                 </ButtonLink>
               </>
             )}
-            <ExampleImage />
           </div>
         ) : null}
         {isFilteredEmpty ? (

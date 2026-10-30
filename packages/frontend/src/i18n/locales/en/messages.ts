@@ -14,7 +14,6 @@ export default {
     emptyGlobal: 'Create a harness and send a request. Every caller request shows up here.',
     goToHarnesses: 'Go to Harnesses',
     emptyAgent: 'Set up your harness and send a request. Every caller request shows up here.',
-    exampleAlt: 'Example request log showing LLM request history',
     connectProviderHint: 'Connect a provider to start routing LLM calls.',
     connectProvider: 'Connect provider',
     zeroResults: '0 results',

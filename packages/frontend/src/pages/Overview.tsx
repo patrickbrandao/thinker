@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import UnifiedChartCard, { type ChartTab } from '../components/UnifiedChartCard.js';
 import ReliabilityKpiCards from '../components/ReliabilityKpiCards.js';
 import FilterSelect from '../components/FilterSelect.js';
@@ -9,11 +9,9 @@ import ErrorState from '../components/ErrorState.js';
 import MessageTable from '../components/MessageTable.js';
 import OverviewSkeleton from '../components/OverviewSkeleton.js';
 import Select from '../components/Select.js';
-import SetupModal from '../components/SetupModal.js';
-import { Button, EmptyState, Panel } from '../components/ui.js';
+import { EmptyState, Panel } from '../components/ui.js';
 import { type MessageRow } from '../components/message-table-types.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
-import { agentPlatform, agentCategory } from '../services/agent-platform-store.js';
 import { PROVIDERS } from '../services/providers.js';
 import { getOverview, getOverviewDetails } from '../services/api.js';
 import {
@@ -25,7 +23,6 @@ import {
   getPerProviderCostTimeseries,
 } from '../services/api/analytics.js';
 import { preloadModelDisplayNames } from '../services/model-display.js';
-import { isRecentlyCreated, isSetupPending, clearSetupPending } from '../services/recent-agents.js';
 import { analyticsPing } from '../services/sse.js';
 import {
   RANGE_STORAGE_KEY,
@@ -117,14 +114,6 @@ function readStorage(key: string): string | null {
   }
 }
 
-function writeStorage(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Storage blocked: the flag lasts for this page only.
-  }
-}
-
 function loadSavedProviders(key: string): Set<string> {
   try {
     const saved = sessionStorage.getItem(key);
@@ -157,7 +146,6 @@ const providerDisplayName = (provId: string): string =>
 export default function Overview() {
   const params = useParams<{ agentName: string }>();
   const agentName = safeDecode(params.agentName ?? '');
-  const location = useLocation();
   const navigate = useNavigate();
   const ping = useSignal(analyticsPing);
   const { columns } = useOverviewColumns();
@@ -183,20 +171,6 @@ export default function Overview() {
     if (view === 'cost') setCostChartRequested(true);
     setActiveViewRaw(view);
   };
-
-  // Open gate keys off a persistent "setup pending" flag (localStorage) so the
-  // modal reliably reopens after a page refresh until the user dismisses or
-  // completes it; `isRecentlyCreated` is an in-session OR that need not survive
-  // reloads. The completed/dismissed flags are the backstop against re-opening.
-  const [setupOpen, setSetupOpen] = useState(
-    () =>
-      (isSetupPending(agentName) || isRecentlyCreated(agentName)) &&
-      !readStorage(`setup_completed_${agentName}`) &&
-      !readStorage(`setup_dismissed_${agentName}`),
-  );
-  const [setupCompleted, setSetupCompleted] = useState(
-    () => !!readStorage(`setup_completed_${agentName}`),
-  );
 
   // One token per range/agent visit: its identity changes on every transition
   // (A → B → A included) but stays stable across same-scope SSE refreshes, so
@@ -231,12 +205,6 @@ export default function Overview() {
 
   const showDashboard = !!data && (data.has_data !== false || data.has_providers === true);
   const showEmptyState = !!data && data.has_data === false && !data.has_providers;
-
-  useEffect(() => {
-    if (showEmptyState && !setupCompleted && !readStorage(`setup_dismissed_${agentName}`)) {
-      setSetupOpen(true);
-    }
-  }, [showEmptyState, setupCompleted, agentName]);
 
   // Step the chart range down to the next bucket while it has no data, but only
   // once a fetch for the current range resolved. Both `data` and `range` are
@@ -373,10 +341,7 @@ export default function Overview() {
   })();
 
   const encodedAgent = encodeURIComponent(agentName);
-  const goToRouting = () =>
-    navigate(`/harnesses/${encodedAgent}/routing`, { state: { openProviders: true } });
   const name = agentDisplayName() ?? agentName;
-  const newApiKey = (location.state as { newApiKey?: string } | null)?.newApiKey ?? null;
 
   const content = () => {
     if (overviewRes.error && !overviewRes.loading) {
@@ -386,30 +351,10 @@ export default function Overview() {
     if (showEmptyState) {
       return (
         <Panel>
+          {/* The harness overview only shows data: no buttons, no sample screenshot. */}
           <EmptyState
             title={t('overview.empty.noActivity')}
-            description={
-              setupCompleted ? t('overview.empty.agentConnect') : t('overview.empty.agentSetup')
-            }
-            action={
-              <>
-                {setupCompleted ? (
-                  <Button size="sm" className="mt-2" onClick={goToRouting}>
-                    {t('overview.empty.connectProvider')}
-                  </Button>
-                ) : (
-                  <Button size="sm" className="mt-2" onClick={() => setSetupOpen(true)}>
-                    {t('overview.empty.setupHarness')}
-                  </Button>
-                )}
-                <img
-                  src="/example-overview.svg"
-                  alt={t('overview.empty.exampleAlt')}
-                  className="mt-4 w-full max-w-2xl opacity-60"
-                  loading="lazy"
-                />
-              </>
-            }
+            description={t('overview.empty.agentConnect')}
           />
         </Panel>
       );
@@ -505,41 +450,15 @@ export default function Overview() {
       <title>{t('overview.agentPageTitle', { name })}</title>
       <meta name="description" content={t('overview.agentMetaDescription', { name })} />
 
-      {showDashboard || (showEmptyState && !setupCompleted) ? (
+      {showDashboard ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {showDashboard ? (
-            <div className="w-44">
-              <Select value={range} onChange={handleRangeChange} options={rangeOptions()} />
-            </div>
-          ) : null}
-          {showEmptyState && !setupCompleted ? (
-            <Button size="sm" onClick={() => setSetupOpen(true)}>
-              {t('overview.empty.setupHarness')}
-            </Button>
-          ) : null}
+          <div className="w-44">
+            <Select value={range} onChange={handleRangeChange} options={rangeOptions()} />
+          </div>
         </div>
       ) : null}
 
       {content()}
-
-      <SetupModal
-        open={setupOpen}
-        agentName={agentName}
-        apiKey={newApiKey}
-        agentPlatform={agentPlatform()}
-        agentCategory={agentCategory()}
-        onClose={() => {
-          writeStorage(`setup_dismissed_${agentName}`, '1');
-          clearSetupPending(agentName);
-          setSetupOpen(false);
-        }}
-        onDone={() => {
-          writeStorage(`setup_completed_${agentName}`, '1');
-          clearSetupPending(agentName);
-          setSetupCompleted(true);
-        }}
-        onGoToRouting={goToRouting}
-      />
     </div>
   );
 }

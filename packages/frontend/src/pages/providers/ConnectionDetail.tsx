@@ -57,6 +57,7 @@ import {
   Skel,
   cx,
 } from '../../components/ui.js';
+import { ThemedIcon } from '../../components/setup-ui.js';
 
 const AUTH_TYPE_KIND: Record<string, string> = {
   subscription: 'subscriptions',
@@ -913,11 +914,9 @@ const ConnectionDetail = () => {
                             className="row-title flex items-center gap-2 no-underline"
                           >
                             {platform ? (
-                              <img
+                              <ThemedIcon
                                 src={platform}
-                                alt=""
-                                width="16"
-                                height="16"
+                                size={16}
                                 className="platform-icon rounded-sm"
                               />
                             ) : null}

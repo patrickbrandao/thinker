@@ -22,6 +22,10 @@ describe('agent-type', () => {
       'craft',
       'claude-app',
       'n8n',
+      'zapier',
+      'langflow',
+      'chatwoot',
+      'open-webui',
       'claude-code',
       'opencode',
       'codex',
@@ -188,6 +192,20 @@ describe('agent-type', () => {
       expect(PLATFORMS_BY_CATEGORY.personal).toContain('claude-app');
       expect(PLATFORM_LABELS['claude-app']).toBe('Claude (APP)');
       expect(platformIcon('claude-app', 'personal')).toBe('/icons/claude-app.svg');
+    });
+
+    it('offers Zapier, Langflow, Chatwoot and Open WebUI as automations', () => {
+      expect(PLATFORMS_BY_CATEGORY.automation).toEqual([
+        'n8n',
+        'zapier',
+        'langflow',
+        'chatwoot',
+        'open-webui',
+      ]);
+      expect(DARK_ICON_VARIANTS[platformIcon('zapier', 'automation')!]).toBeUndefined();
+      expect(DARK_ICON_VARIANTS[platformIcon('open-webui', 'automation')!]).toBe(
+        '/icons/open-webui-dark.svg',
+      );
     });
 
     it('draws Copilot with a white variant on the dark theme', () => {

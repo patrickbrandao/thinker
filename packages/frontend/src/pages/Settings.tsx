@@ -39,6 +39,7 @@ import { categoryLabel, platformLabel } from '../services/agent-type-labels.js';
 import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { ThemedIcon } from '../components/setup-ui.js';
 
 /** Catches a render crash in the key/setup block and offers a retry. */
 class SectionBoundary extends Component<
@@ -221,11 +222,9 @@ export default function Settings() {
               title={
                 <>
                   {typeIcon ? (
-                    <img
+                    <ThemedIcon
                       src={typeIcon}
-                      alt=""
-                      width="18"
-                      height="18"
+                      size={18}
                       className="platform-icon settings-type__icon shrink-0"
                     />
                   ) : null}

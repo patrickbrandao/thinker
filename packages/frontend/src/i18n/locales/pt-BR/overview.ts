@@ -23,9 +23,7 @@ const ptBR: Catalog<typeof en> = {
     connectToRoute:
       'Conecte um provedor de modelos para começar a rotear as chamadas de LLM dos seus harnesses.',
     connectProvider: 'Conectar provedor',
-    agentSetup: 'Configure o seu harness e envie uma mensagem. Os dados de uso aparecem aqui.',
     agentConnect: 'Conecte um provedor para começar a rotear as chamadas de LLM.',
-    exampleAlt: 'Exemplo de visão geral do painel com gráficos de custo e de tokens',
     waiting:
       'Nenhuma atividade ainda. O painel se atualiza segundos depois da primeira chamada de LLM.',
   },

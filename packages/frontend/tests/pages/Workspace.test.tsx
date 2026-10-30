@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
 
 const mockNavigate = vi.fn();
@@ -96,11 +96,17 @@ vi.mock('../../src/components/AgentTypeGrid', () => ({
   ),
 }));
 
-const mockMarkAgentCreated = vi.fn();
-vi.mock('../../src/services/recent-agents', () => ({
-  markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
-  markSetupPending: vi.fn(),
-}));
+const mockHighlightAgent = vi.fn();
+vi.mock('../../src/services/recent-agents', async (orig) => {
+  const real = await orig<typeof import('../../src/services/recent-agents')>();
+  return {
+    ...real,
+    highlightAgent: (slug: string) => {
+      mockHighlightAgent(slug);
+      real.highlightAgent(slug);
+    },
+  };
+});
 
 const { MOCK_FREE_PLAN_REQUESTS_PER_MONTH } = vi.hoisted(() => ({
   MOCK_FREE_PLAN_REQUESTS_PER_MONTH: 10_000,
@@ -144,6 +150,7 @@ vi.mock('thinker-shared', async (importOriginal) => ({
 }));
 
 import Workspace from '../../src/pages/Workspace';
+import { highlightedAgent } from '../../src/services/recent-agents';
 
 let currentSearch = '';
 function SearchProbe() {
@@ -263,7 +270,7 @@ describe('Workspace', () => {
       expect(mockCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ name: 'new-agent' }));
     });
     await vi.waitFor(() => {
-      expect(mockMarkAgentCreated).toHaveBeenCalledWith('new-agent');
+      expect(mockHighlightAgent).toHaveBeenCalledWith('new-agent');
     });
   });
 
@@ -421,14 +428,50 @@ describe('Workspace', () => {
         }),
       );
     });
-    // New agents land on the Routing tab (they inherit all providers + routes).
-    // Navigation happens after the async providers lookup, so wait for it.
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        '/harnesses/typed-agent/routing',
-        expect.objectContaining({ state: expect.objectContaining({ newApiKey: 'k' }) }),
-      );
+    // No success screen: the user stays on the list, where the harness is ringed.
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('typed-agent'));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('rings the just-created harness card until its fade ends', async () => {
+    mockGetAgents.mockResolvedValue({
+      agents: [
+        {
+          agent_name: 'fresh-bot',
+          display_name: 'fresh-bot',
+          message_count: 0,
+          total_tokens: 0,
+          sparkline: [],
+        },
+        {
+          agent_name: 'old-bot',
+          display_name: 'old-bot',
+          message_count: 0,
+          total_tokens: 0,
+          sparkline: [],
+        },
+      ],
     });
+    highlightedAgent.set('fresh-bot');
+    render(() => <Workspace />);
+    const card = await vi.waitFor(() => {
+      const el = document.querySelector('a[href="/harnesses/fresh-bot"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(card.className).toContain('liquid-metal--flash');
+    expect(document.querySelector('a[href="/harnesses/old-bot"]')!.className).not.toContain(
+      'liquid-metal',
+    );
+    // jsdom has no AnimationEvent, so React listens for the webkit-prefixed
+    // name; the event carries animationName like a real one.
+    const end = new Event('webkitAnimationEnd', { bubbles: true });
+    Object.defineProperty(end, 'animationName', { value: 'liquid-metal-flash' });
+    act(() => {
+      fireEvent(card, end);
+    });
+    expect(highlightedAgent()).toBeNull();
+    expect(card.className).not.toContain('liquid-metal');
   });
 
   it('does not submit when name is empty', async () => {

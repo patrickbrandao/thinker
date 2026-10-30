@@ -185,7 +185,6 @@ export default {
   },
   add: {
     title: 'Connect Harness',
-    titleNamed: 'Harness {{ name }}',
     desc: 'Name your harness to start tracking its LLM usage, costs, and messages in real time.',
     type: 'Type',
     name: 'Harness name',
@@ -196,14 +195,12 @@ export default {
     enableLogs: 'Enable logs',
     logsHint:
       'See exactly what your agent sends on every attempt, and debug it faster. Logs stay in your own database.',
-    connected: 'Harness "{{ name }}" connected',
     tabHarness: 'Harness',
     tabSettings: 'Settings',
   },
   retention: {
     control: 'Retention control',
     daysLabel: 'Retention days',
-    suggested: 'Suggested',
     label: 'Log retention',
     hint: 'How long requests keep their logs (bodies, headers, parameters). Tokens, costs and status are kept.',
     global: 'Global',

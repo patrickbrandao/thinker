@@ -233,6 +233,22 @@ export const PLATFORM_CATALOG: readonly PlatformCatalogEntry[] = [
     surface: 'chat_completions',
   },
   {
+    id: 'zapier',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'langflow',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'chatwoot',
+    surface: 'chat_completions',
+  },
+  {
+    id: 'open-webui',
+    surface: 'chat_completions',
+  },
+  {
     id: 'claude-code',
     surface: 'messages',
   },

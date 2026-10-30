@@ -51,6 +51,7 @@ import { rangeOptions } from '../services/use-overview-range.js';
 import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { ThemedIcon } from '../components/setup-ui.js';
 
 interface ProviderGroup {
   provider: string;
@@ -913,9 +914,7 @@ export default function GlobalOverview() {
                   >
                     <td>
                       <div className="flex items-center gap-2">
-                        {icon ? (
-                          <img src={icon} alt="" width={20} height={20} className="shrink-0" />
-                        ) : null}
+                        {icon ? <ThemedIcon src={icon} size={20} className="shrink-0" /> : null}
                         <span className="row-title">{agent.display_name || agent.agent_name}</span>
                       </div>
                     </td>

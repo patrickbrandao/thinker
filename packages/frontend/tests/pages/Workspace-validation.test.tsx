@@ -68,11 +68,17 @@ vi.mock('../../src/components/AgentTypeGrid', () => ({
   ),
 }));
 
-const mockMarkAgentCreated = vi.fn();
-vi.mock('../../src/services/recent-agents', () => ({
-  markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
-  markSetupPending: vi.fn(),
-}));
+const mockHighlightAgent = vi.fn();
+vi.mock('../../src/services/recent-agents', async (orig) => {
+  const real = await orig<typeof import('../../src/services/recent-agents')>();
+  return {
+    ...real,
+    highlightAgent: (slug: string) => {
+      mockHighlightAgent(slug);
+      real.highlightAgent(slug);
+    },
+  };
+});
 
 const { MOCK_FREE_PLAN_REQUESTS_PER_MONTH } = vi.hoisted(() => ({
   MOCK_FREE_PLAN_REQUESTS_PER_MONTH: 10_000,
@@ -167,30 +173,6 @@ describe('Workspace AddAgentModal - name validation', () => {
     expect(createBtn.disabled).toBe(false);
   });
 
-  it('accepts a name with a URL-reserved slash and routes through encodeURIComponent', async () => {
-    mockCreateAgent.mockResolvedValue({ agent: { name: 'weird/name' }, apiKey: 'k' });
-    const { input, createBtn } = openModal();
-    fireEvent.change(input, { target: { value: 'weird/name' } });
-    expect(createBtn.disabled).toBe(false);
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        '/harnesses/weird%2Fname/routing',
-        expect.anything(),
-      );
-    });
-  });
-
-  it('accepts a name with a percent sign without double-encoding', async () => {
-    mockCreateAgent.mockResolvedValue({ agent: { name: '100%cool' }, apiKey: 'k' });
-    const { input, createBtn } = openModal();
-    fireEvent.change(input, { target: { value: '100%cool' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/100%25cool/routing', expect.anything());
-    });
-  });
-
   it('turns typed text into a DNS name (a-z, 0-9, -)', () => {
     const { input } = openModal();
     fireEvent.change(input, { target: { value: 'My Bot_🚀 1' } });
@@ -267,17 +249,13 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     });
   });
 
-  it('navigates to the slug returned by the server, not the typed name', async () => {
+  it('rings the slug returned by the server, not the typed name, and stays on the list', async () => {
     mockCreateAgent.mockResolvedValue({ agent: { name: 'demo-agent-1' }, apiKey: 'key-xyz' });
     const { input, createBtn } = openModal();
     fireEvent.change(input, { target: { value: 'Demo Agent' } });
     fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/demo-agent-1/routing', {
-        state: { newApiKey: 'key-xyz' },
-      });
-    });
-    expect(mockMarkAgentCreated).toHaveBeenCalledWith('demo-agent-1');
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('demo-agent-1'));
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('falls back to the typed name when the server omits the slug', async () => {
@@ -285,16 +263,10 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     const { input, createBtn } = openModal();
     fireEvent.change(input, { target: { value: 'Fallback Agent' } });
     fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        `/harnesses/${encodeURIComponent('fallback-agent')}/routing`,
-        { state: { newApiKey: 'k' } },
-      );
-    });
-    expect(mockMarkAgentCreated).toHaveBeenCalledWith('fallback-agent');
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('fallback-agent'));
   });
 
-  it('does not call markAgentCreated or navigate when createAgent rejects', async () => {
+  it('does not highlight or navigate when createAgent rejects', async () => {
     mockCreateAgent.mockRejectedValue(new Error('boom'));
     const { input, createBtn } = openModal();
     fireEvent.change(input, { target: { value: 'Demo Agent' } });
@@ -302,7 +274,7 @@ describe('Workspace AddAgentModal - exact createAgent payload', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalled();
     });
-    expect(mockMarkAgentCreated).not.toHaveBeenCalled();
+    expect(mockHighlightAgent).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

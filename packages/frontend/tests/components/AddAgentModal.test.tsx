@@ -1,18 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { useState } from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockNavigate = vi.fn();
+let mockPathname = '/harnesses';
 vi.mock('react-router', async (orig) => ({
   ...(await orig<object>()),
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ pathname: mockPathname }),
 }));
 
 const mockCreateAgent = vi.fn();
-const mockGetGlobalProviders = vi.fn();
 vi.mock('../../src/services/api', () => ({
   createAgent: (...args: unknown[]) => mockCreateAgent(...args),
-  getGlobalProviders: (...args: unknown[]) => mockGetGlobalProviders(...args),
 }));
 
 const mockGetLogRetention = vi.fn();
@@ -20,15 +19,9 @@ vi.mock('../../src/services/api/organizations', () => ({
   getLogRetention: (...args: unknown[]) => mockGetLogRetention(...args),
 }));
 
-vi.mock('../../src/services/toast-store', () => ({
-  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
-}));
-
-const mockMarkAgentCreated = vi.fn();
-const mockMarkSetupPending = vi.fn();
+const mockHighlightAgent = vi.fn();
 vi.mock('../../src/services/recent-agents', () => ({
-  markAgentCreated: (...args: unknown[]) => mockMarkAgentCreated(...args),
-  markSetupPending: (...args: unknown[]) => mockMarkSetupPending(...args),
+  highlightAgent: (...args: unknown[]) => mockHighlightAgent(...args),
 }));
 
 const mockRefreshAgents = vi.fn();
@@ -79,7 +72,7 @@ describe('AddAgentModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateAgent.mockResolvedValue({ agent: { name: 'new-agent' }, apiKey: 'key-1' });
-    mockGetGlobalProviders.mockResolvedValue({ providers: [{ provider: 'openai' }] });
+    mockPathname = '/harnesses';
   });
 
   it('renders nothing when closed', () => {
@@ -126,37 +119,6 @@ describe('AddAgentModal', () => {
       await vi.waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
       expect(mockCreateAgent).toHaveBeenCalledTimes(1);
     });
-
-    it('does not navigate to the created harness if the modal is reopened mid-provider-lookup', async () => {
-      // Models the real parent: <AddAgentModal open={signal()} onClose={...}>,
-      // where closing does not unmount. The success path closes the modal and
-      // *then* awaits getGlobalProviders, so a user who reopens to add a second
-      // harness used to get redirected to the first one when that lookup landed.
-      let resolveProviders!: (v: { providers: unknown[] }) => void;
-      mockGetGlobalProviders.mockReturnValue(
-        new Promise<{ providers: unknown[] }>((r) => (resolveProviders = r)),
-      );
-      let open = true;
-      let setOpen!: (v: boolean) => void;
-      function Parent() {
-        const [o, setO] = useState(true);
-        open = o;
-        setOpen = setO;
-        return <AddAgentModal open={o} onClose={() => setO(false)} />;
-      }
-      render(<Parent />);
-      const input = document.querySelector('#agent-name-input') as HTMLInputElement;
-      fireEvent.change(input, { target: { value: 'first-harness' } });
-      fireEvent.click(screen.getByText('Create'));
-
-      await vi.waitFor(() => expect(open).toBe(false));
-      act(() => setOpen(true)); // user reopens to add another harness
-      resolveProviders({ providers: [] });
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(mockNavigate).not.toHaveBeenCalled();
-    });
   });
 
   it('keeps Create disabled until a non-blank name is entered', () => {
@@ -175,20 +137,22 @@ describe('AddAgentModal', () => {
     expect(mockCreateAgent).not.toHaveBeenCalled();
   });
 
-  it('navigates with newApiKey only when the tenant already has providers', async () => {
-    mockGetGlobalProviders.mockResolvedValue({ providers: [{ provider: 'openai' }] });
+  it('stays on the harness list and rings the new harness, with no success screen', async () => {
     const { input, createBtn, onClose } = renderOpen();
     fireEvent.change(input, { target: { value: 'agent-a' } });
     fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/new-agent/routing', {
-        state: { newApiKey: 'key-1' },
-      });
-    });
-    expect(mockMarkAgentCreated).toHaveBeenCalledWith('new-agent');
-    // Persistent flag set so the setup modal survives a refresh on landing.
-    expect(mockMarkSetupPending).toHaveBeenCalledWith('new-agent');
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('new-agent'));
     expect(onClose).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('goes to the harness list when created from another page', async () => {
+    mockPathname = '/overview';
+    const { input, createBtn } = renderOpen();
+    fireEvent.change(input, { target: { value: 'agent-b' } });
+    fireEvent.click(createBtn);
+    await vi.waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/harnesses'));
+    expect(mockHighlightAgent).toHaveBeenCalledWith('new-agent');
   });
 
   it('refreshes the harness list as soon as creation succeeds', async () => {
@@ -201,55 +165,12 @@ describe('AddAgentModal', () => {
     });
   });
 
-  it('adds openProviders when the tenant has no providers yet', async () => {
-    mockGetGlobalProviders.mockResolvedValue({ providers: [] });
-    const { input, createBtn } = renderOpen();
-    fireEvent.change(input, { target: { value: 'agent-b' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/new-agent/routing', {
-        state: { newApiKey: 'key-1', openProviders: true },
-      });
-    });
-  });
-
-  it('treats a missing providers array as no providers', async () => {
-    mockGetGlobalProviders.mockResolvedValue({});
-    const { input, createBtn } = renderOpen();
-    fireEvent.change(input, { target: { value: 'agent-c' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/new-agent/routing', {
-        state: { newApiKey: 'key-1', openProviders: true },
-      });
-    });
-  });
-
-  it('falls back to openProviders when the providers lookup throws', async () => {
-    mockGetGlobalProviders.mockRejectedValue(new Error('network'));
-    const { input, createBtn } = renderOpen();
-    fireEvent.change(input, { target: { value: 'agent-d' } });
-    fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/new-agent/routing', {
-        state: { newApiKey: 'key-1', openProviders: true },
-      });
-    });
-  });
-
   it('falls back to the typed name when the server omits the slug', async () => {
     mockCreateAgent.mockResolvedValue({ apiKey: 'k' });
     const { input, createBtn } = renderOpen();
     fireEvent.change(input, { target: { value: 'Typed Name' } });
     fireEvent.click(createBtn);
-    await vi.waitFor(() => {
-      expect(mockMarkAgentCreated).toHaveBeenCalledWith('typed-name');
-      expect(mockMarkSetupPending).toHaveBeenCalledWith('typed-name');
-      expect(mockNavigate).toHaveBeenCalledWith(
-        `/harnesses/${encodeURIComponent('typed-name')}/routing`,
-        expect.anything(),
-      );
-    });
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('typed-name'));
   });
 
   it('titles the window with the typed name', () => {
@@ -257,8 +178,18 @@ describe('AddAgentModal', () => {
     const title = () => document.querySelector('.floating-window-head')!.textContent;
     expect(title()).toContain('Connect Harness');
     fireEvent.change(input, { target: { value: 'my-bot' } });
-    expect(title()).toContain('Harness my-bot');
-    expect(title()).not.toContain('Connect');
+    expect(title()).toBe('my-bot');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(title()).toContain('Connect Harness');
+  });
+
+  it('shows the chosen type icon left of the title', () => {
+    renderOpen();
+    const icon = () =>
+      document.querySelector('.floating-window-head .add-agent__title-icon')!.getAttribute('src');
+    expect(icon()).toBe('/icons/providers/opencode.svg');
+    fireEvent.click(document.querySelector('[data-testid="pick-app"]')!);
+    expect(icon()).toBe('/icons/providers/openai.svg');
   });
 
   it('sends the selected category and platform in the createAgent payload', async () => {
@@ -334,7 +265,7 @@ describe('AddAgentModal', () => {
     resolveCreate!({ agent: { name: 'slow' }, apiKey: 'k' });
   });
 
-  it('does not navigate after the create resolves if the modal was dismissed mid-request (close button)', async () => {
+  it('does not highlight after the create resolves if the modal was dismissed mid-request (close button)', async () => {
     let resolveCreate: (v: unknown) => void;
     mockCreateAgent.mockReturnValue(
       new Promise((r) => {
@@ -356,12 +287,10 @@ describe('AddAgentModal', () => {
     await Promise.resolve();
 
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(mockMarkAgentCreated).not.toHaveBeenCalled();
-    expect(mockMarkSetupPending).not.toHaveBeenCalled();
-    expect(mockGetGlobalProviders).not.toHaveBeenCalled();
+    expect(mockHighlightAgent).not.toHaveBeenCalled();
   });
 
-  it('does not navigate after the create resolves if the modal was dismissed mid-request (Escape)', async () => {
+  it('does not highlight after the create resolves if the modal was dismissed mid-request (Escape)', async () => {
     let resolveCreate: (v: unknown) => void;
     mockCreateAgent.mockReturnValue(
       new Promise((r) => {
@@ -381,51 +310,21 @@ describe('AddAgentModal', () => {
     await Promise.resolve();
 
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(mockMarkAgentCreated).not.toHaveBeenCalled();
-    expect(mockMarkSetupPending).not.toHaveBeenCalled();
+    expect(mockHighlightAgent).not.toHaveBeenCalled();
   });
 
-  it('does not navigate if dismissed during the providers lookup', async () => {
-    let resolveProviders: (v: unknown) => void;
-    mockGetGlobalProviders.mockReturnValue(
-      new Promise((r) => {
-        resolveProviders = r;
-      }),
-    );
-    const { input } = renderOpen();
-    fireEvent.change(input, { target: { value: 'late-dismiss' } });
-    fireEvent.click(screen.getByText('Create'));
-
-    // createAgent resolves first (it ran the success side effects), then the
-    // providers lookup is in flight when the user dismisses the modal.
-    await vi.waitFor(() => expect(mockGetGlobalProviders).toHaveBeenCalled());
-    // Default mock returns agent.name "new-agent" as the slug.
-    expect(mockMarkAgentCreated).toHaveBeenCalledWith('new-agent');
-
-    fireEvent.click(screen.getByLabelText('Close'));
-    resolveProviders!({ providers: [{ provider: 'openai' }] });
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it('still navigates on a normal (non-dismissed) successful create', async () => {
+  it('still highlights on a normal (non-dismissed) successful create', async () => {
     // Guards against the dismissal flag wrongly suppressing a clean success: a
-    // second create after a prior dismissal must reset the flag and navigate.
+    // second create after a prior dismissal must reset the flag.
     const { input } = renderOpen();
     fireEvent.change(input, { target: { value: 'clean' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     fireEvent.change(input, { target: { value: 'clean' } });
     fireEvent.click(screen.getByText('Create'));
-    await vi.waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/harnesses/new-agent/routing', {
-        state: { newApiKey: 'key-1' },
-      });
-    });
+    await vi.waitFor(() => expect(mockHighlightAgent).toHaveBeenCalledWith('new-agent'));
   });
 
-  it('does not navigate or mark created when createAgent rejects', async () => {
+  it('does not navigate or highlight when createAgent rejects', async () => {
     mockCreateAgent.mockRejectedValue(new Error('boom'));
     const { input, createBtn } = renderOpen();
     fireEvent.change(input, { target: { value: 'fails' } });
@@ -433,8 +332,7 @@ describe('AddAgentModal', () => {
     await vi.waitFor(() => {
       expect(mockCreateAgent).toHaveBeenCalled();
     });
-    expect(mockMarkAgentCreated).not.toHaveBeenCalled();
-    expect(mockMarkSetupPending).not.toHaveBeenCalled();
+    expect(mockHighlightAgent).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -481,9 +379,11 @@ describe('AddAgentModal', () => {
     const { input, createBtn } = renderOpen();
     openSettingsTab();
     fireEvent.click(document.querySelector('#add-agent-retention-custom')!);
-    fireEvent.change(document.querySelector('#add-agent-retention-suggested')!, {
-      target: { value: '7' },
-    });
+    // Custom shows only the days field (no suggestions list); it commits on blur.
+    expect(document.querySelector('#add-agent-retention-suggested')).toBeNull();
+    const days = document.querySelector('#add-agent-retention-days') as HTMLInputElement;
+    fireEvent.change(days, { target: { value: '7' } });
+    fireEvent.blur(days);
     fireEvent.click(screen.getByRole('tab', { name: 'Harness' }));
     fireEvent.change(input, { target: { value: 'kept' } });
     fireEvent.click(createBtn);

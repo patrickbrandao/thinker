@@ -1175,15 +1175,36 @@
     linear-gradient(#000 0 0);
   animation: liquid-metal-flow 6s linear infinite;
 }
+.liquid-metal::before {
+  opacity: var(--lm-fade);
+}
 .liquid-metal::after {
   z-index: -1;
   inset: -5px;
   padding: 5px;
   filter: blur(6px);
-  opacity: 0.35;
+  opacity: calc(0.35 * var(--lm-fade));
 }
 .dark .liquid-metal::after {
-  opacity: 0.5;
+  opacity: calc(0.5 * var(--lm-fade));
+}
+/* A ring that shows for 5 seconds and fades out over the last 0.6 s (the
+   just-created harness in the list). */
+@property --lm-fade {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+@keyframes liquid-metal-flash {
+  88% {
+    --lm-fade: 1;
+  }
+  to {
+    --lm-fade: 0;
+  }
+}
+.liquid-metal--flash {
+  animation: liquid-metal-flash 5s linear forwards;
 }
 /* The chosen harness type: the hover gray on light, pure black on dark so
    the brand marks stand out. */

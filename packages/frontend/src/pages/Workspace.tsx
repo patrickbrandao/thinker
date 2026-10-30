@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type AnimationEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Copy, LayoutGrid, Plus, Rows3, Trash2 } from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
@@ -11,12 +11,15 @@ import RichText from '../components/RichText.js';
 import { Button, EmptyState, Modal, Skel } from '../components/ui.js';
 import { getAgents, deleteAgent } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
+import { clearHighlight, highlightedAgent } from '../services/recent-agents.js';
 import { me, roleCan } from '../services/session-store.js';
 import { formatCost, formatNumber, formatTime } from '../services/formatters.js';
 import { agentPing, analyticsPing } from '../services/sse.js';
 import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
+import { cx } from '../components/ui.js';
+import { ThemedIcon } from '../components/setup-ui.js';
 
 interface Agent {
   agent_name: string;
@@ -67,6 +70,17 @@ export default function Workspace() {
   const agentTick = useSignal(agentPing);
   const analyticsTick = useSignal(analyticsPing);
   const canEdit = roleCan.editHarnesses();
+  const highlighted = useSignal(highlightedAgent);
+  // Ring for the harness just created; it fades out on its own after 5 s.
+  const flash = (agentName: string) =>
+    agentName === highlighted
+      ? {
+          className: 'liquid-metal liquid-metal--flash',
+          onAnimationEnd: (e: AnimationEvent<HTMLElement>) => {
+            if (e.animationName === 'liquid-metal-flash') clearHighlight(agentName);
+          },
+        }
+      : {};
   const data = useResource(() => getAgents() as Promise<AgentsData>, [agentTick, analyticsTick]);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -226,16 +240,14 @@ export default function Workspace() {
                 <td>
                   <Link
                     to={harnessPath(agent.agent_name)}
-                    className="row-title inline-flex items-center gap-2 hover:underline"
+                    {...flash(agent.agent_name)}
+                    className={cx(
+                      'row-title inline-flex items-center gap-2 rounded-control hover:underline',
+                      flash(agent.agent_name).className,
+                    )}
                   >
                     {icon ? (
-                      <img
-                        src={icon}
-                        alt=""
-                        width="16"
-                        height="16"
-                        className="workspace-table__icon shrink-0"
-                      />
+                      <ThemedIcon src={icon} size={16} className="workspace-table__icon shrink-0" />
                     ) : null}
                     {agent.display_name ?? agent.agent_name}
                   </Link>
@@ -272,19 +284,23 @@ export default function Workspace() {
           <div key={agent.agent_name} className="relative">
             <Link
               to={harnessPath(agent.agent_name)}
-              className="agent-card card flex flex-col gap-3 transition-colors hover:border-line-strong"
+              {...flash(agent.agent_name)}
+              className={cx(
+                // Hover: accent border and a shade on the background (gray on light,
+                // darker on dark), with no link underline on the card's text.
+                'agent-card card flex flex-col gap-3 transition-colors hover:border-accent hover:bg-s2 hover:no-underline [.dark_&]:hover:bg-sunken',
+                flash(agent.agent_name).className,
+              )}
             >
-              <div className="flex min-w-0 items-center gap-2 pr-8">
+              <div className="flex min-w-0 items-center gap-3 pr-8">
                 {icon ? (
-                  <img
+                  <ThemedIcon
                     src={icon}
-                    alt=""
-                    width="18"
-                    height="18"
-                    className="agent-card__platform-icon shrink-0"
+                    size={48}
+                    className="agent-card__platform-icon size-12 shrink-0 object-contain"
                   />
                 ) : null}
-                <span className="truncate text-sm font-semibold text-ink">
+                <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
                   {agent.display_name ?? agent.agent_name}
                 </span>
               </div>
