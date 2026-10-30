@@ -194,10 +194,13 @@ const ptBR: Catalog<typeof en> = {
   },
   add: {
     title: 'Conectar harness',
+    titleNamed: 'Harness {{ name }}',
     desc: 'Dê um nome ao harness para acompanhar o uso de LLM, os custos e as mensagens em tempo real.',
     type: 'Tipo',
     name: 'Nome do harness',
-    namePlaceholder: 'ex.: Meu harness',
+    namePlaceholder: 'ex.: meu-harness',
+    nameHint: 'Letras minúsculas, números e hífen (a-z, 0-9, -), como um nome de DNS.',
+    nameInvalid: 'O nome não pode começar nem terminar com hífen.',
     settings: 'Configurações',
     enableLogs: 'Ativar logs',
     logsHint:

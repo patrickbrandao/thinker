@@ -103,7 +103,7 @@ describe('Reserved local runner aliases (e2e)', () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/agents')
       .set(headers)
-      .send({ name: 'Alias E2E', agent_category: 'coding' })
+      .send({ name: 'alias-e2e', agent_category: 'coding' })
       .expect(201);
     agentKey = created.body.apiKey;
   }, 30000);

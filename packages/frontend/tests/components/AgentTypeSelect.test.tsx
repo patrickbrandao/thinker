@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   AGENT_CATEGORIES: ['personal', 'automation', 'app', 'coding'],
   CATEGORY_LABELS: {
     personal: 'AI agent',
@@ -37,7 +38,7 @@ vi.mock('thinker-shared', () => ({
     langchain: '/icons/langchain.svg',
     'claude-code': '/icons/providers/claude-code.svg',
     opencode: '/icons/providers/opencode.svg',
-    codex: '/icons/providers/codex.svg',
+    codex: '/icons/codex.svg',
   },
 }));
 
@@ -139,7 +140,7 @@ describe('AgentTypeSelect', () => {
     const options = container.querySelectorAll('.agent-type-select__option');
     expect(options[11].textContent).toContain('Codex');
     const codexIcon = options[11].querySelector('.agent-type-select__option-icon');
-    expect(codexIcon!.getAttribute('src')).toBe('/icons/providers/codex.svg');
+    expect(codexIcon!.getAttribute('src')).toBe('/icons/codex.svg');
   });
 
   it('places n8n in the automation column with the n8n mark', () => {

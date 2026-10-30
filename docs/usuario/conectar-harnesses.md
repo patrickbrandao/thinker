@@ -13,6 +13,8 @@ O dashboard gera estes mesmos trechos já com a sua chave, no assistente de conf
 
 A chave pode ir em `Authorization: Bearer thk_...` ou em `x-api-key: thk_...`. Se os dois cabeçalhos chegam com valores diferentes, o gateway responde `M006`.
 
+O nome de um harness segue a regra de um nome de DNS: só letras minúsculas, números e hífen (`a-z`, `0-9`, `-`), sem hífen no começo nem no fim, com até 63 caracteres. Ao digitar na janela **Conectar harness**, maiúsculas viram minúsculas, espaços e `_` viram hífen, acentos são removidos e os demais caracteres são descartados. A API (`POST /api/v1/agents`, renomear e duplicar) recusa com 400 um nome fora da regra. Harnesses criados antes da regra mantêm o nome.
+
 ## Claude Code
 
 O Claude Code usa a API Anthropic Messages. Em `~/.claude/settings.json`:

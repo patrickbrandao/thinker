@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { AGENT_NAME_PATTERN, toAgentName } from 'thinker-shared';
 import { duplicateAgent, getDuplicatePreview } from '../services/api.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { toast } from '../services/toast-store.js';
@@ -60,7 +61,7 @@ export default function DuplicateAgentModal({ open, sourceName, onClose, onDupli
 
   const handleDuplicate = async () => {
     const newName = name.trim();
-    if (!newName || submitting) return;
+    if (!AGENT_NAME_PATTERN.test(newName) || submitting) return;
     cancelledInFlight.current = false;
     setSubmitting(true);
     try {
@@ -114,7 +115,7 @@ export default function DuplicateAgentModal({ open, sourceName, onClose, onDupli
         value={name}
         onChange={(e) => {
           setNameTouched(true);
-          setName(e.currentTarget.value);
+          setName(toAgentName(e.currentTarget.value));
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') void handleDuplicate();
@@ -165,7 +166,7 @@ export default function DuplicateAgentModal({ open, sourceName, onClose, onDupli
         <Button
           size="sm"
           onClick={() => void handleDuplicate()}
-          disabled={!name.trim()}
+          disabled={!AGENT_NAME_PATTERN.test(name.trim())}
           busy={submitting}
         >
           {submitting ? null : t('harnesses.duplicateModal.submit')}

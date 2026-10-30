@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   platformIcon: (plat: string | null, cat: string | null) => {
     if (!plat) return undefined;
     if (plat === 'other') return cat === 'personal' ? '/icons/other-agent.svg' : '/icons/other.svg';

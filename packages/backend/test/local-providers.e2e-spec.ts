@@ -157,7 +157,7 @@ describe('Built-in local providers: LM Studio and llama.cpp (e2e)', () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/agents')
       .set('x-api-key', TEST_API_KEY)
-      .send({ name: 'Local E2E', agent_category: 'coding' })
+      .send({ name: 'local-e2e', agent_category: 'coding' })
       .expect(201);
     agentKey = created.body.apiKey;
     agentId = created.body.agent.id;

@@ -249,7 +249,8 @@ vi.mock('../../src/services/routing-utils.js', () => ({
   stripCustomPrefix: (m: string) => m.replace(/^custom:[^/]+\//, ''),
 }));
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   platformIcon: () => 'robot',
 }));
 

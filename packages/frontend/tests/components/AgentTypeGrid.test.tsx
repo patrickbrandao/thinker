@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 
-vi.mock('thinker-shared', () => ({
+vi.mock('thinker-shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('thinker-shared')>()),
   AGENT_CATEGORIES: ['personal', 'automation', 'app', 'coding'],
   CATEGORY_LABELS: {
     personal: 'AI agent',
@@ -41,7 +42,7 @@ vi.mock('thinker-shared', () => ({
     langchain: '/icons/langchain.svg',
     'claude-code': '/icons/providers/claude-code.svg',
     opencode: '/icons/providers/opencode.svg',
-    codex: '/icons/providers/codex.svg',
+    codex: '/icons/codex.svg',
   },
 }));
 
@@ -235,7 +236,7 @@ describe('AgentTypeGrid', () => {
     const { container } = render(<AgentTypeGrid {...defaultProps} />);
     const options = container.querySelectorAll('.agent-type-select__option');
     const icon = options[13].querySelector('.agent-type-select__option-icon');
-    expect(icon!.getAttribute('src')).toBe('/icons/providers/codex.svg');
+    expect(icon!.getAttribute('src')).toBe('/icons/codex.svg');
   });
 
   it('disables buttons when disabled prop is true', () => {

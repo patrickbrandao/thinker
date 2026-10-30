@@ -6,7 +6,7 @@ import {
   PLATFORM_ICONS,
 } from 'thinker-shared';
 import { categoryLabel, platformLabel } from '../services/agent-type-labels.js';
-import { monoIconClass } from './setup-ui.js';
+import { themedIcon, useDarkTheme } from './setup-ui.js';
 import { cx } from './ui.js';
 
 interface Props {
@@ -35,6 +35,7 @@ const iconFor = (plat: AgentPlatform, cat: AgentCategory): string | undefined =>
 export default function AgentTypeGrid(props: Props) {
   const inline = props.inline !== false;
   const iconSize = props.iconSize ?? 18;
+  const dark = useDarkTheme();
   const handleSelect = (cat: AgentCategory, plat: AgentPlatform) => {
     props.onCategoryChange(cat);
     props.onPlatformChange(plat);
@@ -77,7 +78,8 @@ export default function AgentTypeGrid(props: Props) {
             <div className={inline ? 'flex flex-wrap gap-2' : 'contents'}>
               {[...PLATFORMS_BY_CATEGORY[cat]].map((plat) => {
                 const isSelected = props.category === cat && props.platform === plat;
-                const icon = iconFor(plat, cat);
+                const base = iconFor(plat, cat);
+                const icon = base ? themedIcon(base, dark) : null;
                 return (
                   <button
                     key={plat}
@@ -95,13 +97,13 @@ export default function AgentTypeGrid(props: Props) {
                   >
                     {icon ? (
                       <img
-                        src={icon}
+                        src={icon.src}
                         alt=""
                         width={iconSize}
                         height={iconSize}
                         className={cx(
                           'agent-type-select__option-icon shrink-0 object-contain',
-                          monoIconClass(icon),
+                          icon.className,
                         )}
                       />
                     ) : null}

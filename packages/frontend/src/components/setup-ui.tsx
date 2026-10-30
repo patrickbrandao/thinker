@@ -4,20 +4,41 @@
  * are stable hooks for tests; the look comes from tokens and utilities.
  */
 import { useMemo, type ReactNode } from 'react';
+import { DARK_ICON_VARIANTS } from 'thinker-shared';
 import { Eye, EyeOff } from 'lucide-react';
 import CopyButton from './CopyButton.jsx';
 import { highlight } from '../services/syntax-highlight.js';
 import { t } from '../i18n/index.js';
 import { cx } from './ui.jsx';
+import { effectiveTheme, themePreference } from '../lib/theme.js';
+import { useSignal } from '../lib/signal.js';
 
 /**
  * Monochrome brand marks (black glyphs) are inverted on the dark theme so they
  * stay visible. Filter only, no color.
  */
 export function monoIconClass(src: string | null | undefined): string | undefined {
-  return src && /openai|anthropic|vercel|opencode|hermes|codex|other|github/.test(src)
+  return src &&
+    /openai|anthropic|\/vercel\.svg|opencode|hermes|providers\/codex|other|github|copilot\.svg/.test(
+      src,
+    )
     ? '[.dark_&]:invert'
     : undefined;
+}
+
+/** True while the dark theme shows; re-renders when the theme choice changes. */
+export function useDarkTheme(): boolean {
+  useSignal(themePreference);
+  return effectiveTheme() === 'dark';
+}
+
+/**
+ * The icon to draw for the current theme: the dark variant when one exists
+ * (it is already light, so it is not inverted), otherwise the icon itself.
+ */
+export function themedIcon(src: string, dark: boolean): { src: string; className?: string } {
+  const variant = dark ? DARK_ICON_VARIANTS[src] : undefined;
+  return variant ? { src: variant } : { src, className: monoIconClass(src) };
 }
 
 /**

@@ -62,8 +62,7 @@ let blockRuleId: string;
 
 const api = () => request(app.getHttpServer());
 const auth = (r: request.Test) => r.set('x-api-key', TEST_API_KEY);
-const smokeBearer = (r: request.Test) =>
-  r.set('Authorization', `Bearer ${smokeOtlpKey}`);
+const smokeBearer = (r: request.Test) => r.set('Authorization', `Bearer ${smokeOtlpKey}`);
 
 async function waitForMessages(
   agentName: string,
@@ -90,9 +89,7 @@ beforeAll(async () => {
   // The notification cron's resolveUserEmail() queries it.
   const { DataSource } = await import('typeorm');
   const ds = app.get(DataSource);
-  await ds.query(
-    'CREATE TABLE IF NOT EXISTS "user" (id VARCHAR PRIMARY KEY, email VARCHAR)',
-  );
+  await ds.query('CREATE TABLE IF NOT EXISTS "user" (id VARCHAR PRIMARY KEY, email VARCHAR)');
 }, 30_000);
 
 afterAll(async () => {
@@ -119,9 +116,7 @@ describe('ST-01: Auth', () => {
 /* ------------------------------------------------------------------ */
 describe('ST-02: Create agent', () => {
   it('creates agent and returns thk_* API key', async () => {
-    const res = await auth(api().post('/api/v1/agents'))
-      .send({ name: 'Smoke Agent' })
-      .expect(201);
+    const res = await auth(api().post('/api/v1/agents')).send({ name: 'smoke-agent' }).expect(201);
 
     expect(res.body.agent.name).toBe('smoke-agent');
     expect(res.body.apiKey).toMatch(/^thk_/);
@@ -141,20 +136,16 @@ describe('ST-03: Seed agent data', () => {
     const ds = app.get(DataSource);
 
     // Look up tenant and agent IDs created by ST-02
-    const agents = await ds.query(
-      `SELECT id, tenant_id FROM agents WHERE name = $1`,
-      [smokeAgentName],
-    );
+    const agents = await ds.query(`SELECT id, tenant_id FROM agents WHERE name = $1`, [
+      smokeAgentName,
+    ]);
     expect(agents.length).toBe(1);
 
     const tenantId = agents[0].tenant_id;
     const agentId = agents[0].id;
 
     // Enable complexity routing so ST-05 tier routing tests can score requests
-    await ds.query(
-      `UPDATE agents SET complexity_routing_enabled = true WHERE id = $1`,
-      [agentId],
-    );
+    await ds.query(`UPDATE agents SET complexity_routing_enabled = true WHERE id = $1`, [agentId]);
 
     // Use a timestamp 60s in the past so period boundary comparisons are safe.
     // Pass a Date (not a UTC string): the pg driver serialises it in the Node
@@ -165,7 +156,20 @@ describe('ST-03: Seed agent data', () => {
     await ds.query(
       `INSERT INTO agent_messages (id, tenant_id, agent_id, timestamp, status, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, agent_name, user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [randomUUID(), tenantId, agentId, past, 'ok', 'test-model', 500, 200, 0, 0, smokeAgentName, 'test-user-001'],
+      [
+        randomUUID(),
+        tenantId,
+        agentId,
+        past,
+        'ok',
+        'test-model',
+        500,
+        200,
+        0,
+        0,
+        smokeAgentName,
+        'test-user-001',
+      ],
     );
 
     // Verify message is visible in the API
@@ -181,18 +185,32 @@ describe('ST-03: Seed agent data', () => {
 /* ------------------------------------------------------------------ */
 describe('ST-04: Routing enabled', () => {
   it('creates a custom provider and enables routing', async () => {
-    const res = await auth(
-      api().post(`/api/v1/routing/${smokeAgentName}/custom-providers`),
-    )
+    const res = await auth(api().post(`/api/v1/routing/${smokeAgentName}/custom-providers`))
       .send({
         name: 'Mock Provider',
         base_url: `http://127.0.0.1:${mockPort}`,
         apiKey: 'mock-key',
         models: [
-          { model_name: 'model-primary', input_price_per_million_tokens: 0.1, output_price_per_million_tokens: 0.1 },
-          { model_name: 'model-a', input_price_per_million_tokens: 0.5, output_price_per_million_tokens: 0.5 },
-          { model_name: 'model-b', input_price_per_million_tokens: 1, output_price_per_million_tokens: 1 },
-          { model_name: 'model-c', input_price_per_million_tokens: 2, output_price_per_million_tokens: 2 },
+          {
+            model_name: 'model-primary',
+            input_price_per_million_tokens: 0.1,
+            output_price_per_million_tokens: 0.1,
+          },
+          {
+            model_name: 'model-a',
+            input_price_per_million_tokens: 0.5,
+            output_price_per_million_tokens: 0.5,
+          },
+          {
+            model_name: 'model-b',
+            input_price_per_million_tokens: 1,
+            output_price_per_million_tokens: 1,
+          },
+          {
+            model_name: 'model-c',
+            input_price_per_million_tokens: 2,
+            output_price_per_million_tokens: 2,
+          },
         ],
       })
       .expect(201);
@@ -201,9 +219,7 @@ describe('ST-04: Routing enabled', () => {
 
     // A connected provider alone is not "enabled" anymore — routing turns on
     // once the user pins a routable model (next test).
-    const status = await auth(
-      api().get(`/api/v1/routing/${smokeAgentName}/status`),
-    ).expect(200);
+    const status = await auth(api().get(`/api/v1/routing/${smokeAgentName}/status`)).expect(200);
     expect(status.body).toEqual({ enabled: false, reason: 'no_routable_models' });
   });
 
@@ -217,9 +233,7 @@ describe('ST-04: Routing enabled', () => {
         .expect(200);
     }
 
-    const status = await auth(
-      api().get(`/api/v1/routing/${smokeAgentName}/status`),
-    ).expect(200);
+    const status = await auth(api().get(`/api/v1/routing/${smokeAgentName}/status`)).expect(200);
     expect(status.body.enabled).toBe(true);
   });
 });
@@ -351,9 +365,7 @@ describe('ST-09: Fallback chain', () => {
       .expect(200);
 
     // Set fallback chain: model-b → model-c
-    await auth(
-      api().put(`/api/v1/routing/${smokeAgentName}/tiers/simple/fallbacks`),
-    )
+    await auth(api().put(`/api/v1/routing/${smokeAgentName}/tiers/simple/fallbacks`))
       .send({ models: [modelKey('model-b'), modelKey('model-c')] })
       .expect(200);
 
@@ -371,8 +383,10 @@ describe('ST-09: Fallback chain', () => {
   });
 
   it('tries primary, then fallbacks in order, succeeds on model-c', async () => {
-    const res = await smokeBearer(api().post('/v1/chat/completions'))
-      .send({ messages: [{ role: 'user', content: 'hi' }], stream: false });
+    const res = await smokeBearer(api().post('/v1/chat/completions')).send({
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: false,
+    });
 
     // Should succeed via fallback model-c
     expect(res.status).toBe(200);

@@ -185,10 +185,13 @@ export default {
   },
   add: {
     title: 'Connect Harness',
+    titleNamed: 'Harness {{ name }}',
     desc: 'Name your harness to start tracking its LLM usage, costs, and messages in real time.',
     type: 'Type',
     name: 'Harness name',
-    namePlaceholder: 'e.g. My Cool Harness',
+    namePlaceholder: 'e.g. my-harness',
+    nameHint: 'Lowercase letters, numbers and hyphens (a-z, 0-9, -), like a DNS name.',
+    nameInvalid: 'The name cannot start or end with a hyphen.',
     settings: 'Settings',
     enableLogs: 'Enable logs',
     logsHint:

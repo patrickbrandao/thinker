@@ -62,7 +62,7 @@ const AGENT_TABS: { id: AgentId; label: string; icon: string }[] = [
   { id: 'craft', label: 'Craft Agent', icon: '/icons/craft.png' },
   { id: 'claude-code', label: 'Claude Code', icon: '/icons/providers/claude-code.svg' },
   { id: 'opencode', label: 'OpenCode', icon: '/icons/providers/opencode.svg' },
-  { id: 'codex', label: 'Codex', icon: '/icons/providers/codex.svg' },
+  { id: 'codex', label: 'Codex', icon: '/icons/codex.svg' },
 ];
 
 function headingFor(platform: string | null | undefined): string {

@@ -66,7 +66,7 @@ beforeAll(async () => {
   app = await createTestApp();
 
   const created = await dashboard(api().post('/api/v1/agents'))
-    .send({ name: 'Auto Eval' })
+    .send({ name: 'auto-eval' })
     .expect(201);
   agentName = created.body.agent.name;
   agentKey = created.body.apiKey;

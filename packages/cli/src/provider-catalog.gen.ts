@@ -225,6 +225,10 @@ export const PLATFORM_CATALOG: readonly PlatformCatalogEntry[] = [
     surface: 'chat_completions',
   },
   {
+    id: 'claude-app',
+    surface: 'messages',
+  },
+  {
     id: 'n8n',
     surface: 'chat_completions',
   },

@@ -591,8 +591,8 @@
     box-shadow: var(--shadow-float);
   }
   .floating-window--wide {
-    width: min(800px, calc(100vw - 32px));
-    height: min(720px, calc(100vh - 32px));
+    width: min(840px, calc(100vw - 32px));
+    height: min(760px, calc(100vh - 32px));
   }
   .floating-window-body {
     flex: 1 1 auto;
@@ -1184,6 +1184,14 @@
 }
 .dark .liquid-metal::after {
   opacity: 0.5;
+}
+/* The chosen harness type: the hover gray on light, pure black on dark so
+   the brand marks stand out. */
+.agent-type-select__option.liquid-metal {
+  background: var(--surface-2);
+}
+.dark .agent-type-select__option.liquid-metal {
+  background: #000;
 }
 @media (prefers-reduced-motion: reduce) {
   .liquid-metal::before,

@@ -100,7 +100,7 @@ describe('MCP server page', () => {
     );
     expect(icons).toEqual([
       '/icons/providers/claude-code.svg',
-      '/icons/providers/codex.svg',
+      '/icons/codex.svg',
       '/icons/providers/opencode.svg',
       '/icons/other.svg',
     ]);
