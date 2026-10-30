@@ -692,6 +692,7 @@
         "hljs"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -799,6 +800,7 @@
         "hljs-punctuation"
       ],
       "files": [
+        "shell.css",
         "syntax-highlight.css"
       ]
     },
@@ -1037,14 +1039,6 @@
       ],
       "files": [
         "base.css"
-      ]
-    },
-    "language-json": {
-      "classes": [
-        "language-json"
-      ],
-      "files": [
-        "shell.css"
       ]
     },
     "link-action": {
@@ -1780,7 +1774,8 @@
     "tool-card": {
       "classes": [
         "tool-card",
-        "tool-card__details"
+        "tool-card__details",
+        "tool-card__panel"
       ],
       "files": [
         "shell.css"
@@ -1789,6 +1784,14 @@
     "tool-key": {
       "classes": [
         "tool-key"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "tool-opt": {
+      "classes": [
+        "tool-opt"
       ],
       "files": [
         "shell.css"
@@ -2025,7 +2028,7 @@
     "tokens": 58,
     "darkOverrides": 50,
     "blocks": 201,
-    "classes": 214,
+    "classes": 215,
     "canonicalRules": 3,
     "ghostRules": 3
   }

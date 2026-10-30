@@ -1008,43 +1008,55 @@
 .tool-card__details {
   border-top: 1px solid hsl(36 80% 50% / 0.2);
 }
-.tool-card__details tr {
+.tool-card__panel {
+  border: 1px solid hsl(36 80% 50% / 0.2);
+}
+.tool-card__panel tr {
   border-bottom: 1px solid hsl(36 80% 50% / 0.12);
+}
+.tool-opt {
+  color: hsl(142 60% 32%);
+  font-weight: 500;
+}
+.dark .tool-opt {
+  color: hsl(142 55% 58%);
 }
 .tool-key {
   color: hsl(187 60% 38%);
   font-weight: 500;
 }
-.tool-str,
-.tool-card .language-json .hljs-string {
+.tool-str {
   color: hsl(24 80% 44%);
 }
-.tool-card .hljs-attr {
-  color: hsl(187 60% 38%);
-  font-weight: 500;
-}
-.tool-card .language-json .hljs-number {
-  color: hsl(260 60% 52%);
-}
-.tool-card .language-json .hljs-literal {
-  color: hsl(340 65% 45%);
-  font-weight: 500;
-}
+/* Schema JSON sits on black in both themes, so its tokens use the dark-theme colors. */
 .tool-card .json-block {
   border: 0;
-  background: hsl(36 80% 50% / 0.04);
+  background: #000;
+  color: hsl(0 0% 88%);
 }
-.dark .tool-key,
-.dark .tool-card .hljs-attr {
+.tool-card .json-block .hljs {
+  color: hsl(0 0% 88%);
+}
+.tool-card .json-block .hljs-attr {
   color: hsl(187 70% 58%);
+  font-weight: 500;
 }
-.dark .tool-str,
-.dark .tool-card .language-json .hljs-string {
+.tool-card .json-block .hljs-string {
   color: hsl(24 90% 65%);
 }
-.dark .tool-card .language-json .hljs-number {
+.tool-card .json-block .hljs-number {
   color: hsl(260 80% 75%);
 }
-.dark .tool-card .language-json .hljs-literal {
+.tool-card .json-block .hljs-literal {
   color: hsl(340 75% 68%);
+  font-weight: 500;
+}
+.tool-card .json-block .hljs-punctuation {
+  color: hsl(0 0% 60%);
+}
+.dark .tool-key {
+  color: hsl(187 70% 58%);
+}
+.dark .tool-str {
+  color: hsl(24 90% 65%);
 }

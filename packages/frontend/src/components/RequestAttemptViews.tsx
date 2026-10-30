@@ -305,14 +305,24 @@ interface ParamInfo {
   description?: string;
 }
 
+const SHORT_TYPES: Record<string, string> = {
+  string: 'str',
+  boolean: 'bool',
+  integer: 'int',
+  number: 'float',
+  object: 'obj',
+  array: 'arr',
+};
+
+const shortType = (type: unknown): string => SHORT_TYPES[String(type)] ?? String(type);
+
 function schemaType(schema: unknown): string {
   if (!isRec(schema)) return 'any';
   if (Array.isArray(schema.enum)) {
     return schema.enum.map((v) => JSON.stringify(v)).join(' | ');
   }
-  if (Array.isArray(schema.type)) return schema.type.join(' | ');
-  if (schema.type === 'array') return `${schemaType(schema.items)}[]`;
-  if (typeof schema.type === 'string') return schema.type;
+  if (Array.isArray(schema.type)) return schema.type.map(shortType).join(' | ');
+  if (typeof schema.type === 'string') return shortType(schema.type);
   const union = schema.anyOf ?? schema.oneOf;
   if (Array.isArray(union)) return union.map(schemaType).join(' | ');
   return 'any';
@@ -330,7 +340,7 @@ export function toolParams(parameters: unknown): ParamInfo[] {
   }));
 }
 
-/** `function name(string query, number limit?)` with required args orange, optional gray. */
+/** `ƒ name(str query, int limit)`: types gray, required names blue, optional names green. */
 function Signature({ kind, name, params }: { kind: string; name: string; params: ParamInfo[] }) {
   return (
     <code className="inline-flex flex-wrap items-center font-mono text-sm">
@@ -344,10 +354,8 @@ function Signature({ kind, name, params }: { kind: string; name: string; params:
       {params.map((p, i) => (
         <span key={p.name}>
           {i > 0 ? <span className="text-faint">, </span> : null}
-          <span className={p.required ? 'text-warn' : 'text-muted'}>
-            <span className="opacity-80">{p.type}</span> {p.name}
-            {p.required ? '' : '?'}
-          </span>
+          <span className="text-muted">{p.type}</span>{' '}
+          <span className={p.required ? 'tool-key' : 'tool-opt'}>{p.name}</span>
         </span>
       ))}
       <span className="text-faint">)</span>
@@ -367,10 +375,6 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <ChevronDown
-          className={cx('size-3.5 shrink-0 text-faint transition-transform', !open && '-rotate-90')}
-          aria-hidden="true"
-        />
         <Signature kind={tool.type ?? 'function'} name={name} params={params} />
         {calls != null ? (
           <span className={cx('badge ml-auto', calls > 0 ? 'is-ok' : '')}>
@@ -381,7 +385,7 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
         ) : null}
       </button>
       {open ? (
-        <div className="tool-card__details py-2 pr-3 pl-[75px]">
+        <div className="tool-card__panel mr-3 mb-2 ml-[75px] rounded-control px-3 py-2">
           {tool.function?.description ? (
             <p className="m-0 mb-2 whitespace-pre-wrap font-mono text-xs leading-normal text-muted">
               {tool.function.description}
@@ -392,8 +396,10 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
               <tbody>
                 {params.map((p) => (
                   <tr key={p.name} className="align-baseline">
-                    <td className="tool-key py-1 pr-3 font-mono">{p.name}</td>
-                    <td className="tool-str py-1 pr-3 font-mono">{p.type}</td>
+                    <td className={cx('py-1 pr-3 font-mono', p.required ? 'tool-key' : 'tool-opt')}>
+                      {p.name}
+                    </td>
+                    <td className="py-1 pr-3 font-mono text-muted">{p.type}</td>
                     <td className="py-1 pr-3 text-muted">
                       {p.required
                         ? t('messages.recording.required')

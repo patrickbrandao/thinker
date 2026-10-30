@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (201 BEM blocks, 214 classes)
+## Blocks (201 BEM blocks, 215 classes)
 actions (shell.css): actions
 alert-row (shell.css): alert-row
 alert-title (shell.css): alert-title
@@ -128,7 +128,7 @@ full (shell.css): full
 function_ (syntax-highlight.css): function_
 gate (shell.css): gate
 hint (base.css): hint
-hljs (syntax-highlight.css): hljs
+hljs (shell.css, syntax-highlight.css): hljs
 hljs-addition (syntax-highlight.css): hljs-addition
 hljs-attr (shell.css, syntax-highlight.css): hljs-attr
 hljs-built_in (syntax-highlight.css): hljs-built_in
@@ -141,7 +141,7 @@ hljs-number (shell.css, syntax-highlight.css): hljs-number
 hljs-operator (syntax-highlight.css): hljs-operator
 hljs-params (syntax-highlight.css): hljs-params
 hljs-property (syntax-highlight.css): hljs-property
-hljs-punctuation (syntax-highlight.css): hljs-punctuation
+hljs-punctuation (shell.css, syntax-highlight.css): hljs-punctuation
 hljs-regexp (syntax-highlight.css): hljs-regexp
 hljs-section (syntax-highlight.css): hljs-section
 hljs-string (shell.css, syntax-highlight.css): hljs-string
@@ -171,7 +171,6 @@ json-block (shell.css): json-block
 kbd (base.css): kbd
 kv (shell.css): kv
 label (base.css): label
-language-json (shell.css): language-json
 link-action (base.css): link-action
 logo-dark (shell.css): logo-dark
 logo-light (shell.css): logo-light
@@ -262,8 +261,9 @@ toast (shell.css): toast
 toast-close (shell.css): toast-close
 toast-msg (shell.css): toast-msg
 toasts (shell.css): toasts
-tool-card (shell.css): tool-card tool-card__details
+tool-card (shell.css): tool-card tool-card__details tool-card__panel
 tool-key (shell.css): tool-key
+tool-opt (shell.css): tool-opt
 tool-str (shell.css): tool-str
 topbar (shell.css): topbar
 topbar-actions (shell.css): topbar-actions
