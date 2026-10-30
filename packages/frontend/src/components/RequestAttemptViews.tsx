@@ -363,29 +363,22 @@ function Signature({ kind, name, params }: { kind: string; name: string; params:
   );
 }
 
-function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null }) {
+function DeclaredTool({ tool }: { tool: ChatTool }) {
   const [open, setOpen] = useState(false);
   const params = toolParams(tool.function?.parameters);
   const name = tool.function?.name ?? t('messages.recording.unknownTool');
   return (
-    <article className="tool-card rounded-control">
+    <div>
       <button
         type="button"
-        className="flex w-full cursor-pointer flex-wrap items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left"
+        className="tool-card flex w-full cursor-pointer flex-wrap items-center gap-2 rounded-control px-3 py-1.5 text-left"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <Signature kind={tool.type ?? 'function'} name={name} params={params} />
-        {calls != null ? (
-          <span className={cx('badge ml-auto', calls > 0 ? 'is-ok' : '')}>
-            {calls > 0
-              ? t('messages.recording.calledTimes', { count: calls })
-              : t('messages.recording.notCalled')}
-          </span>
-        ) : null}
       </button>
       {open ? (
-        <div className="tool-card__panel mr-3 mb-2 ml-[75px] rounded-control px-3 py-2">
+        <div className="tool-card tool-card__panel mt-1 ml-[75px] rounded-control px-3 py-2">
           {tool.function?.description ? (
             <p className="m-0 mb-2 whitespace-pre-wrap font-mono text-xs leading-normal text-muted">
               {tool.function.description}
@@ -423,7 +416,7 @@ function DeclaredTool({ tool, calls }: { tool: ChatTool; calls: number | null })
           ) : null}
         </div>
       ) : null}
-    </article>
+    </div>
   );
 }
 
@@ -443,7 +436,6 @@ export function ToolsView({
     (p): p is Extract<ResponsePart, { kind: 'tool_call' }> => p.kind === 'tool_call',
   );
   const answered = parsed.mode !== 'none';
-  const callCount = (name: string | undefined) => calls.filter((c) => c.name === name).length;
   const declaredByName = new Map(declared.map((tool) => [tool.function?.name, tool]));
 
   return (
@@ -499,11 +491,7 @@ export function ToolsView({
         ) : (
           <div className="flex flex-col gap-1">
             {declared.map((tool, i) => (
-              <DeclaredTool
-                key={i}
-                tool={tool}
-                calls={answered ? callCount(tool.function?.name) : null}
-              />
+              <DeclaredTool key={i} tool={tool} />
             ))}
           </div>
         )}
