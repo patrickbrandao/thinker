@@ -1,18 +1,8 @@
-import { sanitizeRequestHeaders } from './request-headers';
+import { receivedHeaders, sanitizeRequestHeaders } from './request-headers';
 
 describe('sanitizeRequestHeaders', () => {
   it('returns null when no headers are provided', () => {
     expect(sanitizeRequestHeaders({})).toBeNull();
-  });
-
-  it('returns null when every header is empty or sensitive', () => {
-    expect(
-      sanitizeRequestHeaders({
-        authorization: 'Bearer thk_secret',
-        cookie: 'session=abc',
-        'x-blank': '   ',
-      }),
-    ).toBeNull();
   });
 
   it('keeps ordinary headers and lowercases keys', () => {
@@ -29,7 +19,7 @@ describe('sanitizeRequestHeaders', () => {
     });
   });
 
-  it('drops sensitive headers regardless of casing', () => {
+  it('keeps sensitive headers but redacts their values, preserving the auth scheme', () => {
     const result = sanitizeRequestHeaders({
       Authorization: 'Bearer thk_secret',
       Cookie: 'session=abc',
@@ -38,38 +28,46 @@ describe('sanitizeRequestHeaders', () => {
       'X-API-Key': 'abc',
       'x-safe': 'keep',
     });
-    expect(result).toEqual({ 'x-safe': 'keep' });
+    expect(result).toEqual({
+      authorization: 'Bearer [REDACTED]',
+      cookie: '[REDACTED]',
+      'set-cookie': '[REDACTED]',
+      'proxy-authorization': 'Basic [REDACTED]',
+      'x-api-key': '[REDACTED]',
+      'x-safe': 'keep',
+    });
+    expect(JSON.stringify(result)).not.toContain('thk_secret');
   });
 
-  it('drops Railway/proxy/transport noise headers regardless of casing', () => {
+  it('keeps proxy, edge and transport headers', () => {
     const result = sanitizeRequestHeaders({
-      'X-Railway-Edge': 'railway/europe-west4-drams3a',
-      'X-Railway-Request-Id': 'm5e5d2NRQLKtNMov2JZdWA',
-      'X-Forwarded-For': '193.33.57.199',
+      'X-Forwarded-For': '193.33.57.199, 10.0.0.1',
       'X-Forwarded-Host': 'app.thinker.example.com',
       'X-Forwarded-Proto': 'https',
-      'X-Forwarded-Port': '443',
       'X-Real-Ip': '193.33.57.199',
-      'X-Request-Start': '1779377596677',
-      'X-Envoy-External-Address': '193.33.57.199',
+      Forwarded: 'for="193.33.57.199";proto=https',
+      Via: '1.1 google',
       Host: 'app.thinker.example.com',
       Connection: 'keep-alive',
       'Accept-Encoding': 'gzip',
       'Content-Length': '143',
-      'User-Agent': 'curl/8.18.0',
     });
-    expect(result).toEqual({ 'user-agent': 'curl/8.18.0' });
+    expect(result).toEqual({
+      'x-forwarded-for': '193.33.57.199, 10.0.0.1',
+      'x-forwarded-host': 'app.thinker.example.com',
+      'x-forwarded-proto': 'https',
+      'x-real-ip': '193.33.57.199',
+      forwarded: 'for="193.33.57.199";proto=https',
+      via: '1.1 google',
+      host: 'app.thinker.example.com',
+      connection: 'keep-alive',
+      'accept-encoding': 'gzip',
+      'content-length': '143',
+    });
   });
 
-  it('drops Google Cloud edge headers that carry the caller IP or trace ids', () => {
-    const result = sanitizeRequestHeaders({
-      Forwarded: 'for="193.33.57.199";proto=https',
-      Via: '1.1 google',
-      'X-Cloud-Trace-Context': '105445aa7843bc8bf206b12000100000/1;o=1',
-      Traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-      'User-Agent': 'curl/8.18.0',
-    });
-    expect(result).toEqual({ 'user-agent': 'curl/8.18.0' });
+  it('keeps headers with empty values', () => {
+    expect(sanitizeRequestHeaders({ 'x-blank': '   ' })).toEqual({ 'x-blank': '' });
   });
 
   it('flattens array values with comma-space separator', () => {
@@ -79,66 +77,54 @@ describe('sanitizeRequestHeaders', () => {
   });
 
   it('skips headers with null/undefined values', () => {
-    expect(
-      sanitizeRequestHeaders({
-        'x-keep': 'yes',
-        'x-null': undefined,
-      }),
-    ).toEqual({ 'x-keep': 'yes' });
+    expect(sanitizeRequestHeaders({ 'x-keep': 'yes', 'x-null': undefined })).toEqual({
+      'x-keep': 'yes',
+    });
   });
 
   it('strips control characters and trims whitespace', () => {
-    expect(
-      sanitizeRequestHeaders({
-        'x-dirty': '  hello\u0001world\u007f  ',
-      }),
-    ).toEqual({ 'x-dirty': 'helloworld' });
+    expect(sanitizeRequestHeaders({ 'x-dirty': '  hello\u0001world\u007f  ' })).toEqual({
+      'x-dirty': 'helloworld',
+    });
   });
 
-  it('truncates values longer than 1024 bytes with an ellipsis', () => {
-    const big = 'a'.repeat(2000);
-    const result = sanitizeRequestHeaders({ 'x-big': big });
-    const value = result!['x-big'];
-    expect(Buffer.byteLength(value, 'utf8')).toBeLessThanOrEqual(1024);
+  it('truncates values longer than 8192 bytes with an ellipsis, by byte length', () => {
+    const value = sanitizeRequestHeaders({ 'x-big': '🦞'.repeat(4000) })!['x-big'];
+    expect(Buffer.byteLength(value, 'utf8')).toBeLessThanOrEqual(8192);
     expect(value.endsWith('…')).toBe(true);
-    // Budget is 1024 bytes − 3 (ellipsis) = 1021 'a's.
-    expect(value.slice(0, -1)).toBe('a'.repeat(1021));
+    expect(value).not.toContain('�');
   });
 
-  it('truncates multi-byte values by byte length without leaving replacement chars', () => {
-    // Each 🦞 is 4 bytes in UTF-8, so 400 of them = 1600 bytes > 1024.
-    const big = '🦞'.repeat(400);
-    const result = sanitizeRequestHeaders({ 'x-big': big });
-    const value = result!['x-big'];
-    expect(Buffer.byteLength(value, 'utf8')).toBeLessThanOrEqual(1024);
-    expect(value.endsWith('…')).toBe(true);
-    expect(value).not.toContain('\uFFFD');
-  });
-
-  it('caps the total number of headers at 50', () => {
+  it('caps the total number of headers at 200', () => {
     const headers: Record<string, string> = {};
-    for (let i = 0; i < 100; i++) headers[`x-h-${i}`] = 'v';
-    const result = sanitizeRequestHeaders(headers);
-    expect(Object.keys(result!).length).toBe(50);
+    for (let i = 0; i < 300; i++) headers[`x-h-${i}`] = 'v';
+    expect(Object.keys(sanitizeRequestHeaders(headers)!).length).toBe(200);
   });
 
-  it('accounts for JSON-escaped bytes in the total budget', () => {
-    // Values full of " chars — each byte doubles after JSON escaping.
+  it('respects the 64 KB total byte budget, counting JSON escapes', () => {
     const headers: Record<string, string> = {};
-    for (let i = 0; i < 30; i++) headers[`x-h-${i}`] = '"'.repeat(500);
+    for (let i = 0; i < 30; i++) headers[`x-h-${i}`] = '"'.repeat(4000);
     const result = sanitizeRequestHeaders(headers);
-    const serialized = Buffer.byteLength(JSON.stringify(result), 'utf8');
-    expect(serialized).toBeLessThanOrEqual(8192);
+    expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(65536);
+    expect(Object.keys(result!).length).toBeLessThan(30);
+  });
+});
+
+describe('receivedHeaders', () => {
+  it('rebuilds headers from rawHeaders, ignoring values stamped by middleware', () => {
+    const result = receivedHeaders({
+      headers: { 'x-forwarded-for': '1.2.3.4', 'x-thinker-client-ip': '1.2.3.4' },
+      rawHeaders: ['X-Forwarded-For', '1.2.3.4', 'Host', 'a.example', 'X-Dup', 'a', 'x-dup', 'b'],
+    });
+    expect(result).toEqual({
+      'x-forwarded-for': '1.2.3.4',
+      host: 'a.example',
+      'x-dup': ['a', 'b'],
+    });
   });
 
-  it('respects the 8 KB total byte budget', () => {
-    const headers: Record<string, string> = {};
-    // Each entry ~1 KB; at most ~8 should fit (budget is 8192 bytes).
-    for (let i = 0; i < 20; i++) headers[`x-chunk-${i}`] = 'a'.repeat(1000);
-    const result = sanitizeRequestHeaders(headers);
-    const serialized = Buffer.byteLength(JSON.stringify(result), 'utf8');
-    expect(serialized).toBeLessThanOrEqual(8192);
-    expect(Object.keys(result!).length).toBeLessThan(20);
-    expect(Object.keys(result!).length).toBeGreaterThan(0);
+  it('falls back to headers when rawHeaders is missing', () => {
+    const headers = { host: 'a.example' };
+    expect(receivedHeaders({ headers })).toBe(headers);
   });
 });

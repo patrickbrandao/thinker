@@ -1,13 +1,16 @@
 import type { IncomingHttpHeaders } from 'http';
 
-const MAX_HEADERS = 50;
-const MAX_VALUE_BYTES = 1024;
-const MAX_TOTAL_BYTES = 8192;
+const MAX_HEADERS = 200;
+const MAX_VALUE_BYTES = 8192;
+const MAX_TOTAL_BYTES = 65536;
 const ELLIPSIS_BYTES = Buffer.byteLength('…', 'utf8');
+const REDACTED = '[REDACTED]';
 
-// Headers that can carry secrets — dropped entirely so they never hit the DB.
-// The Playground blocklist (thinker-shared) must cover every name here; a spec
-// in playground/request-header-sanitizer.spec.ts guards that.
+// Headers that can carry secrets. They are recorded (so the stored header set
+// is complete) but their value is replaced, keeping only the auth scheme, so
+// credentials never hit the DB. The Playground blocklist (thinker-shared) must
+// cover every name here; a spec in playground/request-header-sanitizer.spec.ts
+// guards that.
 export const SENSITIVE_HEADERS: ReadonlySet<string> = new Set<string>([
   'authorization',
   'cookie',
@@ -16,42 +19,37 @@ export const SENSITIVE_HEADERS: ReadonlySet<string> = new Set<string>([
   'x-api-key',
 ]);
 
-// Infrastructure noise injected by the hosting edge (Railway, Google Cloud
-// load balancers / Cloud Run) and the
-// transport layer. None of it is meaningful for routing or studying an LLM
-// call, so we drop it before recording rather than persisting it on every
-// message.
-//
-// NOTE: `x-forwarded-for`, `x-real-ip` and `forwarded` carry the end-user's IP. They are
-// dropped on purpose — not just as noise but because storing client IPs on
-// every message is PII we have no product use for (the telemetry policy
-// already lists "raw IPs" as never-sent). Do NOT re-add them for a "request
-// origin" feature without a deliberate retention/consent decision.
-const NOISE_HEADERS = new Set<string>([
-  'x-railway-edge',
-  'x-railway-request-id',
-  'x-forwarded-for',
-  'x-forwarded-host',
-  'x-forwarded-proto',
-  'x-forwarded-port',
-  'x-real-ip',
-  // Stamped by clientIpMiddleware; the resolved address lives in caller_attribution.
-  'x-thinker-client-ip',
-  'x-thinker-client-ip-source',
-  'x-thinker-peer-ip',
-  'x-request-start',
-  'x-envoy-external-address',
-  // Google Cloud edge: `forwarded` (RFC 7239) carries the caller's IP, the
-  // rest is proxy and tracing metadata.
-  'forwarded',
-  'via',
-  'x-cloud-trace-context',
-  'traceparent',
-  'host',
-  'connection',
-  'accept-encoding',
-  'content-length',
-]);
+/**
+ * The headers exactly as received on the wire (direct or through a reverse
+ * proxy), built from `rawHeaders` so values stamped later by middleware (e.g.
+ * the `x-thinker-client-ip*` resolver headers) are not mistaken for client
+ * headers. Repeated headers are kept as arrays. Falls back to `headers` when
+ * the raw list is unavailable.
+ */
+export function receivedHeaders(req: {
+  headers: IncomingHttpHeaders;
+  rawHeaders?: string[];
+}): IncomingHttpHeaders {
+  const raw = req.rawHeaders;
+  if (!Array.isArray(raw) || raw.length === 0) return req.headers;
+  const out: Record<string, string | string[]> = {};
+  for (let i = 0; i + 1 < raw.length; i += 2) {
+    const key = raw[i].toLowerCase();
+    const value = raw[i + 1];
+    const prev = out[key];
+    if (prev === undefined) out[key] = value;
+    else out[key] = Array.isArray(prev) ? [...prev, value] : [prev, value];
+  }
+  return out;
+}
+
+function redact(key: string, value: string): string {
+  if (key === 'authorization' || key === 'proxy-authorization') {
+    const scheme = /^(\S+)\s+\S/.exec(value)?.[1];
+    return scheme ? `${scheme} ${REDACTED}` : REDACTED;
+  }
+  return REDACTED;
+}
 
 export function sanitizeRequestHeaders(
   headers: IncomingHttpHeaders,
@@ -65,18 +63,16 @@ export function sanitizeRequestHeaders(
     if (rawVal == null) continue;
 
     const key = rawKey.toLowerCase();
-    if (SENSITIVE_HEADERS.has(key)) continue;
-    if (NOISE_HEADERS.has(key)) continue;
-
     const joined = Array.isArray(rawVal) ? rawVal.join(', ') : String(rawVal);
     const cleaned = joined.replace(/[\x00-\x1f\x7f]/g, '').trim();
-    if (!cleaned) continue;
 
-    const value = truncateUtf8(cleaned, MAX_VALUE_BYTES);
+    const value = SENSITIVE_HEADERS.has(key)
+      ? redact(key, cleaned)
+      : truncateUtf8(cleaned, MAX_VALUE_BYTES);
 
     // Measure the *actual* serialized cost (JSON.stringify handles escaping of
     // quotes, backslashes, control chars) so values full of `"` or `\` can't
-    // silently blow past the 8 KB budget.
+    // silently blow past the total budget.
     const entryBytes =
       Buffer.byteLength(JSON.stringify(key), 'utf8') +
       Buffer.byteLength(JSON.stringify(value), 'utf8') +
