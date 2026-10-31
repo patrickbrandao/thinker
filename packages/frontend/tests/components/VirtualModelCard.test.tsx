@@ -74,9 +74,9 @@ describe('VirtualModelCard', () => {
     fallbackProps = {};
   });
 
-  it('titles the card "Virtual model: <name>" and shows the primary and the fallbacks', () => {
+  it('titles the card with the bare name and shows the primary and the fallbacks', () => {
     renderCard();
-    expect(screen.getByText('Virtual model:')).toBeTruthy();
+    expect(screen.queryByText('Virtual model:')).toBeNull();
     expect(screen.getByText('deepseek/flash')).toBeTruthy();
     expect(screen.queryByText('model: "deepseek/flash"')).toBeNull();
     expect(screen.getByText('deepseek-chat')).toBeTruthy();
@@ -141,7 +141,7 @@ describe('VirtualModelCard', () => {
     expect(mockSetFallbacks).toHaveBeenCalledWith('demo', 'vm-1', ['m'], undefined);
     await (fallbackProps.persistClearFallbacks as () => Promise<unknown>)();
     expect(mockClearFallbacks).toHaveBeenCalledWith('demo', 'vm-1');
-    fireEvent.click(screen.getByText('Reset'));
-    expect(mockClearOverride).toHaveBeenCalledWith('demo', 'vm-1');
+    // No Reset on virtual model cards: models are removed one by one.
+    expect(screen.queryByText('Reset')).toBeNull();
   });
 });

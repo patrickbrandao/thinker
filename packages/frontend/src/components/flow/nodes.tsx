@@ -1,13 +1,13 @@
 import { memo, type CSSProperties } from 'react';
 import { Handle, Position, type NodeProps, type NodeTypes } from '@xyflow/react';
-import { Bot, Boxes, Monitor, Plug, Route } from 'lucide-react';
+import { BrainCircuit, Boxes, Monitor, Plug, Route } from 'lucide-react';
 import type { FlowNode, FlowNodeKind } from './types.js';
 import { t } from '../../i18n/index.js';
 import { cx } from '../ui.jsx';
 
-const KIND_ICON: Record<FlowNodeKind, typeof Bot> = {
+const KIND_ICON: Record<FlowNodeKind, typeof BrainCircuit> = {
   client: Monitor,
-  entry: Bot,
+  entry: BrainCircuit,
   hub: Route,
   item: Plug,
   group: Boxes,

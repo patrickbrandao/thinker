@@ -31,10 +31,6 @@ vi.mock('../../src/services/api', () => ({
   updateModelListing: (_agent: string, mode: string) => Promise.resolve({ mode }),
 }));
 
-vi.mock('../../src/services/api/virtual-models', () => ({
-  listVirtualModels: () => Promise.resolve([]),
-}));
-
 vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -77,22 +73,6 @@ vi.mock('../../src/components/AgentTypeGrid', () => ({
       </button>
     </div>
   ),
-}));
-
-let mockSetupThrows = false;
-vi.mock('../../src/components/SetupStepAddProvider', () => ({
-  default: (props: any) => {
-    if (mockSetupThrows) throw new Error('render crash');
-    return (
-      <div
-        data-testid="setup-add-provider"
-        data-base-url={props.baseUrl ?? ''}
-        data-key={props.apiKey ?? ''}
-        data-platform={props.platform ?? ''}
-        data-key-prefix={props.keyPrefix ?? ''}
-      />
-    );
-  },
 }));
 
 const mockMarkAgentCreated = vi.fn();
@@ -164,7 +144,6 @@ describe('Settings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAgentName = 'test-agent';
-    mockSetupThrows = false;
     mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_abc' });
     mockGetAgentInfo.mockResolvedValue({
       agent_name: 'test-agent',
@@ -215,11 +194,6 @@ describe('Settings', () => {
   it('renders API Key section', () => {
     render(() => <Settings />);
     expect(screen.getByText('Harness API key')).toBeDefined();
-  });
-
-  it('renders Setup section', () => {
-    render(() => <Settings />);
-    expect(screen.getByText('Setup')).toBeDefined();
   });
 
   it('has no Autofix section or third-party terms link', () => {
@@ -403,18 +377,9 @@ describe('Settings', () => {
     });
   });
 
-  it('shows setup instructions with platform from agent info', async () => {
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      const el = container.querySelector('[data-testid="setup-add-provider"]');
-      expect(el).not.toBeNull();
-      expect(el!.getAttribute('data-platform')).toBe('openclaw');
-    });
-  });
-
   it('shows settings description without duplicating the agent heading', () => {
     const { container } = render(() => <Settings />);
-    expect(container.textContent).toContain('Rename your agent');
+    expect(container.textContent).toContain('Rename the harness');
   });
 
   it('handles rotate key error gracefully', async () => {
@@ -443,24 +408,6 @@ describe('Settings', () => {
     await vi.waitFor(() => {
       expect(mockDeleteAgent).toHaveBeenCalled();
     });
-  });
-
-  it('shows ErrorBoundary fallback when child crashes', async () => {
-    mockSetupThrows = true;
-    const suppress = (e: ErrorEvent) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    };
-    window.addEventListener('error', suppress, true);
-    try {
-      const { container } = render(() => <Settings />);
-      await vi.waitFor(() => {
-        expect(container.textContent).toContain('Something went wrong');
-      });
-    } finally {
-      window.removeEventListener('error', suppress, true);
-      mockSetupThrows = false;
-    }
   });
 
   it('calls updateAgent when type changed via modal Save', async () => {
@@ -568,16 +515,6 @@ describe('Settings', () => {
     });
   });
 
-  it('passes keyPrefix to setup component', async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_xyz_prefix' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      const el = container.querySelector('[data-testid="setup-add-provider"]');
-      expect(el).not.toBeNull();
-      expect(el!.getAttribute('data-key-prefix')).toBe('thk_xyz_prefix');
-    });
-  });
-
   it('disables AgentTypePicker during save in modal', async () => {
     let resolveSave: (v: any) => void;
     mockUpdateAgent.mockReturnValue(
@@ -621,14 +558,6 @@ describe('Settings', () => {
       expect(picker!.getAttribute('data-disabled')).toBe('true');
     });
     resolveSave!({});
-  });
-
-  it('shows error banner when API key fetch fails', async () => {
-    mockGetAgentKey.mockRejectedValue(new Error('key fetch failed'));
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Could not load your API key');
-    });
   });
 
   it('shows fallback key display when no full key available', async () => {
@@ -722,31 +651,6 @@ describe('Settings', () => {
     fireEvent.mouseDown(pickerModal);
     await vi.waitFor(() => {
       expect(document.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
-    });
-  });
-
-  it('uses thinker.example.com in setup on the gateway host', async () => {
-    const originalLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      value: {
-        ...originalLocation,
-        hostname: 'thinker.example.com',
-        origin: 'https://thinker.example.com',
-      },
-      writable: true,
-      configurable: true,
-    });
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_abc' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      const el = container.querySelector('[data-testid="setup-add-provider"]');
-      expect(el).not.toBeNull();
-      expect(el!.getAttribute('data-base-url')).toBe('https://thinker.example.com/v1');
-    });
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
     });
   });
 

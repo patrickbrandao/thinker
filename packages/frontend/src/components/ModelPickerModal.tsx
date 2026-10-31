@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { KeyRound, RefreshCw, Search, Server, User } from 'lucide-react';
+import { KeyRound, Layers, RefreshCw, Search, Server, User } from 'lucide-react';
 import {
   refreshModels,
   refreshProviderModels,
@@ -31,10 +31,19 @@ const PICKER_MODEL_ROW_HEIGHT = 40;
 /** Stacked label + four cells + gaps + padding in the ≤640px layout. */
 const PICKER_MODEL_ROW_HEIGHT_NARROW = 160;
 
-type ModalModel = { value: string; label: string; pricing: AvailableModel };
+type ModalModel = { value: string; label: string; pricing: AvailableModel; authType: AuthType };
 type PickerItem =
-  | { kind: 'header'; provId: string; name: string }
+  | { kind: 'header'; provId: string; name: string; authType: AuthType }
   | { kind: 'model'; provId: string; name: string; model: ModalModel };
+/** Picker tab: one auth category, or every connected provider at once. */
+type PickerTab = AuthType | 'all';
+
+/** Price text color by billing: dark blue for subscriptions, dark orange for usage-based. */
+const PRICE_COLOR: Record<AuthType, string> = {
+  subscription: 'routing-modal__model-price--subscription text-[#1e3a8a] [.dark_&]:text-[#93c5fd]',
+  api_key: 'routing-modal__model-price--api-key text-[#9a3412] [.dark_&]:text-[#fdba74]',
+  local: 'text-muted',
+};
 
 interface Props {
   tierId: string;
@@ -131,7 +140,8 @@ export default function ModelPickerModal(props: Props) {
   // connected the default is 'api_key' — matches the pre-local behavior so
   // existing snapshots / tests that assume the free-only pill is visible
   // (only shown for api_key) don't start failing.
-  const [activeTab, setActiveTab] = useState<AuthType>(() => {
+  const [activeTab, setActiveTab] = useState<PickerTab>(() => {
+    if (showTabs) return 'all';
     if (hasSubscription) return 'subscription';
     if (hasLocal && !hasApiKey) return 'local';
     return 'api_key';
@@ -207,12 +217,12 @@ export default function ModelPickerModal(props: Props) {
     return ACTION_CAPABILITIES.filter((c) => found.has(c));
   }, [props.models]);
 
-  const handleRefreshGroup = async (provId: string, displayName: string) => {
+  const handleRefreshGroup = async (provId: string, displayName: string, authType: AuthType) => {
     if (!props.agentName) return;
     if (provId.startsWith('custom:')) return;
     setRefreshingProvId(provId);
     try {
-      const result = await refreshProviderModels(props.agentName, provId, activeTab);
+      const result = await refreshProviderModels(props.agentName, provId, authType);
       if (result.ok) {
         toast.success(t('models.picker.refreshed', displayName, result.model_count));
       } else {
@@ -239,20 +249,31 @@ export default function ModelPickerModal(props: Props) {
     const connectedList = props.connectedProviders ?? [];
     const hasConnectedProviders = connectedList.length > 0;
 
-    /** Provider IDs that have an active connection of the current auth type. */
+    /** `auth\0provider` keys of every active connection (any auth type). */
     let allowedProviders: Set<string> | undefined;
     if (hasConnectedProviders) {
       allowedProviders = new Set<string>();
       for (const p of connectedList) {
-        if (p.is_active && p.auth_type === tab) {
-          allowedProviders.add(p.provider.toLowerCase());
-          const resolved = resolveProviderId(p.provider);
-          if (resolved) allowedProviders.add(resolved);
-        }
+        if (!p.is_active) continue;
+        allowedProviders.add(`${p.auth_type}\0${p.provider.toLowerCase()}`);
+        const resolved = resolveProviderId(p.provider);
+        if (resolved) allowedProviders.add(`${p.auth_type}\0${resolved}`);
       }
     }
+    /** Auth type of a row: the model's own, else the tab's (or the provider's connection). */
+    const authFor = (m: AvailableModel, provId: string): AuthType => {
+      if (m.auth_type) return m.auth_type;
+      if (tab !== 'all') return tab;
+      const conn = connectedList.find(
+        (p) =>
+          p.is_active &&
+          (p.provider.toLowerCase() === provId || resolveProviderId(p.provider) === provId),
+      );
+      return conn?.auth_type ?? 'api_key';
+    };
 
-    const groupMap = new Map<string, { provId: string; name: string; models: ModalModel[] }>();
+    type Group = { provId: string; name: string; authType: AuthType; models: ModalModel[] };
+    const groupMap = new Map<string, Group>();
     const freeOnly = tab === 'api_key' && showFreeOnly;
 
     for (const m of props.models) {
@@ -260,7 +281,7 @@ export default function ModelPickerModal(props: Props) {
       // from leaking into the API Keys tab and vice versa (e.g. when the
       // same provider is connected with both auth types and they have
       // different model access levels).
-      if (showTabs && m.auth_type && m.auth_type !== tab) continue;
+      if (showTabs && tab !== 'all' && m.auth_type && m.auth_type !== tab) continue;
       if (freeOnly && !isFreeModel(m)) continue;
       if (requiredCapabilities.size > 0) {
         const caps = m.capabilities ?? [];
@@ -289,23 +310,25 @@ export default function ModelPickerModal(props: Props) {
             ? prefixProvId
             : (dbProvId ?? prefixProvId);
       if (!provId) continue;
-      if (allowedProviders && !allowedProviders.has(provId)) continue;
-      if (!groupMap.has(provId)) {
+      const authType = authFor(m, provId);
+      if (allowedProviders && !allowedProviders.has(`${authType}\0${provId}`)) continue;
+      const groupKey = `${authType}\0${provId}`;
+      if (!groupMap.has(groupKey)) {
         const isCustom = provId.startsWith('custom:');
         const provDef = PROVIDERS.find((p) => p.id === provId);
         const name = isCustom
           ? (m.provider_display_name ?? cpNames.get(provId) ?? m.provider)
           : (provDef?.name ?? m.provider);
-        groupMap.set(provId, { provId, name, models: [] });
+        groupMap.set(groupKey, { provId, name, authType, models: [] });
       }
       const label =
         m.display_name && m.display_name !== m.model_name
           ? m.display_name
           : labelForModel(m.model_name, labels, providerIds);
-      groupMap.get(provId)!.models.push({ value: m.model_name, label, pricing: m });
+      groupMap.get(groupKey)!.models.push({ value: m.model_name, label, pricing: m, authType });
     }
 
-    const groups: { provId: string; name: string; models: ModalModel[] }[] = [];
+    const groups: Group[] = [];
     for (const group of groupMap.values()) {
       group.models.sort((a, b) => {
         if (a.value === 'openrouter/free') return -1;
@@ -324,7 +347,7 @@ export default function ModelPickerModal(props: Props) {
         groups.push(group);
       }
     }
-    groups.sort((a, b) => a.name.localeCompare(b.name));
+    groups.sort((a, b) => a.name.localeCompare(b.name) || a.authType.localeCompare(b.authType));
     return groups;
   }, [
     search,
@@ -340,7 +363,12 @@ export default function ModelPickerModal(props: Props) {
   const pickerItems = useMemo((): PickerItem[] => {
     const items: PickerItem[] = [];
     for (const group of groupedModels) {
-      items.push({ kind: 'header', provId: group.provId, name: group.name });
+      items.push({
+        kind: 'header',
+        provId: group.provId,
+        name: group.name,
+        authType: group.authType,
+      });
       for (const model of group.models) {
         items.push({ kind: 'model', provId: group.provId, name: group.name, model });
       }
@@ -400,9 +428,10 @@ export default function ModelPickerModal(props: Props) {
     return () => cancelAnimationFrame(id);
   }, [showSearch]);
 
+  const isAll = activeTab === 'all';
   const isSub = activeTab === 'subscription';
   const isLocal = activeTab === 'local';
-  const isPaid = !isSub && !isLocal;
+  const isPaid = activeTab === 'api_key';
   const missingRequiredCapability = (model: AvailableModel): string | null => {
     const required = props.requiredCapability;
     if (!required) return null;
@@ -432,7 +461,13 @@ export default function ModelPickerModal(props: Props) {
     (s) => s.id === props.tierId,
   )?.label;
 
-  const tabItems: TabItem<AuthType>[] = [];
+  const tabItems: TabItem<PickerTab>[] = [
+    {
+      key: 'all',
+      label: t('models.picker.allProviders'),
+      icon: <Layers className="size-3.5" aria-hidden="true" />,
+    },
+  ];
   if (hasSubscription)
     tabItems.push({
       key: 'subscription',
@@ -456,11 +491,13 @@ export default function ModelPickerModal(props: Props) {
     ? t('models.noSearchMatch')
     : showFreeOnly
       ? t('models.picker.noFree')
-      : isSub
-        ? t('models.picker.noSubscription')
-        : isLocal
-          ? t('models.picker.noLocal')
-          : t('models.picker.noApiKey');
+      : isAll
+        ? t('models.picker.noAll')
+        : isSub
+          ? t('models.picker.noSubscription')
+          : isLocal
+            ? t('models.picker.noLocal')
+            : t('models.picker.noApiKey');
 
   const renderGroupIcon = (provId: string, name: string) => {
     if (!provId.startsWith('custom:')) return providerIcon(provId, 16);
@@ -486,14 +523,15 @@ export default function ModelPickerModal(props: Props) {
     const tooltip = [model.label, model.value !== model.label ? model.value : null, disabledReason]
       .filter(Boolean)
       .join('\n');
-    const role = modelRole(model.value, provId, activeTab);
+    const role = modelRole(model.value, provId, model.authType);
     const actionCaps = actionCapabilitiesFor(model.pricing);
     const cellLabel = 'routing-modal__model-cell-label text-xs text-faint sm:hidden';
     return (
       <button
         type="button"
         className={cx(
-          'routing-modal__model w-full rounded-control px-3 py-2 text-left text-sm sm:h-10 sm:py-0',
+          // pl-8 indents the row 20px past the provider header (px-3).
+          'routing-modal__model w-full rounded-control py-2 pl-8 pr-3 text-left text-sm sm:h-10 sm:py-0',
           ROW_GRID,
           disabled
             ? 'routing-modal__model--disabled cursor-not-allowed opacity-50'
@@ -501,7 +539,7 @@ export default function ModelPickerModal(props: Props) {
         )}
         disabled={disabled}
         title={tooltip}
-        onClick={() => props.onSelect(props.tierId, model.value, provId, activeTab)}
+        onClick={() => props.onSelect(props.tierId, model.value, provId, model.authType)}
       >
         <span className="routing-modal__model-left flex min-w-0 items-center">
           <span className="routing-modal__model-label flex min-w-0 items-center gap-2 font-medium text-ink">
@@ -542,15 +580,20 @@ export default function ModelPickerModal(props: Props) {
         </span>
         <span className="routing-modal__model-cell routing-modal__model-cell--price flex items-center justify-between gap-2 sm:justify-end">
           <span className={cellLabel}>{t('models.picker.colPrice')}</span>
-          <span className="routing-modal__model-price font-mono text-xs text-muted">
-            {isPaid
+          <span
+            className={cx(
+              'routing-modal__model-price text-right font-mono text-xs',
+              PRICE_COLOR[model.authType],
+            )}
+          >
+            {model.authType === 'api_key'
               ? model.pricing
                 ? t('models.picker.priceInOut', {
                     input: pricePerM(model.pricing.input_price_per_token),
                     output: pricePerM(model.pricing.output_price_per_token),
                   })
                 : null
-              : isLocal
+              : model.authType === 'local'
                 ? t('models.picker.runsLocally')
                 : (formatPerRequestCost(model.pricing.cost_per_request) ??
                   t('models.picker.included'))}
@@ -583,7 +626,7 @@ export default function ModelPickerModal(props: Props) {
             className="!mb-0"
             items={tabItems}
             value={activeTab}
-            onChange={(key) => {
+            onChange={(key: PickerTab) => {
               setActiveTab(key);
               if (key !== 'api_key') setShowFreeOnly(false);
             }}
@@ -640,7 +683,7 @@ export default function ModelPickerModal(props: Props) {
         {groupedModels.length > 0 ? (
           <div
             className={cx(
-              'routing-modal__table-head hidden border-b border-line px-3 pb-2 text-xs font-medium uppercase tracking-wide text-faint',
+              'routing-modal__table-head hidden border-b border-line pb-2 pl-8 pr-3 text-xs font-medium uppercase tracking-wide text-faint',
               'sm:grid',
               ROW_COLUMNS,
             )}
@@ -671,6 +714,15 @@ export default function ModelPickerModal(props: Props) {
                     {renderGroupIcon(item.provId, item.name)}
                   </span>
                   <span className="routing-modal__group-name truncate">{item.name}</span>
+                  {isAll ? (
+                    <span className="routing-modal__group-auth shrink-0 font-normal text-faint">
+                      {item.authType === 'subscription'
+                        ? t('models.picker.subscription')
+                        : item.authType === 'local'
+                          ? t('models.picker.local')
+                          : t('models.picker.usageBased')}
+                    </span>
+                  ) : null}
                   {props.agentName && !item.provId.startsWith('custom:') ? (
                     <button
                       type="button"
@@ -678,7 +730,7 @@ export default function ModelPickerModal(props: Props) {
                       disabled={refreshingProvId !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleRefreshGroup(item.provId, item.name);
+                        void handleRefreshGroup(item.provId, item.name, item.authType);
                       }}
                       aria-label={t('models.picker.refreshModels', { name: item.name })}
                       title={t('models.picker.refreshModels', { name: item.name })}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import {
-  Bot,
+  BrainCircuit,
   Box,
   Building2,
   KeyRound,
@@ -41,7 +41,7 @@ interface Command {
 }
 
 const RESULT_ICONS: Record<SearchResultType, ReactNode> = {
-  harness: <Bot />,
+  harness: <BrainCircuit />,
   connection: <Plug />,
   custom_provider: <KeyRound />,
   virtual_model: <Sparkles />,

@@ -13,6 +13,26 @@ const ModelParamsDialog = lazy(() => import('./ModelParamsDialog.jsx'));
 
 const NO_SPECS: ProviderParamSpec[] = [];
 
+// Whether a route has any configurable params, cached for the page's lifetime
+// so each chip asks once. The dialog still fetches fresh specs when opened.
+const hasSpecsCache = new Map<string, Promise<boolean>>();
+/** Test hook: forget every cached answer. */
+export function resetRouteSpecsCache() {
+  hasSpecsCache.clear();
+}
+function routeHasSpecs(agentName: string, provider: string, authType: AuthType, model: string) {
+  const key = [agentName, provider, authType, model].join('\u0000');
+  let hit = hasSpecsCache.get(key);
+  if (!hit) {
+    hit = getModelParamSpecs(agentName, provider, authType, model).then(
+      (specs) => specs.length > 0,
+      () => false,
+    );
+    hasSpecsCache.set(key, hit);
+  }
+  return hit;
+}
+
 interface Props {
   agentName: string;
   provider: string | undefined;
@@ -52,12 +72,20 @@ export default function ModelParamsAffordance(props: Props) {
     { enabled: dialogOpen && !!provider && !!authType },
   );
 
-  const canOpen = provider !== undefined && authType !== undefined && authType !== 'local';
-  if (!canOpen) return null;
+  const routable = provider !== undefined && authType !== undefined && authType !== 'local';
+  const hasSpecs = useResource(
+    () => routeHasSpecs(agentName, provider!, authType!, model),
+    [agentName, provider, authType, model],
+    { enabled: routable },
+  );
+
+  if (!routable) return null;
 
   const current =
     provider && authType ? props.getParams(props.scope, provider, authType, model) : null;
   const configured = current !== null;
+  // No button for a model without params (saved params stay reachable).
+  if (!configured && hasSpecs.data !== true) return null;
 
   return (
     <>
@@ -79,17 +107,21 @@ export default function ModelParamsAffordance(props: Props) {
         <SlidersHorizontal aria-hidden="true" className="size-3" />
       </button>
       {dialogOpen && provider && authType ? (
-        <Suspense fallback={null}>
-          <ModelParamsDialog
-            open={dialogOpen}
-            slotLabel={props.slotLabel}
-            current={current}
-            specs={specs.data ?? NO_SPECS}
-            loading={specs.loading || specs.data === undefined}
-            onSave={(next) => props.setParams(props.scope, provider, authType, model, next)}
-            onClose={() => setDialogOpen(false)}
-          />
-        </Suspense>
+        // The dialog is portaled but React events still bubble to the chip,
+        // whose click opens the model picker: stop them here.
+        <span className="contents" onClick={(e) => e.stopPropagation()}>
+          <Suspense fallback={null}>
+            <ModelParamsDialog
+              open={dialogOpen}
+              slotLabel={props.slotLabel}
+              current={current}
+              specs={specs.data ?? NO_SPECS}
+              loading={specs.loading || specs.data === undefined}
+              onSave={(next) => props.setParams(props.scope, provider, authType, model, next)}
+              onClose={() => setDialogOpen(false)}
+            />
+          </Suspense>
+        </span>
       ) : null}
     </>
   );

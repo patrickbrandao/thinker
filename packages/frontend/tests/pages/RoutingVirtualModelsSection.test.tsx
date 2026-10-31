@@ -139,14 +139,14 @@ describe('RoutingVirtualModelsSection', () => {
     await screen.findByText('creating');
   });
 
-  it('opens the example after a create and adds the card', async () => {
+  it('adds the card after a create without opening the example', async () => {
     mockList.mockResolvedValue([]);
     renderSection();
     await waitFor(() => expect(mockList).toHaveBeenCalled());
     act(() => openCreate?.());
     fireEvent.click(await screen.findByText('save'));
     await screen.findByTestId('card-created');
-    expect(screen.getByTestId('snippet').textContent).toContain('created');
+    expect(screen.queryByTestId('snippet')).toBeNull();
     expect(mockToastSuccess).toHaveBeenCalledWith('Created "created"');
   });
 

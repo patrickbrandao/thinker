@@ -8,6 +8,10 @@ vi.mock('../../src/services/api.js', () => ({
   setFallbacks: (...args: unknown[]) => mockSetFallbacks(...args),
 }));
 
+import { resetRouteSpecsCache } from '../../src/components/ModelParamsAffordance';
+
+beforeEach(() => resetRouteSpecsCache());
+
 vi.mock('../../src/services/api/model-params.js', () => ({
   getModelParamSpecs: vi.fn(),
 }));
@@ -265,13 +269,13 @@ function makeProps(overrides: Partial<Parameters<typeof RoutingTierCard>[0]> = {
 }
 
 describe('RoutingTierCard', () => {
-  it('titles the default stage "Virtual model: auto" and opens its example from the script icon', () => {
-    const { getByText, getByLabelText, getByTestId } = render(
+  it('titles the default stage "auto" without a prefix and opens its example from the script icon', () => {
+    const { getByText, queryByText, getByLabelText, getByTestId } = render(
       <RoutingTierCard
         {...makeProps({ stage: { id: 'default', step: 0, label: 'Default', desc: '' } })}
       />,
     );
-    expect(getByText('Virtual model:')).toBeTruthy();
+    expect(queryByText('Virtual model:')).toBeNull();
     expect(getByText('auto')).toBeTruthy();
     fireEvent.click(getByLabelText('Show how to use auto'));
     expect(getByTestId('snippet-modal').textContent).toBe('auto');
@@ -1437,6 +1441,7 @@ describe('providerIdForModel route-provider attribution', () => {
     const deepseekProviders = [
       { provider: 'deepseek', auth_type: 'api_key' as const, is_active: true } as any,
     ];
+    vi.mocked(getModelParamSpecs).mockResolvedValue(modelParamSpecs[0].params);
     const { container, getByRole } = render(
       <RoutingTierCard
         {...makeProps({
@@ -1449,11 +1454,13 @@ describe('providerIdForModel route-provider attribution', () => {
         })}
       />,
     );
-    vi.mocked(getModelParamSpecs).mockResolvedValue(modelParamSpecs[0].params);
-    const btn = container.querySelector(
-      '[aria-label="Configure model parameters for DeepSeek V4"]',
-    ) as HTMLButtonElement;
-    expect(btn).not.toBeNull();
+    const btn = await waitFor(() => {
+      const found = container.querySelector(
+        '[aria-label="Configure model parameters for DeepSeek V4"]',
+      ) as HTMLButtonElement;
+      expect(found).not.toBeNull();
+      return found;
+    });
     fireEvent.click(btn);
     const toggle = await waitFor(() => getByRole('button', { name: /Thinking mode/ }));
     fireEvent.click(toggle);

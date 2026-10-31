@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, waitFor, configure } from '@testing-library/react';
 import type { ProviderParamSpec } from 'thinker-shared';
 
-import ModelParamsAffordance from '../../src/components/ModelParamsAffordance';
+import ModelParamsAffordance, {
+  resetRouteSpecsCache,
+} from '../../src/components/ModelParamsAffordance';
 import { getModelParamSpecs } from '../../src/services/api/model-params.js';
 
 vi.mock('../../src/services/api/model-params.js', () => ({
@@ -40,6 +42,7 @@ const findButton = (container: HTMLElement) =>
 describe('ModelParamsAffordance', () => {
   beforeEach(() => {
     mockGetSpecs.mockReset();
+    resetRouteSpecsCache();
     mockGetSpecs.mockResolvedValue(specs);
     // These assertions wait on a lazily-loaded resource (getModelParamSpecs) and a
     // reactive `Show` gate; the default 1s waitFor budget can be exceeded under CI
@@ -51,27 +54,33 @@ describe('ModelParamsAffordance', () => {
     configure({ asyncUtilTimeout: 1000 });
   });
 
-  it('renders the button for non-local routes', () => {
+  it('renders the button for non-local routes with params', async () => {
     const { container } = render(<ModelParamsAffordance {...baseProps} />);
-    expect(findButton(container)).not.toBeNull();
+    await waitFor(() => expect(findButton(container)).not.toBeNull());
   });
 
-  it('opens a model with no parameters without any outbound report link', async () => {
+  it('hides the button for a model with no parameters', async () => {
     mockGetSpecs.mockResolvedValue([]);
     const { container } = render(
       <ModelParamsAffordance {...baseProps} provider="openai" model="gpt-4o" slotLabel="gpt-4o" />,
     );
-    fireEvent.click(
-      container.querySelector(
-        'button[aria-label="Configure model parameters for gpt-4o"]',
-      ) as HTMLButtonElement,
-    );
-
-    await waitFor(() =>
-      expect(screen.getByText('This model has no configurable parameters.')).toBeTruthy(),
-    );
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    await waitFor(() => expect(mockGetSpecs).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(findButton(container)).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('keeps clicks inside the dialog from reaching the parent chip', async () => {
+    const parentClick = vi.fn();
+    const { container, findByRole } = render(
+      <div onClick={parentClick}>
+        <ModelParamsAffordance {...baseProps} />
+      </div>,
+    );
+    await waitFor(() => expect(findButton(container)).not.toBeNull());
+    fireEvent.click(findButton(container) as HTMLButtonElement);
+    fireEvent.click(await findByRole('button', { name: /Thinking mode/ }));
+    expect(parentClick).not.toHaveBeenCalled();
   });
 
   it('does not render the button when authType is missing', () => {
@@ -127,6 +136,7 @@ describe('ModelParamsAffordance', () => {
     const { container, getByRole } = render(
       <ModelParamsAffordance {...baseProps} setParams={setParams} />,
     );
+    await waitFor(() => expect(findButton(container)).not.toBeNull());
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     fireEvent.click(await waitFor(() => getByRole('button', { name: /Thinking mode/ })));
@@ -165,25 +175,31 @@ describe('ModelParamsAffordance', () => {
     });
   });
 
-  it('shows an empty state when the model has no configurable params', async () => {
+  it('shows an empty state when saved params exist but the model has none now', async () => {
     mockGetSpecs.mockResolvedValue([]);
-    const { container, findByText, queryByRole } = render(<ModelParamsAffordance {...baseProps} />);
+    const { container, findByText, queryByRole } = render(
+      <ModelParamsAffordance
+        {...baseProps}
+        getParams={() => ({ thinking: { type: 'disabled' } })}
+      />,
+    );
     fireEvent.click(findButton(container) as HTMLButtonElement);
 
     expect(await findByText('No parameter controls are available for deepseek-v4.')).toBeTruthy();
     expect(queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
-  it('swallows a fetch error and shows the empty state', async () => {
+  it('hides the button when the spec lookup fails', async () => {
     mockGetSpecs.mockRejectedValue(new Error('boom'));
-    const { container, findByText } = render(<ModelParamsAffordance {...baseProps} />);
-    fireEvent.click(findButton(container) as HTMLButtonElement);
-
-    expect(await findByText('No parameter controls are available for deepseek-v4.')).toBeTruthy();
+    const { container } = render(<ModelParamsAffordance {...baseProps} />);
+    await waitFor(() => expect(mockGetSpecs).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(findButton(container)).toBeNull();
   });
 
-  it('button is disabled when the parent says so', () => {
+  it('button is disabled when the parent says so', async () => {
     const { container } = render(<ModelParamsAffordance {...baseProps} disabled />);
+    await waitFor(() => expect(findButton(container)).not.toBeNull());
     const btn = findButton(container) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
