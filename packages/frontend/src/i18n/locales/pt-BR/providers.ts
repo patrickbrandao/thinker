@@ -254,12 +254,6 @@ const ptBR: Catalog<typeof en> = {
       'Conecte provedores que você paga por token ou por uso com suas próprias chaves de API.',
     localDesc: 'Conecte-se a servidores de LLM rodando na sua máquina.',
   },
-  banner: {
-    yourProvider: 'Seu provedor',
-    options: 'Opções do provedor',
-    edit: 'Editar',
-    remove: 'Remover',
-  },
 };
 
 export default ptBR;

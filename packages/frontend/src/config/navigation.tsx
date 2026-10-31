@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ScrollText,
   Workflow,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
@@ -82,6 +83,7 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 export const USER_MENU_PAGES: NavItem[] = [
   { key: 'account', to: '/account', label: 'nav.accountPreferences', icon: Settings },
   { key: 'organization', to: '/organization', label: 'nav.organization', icon: Users },
+  { key: 'triggers', to: '/triggers', label: 'nav.triggers', icon: Zap },
   { key: 'adminUsers', to: '/admin/users', label: 'nav.users', icon: ShieldCheck },
   { key: 'mcp', to: '/integrations/mcp', label: 'nav.mcpServer', icon: Unplug },
   { key: 'cli', to: '/integrations/cli', label: 'nav.cli', icon: Terminal },

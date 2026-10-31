@@ -1,7 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import ErrorState from '../components/ErrorState.js';
 import TemporaryPasswordBox from '../components/TemporaryPasswordBox.js';
-import { Badge, Button, Field, Modal, Panel } from '../components/ui.js';
+import { Badge, Button, ButtonLink, Field, Modal, Panel } from '../components/ui.js';
 import { retentionOptions } from '../components/LogRetentionSelect.js';
 import {
   addMember,
@@ -237,6 +237,15 @@ export default function Organization() {
               ))}
             </select>
           </Field>
+        </Panel>
+
+        <Panel title={t('triggers.org.title')}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-dim">{t('triggers.org.body')}</p>
+            <ButtonLink to="/triggers" variant="ghost" size="sm">
+              {t('triggers.org.open')}
+            </ButtonLink>
+          </div>
         </Panel>
 
         <Panel title={t('org.page.members')} bodyClassName="flex flex-col gap-4">

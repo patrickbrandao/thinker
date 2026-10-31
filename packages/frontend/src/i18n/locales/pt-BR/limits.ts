@@ -12,11 +12,10 @@ const ptBR: Catalog<typeof en> = {
     'Um ou mais limites rígidos foram atingidos. Novas requisições de proxy deste harness ficam bloqueadas até o uso zerar no próximo período.',
   connectProviderTitle: 'Conecte um provedor para definir limites rígidos',
   connectProviderBody:
-    'Limites rígidos bloqueiam automaticamente as requisições de proxy quando o uso passa de um valor. Os alertas por e-mail funcionam sem provedor conectado — só os limites rígidos precisam de um.',
+    'Limites rígidos bloqueiam automaticamente as requisições de proxy quando o uso passa de um valor. Os alertas funcionam sem provedor conectado — só os limites rígidos precisam de um.',
   readOnlyNotice:
     'Você tem acesso somente leitura a limites e notificações. Só administradores e proprietários podem alterá-los.',
   toast: {
-    providerRemoved: 'Provedor de e-mail removido',
     ruleUpdated: 'Regra atualizada',
     ruleCreated: 'Regra criada',
     ruleDeleted: 'Regra excluída',
@@ -45,13 +44,13 @@ const ptBR: Catalog<typeof en> = {
     emptyTitle: 'Nenhuma regra ainda',
     emptyBody:
       'Crie alertas para picos de uso ou limites rígidos para bloquear requisições acima do orçamento.',
-    emailAlert: 'Alerta por e-mail',
+    emailAlert: 'Alerta',
     hardLimit: 'Limite rígido',
-    noProvider: 'Sem provedor',
+    noProvider: 'Sem trigger',
     ruleOptions: 'Opções da regra',
   },
   modal: {
-    desc: 'Você vai receber um alerta por e-mail quando o uso passar do limite.',
+    desc: 'Os triggers ligados a este harness com Alerta de limite recebem um evento quando o uso passar do limite.',
     metric: 'Métrica',
     tokens: 'Tokens',
     costUsd: 'Custo (USD)',
@@ -69,11 +68,6 @@ const ptBR: Catalog<typeof en> = {
     bodyAfter: '({{ threshold }} {{ period }}). Esta ação não pode ser desfeita.',
     confirm: 'Entendo que esta ação é irreversível',
     submit: 'Excluir regra',
-  },
-  removeProvider: {
-    title: 'Remover provedor',
-    body: 'Isso vai desconectar seu provedor de e-mail.',
-    bodyRules: 'Os alertas por e-mail não serão enviados até você configurar um novo.',
   },
 };
 

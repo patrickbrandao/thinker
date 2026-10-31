@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../src/services/toast-store.js', () => ({
@@ -48,7 +49,11 @@ describe('Organization page', () => {
 
   it('lets an admin manage non-owners only, without rename or delete', async () => {
     asRole('admin');
-    render(<Organization />);
+    render(
+      <MemoryRouter>
+        <Organization />
+      </MemoryRouter>,
+    );
     await screen.findByText('owner@x.io');
     expect(screen.queryByLabelText('Role of owner@x.io')).toBeNull();
     expect(screen.getByLabelText('Role of view@x.io')).toBeTruthy();
@@ -63,7 +68,11 @@ describe('Organization page', () => {
 
   it('is read-only for a viewer', async () => {
     asRole('viewer');
-    render(<Organization />);
+    render(
+      <MemoryRouter>
+        <Organization />
+      </MemoryRouter>,
+    );
     await screen.findByText('owner@x.io');
     expect(screen.queryByRole('form', { name: 'Add member' })).toBeNull();
     expect(screen.queryByText('Remove')).toBeNull();
@@ -81,7 +90,11 @@ describe('Organization page', () => {
       },
       temporaryPassword: 'Temp-Pass-123',
     });
-    render(<Organization />);
+    render(
+      <MemoryRouter>
+        <Organization />
+      </MemoryRouter>,
+    );
     await screen.findByText('owner@x.io');
     expect(screen.getByText('Delete organization')).toBeTruthy();
     const form = screen.getByRole('form', { name: 'Add member' });

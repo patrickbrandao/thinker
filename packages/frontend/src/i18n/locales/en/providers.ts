@@ -247,10 +247,4 @@ export default {
     byokDesc: 'Connect providers you pay per token or per usage with your own API keys.',
     localDesc: 'Connect to LLM servers running on your machine.',
   },
-  banner: {
-    yourProvider: 'Your provider',
-    options: 'Provider options',
-    edit: 'Edit',
-    remove: 'Remove',
-  },
 };

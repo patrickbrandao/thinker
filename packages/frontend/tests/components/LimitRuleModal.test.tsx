@@ -24,14 +24,18 @@ describe('LimitRuleModal', () => {
     render(<LimitRuleModal open={true} onClose={mockOnClose} onSave={mockOnSave} />);
     expect(screen.getByRole('dialog')).toBeDefined();
     expect(
-      screen.getByText("You'll receive an email alert when usage exceeds the threshold."),
+      screen.getByText(
+        'Triggers bound to this harness with Limit alert receive an event when usage exceeds the threshold.',
+      ),
     ).toBeDefined();
   });
 
   it('shows description text', () => {
     render(<LimitRuleModal open={true} onClose={mockOnClose} onSave={mockOnSave} />);
     expect(
-      screen.getByText("You'll receive an email alert when usage exceeds the threshold."),
+      screen.getByText(
+        'Triggers bound to this harness with Limit alert receive an event when usage exceeds the threshold.',
+      ),
     ).toBeDefined();
   });
 

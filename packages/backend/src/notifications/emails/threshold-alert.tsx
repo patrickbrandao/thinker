@@ -25,6 +25,8 @@ export interface ThresholdAlertProps {
   logoUrl?: string;
   alertType?: 'soft' | 'hard';
   periodResetDate?: string;
+  /** Extra text from the e-mail trigger's body template, one paragraph per line. */
+  note?: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -59,6 +61,7 @@ export function ThresholdAlertEmail(props: ThresholdAlertProps) {
     logoUrl = getEmailAssetUrl('thinker-logo.png'),
     alertType = 'hard',
     periodResetDate,
+    note,
   } = props;
 
   const isSoft = alertType === 'soft';
@@ -125,6 +128,17 @@ export function ThresholdAlertEmail(props: ThresholdAlertProps) {
                 </Text>
               </Section>
             )}
+
+            {note
+              ? note
+                  .split(/\n+/)
+                  .filter((line) => line.trim())
+                  .map((line, i) => (
+                    <Text key={i} style={paragraph}>
+                      {line}
+                    </Text>
+                  ))
+              : null}
 
             {/* Stats row */}
             <Section style={statsRow}>
@@ -353,4 +367,25 @@ const footerMuted: React.CSSProperties = {
 const footerLink: React.CSSProperties = {
   color: '#94a3b8',
   textDecoration: 'underline',
+};
+
+/** Shared with the generic trigger e-mail so every alert keeps one look. */
+export const alertEmailStyles = {
+  body,
+  container,
+  logoSection,
+  logoImg,
+  card,
+  alertBadgeContainer,
+  alertBadge,
+  heading,
+  paragraph,
+  metaRow,
+  metaText,
+  ctaContainer,
+  ctaButton,
+  divider,
+  footer,
+  footerMuted,
+  footerLink,
 };

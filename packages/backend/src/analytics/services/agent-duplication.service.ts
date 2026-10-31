@@ -232,6 +232,13 @@ export class AgentDuplicationService {
         }
       }
 
+      // Event trigger bindings follow the copy, like the routing setup.
+      await manager.query(
+        `INSERT INTO "agent_triggers" ("agent_id", "trigger_id", "tenant_id", "events")
+         SELECT $1, "trigger_id", "tenant_id", "events" FROM "agent_triggers" WHERE "agent_id" = $2`,
+        [newAgentId, source.id],
+      );
+
       return {
         providers: providersEnabled,
         tierAssignments: tiers.length,

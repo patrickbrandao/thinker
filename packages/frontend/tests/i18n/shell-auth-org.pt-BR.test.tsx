@@ -112,7 +112,11 @@ describe('shell, auth and organization screens in pt-BR', () => {
   });
 
   it('renders the Organization page in Portuguese', async () => {
-    render(<Organization />);
+    render(
+      <MemoryRouter>
+        <Organization />
+      </MemoryRouter>,
+    );
     await screen.findByText('v@x.io');
     expect(screen.getByText('Membros')).toBeTruthy();
     expect(screen.getByText('Troca de senha pendente')).toBeTruthy();

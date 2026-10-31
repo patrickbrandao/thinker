@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationRulesService } from './services/notification-rules.service';
 import { NotificationLogService } from './services/notification-log.service';
-import { EmailProviderConfigService } from './services/email-provider-config.service';
 import { NotificationCronService } from './services/notification-cron.service';
 
 const mockCtx = { tenantId: 't-1', userId: 'user-1' } as never;
@@ -25,7 +24,6 @@ describe('NotificationsController', () => {
   let module: TestingModule;
   let controller: NotificationsController;
   let rulesService: jest.Mocked<NotificationRulesService>;
-  let emailProviderConfigService: jest.Mocked<EmailProviderConfigService>;
 
   beforeEach(async () => {
     const mockRulesService = {
@@ -35,22 +33,6 @@ describe('NotificationsController', () => {
       deleteRule: jest.fn().mockResolvedValue(undefined),
       getRule: jest.fn().mockResolvedValue(mockRule),
       getOwnedRule: jest.fn().mockResolvedValue(mockRule),
-    };
-
-    const mockEmailProviderConfigService = {
-      getConfig: jest.fn().mockResolvedValue(null),
-      upsert: jest.fn().mockResolvedValue({
-        provider: 'resend',
-        domain: null,
-        keyPrefix: 're_test1',
-        is_active: true,
-        notificationEmail: null,
-      }),
-      remove: jest.fn().mockResolvedValue(undefined),
-      testConfig: jest.fn().mockResolvedValue({ success: true }),
-      testSavedConfig: jest.fn().mockResolvedValue({ success: true }),
-      getNotificationEmail: jest.fn().mockResolvedValue(null),
-      setNotificationEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockCronService = {
@@ -66,14 +48,12 @@ describe('NotificationsController', () => {
       providers: [
         { provide: NotificationRulesService, useValue: mockRulesService },
         { provide: NotificationLogService, useValue: mockNotificationLog },
-        { provide: EmailProviderConfigService, useValue: mockEmailProviderConfigService },
         { provide: NotificationCronService, useValue: mockCronService },
       ],
     }).compile();
 
     controller = module.get(NotificationsController);
     rulesService = module.get(NotificationRulesService);
-    emailProviderConfigService = module.get(EmailProviderConfigService);
   });
 
   it('returns notification logs for an agent', async () => {
@@ -128,100 +108,10 @@ describe('NotificationsController', () => {
     expect(result).toEqual({ deleted: true });
   });
 
-  it('returns configured: false when no provider', async () => {
-    const result = await controller.getEmailProvider(mockCtx);
-    expect(emailProviderConfigService.getConfig).toHaveBeenCalledWith('t-1');
-    expect(result).toEqual({ configured: false });
-  });
-
-  it('tests email provider config', async () => {
-    const dto = {
-      provider: 'resend',
-      apiKey: 're_testkey123',
-      domain: 'example.com',
-      to: 'test@test.com',
-    } as never;
-    const result = await controller.testEmailProvider(mockCtx, dto);
-    expect(emailProviderConfigService.testConfig).toHaveBeenCalledWith(
-      { provider: 'resend', apiKey: 're_testkey123', domain: 'example.com' },
-      'test@test.com',
-    );
-    expect(result).toEqual({ success: true });
-  });
-
-  it('tests sendgrid provider config without domain', async () => {
-    const dto = { provider: 'sendgrid', apiKey: 'SG.testkey123456', to: 'test@test.com' } as never;
-    const result = await controller.testEmailProvider(mockCtx, dto);
-    expect(emailProviderConfigService.testConfig).toHaveBeenCalledWith(
-      { provider: 'sendgrid', apiKey: 'SG.testkey123456', domain: undefined },
-      'test@test.com',
-    );
-    expect(result).toEqual({ success: true });
-  });
-
   it('triggers manual notification check', async () => {
     const cronService = module.get(NotificationCronService) as jest.Mocked<NotificationCronService>;
     const result = await controller.triggerCheck(mockCtx);
     expect(cronService.checkThresholds).toHaveBeenCalledWith('t-1');
     expect(result).toEqual({ triggered: 2, message: '2 notification(s) triggered' });
-  });
-
-  it('returns null notification email when not set', async () => {
-    const result = await controller.getNotificationEmail(mockCtx);
-    expect(emailProviderConfigService.getNotificationEmail).toHaveBeenCalledWith('t-1');
-    expect(result).toEqual({ email: null });
-  });
-
-  it('saves notification email', async () => {
-    const result = await controller.setNotificationEmail(mockCtx, { email: 'alerts@test.com' });
-    expect(emailProviderConfigService.setNotificationEmail).toHaveBeenCalledWith(
-      't-1',
-      'alerts@test.com',
-    );
-    expect(result).toEqual({ saved: true });
-  });
-
-  it('saves email provider config', async () => {
-    const dto = { provider: 'resend', apiKey: 're_testkey123456' } as never;
-    const result = await controller.setEmailProvider(mockCtx, dto);
-    expect(emailProviderConfigService.upsert).toHaveBeenCalledWith(mockCtx, dto);
-    expect(result.provider).toBe('resend');
-  });
-
-  it('saves email provider config without API key (keep existing)', async () => {
-    const dto = { provider: 'resend', notificationEmail: 'new@test.com' } as never;
-    const result = await controller.setEmailProvider(mockCtx, dto);
-    expect(emailProviderConfigService.upsert).toHaveBeenCalledWith(mockCtx, dto);
-    expect(result.provider).toBe('resend');
-  });
-
-  it('removes email provider config', async () => {
-    const result = await controller.removeEmailProvider(mockCtx);
-    expect(emailProviderConfigService.remove).toHaveBeenCalledWith('t-1');
-    expect(result).toEqual({ ok: true });
-  });
-
-  it('returns existing provider config', async () => {
-    emailProviderConfigService.getConfig.mockResolvedValue({
-      provider: 'sendgrid',
-      domain: null,
-      keyPrefix: 'SG.abcde',
-      is_active: true,
-      notificationEmail: 'alerts@test.com',
-    });
-    const result = await controller.getEmailProvider(mockCtx);
-    expect(result).toEqual({
-      provider: 'sendgrid',
-      domain: null,
-      keyPrefix: 'SG.abcde',
-      is_active: true,
-      notificationEmail: 'alerts@test.com',
-    });
-  });
-
-  it('tests saved email provider config', async () => {
-    const result = await controller.testSavedEmailProvider(mockCtx, { to: 'test@test.com' });
-    expect(emailProviderConfigService.testSavedConfig).toHaveBeenCalledWith('t-1', 'test@test.com');
-    expect(result).toEqual({ success: true });
   });
 });

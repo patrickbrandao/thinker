@@ -13,6 +13,7 @@ import { AgentRecordingConfigService } from './services/agent-recording-config.s
 import { RequestRecordingStorageService } from './services/request-recording-storage.service';
 import { AgentListCacheInterceptor } from './interceptors/agent-list-cache.interceptor';
 import { AgentListCacheService } from './services/agent-list-cache.service';
+import { TriggerSignalService } from './services/trigger-signal.service';
 
 @Global()
 @Module({
@@ -27,6 +28,7 @@ import { AgentListCacheService } from './services/agent-list-cache.service';
     AgentListCacheService,
     AgentRecordingConfigService,
     RequestRecordingStorageService,
+    TriggerSignalService,
   ],
   exports: [
     IngestEventBusService,
@@ -38,6 +40,7 @@ import { AgentListCacheService } from './services/agent-list-cache.service';
     AgentListCacheService,
     AgentRecordingConfigService,
     RequestRecordingStorageService,
+    TriggerSignalService,
   ],
 })
 export class CommonModule {}

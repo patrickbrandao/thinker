@@ -109,37 +109,4 @@ function DeleteRuleModal({
   );
 }
 
-interface RemoveProviderModalProps {
-  open: boolean;
-  hasEmailRules: boolean;
-  removing: boolean;
-  onCancel: () => void;
-  onRemove: () => void;
-}
-
-function RemoveProviderModal({
-  open,
-  hasEmailRules,
-  removing,
-  onCancel,
-  onRemove,
-}: RemoveProviderModalProps) {
-  return (
-    <Modal open={open} title={t('limits.removeProvider.title')} onClose={onCancel}>
-      <p className="text-sm text-dim">
-        {t('limits.removeProvider.body')}
-        {hasEmailRules ? ` ${t('limits.removeProvider.bodyRules')}` : null}
-      </p>
-      <div className="actions">
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="danger" size="sm" busy={removing} onClick={onRemove}>
-          {t('common.remove')}
-        </Button>
-      </div>
-    </Modal>
-  );
-}
-
-export { KebabMenu, DeleteRuleModal, RemoveProviderModal };
+export { KebabMenu, DeleteRuleModal };

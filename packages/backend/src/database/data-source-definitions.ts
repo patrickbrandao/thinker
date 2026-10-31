@@ -27,6 +27,7 @@ import { CliAuthCode } from '../entities/cli-auth-code.entity';
 import { AgentUsageDaily } from '../entities/agent-usage-daily.entity';
 import { OrganizationMember } from '../entities/organization-member.entity';
 import { UserProfile } from '../entities/user-profile.entity';
+import { AgentTrigger, Trigger, TriggerEvent, TriggerEventLog } from '../entities/trigger.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -69,6 +70,7 @@ import { AddAgentModelListing1804000000000 } from './migrations/1804000000000-Ad
 import { DropHeaderTiers1804100000000 } from './migrations/1804100000000-DropHeaderTiers';
 import { AddRequestTimeline1804200000000 } from './migrations/1804200000000-AddRequestTimeline';
 import { AddLogRetentionDays1804300000000 } from './migrations/1804300000000-AddLogRetentionDays';
+import { AddEventTriggers1804400000000 } from './migrations/1804400000000-AddEventTriggers';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -221,6 +223,10 @@ export const entities = [
   AgentUsageDaily,
   OrganizationMember,
   UserProfile,
+  Trigger,
+  AgentTrigger,
+  TriggerEvent,
+  TriggerEventLog,
 ];
 
 export const migrations = [
@@ -384,4 +390,5 @@ export const migrations = [
   DropHeaderTiers1804100000000,
   AddRequestTimeline1804200000000,
   AddLogRetentionDays1804300000000,
+  AddEventTriggers1804400000000,
 ];

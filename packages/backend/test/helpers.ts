@@ -48,6 +48,12 @@ import { ReasoningContentCacheEntry } from '../src/entities/reasoning-content-ca
 import { AgentEnabledProvider } from '../src/entities/agent-enabled-provider.entity';
 import { BackfillState } from '../src/entities/backfill-state.entity';
 import { CliAuthCode } from '../src/entities/cli-auth-code.entity';
+import {
+  AgentTrigger,
+  Trigger,
+  TriggerEvent,
+  TriggerEventLog,
+} from '../src/entities/trigger.entity';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
 import { AnalyticsModule } from '../src/analytics/analytics.module';
@@ -93,6 +99,10 @@ const entities = [
   AgentEnabledProvider,
   BackfillState,
   CliAuthCode,
+  Trigger,
+  AgentTrigger,
+  TriggerEvent,
+  TriggerEventLog,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MODELS_DEV_URL = 'https://models.dev/api.json';

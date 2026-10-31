@@ -37,6 +37,13 @@ Uma avaliação de rota durante o atendimento de uma Requisição. A maioria cha
 
 Toda chamada a um provedor conta como Tentativa, inclusive as que falham e as de fallback. Falhas locais do Thinker, como uma rota ignorada durante o resfriamento do provedor, também contam como Tentativas com falha, mas a origem de erro "Thinker" as mantém fora das métricas de confiabilidade de provedores.
 
+### Trigger (Gatilho)
+
+Destino de entrega de eventos do workspace: e-mail (Resend, Mailgun, SendGrid), webhook HTTP, Telegram ou log remoto (Syslog). O harness aponta para os gatilhos e escolhe quais eventos manda para cada um; o gatilho não guarda nada de harness.
+
+- Tabelas: `triggers` (cadastro), `agent_triggers` (vínculo harness → gatilho com os eventos), `trigger_events` (fila, uma linha por evento e gatilho) e `trigger_event_logs` (uma linha por tentativa de entrega).
+- Uma **entrega** (`trigger_events`) não é uma Tentativa (`agent_messages`): nada aqui fala com provedor de IA.
+
 ### Status
 
 Requisições e Tentativas novas usam os mesmos valores canônicos:
