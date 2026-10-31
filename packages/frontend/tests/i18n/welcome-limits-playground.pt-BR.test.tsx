@@ -21,8 +21,6 @@ vi.mock('../../src/services/api.js', () => ({
   createNotificationRule: vi.fn(() => Promise.resolve({})),
   updateNotificationRule: vi.fn(() => Promise.resolve({})),
   deleteNotificationRule: vi.fn(() => Promise.resolve({})),
-  getEmailProvider: vi.fn(() => Promise.resolve(null)),
-  removeEmailProvider: vi.fn(() => Promise.resolve({})),
   getRoutingStatus: vi.fn(() => Promise.resolve({ enabled: false })),
   togglePlaygroundRunStar: vi.fn(() => Promise.resolve(true)),
 }));
@@ -32,8 +30,11 @@ vi.mock('../../src/services/setup-status.js', () => ({
   checkEmailConfigured: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock('../../src/components/EmailProviderSection.js', () => ({ default: () => null }));
-vi.mock('../../src/components/EmailProviderModal.js', () => ({ default: () => null }));
+vi.mock('../../src/services/api/triggers.js', () => ({
+  listTriggers: vi.fn(() => Promise.resolve([])),
+  getHarnessTriggers: vi.fn(() => Promise.resolve([])),
+  setHarnessTriggers: vi.fn(() => Promise.resolve([])),
+}));
 vi.mock('../../src/services/toast-store.js', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));

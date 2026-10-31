@@ -9,11 +9,10 @@ export default {
     'One or more hard limits triggered. New proxy requests for this harness will be blocked until the usage resets in the next period.',
   connectProviderTitle: 'Connect a provider to set hard limits',
   connectProviderBody:
-    'Hard limits automatically block proxy requests when usage exceeds a threshold. Email alerts work without a connected provider — only hard limits require one.',
+    'Hard limits automatically block proxy requests when usage exceeds a threshold. Alerts work without a connected provider — only hard limits require one.',
   readOnlyNotice:
     'You have read-only access to limits and notifications. Only admins and owners can change them.',
   toast: {
-    providerRemoved: 'Email provider removed',
     ruleUpdated: 'Rule updated',
     ruleCreated: 'Rule created',
     ruleDeleted: 'Rule deleted',
@@ -41,13 +40,13 @@ export default {
     actions: 'Actions',
     emptyTitle: 'No rules yet',
     emptyBody: 'Set up alerts for usage spikes, or hard limits to block requests over budget.',
-    emailAlert: 'Email Alert',
+    emailAlert: 'Alert',
     hardLimit: 'Hard Limit',
-    noProvider: 'No provider',
+    noProvider: 'No trigger',
     ruleOptions: 'Rule options',
   },
   modal: {
-    desc: "You'll receive an email alert when usage exceeds the threshold.",
+    desc: 'Triggers bound to this harness with Limit alert receive an event when usage exceeds the threshold.',
     metric: 'Metric',
     tokens: 'Tokens',
     costUsd: 'Cost (USD)',
@@ -65,10 +64,5 @@ export default {
     bodyAfter: 'rule ({{ threshold }} {{ period }}). This action cannot be undone.',
     confirm: 'I understand this action is irreversible',
     submit: 'Delete rule',
-  },
-  removeProvider: {
-    title: 'Remove provider',
-    body: 'This will disconnect your email provider.',
-    bodyRules: "Email alerts won't be sent until you set up a new one.",
   },
 };

@@ -16,6 +16,7 @@ import welcome from './welcome.js';
 import limits from './limits.js';
 import playground from './playground.js';
 import shell from './shell.js';
+import triggers from './triggers.js';
 
 export default {
   common,
@@ -36,4 +37,5 @@ export default {
   limits,
   playground,
   shell,
+  triggers,
 };

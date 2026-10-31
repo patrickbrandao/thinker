@@ -36,7 +36,10 @@ export class AgentLifecycleService {
     };
   }
 
-  async deleteAgent(tenantId: string | null, agentName: string): Promise<void> {
+  async deleteAgent(
+    tenantId: string | null,
+    agentName: string,
+  ): Promise<{ id: string; name: string; displayName: string }> {
     const agent = await this.findAgentByTenant(tenantId, agentName);
 
     if (!agent) {
@@ -66,6 +69,7 @@ export class AgentLifecycleService {
     this.resolveAgent.invalidate(agentTenantId, agentName);
     this.routingCache.invalidateAgent(agentId);
     this.otlpAuthGuard.clearCache();
+    return { id: agentId, name: agent.name, displayName: agent.display_name ?? agent.name };
   }
 
   private async findAgentByTenant(tenantId: string | null, agentName: string) {

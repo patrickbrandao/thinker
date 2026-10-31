@@ -65,6 +65,24 @@ const STRIP_ATTEMPT_LOGS_SQL = `
   RETURNING id
 `;
 
+/**
+ * Finished trigger deliveries follow the same retention as request logs
+ * (harness → organization → environment). Their attempt logs cascade.
+ * Queued rows are never removed here.
+ */
+const DELETE_TRIGGER_EVENTS_SQL = `
+  DELETE FROM trigger_events
+  WHERE id IN (
+    SELECT e.id FROM trigger_events e
+    LEFT JOIN agents a ON a.id = e.agent_id
+    LEFT JOIN tenants t ON t.id = e.tenant_id
+    WHERE e.status IN ('delivered', 'failed')
+      AND e.created_at < CURRENT_TIMESTAMP - (${RETENTION_DAYS_SQL} * INTERVAL '1 day')
+    LIMIT ${LOG_PURGE_BATCH}
+  )
+  RETURNING id
+`;
+
 const DELETE_METADATA_SQL = `
   UPDATE agent_messages
   SET recording_key = NULL
@@ -134,6 +152,10 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
         this.logger.log(
           `Cleared expired logs of ${requests} Request(s) and ${attempts} Provider Attempt(s)`,
         );
+      }
+      const triggerEvents = await this.stripLogs(queryRunner, DELETE_TRIGGER_EVENTS_SQL);
+      if (triggerEvents > 0) {
+        this.logger.log(`Deleted ${triggerEvents} expired trigger delivery event(s)`);
       }
       return deleted;
     } catch (error) {

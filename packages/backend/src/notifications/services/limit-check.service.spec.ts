@@ -1,20 +1,15 @@
 import { LimitCheckService } from './limit-check.service';
 import { NotificationRulesService } from './notification-rules.service';
-import { NotificationEmailService } from './notification-email.service';
-import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 
 describe('LimitCheckService', () => {
   let service: LimitCheckService;
   let mockGetActiveBlockRules: jest.Mock;
   let mockGetConsumption: jest.Mock;
-  let mockSendThresholdAlert: jest.Mock;
-  let mockGetFullConfig: jest.Mock;
   let mockHasAlreadySent: jest.Mock;
   let mockInsertLog: jest.Mock;
-  let mockResolveRecipientEmail: jest.Mock;
-  let mockRuntime: { getAuthBaseUrl: jest.Mock };
+  let mockEmit: jest.Mock;
 
   beforeEach(() => {
     mockGetActiveBlockRules = jest.fn().mockResolvedValue([]);
@@ -25,35 +20,17 @@ describe('LimitCheckService', () => {
       getConsumption: mockGetConsumption,
     } as unknown as NotificationRulesService;
 
-    mockSendThresholdAlert = jest.fn().mockResolvedValue(true);
-    const emailService = {
-      sendThresholdAlert: mockSendThresholdAlert,
-    } as unknown as NotificationEmailService;
-
-    mockGetFullConfig = jest.fn().mockResolvedValue(null);
-    const emailProviderConfig = {
-      getFullConfig: mockGetFullConfig,
-    } as unknown as EmailProviderConfigService;
-    mockRuntime = {
-      getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-    };
-
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);
     mockInsertLog = jest.fn().mockResolvedValue(undefined);
-    mockResolveRecipientEmail = jest.fn().mockResolvedValue(null);
     const notificationLog = {
       hasAlreadySent: mockHasAlreadySent,
       insertLog: mockInsertLog,
-      resolveRecipientEmail: mockResolveRecipientEmail,
     } as unknown as NotificationLogService;
 
-    service = new LimitCheckService(
-      rulesService,
-      emailService,
-      emailProviderConfig,
-      mockRuntime as unknown as ThinkerRuntimeService,
-      notificationLog,
-    );
+    mockEmit = jest.fn();
+    const triggerSignals = { emit: mockEmit } as unknown as TriggerSignalService;
+
+    service = new LimitCheckService(rulesService, notificationLog, triggerSignals);
   });
 
   it('returns null when no block rules exist', async () => {
@@ -283,7 +260,7 @@ describe('LimitCheckService', () => {
     expect(mockGetConsumption).toHaveBeenCalledTimes(2);
   });
 
-  describe('email notification on block', () => {
+  describe('limit signal on block', () => {
     const rule = {
       id: 'r1',
       tenant_id: 'tenant-1',
@@ -298,25 +275,10 @@ describe('LimitCheckService', () => {
       mockGetConsumption.mockResolvedValue(60000);
     });
 
-    it('sends email and logs when limit exceeded first time', async () => {
-      mockResolveRecipientEmail.mockResolvedValue('test@example.com');
-
+    it('logs and emits a hard limit signal when limit exceeded first time', async () => {
       await service.checkLimits('tenant-1', 'my-agent');
       await new Promise((r) => setTimeout(r, 50));
 
-      expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-        'test@example.com',
-        expect.objectContaining({
-          agentName: 'my-agent',
-          metricType: 'tokens',
-          threshold: 50000,
-          actualValue: 60000,
-          period: 'day',
-          alertType: 'hard',
-          periodResetDate: expect.any(String),
-        }),
-        undefined,
-      );
       expect(mockInsertLog).toHaveBeenCalledWith(
         expect.objectContaining({
           ruleId: 'r1',
@@ -326,54 +288,37 @@ describe('LimitCheckService', () => {
           agentName: 'my-agent',
         }),
       );
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      expect(mockEmit).toHaveBeenCalledWith({
+        kind: 'limit',
+        alertType: 'hard',
+        tenantId: 'tenant-1',
+        agentName: 'my-agent',
+        ruleId: 'r1',
+        metric: 'tokens',
+        threshold: 50000,
+        actual: 60000,
+        period: 'day',
+        periodStart: expect.any(String),
+        periodEnd: expect.any(String),
+        periodReset: expect.any(String),
+      });
+      // The signal carries the same window that was written to the log.
+      const logged = mockInsertLog.mock.calls[0][0];
+      const signal = mockEmit.mock.calls[0][0];
+      expect(signal.periodStart).toBe(logged.periodStart);
+      expect(signal.periodEnd).toBe(logged.periodEnd);
+      expect(mockHasAlreadySent).toHaveBeenCalledWith('r1', logged.periodStart);
     });
 
-    it('skips email when already notified for this period', async () => {
+    it('neither logs nor emits when already notified for this period', async () => {
       mockHasAlreadySent.mockResolvedValue(true);
-      await service.checkLimits('tenant-1', 'my-agent');
+      const result = await service.checkLimits('tenant-1', 'my-agent');
       await new Promise((r) => setTimeout(r, 50));
-      expect(mockSendThresholdAlert).not.toHaveBeenCalled();
-    });
-
-    it('logs notification even when no email is resolved', async () => {
-      mockResolveRecipientEmail.mockResolvedValue(null);
-      await service.checkLimits('tenant-1', 'my-agent');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(mockSendThresholdAlert).not.toHaveBeenCalled();
-      expect(mockInsertLog).toHaveBeenCalled();
-    });
-
-    it('logs notification even when email send fails', async () => {
-      mockSendThresholdAlert.mockResolvedValue(false);
-      mockResolveRecipientEmail.mockResolvedValue('test@example.com');
-      await service.checkLimits('tenant-1', 'my-agent');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(mockSendThresholdAlert).toHaveBeenCalled();
-      expect(mockInsertLog).toHaveBeenCalled();
-    });
-
-    it('uses email provider config when available', async () => {
-      const providerConfig = {
-        provider: 'resend',
-        apiKey: 'key',
-        notificationEmail: 'custom@example.com',
-      };
-      mockGetFullConfig.mockResolvedValue(providerConfig);
-      mockResolveRecipientEmail.mockResolvedValue('custom@example.com');
-      await service.checkLimits('tenant-1', 'my-agent');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-        'custom@example.com',
-        expect.anything(),
-        providerConfig,
-      );
-    });
-
-    it('suppresses email when resolveRecipientEmail returns null', async () => {
-      mockResolveRecipientEmail.mockResolvedValue(null);
-      await service.checkLimits('tenant-1', 'my-agent');
-      await new Promise((r) => setTimeout(r, 50));
-      expect(mockSendThresholdAlert).not.toHaveBeenCalled();
+      // The request is still blocked.
+      expect(result).toEqual(expect.objectContaining({ ruleId: 'r1' }));
+      expect(mockInsertLog).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
 
     it('catches and logs error in notifyLimitExceeded', async () => {
@@ -384,6 +329,7 @@ describe('LimitCheckService', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to send block notification'),
       );
+      expect(mockEmit).not.toHaveBeenCalled();
       loggerSpy.mockRestore();
     });
 
@@ -391,22 +337,6 @@ describe('LimitCheckService', () => {
       const result = await service.checkLimits('tenant-1', 'my-agent');
       expect(result).not.toBeNull();
       expect(result!.period).toBe('day');
-    });
-
-    it('passes notificationEmail from provider config to resolveRecipientEmail', async () => {
-      const providerConfig = { notificationEmail: 'local-user@real.com' };
-      mockGetFullConfig.mockResolvedValue(providerConfig);
-      mockResolveRecipientEmail.mockResolvedValue('local-user@real.com');
-
-      await service.checkLimits('tenant-1', 'my-agent');
-      await new Promise((r) => setTimeout(r, 50));
-
-      expect(mockResolveRecipientEmail).toHaveBeenCalledWith('tenant-1', 'local-user@real.com');
-      expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-        'local-user@real.com',
-        expect.objectContaining({ agentName: 'my-agent' }),
-        providerConfig,
-      );
     });
   });
 });

@@ -16,6 +16,7 @@ import {
   Sparkles,
   Terminal,
   User,
+  Zap,
 } from 'lucide-react';
 import { NAVIGATION, navLabel } from '../../config/navigation.js';
 import {
@@ -130,6 +131,13 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
         label: t('shell.user.organization'),
         icon: <Building2 />,
         run: go('/organization'),
+      },
+      {
+        id: 'nav:triggers',
+        group: t('shell.palette.goTo'),
+        label: t('nav.triggers'),
+        icon: <Zap />,
+        run: go('/triggers'),
       },
       {
         id: 'nav:cli',

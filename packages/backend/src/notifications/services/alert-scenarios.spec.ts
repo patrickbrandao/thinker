@@ -2,27 +2,24 @@
  * Integration-style tests for the full alert + block flow.
  *
  * Scenarios:
- * 1. Cost alert (notify only) → email sent once, no block
- * 2. Token alert (notify only) → email sent once, no block
- * 3. Cost alert + block (both) → email sent once + proxy blocked with message
- * 4. Token alert + block (both) → email sent once + proxy blocked with message
- * 5. No alert defined → no email, no block
+ * 1. Cost alert (notify only) → soft limit signal emitted once, no block
+ * 2. Token alert (notify only) → soft limit signal emitted once, no block
+ * 3. Cost alert + block (both) → hard limit signal emitted once + proxy blocked with message
+ * 4. Token alert + block (both) → hard limit signal emitted once + proxy blocked with message
+ * 5. No alert defined → no signal, no block
  */
 import { HttpException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationCronService } from './notification-cron.service';
 import { LimitCheckService } from './limit-check.service';
 import { NotificationRulesService } from './notification-rules.service';
-import { NotificationEmailService } from './notification-email.service';
-import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 
 /* ── Shared helpers ──────────────────────────────── */
 
 const TENANT = 'tenant-1';
 const AGENT = 'my-agent';
-const EMAIL = 'alerts@example.com';
 
 function makeRule(overrides: Record<string, unknown> = {}) {
   return {
@@ -36,26 +33,22 @@ function makeRule(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/* ── 1 & 2: Email-only alerts (cost / tokens) ───── */
+/* ── 1 & 2: Notify-only alerts (cost / tokens) ───── */
 
-describe('Alert scenarios — email only (notify)', () => {
+describe('Alert scenarios — notify only', () => {
   let cronService: NotificationCronService;
   let mockGetAllActiveRules: jest.Mock;
   let mockGetConsumption: jest.Mock;
-  let mockSendThresholdAlert: jest.Mock;
+  let mockEmit: jest.Mock;
   let mockHasAlreadySent: jest.Mock;
   let mockInsertLog: jest.Mock;
-  let mockResolveRecipientEmail: jest.Mock;
-  let mockGetFullConfig: jest.Mock;
 
   beforeEach(async () => {
     mockGetAllActiveRules = jest.fn().mockResolvedValue([]);
     mockGetConsumption = jest.fn().mockResolvedValue(0);
-    mockSendThresholdAlert = jest.fn().mockResolvedValue(true);
+    mockEmit = jest.fn();
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);
     mockInsertLog = jest.fn().mockResolvedValue(undefined);
-    mockResolveRecipientEmail = jest.fn().mockResolvedValue(EMAIL);
-    mockGetFullConfig = jest.fn().mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -69,34 +62,20 @@ describe('Alert scenarios — email only (notify)', () => {
           },
         },
         {
-          provide: NotificationEmailService,
-          useValue: { sendThresholdAlert: mockSendThresholdAlert },
-        },
-        {
-          provide: EmailProviderConfigService,
-          useValue: { getFullConfig: mockGetFullConfig },
-        },
-        {
           provide: NotificationLogService,
           useValue: {
             hasAlreadySent: mockHasAlreadySent,
             insertLog: mockInsertLog,
-            resolveRecipientEmail: mockResolveRecipientEmail,
           },
         },
-        {
-          provide: ThinkerRuntimeService,
-          useValue: {
-            getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-          },
-        },
+        { provide: TriggerSignalService, useValue: { emit: mockEmit } },
       ],
     }).compile();
 
     cronService = module.get(NotificationCronService);
   });
 
-  it('cost alert (notify) — sends email once when cost threshold exceeded', async () => {
+  it('cost alert (notify) — emits a soft limit signal once when cost threshold exceeded', async () => {
     const rule = makeRule({ metric_type: 'cost', threshold: 10, action: 'notify' });
     mockGetAllActiveRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(15.5);
@@ -104,38 +83,38 @@ describe('Alert scenarios — email only (notify)', () => {
     const triggered = await cronService.checkThresholds();
 
     expect(triggered).toBe(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-      EMAIL,
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({
+        kind: 'limit',
+        tenantId: TENANT,
         agentName: AGENT,
-        metricType: 'cost',
+        metric: 'cost',
         threshold: 10,
-        actualValue: 15.5,
+        actual: 15.5,
         period: 'day',
         alertType: 'soft',
       }),
-      undefined,
     );
     expect(mockInsertLog).toHaveBeenCalledTimes(1);
   });
 
-  it('cost alert (notify) — does not send email twice in the same period', async () => {
+  it('cost alert (notify) — does not emit twice in the same period', async () => {
     const rule = makeRule({ metric_type: 'cost', threshold: 10, action: 'notify' });
     mockGetAllActiveRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(15.5);
 
     await cronService.checkThresholds();
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
 
     // Second run: already sent
     mockHasAlreadySent.mockResolvedValue(true);
     const triggered2 = await cronService.checkThresholds();
     expect(triggered2).toBe(0);
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
   });
 
-  it('token alert (notify) — sends email once when token threshold exceeded', async () => {
+  it('token alert (notify) — emits a soft limit signal once when token threshold exceeded', async () => {
     const rule = makeRule({ metric_type: 'tokens', threshold: 50000, action: 'notify' });
     mockGetAllActiveRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(60000);
@@ -143,55 +122,53 @@ describe('Alert scenarios — email only (notify)', () => {
     const triggered = await cronService.checkThresholds();
 
     expect(triggered).toBe(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-      EMAIL,
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({
+        kind: 'limit',
+        tenantId: TENANT,
         agentName: AGENT,
-        metricType: 'tokens',
+        metric: 'tokens',
         threshold: 50000,
-        actualValue: 60000,
+        actual: 60000,
         period: 'day',
         alertType: 'soft',
       }),
-      undefined,
     );
     expect(mockInsertLog).toHaveBeenCalledTimes(1);
   });
 
-  it('token alert (notify) — does not send email twice in the same period', async () => {
+  it('token alert (notify) — does not emit twice in the same period', async () => {
     const rule = makeRule({ metric_type: 'tokens', threshold: 50000, action: 'notify' });
     mockGetAllActiveRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(60000);
 
     await cronService.checkThresholds();
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
 
     mockHasAlreadySent.mockResolvedValue(true);
     const triggered2 = await cronService.checkThresholds();
     expect(triggered2).toBe(0);
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
   });
 });
 
-/* ── 3 & 4: Email + block (both) ────────────────── */
+/* ── 3 & 4: Notify + block (both) ────────────────── */
 
-describe('Alert scenarios — email + block (both)', () => {
+describe('Alert scenarios — notify + block (both)', () => {
   let limitCheckService: LimitCheckService;
   let mockGetActiveBlockRules: jest.Mock;
   let mockGetConsumption: jest.Mock;
-  let mockSendThresholdAlert: jest.Mock;
+  let mockEmit: jest.Mock;
   let mockHasAlreadySent: jest.Mock;
   let mockInsertLog: jest.Mock;
-  let mockResolveRecipientEmail: jest.Mock;
 
   beforeEach(() => {
     mockGetActiveBlockRules = jest.fn().mockResolvedValue([]);
     mockGetConsumption = jest.fn().mockResolvedValue(0);
-    mockSendThresholdAlert = jest.fn().mockResolvedValue(true);
+    mockEmit = jest.fn();
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);
     mockInsertLog = jest.fn().mockResolvedValue(undefined);
-    mockResolveRecipientEmail = jest.fn().mockResolvedValue(EMAIL);
 
     limitCheckService = new LimitCheckService(
       {
@@ -199,23 +176,14 @@ describe('Alert scenarios — email + block (both)', () => {
         getConsumption: mockGetConsumption,
       } as unknown as NotificationRulesService,
       {
-        sendThresholdAlert: mockSendThresholdAlert,
-      } as unknown as NotificationEmailService,
-      {
-        getFullConfig: jest.fn().mockResolvedValue(null),
-      } as unknown as EmailProviderConfigService,
-      {
-        getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-      } as unknown as ThinkerRuntimeService,
-      {
         hasAlreadySent: mockHasAlreadySent,
         insertLog: mockInsertLog,
-        resolveRecipientEmail: mockResolveRecipientEmail,
       } as unknown as NotificationLogService,
+      { emit: mockEmit } as unknown as TriggerSignalService,
     );
   });
 
-  it('cost alert + block — sends email, blocks agent, returns formatted message', async () => {
+  it('cost alert + block — emits a hard limit signal, blocks agent, returns formatted message', async () => {
     const rule = makeRule({ metric_type: 'cost', threshold: 10, action: 'both' });
     mockGetActiveBlockRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(12.5);
@@ -228,19 +196,19 @@ describe('Alert scenarios — email + block (both)', () => {
     expect(exceeded!.actual).toBe(12.5);
     expect(exceeded!.period).toBe('day');
 
-    // 2. Email is sent (async, wait a tick)
+    // 2. Signal is emitted (async, wait a tick)
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-      EMAIL,
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({
+        kind: 'limit',
+        tenantId: TENANT,
         agentName: AGENT,
-        metricType: 'cost',
+        metric: 'cost',
         threshold: 10,
-        actualValue: 12.5,
+        actual: 12.5,
         alertType: 'hard',
       }),
-      undefined,
     );
 
     // 3. Proxy would format the error message like this
@@ -260,14 +228,14 @@ describe('Alert scenarios — email + block (both)', () => {
     expect((body.error as Record<string, string>).message).toContain('Limit exceeded');
   });
 
-  it('cost alert + block — email sent only once per period', async () => {
+  it('cost alert + block — signal emitted only once per period', async () => {
     const rule = makeRule({ metric_type: 'cost', threshold: 10, action: 'both' });
     mockGetActiveBlockRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(12.5);
 
     await limitCheckService.checkLimits(TENANT, AGENT);
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
 
     // Second check — already sent
     mockHasAlreadySent.mockResolvedValue(true);
@@ -276,11 +244,11 @@ describe('Alert scenarios — email + block (both)', () => {
 
     // Still blocked
     expect(exceeded2).not.toBeNull();
-    // But email not sent again
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    // But no new signal
+    expect(mockEmit).toHaveBeenCalledTimes(1);
   });
 
-  it('token alert + block — sends email, blocks agent, returns formatted message', async () => {
+  it('token alert + block — emits a hard limit signal, blocks agent, returns formatted message', async () => {
     const rule = makeRule({ metric_type: 'tokens', threshold: 50000, action: 'both' });
     mockGetActiveBlockRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(62000);
@@ -293,19 +261,19 @@ describe('Alert scenarios — email + block (both)', () => {
     expect(exceeded!.actual).toBe(62000);
     expect(exceeded!.period).toBe('day');
 
-    // 2. Email is sent
+    // 2. Signal is emitted
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
-    expect(mockSendThresholdAlert).toHaveBeenCalledWith(
-      EMAIL,
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({
+        kind: 'limit',
+        tenantId: TENANT,
         agentName: AGENT,
-        metricType: 'tokens',
+        metric: 'tokens',
         threshold: 50000,
-        actualValue: 62000,
+        actual: 62000,
         alertType: 'hard',
       }),
-      undefined,
     );
 
     // 3. Proxy would format the error message like this
@@ -324,21 +292,21 @@ describe('Alert scenarios — email + block (both)', () => {
     expect(error.getStatus()).toBe(429);
   });
 
-  it('token alert + block — email sent only once per period', async () => {
+  it('token alert + block — signal emitted only once per period', async () => {
     const rule = makeRule({ metric_type: 'tokens', threshold: 50000, action: 'both' });
     mockGetActiveBlockRules.mockResolvedValue([rule]);
     mockGetConsumption.mockResolvedValue(62000);
 
     await limitCheckService.checkLimits(TENANT, AGENT);
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
 
     mockHasAlreadySent.mockResolvedValue(true);
     const exceeded2 = await limitCheckService.checkLimits(TENANT, AGENT);
     await new Promise((r) => setTimeout(r, 50));
 
     expect(exceeded2).not.toBeNull();
-    expect(mockSendThresholdAlert).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledTimes(1);
   });
 
   it('block — subsequent proxy calls are also blocked', async () => {
@@ -363,12 +331,12 @@ describe('Alert scenarios — no rules defined', () => {
   let limitCheckService: LimitCheckService;
   let mockGetAllActiveRules: jest.Mock;
   let mockGetActiveBlockRules: jest.Mock;
-  let mockSendThresholdAlert: jest.Mock;
+  let mockEmit: jest.Mock;
 
   beforeEach(async () => {
     mockGetAllActiveRules = jest.fn().mockResolvedValue([]);
     mockGetActiveBlockRules = jest.fn().mockResolvedValue([]);
-    mockSendThresholdAlert = jest.fn().mockResolvedValue(true);
+    mockEmit = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -382,27 +350,13 @@ describe('Alert scenarios — no rules defined', () => {
           },
         },
         {
-          provide: NotificationEmailService,
-          useValue: { sendThresholdAlert: mockSendThresholdAlert },
-        },
-        {
-          provide: EmailProviderConfigService,
-          useValue: { getFullConfig: jest.fn().mockResolvedValue(null) },
-        },
-        {
           provide: NotificationLogService,
           useValue: {
             hasAlreadySent: jest.fn().mockResolvedValue(false),
             insertLog: jest.fn().mockResolvedValue(undefined),
-            resolveRecipientEmail: jest.fn().mockResolvedValue(EMAIL),
           },
         },
-        {
-          provide: ThinkerRuntimeService,
-          useValue: {
-            getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-          },
-        },
+        { provide: TriggerSignalService, useValue: { emit: mockEmit } },
       ],
     }).compile();
 
@@ -414,31 +368,22 @@ describe('Alert scenarios — no rules defined', () => {
         getConsumption: jest.fn().mockResolvedValue(999999),
       } as unknown as NotificationRulesService,
       {
-        sendThresholdAlert: mockSendThresholdAlert,
-      } as unknown as NotificationEmailService,
-      {
-        getFullConfig: jest.fn().mockResolvedValue(null),
-      } as unknown as EmailProviderConfigService,
-      {
-        getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099'),
-      } as unknown as ThinkerRuntimeService,
-      {
         hasAlreadySent: jest.fn().mockResolvedValue(false),
         insertLog: jest.fn().mockResolvedValue(undefined),
-        resolveRecipientEmail: jest.fn().mockResolvedValue(EMAIL),
       } as unknown as NotificationLogService,
+      { emit: mockEmit } as unknown as TriggerSignalService,
     );
   });
 
-  it('no email is sent when no rules are defined', async () => {
+  it('no signal is emitted when no rules are defined', async () => {
     const triggered = await cronService.checkThresholds();
     expect(triggered).toBe(0);
-    expect(mockSendThresholdAlert).not.toHaveBeenCalled();
+    expect(mockEmit).not.toHaveBeenCalled();
   });
 
   it('no block occurs when no rules are defined', async () => {
     const result = await limitCheckService.checkLimits(TENANT, AGENT);
     expect(result).toBeNull();
-    expect(mockSendThresholdAlert).not.toHaveBeenCalled();
+    expect(mockEmit).not.toHaveBeenCalled();
   });
 });

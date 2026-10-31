@@ -11,10 +11,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationCronService } from './notification-cron.service';
 import { NotificationRulesService } from './notification-rules.service';
-import { NotificationEmailService } from './notification-email.service';
-import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService } from './notification-log.service';
-import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 
 const baseRule = {
   id: 'rule-1',
@@ -47,21 +45,17 @@ describe('NotificationCronService — edge cases', () => {
   let mockGetAllActiveRules: jest.Mock;
   let mockGetActiveRulesForTenant: jest.Mock;
   let mockGetConsumption: jest.Mock;
-  let mockSendThresholdAlert: jest.Mock;
   let mockHasAlreadySent: jest.Mock;
   let mockInsertLog: jest.Mock;
-  let mockResolveRecipientEmail: jest.Mock;
-  let mockGetFullConfig: jest.Mock;
+  let mockEmit: jest.Mock;
 
   beforeEach(async () => {
     mockGetAllActiveRules = jest.fn();
     mockGetActiveRulesForTenant = jest.fn();
     mockGetConsumption = jest.fn();
-    mockSendThresholdAlert = jest.fn().mockResolvedValue(true);
     mockHasAlreadySent = jest.fn().mockResolvedValue(false);
     mockInsertLog = jest.fn().mockResolvedValue(undefined);
-    mockResolveRecipientEmail = jest.fn().mockResolvedValue('user@test.com');
-    mockGetFullConfig = jest.fn().mockResolvedValue(null);
+    mockEmit = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,25 +69,10 @@ describe('NotificationCronService — edge cases', () => {
           },
         },
         {
-          provide: NotificationEmailService,
-          useValue: { sendThresholdAlert: mockSendThresholdAlert },
-        },
-        {
-          provide: EmailProviderConfigService,
-          useValue: { getFullConfig: mockGetFullConfig },
-        },
-        {
           provide: NotificationLogService,
-          useValue: {
-            hasAlreadySent: mockHasAlreadySent,
-            insertLog: mockInsertLog,
-            resolveRecipientEmail: mockResolveRecipientEmail,
-          },
+          useValue: { hasAlreadySent: mockHasAlreadySent, insertLog: mockInsertLog },
         },
-        {
-          provide: ThinkerRuntimeService,
-          useValue: { getAuthBaseUrl: jest.fn().mockReturnValue('http://localhost:2099') },
-        },
+        { provide: TriggerSignalService, useValue: { emit: mockEmit } },
       ],
     }).compile();
 
@@ -299,6 +278,17 @@ describe('NotificationCronService — edge cases', () => {
           metricType: 'cost',
         }),
       );
+      expect(mockEmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'limit',
+          alertType: 'soft',
+          ruleId: 'cost-rule',
+          metric: 'cost',
+          threshold: 12.5,
+          actual: 12.5,
+          period: 'month',
+        }),
+      );
     });
 
     it('does not trigger when cost falls 0.01 below threshold', async () => {
@@ -314,6 +304,7 @@ describe('NotificationCronService — edge cases', () => {
       const result = await service.checkThresholds();
       expect(result).toBe(0);
       expect(mockInsertLog).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 });

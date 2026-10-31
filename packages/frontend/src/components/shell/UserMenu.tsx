@@ -10,6 +10,7 @@ import {
   Terminal,
   Unplug,
   Users,
+  Zap,
 } from 'lucide-react';
 import { authClient } from '../../services/auth-client.js';
 import { createOrganization, listOrganizations } from '../../services/api/organizations.js';
@@ -99,6 +100,9 @@ export default function UserMenu() {
           {roleCan.manageMembers()
             ? t('shell.user.manageOrganization')
             : t('shell.user.viewOrganization')}
+        </MenuItem>
+        <MenuItem icon={<Zap />} to="/triggers">
+          {t('nav.triggers')}
         </MenuItem>
         {organizations.length > 1 ? (
           <>

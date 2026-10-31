@@ -22,6 +22,7 @@ export default {
   membersSettings: 'Members & settings',
   users: 'Users',
   organization: 'Organization',
+  triggers: 'Triggers',
   cli: 'CLI',
   userFallback: 'User',
   harnessActions: 'Harness actions',

@@ -24,6 +24,7 @@ const ptBR: Catalog<typeof en> = {
   membersSettings: 'Membros e configurações',
   users: 'Usuários',
   organization: 'Organização',
+  triggers: 'Triggers',
   cli: 'CLI',
   userFallback: 'Usuário',
   harnessActions: 'Ações do harness',

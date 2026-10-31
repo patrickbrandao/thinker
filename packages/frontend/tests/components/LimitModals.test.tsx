@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { KebabMenu, DeleteRuleModal, RemoveProviderModal } from '../../src/components/LimitModals';
+import { KebabMenu, DeleteRuleModal } from '../../src/components/LimitModals';
 import type { NotificationRule } from '../../src/services/api';
 
 vi.mock('../../src/components/LimitRuleTable.js', () => ({
@@ -120,37 +120,6 @@ describe('DeleteRuleModal', () => {
         onConfirmChange={vi.fn()}
         onCancel={vi.fn()}
         onDelete={vi.fn()}
-      />,
-    );
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-  });
-});
-
-describe('RemoveProviderModal', () => {
-  it('renders a labelled modal dialog', () => {
-    render(
-      <RemoveProviderModal
-        open={true}
-        hasEmailRules={false}
-        removing={false}
-        onCancel={vi.fn()}
-        onRemove={vi.fn()}
-      />,
-    );
-    const dialog = document.querySelector('[role="dialog"]');
-    expect(dialog).not.toBeNull();
-    expect(dialog!.getAttribute('aria-label')).toBe('Remove provider');
-    expect(screen.getByRole('heading', { name: 'Remove provider' })).toBeDefined();
-  });
-
-  it('does not render when closed', () => {
-    const { container } = render(
-      <RemoveProviderModal
-        open={false}
-        hasEmailRules={false}
-        removing={false}
-        onCancel={vi.fn()}
-        onRemove={vi.fn()}
       />,
     );
     expect(document.querySelector('[role="dialog"]')).toBeNull();

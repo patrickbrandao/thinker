@@ -7,6 +7,7 @@ import {
   Get,
   Logger,
   NotFoundException,
+  Optional,
   Param,
   Patch,
   Post,
@@ -20,6 +21,7 @@ import { AgentLifecycleService } from '../services/agent-lifecycle.service';
 import { AgentDuplicationService } from '../services/agent-duplication.service';
 import { ApiKeyGeneratorService } from '../../otlp/services/api-key.service';
 import { IngestEventBusService } from '../../common/services/ingest-event-bus.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
 import { CreateAgentDto } from '../../common/dto/create-agent.dto';
 import { DuplicateAgentDto } from '../../common/dto/duplicate-agent.dto';
@@ -43,7 +45,27 @@ export class AgentsController {
     private readonly eventBus: IngestEventBusService,
     private readonly providerService: ProviderService,
     private readonly agentListCache: AgentListCacheService,
+    @Optional()
+    private readonly triggerSignals?: TriggerSignalService,
   ) {}
+
+  private signalHarness(
+    tenantId: string | null,
+    action: 'created' | 'deleted',
+    agent: { id: string; name: string; displayName: string },
+    userId: string | null,
+  ): void {
+    if (!tenantId) return;
+    this.triggerSignals?.emit({
+      kind: 'harness',
+      tenantId,
+      action,
+      agentId: agent.id,
+      agentName: agent.name,
+      displayName: agent.displayName,
+      userId,
+    });
+  }
 
   private async invalidateAgentListCache(tenantId: string | null): Promise<void> {
     // GET /agents has exactly two canonical cache entries per tenant (playground
@@ -130,6 +152,12 @@ export class AgentsController {
     }
     await this.invalidateAgentListCache(result.tenantId);
     this.emitAgentEvent(result.tenantId, ctx.userId);
+    this.signalHarness(
+      result.tenantId,
+      'created',
+      { id: result.agentId, name: slug, displayName },
+      ctx.userId,
+    );
     return {
       agent: {
         id: result.agentId,
@@ -180,6 +208,12 @@ export class AgentsController {
     }
     await this.invalidateAgentListCache(ctx.tenantId);
     this.emitAgentEvent(ctx.tenantId, ctx.userId);
+    this.signalHarness(
+      ctx.tenantId,
+      'created',
+      { id: result.agentId, name: result.agentName, displayName: result.displayName },
+      ctx.userId,
+    );
     return {
       agent: {
         id: result.agentId,
@@ -265,9 +299,10 @@ export class AgentsController {
 
   @Delete('agents/:agentName')
   async deleteAgent(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
-    await this.lifecycle.deleteAgent(ctx.tenantId, agentName);
+    const deleted = await this.lifecycle.deleteAgent(ctx.tenantId, agentName);
     await this.invalidateAgentListCache(ctx.tenantId);
     this.emitAgentEvent(ctx.tenantId, ctx.userId);
+    if (deleted) this.signalHarness(ctx.tenantId, 'deleted', deleted, ctx.userId);
     return { deleted: true };
   }
 }

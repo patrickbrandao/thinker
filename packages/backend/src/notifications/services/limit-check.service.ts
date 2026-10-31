@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationRulesService } from './notification-rules.service';
-import { NotificationEmailService } from './notification-email.service';
-import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService, formatNotificationTimestamp } from './notification-log.service';
-import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 import {
   computePeriodBoundaries,
   computePeriodResetDate,
@@ -33,10 +31,8 @@ export class LimitCheckService {
 
   constructor(
     private readonly rulesService: NotificationRulesService,
-    private readonly emailService: NotificationEmailService,
-    private readonly emailProviderConfig: EmailProviderConfigService,
-    private readonly runtime: ThinkerRuntimeService,
     private readonly notificationLog: NotificationLogService,
+    private readonly triggerSignals: TriggerSignalService,
   ) {}
 
   async checkLimits(tenantId: string, agentName: string): Promise<LimitExceeded | null> {
@@ -99,11 +95,6 @@ export class LimitCheckService {
     if (await this.notificationLog.hasAlreadySent(rule.id, periodStart)) return;
 
     const now = formatNotificationTimestamp();
-    const providerConfig = await this.emailProviderConfig.getFullConfig(rule.tenant_id);
-    const email = await this.notificationLog.resolveRecipientEmail(
-      rule.tenant_id,
-      providerConfig?.notificationEmail,
-    );
     await this.notificationLog.insertLog({
       ruleId: rule.id,
       periodStart,
@@ -115,22 +106,20 @@ export class LimitCheckService {
       sentAt: now,
     });
 
-    if (email) {
-      await this.emailService.sendThresholdAlert(
-        email,
-        {
-          agentName: rule.agent_name,
-          metricType: rule.metric_type,
-          threshold: rule.threshold,
-          actualValue: actual,
-          period: rule.period,
-          timestamp: now,
-          agentUrl: `${this.runtime.getAuthBaseUrl()}/harnesses/${encodeURIComponent(rule.agent_name)}`,
-          alertType: 'hard',
-          periodResetDate: computePeriodResetDate(rule.period),
-        },
-        providerConfig ?? undefined,
-      );
-    }
+    // Delivery goes through the harness's event triggers (limit.block).
+    this.triggerSignals.emit({
+      kind: 'limit',
+      tenantId: rule.tenant_id,
+      agentName: rule.agent_name,
+      alertType: 'hard',
+      ruleId: rule.id,
+      metric: rule.metric_type,
+      threshold: Number(rule.threshold),
+      actual,
+      period: rule.period,
+      periodStart,
+      periodEnd,
+      periodReset: computePeriodResetDate(rule.period),
+    });
   }
 }

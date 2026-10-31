@@ -25,7 +25,8 @@ Estes só são contatados porque você os configurou, e só quando o recurso é 
 | APIs de inferência e de listagem de modelos dos **provedores conectados**, incluindo Ollama Cloud (`ollama.com`) e o `OLLAMA_HOST` local | Requisições roteadas e descoberta de modelos. |
 | URLs dos **provedores customizados**, inclusive em LAN | Idem. |
 | **Fluxos OAuth e de assinatura** dos provedores que você conecta, como `auth.openai.com`, `claude.ai` e `console.anthropic.com`, `accounts.google.com`, `oauth2.googleapis.com` e `cloudcode-pa.googleapis.com`, `github.com` e `api.github.com` (Copilot), `auth.x.ai`, MiniMax e o AWS SSO (Kiro) | Ao conectar ou renovar a assinatura. |
-| **E-mail** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |
+| **E-mail de autenticação** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |
+| **Gatilhos de eventos**: as APIs de e-mail (`api.resend.com`, `api.sendgrid.com`, `api.mailgun.net`), `api.telegram.org`, a URL de cada webhook e o servidor Syslog que você cadastrar | Só para os gatilhos cadastrados no workspace e ligados a um harness ou evento. |
 | **Login social** (Google, GitHub, Discord) | Só se o par `*_CLIENT_ID`/`*_CLIENT_SECRET` estiver definido. |
 | **Armazenamento S3** das gravações | Só se `THINKER_RECORDING_S3_ENDPOINT` estiver definido. |
 | **Metadados de cliente MCP (CIMD)**: o documento na URL HTTPS que um cliente MCP informa como `client_id` durante o OAuth | Quando um cliente MCP faz login. Só endereços públicos, salvo `THINKER_CIMD_ALLOW_PRIVATE=true`; endereços de metadata de nuvem ficam sempre bloqueados. Desligue o MCP com `MCP_ENABLED=false`. |

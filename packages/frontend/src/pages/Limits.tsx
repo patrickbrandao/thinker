@@ -1,34 +1,31 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useParams } from 'react-router';
 import { Info, Plus, TriangleAlert } from 'lucide-react';
-import EmailProviderModal from '../components/EmailProviderModal.js';
-import EmailProviderSection from '../components/EmailProviderSection.js';
 import LimitRuleModal from '../components/LimitRuleModal.js';
 import type { LimitRuleData } from '../components/LimitRuleModal.js';
 import LimitRuleTable from '../components/LimitRuleTable.js';
 import LimitHistoryTable from '../components/LimitHistoryTable.js';
-import { KebabMenu, DeleteRuleModal, RemoveProviderModal } from '../components/LimitModals.js';
+import { KebabMenu, DeleteRuleModal } from '../components/LimitModals.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
+import HarnessTriggersPanel from '../components/triggers/HarnessTriggersPanel.js';
 import { Button } from '../components/ui.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { roleCan } from '../services/session-store.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
-import { checkEmailConfigured } from '../services/setup-status.js';
 import { useResource } from '../lib/use-resource.js';
+import { getHarnessTriggers, listTriggers } from '../services/api/triggers.js';
 import {
   getNotificationRules,
   getNotificationLogs,
   createNotificationRule,
   updateNotificationRule,
   deleteNotificationRule,
-  getEmailProvider,
-  removeEmailProvider,
   getRoutingStatus,
   type NotificationRule,
 } from '../services/api.js';
 
-/** Guardrails tab of a harness: spend/token rules, the email sender, alert history. */
+/** Guardrails tab of a harness: spend/token rules, the triggers that receive its events, alert history. */
 export default function Limits() {
   const params = useParams<{ agentName: string }>();
   const agentName = decodeURIComponent(params.agentName ?? '');
@@ -36,16 +33,10 @@ export default function Limits() {
   const rules = useResource(() => getNotificationRules(agentName), [agentName]);
   const logs = useResource(() => getNotificationLogs(agentName), [agentName]);
   const routingStatus = useResource(() => getRoutingStatus(agentName), [agentName]);
-  const emailConfigured = useResource(() => checkEmailConfigured(), []);
-  const emailProvider = useResource(() => getEmailProvider(), []);
-  // A failed initial fetch or a failed refresh after a successful delete reads
-  // as "no provider saved" instead of showing stale data.
-  const savedProvider = emailProvider.error ? undefined : emailProvider.data;
+  const triggers = useResource(() => listTriggers(), []);
+  const bindings = useResource(() => getHarnessTriggers(agentName), [agentName]);
 
   const [showModal, setShowModal] = useState(false);
-  const [showEditProvider, setShowEditProvider] = useState(false);
-  const [showRemoveProvider, setShowRemoveProvider] = useState(false);
-  const [removingProvider, setRemovingProvider] = useState(false);
   const [editRule, setEditRule] = useState<NotificationRule | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -54,11 +45,16 @@ export default function Limits() {
   const [deleting, setDeleting] = useState(false);
 
   const routingEnabled = routingStatus.data?.enabled ?? false;
-  // There is a sender when the operator saved a provider in the dashboard or
-  // set the EMAIL_* environment variables. Assume one while the status loads.
-  const hasProvider = !!savedProvider || emailConfigured.data !== false;
+  // Alerts are delivered when an enabled trigger bound to this harness gets
+  // `limit.alert`. Assume one while the bindings load.
+  const hasProvider =
+    bindings.data === undefined ||
+    bindings.data.some(
+      (b) =>
+        b.events.includes('limit.alert') &&
+        (triggers.data?.find((tr) => tr.id === b.trigger_id)?.enabled ?? true),
+    );
   const ruleList = rules.data ?? [];
-  const hasEmailRules = ruleList.some((r) => r.action === 'notify' || r.action === 'both');
   const blockRulesExceeded = ruleList.some(
     (r) =>
       (r.action === 'block' || r.action === 'both') && r.is_active && Number(r.trigger_count) > 0,
@@ -95,23 +91,6 @@ export default function Limits() {
       clearTimeout(timer);
       document.removeEventListener('click', onDocClick);
     };
-  };
-
-  const handleRemoveProvider = async () => {
-    setRemovingProvider(true);
-    try {
-      await removeEmailProvider();
-    } catch {
-      // error toast from fetchMutate
-      setRemovingProvider(false);
-      return;
-    }
-    // The DELETE succeeded: acknowledge it before the refetch, whose own
-    // failure must not leave the modal open claiming nothing happened.
-    setRemovingProvider(false);
-    setShowRemoveProvider(false);
-    toast.success(t('limits.toast.providerRemoved'));
-    await emailProvider.reload();
   };
 
   const handleEdit = (rule: NotificationRule) => {
@@ -202,14 +181,6 @@ export default function Limits() {
       ) : null}
 
       <ReadOnlyRegion readOnly={!canManage} notice={t('limits.readOnlyNotice')}>
-        <EmailProviderSection
-          emailProvider={savedProvider}
-          loading={emailProvider.loading}
-          onConfigured={() => void emailProvider.reload()}
-          onEdit={() => setShowEditProvider(true)}
-          onRemove={() => setShowRemoveProvider(true)}
-        />
-
         <LimitRuleTable
           rules={rules.data}
           loading={rules.loading && rules.data === undefined}
@@ -217,6 +188,15 @@ export default function Limits() {
           onToggleMenu={toggleMenu}
         />
       </ReadOnlyRegion>
+
+      <HarnessTriggersPanel
+        agentName={agentName}
+        triggers={triggers.data}
+        bindings={bindings.data}
+        loading={triggers.loading || bindings.loading}
+        canEdit={roleCan.editHarnesses()}
+        onSaved={(saved) => bindings.setData(saved)}
+      />
 
       {!logs.loading && historyLogs.length > 0 ? (
         <LimitHistoryTable logs={historyLogs} loading={false} />
@@ -260,25 +240,6 @@ export default function Limits() {
               }
             : null
         }
-      />
-
-      <RemoveProviderModal
-        open={showRemoveProvider}
-        hasEmailRules={hasEmailRules}
-        removing={removingProvider}
-        onCancel={() => setShowRemoveProvider(false)}
-        onRemove={() => void handleRemoveProvider()}
-      />
-
-      <EmailProviderModal
-        open={showEditProvider}
-        initialProvider={savedProvider?.provider ?? 'resend'}
-        editMode={true}
-        existingKeyPrefix={savedProvider?.keyPrefix ?? null}
-        existingDomain={savedProvider?.domain ?? null}
-        existingNotificationEmail={savedProvider?.notificationEmail ?? null}
-        onClose={() => setShowEditProvider(false)}
-        onSaved={() => void emailProvider.reload()}
       />
     </div>
   );

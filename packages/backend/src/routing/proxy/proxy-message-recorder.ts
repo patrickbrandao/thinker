@@ -19,6 +19,7 @@ import {
   type PricingEntry,
 } from '../../model-prices/model-pricing-cache.service';
 import { IngestEventBusService } from '../../common/services/ingest-event-bus.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 import { IngestionContext } from '../../otlp/interfaces/ingestion-context.interface';
 import { FailedFallback } from './proxy-fallback.service';
 import { StreamUsage } from './stream-writer';
@@ -363,6 +364,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     private readonly opencodeGoCatalog: OpencodeGoCatalogService,
     @Optional()
     private readonly providerService?: ProviderService,
+    @Optional()
+    private readonly triggerSignals?: TriggerSignalService,
   ) {
     this.cooldownCleanupTimer = setInterval(() => this.evictExpiredCooldowns(), 60_000);
     if (typeof this.cooldownCleanupTimer === 'object' && 'unref' in this.cooldownCleanupTimer) {
@@ -518,6 +521,13 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         ...(apiMode == null ? [] : ['api_mode']),
       ];
       await insert.orUpdate(updatedColumns, ['id']).execute();
+      this.triggerSignals?.emit({
+        kind: 'request',
+        tenantId: ctx.tenantId,
+        agentId: ctx.agentId,
+        agentName: ctx.agentName,
+        requestId,
+      });
     } else {
       await insert.orIgnore().execute();
     }
@@ -526,6 +536,34 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
 
   /** Update the pending row when present; retain insert-only legacy/test paths. */
   private async persistAttempt(
+    row: Partial<AgentMessage>,
+    attempt?: ProviderAttemptRef,
+  ): Promise<void> {
+    await this.persistAttemptRow(row, attempt);
+    this.signalAttempt(row);
+  }
+
+  /** Tells event triggers how a provider connection answered (credential checks). */
+  private signalAttempt(row: Partial<AgentMessage>): void {
+    if (!this.triggerSignals || !row.tenant_id || !row.agent_id) return;
+    const status = normalizeStatus(row.status);
+    if (status === PENDING_STATUS || status === CANCELLED_STATUS) return;
+    this.triggerSignals.emit({
+      kind: 'attempt',
+      tenantId: row.tenant_id,
+      agentId: row.agent_id,
+      agentName: row.agent_name ?? '',
+      tenantProviderId: row.tenant_provider_id ?? null,
+      provider: row.provider ?? null,
+      keyLabel: row.provider_key_label ?? null,
+      ok: normalizeStatus(row.status ?? 'ok') === 'success',
+      httpStatus: row.error_http_status ?? null,
+      errorCode: row.error_code ?? null,
+      errorMessage: row.error_message ?? null,
+    });
+  }
+
+  private async persistAttemptRow(
     row: Partial<AgentMessage>,
     attempt?: ProviderAttemptRef,
   ): Promise<void> {

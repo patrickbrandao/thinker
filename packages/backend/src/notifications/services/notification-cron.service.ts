@@ -1,10 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationRulesService } from './notification-rules.service';
-import { NotificationEmailService } from './notification-email.service';
-import { EmailProviderConfigService } from './email-provider-config.service';
 import { NotificationLogService, formatNotificationTimestamp } from './notification-log.service';
-import { ThinkerRuntimeService } from '../../common/services/thinker-runtime.service';
+import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 import { computePeriodBoundaries } from '../../common/utils/period.util';
 
 interface ActiveRule {
@@ -22,10 +20,8 @@ export class NotificationCronService implements OnModuleInit {
 
   constructor(
     private readonly rulesService: NotificationRulesService,
-    private readonly emailService: NotificationEmailService,
-    private readonly emailProviderConfigService: EmailProviderConfigService,
-    private readonly runtime: ThinkerRuntimeService,
     private readonly notificationLog: NotificationLogService,
+    private readonly triggerSignals: TriggerSignalService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -107,11 +103,6 @@ export class NotificationCronService implements OnModuleInit {
     if (actual < rule.threshold) return false;
 
     const now = formatNotificationTimestamp();
-    const fullConfig = await this.emailProviderConfigService.getFullConfig(rule.tenant_id);
-    const email = await this.notificationLog.resolveRecipientEmail(
-      rule.tenant_id,
-      fullConfig?.notificationEmail,
-    );
     await this.notificationLog.insertLog({
       ruleId: rule.id,
       periodStart,
@@ -123,29 +114,20 @@ export class NotificationCronService implements OnModuleInit {
       sentAt: now,
     });
 
-    if (email) {
-      const emailSent = await this.emailService.sendThresholdAlert(
-        email,
-        {
-          agentName: rule.agent_name,
-          metricType: rule.metric_type,
-          threshold: rule.threshold,
-          actualValue: actual,
-          period: rule.period,
-          timestamp: now,
-          agentUrl: `${this.runtime.getAuthBaseUrl()}/harnesses/${encodeURIComponent(rule.agent_name)}`,
-          alertType: 'soft',
-        },
-        fullConfig ?? undefined,
-      );
-      if (!emailSent) {
-        this.logger.warn(`Failed to send alert for rule ${rule.id}, will retry next cron run`);
-      }
-    } else {
-      this.logger.warn(
-        `No email found for tenant ${rule.tenant_id}, skipping alert for rule ${rule.id}`,
-      );
-    }
+    // Delivery goes through the harness's event triggers (limit.alert).
+    this.triggerSignals.emit({
+      kind: 'limit',
+      tenantId: rule.tenant_id,
+      agentName: rule.agent_name,
+      alertType: 'soft',
+      ruleId: rule.id,
+      metric: rule.metric_type,
+      threshold: Number(rule.threshold),
+      actual,
+      period: rule.period,
+      periodStart,
+      periodEnd,
+    });
 
     return true;
   }
