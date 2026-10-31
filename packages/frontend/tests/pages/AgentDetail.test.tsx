@@ -64,17 +64,25 @@ describe('AgentDetail', () => {
     expect(container.querySelector('h1')?.textContent?.trim()).toBe('my-agent');
   });
 
-  it('renders a tablist with exactly 6 tabs', () => {
+  it('renders a tablist with exactly 7 tabs', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
-    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(6);
+    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(7);
   });
 
-  it('renders tabs labeled Overview, Routing, Models, Providers, Limits, Settings in order', () => {
+  it('renders tabs labeled Overview, Routing, Models, Providers, Limits, Triggers, Settings in order', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const labels = Array.from(tabsOf(container)).map((t) => t.textContent);
-    expect(labels).toEqual(['Overview', 'Routing', 'Models', 'Providers', 'Limits', 'Settings']);
+    expect(labels).toEqual([
+      'Overview',
+      'Routing',
+      'Models',
+      'Providers',
+      'Limits',
+      'Triggers',
+      'Settings',
+    ]);
   });
 
   it('Overview tab links to the agent root path', () => {
@@ -104,7 +112,7 @@ describe('AgentDetail', () => {
 
   it('Settings tab links to /harnesses/:name/settings', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    expect(tabsOf(container)[5].getAttribute('href')).toBe('/harnesses/my-agent/settings');
+    expect(tabsOf(container)[6].getAttribute('href')).toBe('/harnesses/my-agent/settings');
   });
 
   it('marks Overview tab active when pathname is the agent root', () => {
@@ -116,6 +124,7 @@ describe('AgentDetail', () => {
     expect(tabs[3].getAttribute('aria-selected')).toBe('false');
     expect(tabs[4].getAttribute('aria-selected')).toBe('false');
     expect(tabs[5].getAttribute('aria-selected')).toBe('false');
+    expect(tabs[6].getAttribute('aria-selected')).toBe('false');
   });
 
   it('marks Overview tab active when pathname is /overview', () => {
@@ -147,6 +156,12 @@ describe('AgentDetail', () => {
 
   it('marks Settings tab active when pathname starts with /settings', () => {
     const { container } = renderAt('/harnesses/my-agent/settings/advanced');
+    expect(tabsOf(container)[6].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('Triggers tab links to /harnesses/:name/triggers and is active there', () => {
+    const { container } = renderAt('/harnesses/my-agent/triggers');
+    expect(tabsOf(container)[5].getAttribute('href')).toBe('/harnesses/my-agent/triggers');
     expect(tabsOf(container)[5].getAttribute('aria-selected')).toBe('true');
   });
 

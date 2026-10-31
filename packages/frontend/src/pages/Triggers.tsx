@@ -1,18 +1,16 @@
 import { useCallback, useState } from 'react';
-import { Pencil, Plus, Send, Trash2, Zap } from 'lucide-react';
-import ActionMenu from '../components/ActionMenu.js';
+import { Link } from 'react-router';
+import { FlaskConical, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import ErrorState from '../components/ErrorState.js';
 import TriggerDeliveries from '../components/triggers/TriggerDeliveries.js';
 import TriggerEditor from '../components/triggers/TriggerEditor.js';
-import { TriggerTestResultView, TriggerTypeTag } from '../components/triggers/TriggerParts.js';
-import { eventLabel } from '../components/triggers/trigger-form.js';
-import { Badge, Button, EmptyState, Modal, Switch, Tabs } from '../components/ui.js';
+import { TriggerTypeTag } from '../components/triggers/TriggerParts.js';
+import { eventLabel, providerOf, triggerTestPath } from '../components/triggers/trigger-form.js';
+import { Badge, Button, EmptyState, IconButton, Modal, Switch, Tabs } from '../components/ui.js';
 import {
   deleteTrigger,
   listTriggers,
-  testTrigger,
   updateTrigger,
-  type TriggerTestResult,
   type TriggerView,
 } from '../services/api/triggers.js';
 import { roleCan } from '../services/session-store.js';
@@ -34,8 +32,6 @@ export default function Triggers() {
   const [editing, setEditing] = useState<TriggerView | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TriggerView | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [testTarget, setTestTarget] = useState<TriggerView | null>(null);
-  const [testResult, setTestResult] = useState<TriggerTestResult | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
 
   const list = triggers.data ?? [];
@@ -46,7 +42,6 @@ export default function Triggers() {
   };
   const closeEditor = useCallback(() => setEditorOpen(false), []);
   const closeDelete = useCallback(() => setDeleteTarget(null), []);
-  const closeTest = useCallback(() => setTestTarget(null), []);
 
   const handleSaved = (saved: TriggerView) => {
     setEditorOpen(false);
@@ -72,16 +67,6 @@ export default function Triggers() {
     }
   };
 
-  const runTest = async (trigger: TriggerView) => {
-    setTestTarget(trigger);
-    setTestResult(null);
-    try {
-      setTestResult(await testTrigger(trigger.id));
-    } catch {
-      setTestTarget(null);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -103,10 +88,10 @@ export default function Triggers() {
       <meta name="description" content={t('triggers.metaDescription')} />
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <p className="max-w-3xl text-sm text-muted">{t('triggers.subtitle')}</p>
           {canManage && tab === 'triggers' ? (
-            <Button size="sm" onClick={() => openEditor(null)}>
+            <Button size="sm" className="shrink-0" onClick={() => openEditor(null)}>
               <Plus aria-hidden="true" />
               {t('triggers.create')}
             </Button>
@@ -139,14 +124,6 @@ export default function Triggers() {
             title={t('triggers.list.emptyTitle')}
             description={
               canManage ? t('triggers.list.emptyBody') : t('triggers.list.emptyBodyReadOnly')
-            }
-            action={
-              canManage ? (
-                <Button size="sm" onClick={() => openEditor(null)}>
-                  <Plus aria-hidden="true" />
-                  {t('triggers.create')}
-                </Button>
-              ) : undefined
             }
           />
         ) : (
@@ -189,7 +166,7 @@ export default function Triggers() {
                       ) : null}
                     </td>
                     <td>
-                      <TriggerTypeTag type={trigger.type} />
+                      <TriggerTypeTag type={trigger.type} provider={providerOf(trigger)} />
                     </td>
                     <td>
                       {canManage ? (
@@ -211,27 +188,29 @@ export default function Triggers() {
                     <td>
                       <div className="row-actions">
                         {canManage ? (
-                          <ActionMenu
-                            ariaLabel={t('triggers.list.actions')}
-                            items={[
-                              {
-                                label: t('triggers.list.edit'),
-                                icon: <Pencil aria-hidden="true" />,
-                                onClick: () => openEditor(trigger),
-                              },
-                              {
-                                label: t('triggers.list.test'),
-                                icon: <Send aria-hidden="true" />,
-                                onClick: () => void runTest(trigger),
-                              },
-                              {
-                                label: t('triggers.list.delete'),
-                                icon: <Trash2 aria-hidden="true" />,
-                                danger: true,
-                                onClick: () => setDeleteTarget(trigger),
-                              },
-                            ]}
-                          />
+                          <>
+                            <IconButton
+                              label={t('triggers.list.editNamed', { name: trigger.name })}
+                              onClick={() => openEditor(trigger)}
+                            >
+                              <Pencil aria-hidden="true" />
+                            </IconButton>
+                            <Link
+                              to={triggerTestPath(trigger.id)}
+                              className="icon-btn"
+                              aria-label={t('triggers.list.testNamed', { name: trigger.name })}
+                              title={t('triggers.list.testNamed', { name: trigger.name })}
+                            >
+                              <FlaskConical aria-hidden="true" />
+                            </Link>
+                            <IconButton
+                              label={t('triggers.list.deleteNamed', { name: trigger.name })}
+                              className="hover:text-danger"
+                              onClick={() => setDeleteTarget(trigger)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                            </IconButton>
+                          </>
                         ) : (
                           <Button variant="quiet" size="sm" onClick={() => openEditor(trigger)}>
                             {t('triggers.list.view')}
@@ -270,18 +249,6 @@ export default function Triggers() {
             {t('triggers.deleteModal.submit')}
           </Button>
         </div>
-      </Modal>
-
-      <Modal
-        open={!!testTarget}
-        title={`${t('triggers.testResult.title')}: ${testTarget?.name ?? ''}`}
-        onClose={closeTest}
-      >
-        {testResult ? (
-          <TriggerTestResultView result={testResult} />
-        ) : (
-          <p className="text-sm text-muted">{t('triggers.testResult.sending')}</p>
-        )}
       </Modal>
     </div>
   );

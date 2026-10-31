@@ -5,6 +5,7 @@ import {
   HARNESS_TRIGGER_EVENTS,
   TRIGGER_EVENT_STATUSES,
   TRIGGER_EVENT_TYPES,
+  type TriggerEventType,
   type TriggerType,
 } from 'thinker-shared';
 import { encrypt, getEncryptionSecret } from '../common/utils/crypto.util';
@@ -19,6 +20,59 @@ import {
 } from './trigger-config';
 import { TriggerDispatchService } from './trigger-dispatch.service';
 import { TriggerWorkerService, decryptSecrets } from './trigger-worker.service';
+
+export interface TriggerTestInput {
+  event_type?: unknown;
+  vars?: unknown;
+}
+
+/** Variables the gateway always computes itself; a simulated test cannot set them. */
+const COMPUTED_TEST_VARS = new Set([
+  'event.id',
+  'event.type',
+  'event.json',
+  'trigger.name',
+  'delivery.attempt',
+  'workspace.id',
+]);
+const MAX_TEST_VARS = 100;
+const MAX_TEST_VALUE = 4000;
+
+/** Validates the simulated event of a test: its type and the variable values to use. */
+export function parseTestInput(input: TriggerTestInput): {
+  eventType: TriggerEventType;
+  vars: Record<string, string>;
+} {
+  const eventType = input.event_type ?? 'test';
+  if (
+    typeof eventType !== 'string' ||
+    !(TRIGGER_EVENT_TYPES as readonly string[]).includes(eventType)
+  ) {
+    throw new BadRequestException(`event_type must be one of: ${TRIGGER_EVENT_TYPES.join(', ')}`);
+  }
+  const vars: Record<string, string> = {};
+  if (input.vars !== undefined && input.vars !== null) {
+    if (typeof input.vars !== 'object' || Array.isArray(input.vars)) {
+      throw new BadRequestException('vars must be an object of strings');
+    }
+    const entries = Object.entries(input.vars as Record<string, unknown>);
+    if (entries.length > MAX_TEST_VARS) {
+      throw new BadRequestException(`vars accepts at most ${MAX_TEST_VARS} variables`);
+    }
+    for (const [name, value] of entries) {
+      if (!/^[a-z][a-z0-9_.]{0,63}$/.test(name)) {
+        throw new BadRequestException(`Invalid variable name "${name}"`);
+      }
+      if (typeof value !== 'string' || value.length > MAX_TEST_VALUE) {
+        throw new BadRequestException(
+          `vars.${name} must be a string of at most ${MAX_TEST_VALUE} characters`,
+        );
+      }
+      if (!COMPUTED_TEST_VARS.has(name)) vars[name] = value;
+    }
+  }
+  return { eventType: eventType as TriggerEventType, vars };
+}
 
 interface TriggerRow {
   id: string;
@@ -218,16 +272,25 @@ export class TriggersService {
     return rows[0]?.email ?? null;
   }
 
-  async test(tenantId: string | null, id: string, userId: string | null) {
+  async test(
+    tenantId: string | null,
+    id: string,
+    userId: string | null,
+    input: TriggerTestInput = {},
+  ) {
     const trigger = await this.row(tenantId, id);
     const actorEmail = await this.userEmail(userId);
+    const { eventType, vars } = parseTestInput(input);
+    const { 'event.title': title, 'event.message': message, ...rest } = vars;
     const [eventId] = await this.dispatch.emit({
       tenantId: tenantId!,
-      eventType: 'test',
+      eventType,
       triggerId: trigger.id,
-      title: `Test from trigger ${trigger.name}`,
-      message: `This is a test event sent from Thinker${actorEmail ? ` by ${actorEmail}` : ''}.`,
-      vars: actorEmail ? { 'actor.email': actorEmail } : {},
+      title: title ?? `Test from trigger ${trigger.name}`,
+      message:
+        message ??
+        `This is a test event sent from Thinker${actorEmail ? ` by ${actorEmail}` : ''}.`,
+      vars: { ...(actorEmail ? { 'actor.email': actorEmail } : {}), ...rest },
     });
     const started = Date.now();
     const result = eventId ? await this.worker.deliverNow(eventId) : null;

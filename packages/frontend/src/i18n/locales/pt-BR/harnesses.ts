@@ -54,6 +54,7 @@ const ptBR: Catalog<typeof en> = {
     providers: 'Provedores',
     limits: 'Limites',
     settings: 'Configurações',
+    triggers: 'Triggers',
   },
   settings: {
     pageTitle: 'Configurações de {{ name }}',

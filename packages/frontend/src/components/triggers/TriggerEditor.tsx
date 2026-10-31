@@ -2,37 +2,33 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   DEFAULT_SYSLOG_SEVERITIES,
-  EMAIL_TRIGGER_PROVIDERS,
   SYSLOG_FACILITIES,
   SYSLOG_FORMATS,
   SYSLOG_SEVERITIES,
   SYSLOG_TRANSPORTS,
   TRIGGER_LIMITS,
-  TRIGGER_TYPES,
   TRIGGER_VARIABLES,
   WEBHOOK_METHODS,
   WORKSPACE_TRIGGER_EVENTS,
   type SyslogSeverity,
-  type TriggerType,
 } from 'thinker-shared';
 import { t } from '../../i18n/index.js';
 import { getEmailProviderApiKeyUrl } from '../../services/provider-api-key-urls.js';
 import { toast } from '../../services/toast-store.js';
-import {
-  createTrigger,
-  testTrigger,
-  updateTrigger,
-  type TriggerTestResult,
-  type TriggerView,
-} from '../../services/api/triggers.js';
+import { useNavigate } from 'react-router';
+import { createTrigger, updateTrigger, type TriggerView } from '../../services/api/triggers.js';
 import { Button, Field, IconButton, Modal, Switch } from '../ui.js';
-import { TriggerTestResultView } from './TriggerParts.js';
 import {
   buildPayload,
   emptyForm,
   eventLabel,
   formFromTrigger,
-  triggerTypeLabel,
+  kindLabel,
+  kindOf,
+  splitKind,
+  triggerTestPath,
+  TRIGGER_KINDS,
+  type TriggerKind,
   validateForm,
   type TriggerForm,
 } from './trigger-form.js';
@@ -65,14 +61,12 @@ export default function TriggerEditor({
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<TriggerTestResult | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!open) return;
     setForm(trigger ? formFromTrigger(trigger) : emptyForm());
     setErrors({});
-    setTestResult(null);
   }, [open, trigger]);
 
   const isCreate = !trigger;
@@ -99,19 +93,6 @@ export default function TriggerEditor({
       // the backend's 400 messages are toasted by fetchMutate
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleTest = async () => {
-    if (!trigger) return;
-    setTesting(true);
-    setTestResult(null);
-    try {
-      setTestResult(await testTrigger(trigger.id));
-    } catch {
-      // toasted
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -196,16 +177,24 @@ export default function TriggerEditor({
             <select
               id="trigger-type"
               className="field"
-              value={form.type}
-              disabled={!isCreate}
+              value={kindOf(form.type, form.email.provider)}
+              disabled={!isCreate && form.type !== 'email'}
               onChange={(e) => {
-                patch('type', e.currentTarget.value as TriggerType);
+                const { type, provider } = splitKind(e.currentTarget.value as TriggerKind);
+                setForm((f) => ({
+                  ...f,
+                  type,
+                  email: provider ? { ...f.email, provider } : f.email,
+                }));
                 setErrors({});
               }}
             >
-              {TRIGGER_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {triggerTypeLabel(type)}
+              {TRIGGER_KINDS.filter(
+                // An existing trigger keeps its type; e-mail can still switch provider.
+                (kind) => isCreate || splitKind(kind).type === form.type,
+              ).map((kind) => (
+                <option key={kind} value={kind}>
+                  {kindLabel(kind)}
                 </option>
               ))}
             </select>
@@ -226,24 +215,6 @@ export default function TriggerEditor({
         {form.type === 'email' ? (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={t('triggers.editor.email.provider')} htmlFor="trigger-email-provider">
-                <select
-                  id="trigger-email-provider"
-                  className="field"
-                  value={form.email.provider}
-                  onChange={(e) =>
-                    patchIn('email', {
-                      provider: e.currentTarget.value as TriggerForm['email']['provider'],
-                    })
-                  }
-                >
-                  {EMAIL_TRIGGER_PROVIDERS.map((p) => (
-                    <option key={p} value={p}>
-                      {PROVIDER_NAMES[p]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               {secretInput(
                 'apiKey',
                 true,
@@ -663,21 +634,17 @@ export default function TriggerEditor({
         </div>
       </fieldset>
 
-      {testResult ? (
-        <div className="mt-4">
-          <TriggerTestResultView result={testResult} />
-        </div>
-      ) : null}
-
       {!readOnly ? (
         <div className="actions">
           {trigger ? (
             <Button
               variant="ghost"
               size="sm"
-              busy={testing}
               title={t('triggers.editor.testHint')}
-              onClick={() => void handleTest()}
+              onClick={() => {
+                onClose();
+                navigate(triggerTestPath(trigger.id));
+              }}
             >
               {t('triggers.editor.sendTest')}
             </Button>
@@ -693,12 +660,6 @@ export default function TriggerEditor({
     </Modal>
   );
 }
-
-const PROVIDER_NAMES: Record<string, string> = {
-  resend: 'Resend',
-  mailgun: 'Mailgun',
-  sendgrid: 'SendGrid',
-};
 
 function HeaderEditor({
   form,

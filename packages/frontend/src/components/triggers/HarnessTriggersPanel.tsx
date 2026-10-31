@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Trash2, Zap } from 'lucide-react';
+import { FlaskConical, Plus, Trash2, Zap } from 'lucide-react';
 import { HARNESS_TRIGGER_EVENTS, type HarnessTriggerEvent } from 'thinker-shared';
 import { t } from '../../i18n/index.js';
 import { toast } from '../../services/toast-store.js';
@@ -11,7 +11,7 @@ import {
 } from '../../services/api/triggers.js';
 import { Badge, Button, IconButton, Panel } from '../ui.js';
 import { TriggerTypeIcon } from './TriggerParts.js';
-import { eventLabel } from './trigger-form.js';
+import { eventLabel, providerOf, triggerTestPath, triggerTypeLabel } from './trigger-form.js';
 
 /** Events a newly added trigger starts with: everything but the per-request debug event. */
 export const DEFAULT_BINDING_EVENTS: HarnessTriggerEvent[] = HARNESS_TRIGGER_EVENTS.filter(
@@ -49,6 +49,8 @@ export default function HarnessTriggersPanel({
 }) {
   const [draft, setDraft] = useState<HarnessTriggerBinding[]>(bindings ?? []);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
 
   useEffect(() => {
     setDraft(bindings ?? []);
@@ -83,6 +85,17 @@ export default function HarnessTriggersPanel({
     } finally {
       setSaving(false);
     }
+  };
+
+  const addPicked = () => {
+    setDraft((list) => [
+      ...list,
+      ...picked
+        .filter((id) => !list.some((b) => b.trigger_id === id))
+        .map((id) => ({ trigger_id: id, events: DEFAULT_BINDING_EVENTS })),
+    ]);
+    setPicked([]);
+    setPicking(false);
   };
 
   const noTriggers = !loading && triggers !== undefined && triggers.length === 0;
@@ -126,16 +139,30 @@ export default function HarnessTriggersPanel({
                       <Badge tone="warn">{t('triggers.harness.disabled')}</Badge>
                     ) : null}
                   </div>
-                  {canEdit ? (
-                    <IconButton
-                      label={t('triggers.harness.remove', { name })}
-                      onClick={() =>
-                        setDraft((list) => list.filter((b) => b.trigger_id !== binding.trigger_id))
-                      }
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </IconButton>
-                  ) : null}
+                  <div className="flex items-center gap-1">
+                    {trigger ? (
+                      <Link
+                        to={triggerTestPath(trigger.id, agentName)}
+                        className="icon-btn"
+                        aria-label={t('triggers.harness.test', { name })}
+                        title={t('triggers.harness.test', { name })}
+                      >
+                        <FlaskConical aria-hidden="true" />
+                      </Link>
+                    ) : null}
+                    {canEdit ? (
+                      <IconButton
+                        label={t('triggers.harness.remove', { name })}
+                        onClick={() =>
+                          setDraft((list) =>
+                            list.filter((b) => b.trigger_id !== binding.trigger_id),
+                          )
+                        }
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   {HARNESS_TRIGGER_EVENTS.map((event) => (
@@ -164,26 +191,56 @@ export default function HarnessTriggersPanel({
         </ul>
       )}
 
+      {canEdit && picking && available.length > 0 ? (
+        <div
+          className="well flex flex-col gap-2"
+          role="group"
+          aria-label={t('triggers.harness.addLabel')}
+        >
+          <span className="label m-0">{t('triggers.harness.pickTitle')}</span>
+          {available.map((tr) => (
+            <label key={tr.id} className="check">
+              <input
+                type="checkbox"
+                checked={picked.includes(tr.id)}
+                onChange={(e) => {
+                  const on = e.currentTarget.checked;
+                  setPicked((list) => (on ? [...list, tr.id] : list.filter((id) => id !== tr.id)));
+                }}
+              />
+              <TriggerTypeIcon type={tr.type} />
+              {tr.name}
+              <span className="text-xs text-muted">
+                {triggerTypeLabel(tr.type, providerOf(tr))}
+              </span>
+            </label>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" disabled={picked.length === 0} onClick={addPicked}>
+              {t('triggers.harness.addPicked', picked.length)}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setPicking(false)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {canEdit ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {available.length > 0 ? (
-            <select
-              className="field w-auto min-w-[200px]"
-              aria-label={t('triggers.harness.addLabel')}
-              value=""
-              onChange={(e) => {
-                const id = e.currentTarget.value;
-                if (!id) return;
-                setDraft((list) => [...list, { trigger_id: id, events: DEFAULT_BINDING_EVENTS }]);
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={picking}
+              onClick={() => {
+                setPicked([]);
+                setPicking(!picking);
               }}
             >
-              <option value="">{t('triggers.harness.addPlaceholder')}</option>
-              {available.map((tr) => (
-                <option key={tr.id} value={tr.id}>
-                  {tr.name}
-                </option>
-              ))}
-            </select>
+              <Plus aria-hidden="true" />
+              {t('triggers.harness.add')}
+            </Button>
           ) : (
             <span />
           )}

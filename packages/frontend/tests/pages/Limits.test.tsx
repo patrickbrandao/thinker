@@ -713,14 +713,6 @@ describe('Limits page', () => {
     });
   });
 
-  it('shows the trigger picker with a link to create one when the workspace has none', async () => {
-    render(() => <Limits />);
-    await waitFor(() => {
-      expect(screen.getByText('No triggers in this workspace yet.')).toBeDefined();
-    });
-    expect(screen.getByText('Create a trigger').getAttribute('href')).toBe('/triggers');
-  });
-
   it('tells the rule modal there is no delivery target without a limit.alert binding', async () => {
     mockTriggers = [{ id: 't1', name: 'ops', type: 'webhook', enabled: true }];
     mockBindings = [{ trigger_id: 't1', events: ['limit.block'] }];
@@ -734,7 +726,9 @@ describe('Limits page', () => {
     mockTriggers = [{ id: 't1', name: 'ops', type: 'webhook', enabled: true }];
     mockBindings = [{ trigger_id: 't1', events: ['limit.alert'] }];
     render(() => <Limits />);
-    await screen.findByText('ops');
-    expect(screen.getByTestId('limit-modal').getAttribute('data-has-provider')).toBe('true');
+    await waitFor(() => {
+      expect(screen.getByTestId('limit-modal').getAttribute('data-has-provider')).toBe('true');
+    });
+    expect(screen.queryByText('ops')).toBeNull();
   });
 });

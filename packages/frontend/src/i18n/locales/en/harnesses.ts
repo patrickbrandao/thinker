@@ -50,6 +50,7 @@ export default {
     providers: 'Providers',
     limits: 'Limits',
     settings: 'Settings',
+    triggers: 'Triggers',
   },
   settings: {
     pageTitle: '{{ name }} Settings',

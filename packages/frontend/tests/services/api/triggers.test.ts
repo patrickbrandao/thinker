@@ -60,6 +60,17 @@ describe('triggers API client', () => {
     ]);
   });
 
+  it('testTrigger sends the simulated event as JSON', async () => {
+    const fetchMock = setupFetch({ success: true });
+    await triggers.testTrigger('t1', {
+      event_type: 'limit.block',
+      vars: { 'harness.name': 'bot' },
+    });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
+    expect(body(init)).toEqual({ event_type: 'limit.block', vars: { 'harness.name': 'bot' } });
+  });
+
   it('listTriggerEvents sends filters, the cursor and a default limit', async () => {
     const fetchMock = setupFetch({ events: [] });
     await triggers.listTriggerEvents({ status: 'failed', before: '2026-10-01T00:00:00.000Z' });
