@@ -11,6 +11,10 @@ vi.mock('../../src/services/api.js', () => ({
   clearFallbacks: (...args: unknown[]) => mockClearFallbacks(...args),
 }));
 
+import { resetRouteSpecsCache } from '../../src/components/ModelParamsAffordance';
+
+beforeEach(() => resetRouteSpecsCache());
+
 vi.mock('../../src/services/api/model-params.js', () => ({
   getModelParamSpecs: vi.fn(),
 }));
@@ -1309,10 +1313,13 @@ describe('FallbackList', () => {
           setModelParams={setModelParams}
         />,
       );
-      const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
-        b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
-      );
-      expect(btn).toBeDefined();
+      const btn = await waitFor(() => {
+        const found = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+          (b) => b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
+        );
+        expect(found).toBeDefined();
+        return found;
+      });
       // Open dialog and save to evaluate the parent's `setParams={...}` JSX
       // attribute (Solid lazily reads child props — `setParams` only fires
       // when the affordance calls it on save).
@@ -1325,7 +1332,7 @@ describe('FallbackList', () => {
       });
     });
 
-    it('renders the affordance and shows the request empty state for a model with no params', async () => {
+    it('hides the affordance for a model with no params', async () => {
       vi.mocked(getModelParamSpecs).mockResolvedValue([]);
       const { container } = render(
         <FallbackList
@@ -1336,15 +1343,12 @@ describe('FallbackList', () => {
           setModelParams={vi.fn()}
         />,
       );
+      await waitFor(() => expect(getModelParamSpecs).toHaveBeenCalled());
+      await Promise.resolve();
       const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
         b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
       );
-      expect(btn).toBeDefined();
-      fireEvent.click(btn!);
-
-      await waitFor(() => {
-        expect(screen.getByText('No parameter controls are available for gpt-4o.')).toBeTruthy();
-      });
+      expect(btn).toBeUndefined();
     });
 
     it('does NOT render the affordance when the params callbacks are undefined', () => {
@@ -1361,11 +1365,12 @@ describe('FallbackList', () => {
       expect(btn).toBeUndefined();
     });
 
-    it('renders the affordance on the legacy path when both the model catalog AND a matching connected provider supply the auth_type', () => {
+    it('renders the affordance on the legacy path when both the model catalog AND a matching connected provider supply the auth_type', async () => {
       // Legacy / pre-backfill data path: structured routes are not available
       // yet, but the row's provider can still be resolved via the model
       // catalog AND the connected providers list. The affordance needs
       // `authType` to call /model-params, so both signals are required.
+      vi.mocked(getModelParamSpecs).mockResolvedValue(modelParamSpecs[0].params);
       const modelsWithDeepseek = [
         ...models,
         { model_name: 'deepseek-v4-flash', provider: 'DeepSeek' },
@@ -1391,10 +1396,13 @@ describe('FallbackList', () => {
           setModelParams={vi.fn()}
         />,
       );
-      const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
-        b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
-      );
-      expect(btn).toBeDefined();
+      const btn = await waitFor(() => {
+        const found = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+          (b) => b.getAttribute('aria-label')?.startsWith('Configure model parameters'),
+        );
+        expect(found).toBeDefined();
+        return found;
+      });
     });
   });
 

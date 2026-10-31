@@ -13,16 +13,14 @@ import CopyButton from '../components/CopyButton.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
 import ErrorState from '../components/ErrorState.js';
 import AgentTypeGrid from '../components/AgentTypeGrid.js';
-import SetupStepAddProvider from '../components/SetupStepAddProvider.js';
 import SetupModal from '../components/SetupModal.js';
 import RichText from '../components/RichText.js';
-import { Button, IconButton, Modal, Panel, Skel } from '../components/ui.js';
+import { Button, IconButton, Modal, Panel } from '../components/ui.js';
 import SettingsRecordingSection from './SettingsRecordingSection.js';
 import SettingsModelListingSection from './SettingsModelListingSection.js';
 import SettingsRow from './SettingsRow.js';
 import { me, roleCan } from '../services/session-store.js';
 import { agentDisplayNameSignal } from '../services/agent-display-name.js';
-import { installOrigin } from '../services/install-endpoints.js';
 import {
   deleteAgent,
   getAgentInfo,
@@ -31,7 +29,6 @@ import {
   rotateAgentKey,
   updateAgent,
 } from '../services/api.js';
-import { listVirtualModels } from '../services/api/virtual-models.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { toast } from '../services/toast-store.js';
 import { setAgentPlatform } from '../services/agent-platform-store.js';
@@ -89,13 +86,6 @@ export default function Settings() {
 
   const agentInfo = useResource(() => getAgentInfo(agentName), [agentName]);
   const apiKeyData = useResource(() => getAgentKey(agentName), [agentName]);
-  // Enabled virtual models, shown in the setup snippets.
-  const virtualModelList = useResource(
-    () =>
-      listVirtualModels(agentName).catch(() => [] as Awaited<ReturnType<typeof listVirtualModels>>),
-    [agentName],
-  );
-  const virtualModels = (virtualModelList.data ?? []).filter((v) => v.enabled).map((v) => v.name);
 
   const currentCategory = (agentInfo.data?.agent_category as AgentCategory | undefined) ?? null;
   const currentPlatform = (agentInfo.data?.agent_platform as AgentPlatform | undefined) ?? null;
@@ -131,7 +121,6 @@ export default function Settings() {
   const fullKey = rotatedKey ?? keyData?.apiKey ?? null;
   const maskedKey = `${keyData?.keyPrefix ?? '...'}...`;
   const displayedKey = fullKey && keyRevealed ? fullKey : maskedKey;
-  const baseUrl = `${installOrigin()}/v1`;
 
   const handleDeleteAgent = async () => {
     if (deleteConfirmName !== agentName || deleting) return;
@@ -247,7 +236,7 @@ export default function Settings() {
           {/* -- /v1/models listing ------------------------ */}
           <SettingsModelListingSection agentName={agentName} />
 
-          {/* -- API key and setup ------------------------- */}
+          {/* -- API key ---------------------------------- */}
           <SectionBoundary
             fallback={(err, reset) => (
               <div className="panel">
@@ -298,33 +287,6 @@ export default function Settings() {
                   )}
                 </Button>
               </div>
-            </Panel>
-
-            <Panel title={t('harnesses.settings.setupTitle')}>
-              {apiKeyData.loading && !apiKeyData.data && !apiKeyData.error ? (
-                <Skel width="100%" height={200} />
-              ) : (
-                <>
-                  {apiKeyData.error ? (
-                    <div className="notice is-warn mb-3" role="alert">
-                      <span>
-                        <RichText
-                          text={t('harnesses.settings.keyLoadError')}
-                          parts={{ rotate: <strong>{t('harnesses.settings.rotate')}</strong> }}
-                        />
-                      </span>
-                    </div>
-                  ) : null}
-                  <SetupStepAddProvider
-                    apiKey={fullKey}
-                    keyPrefix={keyData?.keyPrefix ?? null}
-                    baseUrl={baseUrl}
-                    hideFullKey
-                    platform={currentPlatform}
-                    virtualModels={virtualModels}
-                  />
-                </>
-              )}
             </Panel>
           </SectionBoundary>
 

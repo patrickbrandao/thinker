@@ -8,7 +8,7 @@ interface Props {
 
 /**
  * Card title of a virtual model, `auto` included: the script icon that opens
- * the usage example, then "Virtual model:" and the name as a code badge.
+ * the usage example, then the name as a code badge.
  */
 export default function VirtualModelTitle(props: Props) {
   return (
@@ -22,7 +22,6 @@ export default function VirtualModelTitle(props: Props) {
       >
         <FileCode2 aria-hidden="true" className="size-3.5" />
       </button>
-      <span className="shrink-0">{t('routing.tierCard.virtualModelLabel')}</span>
       <code className="routing-card__auto header-tier-card__name truncate rounded-control border border-accent bg-accent-tint px-1.5 py-px font-mono font-bold text-accent">
         {props.name}
       </code>

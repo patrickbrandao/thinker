@@ -84,7 +84,7 @@ describe('Routing in pt-BR', () => {
     });
     expect(screen.getByText('Modo de resposta: Buffered')).toBeDefined();
     expect(screen.getByText('Criar modelo virtual')).toBeDefined();
-    expect(screen.getByText('Modelo virtual:')).toBeDefined();
+    expect(screen.queryByText('Modelo virtual:')).toBeNull();
     expect(screen.getByText('+ Adicionar modelo')).toBeDefined();
     expect(screen.getByText('1 conexão')).toBeDefined();
     expect(screen.queryByText('Criar nível personalizado')).toBeNull();

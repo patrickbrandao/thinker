@@ -9,7 +9,6 @@ import type {
 } from '../services/api.js';
 import {
   clearVirtualModelFallbacks,
-  clearVirtualModelOverride,
   setVirtualModelFallbacks,
   type VirtualModel,
 } from '../services/api/virtual-models.js';
@@ -74,7 +73,6 @@ export default function VirtualModelCard(props: VirtualModelCardProps) {
       connectedProviders={props.connectedProviders}
       onOverride={props.onOverride}
       onFallbacksUpdate={props.onFallbacksUpdate}
-      onResetChain={() => clearVirtualModelOverride(props.agentName, vm.id)}
       persistFallbacks={(models, routes) =>
         setVirtualModelFallbacks(props.agentName, vm.id, models, routes)
       }

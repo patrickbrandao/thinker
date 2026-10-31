@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { Pencil, Settings, Undo2 } from 'lucide-react';
+import { Pencil, Settings } from 'lucide-react';
 import type {
   AuthType,
   AvailableModel,
@@ -85,8 +85,6 @@ export interface RouteChainCardProps {
     providerKeyLabel?: string,
   ) => void | Promise<void>;
   onFallbacksUpdate: (fallbacks: string[], routes?: ModelRoute[] | null) => void;
-  /** Clears the primary (and the fallbacks behind it). */
-  onResetChain: () => Promise<unknown>;
   persistFallbacks: (models: string[], routes?: ModelRoute[]) => Promise<unknown>;
   persistClearFallbacks: () => Promise<unknown>;
   /** Model params scope for every route of the chain (`header:<id>`, `virtual:<id>`). */
@@ -135,7 +133,6 @@ export default function RouteChainCard(props: RouteChainCardProps) {
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [pendingKeyPick, setPendingKeyPick] = useState<PendingKeyPick | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   useClickOutside(menuRef, menuOpen, closeMenu);
@@ -279,18 +276,6 @@ export default function RouteChainCard(props: RouteChainCardProps) {
     );
   };
 
-  const handleReset = async () => {
-    setResetting(true);
-    try {
-      await props.onResetChain();
-      props.onFallbacksUpdate([]);
-    } catch {
-      // silent
-    } finally {
-      setResetting(false);
-    }
-  };
-
   const renderOverrideIcon = () => {
     if (providerId?.startsWith('custom:')) {
       const cp = customProviderForId(providerId);
@@ -352,22 +337,7 @@ export default function RouteChainCard(props: RouteChainCardProps) {
             ) : null}
           </div>
         </span>
-        {currentModel ? (
-          <Button
-            variant="quiet"
-            size="sm"
-            className="routing-card__header-action routing-card__header-action--danger"
-            onClick={handleReset}
-            disabled={resetting}
-          >
-            {resetting ? (
-              <span className="spinner" aria-hidden="true" />
-            ) : (
-              <Undo2 aria-hidden="true" className="size-3" />
-            )}
-            {t('routing.reset')}
-          </Button>
-        ) : (
+        {currentModel ? null : (
           <Button
             variant="ghost"
             size="sm"

@@ -170,7 +170,7 @@ function ProviderMark({
     <span
       className={cx(
         'inline-flex shrink-0 items-center justify-center rounded-[4px] bg-accent-tint font-semibold text-accent',
-        size > 20 ? 'text-xs' : 'text-[11px]',
+        size > 40 ? 'text-xl' : size > 20 ? 'text-xs' : 'text-[11px]',
       )}
       style={{ width: size, height: size }}
     >
@@ -881,9 +881,11 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
             const activeCount = activeConnectionCount(provider.id);
             return (
               <div key={provider.id} className="card flex flex-col gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <ProviderMark providerId={provider.id} name={provider.name} size={24} />
-                  <span className="truncate text-sm font-semibold text-ink">{provider.name}</span>
+                <div className="flex min-w-0 items-center gap-3">
+                  <ProviderMark providerId={provider.id} name={provider.name} size={48} />
+                  <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
+                    {provider.name}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   {activeCount > 0 ? (

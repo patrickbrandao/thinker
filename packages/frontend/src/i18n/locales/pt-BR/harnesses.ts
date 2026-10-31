@@ -55,11 +55,12 @@ const ptBR: Catalog<typeof en> = {
     limits: 'Limites',
     settings: 'Configurações',
     triggers: 'Triggers',
+    connection: 'Conexão',
   },
   settings: {
     pageTitle: 'Configurações de {{ name }}',
     metaDescription: 'Configure {{ name }}.',
-    intro: 'Renomeie o agente, gerencie as chaves de API e veja as instruções de configuração',
+    intro: 'Renomeie o harness, altere o tipo e gerencie a chave de API',
     readOnly:
       'Você tem acesso somente leitura. Leitores não podem alterar as configurações do harness.',
     nameTitle: 'Nome do harness',
@@ -90,6 +91,15 @@ const ptBR: Catalog<typeof en> = {
     deleteModalButton: 'Excluir este harness',
     changeTypeTitle: 'Alterar tipo de harness',
     changeTypeDesc: 'Escolha o novo tipo e a plataforma deste harness.',
+  },
+  connection: {
+    pageTitle: 'Conexão de {{ name }}',
+    intro:
+      'Como apontar este harness para o Thinker: a configuração sugerida para o tipo dele e exemplos de código prontos para copiar.',
+    setupTitle: 'Configuração sugerida',
+    sdkTitle: 'Exemplos de código por SDK',
+    sdkDesc:
+      'Chame o gateway a partir do seu próprio código. Escolha o SDK e o modelo que o exemplo envia.',
   },
   recording: {
     title: 'Logs',

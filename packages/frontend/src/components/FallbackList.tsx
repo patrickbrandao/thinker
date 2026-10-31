@@ -490,7 +490,7 @@ export default function FallbackList(props: FallbackListProps) {
                   className={cx(
                     'fallback-list__card flex min-h-9 items-center gap-2 rounded-control border border-line bg-elev px-2.5 py-1.5 text-sm',
                     !dragLocked && 'cursor-grab',
-                    dragIndex === i && 'fallback-list__card--dragging opacity-30',
+                    dragIndex === i && 'fallback-list__card--dragging',
                     pending && 'fallback-list__card--swapping',
                     skipped && 'fallback-list__card--skipped opacity-60',
                   )}

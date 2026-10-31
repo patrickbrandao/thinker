@@ -395,7 +395,7 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
         className={cx(
           'routing-card__model-chip group cursor-grab rounded-control border bg-sunken p-2.5 transition-colors',
           primaryDropTarget ? 'border-accent bg-accent-tint' : 'border-line',
-          primaryDragging && 'routing-card__model-chip--dragging opacity-50',
+          primaryDragging && 'routing-card__model-chip--dragging',
           primaryDropTarget && 'routing-card__model-chip--drop-target',
           primarySkipped && 'routing-card__model-chip--skipped opacity-60',
         )}
@@ -500,7 +500,8 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
           )}
         </span>
         <div className="flex items-center gap-1">
-          {hasCustomizations ? (
+          {/* The `auto` card is a virtual model: no Reset, the user removes models one by one. */}
+          {hasCustomizations && stageId !== 'default' ? (
             <Button
               variant="quiet"
               size="sm"

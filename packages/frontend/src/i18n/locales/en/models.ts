@@ -77,6 +77,8 @@ export default {
   picker: {
     title: 'Select a model',
     tierSubtitle: '{{ label }} tier',
+    allProviders: 'All providers',
+    noAll: 'No providers connected. Connect a provider to see models.',
     subscription: 'Subscription',
     usageBased: 'Usage-based',
     local: 'Local',

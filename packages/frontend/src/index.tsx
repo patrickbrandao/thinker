@@ -62,6 +62,7 @@ const Organization = lazyReload(() => import('./pages/Organization.jsx'));
 const Triggers = lazyReload(() => import('./pages/Triggers.jsx'));
 const TriggerTest = lazyReload(() => import('./pages/TriggerTest.jsx'));
 const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
+const AgentConnection = lazyReload(() => import('./pages/AgentConnection.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
@@ -295,6 +296,14 @@ function AppRoutes() {
               element={
                 <Lazy>
                   <AgentTriggers />
+                </Lazy>
+              }
+            />
+            <Route
+              path="connection"
+              element={
+                <Lazy>
+                  <AgentConnection />
                 </Lazy>
               }
             />

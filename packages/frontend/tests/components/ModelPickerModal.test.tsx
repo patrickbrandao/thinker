@@ -662,8 +662,32 @@ describe('ModelPickerModal', () => {
         onClose={vi.fn()}
       />,
     );
-    const subTab = document.body.querySelector('[role="tab"][aria-selected="true"]');
-    expect(subTab?.textContent).toContain('Subscription');
+    const active = document.body.querySelector('[role="tab"][aria-selected="true"]');
+    expect(active?.textContent).toContain('All providers');
+    const tabs = Array.from(document.body.querySelectorAll('[role="tab"]'));
+    expect(tabs[0]?.textContent).toContain('All providers');
+  });
+
+  it('lists every connected provider on the All providers tab with billing-colored prices', () => {
+    const onSelect = vi.fn();
+    render(
+      <ModelPickerModal
+        tierId="simple"
+        models={baseModels}
+        tiers={tiers}
+        connectedProviders={subAndApi}
+        onSelect={onSelect}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(document.body.querySelector('.routing-modal__model-price--subscription')).not.toBeNull();
+    expect(document.body.querySelector('.routing-modal__model-price--api-key')).not.toBeNull();
+    const row = Array.from(document.body.querySelectorAll('.routing-modal__model')).find((b) =>
+      b.textContent?.includes('GPT-4o mini'),
+    ) as HTMLButtonElement;
+    expect(row.className).toContain('pl-8');
+    fireEvent.click(row);
+    expect(onSelect).toHaveBeenCalledWith('simple', 'gpt-4o-mini', 'openai', 'api_key');
   });
 
   it('switches to api_key tab when clicked', () => {
@@ -1289,6 +1313,11 @@ describe('ModelPickerModal', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
+    );
+    fireEvent.click(
+      Array.from(document.body.querySelectorAll('[role="tab"]')).find((t) =>
+        t.textContent?.includes('Subscription'),
+      ) as HTMLButtonElement,
     );
     expect(document.body.textContent).toContain('No subscription providers connected');
   });

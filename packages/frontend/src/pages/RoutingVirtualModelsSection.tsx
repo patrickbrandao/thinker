@@ -193,7 +193,7 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
               key={vm.id}
               className={cx(
                 'virtual-model-slot rounded-surface transition-opacity',
-                dragId === vm.id && 'virtual-model-slot--dragging opacity-50',
+                dragId === vm.id && 'virtual-model-slot--dragging',
                 dropId === vm.id &&
                   dragId !== vm.id &&
                   'virtual-model-slot--drop-target outline-2 outline-offset-2 outline-accent',
@@ -289,7 +289,6 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
               setModal(null);
               if (created) {
                 mutate((prev) => [...(prev ?? []), saved]);
-                setSnippetFor(saved);
                 toast.success(t('models.section.created', { name: saved.name }));
               } else {
                 replace(saved);

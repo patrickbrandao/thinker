@@ -79,6 +79,8 @@ const ptBR: Catalog<typeof en> = {
   picker: {
     title: 'Selecione um modelo',
     tierSubtitle: 'Nível {{ label }}',
+    allProviders: 'Todos os provedores',
+    noAll: 'Nenhum provedor conectado. Conecte um provedor para ver os modelos.',
     subscription: 'Assinatura',
     usageBased: 'Por uso',
     local: 'Local',

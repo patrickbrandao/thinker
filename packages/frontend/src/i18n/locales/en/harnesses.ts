@@ -51,11 +51,12 @@ export default {
     limits: 'Limits',
     settings: 'Settings',
     triggers: 'Triggers',
+    connection: 'Connection',
   },
   settings: {
     pageTitle: '{{ name }} Settings',
     metaDescription: 'Configure settings for {{ name }}.',
-    intro: 'Rename your agent, manage API keys, and view setup instructions',
+    intro: 'Rename the harness, change its type and manage its API key',
     readOnly: "You have read-only access. Viewers can't change harness settings.",
     nameTitle: 'Harness name',
     nameDesc: 'The display name for this harness across the dashboard.',
@@ -84,6 +85,14 @@ export default {
     deleteModalButton: 'Delete this harness',
     changeTypeTitle: 'Change harness type',
     changeTypeDesc: 'Select the new type and platform for this harness.',
+  },
+  connection: {
+    pageTitle: '{{ name }} Connection',
+    intro:
+      'How to point this harness at Thinker: the suggested setup for its type and copyable SDK examples.',
+    setupTitle: 'Suggested setup',
+    sdkTitle: 'SDK code examples',
+    sdkDesc: 'Call the gateway from your own code. Pick the SDK and the model the example sends.',
   },
   recording: {
     title: 'Logs',

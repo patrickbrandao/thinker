@@ -1,5 +1,5 @@
 import {
-  Bot,
+  BrainCircuit,
   Settings,
   ShieldCheck,
   Terminal,
@@ -11,7 +11,7 @@ import {
   KeyRound,
   LayoutDashboard,
   ScrollText,
-  Workflow,
+  LayoutArrowRight,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -44,8 +44,8 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { key: 'overview', to: '/overview', label: 'nav.overview', icon: LayoutDashboard },
       { key: 'requests', to: '/messages', label: 'nav.requests', icon: ScrollText },
-      { key: 'harnesses', to: '/harnesses', label: 'nav.harnesses', icon: Bot },
-      { key: 'topology', to: '/topology', label: 'nav.topology', icon: Workflow },
+      { key: 'harnesses', to: '/harnesses', label: 'nav.harnesses', icon: BrainCircuit },
+      { key: 'topology', to: '/topology', label: 'nav.topology', icon: LayoutArrowRight },
     ],
   },
   {
