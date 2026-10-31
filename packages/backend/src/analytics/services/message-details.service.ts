@@ -94,7 +94,16 @@ export class MessageDetailsService {
     private readonly recordingStorage?: RequestRecordingStorageService,
   ) {}
 
-  async getDetails(messageId: string, tenantId: string | null): Promise<MessageDetailResponse> {
+  /**
+   * `includeHeaders` gates the recorded request headers (they carry client IPs
+   * and proxy hops): only organization admins and owners get them, so the
+   * default leaves them out.
+   */
+  async getDetails(
+    messageId: string,
+    tenantId: string | null,
+    { includeHeaders = false }: { includeHeaders?: boolean } = {},
+  ): Promise<MessageDetailResponse> {
     // No tenant → no messages, so any id is unknown.
     if (!tenantId) throw new NotFoundException('Message not found');
 
@@ -196,7 +205,9 @@ export class MessageDetailsService {
         feedback_rating: request?.feedback_rating ?? message?.feedback_rating ?? null,
         feedback_tags: (request?.feedback_tags ?? message?.feedback_tags)?.split(',') ?? null,
         feedback_details: request?.feedback_details ?? message?.feedback_details ?? null,
-        request_headers: request?.request_headers ?? message?.request_headers ?? null,
+        request_headers: includeHeaders
+          ? (request?.request_headers ?? message?.request_headers ?? null)
+          : null,
         request_params: (request?.request_params ??
           message?.request_params) as RequestParamDefaults | null,
         caller_attribution: request?.caller_attribution ?? message?.caller_attribution ?? null,
@@ -224,7 +235,7 @@ export class MessageDetailsService {
                 output_tokens: attempt.output_tokens,
                 fallback_from_model: attempt.fallback_from_model,
                 fallback_index: attempt.fallback_index,
-                request_headers: attempt.request_headers,
+                request_headers: includeHeaders ? attempt.request_headers : null,
                 request_params: attempt.request_params,
                 recording: recordingsByAttempt.get(attempt.id) ?? null,
               })),

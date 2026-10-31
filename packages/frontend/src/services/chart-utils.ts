@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, type RefObject } from 'react';
 import uPlot from 'uplot';
-import { intlLocale, locale } from '../i18n/index.js';
+import { formatNumber } from './formatters.js';
 import { dayMonth } from './overview-format.js';
 
 export interface UseChartLifecycleOptions<T> {
@@ -129,22 +129,7 @@ export function createFormatLegendTimestamp(
 
 export function formatLegendTokens(_u: uPlot, val: number): string {
   if (val == null || isNaN(val)) return '';
-  val = Math.round(val);
-  if (locale() !== 'en') {
-    return new Intl.NumberFormat(intlLocale(), {
-      notation: val >= 1_000 ? 'compact' : 'standard',
-      maximumFractionDigits: 1,
-    }).format(val);
-  }
-  if (val >= 1_000_000) {
-    const v = val / 1_000_000;
-    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}M`;
-  }
-  if (val >= 1_000) {
-    const v = val / 1_000;
-    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}k`;
-  }
-  return val.toString();
+  return formatNumber(Math.round(val));
 }
 
 const RANGE_MAP: Record<string, number> = {

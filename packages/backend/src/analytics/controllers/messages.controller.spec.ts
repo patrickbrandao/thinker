@@ -194,7 +194,28 @@ describe('MessagesController', () => {
   it('delegates getMessageDetails to message details service', async () => {
     await controller.getMessageDetails('msg-123', ctx as never);
 
-    expect(mockGetDetails).toHaveBeenCalledWith('msg-123', 'tenant-1');
+    expect(mockGetDetails).toHaveBeenCalledWith('msg-123', 'tenant-1', { includeHeaders: true });
+  });
+
+  it.each([
+    ['owner', true],
+    ['admin', true],
+    ['member', false],
+    ['viewer', false],
+  ])('sends request headers to the %s role: %s', async (role, includeHeaders) => {
+    await controller.getMessageDetails('msg-1', { ...ctx, role } as never);
+
+    expect(mockGetDetails).toHaveBeenCalledWith('msg-1', 'tenant-1', { includeHeaders });
+  });
+
+  it('sends request headers to the instance administrator whatever the role', async () => {
+    await controller.getMessageDetails('msg-1', {
+      ...ctx,
+      role: 'viewer',
+      isInstanceAdmin: true,
+    } as never);
+
+    expect(mockGetDetails).toHaveBeenCalledWith('msg-1', 'tenant-1', { includeHeaders: true });
   });
 
   it('returns message details result', async () => {
