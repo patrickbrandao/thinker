@@ -16,6 +16,7 @@ import { MessageDetailsService } from '../services/message-details.service';
 import { MessageFeedbackService } from '../services/message-feedback.service';
 import { SpecificityFeedbackService } from '../services/specificity-feedback.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
+import { hasRole } from '../../common/guards/roles.guard';
 
 /** Comma-separated query value → a bounded list of trimmed, non-empty entries. */
 function splitCsv(value: string | undefined, max = 50): string[] | undefined {
@@ -25,6 +26,16 @@ function splitCsv(value: string | undefined, max = 50): string[] | undefined {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .slice(0, max);
+}
+
+/**
+ * Recorded request headers are for organization admins and owners (and the
+ * instance administrator); members and viewers never receive them. Internal
+ * contexts (`role` undefined) skip the role model, as in RolesGuard.
+ */
+function canViewRequestHeaders(ctx: TenantContext): boolean {
+  if (ctx.isInstanceAdmin || ctx.role === undefined) return true;
+  return hasRole(ctx.role ?? (ctx.tenantId ? 'viewer' : 'owner'), 'admin');
 }
 
 @Controller('api/v1')
@@ -79,7 +90,9 @@ export class MessagesController {
 
   @Get('messages/:id/details')
   async getMessageDetails(@Param('id') id: string, @TenantCtx() ctx: TenantContext) {
-    return this.messageDetails.getDetails(id, ctx.tenantId);
+    return this.messageDetails.getDetails(id, ctx.tenantId, {
+      includeHeaders: canViewRequestHeaders(ctx),
+    });
   }
 
   @Patch('messages/:id/feedback')

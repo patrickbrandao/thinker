@@ -175,8 +175,14 @@ describe('MessageDetailsService', () => {
   it('returns request_headers when stored on the message', async () => {
     const headers = { 'user-agent': 'curl/8.14.1', 'x-custom-foo': 'bar' };
     msgQb.getOne.mockResolvedValue({ ...baseMessage, request_headers: headers });
-    const result = await service.getDetails('msg-1', 'u1');
+    const result = await service.getDetails('msg-1', 'u1', { includeHeaders: true });
     expect(result.message.request_headers).toEqual(headers);
+  });
+
+  it('leaves request_headers out unless includeHeaders is set', async () => {
+    msgQb.getOne.mockResolvedValue({ ...baseMessage, request_headers: { 'x-a': '1' } });
+    const result = await service.getDetails('msg-1', 'u1');
+    expect(result.message.request_headers).toBeNull();
   });
 
   it('returns request_params when stored on the message', async () => {
@@ -323,7 +329,7 @@ describe('MessageDetailsService', () => {
       recordingStorage as never,
     );
 
-    const result = await requestAware.getDetails('request-1', 't1');
+    const result = await requestAware.getDetails('request-1', 't1', { includeHeaders: true });
 
     expect(result.message).toEqual(
       expect.objectContaining({
@@ -393,7 +399,7 @@ describe('MessageDetailsService', () => {
       { get: jest.fn().mockRejectedValue(new Error('bucket offline')) } as never,
     );
 
-    const result = await requestAware.getDetails('request-1', 't1');
+    const result = await requestAware.getDetails('request-1', 't1', { includeHeaders: true });
 
     expect(result.message.id).toBe('request-1');
     expect(result.message.attempts![0]!.recording).toBeNull();
