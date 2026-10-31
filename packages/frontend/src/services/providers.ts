@@ -78,14 +78,6 @@ export interface ProviderDef {
   subscriptionSignInHint?: string;
   /** Show a beta badge next to the provider name. */
   beta?: boolean;
-  /**
-   * Default port for a local OpenAI-compatible server (LM Studio today).
-   * When set, clicking the tile in self-hosted mode opens the
-   * LocalServerDetailView, which probes
-   * `http://{localLlmHost}:{defaultLocalPort}/v1` and auto-connects the
-   * discovered models.
-   */
-  defaultLocalPort?: number;
 }
 
 /** UI-only overlay fields for each provider. The id must match a `SHARED_PROVIDERS` entry. */
@@ -116,8 +108,6 @@ interface ProviderUIOverlay {
   subscriptionSignInLabel?: string;
   subscriptionSignInHint?: string;
   beta?: boolean;
-  /** See ProviderDef.defaultLocalPort. */
-  defaultLocalPort?: number;
 }
 
 /**
@@ -369,7 +359,6 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     },
     noKeyRequired: true,
     models: [],
-    defaultLocalPort: 8080,
   },
   lmstudio: {
     initial: 'LM',
@@ -378,7 +367,6 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     },
     noKeyRequired: true,
     models: [],
-    defaultLocalPort: 1234,
   },
   minimax: {
     initial: 'Mm',

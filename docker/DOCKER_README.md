@@ -110,7 +110,7 @@ O compose publica a porta só em `127.0.0.1`. Para a LAN, ponha `HOST_BIND_ADDRE
 
 ## Modelos locais
 
-O container alcança servidores do host por `host.docker.internal:<porta>`: Ollama (`OLLAMA_HOST`, padrão porta 11434), LM Studio (`THINKER_LMSTUDIO_BASE_URL`, 1234) e llama.cpp (`THINKER_LLAMACPP_BASE_URL`, 8080). Ligue o servidor em `0.0.0.0`.
+Em Providers, **Local**, cada tipo (Ollama, LM Studio, llama.cpp) aceita vários servidores, cada um com nome, host, porta, prefixo, chave e timeouts próprios. Servidores do host ficam em `host.docker.internal:<porta>`: Ollama 11434, LM Studio 1234, llama.cpp 9931 (8080 em builds antigos). `OLLAMA_HOST`, `THINKER_LMSTUDIO_BASE_URL` e `THINKER_LLAMACPP_BASE_URL` só pré-preenchem um servidor novo. Ligue o servidor em `0.0.0.0`.
 
 ## Variáveis de ambiente
 

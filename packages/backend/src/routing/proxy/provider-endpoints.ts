@@ -54,6 +54,11 @@ export interface ProviderEndpoint {
    */
   requiresSsrfRevalidation?: boolean;
   /**
+   * Upper bound of one forwarded request, overriding PROVIDER_TIMEOUT_MS.
+   * Set per local server, whose first call may have to load the model.
+   */
+  timeoutMs?: number;
+  /**
    * When `true`, the proxy wraps the outgoing Google-shape request body in
    * the CodeAssist envelope (`{ model, project, request }`) and unwraps
    * `{ response }` from the upstream reply. The project id is read from
@@ -657,9 +662,22 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
 export function buildCustomEndpoint(
   baseUrl: string,
   apiKind: 'openai' | 'anthropic' = 'openai',
+  local?: { timeoutMs?: number },
 ): ProviderEndpoint {
   // Strip trailing /v1 (or /v1/) since both buildPath callbacks include /v1.
   const normalized = normalizeProviderBaseUrl(baseUrl);
+  if (local) {
+    // Local servers need no key; send `Authorization` only when one is stored.
+    return {
+      baseUrl: normalized,
+      buildHeaders: buildLocalServerHeaders,
+      buildPath: openaiPath,
+      format: 'openai',
+      ...openaiStreamUsage,
+      requiresSsrfRevalidation: true,
+      ...(local.timeoutMs ? { timeoutMs: local.timeoutMs } : {}),
+    };
+  }
   if (apiKind === 'anthropic') {
     return {
       baseUrl: normalized,

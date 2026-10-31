@@ -365,7 +365,7 @@ export class PlaygroundService {
         // resolves it — the local check on the canonical provider, because a
         // tile-connected llama.cpp arrives as `custom:<uuid>`, and the
         // per-request rate from the OpenCode Go catalogue.
-        isLocalProvider: isLocalOnlyProvider(canonicalProvider),
+        isLocalProvider: authType === 'local' || isLocalOnlyProvider(canonicalProvider),
         perRequestCostUsd:
           authType === 'subscription' &&
           PROVIDER_BY_ID_OR_ALIAS.get(canonicalProvider.toLowerCase())?.id === 'opencode-go'

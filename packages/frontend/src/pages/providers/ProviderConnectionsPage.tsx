@@ -35,6 +35,8 @@ import { t } from '../../i18n/index.js';
 import { me, roleCan } from '../../services/session-store.js';
 import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
+import LocalServerForm from '../../components/LocalServerForm.jsx';
+import type { LocalServerType } from '../../services/api.js';
 import Sparkline from '../../components/Sparkline.jsx';
 import { attemptSuccessRate } from '../../services/api/analytics.js';
 import { Badge, Button, Modal, Skel, cx } from '../../components/ui.js';
@@ -179,6 +181,44 @@ function ProviderMark({
   );
 }
 
+/** The servers of one local type, each with its address and an Edit action. */
+function LocalServerList({
+  servers,
+  canManage,
+  onEdit,
+}: {
+  servers: CustomProviderData[];
+  canManage: boolean;
+  onEdit: (cp: CustomProviderData) => void;
+}) {
+  if (servers.length === 0) {
+    return <div className="text-xs text-muted">{t('providerSetup.localServer.noServers')}</div>;
+  }
+  return (
+    <ul className="m-0 flex list-none flex-col gap-1 p-0">
+      {servers.map((cp) => {
+        const c = cp.local_config;
+        const address = c ? `${c.host}:${c.port}${c.path_prefix}` : cp.base_url;
+        return (
+          <li key={cp.id} className="flex items-center justify-between gap-2 text-sm">
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-ink">{cp.name}</span>
+              <span className="block truncate font-mono text-xs text-muted">
+                {address} · {t('providerSetup.localServer.modelCount', cp.models.length)}
+              </span>
+            </span>
+            {canManage ? (
+              <Button variant="ghost" size="sm" onClick={() => onEdit(cp)}>
+                {t('providerSetup.localServer.edit')}
+              </Button>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function ActiveLabel({ children }: { children: string }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-ok">
@@ -196,6 +236,11 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
   const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
+  // Local page: the server being added (no editData) or edited.
+  const [localEditor, setLocalEditor] = useState<{
+    type: LocalServerType;
+    editData?: CustomProviderData;
+  } | null>(null);
   const [deepLink, setDeepLink] = useState<ProviderDeepLink | null>(null);
   const [customProviderPrefill, setCustomProviderPrefill] = useState<CustomProviderPrefill | null>(
     null,
@@ -501,7 +546,28 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
     ]);
   };
 
+  const closeLocalEditor = () => {
+    setLocalEditor(null);
+    void Promise.all([refetchGlobalProviders(), customProviders.reload(), modalProviders.reload()]);
+  };
+
+  const localServers = (type: string) =>
+    (customProviders.data ?? []).filter((cp) => cp.local_type === type);
+
   const goToConnection = (id: string) => navigate(`/providers/connections/${id}`);
+
+  const addServerButton = (type: string) =>
+    canManage ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="whitespace-nowrap"
+        disabled={!firstAgentName}
+        onClick={() => setLocalEditor({ type: type as LocalServerType })}
+      >
+        {t('providerSetup.localServer.addServer')}
+      </Button>
+    ) : null;
 
   const connectButton = (providerId: string) =>
     canManage ? (
@@ -634,7 +700,7 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
                             <span className="flex items-center gap-2.5">
                               <ProviderMark providerId={row.summary.provider} name={row.name} />
                               <span className="row-title">{row.name}</span>
-                              {row.summary.provider.startsWith('custom:') ? (
+                              {row.summary.provider.startsWith('custom:') && kind !== 'local' ? (
                                 <Badge tone="outline">{t('providers.custom')}</Badge>
                               ) : null}
                             </span>
@@ -860,13 +926,24 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
                         <ProviderMark providerId={provider.id} name={provider.name} />
                         <span className="row-title">{provider.name}</span>
                       </span>
+                      {kind === 'local' ? (
+                        <LocalServerList
+                          servers={localServers(provider.id)}
+                          canManage={canManage}
+                          onEdit={(cp) =>
+                            setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
+                          }
+                        />
+                      ) : null}
                     </td>
                     <td className="row-actions">
                       <span className="inline-flex items-center justify-end gap-2">
                         {activeCount > 0 ? (
                           <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
                         ) : null}
-                        {connectButton(provider.id)}
+                        {kind === 'local'
+                          ? addServerButton(provider.id)
+                          : connectButton(provider.id)}
                       </span>
                     </td>
                   </tr>
@@ -887,13 +964,22 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
                     {provider.name}
                   </span>
                 </div>
+                {kind === 'local' ? (
+                  <LocalServerList
+                    servers={localServers(provider.id)}
+                    canManage={canManage}
+                    onEdit={(cp) =>
+                      setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
+                    }
+                  />
+                ) : null}
                 <div className="flex items-center justify-between gap-3">
                   {activeCount > 0 ? (
                     <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
                   ) : (
                     <span />
                   )}
-                  {connectButton(provider.id)}
+                  {kind === 'local' ? addServerButton(provider.id) : connectButton(provider.id)}
                 </div>
               </div>
             );
@@ -913,6 +999,24 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
           onClose={handleModalClose}
         />
       ) : null}
+
+      <Modal
+        open={!!localEditor && !!firstAgentName}
+        onClose={() => setLocalEditor(null)}
+        label={t('providerSetup.localServer.addServer')}
+        wide
+      >
+        {localEditor ? (
+          <LocalServerForm
+            agentName={firstAgentName}
+            type={localEditor.type}
+            editData={localEditor.editData}
+            takenNames={(customProviders.data ?? []).map((cp) => cp.name)}
+            onSaved={closeLocalEditor}
+            onCancel={() => setLocalEditor(null)}
+          />
+        ) : null}
+      </Modal>
 
       <Modal
         open={showCustomModal && !!firstAgentName}

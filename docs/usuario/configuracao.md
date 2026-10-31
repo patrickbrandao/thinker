@@ -62,11 +62,11 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
 | `THINKER_PROVIDER_PRIVATE_URLS` | `admin-only` | Quem pode cadastrar provedor custom com URL privada/LAN e conectar Ollama, LM Studio e llama.cpp: `allow` (quem conecta provedores), `admin-only` (admin da instância e owner da organização) ou `deny` (ninguém). Metadados de nuvem ficam bloqueados em qualquer modo. Veja [Organizações](organizacoes.md). |
-| `OLLAMA_HOST` | `http://host.docker.internal:11434` (compose) | Endpoint do Ollama. |
-| `THINKER_LMSTUDIO_BASE_URL` | `http://host.docker.internal:1234` | Servidor do provedor embutido LM Studio, com ou sem `/v1`. Valor que não seja uma URL `http(s)` absoluta é ignorado, com aviso no boot. |
-| `THINKER_LLAMACPP_BASE_URL` | `http://host.docker.internal:8080` | Servidor do provedor embutido llama.cpp, com as mesmas regras. |
+| `OLLAMA_HOST` | `http://host.docker.internal:11434` (compose) | Pré-preenche esquema, host e porta de um **novo** servidor Ollama (aceita `host`, `host:porta` ou URL; `0.0.0.0` vira o host do container). Na atualização para a versão com servidores locais, as conexões Ollama existentes viram um servidor neste endereço. |
+| `THINKER_LMSTUDIO_BASE_URL` | vazio | Pré-preenche um novo servidor LM Studio (URL `http(s)` absoluta, com ou sem `/v1`). Valor inválido é ignorado. |
+| `THINKER_LLAMACPP_BASE_URL` | vazio | Pré-preenche um novo servidor llama.cpp, com as mesmas regras (padrão sem a variável: porta 9931). |
 
-Fora do Docker o padrão de host é `localhost` (e `host.containers.internal` no Podman).
+Cada servidor local guarda a própria configuração (host, porta, prefixo, chave, timeouts); essas variáveis não são configuração global escondida. Fora do Docker o host padrão é `localhost` (e `host.containers.internal` no Podman).
 
 ## Proxy e limites
 

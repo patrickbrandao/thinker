@@ -1,5 +1,9 @@
 import { Entity, Column, PrimaryColumn } from 'typeorm';
 import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
+import type { LocalServerConfig, LocalServerType } from '../common/constants/local-servers';
+
+/** What a local server reports a model can do (Ollama `/api/show`, LM Studio `/api/v1/models`). */
+export type LocalModelCapability = 'tools' | 'vision' | 'reasoning';
 
 export interface CustomProviderModel {
   model_name: string;
@@ -7,6 +11,8 @@ export interface CustomProviderModel {
   output_price_per_million_tokens?: number;
   context_window?: number;
   price_estimated?: boolean;
+  /** Local servers only: capabilities reported by the server at probe time. */
+  capabilities?: LocalModelCapability[];
 }
 
 export type CustomProviderApiKind = 'openai' | 'anthropic';
@@ -45,6 +51,17 @@ export class CustomProvider {
 
   @Column('varchar', { default: 'openai' })
   api_kind!: CustomProviderApiKind;
+
+  /**
+   * Set when the row is a local server (Ollama, LM Studio, llama.cpp). Such
+   * rows sit under the Local tab, are never billed, and keep `base_url`
+   * derived from `local_config`.
+   */
+  @Column('varchar', { nullable: true, default: null })
+  local_type!: LocalServerType | null;
+
+  @Column('jsonb', { nullable: true, default: null })
+  local_config!: LocalServerConfig | null;
 
   @Column('simple-json')
   models!: CustomProviderModel[];

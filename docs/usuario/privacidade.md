@@ -22,7 +22,7 @@ Estes só são contatados porque você os configurou, e só quando o recurso é 
 
 | Destino | Gatilho |
 | --- | --- |
-| APIs de inferência e de listagem de modelos dos **provedores conectados**, incluindo Ollama Cloud (`ollama.com`) e o `OLLAMA_HOST` local | Requisições roteadas e descoberta de modelos. |
+| APIs de inferência e de listagem de modelos dos **provedores conectados**, incluindo Ollama Cloud (`ollama.com`) e os servidores locais cadastrados (Ollama, LM Studio, llama.cpp) | Requisições roteadas e descoberta de modelos. |
 | URLs dos **provedores customizados**, inclusive em LAN | Idem. |
 | **Fluxos OAuth e de assinatura** dos provedores que você conecta, como `auth.openai.com`, `claude.ai` e `console.anthropic.com`, `accounts.google.com`, `oauth2.googleapis.com` e `cloudcode-pa.googleapis.com`, `github.com` e `api.github.com` (Copilot), `auth.x.ai`, MiniMax e o AWS SSO (Kiro) | Ao conectar ou renovar a assinatura. |
 | **E-mail de autenticação** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |

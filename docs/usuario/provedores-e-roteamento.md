@@ -15,11 +15,15 @@ Ao salvar a conexão, o Thinker busca a lista de modelos na API do próprio prov
 
 ### Modelos locais
 
-O container alcança servidores no host por `host.docker.internal:<porta>` (Docker Desktop, ou Docker Engine 20.10+ no Linux). Suba o servidor ligado em `0.0.0.0`, não em `127.0.0.1`, senão o container não o enxerga.
+Em Providers, **Local**, cada tipo (Ollama, LM Studio, llama.cpp) lista os seus **servidores**, e cada tipo aceita vários: por exemplo "Ollama GPU-1" em `192.168.1.20:11434`, "Ollama GPU-2" em `192.168.1.21:11434` e "llama.cpp Mac Studio" em `192.168.1.30:9931`. **Add server** abre o formulário já preenchido com os padrões do tipo; todos os campos podem ser alterados: nome, esquema (`http`/`https`), host, porta, prefixo de caminho (proxy reverso ou `--api-prefix` do llama-server), chave de API opcional (enviada como `Authorization: Bearer`, guardada cifrada), timeout da requisição (padrão 600 s, porque a primeira chamada pode esperar o modelo carregar) e timeout do teste (padrão 10 s). **Test connection** usa os endpoints do próprio software e mostra os modelos com contexto, capacidades (ferramentas, visão, raciocínio) e se estão carregados; escolha os que entram no roteamento e salve. **Edit** muda as configurações, os modelos ou remove o servidor.
 
-- **Ollama:** `ollama pull llama3.1:8b`; em Providers, **Local**, o bloco Ollama usa `http://host.docker.internal:11434`. Para outro host, defina `OLLAMA_HOST` no `.env`.
-- **LM Studio:** ligue "Serve on Local Network" (ou `lms server start --bind 0.0.0.0 --port 1234 --cors`). Padrão `http://host.docker.internal:1234`; mude com `THINKER_LMSTUDIO_BASE_URL`.
-- **llama.cpp:** `./llama-server -m modelo.gguf --host 0.0.0.0 --port 8080`. Padrão `http://host.docker.internal:8080`; mude com `THINKER_LLAMACPP_BASE_URL`.
+O nome distingue os servidores no seletor de modelos, nas rotas e nos logs. Modelos locais nunca são tarifados (preço zero). O host padrão de um servidor novo é o do container (`host.docker.internal`, `host.containers.internal` no Podman, `localhost` fora de container); `OLLAMA_HOST`, `THINKER_LMSTUDIO_BASE_URL` e `THINKER_LLAMACPP_BASE_URL`, quando definidas, só pré-preenchem o formulário.
+
+Do lado do servidor (ligue-o em `0.0.0.0`, não em `127.0.0.1`, senão o Thinker não o enxerga):
+
+- **Ollama:** `OLLAMA_HOST=0.0.0.0:11434 ollama serve` e `ollama pull llama3.1:8b`. Porta padrão 11434.
+- **LM Studio:** ligue "Serve on Local Network" (ou `lms server start --bind 0.0.0.0 --port 1234 --cors`). Porta padrão 1234; com "Require Authentication", informe o token como chave de API.
+- **llama.cpp:** `./llama-server -m modelo.gguf --host 0.0.0.0` (porta padrão 9931 nas versões a partir de outubro de 2026; builds antigos e as imagens Docker de exemplo usam 8080). `--api-key` vira a chave de API do servidor.
 - **Outro servidor OpenAI-compatível (vLLM e similares):** **Add custom provider**, informe a URL (por exemplo `http://host.docker.internal:8000/v1`) e use **Fetch models**.
 
 Provedores customizados aceitam URLs `http://`, de LAN e de loopback; só precisam resolver de dentro do container (no Podman, o host é `host.containers.internal`). Endereços de metadata de nuvem (como `169.254.169.254`) são sempre recusados, e uma URL recusada falha a tentativa com HTTP 502 e `error.code: "provider_url_blocked"`, sem impedir os fallbacks.

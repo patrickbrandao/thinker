@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { normalizeProviderName } from 'thinker-shared';
-import { PROVIDERS, type ProviderDef } from '../services/providers.js';
-import { type AuthType, type CustomProviderData, type RoutingProvider } from '../services/api.js';
+import { PROVIDERS } from '../services/providers.js';
+import {
+  type AuthType,
+  type CustomProviderData,
+  type LocalServerType,
+  type RoutingProvider,
+} from '../services/api.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../services/routing-params.js';
 import CustomProviderForm from './CustomProviderForm.js';
 import CopilotDeviceLogin from './CopilotDeviceLogin.js';
-import LocalServerDetailView from './LocalServerDetailView.js';
+import LocalServerForm from './LocalServerForm.js';
 import ProviderDetailView from './ProviderDetailView.js';
 
 export interface ProviderSelectContentProps {
@@ -50,8 +54,9 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
     ? deepLink.providerId.slice('custom:'.length)
     : null;
 
+  // A deep link to Ollama / LM Studio / llama.cpp adds a server of that type.
   const [selectedProvider, setSelectedProvider] = useState<string | null>(
-    deepLinkProv ? deepLinkProv.id : null,
+    deepLinkProv && !deepLinkProv.localOnly ? deepLinkProv.id : null,
   );
   const [selectedAuthType] = useState<AuthType>(
     deepLink?.authType ?? (deepLinkProv?.subscriptionOnly ? 'subscription' : 'api_key'),
@@ -61,7 +66,9 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
   const [editingCustomProvider, setEditingCustomProvider] = useState<CustomProviderData | null>(
     null,
   );
-  const [localServerProvider, setLocalServerProvider] = useState<ProviderDef | null>(null);
+  const [localServerType, setLocalServerType] = useState<LocalServerType | null>(
+    deepLinkProv?.localOnly ? (deepLinkProv.id as LocalServerType) : null,
+  );
   const [localServerEditData, setLocalServerEditData] = useState<CustomProviderData | undefined>(
     undefined,
   );
@@ -88,7 +95,7 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
     setShowCustomForm(false);
     setTilePrefill(null);
     setEditingCustomProvider(null);
-    setLocalServerProvider(null);
+    setLocalServerType(null);
     setLocalServerEditData(undefined);
     setKeyInput('');
     setEditing(false);
@@ -110,18 +117,9 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
     resetToList();
   };
 
-  const openCustomForm = (prefill?: CustomProviderPrefill) => {
-    setTilePrefill(prefill ?? null);
-    setShowCustomForm(true);
-  };
-
   const openEditCustom = (cp: CustomProviderData) => {
-    const normalized = normalizeProviderName(cp.name);
-    const localProv = PROVIDERS.find(
-      (p) => p.defaultLocalPort && normalizeProviderName(p.name) === normalized,
-    );
-    if (localProv) {
-      setLocalServerProvider(localProv);
+    if (cp.local_type) {
+      setLocalServerType(cp.local_type);
       setLocalServerEditData(cp);
       return;
     }
@@ -150,28 +148,26 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
 
   return (
     <>
-      {/* -- Local Server Detail View (LM Studio) -- */}
-      {localServerProvider && noFormOpen ? (
+      {/* -- Local server (Ollama, LM Studio, llama.cpp): add or edit -- */}
+      {localServerType && noFormOpen ? (
         <div className={VIEW_CLASS}>
-          <LocalServerDetailView
+          <LocalServerForm
             agentName={props.agentName}
-            provider={localServerProvider}
+            type={localServerType}
             editData={localServerEditData}
-            onConnected={() => {
+            takenNames={(props.customProviders ?? []).map((cp) => cp.name)}
+            onSaved={() => {
               completeToList();
               props.onUpdate();
+              if (deepLink) closeHandler();
             }}
-            onBack={goBack}
-            onOpenCustomForm={() => {
-              setLocalServerProvider(null);
-              openCustomForm();
-            }}
+            onCancel={goBack}
           />
         </div>
       ) : null}
 
       {/* -- Custom Provider Form View (create or edit) -- */}
-      {(showCustomForm || editingCustomProvider) && !localServerProvider ? (
+      {(showCustomForm || editingCustomProvider) && !localServerType ? (
         <div className={VIEW_CLASS}>
           <CustomProviderForm
             agentName={props.agentName}

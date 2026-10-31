@@ -16,6 +16,7 @@ import {
   IsBoolean,
   IsInt,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -28,6 +29,50 @@ import {
   MAX_STREAM_WARMUP_OVERRIDE_MS,
   MIN_STREAM_WARMUP_OVERRIDE_MS,
 } from '../proxy/stream-warmup';
+import {
+  LOCAL_SERVER_MAX_TIMEOUT_MS,
+  LOCAL_SERVER_MIN_TIMEOUT_MS,
+  LOCAL_SERVER_TYPES,
+  type LocalServerType,
+} from '../../common/constants/local-servers';
+
+/**
+ * Connection settings of a local server. The service assembles the base URL
+ * from them and re-validates the result (no credentials, query or fragment).
+ */
+export class LocalServerConfigDto {
+  @IsIn(['http', 'https'])
+  scheme!: 'http' | 'https';
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(253)
+  host!: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  port!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  path_prefix?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LOCAL_SERVER_MIN_TIMEOUT_MS)
+  @Max(LOCAL_SERVER_MAX_TIMEOUT_MS)
+  request_timeout_ms?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LOCAL_SERVER_MIN_TIMEOUT_MS)
+  @Max(LOCAL_SERVER_MAX_TIMEOUT_MS)
+  probe_timeout_ms?: number;
+}
+
+const LOCAL_TYPE_MESSAGE = 'local_type must be "ollama", "lmstudio" or "llamacpp"';
 
 /**
  * Public prefix of the provider's model ids (`<alias>/<model_name>`).
@@ -80,6 +125,11 @@ export class CustomProviderModelDto {
   @IsOptional()
   @IsBoolean()
   price_estimated?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['tools', 'vision', 'reasoning'], { each: true })
+  capabilities?: ('tools' | 'vision' | 'reasoning')[];
 }
 
 export class CreateCustomProviderDto {
@@ -95,10 +145,22 @@ export class CreateCustomProviderDto {
   @AliasField()
   alias?: string | null;
 
+  @ValidateIf((o: { local_type?: unknown }) => o.local_type === undefined)
   @IsString()
   @IsNotEmpty()
   @IsUrl({ require_tld: false, require_protocol: true }, { message: 'Must be a valid URL' })
   base_url!: string;
+
+  /** Local servers: the runner type. The base URL is then built from `local_config`. */
+  @IsOptional()
+  @IsIn(LOCAL_SERVER_TYPES, { message: LOCAL_TYPE_MESSAGE })
+  local_type?: LocalServerType;
+
+  /** Omitted: the type's defaults (container host alias, documented port). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocalServerConfigDto)
+  local_config?: LocalServerConfigDto;
 
   @IsOptional()
   @IsIn(CUSTOM_PROVIDER_API_KINDS, { message: 'api_kind must be "openai" or "anthropic"' })
@@ -117,10 +179,22 @@ export class CreateCustomProviderDto {
 }
 
 export class ProbeCustomProviderDto {
+  @ValidateIf((o: { local_type?: unknown }) => o.local_type === undefined)
   @IsString()
   @IsNotEmpty()
   @IsUrl({ require_tld: false, require_protocol: true }, { message: 'Must be a valid URL' })
   base_url!: string;
+
+  /** Local servers: the runner type. The base URL is then built from `local_config`. */
+  @IsOptional()
+  @IsIn(LOCAL_SERVER_TYPES, { message: LOCAL_TYPE_MESSAGE })
+  local_type?: LocalServerType;
+
+  /** Omitted: the type's defaults (container host alias, documented port). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocalServerConfigDto)
+  local_config?: LocalServerConfigDto;
 
   @IsOptional()
   @IsString()
@@ -170,6 +244,12 @@ export class UpdateCustomProviderDto {
   @IsOptional()
   @IsIn(CUSTOM_PROVIDER_API_KINDS, { message: 'api_kind must be "openai" or "anthropic"' })
   api_kind?: CustomProviderApiKindDto;
+
+  /** Local servers only: new connection settings (the type never changes). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocalServerConfigDto)
+  local_config?: LocalServerConfigDto;
 
   @IsOptional()
   @IsString()

@@ -497,6 +497,37 @@ export interface CustomProviderModel {
   output_price_per_million_tokens?: number;
   context_window?: number;
   price_estimated?: boolean;
+  /** Local servers only: what the server reported the model can do. */
+  capabilities?: LocalModelCapability[];
+}
+
+export type LocalServerType = 'ollama' | 'lmstudio' | 'llamacpp';
+export type LocalModelCapability = 'tools' | 'vision' | 'reasoning';
+
+/** Connection settings of one local server (all user-editable). */
+export interface LocalServerConfig {
+  scheme: 'http' | 'https';
+  host: string;
+  port: number;
+  path_prefix: string;
+  request_timeout_ms: number;
+  probe_timeout_ms: number;
+}
+
+export interface LocalServerDefaults {
+  type: LocalServerType;
+  display_name: string;
+  /** Env var that pre-fills a new server (OLLAMA_HOST, THINKER_*_BASE_URL). */
+  env: string;
+  default_port: number;
+  config: LocalServerConfig;
+}
+
+export interface LocalProbeModel {
+  model_name: string;
+  context_window?: number;
+  capabilities?: LocalModelCapability[];
+  loaded?: boolean;
 }
 
 export interface CustomProviderData {
@@ -506,6 +537,9 @@ export interface CustomProviderData {
   alias: string | null;
   base_url: string;
   api_kind: CustomProviderApiKind;
+  /** Set for local servers (Ollama, LM Studio, llama.cpp). */
+  local_type?: LocalServerType | null;
+  local_config?: LocalServerConfig | null;
   has_api_key: boolean;
   /** Key pool in the order the proxy tries it (managed through the provider key endpoints). */
   keys?: Array<{ label: string; key_prefix: string | null; priority: number }>;
@@ -554,8 +588,11 @@ export function createCustomProvider(
   data: {
     name: string;
     alias?: string | null;
-    base_url: string;
+    /** Omitted for a local server: the backend builds it from `local_config`. */
+    base_url?: string;
     api_kind?: CustomProviderApiKind;
+    local_type?: LocalServerType;
+    local_config?: Partial<LocalServerConfig>;
     apiKey?: string;
     models: CustomProviderModel[];
   },
@@ -576,6 +613,7 @@ export function updateCustomProvider(
     alias?: string | null;
     base_url?: string;
     api_kind?: CustomProviderApiKind;
+    local_config?: Partial<LocalServerConfig>;
     apiKey?: string;
     models?: CustomProviderModel[];
   },
@@ -614,6 +652,37 @@ export async function probeCustomProvider(
   const text = await res.text();
   if (!text) return { models: [] } as { models: CustomProviderModel[] };
   return JSON.parse(text) as { models: CustomProviderModel[] };
+}
+
+/** Pre-filled settings of a new local server, per type. */
+export function getLocalServerDefaults(agentName: string) {
+  return fetchJson<LocalServerDefaults[]>(
+    routingPath(agentName, 'custom-providers/local-defaults'),
+  );
+}
+
+/**
+ * Test a local server with its own software's endpoints and list its chat
+ * models. `provider_id` (edit mode) lets the backend reuse the stored key when
+ * the settings still point at the saved server.
+ */
+export async function probeLocalServer(
+  agentName: string,
+  data: {
+    local_type: LocalServerType;
+    local_config: Partial<LocalServerConfig>;
+    apiKey?: string;
+    provider_id?: string;
+  },
+) {
+  const res = await fetch(`${BASE_URL}${routingPath(agentName, 'custom-providers/probe')}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: withOrganizationHeader({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res));
+  return (await res.json()) as { version?: string; base_url: string; models: LocalProbeModel[] };
 }
 
 export function deleteCustomProvider(agentName: string, id: string) {

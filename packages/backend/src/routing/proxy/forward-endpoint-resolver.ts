@@ -42,6 +42,8 @@ const XIAOMI_MODEL_PREFIXES = ['xiaomi/', 'mimo/', 'xiaomi-mimo/'] as const;
 export interface CustomProviderEndpointConfig {
   base_url: string;
   api_kind?: 'openai' | 'anthropic' | null;
+  local_type?: string | null;
+  local_config?: { request_timeout_ms?: number } | null;
 }
 
 export interface ResolveForwardEndpointParams {
@@ -132,6 +134,9 @@ export function resolveForwardEndpoint(
       customEndpoint = buildCustomEndpoint(
         customProvider.base_url,
         customProvider.api_kind ?? 'openai',
+        customProvider.local_type
+          ? { timeoutMs: customProvider.local_config?.request_timeout_ms }
+          : undefined,
       );
       forwardModel = CustomProviderService.rawModelName(model);
     }

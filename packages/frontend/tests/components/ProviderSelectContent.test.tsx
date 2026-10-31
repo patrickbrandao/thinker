@@ -8,6 +8,43 @@ vi.mock('../../src/services/api.js', () => ({
   createCustomProvider: vi.fn().mockResolvedValue({ id: 'cp-1' }),
   deleteCustomProvider: vi.fn().mockResolvedValue({}),
   updateCustomProvider: vi.fn().mockResolvedValue({}),
+  getLocalServerDefaults: vi.fn().mockResolvedValue([
+    {
+      type: 'ollama',
+      display_name: 'Ollama',
+      env: 'OLLAMA_HOST',
+      default_port: 11434,
+      config: {
+        scheme: 'http',
+        host: 'host.docker.internal',
+        port: 11434,
+        path_prefix: '',
+        request_timeout_ms: 600000,
+        probe_timeout_ms: 10000,
+      },
+    },
+    {
+      type: 'lmstudio',
+      display_name: 'LM Studio',
+      env: 'THINKER_LMSTUDIO_BASE_URL',
+      default_port: 1234,
+      config: {
+        scheme: 'http',
+        host: 'host.docker.internal',
+        port: 1234,
+        path_prefix: '',
+        request_timeout_ms: 600000,
+        probe_timeout_ms: 10000,
+      },
+    },
+  ]),
+  probeLocalServer: vi.fn().mockResolvedValue({
+    version: '0.12.3',
+    base_url: 'http://host.docker.internal:11434/v1',
+    models: [
+      { model_name: 'qwen3:8b', context_window: 40960, capabilities: ['tools'], loaded: true },
+    ],
+  }),
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
@@ -231,120 +268,117 @@ describe('ProviderSelectContent', () => {
     expect(() => fireEvent.click(backBtn)).not.toThrow();
   });
 
-  describe('LocalServerDetailView flow', () => {
-    // The LM Studio / llama.cpp local-server detail view is reached by editing
-    // an existing local custom provider (its name maps to a defaultLocalPort
-    // provider). The create-from-tile flow was removed with the list view.
-    it('routes editing an LM Studio custom provider to LocalServerDetailView in edit mode', async () => {
-      const lmsCustom = {
-        id: 'cp-lms',
-        name: 'LM Studio',
-        base_url: 'http://localhost:1234/v1',
-        models: [
-          {
-            model_name: 'llama',
-            input_price_per_million_tokens: 0,
-            output_price_per_million_tokens: 0,
-          },
-        ],
-      };
+  describe('local servers', () => {
+    const lmsServer = {
+      id: 'cp-lms',
+      name: 'LM Studio Mac',
+      base_url: 'http://192.168.1.30:1234/v1',
+      local_type: 'lmstudio' as const,
+      local_config: {
+        scheme: 'http' as const,
+        host: '192.168.1.30',
+        port: 1234,
+        path_prefix: '',
+        request_timeout_ms: 600_000,
+        probe_timeout_ms: 10_000,
+      },
+      models: [
+        {
+          model_name: 'llama',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+        },
+      ],
+    };
 
+    it('opens a local server in the server editor with its settings', async () => {
       const { container } = render(
         <ProviderSelectContent
           agentName="test-agent"
           providers={[]}
-          customProviders={[lmsCustom]}
+          customProviders={[lmsServer] as never}
           providerDeepLink={{ providerId: 'custom:cp-lms' }}
           onUpdate={onUpdate}
         />,
       );
-
-      // Opening the custom: deep link for an LM Studio provider routes to
-      // LocalServerDetailView in edit mode rather than the generic form.
       await waitFor(() => {
-        expect(container.textContent).toContain('Edit provider');
+        expect(container.textContent).toContain('Edit LM Studio server');
       });
+      expect((container.querySelector('#ls-lmstudio-host') as HTMLInputElement).value).toBe(
+        '192.168.1.30',
+      );
     });
 
-    it('completes the Connect flow from edit mode: closes the detail view and calls onUpdate', async () => {
-      const lmsCustom = {
-        id: 'cp-lms',
-        name: 'LM Studio',
-        base_url: 'http://localhost:1234/v1',
-        models: [
-          {
-            model_name: 'llama-3.1-8b',
-            input_price_per_million_tokens: 0,
-            output_price_per_million_tokens: 0,
-          },
-        ],
-      };
+    it('saves edited settings through updateCustomProvider with zero prices', async () => {
+      const api = await import('../../src/services/api.js');
       const onUpdateLocal = vi.fn().mockResolvedValue(undefined);
-      const onClose = vi.fn();
       const { container } = render(
         <ProviderSelectContent
           agentName="test-agent"
           providers={[]}
-          customProviders={[lmsCustom]}
+          customProviders={[lmsServer] as never}
           providerDeepLink={{ providerId: 'custom:cp-lms' }}
           onUpdate={onUpdateLocal}
-          onClose={onClose}
+          onClose={vi.fn()}
         />,
       );
-
-      // In edit mode the primary action saves changes (the create-mode
-      // "Connect N models" label only appears for a brand-new connection).
-      const saveBtn = await waitFor(() => {
-        const b = Array.from(container.querySelectorAll('button')).find(
-          (el) => el.textContent?.trim() === 'Save changes',
-        );
-        if (!b) throw new Error('Save changes button not yet rendered');
-        return b as HTMLButtonElement;
+      const port = await waitFor(() => {
+        const el = container.querySelector('#ls-lmstudio-port') as HTMLInputElement | null;
+        if (!el) throw new Error('form not rendered');
+        return el;
       });
-      fireEvent.click(saveBtn);
-
-      // After a successful update, onConnected → onUpdate (and goBack → onClose
-      // since a deep-link entry has no list view to return to).
-      await waitFor(() => {
-        expect(onUpdateLocal).toHaveBeenCalled();
-      });
+      fireEvent.change(port, { target: { value: '4321' } });
+      fireEvent.click(screen.getByText('Save changes'));
+      await waitFor(() => expect(onUpdateLocal).toHaveBeenCalled());
+      expect(api.updateCustomProvider).toHaveBeenCalledWith(
+        'test-agent',
+        'cp-lms',
+        expect.objectContaining({
+          local_config: expect.objectContaining({ host: '192.168.1.30', port: 4321 }),
+          models: [
+            {
+              model_name: 'llama',
+              input_price_per_million_tokens: 0,
+              output_price_per_million_tokens: 0,
+            },
+          ],
+        }),
+      );
     });
 
-    it('does not expose an Advanced / customize escape hatch from the local-server view', async () => {
-      const lmsCustom = {
-        id: 'cp-lms',
-        name: 'LM Studio',
-        base_url: 'http://localhost:1234/v1',
-        models: [
-          {
-            model_name: 'llama-3.1-8b',
-            input_price_per_million_tokens: 0,
-            output_price_per_million_tokens: 0,
-          },
-        ],
-      };
+    it('adds a server from a type deep link: defaults, test, then create', async () => {
+      const api = await import('../../src/services/api.js');
       const { container } = render(
         <ProviderSelectContent
           agentName="test-agent"
           providers={[]}
-          customProviders={[lmsCustom]}
-          providerDeepLink={{ providerId: 'custom:cp-lms' }}
+          customProviders={[{ ...lmsServer, id: 'x', name: 'Ollama' }] as never}
+          providerDeepLink={{ providerId: 'ollama' }}
           onUpdate={onUpdate}
+          onClose={vi.fn()}
         />,
       );
-
-      await waitFor(() => {
-        expect(container.textContent).toContain('Edit provider');
+      const name = await waitFor(() => {
+        const el = container.querySelector('#ls-ollama-name') as HTMLInputElement | null;
+        if (!el) throw new Error('form not rendered');
+        return el;
       });
-
-      const advanced = Array.from(container.querySelectorAll('button')).find((el) =>
-        el.textContent?.toLowerCase().includes('advanced'),
+      expect(name.value).toBe('Ollama 2');
+      expect((container.querySelector('#ls-ollama-port') as HTMLInputElement).value).toBe('11434');
+      fireEvent.click(screen.getByText('Test connection'));
+      await waitFor(() => expect(container.textContent).toContain('qwen3:8b'));
+      expect(container.textContent).toContain('40,960 ctx');
+      fireEvent.click(screen.getByText('Connect 1 model'));
+      await waitFor(() =>
+        expect(api.createCustomProvider).toHaveBeenCalledWith(
+          'test-agent',
+          expect.objectContaining({
+            name: 'Ollama 2',
+            local_type: 'ollama',
+            local_config: expect.objectContaining({ host: 'host.docker.internal', port: 11434 }),
+          }),
+        ),
       );
-      const customize = Array.from(container.querySelectorAll('button')).find((el) =>
-        el.textContent?.toLowerCase().includes('customize'),
-      );
-      expect(advanced).toBeUndefined();
-      expect(customize).toBeUndefined();
     });
   });
 
@@ -480,71 +514,6 @@ describe('ProviderSelectContent', () => {
         expect(onUpdateLocal).toHaveBeenCalled();
         expect(container.querySelector('[data-testid="custom-provider-form"]')).toBeNull();
       });
-    });
-  });
-
-  describe('onOpenCustomForm wiring from LocalServerDetailView', () => {
-    // Exercises the llama.cpp escape hatch: when the probe fails and the
-    // user clicks the "Add custom provider" link inside LocalServerDetailView,
-    // ProviderSelectContent must (a) dismiss the local-server view and
-    // (b) open the generic custom-provider form. The local-server view is
-    // reached by editing an existing llama.cpp custom provider.
-    it('swaps the local-server view for the custom-provider form when the hint link is clicked', async () => {
-      const api = await import('../../src/services/api.js');
-      const probeMock = api.probeCustomProvider as ReturnType<typeof vi.fn>;
-      // Force the llama.cpp probe to fail so FailureState renders its
-      // notReachableHint. The global mock defaults to success for the
-      // other tests, so we restore it afterwards.
-      const defaultImpl = probeMock.getMockImplementation();
-      probeMock.mockRejectedValue(new Error('returned 404'));
-      try {
-        const llamaCustom = {
-          id: 'cp-llama',
-          name: 'llama.cpp',
-          base_url: 'http://localhost:8080/v1',
-          models: [
-            {
-              model_name: 'llama',
-              input_price_per_million_tokens: 0,
-              output_price_per_million_tokens: 0,
-            },
-          ],
-        };
-
-        const { container } = render(
-          <ProviderSelectContent
-            agentName="test-agent"
-            providers={[]}
-            customProviders={[llamaCustom]}
-            providerDeepLink={{ providerId: 'custom:cp-llama' }}
-            onUpdate={onUpdate}
-          />,
-        );
-
-        // Wait for the probe to fail and the "Add custom provider" link to surface.
-        const hintLink = await waitFor(() => {
-          const b = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-            (el) => el.textContent?.trim() === 'Add custom provider',
-          );
-          if (!b) throw new Error('notReachableHint link not yet rendered');
-          return b;
-        });
-        fireEvent.click(hintLink);
-
-        // After the click, the LocalServerDetailView must be gone and the
-        // CustomProviderForm must be mounted. Both views share .modal-back-btn,
-        // so verify a CustomProviderForm-specific surface (its inputs).
-        await waitFor(() => {
-          // LocalServerDetailView content must be gone
-          expect(container.textContent).not.toContain('llama-server');
-          // CustomProviderForm surfaces inputs for name + base URL.
-          const inputs = container.querySelectorAll('input');
-          expect(inputs.length).toBeGreaterThan(0);
-        });
-      } finally {
-        if (defaultImpl) probeMock.mockImplementation(defaultImpl);
-        else probeMock.mockResolvedValue({ models: [{ model_name: 'llama-3.1-8b' }] });
-      }
     });
   });
 

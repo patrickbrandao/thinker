@@ -113,6 +113,8 @@ describe('CustomProviderController', () => {
         name: 'Groq',
         alias: 'groq',
         base_url: 'https://api.groq.com/v1',
+        local_type: null,
+        local_config: null,
         has_api_key: true,
         keys: [
           { label: 'Default', key_prefix: 'sk-abc12', priority: 0 },
