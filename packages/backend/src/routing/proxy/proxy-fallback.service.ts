@@ -379,7 +379,10 @@ export class ProxyFallbackService {
           stream,
           provider,
           model,
-          warmupMs: streamWarmupMsFor(provider, { connectionMs: credentials.streamWarmupMs }),
+          warmupMs: streamWarmupMsFor(provider, {
+            connectionMs: credentials.streamWarmupMs,
+            local: authType === 'local',
+          }),
         },
       );
       // A custom provider's key pool may have rotated to another key.

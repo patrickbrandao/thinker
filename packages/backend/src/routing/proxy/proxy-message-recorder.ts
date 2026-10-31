@@ -467,7 +467,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         copilotPricing ??
         (!isCopilot && usage ? this.pricingCache.getByModel(model, provider) : undefined),
       isSubscription: authType === 'subscription' && !copilotPricing,
-      isLocalProvider: isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
+      isLocalProvider:
+        authType === 'local' || isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
       perRequestCostUsd: copilotPricing
         ? null
         : await this.perRequestSubscriptionCost(provider, authType, model),

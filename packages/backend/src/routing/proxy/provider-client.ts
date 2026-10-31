@@ -518,6 +518,7 @@ export class ProviderClient {
           opts.apiMode === 'responses' ? responsesToolNames(body.tools) : undefined,
       },
       endpoint.requiresSsrfRevalidation === true,
+      endpoint.timeoutMs,
     );
     const result = { ...fetched, response: timeProviderResponse(fetched.response, attempt) };
     const response =
@@ -961,6 +962,8 @@ export class ProviderClient {
     },
     // User-supplied destination: pin the connection to a validated address.
     pinDestination = false,
+    // Per-endpoint upper bound (local servers); PROVIDER_TIMEOUT_MS otherwise.
+    timeoutMs = PROVIDER_TIMEOUT_MS,
   ): Promise<ForwardResult> {
     let fetchSignal: AbortSignal;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -971,12 +974,12 @@ export class ProviderClient {
         const timeoutError = new Error('Upstream provider request timed out');
         timeoutError.name = 'TimeoutError';
         timeoutController?.abort(timeoutError);
-      }, PROVIDER_TIMEOUT_MS);
+      }, timeoutMs);
       fetchSignal = signal
         ? AbortSignal.any([timeoutController.signal, signal])
         : timeoutController.signal;
     } else {
-      const timeoutSignal = AbortSignal.timeout(PROVIDER_TIMEOUT_MS);
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
       fetchSignal = signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal;
     }
 

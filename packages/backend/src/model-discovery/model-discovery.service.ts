@@ -633,8 +633,15 @@ export class ModelDiscoveryService {
           contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
           inputPricePerToken: inputPerToken,
           outputPricePerToken: outputPerToken,
-          capabilityReasoning: false,
+          capabilityReasoning: m.capabilities?.includes('reasoning') === true,
           capabilityCode: false,
+          // Local servers report tools/vision at probe time.
+          ...(m.capabilities?.includes('tools')
+            ? { capabilities: ['text', 'tools'] as const }
+            : {}),
+          ...(m.capabilities?.includes('vision')
+            ? { inputModalities: ['text', 'image'] as const }
+            : {}),
           qualityScore: 2,
           providerName: cp.name,
           ...(cp.alias ? { providerAlias: cp.alias } : {}),

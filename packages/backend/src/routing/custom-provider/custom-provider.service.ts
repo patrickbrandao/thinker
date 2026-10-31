@@ -35,6 +35,16 @@ import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache
 import { ModelsDevSyncService } from '../../database/models-dev-sync.service';
 import { IngestEventBusService } from '../../common/services/ingest-event-bus.service';
 import { classifyProbeError } from './probe-error';
+import {
+  defaultLocalServerConfig,
+  invalidLocalServerConfigReason,
+  localServerBaseUrl,
+  localServerRootUrl,
+  normalizePathPrefix,
+  type LocalServerConfig,
+  type LocalServerType,
+} from '../../common/constants/local-servers';
+import { LocalProbeError, probeLocalServer, type LocalProbeResult } from './local-server-probe';
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -113,8 +123,29 @@ function trimBaseUrl(baseUrl: string): string {
   return s.slice(0, end);
 }
 
-function authTypeForCustomProvider(name: string): AuthType {
-  return isLocalCustomProviderName(name) ? 'local' : 'api_key';
+function authTypeForCustomProvider(name: string, localType?: LocalServerType | null): AuthType {
+  return localType || isLocalCustomProviderName(name) ? 'local' : 'api_key';
+}
+
+/**
+ * Full settings of a local server: the type's defaults, then the stored
+ * settings, then the submitted ones. Throws a 400 when the result is unusable.
+ */
+export function resolveLocalServerConfig(
+  type: LocalServerType,
+  submitted?: Partial<LocalServerConfig> | null,
+  current?: LocalServerConfig | null,
+): LocalServerConfig {
+  const merged: LocalServerConfig = {
+    ...defaultLocalServerConfig(type),
+    ...(current ?? {}),
+    ...Object.fromEntries(Object.entries(submitted ?? {}).filter(([, v]) => v !== undefined)),
+  };
+  merged.host = merged.host.trim();
+  merged.path_prefix = normalizePathPrefix(merged.path_prefix);
+  const reason = invalidLocalServerConfigReason(merged);
+  if (reason) throw new BadRequestException(`Invalid server settings: ${reason}`);
+  return merged;
 }
 
 const ALIAS_UNIQUE_INDEX = 'IDX_custom_providers_tenant_alias';
@@ -286,7 +317,11 @@ export class CustomProviderService {
     const row = rows.find((r) => r.id === cpId);
     if (!row) return { provider: provider ?? null, model: model ?? null };
 
-    const canonical = CustomProviderService.canonicalTileIdForName(row.name);
+    // Local servers keep their own key: several servers of one type must stay
+    // apart in logs and dashboards.
+    const canonical = row.local_type
+      ? null
+      : CustomProviderService.canonicalTileIdForName(row.name);
     if (!canonical) return { provider: provider ?? null, model: model ?? null };
 
     const rewrittenProvider = providerIsCustom ? canonical : (provider ?? null);
@@ -331,8 +366,14 @@ export class CustomProviderService {
         : normalizeCustomProviderAlias(dto.alias);
     if (alias && dto.alias !== undefined) this.assertAliasAvailable(alias, allForTenant);
 
+    const localType = dto.local_type ?? null;
+    if (localType && dto.base_url !== undefined) {
+      throw new BadRequestException('A local server takes local_config, not base_url');
+    }
+    const localConfig = localType ? resolveLocalServerConfig(localType, dto.local_config) : null;
+    const baseUrl = localConfig ? localServerBaseUrl(localConfig) : dto.base_url;
     try {
-      await validatePublicUrl(dto.base_url, urlPolicy(urlOpts));
+      await validatePublicUrl(baseUrl, urlPolicy(urlOpts));
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }
@@ -346,9 +387,12 @@ export class CustomProviderService {
       created_by_user_id: createdByUserId ?? null,
       name: dto.name,
       alias,
-      base_url: dto.base_url,
-      api_kind: dto.api_kind ?? 'openai',
-      models: this.enrichCustomProviderModels(dto.name, dto.models),
+      base_url: baseUrl,
+      // Local servers speak OpenAI Chat Completions under `/v1`.
+      api_kind: localType ? 'openai' : (dto.api_kind ?? 'openai'),
+      local_type: localType,
+      local_config: localConfig,
+      models: this.enrichCustomProviderModels(dto.name, dto.models, { local: !!localType }),
       created_at: new Date().toISOString(),
     });
     // A custom provider is two rows that must exist together: the
@@ -372,7 +416,7 @@ export class CustomProviderService {
           tenantId,
           provKey,
           dto.apiKey,
-          authTypeForCustomProvider(dto.name),
+          authTypeForCustomProvider(dto.name, localType),
           undefined,
           undefined,
           createdByUserId,
@@ -437,21 +481,35 @@ export class CustomProviderService {
       cp.alias = alias;
     }
 
-    if (dto.base_url !== undefined) {
+    // A local server's URL is always derived from its settings.
+    if (cp.local_type && dto.base_url !== undefined) {
+      throw new BadRequestException('Change a local server through local_config, not base_url');
+    }
+    if (!cp.local_type && dto.local_config !== undefined) {
+      throw new BadRequestException('local_config only applies to local servers');
+    }
+    let nextBaseUrl = dto.base_url;
+    if (cp.local_type && dto.local_config !== undefined) {
+      cp.local_config = resolveLocalServerConfig(cp.local_type, dto.local_config, cp.local_config);
+      nextBaseUrl = localServerBaseUrl(cp.local_config);
+    }
+    if (nextBaseUrl !== undefined) {
       try {
-        await validatePublicUrl(dto.base_url, urlPolicy(urlOpts));
+        await validatePublicUrl(nextBaseUrl, urlPolicy(urlOpts));
       } catch (err) {
         throw new BadRequestException((err as Error).message);
       }
-      cp.base_url = dto.base_url;
+      cp.base_url = nextBaseUrl;
     }
 
-    if (dto.api_kind !== undefined) {
+    if (dto.api_kind !== undefined && !cp.local_type) {
       cp.api_kind = dto.api_kind;
     }
 
     if (dto.models !== undefined) {
-      cp.models = this.enrichCustomProviderModels(cp.name, dto.models);
+      cp.models = this.enrichCustomProviderModels(cp.name, dto.models, {
+        local: !!cp.local_type,
+      });
     }
 
     try {
@@ -479,9 +537,10 @@ export class CustomProviderService {
     // local). This path fires even without an apiKey update because renaming
     // "LM Studio" to "My Home Server" should move the row off the Local tab,
     // and the reverse should light up the grey-house badge.
-    const nextAuthType = authTypeForCustomProvider(cp.name);
+    const nextAuthType = authTypeForCustomProvider(cp.name, cp.local_type);
     const nameCategoryChanged =
-      previousName !== cp.name && authTypeForCustomProvider(previousName) !== nextAuthType;
+      previousName !== cp.name &&
+      authTypeForCustomProvider(previousName, cp.local_type) !== nextAuthType;
 
     // Flip auth_type in place first, so the rows keep their stored keys and
     // tier overrides. Going through upsertProvider alone would insert a second
@@ -653,6 +712,32 @@ export class CustomProviderService {
   }
 
   /**
+   * Test a local server with its own software's endpoints (see
+   * local-server-probe.ts) and list its chat models. Same URL policy as
+   * `probeModels`: validated up front, then every request pinned through
+   * ssrfSafeFetch with redirects refused.
+   */
+  async probeLocal(
+    type: LocalServerType,
+    config: LocalServerConfig,
+    apiKey?: string,
+    urlOpts: CustomProviderUrlOptions = {},
+  ): Promise<LocalProbeResult> {
+    try {
+      await validatePublicUrl(localServerRootUrl(config), urlPolicy(urlOpts));
+    } catch (err) {
+      throw new BadRequestException((err as Error).message);
+    }
+    try {
+      // codeql[js/request-forgery] — operator-chosen local server, see probeModels.
+      return await probeLocalServer(type, config, apiKey, (url, init) => ssrfSafeFetch(url, init));
+    } catch (err) {
+      if (err instanceof LocalProbeError) throw new BadRequestException(err.message);
+      throw err;
+    }
+  }
+
+  /**
    * Decrypt the stored API key of an existing custom provider for a single
    * server-side probe. The edit form never has the plaintext key (list() only
    * exposes `has_api_key:bool`), so "Fetch models" relies on this when the
@@ -690,8 +775,19 @@ export class CustomProviderService {
   private enrichCustomProviderModels(
     providerName: string | undefined,
     models: readonly CustomProviderModel[],
-    options: { defaultContextWindow?: boolean } = {},
+    options: { defaultContextWindow?: boolean; local?: boolean } = {},
   ): CustomProviderModel[] {
+    // Local inference is never billed: prices are pinned to zero whatever the
+    // client sent, and no catalogue price is looked up.
+    if (options.local) {
+      return models.map((model) => ({
+        model_name: model.model_name,
+        input_price_per_million_tokens: 0,
+        output_price_per_million_tokens: 0,
+        context_window: model.context_window ?? 128000,
+        ...(model.capabilities?.length ? { capabilities: [...model.capabilities] } : {}),
+      }));
+    }
     return models.map((model) => {
       const modelsDevMatch =
         providerName && this.modelsDevSync

@@ -566,7 +566,10 @@ export class ProxyService {
     if (forward.response.ok && stream && forward.response.body) {
       const warmup = await peekStream(
         forward.response.body,
-        streamWarmupMsFor(route.provider, { connectionMs: credentials.streamWarmupMs }),
+        streamWarmupMsFor(route.provider, {
+          connectionMs: credentials.streamWarmupMs,
+          local: route.authType === 'local',
+        }),
       );
       if (warmup.ok) {
         const peeked: ForwardResult = {

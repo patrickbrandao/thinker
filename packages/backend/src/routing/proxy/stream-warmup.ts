@@ -45,6 +45,8 @@ export const MAX_STREAM_WARMUP_OVERRIDE_MS = 600_000;
 export interface StreamWarmupOverrides {
   /** `tenant_providers.stream_warmup_ms` of the connection serving the hop. */
   connectionMs?: number | null;
+  /** The hop is a local server connection (`auth_type 'local'`, e.g. a `custom:<uuid>` Ollama). */
+  local?: boolean;
 }
 
 function validOverride(value: number | null | undefined): number | undefined {
@@ -63,7 +65,7 @@ function validOverride(value: number | null | undefined): number | undefined {
 export function streamWarmupMsFor(provider: string, overrides?: StreamWarmupOverrides): number {
   return (
     validOverride(overrides?.connectionMs) ??
-    (isLocalOnlyProvider(provider) ? LOCAL_STREAM_WARMUP_MS : STREAM_WARMUP_MS)
+    (overrides?.local || isLocalOnlyProvider(provider) ? LOCAL_STREAM_WARMUP_MS : STREAM_WARMUP_MS)
   );
 }
 

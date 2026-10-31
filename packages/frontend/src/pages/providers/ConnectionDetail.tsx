@@ -46,6 +46,7 @@ import {
 import { roleCan } from '../../services/session-store.js';
 import { getModelDisplayName } from '../../services/model-display.js';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
+import LocalServerForm from '../../components/LocalServerForm.jsx';
 import { useResource } from '../../lib/use-resource.js';
 import {
   Badge,
@@ -961,19 +962,36 @@ const ConnectionDetail = () => {
         label={t('providers.detail.editCustomProvider')}
         wide
       >
-        <CustomProviderForm
-          agentName={firstAgentName}
-          initialData={customProviderData!}
-          onCreated={() => {
-            closeManageModal();
-            void detail.reload();
-          }}
-          onBack={closeManageModal}
-          onDeleted={() => {
-            closeManageModal();
-            navigate(backLink);
-          }}
-        />
+        {customProviderData?.local_type ? (
+          <LocalServerForm
+            agentName={firstAgentName}
+            type={customProviderData.local_type}
+            editData={customProviderData}
+            onSaved={() => {
+              closeManageModal();
+              void detail.reload();
+            }}
+            onCancel={closeManageModal}
+            onDeleted={() => {
+              closeManageModal();
+              navigate(backLink);
+            }}
+          />
+        ) : (
+          <CustomProviderForm
+            agentName={firstAgentName}
+            initialData={customProviderData!}
+            onCreated={() => {
+              closeManageModal();
+              void detail.reload();
+            }}
+            onBack={closeManageModal}
+            onDeleted={() => {
+              closeManageModal();
+              navigate(backLink);
+            }}
+          />
+        )}
       </Modal>
 
       {/* Manage connection modal */}

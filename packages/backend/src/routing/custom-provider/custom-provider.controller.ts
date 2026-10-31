@@ -1,6 +1,17 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
-import { CustomProviderService, primaryCustomConnection } from './custom-provider.service';
+import {
+  CustomProviderService,
+  primaryCustomConnection,
+  resolveLocalServerConfig,
+} from './custom-provider.service';
+import type { CustomProvider } from '../../entities/custom-provider.entity';
+import {
+  LOCAL_SERVER_TYPES,
+  LOCAL_SERVER_TYPE_DEFAULTS,
+  defaultLocalServerConfig,
+  localServerBaseUrl,
+} from '../../common/constants/local-servers';
 import { ProviderService } from '../routing-core/provider.service';
 import { ResolveAgentService } from '../routing-core/resolve-agent.service';
 import {
@@ -27,6 +38,26 @@ function keyPool(rows: readonly TenantProvider[], providerKey: string) {
     .map((r) => ({ label: r.label, key_prefix: r.key_prefix ?? null, priority: r.priority }));
 }
 
+/** API shape of one custom provider (local servers included). The API key never leaves. */
+function toResponse(cp: CustomProvider, tenantProviders: readonly TenantProvider[]) {
+  const provKey = CustomProviderService.providerKey(cp.id);
+  const up = primaryCustomConnection(tenantProviders, provKey);
+  return {
+    id: cp.id,
+    name: cp.name,
+    alias: cp.alias,
+    base_url: cp.base_url,
+    api_kind: cp.api_kind,
+    local_type: cp.local_type ?? null,
+    local_config: cp.local_config ?? null,
+    has_api_key: !!up?.api_key_encrypted,
+    keys: keyPool(tenantProviders, provKey),
+    stream_warmup_ms: up?.stream_warmup_ms ?? null,
+    models: cp.models,
+    created_at: cp.created_at,
+  };
+}
+
 @MinRole('admin')
 @Controller('api/v1/routing')
 export class CustomProviderController {
@@ -49,24 +80,26 @@ export class CustomProviderController {
       this.customProviderService.list(agent.tenant_id),
       this.providerService.getProviders(agent.tenant_id),
     ]);
-    if (providers.length === 0) return [];
+    return providers.map((cp) => toResponse(cp, tenantProviders));
+  }
 
-    return providers.map((cp) => {
-      const provKey = CustomProviderService.providerKey(cp.id);
-      const up = primaryCustomConnection(tenantProviders, provKey);
-      return {
-        id: cp.id,
-        name: cp.name,
-        alias: cp.alias,
-        base_url: cp.base_url,
-        api_kind: cp.api_kind,
-        has_api_key: !!up?.api_key_encrypted,
-        keys: keyPool(tenantProviders, provKey),
-        stream_warmup_ms: up?.stream_warmup_ms ?? null,
-        models: cp.models,
-        created_at: cp.created_at,
-      };
+  /**
+   * Pre-filled settings of a new local server, per type: the container host
+   * alias (or the type's env var, OLLAMA_HOST / THINKER_*_BASE_URL) and the
+   * documented port.
+   */
+  @Get(':agentName/custom-providers/local-defaults')
+  async localDefaults(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
+    await this.resolveAgentService.resolve(ctx.tenantId, params.agentName, {
+      allowPlayground: true,
     });
+    return LOCAL_SERVER_TYPES.map((type) => ({
+      type,
+      display_name: LOCAL_SERVER_TYPE_DEFAULTS[type].displayName,
+      env: LOCAL_SERVER_TYPE_DEFAULTS[type].env,
+      default_port: LOCAL_SERVER_TYPE_DEFAULTS[type].defaultPort,
+      config: defaultLocalServerConfig(type),
+    }));
   }
 
   @Post(':agentName/custom-providers/probe')
@@ -87,16 +120,29 @@ export class CustomProviderController {
     // and we reuse the stored key. The service only releases it for the
     // provider's own tenant, base URL and api_kind, so the key can't be
     // sent to a different server. A user-typed apiKey always wins.
+    const localConfig = body.local_type
+      ? resolveLocalServerConfig(body.local_type, body.local_config)
+      : null;
+    const baseUrl = localConfig ? localServerBaseUrl(localConfig) : body.base_url;
     const apiKey =
       body.apiKey ??
       (body.provider_id
         ? await this.customProviderService.loadStoredApiKey(
             agent.tenant_id,
             body.provider_id,
-            body.base_url,
-            body.api_kind,
+            baseUrl,
+            localConfig ? 'openai' : body.api_kind,
           )
         : undefined);
+    if (body.local_type && localConfig) {
+      const result = await this.customProviderService.probeLocal(
+        body.local_type,
+        localConfig,
+        apiKey,
+        { allowPrivate: canUsePrivateDestinations(ctx) },
+      );
+      return { ...result, base_url: baseUrl };
+    }
     const models = await this.customProviderService.probeModels(
       body.base_url,
       apiKey,
@@ -121,22 +167,7 @@ export class CustomProviderController {
     const cp = await this.customProviderService.create(agent.tenant_id, body, ctx.userId, {
       allowPrivate: canUsePrivateDestinations(ctx),
     });
-    const provKey = CustomProviderService.providerKey(cp.id);
-    const tenantProviders = await this.providerService.getProviders(agent.tenant_id);
-    const up = primaryCustomConnection(tenantProviders, provKey);
-
-    return {
-      id: cp.id,
-      name: cp.name,
-      alias: cp.alias,
-      base_url: cp.base_url,
-      api_kind: cp.api_kind,
-      has_api_key: !!up?.api_key_encrypted,
-      keys: keyPool(tenantProviders, provKey),
-      stream_warmup_ms: up?.stream_warmup_ms ?? null,
-      models: cp.models,
-      created_at: cp.created_at,
-    };
+    return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
   @Put(':agentName/custom-providers/:id')
@@ -154,22 +185,7 @@ export class CustomProviderController {
     const cp = await this.customProviderService.update(id, agent.tenant_id, body, ctx.userId, {
       allowPrivate: canUsePrivateDestinations(ctx),
     });
-    const provKey = CustomProviderService.providerKey(cp.id);
-    const tenantProviders = await this.providerService.getProviders(agent.tenant_id);
-    const up = primaryCustomConnection(tenantProviders, provKey);
-
-    return {
-      id: cp.id,
-      name: cp.name,
-      alias: cp.alias,
-      base_url: cp.base_url,
-      api_kind: cp.api_kind,
-      has_api_key: !!up?.api_key_encrypted,
-      keys: keyPool(tenantProviders, provKey),
-      stream_warmup_ms: up?.stream_warmup_ms ?? null,
-      models: cp.models,
-      created_at: cp.created_at,
-    };
+    return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
   @Delete(':agentName/custom-providers/:id')

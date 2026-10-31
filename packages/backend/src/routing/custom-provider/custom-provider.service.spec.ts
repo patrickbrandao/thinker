@@ -313,6 +313,84 @@ describe('CustomProviderService', () => {
     });
   });
 
+  describe('local servers', () => {
+    const local = {
+      name: 'Ollama GPU-1',
+      local_type: 'ollama' as const,
+      local_config: { scheme: 'http' as const, host: '192.168.1.20', port: 11434 },
+      models: [
+        { model_name: 'qwen3:8b', input_price_per_million_tokens: 5, context_window: 40960 },
+      ],
+    };
+
+    it('derives the base URL, pins prices to zero and tags the connection local', async () => {
+      const { svc, insert, upsertProvider } = makeDeps({});
+      const cp = await svc.create('tenant-1', local as never);
+      expect(cp.base_url).toBe('http://192.168.1.20:11434/v1');
+      expect(cp.local_type).toBe('ollama');
+      expect(cp.local_config).toMatchObject({ path_prefix: '', request_timeout_ms: 600_000 });
+      expect(cp.models).toEqual([
+        {
+          model_name: 'qwen3:8b',
+          input_price_per_million_tokens: 0,
+          output_price_per_million_tokens: 0,
+          context_window: 40960,
+        },
+      ]);
+      expect(insert).toHaveBeenCalled();
+      expect(upsertProvider.mock.calls[0][4]).toBe('local');
+    });
+
+    it('rejects unusable server settings', async () => {
+      const { svc } = makeDeps({});
+      await expect(
+        svc.create('tenant-1', {
+          ...local,
+          local_config: { ...local.local_config, host: 'user@box' },
+        } as never),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rebuilds the base URL when the settings change and refuses a raw base_url', async () => {
+      const row = Object.assign(new CustomProvider(), {
+        id: 'cp1',
+        tenant_id: 'tenant-1',
+        name: 'Ollama GPU-1',
+        base_url: 'http://192.168.1.20:11434/v1',
+        api_kind: 'openai',
+        local_type: 'ollama',
+        local_config: {
+          scheme: 'http',
+          host: '192.168.1.20',
+          port: 11434,
+          path_prefix: '',
+          request_timeout_ms: 600_000,
+          probe_timeout_ms: 10_000,
+        },
+        models: [],
+      });
+      const { svc, findOne } = makeDeps({});
+      findOne.mockResolvedValueOnce(row);
+      const updated = await svc.update('cp1', 'tenant-1', {
+        local_config: { scheme: 'http', host: '192.168.1.21', port: 11434 },
+      } as never);
+      expect(updated.base_url).toBe('http://192.168.1.21:11434/v1');
+      findOne.mockResolvedValueOnce(row);
+      await expect(
+        svc.update('cp1', 'tenant-1', { base_url: 'http://evil:1/v1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('keeps local servers apart in message logs', async () => {
+      const { svc } = makeDeps({
+        cached: [{ id: 'cp1', name: 'LM Studio', local_type: 'lmstudio' } as CustomProvider],
+      });
+      await expect(
+        svc.canonicalizeAgentMessageKeys('tenant-1', 'custom:cp1', 'custom:cp1/qwen'),
+      ).resolves.toEqual({ provider: 'custom:cp1', model: 'custom:cp1/qwen' });
+    });
+  });
+
   describe('create', () => {
     const dto = {
       name: 'my-openai',
