@@ -60,6 +60,8 @@ const McpServer = lazyReload(() => import('./pages/integrations/McpServer.jsx'))
 const Cli = lazyReload(() => import('./pages/integrations/Cli.jsx'));
 const Organization = lazyReload(() => import('./pages/Organization.jsx'));
 const Triggers = lazyReload(() => import('./pages/Triggers.jsx'));
+const TriggerTest = lazyReload(() => import('./pages/TriggerTest.jsx'));
+const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
@@ -289,6 +291,14 @@ function AppRoutes() {
               }
             />
             <Route
+              path="triggers"
+              element={
+                <Lazy>
+                  <AgentTriggers />
+                </Lazy>
+              }
+            />
+            <Route
               path="settings/*"
               element={
                 <Lazy>
@@ -346,6 +356,14 @@ function AppRoutes() {
           element={
             <Lazy>
               <Triggers />
+            </Lazy>
+          }
+        />
+        <Route
+          path="triggers/test"
+          element={
+            <Lazy>
+              <TriggerTest />
             </Lazy>
           }
         />

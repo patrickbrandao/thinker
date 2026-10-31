@@ -79,6 +79,50 @@ describe('Triggers page', () => {
     expect(screen.queryByText('Create trigger')).toBeNull();
   });
 
+  it('has a single New trigger button, also on an empty workspace', async () => {
+    asRole('admin');
+    api.listTriggers.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('No triggers yet');
+    expect(screen.getAllByText('New trigger')).toHaveLength(1);
+  });
+
+  it('shows working row actions: edit, test and delete', async () => {
+    asRole('admin');
+    renderPage();
+    await screen.findByText('ops-hook');
+    expect(screen.getByLabelText('Test ops-hook').getAttribute('href')).toBe(
+      '/triggers/test?trigger=t1',
+    );
+    fireEvent.click(screen.getByLabelText('Edit ops-hook'));
+    expect(await screen.findByRole('dialog', { name: 'Edit trigger' })).toBeTruthy();
+    fireEvent.click(screen.getByText('Cancel'));
+    fireEvent.click(screen.getByLabelText('Delete ops-hook'));
+    expect(await screen.findByRole('dialog', { name: 'Delete trigger' })).toBeTruthy();
+  });
+
+  it('lists e-mail providers as their own types', async () => {
+    asRole('admin');
+    api.listTriggers.mockResolvedValue([
+      { ...hook, id: 't3', name: 'mail', type: 'email', config: { provider: 'mailgun' } },
+    ]);
+    renderPage();
+    expect(await screen.findByText('Email API Mailgun')).toBeTruthy();
+    fireEvent.click(screen.getByText('New trigger'));
+    const types = Array.from(
+      (screen.getByLabelText('Type') as HTMLSelectElement).options,
+      (o) => o.textContent,
+    );
+    expect(types).toEqual([
+      'Email API Resend',
+      'Email API Mailgun',
+      'Email API SendGrid',
+      'Webhook',
+      'Telegram',
+      'Syslog',
+    ]);
+  });
+
   it('creates a webhook trigger from the editor', async () => {
     asRole('admin');
     api.createTrigger.mockResolvedValue({ ...hook, id: 't2', name: 'new-hook' });

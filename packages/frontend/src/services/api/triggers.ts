@@ -175,8 +175,17 @@ export function deleteTrigger(triggerId: string) {
   return fetchMutate<{ deleted: true }>(`/triggers/${id(triggerId)}`, { method: 'DELETE' });
 }
 
-export function testTrigger(triggerId: string) {
-  return fetchMutate<TriggerTestResult>(`/triggers/${id(triggerId)}/test`, { method: 'POST' });
+/** A simulated event for the test screen; omitted, the backend sends a plain test event. */
+export interface TriggerTestInput {
+  event_type?: TriggerEventType;
+  vars?: Record<string, string>;
+}
+
+export function testTrigger(triggerId: string, input?: TriggerTestInput) {
+  return fetchMutate<TriggerTestResult>(`/triggers/${id(triggerId)}/test`, {
+    method: 'POST',
+    ...(input ? { headers: JSON_HEADERS, body: JSON.stringify(input) } : {}),
+  });
 }
 
 export async function listTriggerEvents(filters: TriggerEventFilters = {}) {

@@ -2,6 +2,7 @@ import {
   DEFAULT_SYSLOG_SEVERITIES,
   DEFAULT_TRIGGER_TEMPLATES,
   TRIGGER_LIMITS,
+  TRIGGER_VARIABLES,
   type EmailTriggerProvider,
   type SyslogFacility,
   type SyslogFormat,
@@ -49,10 +50,10 @@ export function eventLabel(event: TriggerEventType | string): string {
   return key ? t(key) : event;
 }
 
-export function triggerTypeLabel(type: TriggerType | string): string {
+export function triggerTypeLabel(type: TriggerType | string, provider?: string): string {
   switch (type) {
     case 'email':
-      return t('triggers.types.email');
+      return provider ? kindLabel(`email:${provider}` as TriggerKind) : t('triggers.types.email');
     case 'webhook':
       return t('triggers.types.webhook');
     case 'telegram':
@@ -62,6 +63,162 @@ export function triggerTypeLabel(type: TriggerType | string): string {
     default:
       return type;
   }
+}
+
+/** The e-mail provider of a trigger, undefined for other types. */
+export function providerOf(trigger: Pick<TriggerView, 'type' | 'config'>): string | undefined {
+  return trigger.type === 'email'
+    ? (trigger.config as EmailTriggerConfig | undefined)?.provider
+    : undefined;
+}
+
+/** The trigger test screen, optionally preselecting a trigger and a harness. */
+export function triggerTestPath(triggerId?: string, harness?: string): string {
+  const params = new URLSearchParams();
+  if (triggerId) params.set('trigger', triggerId);
+  if (harness) params.set('harness', harness);
+  const query = params.toString();
+  return `/triggers/test${query ? `?${query}` : ''}`;
+}
+
+/**
+ * What the type picker offers: each e-mail provider is its own choice, the
+ * rest map 1:1 to a trigger type. Stored as `type` + `config.provider`.
+ */
+export const TRIGGER_KINDS = [
+  'email:resend',
+  'email:mailgun',
+  'email:sendgrid',
+  'webhook',
+  'telegram',
+  'syslog',
+] as const;
+export type TriggerKind = (typeof TRIGGER_KINDS)[number];
+
+const KIND_LABELS: Record<TriggerKind, TranslationKey> = {
+  'email:resend': 'triggers.types.emailResend',
+  'email:mailgun': 'triggers.types.emailMailgun',
+  'email:sendgrid': 'triggers.types.emailSendgrid',
+  webhook: 'triggers.types.webhook',
+  telegram: 'triggers.types.telegram',
+  syslog: 'triggers.types.syslog',
+};
+
+export function kindLabel(kind: TriggerKind): string {
+  const key = KIND_LABELS[kind];
+  return key ? t(key) : kind;
+}
+
+export function kindOf(type: TriggerType, provider?: string): TriggerKind {
+  return type === 'email' ? (`email:${provider ?? 'resend'}` as TriggerKind) : type;
+}
+
+export function splitKind(kind: TriggerKind): {
+  type: TriggerType;
+  provider?: EmailTriggerProvider;
+} {
+  if (kind.startsWith('email:')) {
+    return { type: 'email', provider: kind.slice(6) as EmailTriggerProvider };
+  }
+  return { type: kind as TriggerType };
+}
+
+/** Variables the gateway computes on every delivery; the test screen does not offer them. */
+const COMPUTED_VARS = new Set([
+  'event.id',
+  'event.type',
+  'event.json',
+  'event.timestamp',
+  'trigger.name',
+  'delivery.attempt',
+  'workspace.id',
+  'workspace.name',
+]);
+
+/** The variables a simulated event of this type carries, in display order. */
+export function testVariables(event: TriggerEventType): string[] {
+  return TRIGGER_VARIABLES.filter(
+    (v) =>
+      !COMPUTED_VARS.has(v.name) &&
+      (v.events === 'all' || (v.events as readonly string[]).includes(event)),
+  ).map((v) => v.name);
+}
+
+/** Realistic default values for a simulated event, prefilled on the test screen. */
+export function sampleVars(
+  event: TriggerEventType,
+  harness: { name: string; displayName?: string } = { name: 'my-harness' },
+): Record<string, string> {
+  const h = harness.name;
+  const now = new Date();
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const requestId = '00000000-0000-4000-8000-000000000001';
+  const titles: Record<string, [string, string]> = {
+    test: ['Test event', 'This is a simulated test event sent from Thinker.'],
+    'limit.alert': [
+      `${h} exceeded the cost threshold`,
+      `${h} used $12.40 this day, over the $10.00 threshold. Requests are still being processed.`,
+    ],
+    'limit.block': [
+      `${h} has been blocked`,
+      `${h} reached the $10.00 cost limit per day ($10.02). New requests are blocked until the period resets on ${dayEnd.toISOString()}.`,
+    ],
+    'provider.failure': [
+      `${h}: provider failure (openai)`,
+      'All routes failed for a request to gpt-5: upstream returned HTTP 503.',
+    ],
+    'credential.expired': [
+      'Credential rejected: anthropic "work key"',
+      `anthropic rejected the connection "work key" with HTTP 401 while serving ${h}. Reconnect or replace the key.`,
+    ],
+    'request.debug': [
+      `${h}: request gpt-5`,
+      'openai answered gpt-5 in 1840 ms, 1520 tokens, $0.004210.',
+    ],
+    'harness.created': [`Harness ${h} created`, `The harness ${h} (${h}) was created.`],
+    'harness.deleted': [`Harness ${h} deleted`, `The harness ${h} (${h}) was deleted.`],
+  };
+  const [title, message] = titles[event] ?? titles.test!;
+  const values: Record<string, string> = {
+    'event.title': title,
+    'event.message': message,
+    'harness.id': '00000000-0000-4000-8000-0000000000aa',
+    'harness.name': h,
+    'harness.display_name': harness.displayName ?? h,
+    'harness.url': `${origin}/harnesses/${encodeURIComponent(h)}`,
+    'rule.id': '00000000-0000-4000-8000-0000000000bb',
+    'rule.metric': 'cost',
+    'rule.threshold': '10',
+    'rule.period': 'day',
+    'value.actual': event === 'limit.block' ? '10.02' : '12.4',
+    'period.start': dayStart.toISOString(),
+    'period.end': dayEnd.toISOString(),
+    'period.reset': dayEnd.toISOString(),
+    'request.id': requestId,
+    'request.status': event === 'provider.failure' ? 'failed' : 'success',
+    'request.model': 'gpt-5',
+    'request.requested_model': 'auto',
+    'request.provider': 'openai',
+    'request.tier': 'standard',
+    'request.input_tokens': '1200',
+    'request.output_tokens': '320',
+    'request.tokens': '1520',
+    'request.cost': '0.004210',
+    'request.latency_ms': '1840',
+    'request.error': event === 'provider.failure' ? 'upstream returned HTTP 503' : '',
+    'request.http_status': event === 'provider.failure' ? '503' : '',
+    'request.url': `${origin}/requests/${requestId}`,
+    'failure.count': '1',
+    'connection.id': '00000000-0000-4000-8000-0000000000cc',
+    'connection.provider': 'anthropic',
+    'connection.label': 'work key',
+    'connection.http_status': '401',
+    'connection.error': 'invalid x-api-key',
+    'actor.email': 'admin@example.com',
+  };
+  return Object.fromEntries(testVariables(event).map((name) => [name, values[name] ?? '']));
 }
 
 export interface HeaderRow {

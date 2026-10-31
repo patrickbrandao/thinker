@@ -129,8 +129,11 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
     return (rows ?? []) as QueueRow[];
   }
 
-  /** One attempt for a claimed row; records the log and the next state. */
-  async process(row: QueueRow): Promise<DeliveryResult> {
+  /**
+   * One attempt for a claimed row; records the log and the next state.
+   * `manual` (the test screen) delivers even through a disabled trigger.
+   */
+  async process(row: QueueRow, manual = false): Promise<DeliveryResult> {
     const attempt = row.attempts + 1;
     const startedAt = new Date();
     const trigger = row.trigger_id
@@ -149,7 +152,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
     if (!trigger) {
       result = { success: false, statusCode: null, error: 'Trigger was deleted', response: null };
       final = true;
-    } else if (!trigger.enabled && row.event_type !== 'test') {
+    } else if (!trigger.enabled && !manual && row.event_type !== 'test') {
       result = { success: false, statusCode: null, error: 'Trigger is disabled', response: null };
       final = true;
     } else {
@@ -235,7 +238,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
     const rows = (
       Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result
     ) as QueueRow[];
-    return rows?.[0] ? this.process(rows[0]) : null;
+    return rows?.[0] ? this.process(rows[0], true) : null;
   }
 
   private async ownerEmail(tenantId: string): Promise<string | null> {

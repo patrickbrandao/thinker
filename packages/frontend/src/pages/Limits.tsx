@@ -7,7 +7,6 @@ import LimitRuleTable from '../components/LimitRuleTable.js';
 import LimitHistoryTable from '../components/LimitHistoryTable.js';
 import { KebabMenu, DeleteRuleModal } from '../components/LimitModals.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
-import HarnessTriggersPanel from '../components/triggers/HarnessTriggersPanel.js';
 import { Button } from '../components/ui.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
@@ -25,7 +24,7 @@ import {
   type NotificationRule,
 } from '../services/api.js';
 
-/** Guardrails tab of a harness: spend/token rules, the triggers that receive its events, alert history. */
+/** Guardrails tab of a harness: spend/token rules and alert history. Triggers have their own tab. */
 export default function Limits() {
   const params = useParams<{ agentName: string }>();
   const agentName = decodeURIComponent(params.agentName ?? '');
@@ -188,15 +187,6 @@ export default function Limits() {
           onToggleMenu={toggleMenu}
         />
       </ReadOnlyRegion>
-
-      <HarnessTriggersPanel
-        agentName={agentName}
-        triggers={triggers.data}
-        bindings={bindings.data}
-        loading={triggers.loading || bindings.loading}
-        canEdit={roleCan.editHarnesses()}
-        onSaved={(saved) => bindings.setData(saved)}
-      />
 
       {!logs.loading && historyLogs.length > 0 ? (
         <LimitHistoryTable logs={historyLogs} loading={false} />

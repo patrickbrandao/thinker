@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
-import { TriggersService } from './triggers.service';
+import { TriggersService, type TriggerTestInput } from './triggers.service';
 import type { TriggerInput } from './trigger-config';
 
 /**
@@ -67,8 +67,12 @@ export class TriggersController {
 
   @MinRole('admin')
   @Post('triggers/:id/test')
-  test(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
-    return this.triggers.test(ctx.tenantId, id, ctx.userId);
+  test(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: TriggerTestInput | undefined,
+  ) {
+    return this.triggers.test(ctx.tenantId, id, ctx.userId, body ?? {});
   }
 
   @Get('agents/:agentName/triggers')

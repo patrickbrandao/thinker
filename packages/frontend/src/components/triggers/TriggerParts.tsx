@@ -14,11 +14,11 @@ export function TriggerTypeIcon({ type, className }: { type: TriggerType; classN
 }
 
 /** Icon + label of a trigger type. */
-export function TriggerTypeTag({ type }: { type: TriggerType }) {
+export function TriggerTypeTag({ type, provider }: { type: TriggerType; provider?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-dim">
       <TriggerTypeIcon type={type} />
-      {triggerTypeLabel(type)}
+      {triggerTypeLabel(type, provider)}
     </span>
   );
 }

@@ -6,7 +6,8 @@ import { agentPlatformIcon, agentPlatformSignal } from '../services/agent-platfo
 import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
 
-type TabKey = 'overview' | 'routing' | 'models' | 'providers' | 'guardrails' | 'settings';
+type TabKey =
+  'overview' | 'routing' | 'models' | 'providers' | 'guardrails' | 'triggers' | 'settings';
 
 function safeDecode(value: string): string {
   try {
@@ -18,7 +19,7 @@ function safeDecode(value: string): string {
 
 /**
  * AgentDetail — the tabbed shell of a harness: back-link, platform icon and
- * name, then Overview / Routing / Models / Providers / Limits / Settings tabs. The tab
+ * name, then Overview / Routing / Models / Providers / Limits / Triggers / Settings tabs. The tab
  * content is the nested route, rendered through <Outlet />.
  */
 export default function AgentDetail() {
@@ -43,9 +44,11 @@ export default function AgentDetail() {
           ? 'providers'
           : pathname.startsWith(path('/guardrails'))
             ? 'guardrails'
-            : pathname.startsWith(path('/settings'))
-              ? 'settings'
-              : 'overview';
+            : pathname.startsWith(path('/triggers'))
+              ? 'triggers'
+              : pathname.startsWith(path('/settings'))
+                ? 'settings'
+                : 'overview';
 
   const tabs: TabItem<TabKey>[] = [
     { key: 'overview', label: t('harnesses.detail.overview'), to: path('') },
@@ -53,6 +56,7 @@ export default function AgentDetail() {
     { key: 'models', label: t('harnesses.detail.models'), to: path('/models') },
     { key: 'providers', label: t('harnesses.detail.providers'), to: path('/providers') },
     { key: 'guardrails', label: t('harnesses.detail.limits'), to: path('/guardrails') },
+    { key: 'triggers', label: t('harnesses.detail.triggers'), to: path('/triggers') },
     { key: 'settings', label: t('harnesses.detail.settings'), to: path('/settings') },
   ];
 

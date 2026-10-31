@@ -16,6 +16,7 @@ import HarnessTriggersPanel from '../../src/components/triggers/HarnessTriggersP
 const triggers = [
   { id: 't1', name: 'ops-mail', type: 'email', enabled: true },
   { id: 't2', name: 'chat', type: 'telegram', enabled: false },
+  { id: 't3', name: 'hook', type: 'webhook', enabled: true },
 ] as never;
 
 function renderPanel(props: Partial<Parameters<typeof HarnessTriggersPanel>[0]> = {}) {
@@ -42,16 +43,23 @@ describe('HarnessTriggersPanel', () => {
     mockSet.mockImplementation((_a: string, b: unknown) => Promise.resolve(b));
   });
 
-  it('adds a trigger with the default events, edits events and saves with one PUT', async () => {
+  it('adds several triggers at once with the default events, edits events and saves with one PUT', async () => {
     const onSaved = renderPanel();
     const save = screen.getByText('Save') as HTMLButtonElement;
     expect(save.disabled).toBe(true);
 
     fireEvent.click(screen.getByLabelText('ops-mail: Limit block'));
-    fireEvent.change(screen.getByLabelText('Add a trigger'), { target: { value: 't2' } });
+    fireEvent.click(screen.getByText('Add triggers'));
+    fireEvent.click(screen.getByLabelText(/chat/));
+    fireEvent.click(screen.getByLabelText(/hook/));
+    fireEvent.click(screen.getByText('Add 2 triggers'));
     expect(screen.getByText('Disabled')).toBeTruthy();
-    expect(screen.getAllByText('(Fires on every request.)').length).toBe(2);
+    expect(screen.getAllByText('(Fires on every request.)').length).toBe(3);
     expect((screen.getByLabelText('chat: Request debug') as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByText('Add triggers')).toBeNull();
+    expect(screen.getByLabelText('Test chat').getAttribute('href')).toBe(
+      '/triggers/test?trigger=t2&harness=bot',
+    );
 
     fireEvent.click(save);
     await waitFor(() => expect(mockSet).toHaveBeenCalledTimes(1));
@@ -59,6 +67,10 @@ describe('HarnessTriggersPanel', () => {
       { trigger_id: 't1', events: ['limit.alert', 'limit.block'] },
       {
         trigger_id: 't2',
+        events: ['limit.alert', 'limit.block', 'provider.failure', 'credential.expired'],
+      },
+      {
+        trigger_id: 't3',
         events: ['limit.alert', 'limit.block', 'provider.failure', 'credential.expired'],
       },
     ]);

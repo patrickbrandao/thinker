@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { renderTemplate } from './trigger-template';
 import { normalizeTrigger, publicView } from './trigger-config';
 import { deliver, formatSyslog, syslogSeverity } from './trigger-senders';
+import { parseTestInput } from './triggers.service';
 
 describe('renderTemplate', () => {
   const vars = { 'harness.name': 'a"b<c>', 'event.type': 'test' };
@@ -209,5 +210,23 @@ describe('deliver', () => {
     expect(result.success).toBe(true);
     expect(await received).toMatch(/hello my harness$/);
     socket.close();
+  });
+});
+
+describe('parseTestInput', () => {
+  it('defaults to the test event and drops variables the gateway computes', () => {
+    expect(parseTestInput({})).toEqual({ eventType: 'test', vars: {} });
+    expect(
+      parseTestInput({
+        event_type: 'limit.block',
+        vars: { 'harness.name': 'h1', 'event.id': 'x', 'trigger.name': 'y' },
+      }),
+    ).toEqual({ eventType: 'limit.block', vars: { 'harness.name': 'h1' } });
+  });
+
+  it('rejects unknown events and non-string values', () => {
+    expect(() => parseTestInput({ event_type: 'nope' })).toThrow(/event_type/);
+    expect(() => parseTestInput({ vars: { 'harness.name': 1 } })).toThrow(/harness\.name/);
+    expect(() => parseTestInput({ vars: { 'Bad Name': 'x' } })).toThrow(/Invalid variable/);
   });
 });

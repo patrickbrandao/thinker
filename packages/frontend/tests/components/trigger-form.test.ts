@@ -4,7 +4,14 @@ import {
   buildPayload,
   emptyForm,
   formFromTrigger,
+  kindLabel,
+  kindOf,
+  sampleVars,
+  splitKind,
   splitRecipients,
+  TRIGGER_KINDS,
+  triggerTestPath,
+  triggerTypeLabel,
   validateForm,
 } from '../../src/components/triggers/trigger-form';
 import type { TriggerView } from '../../src/services/api/triggers';
@@ -104,5 +111,31 @@ describe('trigger form', () => {
 
   it('splits recipients on commas, semicolons and spaces', () => {
     expect(splitRecipients(' a@x.io ,, b@x.io c@x.io ')).toEqual(['a@x.io', 'b@x.io', 'c@x.io']);
+  });
+});
+
+describe('trigger kinds and test variables', () => {
+  it('offers each e-mail provider as its own type', () => {
+    expect(TRIGGER_KINDS.slice(0, 3).map(kindLabel)).toEqual([
+      'Email API Resend',
+      'Email API Mailgun',
+      'Email API SendGrid',
+    ]);
+    expect(kindOf('email', 'mailgun')).toBe('email:mailgun');
+    expect(splitKind('email:sendgrid')).toEqual({ type: 'email', provider: 'sendgrid' });
+    expect(splitKind('webhook')).toEqual({ type: 'webhook' });
+    expect(triggerTypeLabel('email', 'resend')).toBe('Email API Resend');
+  });
+
+  it('prefills the variables of the chosen event, leaving out the computed ones', () => {
+    const vars = sampleVars('limit.block', { name: 'bot' });
+    expect(vars['harness.name']).toBe('bot');
+    expect(vars['event.title']).toBe('bot has been blocked');
+    expect(vars['period.reset']).toBeTruthy();
+    expect(vars).not.toHaveProperty('event.id');
+    expect(vars).not.toHaveProperty('trigger.name');
+    expect(vars).not.toHaveProperty('request.id');
+    expect(Object.keys(sampleVars('credential.expired'))).toContain('connection.provider');
+    expect(triggerTestPath('t1', 'bot')).toBe('/triggers/test?trigger=t1&harness=bot');
   });
 });
