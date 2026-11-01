@@ -257,26 +257,32 @@ describe('ProxyEgressService.scopeForConnection (assignments)', () => {
   });
 });
 
-describe('ProxyEgressService.scopeForConnection (local runners)', () => {
-  it('uses the local default of the local server', async () => {
+describe('ProxyEgressService.scopeForConnection (local servers)', () => {
+  it('uses the default of the local server type', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM proxy_assignments')) {
         return [
-          {
-            target_type: 'provider',
-            target_id: 'local:custom:abc',
-            mode: 'direct',
-            profile_id: null,
-          },
+          { target_type: 'provider', target_id: 'local:ollama', mode: 'direct', profile_id: null },
         ];
       }
       if (sql.includes('FROM tenant_providers')) {
-        return [{ id: 'c-local', provider: 'custom:abc', auth_type: 'local', label: 'Ollama' }];
+        return [
+          { id: 'c-ollama', provider: 'custom:abc', auth_type: 'local', label: 'Ollama' },
+          { id: 'c-lms', provider: 'custom:def', auth_type: 'local', label: 'LM Studio' },
+        ];
+      }
+      if (sql.includes('FROM custom_providers')) {
+        return [
+          { id: 'custom:abc', local_type: 'ollama' },
+          { id: 'custom:def', local_type: 'lmstudio' },
+        ];
       }
       return [];
     });
     const egress = new ProxyEgressService({ query } as never);
-    const scope = await egress.scopeForConnection('t1', 'custom:abc', 'c-local');
-    expect(scope.chain?.map((i) => i.kind)).toEqual(['direct']);
+    const ollama = await egress.scopeForConnection('t1', 'custom:abc', 'c-ollama');
+    expect(ollama.chain?.map((i) => i.kind)).toEqual(['direct']);
+    expect((await egress.scopeForConnection('t1', 'custom:def', 'c-lms')).chain).toBeNull();
+    expect((await egress.scopeForConnection('t1', 'ollama', null)).chain?.length).toBe(1);
   });
 });

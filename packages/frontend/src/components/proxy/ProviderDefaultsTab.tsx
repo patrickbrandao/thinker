@@ -8,6 +8,7 @@ import {
   type ProxyAssignmentRow,
 } from '../../services/api/proxies.js';
 import { PROVIDERS } from '../../services/providers.js';
+import { LOCAL_SERVER_TYPE_NAMES } from '../LocalServerForm.js';
 import { toast } from '../../services/toast-store.js';
 import ErrorState from '../ErrorState.js';
 import { providerIcon } from '../ProviderIcon.js';
@@ -23,6 +24,12 @@ interface Row {
   icon: string;
 }
 
+/** Local server types: every server of a type inherits its default. */
+const localTypes: Row[] = Object.entries(LOCAL_SERVER_TYPE_NAMES).map(([id, name]) => ({
+  id,
+  name,
+  icon: id,
+}));
 const usageBased: Row[] = PROVIDERS.filter((p) => !p.localOnly && !p.subscriptionOnly).map((p) => ({
   id: p.id,
   name: p.name,
@@ -45,7 +52,7 @@ function ProviderMark({ row }: { row: Row }) {
 }
 
 /**
- * Default outbound path of each provider, kept apart for local servers,
+ * Default outbound path of each provider, kept apart for local server types,
  * usage-based (API key) and subscription connections: the global default,
  * direct or a profile. A connection can override it in its Manage dialog.
  */
@@ -65,9 +72,6 @@ export default function ProviderDefaultsTab() {
   }
 
   const custom = assignments.data?.custom ?? [];
-  const locals: Row[] = custom
-    .filter((c) => c.local_type)
-    .map((c) => ({ id: c.id, name: c.name, icon: c.local_type! }));
   const usage: Row[] = [
     ...usageBased,
     ...custom.filter((c) => !c.local_type).map((c) => ({ id: c.id, name: c.name, icon: c.id })),
@@ -109,52 +113,43 @@ export default function ProviderDefaultsTab() {
     }
   };
 
-  const section = (kind: Kind, title: string, rows: Row[], empty?: string) => (
+  const section = (kind: Kind, title: string, rows: Row[]) => (
     <Panel title={title}>
-      {rows.length === 0 ? (
-        <p className="m-0 text-sm text-muted">{empty}</p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map((row) => {
-            const targetId = `${kind}:${row.id}`;
-            const current = assignments.data?.map.get(targetId);
-            const value =
-              current?.mode === 'profile' && current.profile_id
-                ? `profile:${current.profile_id}`
-                : (current?.mode ?? 'global');
-            return (
-              <div
-                key={targetId}
-                className="flex flex-col gap-3 rounded-control border border-line bg-s2 p-3"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <ProviderMark row={row} />
-                  <span className="truncate text-[18px] font-medium text-ink">{row.name}</span>
-                </div>
-                <OutboundSelect
-                  label={t('proxies.providerDefaults.selectLabel', { provider: row.name })}
-                  value={value}
-                  options={options}
-                  disabled={!assignments.data || saving === targetId}
-                  onChange={(next) => void change(targetId, next)}
-                />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {rows.map((row) => {
+          const targetId = `${kind}:${row.id}`;
+          const current = assignments.data?.map.get(targetId);
+          const value =
+            current?.mode === 'profile' && current.profile_id
+              ? `profile:${current.profile_id}`
+              : (current?.mode ?? 'global');
+          return (
+            <div
+              key={targetId}
+              className="flex flex-col gap-3 rounded-control border border-line bg-s2 p-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <ProviderMark row={row} />
+                <span className="truncate text-[18px] font-medium text-ink">{row.name}</span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <OutboundSelect
+                label={t('proxies.providerDefaults.selectLabel', { provider: row.name })}
+                value={value}
+                options={options}
+                disabled={!assignments.data || saving === targetId}
+                onChange={(next) => void change(targetId, next)}
+              />
+            </div>
+          );
+        })}
+      </div>
     </Panel>
   );
 
   return (
     <div className="flex flex-col gap-4">
       <p className="m-0 max-w-3xl text-sm text-muted">{t('proxies.providerDefaults.subtitle')}</p>
-      {section(
-        'local',
-        t('proxies.providerDefaults.locals'),
-        locals,
-        t('proxies.providerDefaults.noLocals'),
-      )}
+      {section('local', t('proxies.providerDefaults.locals'), localTypes)}
       {section('api_key', t('proxies.providerDefaults.usageBased'), usage)}
       {section('subscription', t('proxies.providerDefaults.subscriptions'), subscriptions)}
     </div>

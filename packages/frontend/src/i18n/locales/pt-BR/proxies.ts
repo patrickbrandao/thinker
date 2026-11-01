@@ -262,7 +262,6 @@ const ptBR: Catalog<typeof en> = {
     subtitle:
       'Como cada provedor sai do Thinker por padrão: padrão global (THINKER_HTTP_PROXY, ou direto se não estiver definido), conexão direta ou um perfil de saída. Uma conexão pode sobrescrever isso no diálogo Gerenciar.',
     locals: 'Locais',
-    noLocals: 'Nenhum servidor local neste workspace.',
     usageBased: 'Por uso (chave de API)',
     subscriptions: 'Assinaturas',
     provider: 'Provedor',

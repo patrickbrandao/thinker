@@ -28,8 +28,20 @@ export function authKindOf(authType: string | null | undefined): ProviderAuthKin
   return authType === 'subscription' ? 'subscription' : 'api_key';
 }
 
-/** Built-in local runner ids (legacy canonical paths); their default is `local:<id>`. */
+/** Local server types; the default of every server of a type is `local:<type>`. */
 export const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'llamacpp']);
+
+/**
+ * Provider part of a connection's default target: local servers (custom
+ * providers with a `local_type`) share the default of their type.
+ */
+export function defaultTargetOf(
+  kind: ProviderAuthKind,
+  provider: string,
+  localType?: string | null,
+): string {
+  return providerTargetId(kind, kind === 'local' && localType ? localType : provider);
+}
 
 export interface ProxyServerRow {
   id: string;
@@ -67,6 +79,8 @@ interface Snapshot {
   /** `${target_type}:${target_id}` → how the object leaves. */
   assignments: Map<string, Assignment>;
   connections: Map<string, ConnectionMeta>;
+  /** `custom:<id>` → local server type. */
+  localTypes: Map<string, string>;
 }
 
 const SNAPSHOT_TTL_MS = 30_000;
@@ -168,7 +182,7 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async load(tenantId: string): Promise<Snapshot> {
-    const [proxies, bindings, assignments, connections] = await Promise.all([
+    const [proxies, bindings, assignments, connections, locals] = await Promise.all([
       this.ds.query(`SELECT * FROM proxy_servers WHERE tenant_id = $1`, [tenantId]),
       this.ds.query(
         `SELECT target_id, position, proxy_id FROM proxy_bindings
@@ -183,12 +197,18 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
         `SELECT id, provider, auth_type, label FROM tenant_providers WHERE tenant_id = $1`,
         [tenantId],
       ),
+      this.ds.query(
+        `SELECT 'custom:' || id AS id, local_type FROM custom_providers
+          WHERE tenant_id = $1 AND local_type IS NOT NULL`,
+        [tenantId],
+      ),
     ]);
     const snap: Snapshot = {
       proxies: new Map(),
       profiles: new Map(),
       assignments: new Map(),
       connections: new Map(),
+      localTypes: new Map(),
     };
     for (const row of unwrap<ProxyServerRow>(proxies))
       snap.proxies.set(row.id, toOutboundProxy(row));
@@ -207,6 +227,9 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     }
     for (const row of unwrap<ConnectionMeta & { id: string }>(connections)) {
       snap.connections.set(row.id, row);
+    }
+    for (const row of unwrap<{ id: string; local_type: string }>(locals ?? [])) {
+      snap.localTypes.set(row.id.toLowerCase(), row.local_type.toLowerCase());
     }
     return snap;
   }
@@ -248,7 +271,7 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
    * Scope of a provider connection: its own assignment, else the default of
    * its provider (usage-based or subscription), else the global proxy.
    * Without a connection (OAuth flows) `authKind` picks the provider default.
-   * Local runners have their own defaults (`local:<provider>`).
+   * Local servers use the default of their type (`local:<type>`).
    */
   async scopeForConnection(
     tenantId: string | null | undefined,
@@ -278,7 +301,8 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
         : LOCAL_PROVIDERS.has(name)
           ? 'local'
           : (authKind ?? 'api_key');
-      const assignment = own ?? snap.assignments.get(`provider:${providerTargetId(kind, name)}`);
+      const target = defaultTargetOf(kind, name, snap.localTypes.get(name));
+      const assignment = own ?? snap.assignments.get(`provider:${target}`);
       return {
         tenantId,
         sourceType: connectionId ? 'connection' : 'provider',
