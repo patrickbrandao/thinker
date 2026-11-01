@@ -28,6 +28,7 @@ import { useResource } from '../lib/use-resource.js';
 import { intlLocale, t } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
 import { IconButton, Tabs, cx } from './ui.js';
+import { splitRequestLine } from '../services/request-line.js';
 
 export interface RequestDrawerProps {
   messageId: string | null;
@@ -414,6 +415,20 @@ function KvList({ entries, mono }: { entries: Array<[string, unknown]>; mono?: b
 const sortedEntries = (obj: Record<string, unknown>) =>
   Object.entries(obj).sort(([a], [b]) => a.localeCompare(b));
 
+function RequestHeadersList({ headers }: { headers: Record<string, string> }) {
+  const { requestLine, rest } = splitRequestLine(headers);
+  return (
+    <>
+      {requestLine ? (
+        <div className="drawer-request-line break-all border-b border-line py-1.5 font-mono text-xs text-ink">
+          {requestLine}
+        </div>
+      ) : null}
+      <KvList entries={sortedEntries(rest)} />
+    </>
+  );
+}
+
 function DetailCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="drawer-card mt-5">
@@ -750,7 +765,7 @@ export default function RequestDrawer({
                     ) : null}
                     {headers && Object.keys(headers).length > 0 ? (
                       <DetailCard title={t('messages.drawer.requestHeaders')}>
-                        <KvList entries={sortedEntries(headers)} />
+                        <RequestHeadersList headers={headers} />
                       </DetailCard>
                     ) : null}
                   </div>

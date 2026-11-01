@@ -143,6 +143,24 @@ export function renameConnection(
   );
 }
 
+/**
+ * Arm a re-authentication: the next subscription sign-in for this
+ * connection's provider updates this connection in place.
+ */
+export function startConnectionReauth(connectionId: string) {
+  return fetchMutate<{ id: string; provider: string; label: string }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/reauth`,
+    { method: 'POST' },
+  );
+}
+
+export function cancelConnectionReauth(connectionId: string) {
+  return fetchMutate<{ ok: boolean }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/reauth`,
+    { method: 'DELETE' },
+  );
+}
+
 export function setConnectionStreamWarmup(connectionId: string, streamWarmupMs: number | null) {
   return fetchMutate<{ id: string; stream_warmup_ms: number | null }>(
     `/providers/connections/${encodeURIComponent(connectionId)}/stream-warmup`,

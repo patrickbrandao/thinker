@@ -47,6 +47,14 @@ const ptBR: Catalog<typeof en> = {
       connectedHeading: 'Minhas conexões locais',
       supportedHeading: 'Provedores locais compatíveis',
     },
+    addProvider: 'Adicionar provedor',
+    noConnections:
+      'Nenhuma conexão por uso ainda. Adicione um provedor para começar a rotear para ele.',
+    connectProvider: 'Conectar a um provedor',
+    noSubscriptionConnections:
+      'Nenhuma conexão de assinatura ainda. Conecte-se a um provedor para começar a rotear para ele.',
+    addAiServer: 'Adicionar servidor de IA',
+    noLocalServers: 'Nenhum servidor de IA local registrado',
     addCustomProvider: 'Adicionar provedor personalizado',
     totalApiCost30d: 'Custo total de API (30d)',
     totalApiCostTooltip:
@@ -54,6 +62,8 @@ const ptBR: Catalog<typeof en> = {
     cost30d: 'Custo (30d)',
     activeConnections: (n: number) => (n === 1 ? `${n} conexão ativa` : `${n} conexões ativas`),
     activeKeys: (n: number) => (n === 1 ? `${n} chave ativa` : `${n} chaves ativas`),
+    colName: 'Nome',
+    colUrl: 'URL',
     colProvider: 'Provedor',
     colConnection: 'Conexão',
     colStatus: 'Status',
@@ -125,6 +135,17 @@ const ptBR: Catalog<typeof en> = {
     warmupHint:
       'Opcional. Quanto tempo uma requisição em stream espera pelo primeiro token antes de passar para o fallback. Deixe vazio para usar o padrão.',
     warmupSaved: 'Aquecimento do stream salvo',
+    credential: 'Credencial',
+    credentialKeyHint:
+      'Troca a chave nesta mesma conexão. O acesso dos harnesses, as rotas e o histórico continuam como estão.',
+    credentialReauthHint:
+      'Entra de novo nesta mesma conexão. O acesso dos harnesses, as rotas e o histórico continuam como estão.',
+    newKeyPlaceholder: 'Nova chave ou token',
+    replaceKey: 'Substituir',
+    replacingKey: 'Substituindo...',
+    keyReplaced: 'Credencial substituída',
+    reauthenticate: 'Autenticar novamente',
+    reauthFailed: 'Não foi possível iniciar a autenticação',
     saveFailed: 'Não foi possível salvar',
     modelCount: (n: number) => (n === 1 ? `${n} modelo` : `${n} modelos`),
     refreshing: 'Atualizando...',

@@ -357,6 +357,7 @@ const ptBR: Catalog<typeof en> = {
     unknownProvider: 'Desconhecido',
     requestHeaders: 'Headers da requisição',
     header: 'Header',
+    requestLine: 'Linha da requisição',
     value: 'Valor',
     modelParameters: 'Parâmetros do modelo',
     parameter: 'Parâmetro',

@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import InfoTooltip from './InfoTooltip.js';
 import { t } from '../i18n/index.js';
 import { cx } from './ui.js';
+import { splitRequestLine } from '../services/request-line.js';
 
 /**
  * Render an effective model parameter value as a readable string. Objects
@@ -88,7 +89,9 @@ function TogglePanel({
 }
 
 export function RequestHeadersSection({ headers }: { headers: Record<string, string> }) {
-  const rows = Object.entries(headers).sort(([a], [b]) => a.localeCompare(b));
+  const { requestLine, rest } = splitRequestLine(headers);
+  const rows = Object.entries(rest).sort(([a], [b]) => a.localeCompare(b));
+  if (requestLine) rows.unshift([t('messages.details.requestLine'), requestLine]);
   return (
     <TogglePanel
       title={t('messages.details.requestHeaders')}

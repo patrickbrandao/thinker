@@ -285,7 +285,11 @@ describe('TenantProvidersController', () => {
         .mockResolvedValue([{ ...makeProvider('p1', 'Default'), provider: 'custom:u-9' }]),
     };
     const customProviderService = {
-      list: jest.fn().mockResolvedValue([{ id: 'u-9', name: 'MyLLM' }]),
+      list: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'u-9', name: 'MyLLM', models: [{ model_name: 'a' }, { model_name: 'b' }] },
+        ]),
     };
     const controller = new TenantProvidersController(
       providerRepo as never,
@@ -303,7 +307,11 @@ describe('TenantProvidersController', () => {
     expect(result.providers[0]).toMatchObject({
       provider: 'custom:u-9',
       display_name: 'MyLLM',
+      total_models: 2,
     });
+    // Discovery never fills cached_models for a custom provider; the count
+    // comes from its hand-entered model list.
+    expect(result.providers[0].connections[0].cached_model_count).toBe(2);
   });
 
   it('returns null display_name for built-in groups and deleted custom providers', async () => {

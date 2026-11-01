@@ -44,19 +44,19 @@ export default function NoConnectionsPrompt() {
       </div>
       <div className="card-grid">
         <ProviderKindCard
-          to="/providers/subscriptions"
+          to="/providers/subscriptions/add"
           icon={<UserRound className="text-info" aria-hidden="true" />}
           title={t('providers.kind.subscriptions')}
           desc={t('providers.noConnections.subscriptionsDesc')}
         />
         <ProviderKindCard
-          to="/providers/usage-based"
+          to="/providers/usage-based/add"
           icon={<KeyRound className="text-warn" aria-hidden="true" />}
           title={t('providers.kind.byok')}
           desc={t('providers.noConnections.byokDesc')}
         />
         <ProviderKindCard
-          to="/providers/local"
+          to="/providers/local/add"
           icon={<Server className="text-accent" aria-hidden="true" />}
           title={t('providers.kind.local')}
           desc={t('providers.noConnections.localDesc')}

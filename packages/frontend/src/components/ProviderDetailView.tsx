@@ -40,6 +40,8 @@ export interface ProviderDetailViewProps {
   onPollProviders?: () => void | Promise<void>;
   onClose: () => void;
   initialAddKey?: boolean;
+  /** Re-authenticating this subscription connection (by label) instead of adding one. */
+  reauthLabel?: string;
 }
 
 const Spinner = () => <span className="spinner" aria-hidden="true" />;
@@ -103,10 +105,9 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
 
   const showAddKeyButton =
     connected &&
-    !subscriptionClosed &&
     supportsMultiKey &&
-    activeKeys.length < MAX_KEYS_PER_PROVIDER &&
-    !addKeyOpen;
+    !addKeyOpen &&
+    (!!props.reauthLabel || (!subscriptionClosed && activeKeys.length < MAX_KEYS_PER_PROVIDER));
 
   const handleOllamaConnect = async () => {
     props.setBusy(true);
@@ -247,12 +248,20 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
         {showAddKeyButton ? (
           <Button size="sm" onClick={() => setAddKeyOpen(true)}>
             <ListPlus size={14} aria-hidden="true" />
-            {isSubMode
-              ? t('providerSetup.shared.addConnection')
-              : t('providerSetup.shared.addAnotherKey')}
+            {props.reauthLabel
+              ? t('providerSetup.shared.reauthConnection', { label: props.reauthLabel })
+              : isSubMode
+                ? t('providerSetup.shared.addConnection')
+                : t('providerSetup.shared.addAnotherKey')}
           </Button>
         ) : null}
       </div>
+
+      {props.reauthLabel ? (
+        <p className="notice is-info text-sm" role="note">
+          {t('providerSetup.shared.reauthNote', { label: props.reauthLabel })}
+        </p>
+      ) : null}
 
       {subscriptionClosed ? (
         <p className="notice is-warn text-sm" role="note">

@@ -28,7 +28,13 @@ import {
   disconnectConnection,
   refreshConnectionModels,
   setConnectionStreamWarmup,
+  connectProvider,
+  getProviders as getAgentProviders,
+  startConnectionReauth,
+  cancelConnectionReauth,
 } from '../../services/api/routing.js';
+import { validateApiKey, validateSubscriptionKey } from '../../services/provider-utils.js';
+import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import UnifiedChartCard, { type ChartTab } from '../../components/UnifiedChartCard.jsx';
 import InfoTooltip from '../../components/InfoTooltip.jsx';
 import { AGENT_COLORS } from '../../components/MultiAgentTokenChart.jsx';
@@ -525,6 +531,76 @@ const ConnectionDetail = () => {
     }
   };
 
+  // Credential replacement keeps the connection row (same id), so harness
+  // access, routes and history are untouched. API keys and pasted tokens are
+  // rewritten under this connection's label; OAuth subscriptions arm a
+  // re-authentication and reopen the provider's sign-in flow.
+  const subscriptionMode =
+    provDef?.subscriptionAuthMode ?? (provDef?.subscriptionKeyPlaceholder ? 'token' : undefined);
+  const credentialMode: 'key' | 'reauth' | null =
+    !provDef || provDef.noKeyRequired || authType === 'local'
+      ? null
+      : authType === 'api_key'
+        ? 'key'
+        : provDef.deviceLogin ||
+            subscriptionMode === 'popup_oauth' ||
+            subscriptionMode === 'popup_paste' ||
+            subscriptionMode === 'device_code'
+          ? 'reauth'
+          : subscriptionMode === 'token'
+            ? 'key'
+            : null;
+  const [newKey, setNewKey] = useState('');
+  const [replacingKey, setReplacingKey] = useState(false);
+  const [newKeyError, setNewKeyError] = useState('');
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const reauthProviders = useResource(
+    () => getAgentProviders(firstAgentName),
+    [firstAgentName, reauthOpen],
+    { enabled: reauthOpen && !!firstAgentName },
+  );
+
+  const handleReplaceKey = async () => {
+    if (!conn || !provDef || !firstAgentName) return;
+    const check =
+      conn.auth_type === 'subscription'
+        ? validateSubscriptionKey(provDef, newKey)
+        : validateApiKey(provDef, newKey);
+    if (!check.valid) {
+      setNewKeyError(check.error ?? '');
+      return;
+    }
+    setReplacingKey(true);
+    setNewKeyError('');
+    try {
+      await connectProvider(firstAgentName, {
+        provider: conn.provider,
+        apiKey: newKey.replace(/\s/g, ''),
+        authType: conn.auth_type as any,
+        label: conn.label,
+      });
+      toast.success(t('providers.detail.keyReplaced'));
+      setNewKey('');
+      void detail.reload();
+    } catch (e: any) {
+      setNewKeyError(e?.message ?? t('providers.detail.saveFailed'));
+    } finally {
+      setReplacingKey(false);
+    }
+  };
+
+  const handleReauth = async () => {
+    if (!conn) return;
+    try {
+      await startConnectionReauth(conn.id);
+    } catch {
+      toast.error(t('providers.detail.reauthFailed'));
+      return;
+    }
+    closeManageModal();
+    setReauthOpen(true);
+  };
+
   const handleDisconnect = async () => {
     if (!conn) return;
     if (!conn.is_active && !deleteConfirmMatches) return;
@@ -995,6 +1071,30 @@ const ConnectionDetail = () => {
       </Modal>
 
       {/* Manage connection modal */}
+      {reauthOpen && provDef && firstAgentName && reauthProviders.data ? (
+        <ProviderSelectModal
+          agentName={firstAgentName}
+          providers={reauthProviders.data}
+          providerDeepLink={{ providerId: provDef.id, authType: 'subscription' }}
+          reauthLabel={conn?.label}
+          onUpdate={async () => {
+            await reauthProviders.reload();
+            void detail.reload();
+          }}
+          onPollProviders={async () => {
+            await reauthProviders.reload();
+            void detail.reload();
+          }}
+          onClose={() => {
+            setReauthOpen(false);
+            // A completed sign-in already consumed the target; this only
+            // disarms an abandoned one so a later new account stays new.
+            if (conn) void cancelConnectionReauth(conn.id).catch(() => undefined);
+            void detail.reload();
+          }}
+        />
+      ) : null}
+
       <Modal
         open={showManageModal && !(isCustomProvider && customProviderData)}
         onClose={closeManageModal}
@@ -1080,6 +1180,52 @@ const ConnectionDetail = () => {
             <p className="hint">{t('providers.detail.warmupHint')}</p>
             {warmupError ? <p className="form-error mt-1">{warmupError}</p> : null}
           </div>
+
+          {c.is_active && credentialMode && firstAgentName ? (
+            <div className="connection-credential">
+              <span className="label">{t('providers.detail.credential')}</span>
+              {credentialMode === 'key' ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    id="connection-new-key"
+                    type="password"
+                    autoComplete="off"
+                    className="field flex-1 font-mono"
+                    placeholder={t('providers.detail.newKeyPlaceholder')}
+                    aria-label={t('providers.detail.newKeyPlaceholder')}
+                    aria-invalid={newKeyError ? true : undefined}
+                    value={newKey}
+                    onChange={(e) => {
+                      setNewKey(e.currentTarget.value);
+                      setNewKeyError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleReplaceKey();
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={replacingKey || !newKey.trim()}
+                    onClick={() => void handleReplaceKey()}
+                  >
+                    {replacingKey
+                      ? t('providers.detail.replacingKey')
+                      : t('providers.detail.replaceKey')}
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" onClick={() => void handleReauth()}>
+                  {t('providers.detail.reauthenticate')}
+                </Button>
+              )}
+              <p className="hint">
+                {credentialMode === 'key'
+                  ? t('providers.detail.credentialKeyHint')
+                  : t('providers.detail.credentialReauthHint')}
+              </p>
+              {newKeyError ? <p className="form-error mt-1">{newKeyError}</p> : null}
+            </div>
+          ) : null}
 
           {c.is_active ? (
             <>

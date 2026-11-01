@@ -21,6 +21,9 @@ export default {
     subscriptionDisconnected: '{{ name }} subscription disconnected',
     popupBlocked: 'Popup was blocked by your browser. Allow popups for this site, then try again.',
     addConnection: 'Add connection',
+    reauthConnection: 'Sign in again: {{ label }}',
+    reauthNote:
+      'The next sign-in replaces the credential of "{{ label }}". Harness access, routes and history stay as they are.',
     addAnotherKey: 'Add another key',
     region: 'Region',
     baseUrl: 'Base URL',

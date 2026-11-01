@@ -25,6 +25,9 @@ const ptBR: Catalog<typeof en> = {
     subscriptionDisconnected: 'Assinatura do {{ name }} desconectada',
     popupBlocked: 'O navegador bloqueou o pop-up. Permita pop-ups para este site e tente de novo.',
     addConnection: 'Adicionar conexão',
+    reauthConnection: 'Autenticar novamente: {{ label }}',
+    reauthNote:
+      'O próximo login substitui a credencial de "{{ label }}". O acesso dos harnesses, as rotas e o histórico continuam como estão.',
     addAnotherKey: 'Adicionar outra chave',
     region: 'Região',
     baseUrl: 'URL base',

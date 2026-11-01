@@ -32,7 +32,7 @@ import { classifyCaller } from './caller-classifier';
 import { clientIpInfo } from '../../common/utils/client-ip';
 import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
-import { receivedHeaders, sanitizeRequestHeaders } from './request-headers';
+import { recordedRequestHeaders } from './request-headers';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -286,7 +286,7 @@ export class ProxyController {
       peerIp,
       peerPort: req.socket?.remotePort,
     };
-    const requestHeaders = sanitizeRequestHeaders(receivedHeaders(req));
+    const requestHeaders = recordedRequestHeaders(req);
     const isStream = body.stream === true;
     let routingBody = body;
     let headersSent = false;
@@ -629,7 +629,7 @@ export class ProxyController {
     traceId: string | undefined,
     sessionKey: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
-    requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
+    requestHeaders: ReturnType<typeof recordedRequestHeaders>,
     durationMs: number,
     apiMode: ProxyApiMode,
   ): void {
@@ -664,7 +664,7 @@ export class ProxyController {
     requestId: string,
     traceId: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
-    requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
+    requestHeaders: ReturnType<typeof recordedRequestHeaders>,
     apiMode: ProxyApiMode,
     meta?: RoutingMeta,
     startTime?: number,
@@ -934,7 +934,7 @@ export class ProxyController {
     requestId: string,
     traceId: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
-    requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
+    requestHeaders: ReturnType<typeof recordedRequestHeaders>,
     reason: ThinkerBlockedRequestReason,
     apiMode: ProxyApiMode,
     httpStatus?: number,

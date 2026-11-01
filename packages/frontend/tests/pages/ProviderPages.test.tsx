@@ -168,8 +168,16 @@ vi.mock('../../src/services/toast-store.js', () => ({
 }));
 
 import Subscriptions from '../../src/pages/providers/Subscriptions';
+import SubscriptionsAdd from '../../src/pages/providers/SubscriptionsAdd';
 import Byok from '../../src/pages/providers/Byok';
+import ByokAdd from '../../src/pages/providers/ByokAdd';
+import ProviderConnectionsPage from '../../src/pages/providers/ProviderConnectionsPage';
 import LocalProviders from '../../src/pages/providers/Local';
+import LocalAdd from '../../src/pages/providers/LocalAdd';
+
+/** Connections and catalog stacked, as the other provider pages render. */
+const ByokBoth = () => <ProviderConnectionsPage kind="byok" />;
+const SubscriptionsBoth = () => <ProviderConnectionsPage kind="subscriptions" />;
 
 const connection = (id: string, label: string, active = true) => ({
   id,
@@ -271,30 +279,11 @@ describe('provider pages', () => {
   // that the agent is available before we drive those handlers.
   const waitForConnectedAgent = async (anchorText = 'Production') => {
     await waitFor(() => expect(screen.getByText(anchorText)).toBeDefined());
-    await waitFor(() =>
-      expect(
-        (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
-      ).toBe(true),
-    );
+    await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
   };
 
-  it('shows each connection its OWN attempt rate, never the provider blend', async () => {
-    // The bug this pins: OpenAI subscription at 92.2% was displayed as ~83%
-    // because the list read a provider-level rate blending in the api_key
-    // connection's failures. Rows must read their (provider, auth_type) grain.
-    renderPage(<Subscriptions />);
-    await waitFor(() => expect(screen.getByText('ChatGPT')).toBeDefined());
-
-    // 119 / 129 = 92.2%, the subscription connection's own rate.
-    // Appears on the header card AND the row: both read the same grain.
-    await waitFor(() => expect(screen.getAllByText('92.2%').length).toBeGreaterThan(0));
-    expect(screen.getAllByText('129').length).toBeGreaterThan(0);
-    // The blended provider rate (267/317 = 84.2%) must appear nowhere.
-    expect(screen.queryByText('84.2%')).toBeNull();
-  });
-
   it('renders the subscriptions page and opens the connect modal', async () => {
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => {
       expect(screen.getByText('My subscription connections')).toBeDefined();
@@ -341,7 +330,7 @@ describe('provider pages', () => {
       ],
     });
 
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => expect(screen.getByText('Old Claude')).toBeDefined());
     expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0);
@@ -351,7 +340,7 @@ describe('provider pages', () => {
   });
 
   it('keeps a provider closed to new subscriptions out of the catalog until connected', async () => {
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
     // Anthropic has no connection in the fixture, so it only shows once the catalog renders.
     await waitFor(() => expect(screen.getByText('Anthropic')).toBeDefined());
     expect(screen.queryByText('Google')).toBeNull();
@@ -377,7 +366,7 @@ describe('provider pages', () => {
       ],
     });
 
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => expect(screen.getByText('Old Google')).toBeDefined());
     // Listed once, in the connections table only.
@@ -404,7 +393,7 @@ describe('provider pages', () => {
       ],
     });
 
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => expect(screen.getByText('Work Google')).toBeDefined());
     // Once in the connections table, once in the catalog.
@@ -414,7 +403,7 @@ describe('provider pages', () => {
   });
 
   it('deep-links the connect modal to a specific provider when added from its row', async () => {
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     // Each supported-provider row carries its own "Connect" button; clicking it
     // opens straight into that provider's connection form (deep link) rather
@@ -434,39 +423,129 @@ describe('provider pages', () => {
     });
   });
 
-  it('renders the BYOK (usage-based) page with custom provider connections', async () => {
-    renderPage(<Byok />);
-
-    await waitFor(() => {
-      expect(screen.getByText('My usage-based connections')).toBeDefined();
-      expect(screen.getByText('Custom Gateway')).toBeDefined();
-      expect(screen.getByText('Inactive')).toBeDefined();
-      expect(screen.getByText('Supported usage-based providers')).toBeDefined();
-    });
-  });
-
-  it('still renders connected rows when the usage endpoint rejects', async () => {
-    // Config resolves so connections paint; usage rejects → the page's usage
-    // resource catch returns [] and the row shows zeroed usage (0 tokens).
-    mockGetProviderUsage.mockRejectedValue(new Error('usage down'));
-
+  it('renders the subscriptions list with its connect button and connections only', async () => {
     renderPage(<Subscriptions />);
 
     await waitFor(() => expect(screen.getByText('ChatGPT')).toBeDefined());
-    await waitFor(() => expect(screen.getByText(/0 tokens/)).toBeDefined());
+    expect(screen.queryByText('My subscription connections')).toBeNull();
+    expect(screen.queryByText('Supported subscription providers')).toBeNull();
+    expect(screen.queryByText('Add custom provider')).toBeNull();
+
+    fireEvent.click(screen.getByText('Connect to a provider'));
+    expect(mockNavigate).toHaveBeenCalledWith('/providers/subscriptions/add');
   });
 
-  it('renders the local providers page', async () => {
-    renderPage(<LocalProviders />);
+  it('renders the subscriptions add page with the provider catalog only', async () => {
+    renderPage(<SubscriptionsAdd />);
 
     await waitFor(() => {
-      expect(screen.getByText('My local connections')).toBeDefined();
-      expect(screen.getAllByText('Ollama').length).toBeGreaterThan(0);
+      expect(screen.getByText('Supported subscription providers')).toBeDefined();
+      expect(screen.getAllByText('Connect').length).toBeGreaterThan(0);
     });
+    expect(screen.queryByText('ChatGPT')).toBeNull();
+  });
+
+  it('renders the usage-based list with its toolbar and connections only', async () => {
+    renderPage(<Byok />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Custom Gateway')).toBeDefined();
+      expect(screen.getByText('Inactive')).toBeDefined();
+    });
+    const add = screen.getByText('Add provider').closest('button')!;
+    const custom = screen.getByText('Add custom provider').closest('button')!;
+    // "Add provider" sits left of "Add custom provider".
+    expect(add.compareDocumentPosition(custom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('My usage-based connections')).toBeNull();
+    expect(screen.queryByText('Supported usage-based providers')).toBeNull();
+    // Usage stats moved to the Overview.
+    expect(screen.queryByText(/Total API cost/)).toBeNull();
+    expect(screen.queryByText(/tokens/)).toBeNull();
+
+    fireEvent.click(add);
+    expect(mockNavigate).toHaveBeenCalledWith('/providers/usage-based/add');
+  });
+
+  it('shows an empty state on the usage-based list without connections', async () => {
+    mockGetGlobalProviders.mockResolvedValue({ providers: [], model_counts: {} });
+    renderPage(<Byok />);
+    await waitFor(() => expect(screen.getByText(/No usage-based connections yet/)).toBeDefined());
+  });
+
+  it('forwards the add=true deep-link from the list to the add page', async () => {
+    renderPage(<Byok />, '/providers?add=true');
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/providers/usage-based/add?add=true', {
+        replace: true,
+      }),
+    );
+  });
+
+  it('renders the usage-based add page with the provider catalog only', async () => {
+    renderPage(<ByokAdd />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Supported usage-based providers')).toBeDefined();
+      expect(screen.getAllByText('Connect').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('Production')).toBeNull();
+    expect(screen.queryByText('Add custom provider')).toBeNull();
+  });
+
+  it('renders the local list with its add-server button and servers only', async () => {
+    mockGetCustomProviders.mockResolvedValue([
+      {
+        id: 'srv-1',
+        name: 'Ollama Office',
+        base_url: 'http://10.0.0.5:11434/v1',
+        api_kind: 'openai',
+        local_type: 'ollama',
+        local_config: {
+          scheme: 'http',
+          host: '10.0.0.5',
+          port: 11434,
+          path_prefix: '/ollama',
+          request_timeout_ms: 1,
+          probe_timeout_ms: 1,
+        },
+        has_api_key: false,
+        models: [],
+        created_at: '2026-01-01',
+      },
+    ]);
+    renderPage(<LocalProviders />);
+
+    await waitFor(() => expect(screen.getByText('Ollama Office')).toBeDefined());
+    expect(screen.getByText('http://10.0.0.5:11434/ollama')).toBeDefined();
+    expect(screen.getByText('Name')).toBeDefined();
+    expect(screen.getByText('URL')).toBeDefined();
+    expect(screen.getByText('Edit')).toBeDefined();
+    expect(screen.queryByText('My local connections')).toBeNull();
+    expect(screen.queryByLabelText('List view')).toBeNull();
+
+    fireEvent.click(screen.getByText('Add AI server'));
+    expect(mockNavigate).toHaveBeenCalledWith('/providers/local/add');
+  });
+
+  it('keeps the local table headers when no server is registered', async () => {
+    mockGetCustomProviders.mockResolvedValue([]);
+    renderPage(<LocalProviders />);
+
+    await waitFor(() => expect(screen.getByText('No local AI servers registered')).toBeDefined());
+    expect(screen.getByText('Name')).toBeDefined();
+    expect(screen.getByText('URL')).toBeDefined();
+  });
+
+  it('renders the local add page with the server types and no heading', async () => {
+    renderPage(<LocalAdd />);
+
+    await waitFor(() => expect(screen.getByLabelText('List view')).toBeDefined());
+    expect(screen.queryByText('Supported local providers')).toBeNull();
+    expect(screen.getAllByText('Add server').length).toBeGreaterThan(0);
   });
 
   it('auto-opens the modal from add=true and clears the query param', async () => {
-    renderPage(<LocalProviders />, '/providers?add=true&keep=1');
+    renderPage(<LocalAdd />, '/providers?add=true&keep=1');
 
     await waitFor(() => {
       // The deep-link handling lives in an effect (not the render body), and
@@ -477,7 +556,7 @@ describe('provider pages', () => {
   });
 
   it('does not auto-open the modal without the add=true deep-link', async () => {
-    renderPage(<Subscriptions />, '/providers?keep=1');
+    renderPage(<SubscriptionsBoth />, '/providers?keep=1');
 
     await waitFor(() => {
       expect(screen.getByText('My subscription connections')).toBeDefined();
@@ -490,7 +569,7 @@ describe('provider pages', () => {
   it('keeps Connect enabled with no harness by falling back to the Playground agent', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
     mockGetPlaygroundAgent.mockResolvedValue({ name: 'playground' });
-    renderPage(<Byok />);
+    renderPage(<ByokBoth />);
 
     await waitFor(() => {
       expect((screen.getAllByText('Connect')[0] as HTMLButtonElement).disabled).toBe(false);
@@ -506,7 +585,7 @@ describe('provider pages', () => {
 
   it('disables Add buttons when no agent exists for the modal context', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
-    renderPage(<Byok />);
+    renderPage(<ByokBoth />);
 
     await waitFor(() => {
       const addButton = screen.getAllByText('Connect')[0] as HTMLButtonElement;
@@ -520,7 +599,7 @@ describe('provider pages', () => {
     mockGetAgentProviders.mockRejectedValue(new Error('agent providers failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom providers failed'));
 
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => {
       expect(screen.getByText('Supported subscription providers')).toBeDefined();
@@ -533,7 +612,7 @@ describe('provider pages', () => {
     mockGetAgentProviders.mockRejectedValue(new Error('agent providers failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom providers failed'));
 
-    renderPage(<Byok />, '/providers?add=true');
+    renderPage(<ByokAdd />, '/providers?add=true');
 
     await waitFor(() => {
       expect(mockProviderSelectModal).toHaveBeenCalledWith(
@@ -721,7 +800,7 @@ describe('provider pages', () => {
   });
 
   it('renders the list view with active-connection counts and opens the connect modal', async () => {
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
     await waitForConnectedAgent('ChatGPT');
 
     // Switch from the default grid view to the list view.
@@ -757,7 +836,7 @@ describe('provider pages', () => {
 
   it('disables the list-view Connect button when no agent exists', async () => {
     mockGetAgents.mockResolvedValue({ agents: [] });
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
     await waitFor(() => expect(screen.getByText('My subscription connections')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
@@ -788,7 +867,7 @@ describe('provider pages', () => {
       model_counts: {},
     });
 
-    renderPage(<Subscriptions />);
+    renderPage(<SubscriptionsBoth />);
     await waitFor(() => expect(screen.getByText('Plan A')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
@@ -796,8 +875,8 @@ describe('provider pages', () => {
   });
 
   it('labels local providers as "Connected" in the list view', async () => {
-    renderPage(<LocalProviders />);
-    await waitFor(() => expect(screen.getByText('My local connections')).toBeDefined());
+    renderPage(<LocalAdd />);
+    await waitFor(() => expect(screen.getByLabelText('List view')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
     // Local providers use the "Connected" label rather than an active-count.
@@ -809,11 +888,7 @@ describe('provider pages', () => {
     await waitFor(() => expect(screen.getByText('Add custom provider')).toBeDefined());
 
     // Wait for agent to load so the modal can render (guarded by firstAgentName()).
-    await waitFor(() =>
-      expect(
-        (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
-      ).toBe(true),
-    );
+    await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
 
     fireEvent.click(screen.getByText('Add custom provider'));
     await waitFor(() =>
@@ -840,11 +915,7 @@ describe('provider pages', () => {
 
   it('closes the custom modal via overlay click', async () => {
     renderPage(<Byok />);
-    await waitFor(() =>
-      expect(
-        (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
-      ).toBe(true),
-    );
+    await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
 
     fireEvent.click(screen.getByText('Add custom provider'));
     await waitFor(() =>
@@ -861,11 +932,7 @@ describe('provider pages', () => {
 
   it('closes the custom modal when the form fires onCreated', async () => {
     renderPage(<Byok />);
-    await waitFor(() =>
-      expect(
-        (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
-      ).toBe(true),
-    );
+    await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
 
     fireEvent.click(screen.getByText('Add custom provider'));
     await waitFor(() => expect(screen.getByTestId('custom-provider-form')).toBeDefined());
@@ -878,11 +945,7 @@ describe('provider pages', () => {
 
   it('closes the custom modal when the form fires onBack', async () => {
     renderPage(<Byok />);
-    await waitFor(() =>
-      expect(
-        (screen.getAllByText('Connect') as HTMLButtonElement[]).some((btn) => !btn.disabled),
-      ).toBe(true),
-    );
+    await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
 
     fireEvent.click(screen.getByText('Add custom provider'));
     await waitFor(() => expect(screen.getByTestId('custom-provider-form')).toBeDefined());
@@ -893,51 +956,7 @@ describe('provider pages', () => {
     );
   });
 
-  it('renders a usage sparkline for connected rows that have 7-day data', async () => {
-    // A connected row with a non-empty sparkline_7d renders the Sparkline cell;
-    // the default fixtures use empty arrays, so this drives the sparkline branch.
-    mockGetGlobalProviders.mockResolvedValue({
-      providers: [
-        {
-          provider: 'openai',
-          auth_type: 'subscription',
-          connection_count: 1,
-          connections: [connection('sub-spark', 'Sparkly')],
-          total_models: 3,
-        },
-      ],
-      model_counts: {},
-    });
-    // Sparkline data now arrives via the usage endpoint and is merged in.
-    mockGetProviderUsage.mockResolvedValue({
-      providers: [
-        {
-          provider: 'openai',
-          auth_type: 'subscription',
-          key_label: 'Sparkly',
-          consumption_tokens: 1200,
-          consumption_messages: 5,
-          consumption_cost: 0,
-          attempts_30d: 5,
-          succeeded_30d: 5,
-          last_used_at: '2026-06-01T00:00:00Z',
-          sparkline_7d: [1, 2, 3, 4],
-        },
-      ],
-    });
-
-    renderPage(<Subscriptions />);
-    await waitFor(() => expect(screen.getByText('Sparkly')).toBeDefined());
-    // The stubbed Sparkline reports its data length (4 points).
-    await waitFor(() => {
-      const spark = screen.getByTestId('sparkline');
-      expect(spark.textContent).toBe('4');
-    });
-  });
-  // ── Collapsed connections list ──────────────────────────────────────────
-  // Past six connections the list is capped inside its own card so the
-  // supported-provider catalog below stays reachable. Nothing is dropped: the
-  // card scrolls, and the footer button expands it to full height.
+  // ── Connections list ────────────────────────────────────────────────────
   const manyConnections = (count: number) => ({
     providers: [
       {
@@ -958,90 +977,14 @@ describe('provider pages', () => {
     model_counts: {},
   });
 
-  it('leaves the connections list uncapped at six connections', async () => {
-    mockGetGlobalProviders.mockResolvedValue(manyConnections(6));
-    mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = renderPage(<Byok />);
-    await waitFor(() => expect(screen.getByText('Key 6')).toBeDefined());
-
-    expect(container.querySelector('.connections-panel--collapsed')).toBeNull();
-    expect(screen.queryByText(/^Show all /)).toBeNull();
-  });
-
-  it('caps the connections list past six and names how many there are', async () => {
+  it('lists every connection at full height, without a show-all toggle', async () => {
     mockGetGlobalProviders.mockResolvedValue(manyConnections(9));
     mockGetProviderUsage.mockResolvedValue({ providers: [] });
     const { container } = renderPage(<Byok />);
     await waitFor(() => expect(screen.getByText('Key 9')).toBeDefined());
 
-    expect(container.querySelector('.connections-panel--collapsed')).not.toBeNull();
-    const toggle = screen.getByText('Show all 9 connections').closest('button')!;
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    // Every row stays in the DOM: the card scrolls, it does not paginate.
     expect(screen.getByText('Key 1')).toBeDefined();
-    expect(screen.getByText('Key 9')).toBeDefined();
-  });
-
-  it('expands the connections list and collapses it again', async () => {
-    mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
-    mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = renderPage(<Byok />);
-    await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
-
-    const toggle = screen.getByText('Show all 8 connections').closest('button')!;
-    // The button points at the region it expands.
-    expect(container.querySelector(`#${toggle.getAttribute('aria-controls')}`)).not.toBeNull();
-
-    fireEvent.click(toggle);
-    await waitFor(() => {
-      expect(screen.getByText('Show less')).toBeDefined();
-      expect(container.querySelector('.connections-panel--collapsed')).toBeNull();
-    });
-    expect(screen.getByText('Show less').closest('button')!.getAttribute('aria-expanded')).toBe(
-      'true',
-    );
-
-    fireEvent.click(screen.getByText('Show less').closest('button')!);
-    await waitFor(() => {
-      expect(screen.getByText('Show all 8 connections')).toBeDefined();
-      expect(container.querySelector('.connections-panel--collapsed')).not.toBeNull();
-    });
-  });
-
-  it('brings the bottom fade back after expanding and collapsing again', async () => {
-    mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
-    mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = renderPage(<Byok />);
-    await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
-
-    const body = container.querySelector('.connections-panel__body') as HTMLElement;
-    const viewport = container.querySelector('.connections-panel__viewport')!;
-    fireEvent.scroll(body);
-    expect(viewport.classList.contains('scroll-panel--at-bottom')).toBe(true);
-
-    // Expanding drops the scroll position, so the flag must not survive into
-    // the next collapse and hide the fade at the top of the list.
-    fireEvent.click(screen.getByText('Show all 8 connections').closest('button')!);
-    await waitFor(() => expect(screen.getByText('Show less')).toBeDefined());
-    expect(viewport.classList.contains('scroll-panel--at-bottom')).toBe(false);
-
-    fireEvent.click(screen.getByText('Show less').closest('button')!);
-    await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
-    expect(viewport.classList.contains('scroll-panel--at-bottom')).toBe(false);
-  });
-
-  it('drops the bottom fade once the capped list is scrolled to the end', async () => {
-    mockGetGlobalProviders.mockResolvedValue(manyConnections(8));
-    mockGetProviderUsage.mockResolvedValue({ providers: [] });
-    const { container } = renderPage(<Byok />);
-    await waitFor(() => expect(screen.getByText('Show all 8 connections')).toBeDefined());
-
-    const body = container.querySelector('.connections-panel__body') as HTMLElement;
-    const viewport = container.querySelector('.connections-panel__viewport')!;
-    expect(viewport.classList.contains('scroll-panel--at-bottom')).toBe(false);
-
-    // jsdom reports zero layout, which reads as "already at the end".
-    fireEvent.scroll(body);
-    expect(viewport.classList.contains('scroll-panel--at-bottom')).toBe(true);
+    expect(container.querySelector('.connections-panel--collapsed')).toBeNull();
+    expect(screen.queryByText(/^Show all /)).toBeNull();
   });
 });

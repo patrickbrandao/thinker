@@ -44,6 +44,13 @@ export default {
       connectedHeading: 'My local connections',
       supportedHeading: 'Supported local providers',
     },
+    addProvider: 'Add provider',
+    noConnections: 'No usage-based connections yet. Add a provider to start routing to it.',
+    connectProvider: 'Connect to a provider',
+    noSubscriptionConnections:
+      'No subscription connections yet. Connect to a provider to start routing to it.',
+    addAiServer: 'Add AI server',
+    noLocalServers: 'No local AI servers registered',
     addCustomProvider: 'Add custom provider',
     totalApiCost30d: 'Total API cost (30d)',
     totalApiCostTooltip: 'Sum of all API key usage costs across your connected providers.',
@@ -51,6 +58,8 @@ export default {
     activeConnections: (n: number) =>
       n === 1 ? `${n} active connection` : `${n} active connections`,
     activeKeys: (n: number) => (n === 1 ? `${n} active key` : `${n} active keys`),
+    colName: 'Name',
+    colUrl: 'URL',
     colProvider: 'Provider',
     colConnection: 'Connection',
     colStatus: 'Status',
@@ -122,6 +131,17 @@ export default {
     warmupHint:
       'Optional. How long a streaming request waits for the first token before failing over. Leave empty to use the default.',
     warmupSaved: 'Stream warm-up saved',
+    credential: 'Credential',
+    credentialKeyHint:
+      'Replace the key on this same connection. Harness access, routes and history stay as they are.',
+    credentialReauthHint:
+      'Sign in again to this same connection. Harness access, routes and history stay as they are.',
+    newKeyPlaceholder: 'New key or token',
+    replaceKey: 'Replace',
+    replacingKey: 'Replacing...',
+    keyReplaced: 'Credential replaced',
+    reauthenticate: 'Sign in again',
+    reauthFailed: 'Could not start the sign-in',
     saveFailed: 'Failed to save',
     modelCount: (n: number) => `${n} models`,
     refreshing: 'Refreshing...',

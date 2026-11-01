@@ -48,12 +48,21 @@ const ptBR: Catalog<typeof en> = {
     cost: 'Custo',
     empty: 'Ainda não há dados de modelos',
   },
+  providerUsage: {
+    title: 'Uso por tipo de provedor (30 dias)',
+    connections: 'Conexões ativas',
+    tokens: 'Tokens (30d)',
+    cost: 'Custo (30d)',
+    attempts: 'Tentativas (30d)',
+    successRate: 'Taxa de sucesso (30d)',
+  },
   connections: {
     title: 'Conexões de provedor',
     provider: 'Provedor',
     name: 'Nome da conexão',
     type: 'Tipo',
     status: 'Status',
+    lastUsed: 'Último uso',
     failedAttempts: 'Tentativas com falha',
     failedAttemptsTip:
       'Tentativas em que esta conexão falhou no período filtrado. Clique em um número para ver as requisições que as contêm.',

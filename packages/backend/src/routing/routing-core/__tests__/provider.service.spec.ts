@@ -1864,3 +1864,78 @@ describe('ProviderService — getFreshSubscriptionCredential', () => {
     expect(await svc.getFreshSubscriptionCredential('tenant-1', 'openai')).toBeNull();
   });
 });
+
+describe('ProviderService — re-authentication target', () => {
+  let providerRepo: ReturnType<typeof makeRepo>;
+  let svc: ProviderService;
+
+  beforeEach(() => {
+    providerRepo = makeRepo();
+    svc = new ProviderService(
+      providerRepo as unknown as Repository<TenantProvider>,
+      makeRepo() as unknown as Repository<TierAssignment>,
+      makeRepo() as unknown as Repository<SpecificityAssignment>,
+      makeRepo() as unknown as Repository<Agent>,
+      { getByModel: jest.fn() } as unknown as ModelPricingCacheService,
+      {} as unknown as RoutingCacheService,
+    );
+  });
+
+  it('makes the next OAuth sign-in reuse the connection label, once', async () => {
+    providerRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      provider: 'openai',
+      auth_type: 'subscription',
+      label: 'Work',
+    });
+    providerRepo.find.mockResolvedValue([{ label: 'Work' }, { label: 'Key 2' }]);
+
+    await svc.startReauth('t1', 'c1');
+
+    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('Work');
+    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('Key 3');
+  });
+
+  it('does not affect other tenants or providers', async () => {
+    providerRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      provider: 'openai',
+      auth_type: 'subscription',
+      label: 'Work',
+    });
+    await svc.startReauth('t1', 'c1');
+
+    await expect(svc.nextOAuthLabel('t2', 'openai')).resolves.toBeUndefined();
+    await expect(svc.nextOAuthLabel('t1', 'xai')).resolves.toBeUndefined();
+  });
+
+  it('rejects API key connections and unknown ids', async () => {
+    providerRepo.findOne.mockResolvedValueOnce({ id: 'c2', auth_type: 'api_key' });
+    await expect(svc.startReauth('t1', 'c2')).rejects.toThrow('subscription');
+    providerRepo.findOne.mockResolvedValueOnce(null);
+    await expect(svc.startReauth('t1', 'nope')).rejects.toThrow('not found');
+  });
+});
+
+describe('ProviderService — cancelReauth', () => {
+  it('disarms a pending re-authentication', async () => {
+    const providerRepo = makeRepo();
+    const svc = new ProviderService(
+      providerRepo as unknown as Repository<TenantProvider>,
+      makeRepo() as unknown as Repository<TierAssignment>,
+      makeRepo() as unknown as Repository<SpecificityAssignment>,
+      makeRepo() as unknown as Repository<Agent>,
+      { getByModel: jest.fn() } as unknown as ModelPricingCacheService,
+      {} as unknown as RoutingCacheService,
+    );
+    providerRepo.findOne.mockResolvedValue({
+      id: 'c1',
+      provider: 'openai',
+      auth_type: 'subscription',
+      label: 'Work',
+    });
+    await svc.startReauth('t1', 'c1');
+    await svc.cancelReauth('t1', 'c1');
+    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBeUndefined();
+  });
+});

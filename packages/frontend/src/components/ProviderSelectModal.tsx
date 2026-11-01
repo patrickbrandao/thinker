@@ -14,6 +14,8 @@ interface Props {
   onClose: () => void;
   onUpdate: () => void | Promise<void>;
   onPollProviders?: () => void | Promise<void>;
+  /** Re-authenticating this subscription connection (by label) instead of adding one. */
+  reauthLabel?: string;
 }
 
 /** The provider connect flow in a modal; the content renders its own header. */
@@ -30,6 +32,7 @@ export default function ProviderSelectModal(props: Props) {
         onUpdate={props.onUpdate}
         onPollProviders={props.onPollProviders}
         onClose={props.onClose}
+        reauthLabel={props.reauthLabel}
       />
     </Modal>
   );

@@ -119,6 +119,24 @@ export class TenantProvidersController {
     return { id: updated.id, stream_warmup_ms: updated.stream_warmup_ms };
   }
 
+  /**
+   * Arm a re-authentication: the next subscription sign-in for this
+   * connection's provider updates this connection in place.
+   */
+  @Post('connections/:id/reauth')
+  async startReauth(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
+    const tenantId = this.requireTenant(ctx);
+    const row = await this.providerService.startReauth(tenantId, id);
+    return { id: row.id, provider: row.provider, label: row.label };
+  }
+
+  @Delete('connections/:id/reauth')
+  async cancelReauth(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
+    const tenantId = this.requireTenant(ctx);
+    await this.providerService.cancelReauth(tenantId, id);
+    return { ok: true };
+  }
+
   @Delete(':provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,
@@ -171,10 +189,22 @@ export class TenantProvidersController {
       }
     >();
 
+    // A custom provider's models are entered by hand on its custom_providers
+    // row; discovery never fills the connection's cached_models.
+    const customProviders = tenantId ? await this.customProviderService.list(tenantId) : [];
+    const customModelCount = new Map(
+      customProviders.map((cp) => [
+        `custom:${cp.id}`,
+        Array.isArray(cp.models) ? cp.models.length : 0,
+      ]),
+    );
+
     for (const p of providers) {
       const key = `${p.provider}::${p.auth_type}`;
       const existing = grouped.get(key);
-      const modelCount = Array.isArray(p.cached_models) ? p.cached_models.length : 0;
+      const modelCount =
+        customModelCount.get(p.provider) ??
+        (Array.isArray(p.cached_models) ? p.cached_models.length : 0);
 
       if (existing) {
         existing.connections.push({
@@ -212,7 +242,6 @@ export class TenantProvidersController {
     }
 
     // Resolve custom provider display names (provider key = `custom:<uuid>`).
-    const customProviders = tenantId ? await this.customProviderService.list(tenantId) : [];
     const customNameById = new Map(customProviders.map((cp) => [cp.id, cp.name]));
 
     const result = Array.from(grouped.values()).map((g) => ({
