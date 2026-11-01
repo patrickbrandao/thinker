@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (207 BEM blocks, 223 classes)
+## Blocks (204 BEM blocks, 220 classes)
 actions (shell.css): actions
 agent-type-select (shell.css): agent-type-select__option
 alert-row (shell.css): alert-row
@@ -115,8 +115,8 @@ desktop-only (shell.css): desktop-only
 dh (shell.css): dh
 dot (base.css): dot
 drawer (shell.css): drawer drawer--floating drawer--minimized drawer--page
+edge-dashed (canvas.css): edge-dashed
 edge-error (canvas.css): edge-error
-edge-live (canvas.css): edge-live
 edge-saving (canvas.css): edge-saving
 empty (base.css): empty
 eyebrow (base.css): eyebrow
@@ -126,7 +126,9 @@ floating-window-body (shell.css): floating-window-body
 floating-window-foot (shell.css): floating-window-foot
 floating-window-head (shell.css): floating-window-head
 flow-edge (canvas.css): flow-edge
-flow-node (canvas.css): flow-node
+flow-edge-hit (canvas.css): flow-edge-hit
+flow-edge-label (canvas.css): flow-edge-label
+flow-edge-pulse (canvas.css): flow-edge-pulse
 form-error (shell.css): form-error
 form-notice (shell.css): form-notice
 full (shell.css): full
@@ -160,7 +162,9 @@ is-accent (base.css): is-accent
 is-active (shell.css): is-active
 is-collapsed (shell.css): is-collapsed
 is-danger (base.css, shell.css): is-danger
-is-error (shell.css): is-error
+is-dashed (canvas.css): is-dashed
+is-error (canvas.css, shell.css): is-error
+is-idle (canvas.css): is-idle
 is-info (base.css, shell.css): is-info
 is-mobile-open (shell.css): is-mobile-open
 is-off (base.css): is-off
@@ -193,6 +197,14 @@ modal (shell.css): modal
 modal-body (shell.css): modal-body
 modal-head (shell.css): modal-head
 mono (base.css): mono
+n8n-box (canvas.css): n8n-box
+n8n-icon (canvas.css): n8n-icon
+n8n-name (canvas.css): n8n-name
+n8n-source (canvas.css): n8n-source
+n8n-source-icon (canvas.css): n8n-source-icon
+n8n-source-lines (canvas.css): n8n-source-lines
+n8n-step (canvas.css): n8n-step
+n8n-sub (canvas.css): n8n-sub
 narrow (shell.css): narrow
 nav-action (shell.css): nav-action
 nav-group (shell.css): nav-group
@@ -200,21 +212,6 @@ nav-group-label (shell.css): nav-group-label
 nav-item (shell.css): nav-item
 nav-label (shell.css): nav-label
 nav-row (shell.css): nav-row
-node-client (canvas.css): node-client
-node-count (canvas.css): node-count
-node-entry (canvas.css): node-entry
-node-group (canvas.css): node-group
-node-hub (canvas.css): node-hub
-node-ip (canvas.css): node-ip
-node-kind (canvas.css): node-kind
-node-line (canvas.css): node-line
-node-metric (canvas.css): node-metric
-node-name (canvas.css): node-name
-node-pill (canvas.css): node-pill
-node-route (canvas.css): node-route
-node-routes (canvas.css): node-routes
-node-sub (canvas.css): node-sub
-node-title (canvas.css): node-title
 notice (shell.css): notice
 num (base.css): num
 overlay (shell.css): overlay

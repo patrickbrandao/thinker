@@ -54,6 +54,13 @@ import {
   TriggerEvent,
   TriggerEventLog,
 } from '../src/entities/trigger.entity';
+import {
+  ProxyAssignment,
+  ProxyBinding,
+  ProxyProfile,
+  ProxyServer,
+} from '../src/entities/proxy-server.entity';
+import { TopologyPosition } from '../src/entities/topology-position.entity';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
 import { AnalyticsModule } from '../src/analytics/analytics.module';
@@ -103,6 +110,11 @@ const entities = [
   AgentTrigger,
   TriggerEvent,
   TriggerEventLog,
+  ProxyServer,
+  ProxyBinding,
+  ProxyProfile,
+  ProxyAssignment,
+  TopologyPosition,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MODELS_DEV_URL = 'https://models.dev/api.json';

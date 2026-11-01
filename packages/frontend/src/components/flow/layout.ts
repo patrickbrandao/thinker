@@ -2,53 +2,68 @@ import type { FlowEdge, FlowNode, Graph } from './types.js';
 
 /** Grid the canvas snaps to; positions are kept on it. */
 export const GRID = 24;
-const COLUMN_GAP = 288;
-const ROW_GAP = 120;
-const CLIENT_GAP = 48;
-const ROUTE_HEIGHT = 18;
-
-/** Vertical room a node takes in its column. */
-const rowHeight = (node: FlowNode) =>
-  node.data.kind === 'client'
-    ? CLIENT_GAP
-    : ROW_GAP + Math.max(0, (node.data.routes?.length ?? 0) - 1) * ROUTE_HEIGHT;
+const COLUMN_GAP = 264;
 
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
+export interface ColumnLayoutOptions {
+  /** Column of each node, left to right. Empty columns close up. */
+  columnOf: (node: FlowNode) => number;
+  /** Vertical room a node takes in its column. */
+  heightOf: (node: FlowNode) => number;
+  /** Saved positions win over the computed ones. */
+  positions?: Record<string, { x: number; y: number }>;
+}
+
 /**
- * Layered left-to-right layout: each node goes one column right of its
- * deepest parent (sources in column 0), stacked in input order. Cycles are
- * broken by ignoring edges back to a node already on the current path.
- * Nodes that already have a position (saved by the user) keep it.
+ * Column layout: each kind of node stacks in its own column, columns
+ * vertically centered on each other. Inside a column nodes sit in the order
+ * of their parents (mean rank in the columns to the left), which keeps links
+ * from crossing; the first column keeps the input order.
  */
-export function autoLayout(graph: Graph, options: { keepPositions?: boolean } = {}): Graph {
-  const incoming = new Map<string, string[]>();
-  for (const node of graph.nodes) incoming.set(node.id, []);
-  for (const edge of graph.edges) incoming.get(edge.target)?.push(edge.source);
+export function columnLayout(graph: Graph, options: ColumnLayoutOptions): Graph {
+  const columns = new Map<number, FlowNode[]>();
+  for (const node of graph.nodes) {
+    const c = options.columnOf(node);
+    columns.set(c, [...(columns.get(c) ?? []), node]);
+  }
+  const parents = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    parents.set(edge.target, [...(parents.get(edge.target) ?? []), edge.source]);
+  }
 
-  const depth = new Map<string, number>();
-  const visiting = new Set<string>();
-  const depthOf = (id: string): number => {
-    const known = depth.get(id);
-    if (known !== undefined) return known;
-    if (visiting.has(id)) return 0;
-    visiting.add(id);
-    const parents = (incoming.get(id) ?? []).filter((p) => incoming.has(p));
-    const d = parents.length === 0 ? 0 : Math.max(...parents.map(depthOf)) + 1;
-    visiting.delete(id);
-    depth.set(id, d);
-    return d;
-  };
+  const rank = new Map<string, number>();
+  const ordered = [...columns.keys()].sort((a, b) => a - b).map((c) => columns.get(c)!);
+  for (const column of ordered) {
+    const weight = (node: FlowNode) => {
+      const ranks = (parents.get(node.id) ?? [])
+        .map((p) => rank.get(p))
+        .filter((r): r is number => r !== undefined);
+      return ranks.length ? ranks.reduce((a, b) => a + b, 0) / ranks.length : Infinity;
+    };
+    const keyed = column.map((node, i) => ({ node, i, w: weight(node) }));
+    keyed.sort((a, b) => (a.w === b.w ? a.i - b.i : a.w - b.w));
+    column.splice(0, column.length, ...keyed.map((k) => k.node));
+    column.forEach((node, i) => rank.set(node.id, i));
+  }
 
-  const rows = new Map<number, number>();
-  const nodes: FlowNode[] = graph.nodes.map((node) => {
-    const column = depthOf(node.id);
-    const y = rows.get(column) ?? 0;
-    rows.set(column, y + rowHeight(node));
-    const hasPosition =
-      options.keepPositions && node.position && (node.position.x !== 0 || node.position.y !== 0);
-    return hasPosition ? node : { ...node, position: { x: snap(column * COLUMN_GAP), y: snap(y) } };
+  const heights = ordered.map((column) =>
+    column.reduce((sum, node) => sum + options.heightOf(node), 0),
+  );
+  const tallest = Math.max(0, ...heights);
+  const placed = new Map<string, { x: number; y: number }>();
+  ordered.forEach((column, c) => {
+    let y = (tallest - (heights[c] ?? 0)) / 2;
+    for (const node of column) {
+      placed.set(node.id, { x: snap(c * COLUMN_GAP), y: snap(y) });
+      y += options.heightOf(node);
+    }
   });
+
+  const nodes = graph.nodes.map((node) => ({
+    ...node,
+    position: options.positions?.[node.id] ?? placed.get(node.id) ?? { x: 0, y: 0 },
+  }));
   return { nodes, edges: graph.edges };
 }
 
