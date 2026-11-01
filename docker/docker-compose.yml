@@ -177,6 +177,9 @@ services:
       # provider exists. Set false for air-gapped installs; costs then come
       # from the bundled data only and most models show $0.
       - THINKER_CATALOG_SYNC=${THINKER_CATALOG_SYNC:-true}
+      # Global outbound proxy (fails closed) and its bypass list.
+      - THINKER_HTTP_PROXY=${THINKER_HTTP_PROXY:-}
+      - THINKER_NO_PROXY=${THINKER_NO_PROXY:-}
       # Daily Harness usage rollup. Reads stay off until backfill parity passes.
       - AGENT_USAGE_DAILY_WORKER=${AGENT_USAGE_DAILY_WORKER:-}
       - AGENT_USAGE_DAILY_READS=${AGENT_USAGE_DAILY_READS:-}

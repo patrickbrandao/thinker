@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { isProviderProxyFailedError } from '../../common/outbound/outbound-proxy';
 
 /**
  * Pure helper functions for classifying and formatting transport-level
@@ -13,6 +14,9 @@ export const PROVIDER_TIMEOUT_STATUS = 504;
 /** Status for a provider URL the SSRF policy refused (#74). */
 export const PROVIDER_URL_BLOCKED_STATUS = 502;
 export const PROVIDER_URL_BLOCKED_CODE = 'provider_url_blocked';
+/** Status and code when no outbound proxy of the chain could carry the call. */
+export const PROVIDER_PROXY_FAILED_STATUS = 502;
+export const PROVIDER_PROXY_FAILED_CODE = 'provider_proxy_failed';
 
 /**
  * The 502 body for a blocked provider URL is built by the gateway itself, but
@@ -55,20 +59,25 @@ export function stripGatewayMarker(rawBody: string): string {
   }
 }
 
-/** True only for a blocked-URL body this gateway process built itself. */
-export function isGatewayProviderUrlBlockedBody(rawBody: string): boolean {
+function isGatewayBodyWithCode(rawBody: string, code: string): boolean {
   try {
     const parsed = JSON.parse(rawBody) as Record<string, unknown>;
     const marker = parsed[GATEWAY_MARKER_FIELD];
     const error = parsed.error as Record<string, unknown> | undefined;
-    return (
-      typeof marker === 'string' &&
-      gatewayMarkers.has(marker) &&
-      error?.code === PROVIDER_URL_BLOCKED_CODE
-    );
+    return typeof marker === 'string' && gatewayMarkers.has(marker) && error?.code === code;
   } catch {
     return false;
   }
+}
+
+/** True only for a blocked-URL body this gateway process built itself. */
+export function isGatewayProviderUrlBlockedBody(rawBody: string): boolean {
+  return isGatewayBodyWithCode(rawBody, PROVIDER_URL_BLOCKED_CODE);
+}
+
+/** True only for a proxy-failure body this gateway process built itself. */
+export function isGatewayProviderProxyFailedBody(rawBody: string): boolean {
+  return isGatewayBodyWithCode(rawBody, PROVIDER_PROXY_FAILED_CODE);
 }
 
 /**
@@ -129,6 +138,7 @@ export function getErrorCause(error: unknown): unknown {
 
 export function isTransportError(error: unknown): boolean {
   if (isProviderUrlBlockedError(error)) return true;
+  if (isProviderProxyFailedError(error)) return true;
   const name = getErrorName(error);
   if (name === 'AbortError' || name === 'TimeoutError') return true;
 
@@ -184,6 +194,24 @@ export function describeTransportError(error: unknown): string {
 }
 
 export function buildTransportErrorResponse(error: unknown): Response {
+  if (isProviderProxyFailedError(error)) {
+    const message = sanitizeTransportErrorDetail(getErrorMessage(error) ?? '');
+    return new Response(
+      JSON.stringify({
+        error: {
+          message,
+          type: PROVIDER_PROXY_FAILED_CODE,
+          code: PROVIDER_PROXY_FAILED_CODE,
+        },
+        [GATEWAY_MARKER_FIELD]: issueGatewayMarker(),
+      }),
+      {
+        status: PROVIDER_PROXY_FAILED_STATUS,
+        statusText: 'Bad Gateway',
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }
   if (isProviderUrlBlockedError(error)) {
     const message = sanitizeTransportErrorDetail(getErrorMessage(error) ?? '');
     return new Response(

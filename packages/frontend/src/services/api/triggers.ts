@@ -12,6 +12,7 @@ import type {
   WorkspaceTriggerEvent,
 } from 'thinker-shared';
 import { fetchJson, fetchMutate } from './core.js';
+import type { Egress, EgressHop } from './proxies.js';
 
 /** Workspace delivery targets (e-mail, webhook, Telegram, syslog) and their delivery log. */
 
@@ -125,6 +126,8 @@ export interface TriggerDeliveryLog {
   status_code: number | null;
   error: string | null;
   response: string | null;
+  egress?: Egress | null;
+  egress_hops?: EgressHop[] | null;
 }
 
 export interface TriggerEventDetail {

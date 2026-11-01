@@ -1,6 +1,8 @@
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import {
   PROVIDER_URL_BLOCKED_CODE,
+  PROVIDER_PROXY_FAILED_CODE,
+  isGatewayProviderProxyFailedBody,
   isGatewayProviderUrlBlockedBody,
   stripGatewayMarker,
 } from './proxy-transport';
@@ -28,8 +30,8 @@ export type OpenAiCompatibleErrorType =
 
 export interface ClassifiedProviderError {
   message: string;
-  type: OpenAiCompatibleErrorType | 'provider_url_blocked';
-  code: 'context_length_exceeded' | 'provider_url_blocked';
+  type: OpenAiCompatibleErrorType | 'provider_url_blocked' | 'provider_proxy_failed';
+  code: 'context_length_exceeded' | 'provider_url_blocked' | 'provider_proxy_failed';
   source: 'provider';
 }
 
@@ -39,6 +41,9 @@ export interface ClassifiedProviderError {
  * production 5xx collapse with a fixed message, so clients can tell a blocked
  * provider configuration from a provider outage.
  */
+export const PROVIDER_PROXY_FAILED_MESSAGE =
+  'No outbound proxy of this connection could reach the provider. Check its Proxy Servers.';
+
 export const PROVIDER_URL_BLOCKED_MESSAGE =
   'Provider URL blocked by the SSRF policy. Check the base URL of this provider.';
 
@@ -222,6 +227,14 @@ export function classifyProviderError(
   status: number,
   rawBody: string,
 ): ClassifiedProviderError | null {
+  if (status === 502 && isGatewayProviderProxyFailedBody(rawBody)) {
+    return {
+      message: PROVIDER_PROXY_FAILED_MESSAGE,
+      type: PROVIDER_PROXY_FAILED_CODE,
+      code: PROVIDER_PROXY_FAILED_CODE,
+      source: 'provider',
+    };
+  }
   if (status === 502 && isGatewayProviderUrlBlockedBody(rawBody)) {
     return {
       message: PROVIDER_URL_BLOCKED_MESSAGE,

@@ -1,3 +1,4 @@
+import type { EgressHop, EgressSummary } from '../../common/outbound/outbound-proxy';
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -70,6 +71,9 @@ export interface MessageDetailResponse {
       request_headers: Record<string, string> | null;
       request_params: object | null;
       recording: AttemptRecordingDetail | null;
+      /** Where the attempt went out (Proxy Servers) and the chain hops. */
+      egress: EgressSummary | null;
+      egress_hops: EgressHop[] | null;
     }>;
   };
 }
@@ -238,6 +242,8 @@ export class MessageDetailsService {
                 request_headers: includeHeaders ? attempt.request_headers : null,
                 request_params: attempt.request_params,
                 recording: recordingsByAttempt.get(attempt.id) ?? null,
+                egress: attempt.egress ?? null,
+                egress_hops: attempt.egress_hops ?? null,
               })),
             }
           : {}),

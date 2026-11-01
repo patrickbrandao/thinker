@@ -18,6 +18,7 @@ import { toast } from '../../services/toast-store.js';
 import { useNavigate } from 'react-router';
 import { createTrigger, updateTrigger, type TriggerView } from '../../services/api/triggers.js';
 import { Button, Field, IconButton, Modal, Switch } from '../ui.js';
+import OutboundProxyPanel from '../proxy/OutboundProxyPanel.js';
 import {
   buildPayload,
   emptyForm,
@@ -633,6 +634,18 @@ export default function TriggerEditor({
           <p className="hint">{t('triggers.editor.workspaceEvents.hint')}</p>
         </div>
       </fieldset>
+
+      {trigger && !readOnly && trigger.type !== 'syslog' ? (
+        <div className="mt-4 border-t border-line pt-4">
+          <OutboundProxyPanel
+            bare
+            targetType="trigger"
+            targetId={trigger.id}
+            canManage
+            description={t('proxies.binding.triggerDescription')}
+          />
+        </div>
+      ) : null}
 
       {!readOnly ? (
         <div className="actions">

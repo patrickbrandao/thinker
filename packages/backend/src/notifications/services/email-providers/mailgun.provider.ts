@@ -1,5 +1,6 @@
 import { EmailProvider, EmailProviderConfig, SendEmailOptions } from './email-provider.interface';
 import { DOMAIN_RE } from '../email-provider-validation';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 const MAILGUN_BASE = 'https://api.mailgun.net';
 
@@ -43,7 +44,7 @@ export class MailgunProvider implements EmailProvider {
       form.append('o:tag', 'thinker');
 
       const url = new URL(`/v3/${encodeURIComponent(this.domain)}/messages`, MAILGUN_BASE);
-      const res = await fetch(url.href, {
+      const res = await outboundFetch(url.href, {
         method: 'POST',
         headers: {
           Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`,

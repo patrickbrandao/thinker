@@ -7,7 +7,9 @@ import {
   Logger,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
 import { TenantCtx, TenantContext } from '../../../common/decorators/tenant-context.decorator';
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
@@ -17,6 +19,7 @@ import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('anthropic'))
 @Controller('api/v1/oauth/anthropic')
 export class AnthropicOauthController {
   private readonly logger = new Logger(AnthropicOauthController.name);

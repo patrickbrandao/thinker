@@ -28,6 +28,12 @@ import { AgentUsageDaily } from '../entities/agent-usage-daily.entity';
 import { OrganizationMember } from '../entities/organization-member.entity';
 import { UserProfile } from '../entities/user-profile.entity';
 import { AgentTrigger, Trigger, TriggerEvent, TriggerEventLog } from '../entities/trigger.entity';
+import {
+  ProxyBinding,
+  ProxyLog,
+  ProxyServer,
+  ProxyUsageDaily,
+} from '../entities/proxy-server.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -73,6 +79,7 @@ import { AddLogRetentionDays1804300000000 } from './migrations/1804300000000-Add
 import { AddEventTriggers1804400000000 } from './migrations/1804400000000-AddEventTriggers';
 import { LocalServers1804500000000 } from './migrations/1804500000000-LocalServers';
 import { DropTriggerKeyHint1804600000000 } from './migrations/1804600000000-DropTriggerKeyHint';
+import { AddProxyServers1804700000000 } from './migrations/1804700000000-AddProxyServers';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -229,6 +236,10 @@ export const entities = [
   AgentTrigger,
   TriggerEvent,
   TriggerEventLog,
+  ProxyServer,
+  ProxyBinding,
+  ProxyLog,
+  ProxyUsageDaily,
 ];
 
 export const migrations = [
@@ -395,4 +406,5 @@ export const migrations = [
   AddEventTriggers1804400000000,
   LocalServers1804500000000,
   DropTriggerKeyHint1804600000000,
+  AddProxyServers1804700000000,
 ];

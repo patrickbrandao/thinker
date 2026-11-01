@@ -47,6 +47,7 @@ export const ENCRYPTED_COLUMNS: ReadonlyArray<EncryptedColumn> = [
   { table: 'agent_api_keys', idColumn: 'id', column: 'key' },
   { table: 'email_provider_configs', idColumn: 'id', column: 'api_key_encrypted' },
   { table: 'triggers', idColumn: 'id', column: 'secrets_encrypted' },
+  { table: 'proxy_servers', idColumn: 'id', column: 'password_encrypted' },
 ];
 
 interface EncryptedRow {

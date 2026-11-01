@@ -30,6 +30,7 @@ import { SseModule } from './sse/sse.module';
 import { SetupModule } from './setup/setup.module';
 import { McpModule } from './mcp/mcp.module';
 import { TriggersModule } from './triggers/triggers.module';
+import { ProxyServersModule } from './proxy-servers/proxy-servers.module';
 import { mcpAvailability } from './auth/mcp-availability';
 
 const frontendPath = resolveFrontendDir();
@@ -85,6 +86,7 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     OtlpModule,
     ModelPricesModule,
     NotificationsModule,
+    ProxyServersModule,
     TriggersModule,
     RoutingModule,
     PlaygroundModule,

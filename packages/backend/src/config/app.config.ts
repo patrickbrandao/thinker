@@ -2,6 +2,7 @@ import { registerAs } from '@nestjs/config';
 import { optionalPositiveInteger } from './env.util';
 import { DEFAULT_PORT } from '../common/constants/server.constants';
 import { parseRecordingRetentionDays } from './recording-retention';
+import { getGlobalProxyConfig } from '../common/outbound/outbound-proxy';
 
 function resolveDatabaseUrl(): string {
   const url = process.env['DATABASE_URL'];
@@ -75,6 +76,9 @@ export const appConfig = registerAs('app', () => ({
   requestRecordingRetentionDays: parseRecordingRetentionDays(
     process.env['THINKER_RECORDING_RETENTION_DAYS'],
   ),
+  // Global outbound proxy (THINKER_HTTP_PROXY / THINKER_NO_PROXY). An invalid
+  // value fails boot naming the variable; display form only, no credentials.
+  outboundProxy: getGlobalProxyConfig()?.display ?? null,
   // Recording storage uses capability detection by default: complete S3
   // credentials win, otherwise self-hosted installs use their mounted
   // filesystem. The explicit selector is an escape hatch for custom setups.

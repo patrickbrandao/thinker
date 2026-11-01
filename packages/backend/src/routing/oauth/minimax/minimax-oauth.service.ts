@@ -24,6 +24,7 @@ import {
   toPollIntervalMs,
   isOAuthTokenBlob,
 } from './minimax-oauth-helpers';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 /** Parse a stored MiniMax credential into a validated OAuth blob, or null. */
 function parseMinimaxBlob(raw: string): OAuthTokenBlob | null {
@@ -114,7 +115,7 @@ export class MinimaxOauthService {
     const flowId = randomBytes(16).toString('base64url');
     const baseUrl = getMinimaxBaseUrl(region);
     const resourceUrl = buildMinimaxResourceUrl(baseUrl);
-    const response = await fetch(buildMinimaxCodeUrl(baseUrl), {
+    const response = await outboundFetch(buildMinimaxCodeUrl(baseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -181,7 +182,7 @@ export class MinimaxOauthService {
       this.pending.delete(flowId);
       return { status: 'error', message: 'MiniMax login expired. Start again.' };
     }
-    const response = await fetch(buildMinimaxTokenUrl(pending.baseUrl), {
+    const response = await outboundFetch(buildMinimaxTokenUrl(pending.baseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -250,7 +251,7 @@ export class MinimaxOauthService {
 
   async refreshAccessToken(refreshToken: string, resourceUrl?: string): Promise<OAuthTokenBlob> {
     const baseUrl = getMinimaxOauthBaseUrl(resourceUrl);
-    const response = await fetch(buildMinimaxTokenUrl(baseUrl), {
+    const response = await outboundFetch(buildMinimaxTokenUrl(baseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

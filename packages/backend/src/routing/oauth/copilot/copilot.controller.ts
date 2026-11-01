@@ -1,4 +1,5 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseInterceptors } from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
 import { TenantCtx, TenantContext } from '../../../common/decorators/tenant-context.decorator';
 import { ProviderService } from '../../routing-core/provider.service';
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
@@ -9,6 +10,7 @@ import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('copilot'))
 @Controller('api/v1/routing')
 export class CopilotController {
   constructor(

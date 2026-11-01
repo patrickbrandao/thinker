@@ -9,7 +9,9 @@ import {
   Query,
   Req,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { Request, Response } from 'express';
@@ -25,6 +27,7 @@ import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('xai'))
 @Controller('api/v1/oauth/xai')
 export class XaiOauthController {
   private readonly logger = new Logger(XaiOauthController.name);

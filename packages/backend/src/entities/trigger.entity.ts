@@ -1,3 +1,4 @@
+import type { EgressHop, EgressSummary } from '../common/outbound/outbound-proxy';
 import { Entity, Column, PrimaryColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
 import { Agent } from './agent.entity';
@@ -169,6 +170,14 @@ export class TriggerEventLog {
 
   @Column('text', { nullable: true })
   response!: string | null;
+
+  /** Where the delivery went out (proxy, direct or global). */
+  @Column('jsonb', { nullable: true })
+  egress!: EgressSummary | null;
+
+  /** Outbound proxy chain hops of the delivery. */
+  @Column('jsonb', { nullable: true })
+  egress_hops!: EgressHop[] | null;
 
   @ManyToOne(() => TriggerEvent, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'event_id' })

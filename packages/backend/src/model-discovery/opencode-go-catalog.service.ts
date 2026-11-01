@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PROVIDER_BY_ID } from '../common/constants/providers';
 import { describeCatalogSyncSetting, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { TenantProvider } from '../entities/tenant-provider.entity';
+import { outboundFetch } from '../common/outbound/outbound-proxy';
 
 export interface OpencodeGoCatalogEntry {
   /** Bare model ID as listed in the docs (e.g. "glm-5.1"). */
@@ -172,7 +173,7 @@ export class OpencodeGoCatalogService implements OnModuleInit {
 
   private async fetchAndCache(now: number): Promise<OpencodeGoCatalogEntry[]> {
     try {
-      const response = await fetch(CATALOG_URL, {
+      const response = await outboundFetch(CATALOG_URL, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!response.ok) {

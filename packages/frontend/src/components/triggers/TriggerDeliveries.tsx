@@ -20,6 +20,7 @@ import { useResource } from '../../lib/use-resource.js';
 import ErrorState from '../ErrorState.js';
 import { Badge, Button, EmptyState, Modal } from '../ui.js';
 import { TriggerTypeIcon } from './TriggerParts.js';
+import { EgressHops, EgressName } from '../proxy/ProxyParts.js';
 import { eventLabel } from './trigger-form.js';
 
 const PAGE_SIZE = 50;
@@ -384,6 +385,16 @@ function DeliveryDetail({
                         {formatDateTime(log.started_at)} · {formatDuration(log.duration_ms)}
                       </span>
                     </div>
+                    {log.egress ? (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                        <span>{t('proxies.egress.label')}:</span>
+                        {log.egress_hops && log.egress_hops.length > 1 ? (
+                          <EgressHops hops={log.egress_hops} />
+                        ) : (
+                          <EgressName egress={log.egress} />
+                        )}
+                      </div>
+                    ) : null}
                     {log.error ? (
                       <p className="m-0 break-words text-xs text-danger">
                         {t('triggers.deliveries.detail.error')}: {log.error}

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { mergeExtraHeaders } from './extra-headers';
+import { outboundFetch } from '../../common/outbound/outbound-proxy';
 
 export const KIRO_BASE_URL = 'https://q.us-east-1.amazonaws.com';
 export const KIRO_MODELS_TARGET = 'AmazonCodeWhispererService.ListAvailableModels';
@@ -1185,7 +1186,7 @@ export async function forwardKiroChat(opts: {
   // Kiro reports no token counts, so seed the estimated usage with the prompt
   // size of the conversation we are about to send.
   const promptTokens = estimateKiroPromptTokens(body);
-  const upstream = await fetch(KIRO_BASE_URL, {
+  const upstream = await outboundFetch(KIRO_BASE_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

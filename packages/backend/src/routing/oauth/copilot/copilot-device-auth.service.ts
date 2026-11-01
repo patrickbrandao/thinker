@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 const GITHUB_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
@@ -19,7 +20,7 @@ export class CopilotDeviceAuthService {
   private readonly logger = new Logger(CopilotDeviceAuthService.name);
 
   async requestDeviceCode(): Promise<DeviceCodeResponse> {
-    const res = await fetch(DEVICE_CODE_URL, {
+    const res = await outboundFetch(DEVICE_CODE_URL, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -44,7 +45,7 @@ export class CopilotDeviceAuthService {
   }
 
   async pollForToken(deviceCode: string): Promise<{ status: PollStatus; token?: string }> {
-    const res = await fetch(ACCESS_TOKEN_URL, {
+    const res = await outboundFetch(ACCESS_TOKEN_URL, {
       method: 'POST',
       headers: {
         Accept: 'application/json',

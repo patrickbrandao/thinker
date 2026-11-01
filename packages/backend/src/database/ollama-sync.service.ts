@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { OLLAMA_HOST } from '../common/constants/ollama';
+import { outboundFetch } from '../common/outbound/outbound-proxy';
 
 @Injectable()
 export class OllamaSyncService {
@@ -27,7 +28,7 @@ export class OllamaSyncService {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 3000);
-        const res = await fetch(url, { signal: controller.signal });
+        const res = await outboundFetch(url, { signal: controller.signal });
         clearTimeout(timeout);
         if (!res.ok) {
           this.logger.warn(`Ollama responded ${res.status} from ${url}`);

@@ -27,6 +27,7 @@ import {
   toPollIntervalMs,
   type KiroOAuthTokenBlob,
 } from './kiro-oidc';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 interface PendingKiroOAuth {
   clientId: string;
@@ -164,7 +165,7 @@ export class KiroOauthService {
     }
 
     const baseUrl = getKiroOidcBaseUrl(pending.region);
-    const response = await fetch(buildKiroTokenUrl(baseUrl), {
+    const response = await outboundFetch(buildKiroTokenUrl(baseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -270,7 +271,7 @@ export class KiroOauthService {
   private async registerClient(
     baseUrl: string,
   ): Promise<{ clientId: string; clientSecret: string }> {
-    const response = await fetch(buildKiroRegisterUrl(baseUrl), {
+    const response = await outboundFetch(buildKiroRegisterUrl(baseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -301,7 +302,7 @@ export class KiroOauthService {
     Required<Pick<KiroDeviceAuthorizationResponse, 'deviceCode' | 'userCode' | 'expiresIn'>> &
       KiroDeviceAuthorizationResponse
   > {
-    const response = await fetch(buildKiroDeviceAuthorizationUrl(baseUrl), {
+    const response = await outboundFetch(buildKiroDeviceAuthorizationUrl(baseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ clientId, clientSecret, startUrl }),
@@ -337,7 +338,7 @@ export class KiroOauthService {
 
   private async refreshAccessToken(blob: KiroOAuthTokenBlob): Promise<KiroOAuthTokenBlob> {
     const baseUrl = getKiroOidcBaseUrl(blob.region ?? this.region);
-    const response = await fetch(buildKiroTokenUrl(baseUrl), {
+    const response = await outboundFetch(buildKiroTokenUrl(baseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({

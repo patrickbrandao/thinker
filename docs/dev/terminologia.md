@@ -44,6 +44,14 @@ Destino de entrega de eventos do workspace: e-mail (Resend, Mailgun, SendGrid), 
 - Tabelas: `triggers` (cadastro), `agent_triggers` (vínculo harness → gatilho com os eventos), `trigger_events` (fila, uma linha por evento e gatilho) e `trigger_event_logs` (uma linha por tentativa de entrega).
 - Uma **entrega** (`trigger_events`) não é uma Tentativa (`agent_messages`): nada aqui fala com provedor de IA.
 
+### Servidor Proxy (Proxy Server)
+
+Proxy HTTP/HTTPS de saída cadastrado no workspace ("Proxy Servers" no dashboard). Provedores, Conexões de provedor e gatilhos HTTP (webhook, Telegram, e-mail) apontam para uma **cadeia**: um proxy e até 5 itens de fallback, que podem ser outros proxies ou **Direct** (a internet do próprio container). O **proxy efetivo** de uma Conexão é a cadeia própria dela, senão a do Provedor, senão o **proxy global** (`THINKER_HTTP_PROXY`), senão direto.
+
+- Tabelas: `proxy_servers` (cadastro), `proxy_bindings` (cadeias), `proxy_logs` (uma linha por conexão ao proxy; só falhas, tudo com debug) e `proxy_usage_daily` (estatísticas diárias, nunca apagadas pela retenção).
+- **Saída** (`egress`) de uma Tentativa: por onde ela saiu (`proxy` com id e nome, `direct` ou `global`). **Saltos** (`egress_hops`): cada item da cadeia tentado, com resultado (`ok`, `auth_407`, `refused`, `timeout`, `tls`, `connect_status`, `dns`, `blocked`, `upstream_429`, `skipped_disabled`, `error`) e tempo.
+- Quando nenhum item funciona, a Tentativa falha com `error.code: "provider_proxy_failed"` (HTTP 502) e o roteamento segue como em qualquer falha.
+
 ### Status
 
 Requisições e Tentativas novas usam os mesmos valores canônicos:

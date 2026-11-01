@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { type AuthType, type ModelModality } from 'thinker-shared';
@@ -128,11 +129,25 @@ export class ModelDiscoveryService {
     @Optional()
     @InjectRepository(AgentEnabledProvider)
     private readonly enabledProviderRepo: Repository<AgentEnabledProvider> | null = null,
+    @Optional()
+    @Inject(ProxyEgressService)
+    private readonly egress: ProxyEgressService | null = null,
   ) {}
 
+  /** Discovery goes out through the connection's outbound proxy chain. */
   async discoverModels(
     provider: TenantProvider,
     options: DiscoverModelsOptions = {},
+  ): Promise<DiscoveredModel[]> {
+    if (!this.egress) return this.discoverModelsInScope(provider, options);
+    return this.egress.runForConnection(provider.tenant_id, provider.provider, provider.id, () =>
+      this.discoverModelsInScope(provider, options),
+    );
+  }
+
+  private async discoverModelsInScope(
+    provider: TenantProvider,
+    options: DiscoverModelsOptions,
   ): Promise<DiscoveredModel[]> {
     let apiKey = '';
     let endpointOverride: string | undefined;
