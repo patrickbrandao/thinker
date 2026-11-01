@@ -343,8 +343,8 @@ export function deleteProxyProfile(profileId: string, remove = false) {
 export function listProxyAssignments(targetType?: ProxyTargetType) {
   return fetchJson<{
     assignments: ProxyAssignmentRow[];
-    /** Workspace custom providers (`custom:<id>`), usage-based only. */
-    custom_providers?: Array<{ id: string; name: string }>;
+    /** Workspace custom providers (`custom:<id>`); `local_type` marks local servers. */
+    custom_providers?: Array<{ id: string; name: string; local_type: string | null }>;
   }>('/proxy-assignments', targetType ? { target_type: targetType } : undefined, { cache: false });
 }
 

@@ -16,18 +16,19 @@ import {
 export const PROXY_TARGET_TYPES = ['provider', 'connection', 'trigger', 'email_config'] as const;
 export type ProxyTargetType = (typeof PROXY_TARGET_TYPES)[number];
 export type ProxyMode = 'global' | 'direct' | 'profile';
-/** Provider defaults are kept apart for usage-based and subscription connections. */
-export type ProviderAuthKind = 'api_key' | 'subscription';
+/** Provider defaults are kept apart for local, usage-based and subscription connections. */
+export type ProviderAuthKind = 'local' | 'api_key' | 'subscription';
 
 export function providerTargetId(kind: ProviderAuthKind, provider: string): string {
   return `${kind}:${provider.toLowerCase()}`;
 }
 
 export function authKindOf(authType: string | null | undefined): ProviderAuthKind {
+  if (authType === 'local') return 'local';
   return authType === 'subscription' ? 'subscription' : 'api_key';
 }
 
-/** Local runners never go through a proxy (no "Outbound proxy" tab). */
+/** Built-in local runner ids (legacy canonical paths); their default is `local:<id>`. */
 export const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'llamacpp']);
 
 export interface ProxyServerRow {
@@ -247,7 +248,7 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
    * Scope of a provider connection: its own assignment, else the default of
    * its provider (usage-based or subscription), else the global proxy.
    * Without a connection (OAuth flows) `authKind` picks the provider default.
-   * Local runners never have one.
+   * Local runners have their own defaults (`local:<provider>`).
    */
   async scopeForConnection(
     tenantId: string | null | undefined,
@@ -271,18 +272,12 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
       const conn = connectionId ? snap.connections.get(connectionId) : undefined;
       const name = (conn?.provider ?? providerName).toLowerCase();
       const label = conn ? `${name} / ${conn.label}` : name;
-      if (conn?.auth_type === 'local' || LOCAL_PROVIDERS.has(name)) {
-        return {
-          tenantId,
-          sourceType: 'provider',
-          sourceId: name,
-          sourceLabel: label,
-          chain: null,
-          hops: [],
-        };
-      }
       const own = connectionId ? snap.assignments.get(`connection:${connectionId}`) : undefined;
-      const kind = conn ? authKindOf(conn.auth_type) : (authKind ?? 'api_key');
+      const kind = conn
+        ? authKindOf(conn.auth_type)
+        : LOCAL_PROVIDERS.has(name)
+          ? 'local'
+          : (authKind ?? 'api_key');
       const assignment = own ?? snap.assignments.get(`provider:${providerTargetId(kind, name)}`);
       return {
         tenantId,

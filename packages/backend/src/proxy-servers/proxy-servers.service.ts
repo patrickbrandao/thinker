@@ -22,7 +22,6 @@ import {
 } from '../common/outbound/outbound-proxy';
 import { PROVIDER_ENDPOINTS, resolveEndpointKey } from '../routing/proxy/provider-endpoints';
 import {
-  LOCAL_PROVIDERS,
   PROXY_TARGET_TYPES,
   ProxyEgressService,
   isDebugActive,
@@ -545,10 +544,9 @@ export class ProxyServersService {
     for (const id of ids('provider')) {
       const [kind, ...rest] = id.split(':');
       const name = await this.providerLabel(tenantId, rest.join(':'));
-      out.set(
-        `provider:${id}`,
-        `${name} (${kind === 'subscription' ? 'subscription' : 'usage-based'})`,
-      );
+      const kindLabel =
+        kind === 'subscription' ? 'subscription' : kind === 'local' ? 'local' : 'usage-based';
+      out.set(`provider:${id}`, `${name} (${kindLabel})`);
     }
     const connections = ids('connection');
     if (connections.length > 0) {
@@ -678,10 +676,12 @@ export class ProxyServersService {
   ): Promise<{ providerTarget?: string }> {
     switch (type) {
       case 'provider': {
-        const match = /^(api_key|subscription):([a-z0-9:._-]{1,120})$/.exec(id.toLowerCase());
-        if (!match)
-          bad('Invalid provider default (expected api_key:<provider> or subscription:<provider>)');
-        if (LOCAL_PROVIDERS.has(match[2]!)) bad('Local providers do not use outbound proxies');
+        const match = /^(local|api_key|subscription):([a-z0-9:._-]{1,120})$/.exec(id.toLowerCase());
+        if (!match) {
+          bad(
+            'Invalid provider default (expected local:, api_key: or subscription: and the provider)',
+          );
+        }
         return {};
       }
       case 'connection': {
@@ -692,9 +692,6 @@ export class ProxyServersService {
           ),
         );
         if (!rows[0]) throw new NotFoundException('Connection not found');
-        if (rows[0].auth_type === 'local' || LOCAL_PROVIDERS.has(rows[0].provider)) {
-          bad('Local providers do not use outbound proxies');
-        }
         return {
           providerTarget: providerTargetId(authKindOf(rows[0].auth_type), rows[0].provider),
         };
@@ -904,10 +901,10 @@ export class ProxyServersService {
   /** Every assignment of the workspace, plus its custom providers (provider defaults tab). */
   async listAssignments(tenantId: string | null, targetType?: string) {
     if (!tenantId) return { assignments: [], custom_providers: [] };
-    const custom = unwrap<{ id: string; name: string }>(
+    const custom = unwrap<{ id: string; name: string; local_type: string | null }>(
       await this.ds.query(
-        `SELECT 'custom:' || id AS id, name FROM custom_providers
-          WHERE tenant_id = $1 AND local_type IS NULL ORDER BY LOWER(name)`,
+        `SELECT 'custom:' || id AS id, name, local_type FROM custom_providers
+          WHERE tenant_id = $1 ORDER BY LOWER(name)`,
         [tenantId],
       ),
     );

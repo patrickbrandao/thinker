@@ -256,3 +256,27 @@ describe('ProxyEgressService.scopeForConnection (assignments)', () => {
     expect((await egress.scopeForConnection('t1', 'anthropic', null)).chain).toBeNull();
   });
 });
+
+describe('ProxyEgressService.scopeForConnection (local runners)', () => {
+  it('uses the local default of the local server', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM proxy_assignments')) {
+        return [
+          {
+            target_type: 'provider',
+            target_id: 'local:custom:abc',
+            mode: 'direct',
+            profile_id: null,
+          },
+        ];
+      }
+      if (sql.includes('FROM tenant_providers')) {
+        return [{ id: 'c-local', provider: 'custom:abc', auth_type: 'local', label: 'Ollama' }];
+      }
+      return [];
+    });
+    const egress = new ProxyEgressService({ query } as never);
+    const scope = await egress.scopeForConnection('t1', 'custom:abc', 'c-local');
+    expect(scope.chain?.map((i) => i.kind)).toEqual(['direct']);
+  });
+});

@@ -226,18 +226,18 @@ const ptBR: Catalog<typeof en> = {
     triggerDescription: 'Toda entrega deste trigger sai por este caminho.',
   },
   assignment: {
-    global: 'Proxy global',
-    globalNone: 'Global (sem proxy global: direto)',
-    direct: 'Direto',
+    global: 'Padrão global',
+    globalNone: 'Padrão global (sem proxy global: direto)',
+    direct: 'Direto - Sem proxy',
     profileNamed: 'Perfil: {{ name }}',
     inheritProvider: 'Padrão do provedor ({{ mode }})',
-    inheritGlobal: 'Proxy global (padrão)',
+    inheritGlobal: 'Padrão global',
     noProfiles: 'Nenhum perfil de saída ainda.',
     manageProfiles: 'Criar um',
   },
   profiles: {
     subtitle:
-      'Um perfil de saída é uma cadeia ordenada: primeiro um proxy, depois até 5 fallbacks (proxies ou Direto). Provedores, conexões e triggers usam um perfil, o proxy global ou conexão direta.',
+      'Um perfil de saída é uma cadeia ordenada: primeiro um proxy, depois até 5 fallbacks (proxies ou Direto). Provedores, conexões e triggers usam um perfil, o padrão global ou conexão direta.',
     create: 'Novo perfil',
     createTitle: 'Novo perfil de saída',
     editTitle: 'Editar perfil de saída',
@@ -260,7 +260,9 @@ const ptBR: Catalog<typeof en> = {
   },
   providerDefaults: {
     subtitle:
-      'Como cada provedor sai do Thinker por padrão: proxy global, conexão direta ou um perfil de saída. Uma conexão pode sobrescrever isso no diálogo Gerenciar.',
+      'Como cada provedor sai do Thinker por padrão: padrão global (THINKER_HTTP_PROXY, ou direto se não estiver definido), conexão direta ou um perfil de saída. Uma conexão pode sobrescrever isso no diálogo Gerenciar.',
+    locals: 'Locais',
+    noLocals: 'Nenhum servidor local neste workspace.',
     usageBased: 'Por uso (chave de API)',
     subscriptions: 'Assinaturas',
     provider: 'Provedor',
