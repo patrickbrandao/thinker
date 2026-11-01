@@ -36,6 +36,8 @@ coverage/
 .windsurf/
 /backend/
 .gstack/
+# Temporary reports of problems found and reported by third parties.
+/tasks/
 scripts/.env.verify
 scripts/verify-free-model-ids.sh
 # Superpowers-generated markdown (plans, brainstorms, specs, reports)
