@@ -73,7 +73,7 @@ export default function UserMenu() {
             <Avatar name={name} />
             <span className="user-text">
               <span className="user-name">{name}</span>
-              <span className="user-org">{org?.name ?? user?.email}</span>
+              <span className="user-org">{user?.email ?? org?.name}</span>
             </span>
             <ChevronsUpDown />
           </button>
