@@ -9,6 +9,7 @@ import {
   type TriggerType,
 } from 'thinker-shared';
 import { encrypt, getEncryptionSecret } from '../common/utils/crypto.util';
+import { validatePublicUrl } from '../common/utils/url-validation';
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
 import {
@@ -187,7 +188,21 @@ export class TriggersService {
     return empty ? null : encrypt(JSON.stringify(secrets), getEncryptionSecret());
   }
 
-  async create(ctx: TenantContext, input: TriggerInput) {
+  /**
+   * Webhook destinations follow the provider private-URL policy: without it
+   * the URL must be an https address on the public internet. Metadata
+   * endpoints are refused again at delivery time (ssrfSafeFetch).
+   */
+  private async assertWebhookDestination(t: NormalizedTrigger, allowPrivate: boolean) {
+    if (t.type !== 'webhook' || allowPrivate) return;
+    try {
+      await validatePublicUrl(String(t.config.url ?? ''));
+    } catch (err) {
+      throw new BadRequestException([`config.url: ${(err as Error).message}`]);
+    }
+  }
+
+  async create(ctx: TenantContext, input: TriggerInput, allowPrivate = false) {
     let tenantId = ctx.tenantId;
     if (!tenantId) {
       if (!ctx.userId) throw new NotFoundException('Tenant not found');
@@ -196,6 +211,7 @@ export class TriggersService {
     const result = normalizeTrigger(input);
     if ('errors' in result) throw new BadRequestException(result.errors);
     const t = result.value;
+    await this.assertWebhookDestination(t, allowPrivate);
     await this.assertUniqueName(tenantId, t.name);
     const id = randomUUID();
     await this.ds.query(
@@ -221,7 +237,7 @@ export class TriggersService {
     return view(await this.row(tenantId, id));
   }
 
-  async update(tenantId: string | null, id: string, input: TriggerInput) {
+  async update(tenantId: string | null, id: string, input: TriggerInput, allowPrivate = false) {
     const existing = await this.row(tenantId, id);
     if (input.type !== undefined && input.type !== existing.type) {
       throw new BadRequestException(['type cannot be changed']);
@@ -229,6 +245,7 @@ export class TriggersService {
     const result = normalizeTrigger(input, toNormalized(existing));
     if ('errors' in result) throw new BadRequestException(result.errors);
     const t = result.value;
+    await this.assertWebhookDestination(t, allowPrivate);
     await this.assertUniqueName(tenantId!, t.name, id);
     await this.ds.query(
       `UPDATE triggers
@@ -293,7 +310,7 @@ export class TriggersService {
       vars: { ...(actorEmail ? { 'actor.email': actorEmail } : {}), ...rest },
     });
     const started = Date.now();
-    const result = eventId ? await this.worker.deliverNow(eventId) : null;
+    const result = eventId ? await this.worker.deliverNow(eventId, tenantId!) : null;
     if (!result) {
       return {
         success: false,

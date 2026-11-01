@@ -26,6 +26,8 @@ O primeiro usuário, criado no assistente `/setup`, é o **admin da instância**
 
 Não há cadastro aberto nem convite por e-mail. O admin da instância (em **Users**) ou um owner/admin da organização (em **Members & settings**) cria a conta com e-mail, nome e papel. O Thinker gera uma **senha temporária**, mostrada uma única vez. Passe-a para a pessoa por um canal seguro. No primeiro login ela precisa definir uma senha nova antes de usar o painel. Se a pessoa esquecer a senha, o admin da instância gera outra senha temporária em **Users**.
 
+Sair da conta ou ter a senha redefinida apaga a sessão no servidor, mas o cookie de sessão é validado por assinatura e continua aceito por até 5 minutos. Uma cópia do cookie feita antes disso vale nesse intervalo; depois de uma redefinição pelo admin, ela só consegue ler o próprio perfil até a senha ser trocada.
+
 ## URLs privadas e provedores locais
 
 `THINKER_PROVIDER_PRIVATE_URLS` controla quem pode apontar provedores para a rede interna ou conectar Ollama, LM Studio e llama.cpp. Veja [Configuração](configuracao.md).

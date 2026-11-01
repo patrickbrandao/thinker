@@ -58,7 +58,7 @@ resource "google_service_account" "thinker" {
 resource "google_sql_database_instance" "thinker" {
   name                = "${var.service_name}-postgres-${local.suffix}"
   region              = var.region
-  database_version    = "POSTGRES_16"
+  database_version    = "POSTGRES_18"
   deletion_protection = var.database_deletion_protection
 
   settings {

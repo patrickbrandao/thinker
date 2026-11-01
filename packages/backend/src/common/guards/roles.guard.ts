@@ -32,16 +32,17 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request & RequestWithTenantContext>();
     const ctx = request.tenantContext;
-    if (!ctx) return true; // No tenant credential: the auth guards decide.
-
+    // Instance-admin routes need a user proven to be instance admin, so a
+    // credential with no tenant context (the env API key) never passes.
     if (this.reflector.getAllAndOverride<boolean>(INSTANCE_ADMIN_KEY, targets)) {
-      if (ctx.isInstanceAdmin) return true;
+      if (ctx?.isInstanceAdmin) return true;
       throw new ForbiddenException({
         message: 'Only the instance administrator can do this.',
         code: 'insufficient_role',
       });
     }
 
+    if (!ctx) return true; // No tenant credential: the auth guards decide.
     if (ctx.role === undefined) return true; // Internal context, not a user credential.
     const meta = this.reflector.getAllAndOverride<MinRoleMetadata>(MIN_ROLE_KEY, targets);
     const isRead = READ_METHODS.has(request.method);

@@ -9,6 +9,7 @@ import {
   SYSLOG_SEVERITIES,
   type TriggerType,
 } from 'thinker-shared';
+import { ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
 import { ThresholdAlertEmail } from '../notifications/emails/threshold-alert';
 import { TriggerEventEmail } from '../notifications/emails/trigger-event';
 import { renderTemplate, type TemplateVars } from './trigger-template';
@@ -67,7 +68,9 @@ async function httpCall(
   secrets: Array<string | undefined> = [],
 ): Promise<DeliveryResult> {
   try {
-    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    // Webhook URLs are tenant-supplied: never reach cloud metadata, even
+    // through a name that resolves there at connect time (DNS rebinding).
+    const res = await ssrfSafeFetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     const text = truncate(await res.text().catch(() => ''));
     return {
       success: res.ok,

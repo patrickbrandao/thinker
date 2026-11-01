@@ -61,8 +61,22 @@ describe('monitorOAuthPopup', () => {
     // Advance past one polling interval so popup.closed is detected
     vi.advanceTimersByTime(300);
 
+    // A message from another origin is ignored
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'thinker-oauth-success' },
+        origin: 'https://evil.example',
+      }),
+    );
+    expect(onSuccess).not.toHaveBeenCalled();
+
     // Simulate postMessage arriving before the 5-minute timeout
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'thinker-oauth-success' } }));
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'thinker-oauth-success' },
+        origin: window.location.origin,
+      }),
+    );
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
 

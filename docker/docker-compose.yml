@@ -43,6 +43,7 @@ name: thinker
 services:
   thinker:
     image: tmsoftbrasil/thinker:${THINKER_VERSION:-latest}
+    restart: unless-stopped
     # Longer than SHUTDOWN_DRAIN_MS (10s by default): Docker's own 10s default
     # would SIGKILL the container right at the end of the drain (exit 137).
     stop_grace_period: 30s
@@ -94,6 +95,8 @@ services:
       - THINKER_PROVIDER_PRIVATE_URLS=${THINKER_PROVIDER_PRIVATE_URLS:-}
       - PROVIDER_TIMEOUT_MS=${PROVIDER_TIMEOUT_MS:-180000}
       - STREAM_WARMUP_MS=${STREAM_WARMUP_MS:-15000}
+      # Longest silence between stream events before the client gets a 504.
+      - STREAM_IDLE_TIMEOUT_MS=${STREAM_IDLE_TIMEOUT_MS:-180000}
       # First-chunk wait for local runners (cold models load slowly).
       - THINKER_LOCAL_STREAM_WARMUP_MS=${THINKER_LOCAL_STREAM_WARMUP_MS:-}
       # false disables falling back on a 200 with no content and zero tokens.
@@ -221,6 +224,7 @@ services:
       - frontend
 
   postgres:
+    restart: unless-stopped
     image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     environment:
       - POSTGRES_USER=thinker

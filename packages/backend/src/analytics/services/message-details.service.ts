@@ -162,7 +162,7 @@ export class MessageDetailsService {
       ? attempts.reduce((sum, attempt) => sum + attempt.cache_creation_tokens, 0)
       : message!.cache_creation_tokens;
     const cost = request
-      ? attempts.reduce((sum, attempt) => sum + Number(attempt.cost_usd ?? 0), 0)
+      ? attempts.reduce((sum, attempt) => sum + Math.max(Number(attempt.cost_usd ?? 0), 0), 0)
       : message!.cost_usd;
     const duration = request
       ? attempts.length > 0

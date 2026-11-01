@@ -58,7 +58,7 @@ describe('RequestRecordingRetentionService', () => {
     const select = query.mock.calls.find(([sql]) => String(sql).includes('FROM agent_messages'));
     expect(select).toBeDefined();
     expect(select![0]).toContain('COALESCE(a.log_retention_days, t.log_retention_days, $1)');
-    expect(select![1]).toEqual([30]);
+    expect(select![1]).toEqual([30, 1000]);
     expect(storage.delete).toHaveBeenCalledWith(expired.storage_key);
     const deleteCall = query.mock.calls.findIndex(([sql]) =>
       String(sql).includes('UPDATE agent_messages'),

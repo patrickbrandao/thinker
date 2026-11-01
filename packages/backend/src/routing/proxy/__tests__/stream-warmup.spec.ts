@@ -67,6 +67,23 @@ async function collectStream(stream: ReadableStream<Uint8Array>): Promise<string
 }
 
 describe('peekStream', () => {
+  it('returns at once when the client aborts during warm-up', async () => {
+    const controller = new AbortController();
+    const started = Date.now();
+    const pending = peekStream(hangingStream(), 10_000, controller.signal);
+    setTimeout(() => controller.abort(), 20);
+    const result = await pending;
+    expect(result).toMatchObject({ ok: false, reason: 'aborted' });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('returns aborted for a signal already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const result = await peekStream(hangingStream(), 10_000, controller.signal);
+    expect(result).toMatchObject({ ok: false, reason: 'aborted' });
+  });
+
   describe('timeout config', () => {
     it('defaults to 15000 ms when env var is unset', () => {
       expect(parseStreamWarmupMs(undefined)).toBe(DEFAULT_STREAM_WARMUP_MS);

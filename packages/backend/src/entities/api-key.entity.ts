@@ -20,7 +20,7 @@ export class ApiKey {
   @Column('varchar')
   tenant_id!: string;
 
-  /** Audit-only: which user created the key. Never used for scoping. */
+  /** The user who created the key; the key carries their current role (ADR 0006). */
   @Column('varchar', { nullable: true })
   created_by_user_id!: string | null;
 

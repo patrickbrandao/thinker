@@ -55,6 +55,12 @@ describe('RolesGuard (ADR 0006)', () => {
     expect(run({ ctx: ctx('viewer', { isInstanceAdmin: true }), meta })).toBe(true);
   });
 
+  it('refuses InstanceAdminOnly without a tenant context (env API key)', () => {
+    const meta = { [INSTANCE_ADMIN_KEY]: true };
+    expect(() => run({ meta })).toThrow(ForbiddenException);
+    expect(() => run({ method: 'PATCH', meta })).toThrow(ForbiddenException);
+  });
+
   it('treats a user with no organization yet as the owner of their first one', () => {
     expect(run({ method: 'POST', ctx: { tenantId: null, userId: 'u1', role: null } })).toBe(true);
   });

@@ -67,4 +67,4 @@ spec:
   databases:
     - name: thinker-db
       engine: PG
-      version: "16"
+      version: "18"

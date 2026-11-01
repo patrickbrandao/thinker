@@ -36,7 +36,7 @@ O passo a passo, inclusive para quem dependia do antigo fallback para `BETTER_AU
 | `THINKER_CORS_ORIGINS` | vazio | Origens de navegador extras que podem chamar o gateway (separadas por vírgula). O dashboard é de mesma origem e não precisa. |
 | `MCP_ENABLED` | ligado | `false` desliga o servidor MCP remoto (`/api/v1/mcp`). O MCP exige `BETTER_AUTH_URL` em HTTPS (ou localhost) e se desliga sozinho em HTTP de LAN. |
 | `THINKER_CIMD_ALLOW_PRIVATE` | `false` | `true` deixa clientes MCP cuja URL de metadados (CIMD) resolve para endereço privado ou loopback fazerem login. Endereços de metadata de nuvem continuam bloqueados. |
-| `API_KEY` | vazio | Credencial opcional de operador para acesso programático via cabeçalho `X-API-Key`. |
+| `API_KEY` | vazio | Credencial opcional de operador para acesso programático via cabeçalho `X-API-Key`. Não está ligada a nenhum usuário, então não abre as rotas do admin da instância (**Users**). |
 | `CLI_TOKEN_TTL_DAYS` / `CLI_TOKEN_ABSOLUTE_TTL_DAYS` | `30` / `90` | Validade deslizante e teto absoluto dos tokens da CLI (`thinker login`). |
 
 ## Gravações de requisições
@@ -61,7 +61,7 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
-| `THINKER_PROVIDER_PRIVATE_URLS` | `admin-only` | Quem pode cadastrar provedor custom com URL privada/LAN e conectar Ollama, LM Studio e llama.cpp: `allow` (quem conecta provedores), `admin-only` (admin da instância e owner da organização) ou `deny` (ninguém). Metadados de nuvem ficam bloqueados em qualquer modo. Veja [Organizações](organizacoes.md). |
+| `THINKER_PROVIDER_PRIVATE_URLS` | `admin-only` | Quem pode cadastrar provedor custom com URL privada/LAN e conectar Ollama, LM Studio e llama.cpp: `allow` (quem conecta provedores), `admin-only` (admin da instância e owner da organização) ou `deny` (ninguém). Também vale para a URL de gatilhos webhook: fora da política, ela precisa ser `https` em endereço público. Metadados de nuvem ficam bloqueados em qualquer modo, inclusive na entrega dos webhooks. Veja [Organizações](organizacoes.md). |
 | `OLLAMA_HOST` | `http://host.docker.internal:11434` (compose) | Pré-preenche esquema, host e porta de um **novo** servidor Ollama (aceita `host`, `host:porta` ou URL; `0.0.0.0` vira o host do container). Na atualização para a versão com servidores locais, as conexões Ollama existentes viram um servidor neste endereço. |
 | `THINKER_LMSTUDIO_BASE_URL` | vazio | Pré-preenche um novo servidor LM Studio (URL `http(s)` absoluta, com ou sem `/v1`). Valor inválido é ignorado. |
 | `THINKER_LLAMACPP_BASE_URL` | vazio | Pré-preenche um novo servidor llama.cpp, com as mesmas regras (padrão sem a variável: porta 9931). |

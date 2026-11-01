@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
+import { canUsePrivateDestinations } from '../common/utils/private-url-policy';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { TriggersService, type TriggerTestInput } from './triggers.service';
 import type { TriggerInput } from './trigger-config';
@@ -50,13 +51,13 @@ export class TriggersController {
   @MinRole('admin')
   @Post('triggers')
   create(@TenantCtx() ctx: TenantContext, @Body() body: TriggerInput) {
-    return this.triggers.create(ctx, body ?? {});
+    return this.triggers.create(ctx, body ?? {}, canUsePrivateDestinations(ctx));
   }
 
   @MinRole('admin')
   @Patch('triggers/:id')
   update(@TenantCtx() ctx: TenantContext, @Param('id') id: string, @Body() body: TriggerInput) {
-    return this.triggers.update(ctx.tenantId, id, body ?? {});
+    return this.triggers.update(ctx.tenantId, id, body ?? {}, canUsePrivateDestinations(ctx));
   }
 
   @MinRole('admin')

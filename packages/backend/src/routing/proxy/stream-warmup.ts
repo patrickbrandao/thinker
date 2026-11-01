@@ -77,7 +77,7 @@ export interface WarmupSuccess {
 
 export interface WarmupFailure {
   ok: false;
-  reason: 'timeout' | 'error' | 'empty';
+  reason: 'timeout' | 'error' | 'empty' | 'aborted';
   message: string;
 }
 
@@ -92,18 +92,35 @@ export type WarmupResult = WarmupSuccess | WarmupFailure;
 export async function peekStream(
   source: ReadableStream<Uint8Array>,
   timeoutMs: number = STREAM_WARMUP_MS,
+  signal?: AbortSignal,
 ): Promise<WarmupResult> {
   const reader = source.getReader();
 
   try {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    // A client that hangs up stops the wait at once, so its concurrency slot
+    // is not held until the warm-up timeout.
     const first = await Promise.race([
       reader.read(),
       new Promise<{ timedOut: true }>((resolve) => {
         timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
       }),
+      new Promise<{ aborted: true }>((resolve) => {
+        if (!signal) return;
+        if (signal.aborted) return resolve({ aborted: true });
+        onAbort = () => resolve({ aborted: true });
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
     ]);
     clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+
+    if ('aborted' in first) {
+      reader.cancel().catch(() => {});
+      reader.releaseLock();
+      return { ok: false, reason: 'aborted', message: 'Client disconnected during warm-up' };
+    }
 
     if ('timedOut' in first) {
       reader.cancel().catch(() => {});

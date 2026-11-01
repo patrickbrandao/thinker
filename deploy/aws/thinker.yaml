@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   Deploy Thinker on AWS with ECS Fargate, RDS PostgreSQL, S3 request
-  recording storage, an Application Load Balancer, and Secrets Manager. The load balancer is
-  HTTP-only by default; configure TLS with your own domain and ACM
-  certificate before sending production auth traffic through it.
+  recording storage, an Application Load Balancer, and Secrets Manager. Pass an
+  ACM certificate and its hostname to serve HTTPS (HTTP then redirects to it);
+  without them the load balancer serves plain HTTP, for evaluation only.
 
 Parameters:
   ServiceName:
@@ -88,7 +88,17 @@ Parameters:
     Default: 10.80.11.0/24
     Description: CIDR block for the second private database subnet.
 
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate for the load balancer. Empty serves plain HTTP (evaluation only).
+  PublicHostname:
+    Type: String
+    Default: ""
+    Description: Hostname the certificate covers, pointed (CNAME/alias) at the load balancer.
+
 Conditions:
+  HasCertificate: !Not [!Equals [!Ref AcmCertificateArn, ""]]
   EnableDatabaseDeletionProtection: !Equals [!Ref DatabaseDeletionProtection, "true"]
 
 Resources:
@@ -190,12 +200,16 @@ Resources:
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP traffic to Thinker.
+      GroupDescription: Allow HTTP and HTTPS traffic to Thinker.
       SecurityGroupIngress:
         - CidrIp: !Ref AllowedIngressCidr
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
+        - CidrIp: !Ref AllowedIngressCidr
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
       SecurityGroupEgress:
         - CidrIp: 0.0.0.0/0
           IpProtocol: -1
@@ -395,11 +409,32 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
-        - TargetGroupArn: !Ref TargetGroup
-          Type: forward
+        - !If
+          - HasCertificate
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+          - TargetGroupArn: !Ref TargetGroup
+            Type: forward
       LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificate
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref AcmCertificateArn
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -415,7 +450,10 @@ Resources:
             - Name: AUTH_DB_POOL_MAX
               Value: "5"
             - Name: BETTER_AUTH_URL
-              Value: !Sub "http://${LoadBalancer.DNSName}"
+              Value: !If
+                - HasCertificate
+                - !Sub "https://${PublicHostname}"
+                - !Sub "http://${LoadBalancer.DNSName}"
             - Name: THINKER_RECORDING_STORAGE
               Value: s3
             - Name: THINKER_RECORDING_S3_BUCKET
@@ -477,10 +515,19 @@ Resources:
 Outputs:
   ServiceUrl:
     Description: Public Thinker URL.
-    Value: !Sub "http://${LoadBalancer.DNSName}"
+    Value: !If
+      - HasCertificate
+      - !Sub "https://${PublicHostname}"
+      - !Sub "http://${LoadBalancer.DNSName}"
+  LoadBalancerDnsName:
+    Description: Point the public hostname (CNAME or alias) here.
+    Value: !GetAtt LoadBalancer.DNSName
   HealthCheckUrl:
     Description: Thinker health check URL.
-    Value: !Sub "http://${LoadBalancer.DNSName}/api/v1/health"
+    Value: !If
+      - HasCertificate
+      - !Sub "https://${PublicHostname}/api/v1/health"
+      - !Sub "http://${LoadBalancer.DNSName}/api/v1/health"
   DatabaseEndpoint:
     Description: RDS PostgreSQL endpoint.
     Value: !GetAtt Database.Endpoint.Address

@@ -21,7 +21,7 @@ const UNLOCK_SQL = `SELECT pg_advisory_unlock(${RETENTION_LOCK_KEY}::bigint)`;
  */
 const RETENTION_DAYS_SQL = `COALESCE(a.log_retention_days, t.log_retention_days, $1)`;
 
-const SELECT_ALL_EXPIRED_SQL = `
+const SELECT_EXPIRED_SQL = `
   SELECT m.id AS attempt_id, m.recording_key AS storage_key
   FROM agent_messages m
   LEFT JOIN agents a ON a.id = m.agent_id
@@ -29,9 +29,12 @@ const SELECT_ALL_EXPIRED_SQL = `
   WHERE m.recording_key IS NOT NULL
     AND m.timestamp < CURRENT_TIMESTAMP - (${RETENTION_DAYS_SQL} * INTERVAL '1 day')
   ORDER BY m.timestamp ASC
+  LIMIT $2
 `;
 
 const LOG_PURGE_BATCH = 5000;
+/** Recordings handled per pass: each one is a storage call, so keep memory flat. */
+const RECORDING_PURGE_BATCH = 1000;
 
 /**
  * Expired logs are stripped, not deleted: the row keeps its status, tokens and
@@ -140,8 +143,15 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
       acquired = lockRows[0]?.acquired === true;
       if (!acquired) return 0;
 
-      const recordings = await this.findAllExpired(queryRunner, this.retentionDays);
-      const deleted = await this.deleteRecordings(queryRunner, recordings);
+      let deleted = 0;
+      for (;;) {
+        const recordings = await this.findExpiredBatch(queryRunner, this.retentionDays);
+        const batchDeleted = await this.deleteRecordings(queryRunner, recordings);
+        deleted += batchDeleted;
+        // A failed delete keeps its row, so a batch with no progress means
+        // only failures are left: stop instead of retrying them forever.
+        if (recordings.length < RECORDING_PURGE_BATCH || batchDeleted === 0) break;
+      }
 
       if (deleted > 0) {
         this.logger.log(`Deleted ${deleted} expired Provider Attempt recording(s)`);
@@ -171,11 +181,11 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
     }
   }
 
-  private async findAllExpired(
+  private async findExpiredBatch(
     queryRunner: QueryRunner,
     retentionDays: number,
   ): Promise<ExpiredRecording[]> {
-    return queryRunner.query(SELECT_ALL_EXPIRED_SQL, [retentionDays]) as Promise<
+    return queryRunner.query(SELECT_EXPIRED_SQL, [retentionDays, RECORDING_PURGE_BATCH]) as Promise<
       ExpiredRecording[]
     >;
   }
