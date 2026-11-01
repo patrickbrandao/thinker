@@ -37,7 +37,7 @@ export interface RequestDrawerProps {
   variant?: 'panel' | 'page';
 }
 
-type AttemptTab = 'details' | 'request' | 'response' | 'tools' | 'raw';
+type AttemptTab = 'details' | 'request' | 'response' | 'timeline' | 'tools' | 'raw';
 type Layout = 'docked' | 'floating';
 
 interface FloatRect {
@@ -490,6 +490,11 @@ export default function RequestDrawer({
     if (currentAttempt.recording || currentAttempt.status === 'pending') {
       visibleTabs.push({ key: 'response', label: t('messages.drawer.tabs.response') });
     }
+  }
+  if (m?.timeline?.events?.length > 0) {
+    visibleTabs.push({ key: 'timeline', label: t('messages.drawer.timeline') });
+  }
+  if (currentAttempt) {
     if (currentAttempt.recording) {
       visibleTabs.push({ key: 'tools', label: t('messages.drawer.tabs.tools') });
       visibleTabs.push({ key: 'raw', label: t('messages.drawer.tabs.raw') });
@@ -758,16 +763,15 @@ export default function RequestDrawer({
                         </div>
                       </DetailCard>
                     ) : null}
-                    {m.timeline?.events?.length > 0 ? (
-                      <DetailCard title={t('messages.drawer.timeline')}>
-                        <RequestTimelineChart timeline={m.timeline} />
-                      </DetailCard>
-                    ) : null}
                     {headers && Object.keys(headers).length > 0 ? (
                       <DetailCard title={t('messages.drawer.requestHeaders')}>
                         <RequestHeadersList headers={headers} />
                       </DetailCard>
                     ) : null}
+                  </div>
+                ) : activeTab === 'timeline' && m.timeline ? (
+                  <div className="db drawer__body">
+                    <RequestTimelineChart timeline={m.timeline} />
                   </div>
                 ) : currentAttempt ? (
                   <div className="drawer__messages-pane min-h-0 flex-1 overflow-hidden">
