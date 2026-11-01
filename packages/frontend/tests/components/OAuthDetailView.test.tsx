@@ -440,7 +440,7 @@ describe('OAuthDetailView', () => {
     });
   });
 
-  it('shows the callback-URL video tutorial for OpenAI after starting OAuth', async () => {
+  it('shows the copy-the-callback-URL hint for OpenAI after starting OAuth, without a video', async () => {
     mockGetOpenaiOAuthUrl.mockResolvedValue({ url: 'https://oauth.openai.com/authorize' });
     vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
 
@@ -450,27 +450,10 @@ describe('OAuthDetailView', () => {
     await waitFor(() => {
       expect(screen.getByText(/Copy the full URL/)).toBeDefined();
     });
-    expect(
-      container.querySelector('video[src="/images/oauth-callback-example.mp4"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('video')).toBeNull();
   });
 
-  it('sets preload="auto" on the OAuth tutorial video so it plays immediately', async () => {
-    mockGetOpenaiOAuthUrl.mockResolvedValue({ url: 'https://oauth.openai.com/authorize' });
-    vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
-
-    const { container } = renderView();
-    fireEvent.click(screen.getByText('Log in with OpenAI'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Copy the full URL/)).toBeDefined();
-    });
-    const video = container.querySelector('video[src="/images/oauth-callback-example.mp4"]');
-    expect(video).not.toBeNull();
-    expect(video!.getAttribute('preload')).toBe('auto');
-  });
-
-  it('does not show the callback-URL video tutorial for non-OpenAI providers (e.g. Gemini)', async () => {
+  it('does not show the callback-URL hint for non-OpenAI providers (e.g. Gemini)', async () => {
     mockGetOpenaiOAuthUrl.mockResolvedValue({ url: 'https://oauth.google.com/authorize' });
     vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
 
@@ -481,7 +464,7 @@ describe('OAuthDetailView', () => {
       expect(mockGetOpenaiOAuthUrl).toHaveBeenCalled();
     });
     expect(screen.queryByText(/Copy the full URL/)).toBeNull();
-    expect(container.querySelector('video[src="/images/oauth-callback-example.mp4"]')).toBeNull();
+    expect(container.querySelector('video')).toBeNull();
   });
 
   it('Disconnect all revokes all OpenAI OAuth tokens', async () => {

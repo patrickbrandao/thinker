@@ -60,6 +60,7 @@ export default {
     activeKeys: (n: number) => (n === 1 ? `${n} active key` : `${n} active keys`),
     colName: 'Name',
     colUrl: 'URL',
+    colModels: 'Models',
     colProvider: 'Provider',
     colConnection: 'Connection',
     colStatus: 'Status',
