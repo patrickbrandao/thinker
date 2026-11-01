@@ -144,6 +144,7 @@ it('builds the topology from clients through connections and proxies to the inte
         target: harness,
         kind: 'client',
         requests: 1,
+        recent: 1,
       }),
       expect.objectContaining({
         source: harness,
@@ -154,7 +155,12 @@ it('builds the topology from clients through connections and proxies to the inte
       }),
       expect.objectContaining({ source: harness, target: backup, kind: 'fallback', requests: 0 }),
       expect.objectContaining({ source: conn, target: `proxy:${profile}`, kind: 'egress' }),
-      expect.objectContaining({ source: `proxy:${profile}`, target: 'internet', requests: 1 }),
+      expect.objectContaining({
+        source: `proxy:${profile}`,
+        target: 'internet',
+        requests: 1,
+        recent: 1,
+      }),
       expect.objectContaining({ source: backup, target: 'internet', kind: 'egress' }),
     ]),
   );

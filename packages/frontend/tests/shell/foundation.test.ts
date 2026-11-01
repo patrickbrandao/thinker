@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { signal, useSignal } from '../../src/lib/signal';
 import { useResource } from '../../src/lib/use-resource';
 import { columnLayout, validEdges } from '../../src/components/flow/layout';
+import { pointOnBezier } from '../../src/components/flow/edges';
 import { t, tMaybe, resetLocaleForTests } from '../../src/i18n';
 import { NAVIGATION, activeNavItem } from '../../src/config/navigation';
 
@@ -86,5 +87,13 @@ describe('flow layout', () => {
     expect(at.x!.y).toBeLessThan(at.y!.y);
     expect(at.z).toEqual({ x: 7, y: 9 });
     expect(validEdges(graph.nodes, [{ id: 'q', source: 'a', target: 'gone' }])).toEqual([]);
+  });
+});
+
+describe('edge label position', () => {
+  it('finds the point of a cubic Bézier path', () => {
+    expect(pointOnBezier('M0,0 C10,0 10,10 20,10', 0.5)).toEqual([10, 5]);
+    expect(pointOnBezier('M0,0 C10,0 10,10 20,10', 0)).toEqual([0, 0]);
+    expect(pointOnBezier('M0,0', 0.2)).toBeNull();
   });
 });

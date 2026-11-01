@@ -23,6 +23,7 @@ export function topologyLegend(): FlowLegendItem[] {
     { id: 'route', label: t('shell.flow.links.route') },
     { id: 'fallback', label: t('shell.flow.links.fallback'), dashed: true },
     { id: 'error', label: t('shell.flow.links.error'), error: true },
+    { id: 'idle', label: t('shell.flow.links.idle'), idle: true },
   ];
 }
 
@@ -53,15 +54,13 @@ export function expandIpv6(ip: string): string[] | null {
   return groups.map((g) => g.padStart(4, '0'));
 }
 
-/** Text lines of a client node: IPv6 in pairs of groups, IPv4 on one line. */
+/** Text lines of a client node: IPv6 in two lines of four groups, IPv4 on one line. */
 export function ipLines(ip: string): string[] {
   const plain = plainIp(ip);
   if (!plain.includes(':')) return [plain];
   const groups = expandIpv6(plain);
   if (!groups) return [plain];
-  const lines: string[] = [];
-  for (let i = 0; i < 8; i += 2) lines.push(`${groups[i]}:${groups[i + 1]}${i < 6 ? ':' : ''}`);
-  return lines;
+  return [groups.slice(0, 4).join(':'), groups.slice(4).join(':')];
 }
 
 function usageTooltip(
@@ -81,8 +80,22 @@ function usageTooltip(
   return lines.filter(Boolean).join('\n');
 }
 
+/** An edge turns red when half or more of its requests failed. */
 const failing = (u: { requests: number; errors: number }) =>
   u.requests > 0 && u.errors * 2 >= u.requests;
+
+/** Node border: red with any error in the window, blue with traffic, plain when idle. */
+const nodeState = (u: { requests: number; errors: number }) =>
+  u.errors > 0 ? 'error' : u.requests > 0 ? 'active' : 'idle';
+
+/** Stroke width of a link: the base for the quietest one, up to 4x for the busiest. */
+const BASE_WIDTH = 1.6;
+export function linkWidths(recent: number[]): (value: number) => number {
+  const min = Math.min(...recent);
+  const max = Math.max(...recent);
+  if (!(max > min)) return () => BASE_WIDTH;
+  return (value) => BASE_WIDTH * (1 + (3 * (value - min)) / (max - min));
+}
 
 const harnessHref = (name: string) => `/harnesses/${encodeURIComponent(name)}`;
 
@@ -101,6 +114,7 @@ function linkTooltip(l: TopologyLink): string | undefined {
     if (l.errors > 0) lines.push(t('shell.flow.metrics.errors', formatNumber(l.errors)));
     if (l.costUsd > 0) lines.push(formatCost(l.costUsd) ?? '');
   }
+  if (l.recent > 0) lines.push(t('shell.flow.metrics.lastMinute', formatNumber(l.recent)));
   return lines.length ? lines.filter(Boolean).join('\n') : undefined;
 }
 
@@ -140,8 +154,9 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           icon: createElement(Bot, { size: 22, strokeWidth: 1.6 }),
           title: c.ip,
           lines: ipLines(c.ip),
+          dense: plainIp(c.ip).includes(':'),
           tooltip: usageTooltip(plainIp(c.ip), c),
-          state: failing(c) ? 'error' : undefined,
+          state: nodeState(c),
         },
       },
       COLUMN.client,
@@ -159,7 +174,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           icon: icon ? createElement(ThemedIcon, { src: icon, size: ICON }) : lucide(BrainCircuit),
           title: h.displayName || h.name,
           tooltip: usageTooltip(h.displayName || h.name, h, [h.platform]),
-          state: failing(h) ? 'error' : h.requests === 0 ? 'idle' : undefined,
+          state: nodeState(h),
           href: harnessHref(h.name),
         },
       },
@@ -185,7 +200,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
             auth,
             p.active ? null : t('shell.flow.disabled'),
           ]),
-          state: failing(p) ? 'error' : p.requests === 0 ? 'idle' : undefined,
+          state: nodeState(p),
           href: `/providers/connections/${encodeURIComponent(p.connectionId)}`,
         },
       },
@@ -205,7 +220,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           title: t('shell.flow.proxy'),
           subtitle: name,
           tooltip: usageTooltip(`${t('shell.flow.proxy')} · ${name}`, proxy),
-          state: failing(proxy) ? 'error' : undefined,
+          state: nodeState(proxy),
           href: '/proxy-servers',
         },
       },
@@ -224,6 +239,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           icon: lucide(end.id === 'local' ? House : Globe),
           title,
           tooltip: usageTooltip(title, end),
+          state: nodeState(end),
         },
       },
       COLUMN.egress,
@@ -231,22 +247,25 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
   }
 
   const ids = new Set(nodes.map((n) => n.id));
-  const edges: FlowEdge[] = links
-    .filter((l) => ids.has(l.source) && ids.has(l.target))
-    .map((l) => ({
-      id: `${l.source}>${l.target}`,
-      source: l.source,
-      target: l.target,
-      data: {
-        live: l.requests,
-        label: l.requests > 0 ? formatNumber(l.requests) : undefined,
-        tooltip: linkTooltip(l),
-        dashed: l.kind === 'fallback',
-        state: failing(l) ? 'error' : undefined,
-      },
-    }));
+  const shown = links.filter((l) => ids.has(l.source) && ids.has(l.target));
+  const width = linkWidths(shown.map((l) => l.recent ?? 0));
+  const edges: FlowEdge[] = shown.map((l) => ({
+    id: `${l.source}>${l.target}`,
+    source: l.source,
+    target: l.target,
+    data: {
+      live: l.requests,
+      label: l.requests > 0 ? formatNumber(l.requests) : undefined,
+      tooltip: linkTooltip(l),
+      dashed: l.kind === 'fallback',
+      idle: l.requests === 0,
+      arrow: l.kind === 'client',
+      width: width(l.recent ?? 0),
+      state: failing(l) ? 'error' : undefined,
+    },
+  }));
 
-  return columnLayout(
+  const laid = columnLayout(
     { nodes, edges },
     {
       columnOf: (node) => columns.get(node.id) ?? 0,
@@ -256,5 +275,31 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           : STEP_HEIGHT,
       positions: data.positions,
     },
+  );
+  return { nodes: laid.nodes, edges: staggerLabels(laid.nodes, laid.edges) };
+}
+
+const LABEL_FIRST = 0.2;
+const LABEL_STEP = 0.12;
+
+/**
+ * Counters sit 20% along the line from the source. Lines leaving the same
+ * node start together, so their counters step further along (top target first)
+ * instead of piling up.
+ */
+function staggerLabels(nodes: FlowNode[], edges: FlowEdge[]): FlowEdge[] {
+  const y = new Map(nodes.map((n) => [n.id, n.position.y]));
+  const bySource = new Map<string, FlowEdge[]>();
+  for (const e of edges) {
+    if (e.data?.label) bySource.set(e.source, [...(bySource.get(e.source) ?? []), e]);
+  }
+  const labelAt = new Map<string, number>();
+  for (const group of bySource.values()) {
+    group
+      .sort((a, b) => (y.get(a.target) ?? 0) - (y.get(b.target) ?? 0))
+      .forEach((e, i) => labelAt.set(e.id, Math.min(0.8, LABEL_FIRST + i * LABEL_STEP)));
+  }
+  return edges.map((e) =>
+    labelAt.has(e.id) ? { ...e, data: { ...e.data, labelAt: labelAt.get(e.id) } } : e,
   );
 }
