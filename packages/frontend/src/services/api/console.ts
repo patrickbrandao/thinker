@@ -64,7 +64,8 @@ export interface Topology {
   >;
   /** Outbound proxy profiles in use (`profileId` null: the global proxy). */
   proxies: Array<Usage & { id: string; profileId: string | null; name: string }>;
-  egress: Array<Usage & { id: 'internet' | 'local' }>;
+  /** `internet` behind a proxy, `gateway` (direct from the instance) or `local` (local servers). */
+  egress: Array<Usage & { id: 'internet' | 'gateway' | 'local' }>;
   links: TopologyLink[];
   /** Saved canvas positions, by node id. */
   positions: Record<string, { x: number; y: number }>;
