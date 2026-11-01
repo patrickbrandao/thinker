@@ -22,6 +22,8 @@ import {
   type OAuthServiceSet,
 } from './oauth-credentials';
 import type { ForwardResult } from './provider-client';
+import { runWithOutboundScope, type OutboundScope } from '../../common/outbound/outbound-proxy';
+import type { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import type { ProviderAttemptRef, StartProviderAttempt } from './proxy-types';
 
 /** Why a route could not produce a usable provider apiKey. */
@@ -58,6 +60,8 @@ export type ResolvedRouteCredentials =
       keyLabel: string;
       /** The selected row's stream warm-up override (#244). */
       streamWarmupMs: number | null;
+      /** Outbound proxy scope of the selected connection (Proxy Servers). */
+      egressScope?: OutboundScope;
     }
   | {
       ok: false;
@@ -76,6 +80,8 @@ export interface CredentialFailurePresentation {
 export interface RouteCredentialDeps {
   providerKeyService: Pick<ProviderKeyService, 'selectProviderKey' | 'getProviderApiKey'>;
   oauth: OAuthServiceSet;
+  /** Resolves the connection's outbound proxy chain; absent in unit tests. */
+  egress?: Pick<ProxyEgressService, 'scopeForConnection'>;
 }
 
 export function credentialFailureCode(
@@ -242,19 +248,23 @@ export async function resolveRouteCredentials(
     providerKeyLabel = key.label;
   }
 
-  const unwrapped = await resolveApiKey(
-    provider,
-    apiKey,
-    authType,
-    agentId,
-    tenantId,
-    oauth.openaiOauth,
-    oauth.minimaxOauth,
-    oauth.anthropicOauth,
-    oauth.geminiOauth,
-    oauth.kiroOauth,
-    oauth.xaiOauth,
-    providerKeyLabel,
+  // OAuth refreshes go out through the same chain as the inference call.
+  const egressScope = await deps.egress?.scopeForConnection(tenantId, provider, tenantProviderId);
+  const unwrapped = await runWithOutboundScope(egressScope, () =>
+    resolveApiKey(
+      provider,
+      apiKey,
+      authType,
+      agentId,
+      tenantId,
+      oauth.openaiOauth,
+      oauth.minimaxOauth,
+      oauth.anthropicOauth,
+      oauth.geminiOauth,
+      oauth.kiroOauth,
+      oauth.xaiOauth,
+      providerKeyLabel,
+    ),
   );
 
   // resolveApiKey only returns null when a subscription OAuth blob exists
@@ -292,5 +302,6 @@ export async function resolveRouteCredentials(
     // have fallen back to the default key when the pin matched nothing.
     keyLabel: key.label,
     streamWarmupMs: key.streamWarmupMs ?? null,
+    ...(egressScope ? { egressScope } : {}),
   };
 }

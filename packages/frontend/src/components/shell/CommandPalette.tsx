@@ -9,6 +9,7 @@ import {
   Layers,
   LogOut,
   Moon,
+  Network,
   Plug,
   Search,
   Settings,
@@ -24,7 +25,7 @@ import {
   type SearchResult,
   type SearchResultType,
 } from '../../services/api/console.js';
-import { isInstanceAdmin } from '../../services/session-store.js';
+import { isInstanceAdmin, roleCan } from '../../services/session-store.js';
 import { toggleTheme } from '../../lib/theme.js';
 import { useFocusTrap } from '../../services/use-focus-trap.js';
 import { t } from '../../i18n/index.js';
@@ -139,6 +140,17 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
         icon: <Zap />,
         run: go('/triggers'),
       },
+      ...(roleCan.manageProviders()
+        ? [
+            {
+              id: 'nav:proxy-servers',
+              group: t('shell.palette.goTo'),
+              label: t('nav.proxyServers'),
+              icon: <Network />,
+              run: go('/proxy-servers'),
+            },
+          ]
+        : []),
       {
         id: 'nav:cli',
         group: t('shell.palette.goTo'),

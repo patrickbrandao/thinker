@@ -1,4 +1,5 @@
-import { Injectable, Logger, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, HttpStatus, Optional } from '@nestjs/common';
+import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { ConfigService } from '@nestjs/config';
 import { ResolveService } from '../resolve/resolve.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
@@ -279,6 +280,7 @@ export class ProxyService {
     private readonly thinkingCache: ThinkingBlockCache,
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
+    @Optional() private readonly egress?: ProxyEgressService,
   ) {}
 
   async proxyRequest(opts: ProxyRequestOptions): Promise<ProxyResult> {
@@ -990,6 +992,7 @@ export class ProxyService {
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
       },
+      egress: this.egress,
     };
   }
 

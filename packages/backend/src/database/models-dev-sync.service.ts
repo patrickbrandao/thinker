@@ -9,6 +9,7 @@ import {
 } from '../model-discovery/model-capabilities';
 import { GOOGLE_VARIANT_RE } from '../model-prices/model-name-normalizer';
 import { loadPricingSnapshot } from '../model-prices/pricing-snapshot';
+import { outboundFetch } from '../common/outbound/outbound-proxy';
 
 /**
  * Providers whose models.dev catalog is authoritative for **pricing as well as
@@ -840,7 +841,7 @@ export class ModelsDevSyncService implements OnModuleInit {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await fetch(MODELS_DEV_API, { signal: controller.signal });
+      const res = await outboundFetch(MODELS_DEV_API, { signal: controller.signal });
       clearTimeout(timeout);
 
       if (!res.ok) {

@@ -1,4 +1,5 @@
 import { EmailProvider, EmailProviderConfig, SendEmailOptions } from './email-provider.interface';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 const logger = {
   warn: (msg: string) => console.warn(`[SendGrid] ${msg}`),
@@ -23,7 +24,7 @@ export class SendGridProvider implements EmailProvider {
     }
 
     try {
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      const res = await outboundFetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.apiKey}`,

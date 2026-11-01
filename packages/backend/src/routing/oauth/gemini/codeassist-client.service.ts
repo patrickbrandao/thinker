@@ -21,6 +21,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { scrubSecrets } from '../../../common/utils/secret-scrub';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 const CODE_ASSIST_BASE = 'https://cloudcode-pa.googleapis.com';
 const CODE_ASSIST_VERSION = 'v1internal';
@@ -112,7 +113,7 @@ export class CodeAssistClientService {
     body: Record<string, unknown>,
   ): Promise<T> {
     const url = `${CODE_ASSIST_BASE}/${CODE_ASSIST_VERSION}${method}`;
-    const response = await fetch(url, {
+    const response = await outboundFetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -130,7 +131,7 @@ export class CodeAssistClientService {
 
   private async callOperation(name: string, accessToken: string): Promise<LongRunningOperation> {
     const url = `${CODE_ASSIST_BASE}/${CODE_ASSIST_VERSION}/${name}`;
-    const response = await fetch(url, {
+    const response = await outboundFetch(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,

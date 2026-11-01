@@ -65,6 +65,10 @@ import {
   cx,
 } from '../../components/ui.js';
 import { ThemedIcon } from '../../components/setup-ui.js';
+import OutboundProxyPanel from '../../components/proxy/OutboundProxyPanel.js';
+
+/** Local runners never go through an outbound proxy. */
+const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'llamacpp']);
 
 const AUTH_TYPE_KIND: Record<string, string> = {
   subscription: 'subscriptions',
@@ -455,6 +459,7 @@ const ConnectionDetail = () => {
 
   // Manage modal state
   const [showManageModal, setShowManageModal] = useState(false);
+  const [proxyVersion, setProxyVersion] = useState(0);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState('');
@@ -1029,6 +1034,31 @@ const ConnectionDetail = () => {
             emptyRow(t('providers.detail.noHarnesses'))
           )}
         </Panel>
+
+        {roleCan.manageProviders() &&
+        c.auth_type !== 'local' &&
+        !LOCAL_PROVIDERS.has(c.provider) &&
+        !customProviderData?.local_type ? (
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <OutboundProxyPanel
+              targetType="provider"
+              targetId={c.provider}
+              canManage
+              onSaved={() => setProxyVersion((v) => v + 1)}
+              title={t('proxies.binding.providerTitle', { provider: providerDisplayName })}
+              description={t('proxies.binding.providerDescription', {
+                provider: providerDisplayName,
+              })}
+            />
+            <OutboundProxyPanel
+              targetType="connection"
+              targetId={c.id}
+              canManage
+              version={proxyVersion}
+              title={t('proxies.binding.connectionTitle')}
+            />
+          </div>
+        ) : null}
       </div>
 
       {/* Custom provider edit modal */}

@@ -25,6 +25,7 @@ import {
   oauthRefreshKey,
   subscriptionCredentialLock,
 } from './oauth-refresh-coordinator';
+import { outboundFetch } from '../../../common/outbound/outbound-proxy';
 
 export interface RedirectPkceOauthConfig {
   /** Provider id stored on `tenant_providers.provider_id`. */
@@ -189,7 +190,7 @@ export abstract class RedirectPkceOauthBaseService {
       code_verifier: pending.verifier,
     });
     if (this.clientSecret) body.set('client_secret', this.clientSecret);
-    const response = await fetch(this.oauthConfig.tokenUrl, {
+    const response = await outboundFetch(this.oauthConfig.tokenUrl, {
       method: 'POST',
       headers: this.tokenHeaders(),
       body,
@@ -244,7 +245,7 @@ export abstract class RedirectPkceOauthBaseService {
       client_id: this.clientId,
     });
     if (this.clientSecret) body.set('client_secret', this.clientSecret);
-    const response = await fetch(this.oauthConfig.tokenUrl, {
+    const response = await outboundFetch(this.oauthConfig.tokenUrl, {
       method: 'POST',
       headers: this.tokenHeaders(),
       body,
@@ -321,7 +322,7 @@ export abstract class RedirectPkceOauthBaseService {
     try {
       const body = new URLSearchParams({ token, client_id: this.clientId });
       if (this.clientSecret) body.set('client_secret', this.clientSecret);
-      const response = await fetch(revokeUrl, {
+      const response = await outboundFetch(revokeUrl, {
         method: 'POST',
         headers: this.tokenHeaders(),
         body,

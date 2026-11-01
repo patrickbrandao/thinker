@@ -6,7 +6,9 @@ import {
   NotFoundException,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
 import { TenantCtx, TenantContext } from '../../../common/decorators/tenant-context.decorator';
 import { isMinimaxRegion, MinimaxOauthService } from './minimax-oauth.service';
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
@@ -16,6 +18,7 @@ import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('minimax'))
 @Controller('api/v1/oauth/minimax')
 export class MinimaxOauthController {
   constructor(

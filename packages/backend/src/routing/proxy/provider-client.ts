@@ -11,6 +11,15 @@ import {
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import {
+  childScope,
+  currentOutboundScope,
+  isProviderProxyFailedError,
+  outboundFetch,
+  runWithOutboundScope,
+  summarizeEgress,
+  type OutboundScope,
+} from '../../common/outbound/outbound-proxy';
+import {
   getErrorCause,
   getErrorCode,
   getErrorMessage,
@@ -372,7 +381,31 @@ export class ProviderClient {
     return this.reasoningCatalog?.isReasoningModel(endpointKey, model) === true;
   }
 
+  /**
+   * Forwards inside the outbound proxy scope of the serving connection, with
+   * a fresh hop list, and stamps where the call went out on the attempt.
+   */
   async forward(opts: ForwardOptions): Promise<ForwardResult> {
+    const base: OutboundScope = opts.egressScope ??
+      currentOutboundScope() ?? {
+        tenantId: null,
+        sourceType: 'provider',
+        sourceId: opts.provider,
+        sourceLabel: opts.provider,
+        chain: null,
+        hops: [],
+      };
+    const scope = childScope(base, { agentMessageId: opts.attempt?.id ?? null });
+    try {
+      return await runWithOutboundScope(scope, () => this.forwardInScope(opts));
+    } finally {
+      if (opts.attempt && scope.hops.length > 0) {
+        opts.attempt.egress = { summary: summarizeEgress(scope.hops), hops: scope.hops };
+      }
+    }
+  }
+
+  private async forwardInScope(opts: ForwardOptions): Promise<ForwardResult> {
     const {
       provider,
       apiKey,
@@ -984,9 +1017,8 @@ export class ProviderClient {
     }
 
     let response: Response;
-    const doFetch = pinDestination ? ssrfSafeFetch : fetch;
     try {
-      response = await doFetch(url, {
+      const init: RequestInit = {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
@@ -994,8 +1026,12 @@ export class ProviderClient {
         // Block redirect-based SSRF escalation: a hostile upstream could 302
         // to a private/metadata endpoint after our pre-fetch validation.
         redirect: 'error',
-      });
+      };
+      // Both honor the outbound proxy chain of the active scope.
+      response = pinDestination ? await ssrfSafeFetch(url, init) : await outboundFetch(url, init);
     } catch (err) {
+      // Every proxy of the chain failed: its own transport error (502).
+      if (isProviderProxyFailedError(err)) throw err;
       const errorLike =
         err !== null && typeof err === 'object'
           ? (err as { message?: unknown; name?: unknown })

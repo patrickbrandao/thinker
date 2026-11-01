@@ -24,6 +24,8 @@ import { FallbackIcon } from './message-table-cells.js';
 import { authBadgeFor } from './AuthBadge.js';
 import { RawView, RequestView, ResponseView, ToolsView } from './RequestAttemptViews.js';
 import { RequestTimelineChart } from './RequestTimelineChart.js';
+import { EgressHops, EgressName } from './proxy/ProxyParts.js';
+import type { Egress, EgressHop } from '../services/api/proxies.js';
 import { useResource } from '../lib/use-resource.js';
 import { intlLocale, t } from '../i18n/index.js';
 import { usd } from '../services/formatters.js';
@@ -96,6 +98,8 @@ interface Attempt {
   request_headers?: Record<string, string>;
   request_params?: Record<string, unknown>;
   recording?: AttemptRecording | null;
+  egress?: Egress | null;
+  egress_hops?: EgressHop[] | null;
 }
 
 function fmtDate(iso: string): string {
@@ -190,6 +194,8 @@ function buildAttempts(msg: any): Attempt[] {
       request_headers: att.request_headers ?? undefined,
       request_params: att.request_params ?? undefined,
       recording: att.recording ?? null,
+      egress: att.egress ?? null,
+      egress_hops: att.egress_hops ?? null,
     }));
   }
 
@@ -263,6 +269,29 @@ function ContextCard({ tone, children }: { tone: 'fallback' | 'error'; children:
   );
 }
 
+/** Timeline tab: the proxy chain each attempt went through, in order. */
+function AttemptEgressList({ attempts }: { attempts: Attempt[] }) {
+  const withHops = attempts.filter((a) => a.egress_hops?.length);
+  if (withHops.length === 0) return null;
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 text-xs font-semibold text-muted">
+        {t('proxies.egress.timelineTitle')}
+      </div>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-xs">
+        {withHops.map((a) => (
+          <li key={a.id} className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-faint">
+              {t('proxies.egress.attempt', { n: a.index })}
+            </span>
+            <EgressHops hops={a.egress_hops ?? []} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function AttemptDetails({ att, attempts }: { att: Attempt; attempts: Attempt[] }) {
   const next = attempts[att.index];
   return (
@@ -311,6 +340,16 @@ function AttemptDetails({ att, attempts }: { att: Attempt; attempts: Attempt[] }
         <Kv label={t('messages.drawer.kv.serviceType')}>{att.service_type}</Kv>
       ) : null}
       {att.session_key ? <Kv label={t('messages.drawer.kv.session')}>{att.session_key}</Kv> : null}
+      {att.egress ? (
+        <Kv label={t('proxies.egress.label')}>
+          <EgressName egress={att.egress} />
+        </Kv>
+      ) : null}
+      {att.egress_hops && att.egress_hops.length > 1 ? (
+        <Kv label={t('proxies.egress.hops')}>
+          <EgressHops hops={att.egress_hops} />
+        </Kv>
+      ) : null}
       {att.duration_ms != null ? (
         // i18n-ignore
         <Kv label={t('messages.drawer.kv.duration')}>{att.duration_ms}ms</Kv>
@@ -772,6 +811,7 @@ export default function RequestDrawer({
                 ) : activeTab === 'timeline' && m.timeline ? (
                   <div className="db drawer__body">
                     <RequestTimelineChart timeline={m.timeline} />
+                    <AttemptEgressList attempts={attempts} />
                   </div>
                 ) : currentAttempt ? (
                   <div className="drawer__messages-pane min-h-0 flex-1 overflow-hidden">

@@ -44,6 +44,7 @@ import {
   type ModelCapability,
   type ModelModality,
 } from 'thinker-shared';
+import { outboundFetch } from '../common/outbound/outbound-proxy';
 
 const FETCH_TIMEOUT_MS = 5000;
 const ANTHROPIC_DEFAULT_CONTEXT = 200000;
@@ -1223,7 +1224,7 @@ export class ProviderModelFetcherService {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await fetch(url, {
+      const res = await outboundFetch(url, {
         headers,
         signal: controller.signal,
       });
@@ -1260,7 +1261,7 @@ export class ProviderModelFetcherService {
       `${getBedrockControlPlaneBaseUrl(region)}/inference-profiles` +
       '?type=SYSTEM_DEFINED&maxResults=1000';
     try {
-      const res = await fetch(url, {
+      const res = await outboundFetch(url, {
         headers: bearerHeaders(apiKey),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -1308,7 +1309,7 @@ export class ProviderModelFetcherService {
         const url = this.buildFireworksModelsUrl(pageToken);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-        const res = await fetch(url, { headers, signal: controller.signal });
+        const res = await outboundFetch(url, { headers, signal: controller.signal });
         clearTimeout(timeout);
         pageCount += 1;
 
@@ -1358,7 +1359,7 @@ export class ProviderModelFetcherService {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await fetch(PIONEER_MODELS_URL, {
+      const res = await outboundFetch(PIONEER_MODELS_URL, {
         headers,
         signal: controller.signal,
       });
@@ -1385,7 +1386,7 @@ export class ProviderModelFetcherService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(PIONEER_BASE_MODELS_URL, { signal: controller.signal });
+      const res = await outboundFetch(PIONEER_BASE_MODELS_URL, { signal: controller.signal });
       if (!res.ok) {
         this.logger.warn(`Pioneer base model catalog returned ${res.status}`);
         return new Map();
@@ -1413,7 +1414,7 @@ export class ProviderModelFetcherService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(OPENCODE_GO_MODELS_URL, {
+      const res = await outboundFetch(OPENCODE_GO_MODELS_URL, {
         headers: apiKey ? bearerHeaders(apiKey) : {},
         signal: controller.signal,
       });
@@ -1475,7 +1476,7 @@ export class ProviderModelFetcherService {
         const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         let res: Response;
         try {
-          res = await fetch(KIRO_BASE_URL, {
+          res = await outboundFetch(KIRO_BASE_URL, {
             method: 'POST',
             headers: buildKiroHeaders(apiKey, KIRO_MODELS_TARGET),
             body: JSON.stringify({
@@ -1548,7 +1549,9 @@ export class ProviderModelFetcherService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(CLINE_PASS_RECOMMENDED_MODELS_URL, { signal: controller.signal });
+      const res = await outboundFetch(CLINE_PASS_RECOMMENDED_MODELS_URL, {
+        signal: controller.signal,
+      });
       if (!res.ok) {
         this.logger.warn(`cline-pass returned ${res.status} from recommended-models`);
         return [];

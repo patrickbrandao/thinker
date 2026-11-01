@@ -3,6 +3,7 @@ import { lookup as dnsLookup } from 'node:dns/promises';
 import { isIP, type LookupFunction } from 'node:net';
 import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from 'undici';
 import { isCloudMetadataHostname, isCloudMetadataIp } from './url-validation';
+import { outboundFetch } from '../outbound/outbound-proxy';
 
 /**
  * Connection-time SSRF guard for requests to operator- or tenant-supplied URLs
@@ -113,12 +114,13 @@ export function getSsrfSafeDispatcher(): Agent {
 }
 
 /**
- * `fetch` for operator- or tenant-supplied URLs. Uses undici's own `fetch`
- * with the pinned dispatcher: Node's built-in `fetch` bundles a different
- * undici major whose dispatcher interface is not stable across Node versions.
- * Metadata literals and names are refused before any socket is opened.
+ * Direct `fetch` for operator- or tenant-supplied URLs. Uses undici's own
+ * `fetch` with the pinned dispatcher: Node's built-in `fetch` bundles a
+ * different undici major whose dispatcher interface is not stable across Node
+ * versions. Metadata literals and names are refused before any socket is
+ * opened. Callers use {@link ssrfSafeFetch}, which also honors outbound proxies.
  */
-export async function ssrfSafeFetch(url: string, init: RequestInit = {}): Promise<Response> {
+export async function pinnedDirectFetch(url: string, init: RequestInit = {}): Promise<Response> {
   assertConnectableHost(new URL(url).hostname);
   const response = await undiciFetch(url, {
     ...(init as unknown as UndiciRequestInit),
@@ -128,4 +130,14 @@ export async function ssrfSafeFetch(url: string, init: RequestInit = {}): Promis
   // is false), but it implements the same interface: status, headers, body
   // stream, json()/text(). Callers only use that interface, never instanceof.
   return response as unknown as Response;
+}
+
+/**
+ * `fetch` for operator- or tenant-supplied URLs. Goes out through the active
+ * outbound proxy chain or the global proxy (common/outbound/outbound-proxy.ts);
+ * direct connections are pinned to validated addresses.
+ */
+export async function ssrfSafeFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  assertConnectableHost(new URL(url).hostname);
+  return outboundFetch(url, init, { pinDestination: true });
 }

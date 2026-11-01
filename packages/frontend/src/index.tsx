@@ -64,6 +64,8 @@ const Cli = lazyReload(() => import('./pages/integrations/Cli.jsx'));
 const Organization = lazyReload(() => import('./pages/Organization.jsx'));
 const Triggers = lazyReload(() => import('./pages/Triggers.jsx'));
 const TriggerTest = lazyReload(() => import('./pages/TriggerTest.jsx'));
+const ProxyServers = lazyReload(() => import('./pages/ProxyServers.jsx'));
+const ProxyServer = lazyReload(() => import('./pages/ProxyServer.jsx'));
 const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
 const AgentConnection = lazyReload(() => import('./pages/AgentConnection.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
@@ -400,6 +402,22 @@ function AppRoutes() {
           element={
             <Lazy>
               <TriggerTest />
+            </Lazy>
+          }
+        />
+        <Route
+          path="proxy-servers"
+          element={
+            <Lazy>
+              <ProxyServers />
+            </Lazy>
+          }
+        />
+        <Route
+          path="proxy-servers/:proxyId"
+          element={
+            <Lazy>
+              <ProxyServer />
             </Lazy>
           }
         />

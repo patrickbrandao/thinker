@@ -93,6 +93,7 @@ describe('SecretReencryptionService', () => {
       'agent_api_keys.key',
       'email_provider_configs.api_key_encrypted',
       'triggers.secrets_encrypted',
+      'proxy_servers.password_encrypted',
     ]);
   });
 

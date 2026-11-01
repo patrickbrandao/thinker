@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
+import { outboundFetch } from '../../common/outbound/outbound-proxy';
 
 const TOKEN_ENDPOINT = 'https://api.github.com/copilot_internal/v2/token';
 
@@ -53,7 +54,7 @@ export class CopilotTokenService {
   }
 
   private async exchange(githubToken: string): Promise<CachedToken> {
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await outboundFetch(TOKEN_ENDPOINT, {
       method: 'GET',
       headers: {
         Authorization: `token ${githubToken}`,

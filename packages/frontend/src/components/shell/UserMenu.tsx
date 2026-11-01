@@ -4,6 +4,7 @@ import {
   Check,
   ChevronsUpDown,
   LogOut,
+  Network,
   Plus,
   Settings,
   ShieldCheck,
@@ -104,6 +105,11 @@ export default function UserMenu() {
         <MenuItem icon={<Zap />} to="/triggers">
           {t('nav.triggers')}
         </MenuItem>
+        {roleCan.manageProviders() ? (
+          <MenuItem icon={<Network />} to="/proxy-servers">
+            {t('nav.proxyServers')}
+          </MenuItem>
+        ) : null}
         {organizations.length > 1 ? (
           <>
             <MenuHeading>{t('shell.user.switchOrganization')}</MenuHeading>

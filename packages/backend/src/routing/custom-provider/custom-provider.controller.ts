@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Optional } from '@nestjs/common';
+import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
 import {
   CustomProviderService,
@@ -65,6 +66,7 @@ export class CustomProviderController {
     private readonly customProviderService: CustomProviderService,
     private readonly providerService: ProviderService,
     private readonly resolveAgentService: ResolveAgentService,
+    @Optional() private readonly egress?: ProxyEgressService,
   ) {}
 
   @Get(':agentName/custom-providers')
@@ -143,13 +145,24 @@ export class CustomProviderController {
       );
       return { ...result, base_url: baseUrl };
     }
-    const models = await this.customProviderService.probeModels(
-      body.base_url,
-      apiKey,
-      body.api_kind,
-      body.provider_name,
-      { allowPrivate: canUsePrivateDestinations(ctx) },
-    );
+    const probe = () =>
+      this.customProviderService.probeModels(
+        body.base_url,
+        apiKey,
+        body.api_kind,
+        body.provider_name,
+        { allowPrivate: canUsePrivateDestinations(ctx) },
+      );
+    // An existing provider is probed through its outbound proxy chain.
+    const models =
+      body.provider_id && this.egress
+        ? await this.egress.runForConnection(
+            agent.tenant_id,
+            `custom:${body.provider_id}`,
+            null,
+            probe,
+          )
+        : await probe();
     return { models };
   }
 

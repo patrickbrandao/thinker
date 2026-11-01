@@ -6,7 +6,9 @@ import {
   NotFoundException,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
 import { TenantCtx, TenantContext } from '../../../common/decorators/tenant-context.decorator';
 import { KiroOauthService } from './kiro-oauth.service';
 import { KiroAuthorizationOptionsError, type KiroAuthorizationOptions } from './kiro-oidc';
@@ -17,6 +19,7 @@ import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
 
 @MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('kiro'))
 @Controller('api/v1/oauth/kiro')
 export class KiroOauthController {
   constructor(

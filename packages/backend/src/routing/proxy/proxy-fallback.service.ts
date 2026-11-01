@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { runWithOutboundScope } from '../../common/outbound/outbound-proxy';
+import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthType, ModelRoute, RequestParamDefaults } from 'thinker-shared';
@@ -181,6 +183,7 @@ export class ProxyFallbackService {
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly reasoningCache: ReasoningContentCache,
+    @Optional() private readonly egress?: ProxyEgressService,
   ) {}
 
   /**
@@ -489,6 +492,7 @@ export class ProxyFallbackService {
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
       },
+      egress: this.egress,
     };
   }
 
@@ -584,7 +588,18 @@ export class ProxyFallbackService {
     });
   }
 
+  /** Each key (connection) goes out through its own outbound proxy chain. */
   private async forwardWithKey(opts: ForwardProviderOptions): Promise<ForwardResult> {
+    if (!this.egress) return this.forwardWithKeyInScope(opts);
+    const scope = await this.egress.scopeForConnection(
+      opts.tenantId,
+      opts.provider,
+      opts.tenantProviderId,
+    );
+    return runWithOutboundScope(scope, () => this.forwardWithKeyInScope(opts));
+  }
+
+  private async forwardWithKeyInScope(opts: ForwardProviderOptions): Promise<ForwardResult> {
     const cooldown = this.getActiveRateLimitCooldown(opts);
     if (cooldown) {
       return this.buildRateLimitCooldownForward(opts, cooldown);

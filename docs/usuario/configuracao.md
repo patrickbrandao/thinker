@@ -56,6 +56,8 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
 | `THINKER_CATALOG_SYNC` | `true` | `false` desliga a busca em `openrouter.ai`, `models.dev` e (com provedor OpenCode Go) `raw.githubusercontent.com`. Os custos passam a vir do snapshot de preços embutido na imagem, com os preços do OpenRouter e do models.dev do dia do build (a data aparece como última sincronização). O mesmo snapshot cobre uma falha da primeira busca. Veja [Privacidade](privacidade.md). |
+| `THINKER_HTTP_PROXY` | (vazio) | Proxy HTTP de saída global (`http://[usuário:senha@]host:porta` ou `https://...`, TLS até o proxy). Vale para todo tráfego de saída sem cadeia de Servidores Proxy: provedores e conexões sem vínculo, OAuth, catálogos públicos, provedores customizados, gatilhos e e-mail. Falha do proxy = falha da chamada (`provider_proxy_failed`, HTTP 502), nunca saída direta. URL inválida derruba o boot. |
+| `THINKER_NO_PROXY` | (vazio) | Hosts que não passam pelo proxy global: nomes, sufixos (`.empresa.com` ou `empresa.com`), IPs e CIDRs, separados por vírgula; `*` desliga o proxy global. Sempre inclui `localhost`, `127.0.0.1`, `::1` e os hosts de `OLLAMA_HOST`, `THINKER_LMSTUDIO_BASE_URL` e `THINKER_LLAMACPP_BASE_URL`. |
 
 ## Provedores locais
 

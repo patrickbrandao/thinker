@@ -437,7 +437,8 @@ export class TriggersService {
       : [];
     if (!rows[0]) throw new NotFoundException('Event not found');
     const logs = await this.ds.query(
-      `SELECT id, attempt, started_at, duration_ms, success, status_code, error, response
+      `SELECT id, attempt, started_at, duration_ms, success, status_code, error, response,
+              egress, egress_hops
          FROM trigger_event_logs WHERE event_id = $1 ORDER BY attempt, started_at`,
       [id],
     );

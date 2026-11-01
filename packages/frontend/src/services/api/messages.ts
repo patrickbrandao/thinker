@@ -1,3 +1,4 @@
+import type { Egress, EgressHop } from './proxies.js';
 import { fetchJson, fetchMutate, type FetchJsonOptions } from './core.js';
 
 export interface AttemptRecording {
@@ -125,6 +126,10 @@ export interface MessageDetailResponse {
       request_params: Record<string, unknown> | null;
       /** Exact provider-facing payload for this Provider Attempt. */
       recording: AttemptRecording | null;
+      /** Where the attempt finally left Thinker (proxy, direct or the global proxy). */
+      egress?: Egress | null;
+      /** Every item of the proxy chain tried, in order. */
+      egress_hops?: EgressHop[] | null;
     }>;
   };
 }

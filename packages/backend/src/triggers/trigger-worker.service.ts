@@ -1,9 +1,21 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import type { TriggerType } from 'thinker-shared';
 import { decryptWithAny, getDecryptionSecrets } from '../common/utils/crypto.util';
+import {
+  runWithOutboundScope,
+  summarizeEgress,
+  type OutboundScope,
+} from '../common/outbound/outbound-proxy';
+import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { deliver, type DeliveryResult } from './trigger-senders';
 import { TriggerDispatchService } from './trigger-dispatch.service';
 import type { TriggerConfig, TriggerSecrets } from './trigger-config';
@@ -63,6 +75,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
     private readonly ds: DataSource,
     private readonly dispatch: TriggerDispatchService,
     config: ConfigService,
+    @Optional() private readonly egress?: ProxyEgressService,
   ) {
     this.defaultFrom =
       config.get<string>('app.emailFrom') ||
@@ -149,6 +162,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
 
     let result: DeliveryResult;
     let final = false;
+    let scope: OutboundScope | undefined;
     if (!trigger) {
       result = { success: false, statusCode: null, error: 'Trigger was deleted', response: null };
       final = true;
@@ -162,16 +176,24 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
           'trigger.name': trigger.name,
           'delivery.attempt': String(attempt),
         };
-        result = await deliver({
-          type: trigger.type,
-          config: parseJson<TriggerConfig>(trigger.config),
-          secrets: decryptSecrets(trigger.secrets_encrypted),
-          eventType: row.event_type,
-          vars,
-          timeoutMs: trigger.timeout_seconds * 1000,
-          defaultFrom: this.defaultFrom,
-          fallbackRecipient: () => this.ownerEmail(row.tenant_id),
-        });
+        // Webhook, Telegram and e-mail deliveries go out through the
+        // trigger's proxy chain (syslog is not HTTP).
+        scope =
+          trigger.type === 'syslog'
+            ? undefined
+            : await this.egress?.scopeForTarget(row.tenant_id, 'trigger', trigger.id, trigger.name);
+        result = await runWithOutboundScope(scope, () =>
+          deliver({
+            type: trigger.type,
+            config: parseJson<TriggerConfig>(trigger.config),
+            secrets: decryptSecrets(trigger.secrets_encrypted),
+            eventType: row.event_type,
+            vars,
+            timeoutMs: trigger.timeout_seconds * 1000,
+            defaultFrom: this.defaultFrom,
+            fallbackRecipient: () => this.ownerEmail(row.tenant_id),
+          }),
+        );
       } catch (err) {
         result = {
           success: false,
@@ -184,8 +206,9 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
 
     await this.ds.query(
       `INSERT INTO trigger_event_logs
-         (id, event_id, tenant_id, attempt, started_at, duration_ms, success, status_code, error, response)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         (id, event_id, tenant_id, attempt, started_at, duration_ms, success, status_code, error,
+          response, egress, egress_hops)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)`,
       [
         randomUUID(),
         row.id,
@@ -197,6 +220,8 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
         result.statusCode,
         result.error,
         result.response,
+        scope && scope.hops.length > 0 ? JSON.stringify(summarizeEgress(scope.hops)) : null,
+        scope && scope.hops.length > 0 ? JSON.stringify(scope.hops) : null,
       ],
     );
 

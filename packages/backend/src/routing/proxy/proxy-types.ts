@@ -1,3 +1,4 @@
+import type { EgressHop, EgressSummary, OutboundScope } from '../../common/outbound/outbound-proxy';
 import type { IncomingHttpHeaders } from 'http';
 import type { RecordingResponseBody } from './attempt-recording.types';
 import { ProviderEndpoint } from './provider-endpoints';
@@ -82,6 +83,8 @@ export interface ProviderAttemptRef {
   recordingCapture?: AttemptRecordingCapture;
   startRecording?: (recording: ProviderAttemptRecordingStart) => void;
   finishRecording?: (response?: RecordingResponseBody | null) => Promise<void>;
+  /** Where this provider call went out (Proxy Servers): set by ProviderClient. */
+  egress?: { summary: EgressSummary | null; hops: EgressHop[] };
 }
 
 export type StartProviderAttempt = (attempt: ProviderAttemptStart) => ProviderAttemptRef;
@@ -144,6 +147,8 @@ export interface ForwardOptions {
   providerResource?: string;
   /** Persisted identity of this exact upstream call. */
   attempt?: ProviderAttemptRef;
+  /** Outbound proxy scope of the connection serving this call. */
+  egressScope?: OutboundScope | null;
 }
 
 /** Options for ProxyService.proxyRequest. */

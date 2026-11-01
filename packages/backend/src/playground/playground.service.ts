@@ -1,4 +1,6 @@
-import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger, Optional } from '@nestjs/common';
+import { runWithOutboundScope, type OutboundScope } from '../common/outbound/outbound-proxy';
+import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
@@ -64,6 +66,7 @@ export class PlaygroundService {
     private readonly customProviderRepo: Repository<CustomProvider>,
     private readonly customProviders: CustomProviderService,
     private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    @Optional() private readonly egress?: ProxyEgressService,
   ) {}
 
   /**
@@ -85,6 +88,7 @@ export class PlaygroundService {
     // with the proxy for minimax/qwen/zai/copilot/custom.
     let oauthResourceUrl: string | undefined;
     let providerRegion: string | null | undefined;
+    let egressScope: OutboundScope | undefined;
     try {
       // The Playground always runs under the reserved per-tenant "Playground"
       // agent (created on first use), so runs record under it in global Messages
@@ -125,19 +129,22 @@ export class PlaygroundService {
       rawApiKey = key.apiKey;
       providerKeyLabel = key.label;
       providerRegion = key.region;
-      const resolved = await resolveApiKey(
-        dto.provider,
-        rawApiKey,
-        authType,
-        agent.id,
-        agent.tenant_id,
-        this.openaiOauth,
-        this.minimaxOauth,
-        this.anthropicOauth,
-        this.geminiOauth,
-        this.kiroOauth,
-        this.xaiOauth,
-        providerKeyLabel,
+      egressScope = await this.egress?.scopeForConnection(agent.tenant_id, dto.provider, key.id);
+      const resolved = await runWithOutboundScope(egressScope, () =>
+        resolveApiKey(
+          dto.provider,
+          rawApiKey,
+          authType,
+          agent.id,
+          agent.tenant_id,
+          this.openaiOauth,
+          this.minimaxOauth,
+          this.anthropicOauth,
+          this.geminiOauth,
+          this.kiroOauth,
+          this.xaiOauth,
+          providerKeyLabel,
+        ),
       );
       if (resolved.apiKey === null) {
         const message = `No usable API key found for provider "${dto.provider}"`;
@@ -221,23 +228,26 @@ export class PlaygroundService {
         customEndpoint,
         signal: abort.signal,
         providerResource,
+        egressScope,
       };
       forward = await this.providerClient.forward(forwardOptions);
       if (forward.response.status === 401 && authType === 'subscription') {
-        const refreshed = await refreshRejectedOAuthCredential(
-          dto.provider,
-          rawApiKey,
-          agent.id,
-          agent.tenant_id,
-          providerKeyLabel,
-          {
-            openaiOauth: this.openaiOauth,
-            minimaxOauth: this.minimaxOauth,
-            anthropicOauth: this.anthropicOauth,
-            geminiOauth: this.geminiOauth,
-            kiroOauth: this.kiroOauth,
-            xaiOauth: this.xaiOauth,
-          },
+        const refreshed = await runWithOutboundScope(egressScope, () =>
+          refreshRejectedOAuthCredential(
+            dto.provider,
+            rawApiKey,
+            agent.id,
+            agent.tenant_id,
+            providerKeyLabel,
+            {
+              openaiOauth: this.openaiOauth,
+              minimaxOauth: this.minimaxOauth,
+              anthropicOauth: this.anthropicOauth,
+              geminiOauth: this.geminiOauth,
+              kiroOauth: this.kiroOauth,
+              xaiOauth: this.xaiOauth,
+            },
+          ),
         );
         if (refreshed?.apiKey && refreshed.apiKey !== apiKey) {
           this.logger.log(

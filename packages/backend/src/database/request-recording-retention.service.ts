@@ -86,6 +86,23 @@ const DELETE_TRIGGER_EVENTS_SQL = `
   RETURNING id
 `;
 
+/**
+ * Proxy logs follow the proxy's own retention, then the workspace's, then the
+ * environment default. The daily statistics are never removed here.
+ */
+const DELETE_PROXY_LOGS_SQL = `
+  DELETE FROM proxy_logs
+  WHERE id IN (
+    SELECT l.id FROM proxy_logs l
+    LEFT JOIN proxy_servers p ON p.id = l.proxy_id
+    LEFT JOIN tenants t ON t.id = l.tenant_id
+    WHERE l.started_at < CURRENT_TIMESTAMP
+      - (COALESCE(p.log_retention_days, t.log_retention_days, $1) * INTERVAL '1 day')
+    LIMIT ${LOG_PURGE_BATCH}
+  )
+  RETURNING id
+`;
+
 const DELETE_METADATA_SQL = `
   UPDATE agent_messages
   SET recording_key = NULL
@@ -166,6 +183,10 @@ export class RequestRecordingRetentionService implements OnApplicationBootstrap 
       const triggerEvents = await this.stripLogs(queryRunner, DELETE_TRIGGER_EVENTS_SQL);
       if (triggerEvents > 0) {
         this.logger.log(`Deleted ${triggerEvents} expired trigger delivery event(s)`);
+      }
+      const proxyLogs = await this.stripLogs(queryRunner, DELETE_PROXY_LOGS_SQL);
+      if (proxyLogs > 0) {
+        this.logger.log(`Deleted ${proxyLogs} expired proxy log(s)`);
       }
       return deleted;
     } catch (error) {

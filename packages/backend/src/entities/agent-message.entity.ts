@@ -1,3 +1,4 @@
+import type { EgressHop, EgressSummary } from '../common/outbound/outbound-proxy';
 import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
 import { timestampType } from '../common/utils/postgres-sql';
 import type { CallerAttribution } from '../routing/proxy/caller-classifier';
@@ -40,6 +41,14 @@ export class AgentMessage {
   /** External S3/filesystem object for this Provider Attempt's exact payload. */
   @Column('varchar', { nullable: true })
   recording_key!: string | null;
+
+  /** Where this attempt went out: `{kind: proxy|direct|global, proxy_id, name}`. */
+  @Column('jsonb', { nullable: true })
+  egress!: EgressSummary | null;
+
+  /** Outbound proxy chain hops: `[{proxy_id, name, result, ms, ...}]`. */
+  @Column('jsonb', { nullable: true })
+  egress_hops!: EgressHop[] | null;
 
   @Column('varchar', { nullable: true })
   tenant_id!: string | null;
