@@ -106,6 +106,8 @@ describe('probeLocalServer', () => {
             },
             { type: 'llm', key: 'deepseek-r1', max_context_length: 131072, loaded_instances: [] },
             { type: 'embedding', key: 'nomic', loaded_instances: [] },
+            { type: 'llm', key: 'stable-diffusion-3.5-large', architecture: 'sd3' },
+            { type: 'llm', key: 'laya-multilingual', architecture: 'modern-bert' },
           ],
         },
       },
@@ -203,7 +205,10 @@ describe('probeLocalServer', () => {
       throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
     });
     await expect(probeLocalServer('ollama', config(11434), undefined, fn)).rejects.toThrow(
-      'No server is listening on http://192.168.1.20:11434/api/tags',
+      'No server is listening on http://192.168.1.20:11434/api/tags.\nStart it with `ollama serve`',
+    );
+    await expect(probeLocalServer('lmstudio', config(1235), undefined, fn)).rejects.toThrow(
+      'Start it with `lms server start --port 1235`',
     );
   });
 });
