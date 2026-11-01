@@ -67,9 +67,6 @@ import {
 import { ThemedIcon } from '../../components/setup-ui.js';
 import OutboundProxyPanel from '../../components/proxy/OutboundProxyPanel.js';
 
-/** Local runners never go through an outbound proxy. */
-const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'llamacpp']);
-
 const AUTH_TYPE_KIND: Record<string, string> = {
   subscription: 'subscriptions',
   api_key: 'byok',
@@ -1072,7 +1069,7 @@ const ConnectionDetail = () => {
             }}
           />
         )}
-        {roleCan.manageProviders() && !customProviderData?.local_type && c ? (
+        {roleCan.manageProviders() && c ? (
           <div className="mt-4 border-t border-line pt-3">
             <OutboundProxyPanel
               bare
@@ -1242,9 +1239,7 @@ const ConnectionDetail = () => {
             </div>
           ) : null}
 
-          {roleCan.manageProviders() &&
-          c.auth_type !== 'local' &&
-          !LOCAL_PROVIDERS.has(c.provider) ? (
+          {roleCan.manageProviders() ? (
             <div className="border-t border-line pt-3">
               <OutboundProxyPanel
                 bare

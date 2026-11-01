@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Network, Plus } from 'lucide-react';
+import { Network, Plus, Server } from 'lucide-react';
 import ErrorState from '../components/ErrorState.js';
 import { endpointOf, ProxyStatusBadge } from '../components/proxy/ProxyParts.js';
 import ProviderDefaultsTab from '../components/proxy/ProviderDefaultsTab.js';
@@ -154,7 +154,11 @@ function ServersTab() {
                   {list.map((proxy) => (
                     <tr key={proxy.id}>
                       <td>
-                        <Link to={proxyPath(proxy.id)} className="row-title hover:underline">
+                        <Link
+                          to={proxyPath(proxy.id)}
+                          className="row-title inline-flex items-center gap-2 hover:underline"
+                        >
+                          <Server aria-hidden="true" className="size-4 shrink-0 text-muted" />
                           {proxy.name}
                         </Link>
                         {proxy.debug_enabled ? (

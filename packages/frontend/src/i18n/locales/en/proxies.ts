@@ -224,18 +224,18 @@ export default {
     triggerDescription: 'Every delivery of this trigger leaves this way.',
   },
   assignment: {
-    global: 'Global proxy',
-    globalNone: 'Global (no global proxy set: direct)',
-    direct: 'Direct',
+    global: 'Global default',
+    globalNone: 'Global default (no global proxy set: direct)',
+    direct: 'Direct - no proxy',
     profileNamed: 'Profile: {{ name }}',
     inheritProvider: 'Provider default ({{ mode }})',
-    inheritGlobal: 'Global proxy (default)',
+    inheritGlobal: 'Global default',
     noProfiles: 'No outbound profiles yet.',
     manageProfiles: 'Create one',
   },
   profiles: {
     subtitle:
-      'An outbound profile is an ordered chain: a proxy first, then up to 5 fallbacks (proxies or Direct). Providers, connections and triggers use a profile, the global proxy or a direct connection.',
+      'An outbound profile is an ordered chain: a proxy first, then up to 5 fallbacks (proxies or Direct). Providers, connections and triggers use a profile, the global default or a direct connection.',
     create: 'New profile',
     createTitle: 'New outbound profile',
     editTitle: 'Edit outbound profile',
@@ -257,7 +257,9 @@ export default {
   },
   providerDefaults: {
     subtitle:
-      'How each provider leaves Thinker by default: the global proxy, a direct connection or an outbound profile. A connection can override it in its Manage dialog.',
+      'How each provider leaves Thinker by default: the global default (THINKER_HTTP_PROXY, or direct when it is not set), a direct connection or an outbound profile. A connection can override it in its Manage dialog.',
+    locals: 'Local',
+    noLocals: 'No local servers in this workspace.',
     usageBased: 'Usage-based (API key)',
     subscriptions: 'Subscriptions',
     provider: 'Provider',

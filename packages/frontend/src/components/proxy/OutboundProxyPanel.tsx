@@ -15,6 +15,7 @@ import {
 } from '../../services/api/proxies.js';
 import { toast } from '../../services/toast-store.js';
 import { Badge, Button, Panel } from '../ui.js';
+import OutboundSelect, { baseOutboundOptions } from './OutboundSelect.js';
 
 export function chainText(chain: ChainItem[]): string {
   return chain
@@ -121,28 +122,29 @@ export default function OutboundProxyPanel({
       )}
       {assignment.data ? (
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="field w-auto min-w-[260px]"
-            aria-label={t('proxies.binding.mode')}
-            value={value}
-            disabled={!canManage}
-            onChange={(e) => setValue(e.currentTarget.value)}
-          >
-            <option value="inherit">
-              {isConnection && inherited
-                ? t('proxies.assignment.inheritProvider', {
-                    mode: modeLabel(inherited.mode, inherited.profile_name),
-                  })
-                : t('proxies.assignment.inheritGlobal')}
-            </option>
-            {isConnection ? <option value="global">{t('proxies.assignment.global')}</option> : null}
-            <option value="direct">{t('proxies.assignment.direct')}</option>
-            {(profiles.data ?? []).map((p) => (
-              <option key={p.id} value={`profile:${p.id}`}>
-                {t('proxies.assignment.profileNamed', { name: p.name })}
-              </option>
-            ))}
-          </select>
+          <div className="w-full max-w-[360px]">
+            <OutboundSelect
+              label={t('proxies.binding.mode')}
+              value={value}
+              disabled={!canManage}
+              onChange={setValue}
+              iconFor={(v) => (v === 'inherit' && isConnection ? 'inherit-provider' : v)}
+              options={[
+                {
+                  value: 'inherit',
+                  label:
+                    isConnection && inherited
+                      ? t('proxies.assignment.inheritProvider', {
+                          mode: modeLabel(inherited.mode, inherited.profile_name),
+                        })
+                      : t('proxies.assignment.inheritGlobal'),
+                },
+                ...baseOutboundOptions(profiles.data ?? []).filter(
+                  (o) => isConnection || o.value !== 'global',
+                ),
+              ]}
+            />
+          </div>
           {canManage ? (
             <>
               <Button size="sm" busy={saving} disabled={!dirty} onClick={() => void save()}>

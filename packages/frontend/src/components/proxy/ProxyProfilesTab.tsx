@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Route, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Route, Trash2, Waypoints } from 'lucide-react';
 import { t } from '../../i18n/index.js';
 import { useResource } from '../../lib/use-resource.js';
 import {
@@ -77,7 +77,12 @@ export default function ProxyProfilesTab() {
             <tbody>
               {list.map((profile) => (
                 <tr key={profile.id}>
-                  <td className="row-title">{profile.name}</td>
+                  <td className="row-title">
+                    <span className="inline-flex items-center gap-2">
+                      <Waypoints aria-hidden="true" className="size-4 shrink-0 text-muted" />
+                      {profile.name}
+                    </span>
+                  </td>
                   <td className="text-sm text-dim">
                     {profile.chain.length ? chainText(profile.chain) : '—'}
                     {profile.chain.some((i) => i.kind === 'proxy' && !i.enabled) ? (
