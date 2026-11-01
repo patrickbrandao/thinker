@@ -259,7 +259,6 @@ export default {
     subtitle:
       'How each provider leaves Thinker by default: the global default (THINKER_HTTP_PROXY, or direct when it is not set), a direct connection or an outbound profile. A connection can override it in its Manage dialog.',
     locals: 'Local',
-    noLocals: 'No local servers in this workspace.',
     usageBased: 'Usage-based (API key)',
     subscriptions: 'Subscriptions',
     provider: 'Provider',

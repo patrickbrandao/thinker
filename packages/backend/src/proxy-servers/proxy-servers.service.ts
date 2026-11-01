@@ -28,7 +28,7 @@ import {
   toOutboundProxy,
   type ProxyServerRow,
   authKindOf,
-  providerTargetId,
+  defaultTargetOf,
   type ProxyTargetType,
 } from './proxy-egress.service';
 
@@ -685,15 +685,22 @@ export class ProxyServersService {
         return {};
       }
       case 'connection': {
-        const rows = unwrap<{ provider: string; auth_type: string }>(
+        const rows = unwrap<{ provider: string; auth_type: string; local_type: string | null }>(
           await this.ds.query(
-            `SELECT provider, auth_type FROM tenant_providers WHERE id = $1 AND tenant_id = $2`,
+            `SELECT tp.provider, tp.auth_type, cp.local_type FROM tenant_providers tp
+               LEFT JOIN custom_providers cp
+                 ON cp.tenant_id = tp.tenant_id AND 'custom:' || cp.id = tp.provider
+              WHERE tp.id = $1 AND tp.tenant_id = $2`,
             [id, tenantId],
           ),
         );
         if (!rows[0]) throw new NotFoundException('Connection not found');
         return {
-          providerTarget: providerTargetId(authKindOf(rows[0].auth_type), rows[0].provider),
+          providerTarget: defaultTargetOf(
+            authKindOf(rows[0].auth_type),
+            rows[0].provider,
+            rows[0].local_type,
+          ),
         };
       }
       case 'trigger': {
