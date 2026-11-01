@@ -2,10 +2,14 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
-import { ProxyServersService, type ProxyServerInput } from './proxy-servers.service';
+import {
+  ProxyServersService,
+  type ProxyProfileInput,
+  type ProxyServerInput,
+} from './proxy-servers.service';
 
 /**
- * Workspace outbound proxy servers and their chains. Reading and managing
+ * Workspace outbound proxy servers, outbound profiles and assignments. Reading and managing
  * them is for owners and admins, like triggers: settings, logs and
  * statistics expose the workspace's network paths.
  */
@@ -80,23 +84,59 @@ export class ProxyServersController {
     return this.proxies.stats(ctx.tenantId, id, days);
   }
 
-  @Get('proxy-bindings/:targetType/:targetId')
-  getBinding(
+  @Get('proxy-profiles')
+  listProfiles(@TenantCtx() ctx: TenantContext) {
+    return this.proxies.listProfiles(ctx.tenantId);
+  }
+
+  /** Body `{ name, chain: [proxyId | "direct", ...] }`. */
+  @Post('proxy-profiles')
+  async createProfile(@TenantCtx() ctx: TenantContext, @Body() body: ProxyProfileInput) {
+    const tenantId = ctx.tenantId ?? (await this.tenantCache.ensureForUser(ctx.userId!));
+    return this.proxies.createProfile(tenantId, body ?? {});
+  }
+
+  @Patch('proxy-profiles/:id')
+  updateProfile(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: ProxyProfileInput,
+  ) {
+    return this.proxies.updateProfile(ctx.tenantId, id, body ?? {});
+  }
+
+  /** 409 with the objects using it unless `mode=remove`. */
+  @Delete('proxy-profiles/:id')
+  removeProfile(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Query('mode') mode?: string,
+  ) {
+    return this.proxies.removeProfile(ctx.tenantId, id, mode);
+  }
+
+  @Get('proxy-assignments')
+  listAssignments(@TenantCtx() ctx: TenantContext, @Query('target_type') targetType?: string) {
+    return this.proxies.listAssignments(ctx.tenantId, targetType);
+  }
+
+  @Get('proxy-assignments/:targetType/:targetId')
+  getAssignment(
     @TenantCtx() ctx: TenantContext,
     @Param('targetType') targetType: string,
     @Param('targetId') targetId: string,
   ) {
-    return this.proxies.getBinding(ctx.tenantId, targetType, targetId);
+    return this.proxies.getAssignment(ctx.tenantId, targetType, targetId);
   }
 
-  /** Body `{ chain: [proxyId | "direct", ...] }`; an empty chain removes the binding. */
-  @Put('proxy-bindings/:targetType/:targetId')
-  setBinding(
+  /** Body `{ mode: 'inherit' | 'global' | 'direct' | 'profile', profile_id? }`. */
+  @Put('proxy-assignments/:targetType/:targetId')
+  setAssignment(
     @TenantCtx() ctx: TenantContext,
     @Param('targetType') targetType: string,
     @Param('targetId') targetId: string,
     @Body() body: unknown,
   ) {
-    return this.proxies.setBinding(ctx.tenantId, targetType, targetId, body);
+    return this.proxies.setAssignment(ctx.tenantId, targetType, targetId, body);
   }
 }

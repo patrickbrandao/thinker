@@ -25,7 +25,7 @@ const ptBR: Catalog<typeof en> = {
   users: 'Usuários',
   organization: 'Organização',
   triggers: 'Triggers',
-  proxyServers: 'Servidores Proxy',
+  proxyServers: 'Configuração de Proxy',
   cli: 'CLI',
   userFallback: 'Usuário',
   harnessActions: 'Ações do harness',

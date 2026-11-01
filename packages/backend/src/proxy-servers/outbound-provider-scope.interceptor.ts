@@ -14,7 +14,7 @@ import { ProxyEgressService } from './proxy-egress.service';
 
 /**
  * Runs a subscription OAuth handler (authorize, code exchange, device polling,
- * revoke) inside the provider's outbound proxy chain, so the account's token
+ * revoke) inside the provider's subscription outbound default, so the account's token
  * is obtained from the same egress as its inference traffic. `next.handle()`
  * is called inside the scope: Nest binds the handler's async context there.
  */
@@ -27,7 +27,7 @@ export function OutboundProviderScope(provider: string): Type<NestInterceptor> {
       const req = context.switchToHttp().getRequest<RequestWithTenantContext>();
       const tenantId = req?.tenantContext?.tenantId;
       if (!this.egress || !tenantId) return next.handle();
-      return from(this.egress.scopeForConnection(tenantId, provider, null)).pipe(
+      return from(this.egress.scopeForConnection(tenantId, provider, null, 'subscription')).pipe(
         switchMap(
           (scope) =>
             new Observable<unknown>((subscriber) =>

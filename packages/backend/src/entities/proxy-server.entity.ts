@@ -85,6 +85,52 @@ export class ProxyBinding {
   proxy?: ProxyServer | null;
 }
 
+/** Named outbound chain; its items are `proxy_bindings` rows with `target_type = 'profile'`. */
+@Entity('proxy_profiles')
+export class ProxyProfile {
+  @PrimaryColumn('varchar')
+  id!: string;
+
+  @Column('varchar')
+  tenant_id!: string;
+
+  @Column('varchar', { length: 100 })
+  name!: string;
+
+  @Column(timestampType(), { default: timestampDefault() })
+  created_at!: string;
+
+  @Column(timestampType(), { default: timestampDefault() })
+  updated_at!: string;
+}
+
+/** How a provider default, connection, trigger or e-mail config leaves: global, direct or a profile. */
+@Entity('proxy_assignments')
+@Index(['profile_id'])
+export class ProxyAssignment {
+  @PrimaryColumn('varchar')
+  tenant_id!: string;
+
+  @PrimaryColumn('varchar', { length: 20 })
+  target_type!: string;
+
+  @PrimaryColumn('varchar')
+  target_id!: string;
+
+  @Column('varchar', { length: 10 })
+  mode!: string;
+
+  @Column('varchar', { nullable: true })
+  profile_id!: string | null;
+
+  @Column(timestampType(), { default: timestampDefault() })
+  updated_at!: string;
+
+  @ManyToOne(() => ProxyProfile, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'profile_id' })
+  profile?: ProxyProfile | null;
+}
+
 @Entity('proxy_logs')
 @Index(['tenant_id', 'proxy_id', 'started_at'])
 @Index(['started_at'])
