@@ -28,6 +28,8 @@ import {
   isDebugActive,
   toOutboundProxy,
   type ProxyServerRow,
+  authKindOf,
+  providerTargetId,
   type ProxyTargetType,
 } from './proxy-egress.service';
 
@@ -60,13 +62,22 @@ export interface ProxyServerInput {
   log_retention_days?: unknown;
 }
 
+/** An outbound profile that uses a proxy server. */
 export interface BindingRef {
-  target_type: ProxyTargetType;
+  target_type: 'profile';
   target_id: string;
   label: string;
-  /** Chain after "Remove from all": true when no proxy would be left. */
+  /** Profile after "Remove from all": true when no proxy would be left. */
   loses_proxy: boolean;
 }
+
+export interface ProxyProfileInput {
+  name?: unknown;
+  /** [proxyId | "direct", ...] */
+  chain?: unknown;
+}
+
+const PROXY_MODES = new Set(['global', 'direct', 'profile']);
 
 export interface Stats7d {
   connections: number;
@@ -481,8 +492,9 @@ export class ProxyServersService {
       await manager.query(
         `SELECT b.target_type, b.target_id, b.position, b.proxy_id
            FROM proxy_bindings b
-          WHERE b.tenant_id = $1 AND (b.target_type, b.target_id) IN (
-            SELECT target_type, target_id FROM proxy_bindings WHERE tenant_id = $1 AND proxy_id = $2)
+          WHERE b.tenant_id = $1 AND b.target_type = 'profile' AND b.target_id IN (
+            SELECT target_id FROM proxy_bindings
+             WHERE tenant_id = $1 AND target_type = 'profile' AND proxy_id = $2)
           ORDER BY b.target_type, b.target_id, b.position`,
         [tenantId, proxyId],
       ),
@@ -507,26 +519,37 @@ export class ProxyServersService {
   /** Bindings of a proxy with display labels. */
   async bindingsOf(tenantId: string, proxyId: string): Promise<BindingRef[]> {
     const chains = await this.chainsUsing(this.ds, tenantId, proxyId);
-    const labels = await this.targetLabels(
-      tenantId,
-      chains.map((c) => ({ type: c.target_type, id: c.target_id })),
-    );
+    const names = await this.profileNames(tenantId);
     return chains.map((c) => ({
-      target_type: c.target_type,
+      target_type: 'profile' as const,
       target_id: c.target_id,
-      label: labels.get(`${c.target_type}:${c.target_id}`) ?? c.target_id,
+      label: names.get(c.target_id) ?? c.target_id,
       loses_proxy: rewriteChain(c.chain, proxyId, null) === null,
     }));
   }
 
+  private async profileNames(tenantId: string): Promise<Map<string, string>> {
+    const rows = unwrap<{ id: string; name: string }>(
+      await this.ds.query(`SELECT id, name FROM proxy_profiles WHERE tenant_id = $1`, [tenantId]),
+    );
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
+  /** Display labels of assignment targets (`type:id` keys). */
   private async targetLabels(
     tenantId: string,
     targets: Array<{ type: string; id: string }>,
   ): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     const ids = (type: string) => targets.filter((t) => t.type === type).map((t) => t.id);
-    for (const id of ids('provider'))
-      out.set(`provider:${id}`, await this.providerLabel(tenantId, id));
+    for (const id of ids('provider')) {
+      const [kind, ...rest] = id.split(':');
+      const name = await this.providerLabel(tenantId, rest.join(':'));
+      out.set(
+        `provider:${id}`,
+        `${name} (${kind === 'subscription' ? 'subscription' : 'usage-based'})`,
+      );
+    }
     const connections = ids('connection');
     if (connections.length > 0) {
       for (const r of unwrap<{ id: string; provider: string; label: string }>(
@@ -552,17 +575,7 @@ export class ProxyServersService {
         out.set(`trigger:${r.id}`, r.name);
       }
     }
-    const emails = ids('email_config');
-    if (emails.length > 0) {
-      for (const r of unwrap<{ id: string; provider: string }>(
-        await this.ds.query(
-          `SELECT id, provider FROM email_provider_configs WHERE tenant_id = $1 AND id = ANY($2)`,
-          [tenantId, emails],
-        ),
-      )) {
-        out.set(`email_config:${r.id}`, `E-mail (${r.provider})`);
-      }
-    }
+    for (const id of ids('email_config')) out.set(`email_config:${id}`, 'E-mail');
     return out;
   }
 
@@ -597,7 +610,7 @@ export class ProxyServersService {
       throw new ConflictException({
         statusCode: 409,
         error: 'proxy_in_use',
-        message: 'This proxy server is used by outbound proxy chains',
+        message: 'This proxy server is used by outbound profiles',
         bindings,
       });
     }
@@ -648,23 +661,28 @@ export class ProxyServersService {
 
   private parseTargetType(value: string): ProxyTargetType {
     if (!(PROXY_TARGET_TYPES as readonly string[]).includes(value)) {
-      throw new NotFoundException('Unknown binding target');
+      throw new NotFoundException('Unknown assignment target');
     }
     return value as ProxyTargetType;
   }
 
-  /** Checks the bound object exists in the workspace and may have a proxy. */
+  /**
+   * Checks the object exists in the workspace and may have an outbound
+   * setting. Provider defaults are `api_key:<provider>` or
+   * `subscription:<provider>`.
+   */
   private async assertTarget(
     tenantId: string,
     type: ProxyTargetType,
     id: string,
-  ): Promise<{ provider?: string }> {
+  ): Promise<{ providerTarget?: string }> {
     switch (type) {
       case 'provider': {
-        const name = id.toLowerCase();
-        if (LOCAL_PROVIDERS.has(name)) bad('Local providers do not use outbound proxies');
-        if (!/^[a-z0-9:._-]{1,120}$/.test(name)) bad('Invalid provider');
-        return { provider: name };
+        const match = /^(api_key|subscription):([a-z0-9:._-]{1,120})$/.exec(id.toLowerCase());
+        if (!match)
+          bad('Invalid provider default (expected api_key:<provider> or subscription:<provider>)');
+        if (LOCAL_PROVIDERS.has(match[2]!)) bad('Local providers do not use outbound proxies');
+        return {};
       }
       case 'connection': {
         const rows = unwrap<{ provider: string; auth_type: string }>(
@@ -677,7 +695,9 @@ export class ProxyServersService {
         if (rows[0].auth_type === 'local' || LOCAL_PROVIDERS.has(rows[0].provider)) {
           bad('Local providers do not use outbound proxies');
         }
-        return { provider: rows[0].provider };
+        return {
+          providerTarget: providerTargetId(authKindOf(rows[0].auth_type), rows[0].provider),
+        };
       }
       case 'trigger': {
         const rows = unwrap<{ type: string }>(
@@ -705,14 +725,14 @@ export class ProxyServersService {
     }
   }
 
-  private async chainView(tenantId: string, type: string, id: string) {
+  private async chainView(tenantId: string, profileId: string) {
     const rows = unwrap<{ proxy_id: string | null; name: string | null; enabled: boolean | null }>(
       await this.ds.query(
         `SELECT b.proxy_id, p.name, p.enabled FROM proxy_bindings b
            LEFT JOIN proxy_servers p ON p.id = b.proxy_id
-          WHERE b.tenant_id = $1 AND b.target_type = $2 AND b.target_id = $3
+          WHERE b.tenant_id = $1 AND b.target_type = 'profile' AND b.target_id = $2
           ORDER BY b.position`,
-        [tenantId, type, id],
+        [tenantId, profileId],
       ),
     );
     return rows.map((r) =>
@@ -727,57 +747,281 @@ export class ProxyServersService {
     );
   }
 
-  /**
-   * The chain bound to an object, plus the effective outbound path: own chain
-   * > provider chain (connections) > global proxy > direct.
-   */
-  async getBinding(tenantId: string | null, targetType: string, targetId: string) {
-    const type = this.parseTargetType(targetType);
-    if (!tenantId) throw new NotFoundException('Binding target not found');
-    const target = await this.assertTarget(tenantId, type, targetId);
-    const id = type === 'provider' ? targetId.toLowerCase() : targetId;
-    const chain = await this.chainView(tenantId, type, id);
-    let inherited: Awaited<ReturnType<ProxyServersService['chainView']>> = [];
-    if (type === 'connection' && target.provider) {
-      inherited = await this.chainView(tenantId, 'provider', target.provider.toLowerCase());
+  // ---------------------------------------------------------------------------
+  // Profiles
+  // ---------------------------------------------------------------------------
+
+  private async profileRow(tenantId: string | null, id: string) {
+    const rows = tenantId
+      ? unwrap<{
+          id: string;
+          tenant_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        }>(
+          await this.ds.query(`SELECT * FROM proxy_profiles WHERE id = $1 AND tenant_id = $2`, [
+            id,
+            tenantId,
+          ]),
+        )
+      : [];
+    if (!rows[0]) throw new NotFoundException('Outbound profile not found');
+    return rows[0];
+  }
+
+  private async profileUsage(tenantId: string, profileId?: string) {
+    const rows = unwrap<{ target_type: string; target_id: string; profile_id: string }>(
+      await this.ds.query(
+        `SELECT target_type, target_id, profile_id FROM proxy_assignments
+          WHERE tenant_id = $1 AND mode = 'profile' ${profileId ? 'AND profile_id = $2' : ''}
+          ORDER BY target_type, target_id`,
+        profileId ? [tenantId, profileId] : [tenantId],
+      ),
+    );
+    const labels = await this.targetLabels(
+      tenantId,
+      rows.map((r) => ({ type: r.target_type, id: r.target_id })),
+    );
+    return rows.map((r) => ({
+      profile_id: r.profile_id,
+      target_type: r.target_type,
+      target_id: r.target_id,
+      label: labels.get(`${r.target_type}:${r.target_id}`) ?? r.target_id,
+    }));
+  }
+
+  async listProfiles(tenantId: string | null) {
+    if (!tenantId) return { profiles: [] };
+    const rows = unwrap<{ id: string; name: string; created_at: string; updated_at: string }>(
+      await this.ds.query(
+        `SELECT id, name, created_at, updated_at FROM proxy_profiles WHERE tenant_id = $1
+          ORDER BY LOWER(name)`,
+        [tenantId],
+      ),
+    );
+    const usage = await this.profileUsage(tenantId);
+    const profiles = [];
+    for (const row of rows) {
+      profiles.push({
+        ...row,
+        chain: await this.chainView(tenantId, row.id),
+        used_by: usage.filter((u) => u.profile_id === row.id),
+      });
     }
+    return { profiles };
+  }
+
+  private async profileInput(tenantId: string, input: ProxyProfileInput, exceptId?: string) {
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    if (!name || name.length > 100) bad('name is required (at most 100 characters)');
+    const dup = unwrap<{ id: string }>(
+      await this.ds.query(
+        `SELECT id FROM proxy_profiles WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)
+           ${exceptId ? 'AND id <> $3' : ''}`,
+        exceptId ? [tenantId, name, exceptId] : [tenantId, name],
+      ),
+    );
+    if (dup.length > 0) throw new ConflictException('An outbound profile with this name exists');
+    const known = new Set((await this.rows(tenantId)).map((r) => r.id));
+    const chain = validateChain(input.chain ?? [], known);
+    if (chain.length === 0) bad('A profile needs at least one proxy server');
+    return { name, chain };
+  }
+
+  async createProfile(tenantId: string, input: ProxyProfileInput) {
+    const { name, chain } = await this.profileInput(tenantId, input ?? {});
+    const id = randomUUID();
+    await this.ds.transaction(async (manager) => {
+      await manager.query(`INSERT INTO proxy_profiles (id, tenant_id, name) VALUES ($1, $2, $3)`, [
+        id,
+        tenantId,
+        name,
+      ]);
+      await this.writeChain(manager, tenantId, 'profile', id, chain);
+    });
+    this.egress.invalidate(tenantId);
+    return (await this.listProfiles(tenantId)).profiles.find((p) => p.id === id);
+  }
+
+  async updateProfile(tenantId: string | null, id: string, input: ProxyProfileInput) {
+    const row = await this.profileRow(tenantId, id);
+    const { name, chain } = await this.profileInput(row.tenant_id, input ?? {}, id);
+    await this.ds.transaction(async (manager) => {
+      await manager.query(
+        `UPDATE proxy_profiles SET name = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`,
+        [name, id, row.tenant_id],
+      );
+      await this.writeChain(manager, row.tenant_id, 'profile', id, chain);
+    });
+    this.egress.invalidate(row.tenant_id);
+    return (await this.listProfiles(row.tenant_id)).profiles.find((p) => p.id === id);
+  }
+
+  /** 409 with the objects using it unless `mode=remove` (they go back to inherit). */
+  async removeProfile(tenantId: string | null, id: string, mode?: string) {
+    const row = await this.profileRow(tenantId, id);
+    const usedBy = await this.profileUsage(row.tenant_id, id);
+    if (usedBy.length > 0 && mode !== 'remove') {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'profile_in_use',
+        message: 'This outbound profile is in use',
+        used_by: usedBy,
+      });
+    }
+    await this.ds.transaction(async (manager) => {
+      await manager.query(
+        `DELETE FROM proxy_assignments WHERE tenant_id = $1 AND profile_id = $2`,
+        [row.tenant_id, id],
+      );
+      await this.writeChain(manager, row.tenant_id, 'profile', id, []);
+      await manager.query(`DELETE FROM proxy_profiles WHERE id = $1 AND tenant_id = $2`, [
+        id,
+        row.tenant_id,
+      ]);
+    });
+    this.egress.invalidate(row.tenant_id);
+    return { deleted: true, affected: usedBy.length };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Assignments
+  // ---------------------------------------------------------------------------
+
+  private async assignmentRow(tenantId: string, type: string, id: string) {
+    const rows = unwrap<{ mode: string; profile_id: string | null; profile_name: string | null }>(
+      await this.ds.query(
+        `SELECT a.mode, a.profile_id, p.name AS profile_name FROM proxy_assignments a
+           LEFT JOIN proxy_profiles p ON p.id = a.profile_id
+          WHERE a.tenant_id = $1 AND a.target_type = $2 AND a.target_id = $3`,
+        [tenantId, type, id],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Every assignment of the workspace, plus its custom providers (provider defaults tab). */
+  async listAssignments(tenantId: string | null, targetType?: string) {
+    if (!tenantId) return { assignments: [], custom_providers: [] };
+    const custom = unwrap<{ id: string; name: string }>(
+      await this.ds.query(
+        `SELECT 'custom:' || id AS id, name FROM custom_providers
+          WHERE tenant_id = $1 AND local_type IS NULL ORDER BY LOWER(name)`,
+        [tenantId],
+      ),
+    );
+    const rows = unwrap<{
+      target_type: string;
+      target_id: string;
+      mode: string;
+      profile_id: string | null;
+      profile_name: string | null;
+    }>(
+      await this.ds.query(
+        `SELECT a.target_type, a.target_id, a.mode, a.profile_id, p.name AS profile_name
+           FROM proxy_assignments a LEFT JOIN proxy_profiles p ON p.id = a.profile_id
+          WHERE a.tenant_id = $1 ${targetType ? 'AND a.target_type = $2' : ''}
+          ORDER BY a.target_type, a.target_id`,
+        targetType ? [tenantId, targetType] : [tenantId],
+      ),
+    );
+    return { assignments: rows, custom_providers: custom };
+  }
+
+  /**
+   * How an object leaves, plus the effective path: own assignment > provider
+   * default (connections) > global proxy > direct.
+   */
+  async getAssignment(tenantId: string | null, targetType: string, targetId: string) {
+    const type = this.parseTargetType(targetType);
+    if (!tenantId) throw new NotFoundException('Assignment target not found');
+    const id = type === 'provider' ? targetId.toLowerCase() : targetId;
+    const target = await this.assertTarget(tenantId, type, id);
+    const own = await this.assignmentRow(tenantId, type, id);
+    const inherited = target.providerTarget
+      ? await this.assignmentRow(tenantId, 'provider', target.providerTarget)
+      : null;
     const global = getGlobalProxyConfig();
+    const used = own ?? inherited;
+    const source = own ? type : inherited ? 'provider' : 'global';
+    const mode = used?.mode ?? 'global';
     const effective =
-      chain.length > 0
-        ? { source: type, chain }
-        : inherited.length > 0
-          ? { source: 'provider' as const, chain: inherited }
+      mode === 'profile' && used?.profile_id
+        ? {
+            source,
+            mode,
+            profile_id: used.profile_id,
+            profile_name: used.profile_name,
+            chain: await this.chainView(tenantId, used.profile_id),
+          }
+        : mode === 'direct'
+          ? { source, mode, chain: [] }
           : global
-            ? { source: 'global' as const, chain: [], global: global.display }
-            : { source: 'direct' as const, chain: [] };
+            ? { source, mode: 'global', chain: [], global: global.display }
+            : { source, mode: 'global', chain: [], global: null };
     return {
       target_type: type,
       target_id: id,
-      mode: chain.length > 0 ? 'own' : 'inherit',
-      chain,
-      inherited_chain: type === 'connection' ? inherited : undefined,
+      mode: own ? own.mode : 'inherit',
+      profile_id: own?.profile_id ?? null,
+      inherited: target.providerTarget
+        ? {
+            target_id: target.providerTarget,
+            mode: inherited?.mode ?? 'global',
+            profile_id: inherited?.profile_id ?? null,
+            profile_name: inherited?.profile_name ?? null,
+          }
+        : undefined,
       effective,
     };
   }
 
-  async setBinding(tenantId: string | null, targetType: string, targetId: string, body: unknown) {
+  /** Body `{ mode: 'inherit' | 'global' | 'direct' | 'profile', profile_id? }`. */
+  async setAssignment(
+    tenantId: string | null,
+    targetType: string,
+    targetId: string,
+    body: unknown,
+  ) {
     const type = this.parseTargetType(targetType);
-    if (!tenantId) throw new NotFoundException('Binding target not found');
-    await this.assertTarget(tenantId, type, targetId);
+    if (!tenantId) throw new NotFoundException('Assignment target not found');
     const id = type === 'provider' ? targetId.toLowerCase() : targetId;
-    const raw = (body as { chain?: unknown } | null)?.chain ?? [];
-    const known = new Set((await this.rows(tenantId)).map((r) => r.id));
-    const chain = validateChain(raw, known);
-    await this.ds.transaction((manager) => this.writeChain(manager, tenantId, type, id, chain));
+    await this.assertTarget(tenantId, type, id);
+    const input = (body ?? {}) as { mode?: unknown; profile_id?: unknown };
+    const mode = typeof input.mode === 'string' ? input.mode : 'inherit';
+    if (mode === 'inherit') {
+      await this.ds.query(
+        `DELETE FROM proxy_assignments WHERE tenant_id = $1 AND target_type = $2 AND target_id = $3`,
+        [tenantId, type, id],
+      );
+    } else {
+      if (!PROXY_MODES.has(mode)) bad('mode must be inherit, global, direct or profile');
+      let profileId: string | null = null;
+      if (mode === 'profile') {
+        if (typeof input.profile_id !== 'string') bad('profile_id is required');
+        profileId = (await this.profileRow(tenantId, input.profile_id)).id;
+      }
+      await this.ds.query(
+        `INSERT INTO proxy_assignments (tenant_id, target_type, target_id, mode, profile_id, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (tenant_id, target_type, target_id)
+         DO UPDATE SET mode = EXCLUDED.mode, profile_id = EXCLUDED.profile_id, updated_at = NOW()`,
+        [tenantId, type, id, mode, profileId],
+      );
+    }
     this.egress.invalidate(tenantId);
-    return this.getBinding(tenantId, type, id);
+    return this.getAssignment(tenantId, type, id);
   }
 
   // ---------------------------------------------------------------------------
   // Test
   // ---------------------------------------------------------------------------
 
-  private async suggestedTestUrl(tenantId: string, bindings: BindingRef[]): Promise<string | null> {
+  private async suggestedTestUrl(tenantId: string, profiles: BindingRef[]): Promise<string | null> {
+    const usage = await this.profileUsage(tenantId);
+    const ids = new Set(profiles.map((p) => p.target_id));
+    const bindings = usage.filter((u) => ids.has(u.profile_id));
     for (const b of bindings) {
       if (b.target_type === 'trigger') {
         const rows = unwrap<{ type: string; config: Record<string, unknown> | string }>(
@@ -800,7 +1044,7 @@ export class ProxyServersService {
         continue;
       }
       let provider: string | null = null;
-      if (b.target_type === 'provider') provider = b.target_id;
+      if (b.target_type === 'provider') provider = b.target_id.split(':').slice(1).join(':');
       if (b.target_type === 'connection') {
         const rows = unwrap<{ provider: string }>(
           await this.ds.query(`SELECT provider FROM tenant_providers WHERE id = $1`, [b.target_id]),

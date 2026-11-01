@@ -59,11 +59,12 @@ export interface ProxyView {
   updated_at: string;
 }
 
+/** An outbound profile that uses a proxy server. */
 export interface BindingRef {
-  target_type: ProxyTargetType;
+  target_type: 'profile';
   target_id: string;
   label: string;
-  /** True when removing this proxy leaves the object with no proxy in its chain. */
+  /** True when removing this proxy leaves the profile with no proxy. */
   loses_proxy: boolean;
 }
 
@@ -160,16 +161,56 @@ export interface ChainItem {
   enabled: boolean;
 }
 
-export type EffectiveSource = ProxyTargetType | 'global' | 'direct';
+export type ProxyMode = 'global' | 'direct' | 'profile';
+export type AssignmentMode = ProxyMode | 'inherit';
 
-export interface ProxyBinding {
+/** An object whose outbound setting points to a profile. */
+export interface ProfileUse {
+  profile_id: string;
   target_type: ProxyTargetType;
   target_id: string;
-  mode: 'own' | 'inherit';
+  label: string;
+}
+
+export interface ProxyProfile {
+  id: string;
+  name: string;
   chain: ChainItem[];
-  /** Connections only: the provider's chain. */
-  inherited_chain?: ChainItem[];
-  effective: { source: EffectiveSource; chain: ChainItem[]; global?: string };
+  used_by: ProfileUse[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProxyAssignmentRow {
+  target_type: ProxyTargetType;
+  /** Provider defaults: `api_key:<provider>` or `subscription:<provider>`. */
+  target_id: string;
+  mode: ProxyMode;
+  profile_id: string | null;
+  profile_name: string | null;
+}
+
+export interface ProxyAssignment {
+  target_type: ProxyTargetType;
+  target_id: string;
+  /** `inherit` when the object has no setting of its own. */
+  mode: AssignmentMode;
+  profile_id: string | null;
+  /** Connections: the default of their provider. */
+  inherited?: {
+    target_id: string;
+    mode: ProxyMode;
+    profile_id: string | null;
+    profile_name: string | null;
+  };
+  effective: {
+    source: ProxyTargetType | 'global';
+    mode: ProxyMode;
+    profile_id?: string;
+    profile_name?: string | null;
+    chain: ChainItem[];
+    global?: string | null;
+  };
 }
 
 /** Where one attempt (or trigger delivery) left Thinker. */
@@ -270,18 +311,61 @@ export function getProxyStats(proxyId: string, days: number) {
   );
 }
 
-export function getProxyBinding(targetType: ProxyTargetType, targetId: string) {
-  return fetchJson<ProxyBinding>(`/proxy-bindings/${id(targetType)}/${id(targetId)}`, undefined, {
-    cache: false,
+export function listProxyProfiles() {
+  return fetchJson<{ profiles: ProxyProfile[] }>('/proxy-profiles', undefined, { cache: false });
+}
+
+/** `chain` is proxy ids and 'direct'. */
+export function createProxyProfile(data: { name: string; chain: string[] }) {
+  return fetchMutate<ProxyProfile>('/proxy-profiles', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
   });
 }
 
-/** `chain` is proxy ids and 'direct'; `[]` removes the binding. */
-export function setProxyBinding(targetType: ProxyTargetType, targetId: string, chain: string[]) {
-  return fetchMutate<ProxyBinding>(`/proxy-bindings/${id(targetType)}/${id(targetId)}`, {
+export function updateProxyProfile(profileId: string, data: { name: string; chain: string[] }) {
+  return fetchMutate<ProxyProfile>(`/proxy-profiles/${id(profileId)}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  });
+}
+
+/** Without `remove`, a profile in use is refused with a 409. */
+export function deleteProxyProfile(profileId: string, remove = false) {
+  return fetchMutate<{ deleted: true; affected: number }>(
+    `/proxy-profiles/${id(profileId)}${remove ? '?mode=remove' : ''}`,
+    { method: 'DELETE' },
+  );
+}
+
+export function listProxyAssignments(targetType?: ProxyTargetType) {
+  return fetchJson<{
+    assignments: ProxyAssignmentRow[];
+    /** Workspace custom providers (`custom:<id>`), usage-based only. */
+    custom_providers?: Array<{ id: string; name: string }>;
+  }>('/proxy-assignments', targetType ? { target_type: targetType } : undefined, { cache: false });
+}
+
+export function getProxyAssignment(targetType: ProxyTargetType, targetId: string) {
+  return fetchJson<ProxyAssignment>(
+    `/proxy-assignments/${id(targetType)}/${id(targetId)}`,
+    undefined,
+    { cache: false },
+  );
+}
+
+export function setProxyAssignment(
+  targetType: ProxyTargetType,
+  targetId: string,
+  mode: AssignmentMode,
+  profileId?: string | null,
+) {
+  return fetchMutate<ProxyAssignment>(`/proxy-assignments/${id(targetType)}/${id(targetId)}`, {
     method: 'PUT',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ chain }),
+    body: JSON.stringify({ mode, profile_id: profileId ?? undefined }),
   });
 }
 

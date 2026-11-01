@@ -2,20 +2,20 @@ import type en from '../en/proxies.js';
 import type { Catalog } from '../../types.js';
 
 const ptBR: Catalog<typeof en> = {
-  title: 'Servidores Proxy',
-  metaDescription: 'Proxies HTTP de saída para provedores, conexões e triggers.',
+  title: 'Configuração de Proxy',
+  metaDescription: 'Proxies HTTP de saída, perfis de saída e padrões dos provedores.',
   subtitle:
-    'Proxies HTTP de saída pelos quais provedores, conexões e triggers podem enviar o tráfego. Vincule-os como uma cadeia ordenada na seção Proxy de saída de cada objeto.',
+    'Proxies HTTP de saída pelos quais provedores, conexões e triggers podem enviar o tráfego. Ordene-os em um perfil de saída.',
   create: 'Adicionar servidor proxy',
   adminOnly: 'Só admins e owners podem ver e gerenciar servidores proxy.',
-  back: '← Servidores Proxy',
+  back: '← Configuração de Proxy',
   global: {
-    note: 'Proxy global do ambiente (usado por tudo que não tem cadeia):',
+    note: 'Proxy global do ambiente (usado por tudo que está em Global):',
     noProxy: 'Ignorado para:',
   },
   list: {
     emptyTitle: 'Nenhum servidor proxy ainda',
-    emptyBody: 'Adicione um servidor proxy e vincule-o a um provedor, uma conexão ou um trigger.',
+    emptyBody: 'Adicione um servidor proxy e coloque-o em um perfil de saída.',
     name: 'Nome',
     endpoint: 'Endereço',
     status: 'Status',
@@ -52,6 +52,7 @@ const ptBR: Catalog<typeof en> = {
     connection: 'Conexão',
     trigger: 'Trigger',
     email_config: 'E-mail de notificação',
+    profile: 'Perfil',
     test: 'Teste',
   },
   common: {
@@ -76,6 +77,9 @@ const ptBR: Catalog<typeof en> = {
     deleteFailed: 'Não foi possível remover o servidor proxy',
   },
   tabs: {
+    servers: 'Servidores proxy',
+    profiles: 'Perfil de saída',
+    providers: 'Padrão dos provedores',
     settings: 'Configurações',
     logs: 'Logs',
     stats: 'Estatísticas',
@@ -136,7 +140,7 @@ const ptBR: Catalog<typeof en> = {
   },
   bindings: {
     title: 'Usado por ({{ count }})',
-    empty: 'Ainda não vinculado a nenhum provedor, conexão ou trigger.',
+    empty: 'Ainda não está em nenhum perfil de saída.',
   },
   delete: {
     title: 'Remover',
@@ -144,9 +148,9 @@ const ptBR: Catalog<typeof en> = {
     button: 'Remover servidor proxy',
     modalTitle: 'Remover {{ name }}',
     confirm: 'Remover o servidor proxy {{ name }}? Não dá para desfazer.',
-    inUse: 'Este proxy está em {{ count }} cadeia(s). Escolha o que acontece com elas:',
-    removeAll: 'Retirar de todas as cadeias',
-    losesProxy: 'Estes ficarão sem proxy (voltam a herdar, global ou direto):',
+    inUse: 'Este proxy está em {{ count }} perfil(is) de saída. Escolha o que acontece com eles:',
+    removeAll: 'Retirar de todos os perfis',
+    losesProxy: 'Estes perfis ficarão sem proxy (passam a usar o proxy global):',
     replace: 'Substituir por outro proxy',
     pickReplacement: 'Escolha um proxy…',
     submit: 'Remover',
@@ -178,6 +182,7 @@ const ptBR: Catalog<typeof en> = {
     loadMore: 'Carregar mais',
   },
   stats: {
+    empty: 'Nenhuma conexão neste período.',
     period: 'Período',
     lastDays: '{{ days }} dias',
     connections: 'Conexões',
@@ -188,7 +193,6 @@ const ptBR: Catalog<typeof en> = {
     bytes: 'Enviado / recebido',
     fallback: 'Usado como fallback',
     perDay: 'Conexões por dia',
-    empty: 'Nenhuma conexão neste período.',
     failuresByCode: 'Falhas por código',
     noFailures: 'Nenhuma falha neste período.',
     bySource: 'Por origem',
@@ -196,18 +200,7 @@ const ptBR: Catalog<typeof en> = {
   binding: {
     title: 'Proxy de saída',
     effectiveLabel: 'Efetivo:',
-    effective: {
-      global: 'Proxy global',
-      direct: 'Direto',
-      provider: 'Cadeia do provedor: {{ chain }}',
-      own: 'Cadeia própria: {{ chain }}',
-    },
     mode: 'Modo de proxy',
-    inherit: 'Herdar do provedor',
-    own: 'Cadeia própria',
-    inheritedChain: 'Cadeia do provedor: {{ chain }}',
-    inheritedNone: 'O provedor não tem cadeia: usa o proxy global ou conexão direta.',
-    empty: 'Sem cadeia: usa o proxy global ou conexão direta.',
     emptyOwn: 'Adicione pelo menos um proxy.',
     fallback: 'Fallback',
     disabledProxy: 'Desativado',
@@ -222,19 +215,57 @@ const ptBR: Catalog<typeof en> = {
     add: 'Adicionar',
     full: 'Uma cadeia tem no máximo 6 itens.',
     saved: 'Proxy de saída salvo',
-    clear: 'Remover cadeia',
     errors: {
-      empty: 'Adicione pelo menos um proxy ou volte para Herdar do provedor.',
       firstNotProxy: 'O primeiro item deve ser um proxy, não Direto.',
       tooLong: 'Uma cadeia tem no máximo 6 itens (um proxy e 5 fallbacks).',
       duplicateProxy: 'Um proxy só pode aparecer uma vez.',
       duplicateDirect: 'Direto só pode aparecer uma vez.',
+      emptyProfile: 'Adicione pelo menos um proxy.',
     },
-    providerTitle: 'Proxy de saída: {{ provider }}',
-    providerDescription:
-      'Vale para todas as conexões {{ provider }} deste workspace, exceto as que têm cadeia própria.',
     connectionTitle: 'Proxy de saída: esta conexão',
-    triggerDescription: 'Toda entrega deste trigger passa pela cadeia.',
+    triggerDescription: 'Toda entrega deste trigger sai por este caminho.',
+  },
+  assignment: {
+    global: 'Proxy global',
+    globalNone: 'Global (sem proxy global: direto)',
+    direct: 'Direto',
+    profileNamed: 'Perfil: {{ name }}',
+    inheritProvider: 'Padrão do provedor ({{ mode }})',
+    inheritGlobal: 'Proxy global (padrão)',
+    noProfiles: 'Nenhum perfil de saída ainda.',
+    manageProfiles: 'Criar um',
+  },
+  profiles: {
+    subtitle:
+      'Um perfil de saída é uma cadeia ordenada: primeiro um proxy, depois até 5 fallbacks (proxies ou Direto). Provedores, conexões e triggers usam um perfil, o proxy global ou conexão direta.',
+    create: 'Novo perfil',
+    createTitle: 'Novo perfil de saída',
+    editTitle: 'Editar perfil de saída',
+    emptyTitle: 'Nenhum perfil de saída ainda',
+    emptyBody:
+      'Crie um perfil para enviar provedores, conexões ou triggers pelos seus servidores proxy.',
+    chain: 'Cadeia',
+    chainHint:
+      'Tentados em ordem: se um proxy falha (ou o provedor responde 429), usa o próximo item.',
+    usedBy: 'Usado por',
+    actions: 'Ações',
+    edit: 'Editar {{ name }}',
+    delete: 'Remover {{ name }}',
+    deleteTitle: 'Remover {{ name }}',
+    deleteConfirm: 'Remover o perfil de saída {{ name }}?',
+    deleteInUse:
+      'Este perfil é usado por {{ count }} item(ns). Eles voltam ao padrão (padrão do provedor ou proxy global):',
+    saved: 'Perfil de saída salvo',
+    deleted: 'Perfil de saída removido',
+  },
+  providerDefaults: {
+    subtitle:
+      'Como cada provedor sai do Thinker por padrão: proxy global, conexão direta ou um perfil de saída. Uma conexão pode sobrescrever isso no diálogo Gerenciar.',
+    usageBased: 'Por uso (chave de API)',
+    subscriptions: 'Assinaturas',
+    provider: 'Provedor',
+    outbound: 'Saída',
+    selectLabel: 'Saída de {{ provider }}',
   },
 };
 

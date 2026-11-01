@@ -15,6 +15,17 @@ import {
 
 export const PROXY_TARGET_TYPES = ['provider', 'connection', 'trigger', 'email_config'] as const;
 export type ProxyTargetType = (typeof PROXY_TARGET_TYPES)[number];
+export type ProxyMode = 'global' | 'direct' | 'profile';
+/** Provider defaults are kept apart for usage-based and subscription connections. */
+export type ProviderAuthKind = 'api_key' | 'subscription';
+
+export function providerTargetId(kind: ProviderAuthKind, provider: string): string {
+  return `${kind}:${provider.toLowerCase()}`;
+}
+
+export function authKindOf(authType: string | null | undefined): ProviderAuthKind {
+  return authType === 'subscription' ? 'subscription' : 'api_key';
+}
 
 /** Local runners never go through a proxy (no "Outbound proxy" tab). */
 export const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'llamacpp']);
@@ -43,10 +54,17 @@ interface ConnectionMeta {
   label: string;
 }
 
+interface Assignment {
+  mode: ProxyMode;
+  profile_id: string | null;
+}
+
 interface Snapshot {
   proxies: Map<string, OutboundProxy>;
-  /** `${target_type}:${target_id}` → ordered proxy ids (null = Direct). */
-  bindings: Map<string, Array<string | null>>;
+  /** Profile id → ordered proxy ids (null = Direct). */
+  profiles: Map<string, Array<string | null>>;
+  /** `${target_type}:${target_id}` → how the object leaves. */
+  assignments: Map<string, Assignment>;
   connections: Map<string, ConnectionMeta>;
 }
 
@@ -149,11 +167,15 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async load(tenantId: string): Promise<Snapshot> {
-    const [proxies, bindings, connections] = await Promise.all([
+    const [proxies, bindings, assignments, connections] = await Promise.all([
       this.ds.query(`SELECT * FROM proxy_servers WHERE tenant_id = $1`, [tenantId]),
       this.ds.query(
-        `SELECT target_type, target_id, position, proxy_id FROM proxy_bindings
-          WHERE tenant_id = $1 ORDER BY target_type, target_id, position`,
+        `SELECT target_id, position, proxy_id FROM proxy_bindings
+          WHERE tenant_id = $1 AND target_type = 'profile' ORDER BY target_id, position`,
+        [tenantId],
+      ),
+      this.ds.query(
+        `SELECT target_type, target_id, mode, profile_id FROM proxy_assignments WHERE tenant_id = $1`,
         [tenantId],
       ),
       this.ds.query(
@@ -161,16 +183,26 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
         [tenantId],
       ),
     ]);
-    const snap: Snapshot = { proxies: new Map(), bindings: new Map(), connections: new Map() };
+    const snap: Snapshot = {
+      proxies: new Map(),
+      profiles: new Map(),
+      assignments: new Map(),
+      connections: new Map(),
+    };
     for (const row of unwrap<ProxyServerRow>(proxies))
       snap.proxies.set(row.id, toOutboundProxy(row));
-    for (const row of unwrap<{ target_type: string; target_id: string; proxy_id: string | null }>(
-      bindings,
-    )) {
-      const key = `${row.target_type}:${row.target_id}`;
-      const list = snap.bindings.get(key) ?? [];
+    for (const row of unwrap<{ target_id: string; proxy_id: string | null }>(bindings)) {
+      const list = snap.profiles.get(row.target_id) ?? [];
       list.push(row.proxy_id);
-      snap.bindings.set(key, list);
+      snap.profiles.set(row.target_id, list);
+    }
+    for (const row of unwrap<Assignment & { target_type: string; target_id: string }>(
+      assignments,
+    )) {
+      snap.assignments.set(`${row.target_type}:${row.target_id}`, {
+        mode: row.mode,
+        profile_id: row.profile_id,
+      });
     }
     for (const row of unwrap<ConnectionMeta & { id: string }>(connections)) {
       snap.connections.set(row.id, row);
@@ -192,23 +224,36 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     return items.length > 0 ? items : null;
   }
 
+  /** Chain of an assignment: null for global (or an empty profile), [Direct] for direct. */
+  private resolve(snap: Snapshot, assignment: Assignment): EgressItem[] | null {
+    if (assignment.mode === 'direct') return [{ kind: 'direct' }];
+    if (assignment.mode === 'profile' && assignment.profile_id) {
+      return this.items(snap, snap.profiles.get(assignment.profile_id));
+    }
+    return null;
+  }
+
   async chainFor(
     tenantId: string,
     targetType: ProxyTargetType,
     targetId: string,
   ): Promise<EgressItem[] | null> {
     const snap = await this.snapshot(tenantId);
-    return this.items(snap, snap.bindings.get(`${targetType}:${targetId}`));
+    const assignment = snap.assignments.get(`${targetType}:${targetId}`);
+    return assignment ? this.resolve(snap, assignment) : null;
   }
 
   /**
-   * Scope of a provider connection: its own chain, else the provider chain,
-   * else no chain (global proxy or direct). Local runners never have one.
+   * Scope of a provider connection: its own assignment, else the default of
+   * its provider (usage-based or subscription), else the global proxy.
+   * Without a connection (OAuth flows) `authKind` picks the provider default.
+   * Local runners never have one.
    */
   async scopeForConnection(
     tenantId: string | null | undefined,
     provider: string,
     connectionId: string | null | undefined,
+    authKind?: ProviderAuthKind,
   ): Promise<OutboundScope> {
     const providerName = provider.toLowerCase();
     if (!tenantId) {
@@ -236,25 +281,15 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
           hops: [],
         };
       }
-      const own = connectionId
-        ? this.items(snap, snap.bindings.get(`connection:${connectionId}`))
-        : null;
-      if (own) {
-        return {
-          tenantId,
-          sourceType: 'connection',
-          sourceId: connectionId!,
-          sourceLabel: label,
-          chain: own,
-          hops: [],
-        };
-      }
+      const own = connectionId ? snap.assignments.get(`connection:${connectionId}`) : undefined;
+      const kind = conn ? authKindOf(conn.auth_type) : (authKind ?? 'api_key');
+      const assignment = own ?? snap.assignments.get(`provider:${providerTargetId(kind, name)}`);
       return {
         tenantId,
         sourceType: connectionId ? 'connection' : 'provider',
         sourceId: connectionId ?? name,
         sourceLabel: label,
-        chain: this.items(snap, snap.bindings.get(`provider:${name}`)),
+        chain: assignment ? this.resolve(snap, assignment) : null,
         hops: [],
       };
     } catch (err) {
@@ -295,8 +330,9 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     provider: string,
     connectionId: string | null | undefined,
     fn: () => Promise<T>,
+    authKind?: ProviderAuthKind,
   ): Promise<T> {
-    const scope = await this.scopeForConnection(tenantId, provider, connectionId);
+    const scope = await this.scopeForConnection(tenantId, provider, connectionId, authKind);
     return runWithOutboundScope(scope, fn);
   }
 

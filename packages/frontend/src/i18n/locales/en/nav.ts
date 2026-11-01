@@ -23,7 +23,7 @@ export default {
   users: 'Users',
   organization: 'Organization',
   triggers: 'Triggers',
-  proxyServers: 'Proxy Servers',
+  proxyServers: 'Proxy configuration',
   cli: 'CLI',
   userFallback: 'User',
   harnessActions: 'Harness actions',

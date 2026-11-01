@@ -66,8 +66,11 @@ describe('ProxyServersService.remove', () => {
       executed.push([sql, params]);
       if (sql.includes('FROM proxy_servers WHERE tenant_id')) return [row];
       if (sql.includes('FROM proxy_bindings b')) return bindingRows;
-      if (sql.includes('FROM tenant_providers')) {
-        return [{ id: 'conn1', provider: 'openai', label: 'Default' }];
+      if (sql.includes('FROM proxy_profiles')) {
+        return [
+          { id: 'pr1', name: 'Only A' },
+          { id: 'pr2', name: 'A then B' },
+        ];
       }
       return [];
     });
@@ -78,35 +81,30 @@ describe('ProxyServersService.remove', () => {
   }
 
   const bound = [
-    { target_type: 'connection', target_id: 'conn1', position: 1, proxy_id: 'p1' },
-    { target_type: 'provider', target_id: 'openai', position: 1, proxy_id: 'p1' },
-    { target_type: 'provider', target_id: 'openai', position: 2, proxy_id: 'p2' },
+    { target_type: 'profile', target_id: 'pr1', position: 1, proxy_id: 'p1' },
+    { target_type: 'profile', target_id: 'pr2', position: 1, proxy_id: 'p1' },
+    { target_type: 'profile', target_id: 'pr2', position: 2, proxy_id: 'p2' },
   ];
 
-  it('refuses with 409 and lists the bindings', async () => {
+  it('refuses with 409 and lists the profiles using it', async () => {
     const { service } = build(bound);
     const err = await service.remove('t1', 'p1').catch((e) => e);
     expect(err).toBeInstanceOf(ConflictException);
     const body = (err as ConflictException).getResponse() as { bindings: unknown[] };
     expect(body.bindings).toEqual([
-      {
-        target_type: 'connection',
-        target_id: 'conn1',
-        label: 'openai / Default',
-        loses_proxy: true,
-      },
-      { target_type: 'provider', target_id: 'openai', label: 'openai', loses_proxy: false },
+      { target_type: 'profile', target_id: 'pr1', label: 'Only A', loses_proxy: true },
+      { target_type: 'profile', target_id: 'pr2', label: 'A then B', loses_proxy: false },
     ]);
   });
 
-  it('"remove from all" rewrites every chain and deletes the proxy in one transaction', async () => {
+  it('"remove from all" rewrites every profile and deletes the proxy in one transaction', async () => {
     const { service, executed, egress } = build(bound);
     await expect(service.remove('t1', 'p1', 'remove')).resolves.toEqual({
       deleted: true,
       affected: 2,
     });
     const inserts = executed.filter(([sql]) => sql.includes('INSERT INTO proxy_bindings'));
-    expect(inserts.map(([, p]) => p)).toEqual([['t1', 'provider', 'openai', 1, 'p2']]);
+    expect(inserts.map(([, p]) => p)).toEqual([['t1', 'profile', 'pr2', 1, 'p2']]);
     expect(executed.at(-1)![0]).toContain('DELETE FROM proxy_servers');
     expect(egress.invalidate).toHaveBeenCalledWith('t1');
   });
@@ -187,5 +185,74 @@ describe('ProxyEgressService.record (daily rollup)', () => {
     expect(params.slice(6, 9)).toEqual([0, 1, JSON.stringify({ auth_407: 1 })]);
     expect(params[14]).toBe(1);
     expect(params[15]).toBe('auth_407');
+  });
+});
+
+describe('ProxyEgressService.scopeForConnection (assignments)', () => {
+  const proxyRow = {
+    id: 'p1',
+    tenant_id: 't1',
+    name: 'A',
+    scheme: 'http',
+    host: 'proxy',
+    port: 3128,
+    username: null,
+    password_encrypted: null,
+    enabled: true,
+    connect_timeout_ms: 10000,
+    debug_enabled: false,
+    debug_until: null,
+    log_retention_days: null,
+    created_at: '2026-11-01',
+    updated_at: '2026-11-01',
+  };
+
+  function build(assignments: Array<Record<string, unknown>>) {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM proxy_servers')) return [proxyRow];
+      if (sql.includes('FROM proxy_bindings')) return [{ target_id: 'pr1', proxy_id: 'p1' }];
+      if (sql.includes('FROM proxy_assignments')) return assignments;
+      if (sql.includes('FROM tenant_providers')) {
+        return [
+          { id: 'c-key', provider: 'openai', auth_type: 'api_key', label: 'Key' },
+          { id: 'c-sub', provider: 'openai', auth_type: 'subscription', label: 'Plus' },
+        ];
+      }
+      return [];
+    });
+    return new ProxyEgressService({ query } as never);
+  }
+
+  const kinds = (chain: unknown) =>
+    (chain as Array<{ kind: string }> | null)?.map((i) => i.kind) ?? null;
+
+  it('uses the usage-based or subscription provider default by auth type', async () => {
+    const egress = build([
+      { target_type: 'provider', target_id: 'api_key:openai', mode: 'profile', profile_id: 'pr1' },
+      {
+        target_type: 'provider',
+        target_id: 'subscription:openai',
+        mode: 'direct',
+        profile_id: null,
+      },
+    ]);
+    expect(kinds((await egress.scopeForConnection('t1', 'openai', 'c-key')).chain)).toEqual([
+      'proxy',
+    ]);
+    expect(kinds((await egress.scopeForConnection('t1', 'openai', 'c-sub')).chain)).toEqual([
+      'direct',
+    ]);
+    expect(
+      kinds((await egress.scopeForConnection('t1', 'openai', null, 'subscription')).chain),
+    ).toEqual(['direct']);
+  });
+
+  it('a connection assignment wins; global means no chain', async () => {
+    const egress = build([
+      { target_type: 'provider', target_id: 'api_key:openai', mode: 'profile', profile_id: 'pr1' },
+      { target_type: 'connection', target_id: 'c-key', mode: 'global', profile_id: null },
+    ]);
+    expect((await egress.scopeForConnection('t1', 'openai', 'c-key')).chain).toBeNull();
+    expect((await egress.scopeForConnection('t1', 'anthropic', null)).chain).toBeNull();
   });
 });

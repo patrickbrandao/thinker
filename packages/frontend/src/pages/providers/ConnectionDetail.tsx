@@ -459,7 +459,6 @@ const ConnectionDetail = () => {
 
   // Manage modal state
   const [showManageModal, setShowManageModal] = useState(false);
-  const [proxyVersion, setProxyVersion] = useState(0);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState('');
@@ -1034,31 +1033,6 @@ const ConnectionDetail = () => {
             emptyRow(t('providers.detail.noHarnesses'))
           )}
         </Panel>
-
-        {roleCan.manageProviders() &&
-        c.auth_type !== 'local' &&
-        !LOCAL_PROVIDERS.has(c.provider) &&
-        !customProviderData?.local_type ? (
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <OutboundProxyPanel
-              targetType="provider"
-              targetId={c.provider}
-              canManage
-              onSaved={() => setProxyVersion((v) => v + 1)}
-              title={t('proxies.binding.providerTitle', { provider: providerDisplayName })}
-              description={t('proxies.binding.providerDescription', {
-                provider: providerDisplayName,
-              })}
-            />
-            <OutboundProxyPanel
-              targetType="connection"
-              targetId={c.id}
-              canManage
-              version={proxyVersion}
-              title={t('proxies.binding.connectionTitle')}
-            />
-          </div>
-        ) : null}
       </div>
 
       {/* Custom provider edit modal */}
@@ -1098,6 +1072,17 @@ const ConnectionDetail = () => {
             }}
           />
         )}
+        {roleCan.manageProviders() && !customProviderData?.local_type && c ? (
+          <div className="mt-4 border-t border-line pt-3">
+            <OutboundProxyPanel
+              bare
+              targetType="connection"
+              targetId={c.id}
+              canManage
+              title={t('proxies.binding.connectionTitle')}
+            />
+          </div>
+        ) : null}
       </Modal>
 
       {/* Manage connection modal */}
@@ -1254,6 +1239,20 @@ const ConnectionDetail = () => {
                   : t('providers.detail.credentialReauthHint')}
               </p>
               {newKeyError ? <p className="form-error mt-1">{newKeyError}</p> : null}
+            </div>
+          ) : null}
+
+          {roleCan.manageProviders() &&
+          c.auth_type !== 'local' &&
+          !LOCAL_PROVIDERS.has(c.provider) ? (
+            <div className="border-t border-line pt-3">
+              <OutboundProxyPanel
+                bare
+                targetType="connection"
+                targetId={c.id}
+                canManage
+                title={t('proxies.binding.connectionTitle')}
+              />
             </div>
           ) : null}
 
