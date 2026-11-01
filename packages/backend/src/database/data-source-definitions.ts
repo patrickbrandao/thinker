@@ -72,6 +72,7 @@ import { AddRequestTimeline1804200000000 } from './migrations/1804200000000-AddR
 import { AddLogRetentionDays1804300000000 } from './migrations/1804300000000-AddLogRetentionDays';
 import { AddEventTriggers1804400000000 } from './migrations/1804400000000-AddEventTriggers';
 import { LocalServers1804500000000 } from './migrations/1804500000000-LocalServers';
+import { DropTriggerKeyHint1804600000000 } from './migrations/1804600000000-DropTriggerKeyHint';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -393,4 +394,5 @@ export const migrations = [
   AddLogRetentionDays1804300000000,
   AddEventTriggers1804400000000,
   LocalServers1804500000000,
+  DropTriggerKeyHint1804600000000,
 ];

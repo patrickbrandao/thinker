@@ -126,7 +126,7 @@ describe('ApiKeyGuard', () => {
     expect(request.authMethod).toBe('api_key');
   });
 
-  it('sets tenantContext but does not synthesize request.user when created_by_user_id is null', async () => {
+  it('rejects a key with no creator (ADR 0006)', async () => {
     const rawKey = 'orphan-key';
     const storedHash = hashKey(rawKey);
     mockFind.mockResolvedValueOnce([
@@ -154,11 +154,8 @@ describe('ApiKeyGuard', () => {
       getClass: () => ({}),
     } as unknown as ExecutionContext;
 
-    await guard.canActivate(ctx);
-    expect(request.tenantContext).toMatchObject({ tenantId: 'tenant-789', userId: null });
-    // No owning user → no synthesized request.user (env-key-style attribution).
-    expect(request.user).toBeUndefined();
-    expect(request.authMethod).toBe('api_key');
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    expect(request.tenantContext).toBeUndefined();
   });
 
   it('falls back to env-based API key when DB lookup returns empty', async () => {

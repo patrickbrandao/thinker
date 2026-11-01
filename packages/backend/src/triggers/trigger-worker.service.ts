@@ -228,12 +228,12 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** Claims and delivers one specific row now (the test button). */
-  async deliverNow(eventId: string): Promise<DeliveryResult | null> {
+  async deliverNow(eventId: string, tenantId: string): Promise<DeliveryResult | null> {
     const result = (await this.ds.query(
       `UPDATE trigger_events SET status = 'delivering', updated_at = NOW()
-        WHERE id = $1 AND status = 'pending'
+        WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
         RETURNING id, tenant_id, trigger_id, event_type, payload, attempts`,
-      [eventId],
+      [eventId, tenantId],
     )) as unknown;
     const rows = (
       Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result

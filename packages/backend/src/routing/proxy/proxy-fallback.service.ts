@@ -383,6 +383,7 @@ export class ProxyFallbackService {
             connectionMs: credentials.streamWarmupMs,
             local: authType === 'local',
           }),
+          signal,
         },
       );
       // A custom provider's key pool may have rotated to another key.
@@ -443,11 +444,17 @@ export class ProxyFallbackService {
    */
   private async warmUpStreamBody(
     forward: ForwardResult,
-    opts: { stream: boolean; provider: string; model: string; warmupMs: number },
+    opts: {
+      stream: boolean;
+      provider: string;
+      model: string;
+      warmupMs: number;
+      signal?: AbortSignal;
+    },
   ): Promise<ForwardResult> {
     const { response, attempt } = forward;
     if (!opts.stream || !response.ok || !response.body) return forward;
-    const warmup = await peekStream(response.body, opts.warmupMs);
+    const warmup = await peekStream(response.body, opts.warmupMs, opts.signal);
     if (warmup.ok) {
       return {
         ...forward,

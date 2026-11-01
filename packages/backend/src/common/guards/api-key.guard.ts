@@ -76,21 +76,24 @@ export class ApiKeyGuard implements CanActivate {
       // still see a user when one exists.
       // The key carries its creator's CURRENT role in that organization
       // (ADR 0006); a creator who left the organization loses the key (403).
-      // Legacy keys with no creator act as the organization's owner.
-      const access = found.created_by_user_id
-        ? await this.tenantCache.resolveAccess(found.created_by_user_id, found.tenant_id)
-        : { role: 'owner' as const, isInstanceAdmin: false, mustChangePassword: false };
+      // A key with no creator has no role to inherit, so it is refused.
+      if (!found.created_by_user_id) {
+        this.logger.warn(`Rejected API key with no creator from ${clientIpLogFields(request)}`);
+        throw new UnauthorizedException('API key has no owning user — run thinker login');
+      }
+      const access = await this.tenantCache.resolveAccess(
+        found.created_by_user_id,
+        found.tenant_id,
+      );
       (request as RequestWithTenantContext).tenantContext = {
         tenantId: found.tenant_id,
         userId: found.created_by_user_id,
         role: access.role,
         isInstanceAdmin: access.isInstanceAdmin,
       };
-      if (found.created_by_user_id) {
-        (request as Request & { user: { id: string } }).user = {
-          id: String(found.created_by_user_id),
-        };
-      }
+      (request as Request & { user: { id: string } }).user = {
+        id: String(found.created_by_user_id),
+      };
       (request as Request & { authMethod: string }).authMethod = 'api_key';
       const ttlDays = this.configService.get<number>('app.cliTokenTtlDays', 30);
       const slidExpiryAt = now + ttlDays * 86_400_000;

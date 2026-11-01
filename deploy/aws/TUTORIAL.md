@@ -12,7 +12,7 @@ This walkthrough deploys Thinker on AWS with ECS Fargate, RDS PostgreSQL, a priv
 
 This stack creates paid resources, including an Application Load Balancer, ECS Fargate tasks, and RDS PostgreSQL.
 
-The default template exposes Thinker over HTTP on the generated load balancer DNS name. Configure TLS with your own domain and ACM certificate before using the deployment for production authentication traffic.
+TLS is required: you need a domain and an [ACM certificate](https://console.aws.amazon.com/acm/home) for it, issued in the deploy region. With `CERTIFICATE_ARN` and `PUBLIC_HOSTNAME` set, the load balancer serves HTTPS on 443 and redirects HTTP to it; after the deploy, point the hostname (CNAME or Route 53 alias) at the `LoadBalancerDnsName` output. Without a certificate the script refuses to run unless you pass `ALLOW_HTTP=true`, which serves plain HTTP for evaluation only: sign-in cookies and API keys would cross the internet unencrypted.
 
 ## Open AWS CloudShell
 
@@ -21,7 +21,10 @@ Open [AWS CloudShell](https://console.aws.amazon.com/cloudshell/home), choose th
 ```bash
 git clone https://github.com/patrickbrandao/thinker.git
 cd thinker
-AWS_REGION=us-east-1 ./deploy/aws/deploy.sh
+AWS_REGION=us-east-1 \
+CERTIFICATE_ARN=arn:aws:acm:us-east-1:123456789012:certificate/... \
+PUBLIC_HOSTNAME=thinker.example.com \
+./deploy/aws/deploy.sh
 ```
 
 Change `AWS_REGION` if you deploy outside `us-east-1`.
@@ -52,7 +55,7 @@ Thinker runs with:
 
 - `PORT=2099`
 - `BIND_ADDRESS=0.0.0.0`
-- `BETTER_AUTH_URL=http://<load-balancer-dns-name>`
+- `BETTER_AUTH_URL=https://<PUBLIC_HOSTNAME>` (`http://<load-balancer-dns-name>` with `ALLOW_HTTP=true`)
 - `THINKER_RECORDING_STORAGE=s3`
 - `THINKER_RECORDING_S3_BUCKET=<generated-private-bucket>`
 - `THINKER_RECORDING_S3_REGION=<stack-region>`
@@ -61,7 +64,7 @@ The ECS task uses its IAM task role to access only the request-recording object 
 
 ## Open Thinker
 
-After deployment, the script prints `ServiceUrl` and `HealthCheckUrl`.
+After deployment, the script prints `ServiceUrl`, `LoadBalancerDnsName` and `HealthCheckUrl`.
 
 To fetch them again:
 

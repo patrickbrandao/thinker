@@ -3,6 +3,7 @@
 services:
   thinker:
     image: tmsoftbrasil/thinker:0.1
+    restart: unless-stopped
     stop_grace_period: 30s
     environment:
       - SERVICE_URL_THINKER_2099
@@ -34,6 +35,7 @@ services:
       retries: 3
 
   postgres:
+    restart: unless-stopped
     image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     environment:
       - POSTGRES_USER=thinker

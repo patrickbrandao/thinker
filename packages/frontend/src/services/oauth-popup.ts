@@ -56,7 +56,11 @@ export function monitorOAuthPopup(
   }
 
   // postMessage fallback (works when window.opener is preserved)
-  const onMessage = (event: MessageEvent) => handleMessage(event.data);
+  // Only the done page served by this same origin may report the result.
+  const onMessage = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin) return;
+    handleMessage(event.data);
+  };
   window.addEventListener('message', onMessage);
 
   // URL polling fallback

@@ -570,6 +570,7 @@ export class ProxyService {
           connectionMs: credentials.streamWarmupMs,
           local: route.authType === 'local',
         }),
+        signal,
       );
       if (warmup.ok) {
         const peeked: ForwardResult = {

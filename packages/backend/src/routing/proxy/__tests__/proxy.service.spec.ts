@@ -2288,7 +2288,7 @@ describe('ProxyService — orchestration', () => {
       });
       expect(result.forward.response.status).toBe(200);
       expect(result.forward.attempt).toBe(attempt);
-      expect(mockedPeek).toHaveBeenCalledWith(streamRes.body, 15_000);
+      expect(mockedPeek).toHaveBeenCalledWith(streamRes.body, 15_000, undefined);
       expect(momentum.recordTier).toHaveBeenCalled();
     });
 
