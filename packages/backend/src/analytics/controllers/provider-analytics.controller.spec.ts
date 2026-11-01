@@ -93,6 +93,7 @@ describe('ProviderAnalyticsController', () => {
       attemptStats as never,
       providerRepo as unknown as Repository<TenantProvider>,
       messageRepo as unknown as Repository<AgentMessage>,
+      { findOne: jest.fn().mockResolvedValue(null) } as never,
     );
   });
 

@@ -10,7 +10,13 @@ import {
   getRecentRequests,
   mergeUsage,
 } from '../services/api.js';
-import { customProviderColor, formatNumber, formatCost } from '../services/formatters.js';
+import {
+  customProviderColor,
+  formatNumber,
+  formatCost,
+  formatTimeAgo,
+} from '../services/formatters.js';
+import { connectionUsage } from '../services/api/providers.js';
 import { customProviderLogo, providerIcon } from '../components/ProviderIcon.js';
 import { stripCustomPrefix } from '../services/routing-utils.js';
 import {
@@ -64,9 +70,14 @@ interface ProviderGroup {
   consumption_tokens: number;
   consumption_messages: number;
   consumption_cost: number;
+  attempts_30d: number;
+  succeeded_30d: number;
   last_used_at: string | null;
   sparkline_7d: number[];
 }
+
+/** Provider-type order of the 30-day usage summary. */
+const AUTH_TYPE_ORDER = ['api_key', 'subscription', 'local'];
 
 interface CostByModelRow {
   model: string;
@@ -751,6 +762,67 @@ export default function GlobalOverview() {
           </table>
         </Panel>
 
+        <Panel title={t('overview.providerUsage.title')} bodyClassName="overflow-auto p-0">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>{t('overview.connections.type')}</th>
+                <th className="num">{t('overview.providerUsage.connections')}</th>
+                <th className="num">{t('overview.providerUsage.tokens')}</th>
+                <th className="num">
+                  <HeadTip
+                    label={t('overview.providerUsage.cost')}
+                    tip={t('providers.page.totalApiCostTooltip')}
+                  />
+                </th>
+                <th className="num">
+                  <HeadTip
+                    label={t('overview.providerUsage.attempts')}
+                    tip={t('ui.analytics.totalAttempts')}
+                  />
+                </th>
+                <th className="num">
+                  <HeadTip
+                    label={t('overview.providerUsage.successRate')}
+                    tip={t('ui.analytics.connectionSuccessRate30d')}
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {AUTH_TYPE_ORDER.map((authType) => {
+                const groups = providerList.filter((g) => g.auth_type === authType);
+                if (groups.length === 0) return null;
+                const sum = (pick: (g: ProviderGroup) => number) =>
+                  groups.reduce((total, g) => total + (pick(g) ?? 0), 0);
+                const attempts = sum((g) => g.attempts_30d);
+                const rate = attemptSuccessRate({
+                  attempts,
+                  succeeded: sum((g) => g.succeeded_30d),
+                });
+                return (
+                  <tr key={authType}>
+                    <td>
+                      <span className="text-xs font-medium text-muted">{authLabel(authType)}</span>
+                    </td>
+                    <td className="num">
+                      {formatNumber(sum((g) => g.connections.filter((c) => c.is_active).length))}
+                    </td>
+                    <td className="num">{formatNumber(sum((g) => g.consumption_tokens))}</td>
+                    <td className="num">
+                      {authType === 'api_key'
+                        ? (formatCost(sum((g) => g.consumption_cost)) ?? '$0.00')
+                        : '—'}
+                    </td>
+                    <td className="num">{formatNumber(attempts)}</td>
+                    <td className="num">{rate == null ? '—' : formatRate(rate)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Panel>
+
         <Panel
           title={t('overview.connections.title')}
           bodyClassName="max-h-[420px] overflow-auto p-0"
@@ -762,6 +834,9 @@ export default function GlobalOverview() {
                 <th>{t('overview.connections.name')}</th>
                 <th>{t('overview.connections.type')}</th>
                 <th>{t('overview.connections.status')}</th>
+                <th>{t('overview.providerUsage.tokens')}</th>
+                <th className="num">{t('overview.providerUsage.cost')}</th>
+                <th>{t('overview.connections.lastUsed')}</th>
                 <th>
                   <HeadTip
                     label={t('overview.totalAttempts')}
@@ -805,6 +880,14 @@ export default function GlobalOverview() {
                   );
                   const failed = rel && rel.succeeded != null ? rel.attempts - rel.succeeded : null;
                   const rate = rel ? attemptSuccessRate(rel) : null;
+                  const u = connection.id
+                    ? connectionUsage(
+                        providerUsageRes.data,
+                        group.provider,
+                        group.auth_type as Parameters<typeof connectionUsage>[2],
+                        connection.label,
+                      )
+                    : undefined;
                   const failedLink = `/messages?connections=${encodeURIComponent(connection.id)}&range=${chartRange}&attempts=has_failed`;
                   return (
                     <tr
@@ -842,6 +925,28 @@ export default function GlobalOverview() {
                           <Badge>{t('overview.connections.inactive')}</Badge>
                         )}
                       </td>
+                      <td>
+                        {u ? (
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            {u.sparkline_7d.length ? (
+                              <span className="shrink-0">
+                                <Sparkline data={u.sparkline_7d} width={60} height={20} />
+                              </span>
+                            ) : null}
+                            <span>{formatNumber(u.consumption_tokens)}</span>
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="num">
+                        {u && group.auth_type === 'api_key'
+                          ? (formatCost(u.consumption_cost) ?? '$0.00')
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap text-xs text-muted">
+                        {u?.last_used_at ? formatTimeAgo(u.last_used_at) : '—'}
+                      </td>
                       <td>{rel ? formatNumber(rel.attempts) : '—'}</td>
                       <td>
                         {failed == null ? (
@@ -866,7 +971,7 @@ export default function GlobalOverview() {
                 })}
               {providerList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-muted">
+                  <td colSpan={10} className="py-6 text-center text-muted">
                     {t('overview.connections.empty')}
                   </td>
                 </tr>
@@ -1009,7 +1114,7 @@ export default function GlobalOverview() {
               title={t('overview.empty.noProviders')}
               description={t('overview.empty.connectToRoute')}
               action={
-                <ButtonLink to="/providers/subscriptions" size="sm" className="mt-2">
+                <ButtonLink to="/providers/subscriptions/add" size="sm" className="mt-2">
                   {t('overview.empty.connectProvider')}
                 </ButtonLink>
               }

@@ -26,6 +26,8 @@ export interface ProviderSelectContentProps {
   showHeader?: boolean;
   /** Kept for callers; the list footer was removed with the tab view. */
   showFooter?: boolean;
+  /** Re-authenticating this subscription connection (by label) instead of adding one. */
+  reauthLabel?: string;
 }
 
 const noop = () => {};
@@ -231,6 +233,7 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
             onUpdate={props.onUpdate}
             onPollProviders={props.onPollProviders}
             onClose={closeHandler}
+            reauthLabel={props.reauthLabel}
           />
         </div>
       ) : null}

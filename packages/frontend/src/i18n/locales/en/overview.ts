@@ -44,12 +44,21 @@ export default {
     cost: 'Cost',
     empty: 'No model data yet',
   },
+  providerUsage: {
+    title: 'Usage by provider type (30 days)',
+    connections: 'Active connections',
+    tokens: 'Tokens (30d)',
+    cost: 'Cost (30d)',
+    attempts: 'Attempts (30d)',
+    successRate: 'Success rate (30d)',
+  },
   connections: {
     title: 'Provider connections',
     provider: 'Provider',
     name: 'Connection name',
     type: 'Type',
     status: 'Status',
+    lastUsed: 'Last used',
     failedAttempts: 'Failed attempts',
     failedAttemptsTip:
       'Attempts this connection failed on the filtered period. Click a count to see the requests holding them.',

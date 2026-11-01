@@ -54,6 +54,9 @@ const Help = lazyReload(() => import('./pages/Help.jsx'));
 const ConnectProvider = lazyReload(() => import('./pages/ConnectProvider.jsx'));
 const Subscriptions = lazyReload(() => import('./pages/providers/Subscriptions.jsx'));
 const Byok = lazyReload(() => import('./pages/providers/Byok.jsx'));
+const ByokAdd = lazyReload(() => import('./pages/providers/ByokAdd.jsx'));
+const SubscriptionsAdd = lazyReload(() => import('./pages/providers/SubscriptionsAdd.jsx'));
+const LocalAdd = lazyReload(() => import('./pages/providers/LocalAdd.jsx'));
 const LocalProviders = lazyReload(() => import('./pages/providers/Local.jsx'));
 const ConnectionDetail = lazyReload(() => import('./pages/providers/ConnectionDetail.jsx'));
 const McpServer = lazyReload(() => import('./pages/integrations/McpServer.jsx'));
@@ -178,10 +181,34 @@ function AppRoutes() {
           }
         />
         <Route
+          path="providers/subscriptions/add"
+          element={
+            <Lazy>
+              <SubscriptionsAdd />
+            </Lazy>
+          }
+        />
+        <Route
           path="providers/usage-based"
           element={
             <Lazy>
               <Byok />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/usage-based/add"
+          element={
+            <Lazy>
+              <ByokAdd />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/local/add"
+          element={
+            <Lazy>
+              <LocalAdd />
             </Lazy>
           }
         />

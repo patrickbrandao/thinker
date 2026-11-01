@@ -7,6 +7,7 @@ import { AttemptStatsService } from '../services/attempt-stats.service';
 import { TimeseriesQueriesService } from '../services/timeseries-queries.service';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
+import { CustomProvider } from '../../entities/custom-provider.entity';
 import {
   selectMessageRowColumns,
   filterByTenantProviderId,
@@ -31,6 +32,8 @@ export class ProviderAnalyticsController {
     private readonly providerRepo: Repository<TenantProvider>,
     @InjectRepository(AgentMessage)
     private readonly messageRepo: Repository<AgentMessage>,
+    @InjectRepository(CustomProvider)
+    private readonly customProviderRepo: Repository<CustomProvider>,
   ) {}
 
   /**
@@ -306,6 +309,19 @@ export class ProviderAnalyticsController {
     });
     if (!conn) return { connection: null, agents: [], model_usage: [], recent_messages: [] };
 
+    // A custom provider's models are entered by hand on its custom_providers
+    // row; discovery never fills the connection's cached_models.
+    const custom = conn.provider.startsWith('custom:')
+      ? await this.customProviderRepo.findOne({
+          where: { id: conn.provider.slice('custom:'.length), tenant_id: tenantId },
+        })
+      : null;
+    const cachedModelCount = Array.isArray(custom?.models)
+      ? custom.models.length
+      : Array.isArray(conn.cached_models)
+        ? conn.cached_models.length
+        : 0;
+
     const cutoff30d = computeCutoff('30 days');
     const costExpr = sqlCastFloat(sqlSanitizeCost('at.cost_usd'));
 
@@ -399,7 +415,7 @@ export class ProviderAnalyticsController {
         provider: conn.provider,
         auth_type: conn.auth_type,
         label: conn.label,
-        cached_model_count: Array.isArray(conn.cached_models) ? conn.cached_models.length : 0,
+        cached_model_count: cachedModelCount,
         key_prefix: conn.key_prefix,
         connected_at: conn.connected_at,
         is_active: conn.is_active,

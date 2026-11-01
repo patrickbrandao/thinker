@@ -108,21 +108,17 @@ describe('provider pages in pt-BR', () => {
   it('renders the usage-based page in Portuguese', async () => {
     renderInRouter(<Byok />);
     await waitFor(() => expect(screen.getByText('Production')).toBeTruthy());
-    expect(screen.getByText('Minhas conexões por uso')).toBeTruthy();
-    expect(screen.getByText('Provedores por uso compatíveis')).toBeTruthy();
-    expect(screen.getByText('Custo total de API (30d)')).toBeTruthy();
     expect(screen.getByText('Ativa')).toBeTruthy();
     expect(screen.getByText('Ver detalhes')).toBeTruthy();
+    expect(screen.getByText('Adicionar provedor')).toBeTruthy();
     expect(screen.getByText('Adicionar provedor personalizado')).toBeTruthy();
-    // Currency follows the locale.
-    expect(screen.getAllByText(/^US\$\s\d+,\d{2}$/).length).toBeGreaterThan(0);
   });
 
   it('switches language live', async () => {
     renderInRouter(<Byok />);
-    await waitFor(() => expect(screen.getByText('Minhas conexões por uso')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Adicionar provedor')).toBeTruthy());
     setLocale('en', { persist: false });
-    await waitFor(() => expect(screen.getByText('My usage-based connections')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Add provider')).toBeTruthy());
   });
 
   it('renders the custom provider form with the context window column in Portuguese', () => {

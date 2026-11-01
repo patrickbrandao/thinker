@@ -79,9 +79,20 @@ interface OwnedAgentRouteTarget {
   name: string;
 }
 
+/** How long an armed re-authentication waits for the OAuth sign-in. */
+const REAUTH_TARGET_TTL_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class ProviderService {
   private readonly logger = new Logger(ProviderService.name);
+  /**
+   * Pending re-authentications, keyed by `${tenantId}:${provider}`. The next
+   * OAuth sign-in for that provider reuses the target connection's label, so
+   * `upsertProvider` refreshes that row in place (same id, harness access and
+   * routes) instead of adding a new account. In-process only, like the OAuth
+   * flows' own pending state.
+   */
+  private readonly reauthTargets = new Map<string, { label: string; expiresAt: number }>();
 
   constructor(
     @InjectRepository(TenantProvider)
@@ -580,6 +591,44 @@ export class ProviderService {
    * Scoped to the tenant: an id from another tenant is a 404. Callers
    * invalidate the routing caches so the proxy reads the new value.
    */
+  /**
+   * Arm a re-authentication for a subscription connection: the next OAuth
+   * sign-in for its provider (within REAUTH_TARGET_TTL_MS) writes into this
+   * connection instead of creating another one.
+   */
+  async startReauth(tenantId: string, connectionId: string): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    if (row.auth_type !== 'subscription') {
+      throw new BadRequestException('Only subscription connections sign in again');
+    }
+    this.reauthTargets.set(`${tenantId}:${row.provider}`, {
+      label: row.label,
+      expiresAt: Date.now() + REAUTH_TARGET_TTL_MS,
+    });
+    return row;
+  }
+
+  /** Disarm a pending re-authentication (the sign-in was abandoned). */
+  async cancelReauth(tenantId: string, connectionId: string): Promise<void> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) return;
+    const key = `${tenantId}:${row.provider}`;
+    if (this.reauthTargets.get(key)?.label === row.label) this.reauthTargets.delete(key);
+  }
+
+  private takeReauthTarget(tenantId: string, provider: string): string | undefined {
+    const key = `${tenantId}:${provider}`;
+    const target = this.reauthTargets.get(key);
+    if (!target) return undefined;
+    this.reauthTargets.delete(key);
+    return target.expiresAt > Date.now() ? target.label : undefined;
+  }
+
   async setStreamWarmup(
     tenantId: string,
     connectionId: string,
@@ -1436,6 +1485,8 @@ export class ProviderService {
    * a "Default" row already exists, returns "Key 2", "Key 3", etc.
    */
   async nextOAuthLabel(tenantId: string, provider: string): Promise<string | undefined> {
+    const reauthLabel = this.takeReauthTarget(tenantId, provider);
+    if (reauthLabel) return reauthLabel;
     const existing = await this.providerRepo.find({
       where: {
         tenant_id: tenantId,

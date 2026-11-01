@@ -1,5 +1,5 @@
 import ProviderConnectionsPage from './ProviderConnectionsPage.jsx';
 
 export default function Byok() {
-  return <ProviderConnectionsPage kind="byok" />;
+  return <ProviderConnectionsPage kind="byok" view="connections" />;
 }

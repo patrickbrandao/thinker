@@ -1,4 +1,9 @@
-import { receivedHeaders, sanitizeRequestHeaders } from './request-headers';
+import {
+  receivedHeaders,
+  recordedRequestHeaders,
+  requestLineHeaders,
+  sanitizeRequestHeaders,
+} from './request-headers';
 
 describe('sanitizeRequestHeaders', () => {
   it('returns null when no headers are provided', () => {
@@ -126,5 +131,30 @@ describe('receivedHeaders', () => {
   it('falls back to headers when rawHeaders is missing', () => {
     const headers = { host: 'a.example' };
     expect(receivedHeaders({ headers })).toBe(headers);
+  });
+});
+
+describe('recordedRequestHeaders', () => {
+  it('stores the request line as pseudo-headers ahead of the received headers', () => {
+    const result = recordedRequestHeaders({
+      method: 'post',
+      originalUrl: '/v1/messages?beta=true',
+      httpVersion: '1.1',
+      headers: {},
+      rawHeaders: ['Host', 'a.example'],
+    });
+    expect(result).toEqual({
+      ':method': 'POST',
+      ':path': '/v1/messages?beta=true',
+      ':version': 'HTTP/1.1',
+      host: 'a.example',
+    });
+    expect(Object.keys(result!)[0]).toBe(':method');
+  });
+
+  it('redacts credential query parameters in the path', () => {
+    expect(
+      requestLineHeaders({ method: 'GET', originalUrl: '/v1/models?key=abc&x=1&api_key=' }),
+    ).toEqual({ ':method': 'GET', ':path': '/v1/models?key=[REDACTED]&x=1&api_key=[REDACTED]' });
   });
 });

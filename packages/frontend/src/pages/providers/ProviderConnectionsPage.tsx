@@ -1,13 +1,6 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type SyntheticEvent,
-} from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ChevronDown, LayoutGrid, List, Pencil, Shapes } from 'lucide-react';
+import { LayoutGrid, List, Pencil, Plus, Shapes } from 'lucide-react';
 import {
   getAgents,
   getCustomProviders,
@@ -17,18 +10,14 @@ import {
   getProviders as getGlobalProviders,
   getProviderUsage,
   mergeUsage,
-  connectionUsage,
   type TenantProviderSummary,
 } from '../../services/api/providers.js';
 import { analyticsPing, routingPing } from '../../services/sse.js';
-import { toggleScrollFade } from '../../services/scroll-fade.js';
 import { renameProviderKey } from '../../services/api/routing.js';
 import { getPlaygroundAgent } from '../../services/api/playground.js';
 import type { AuthType, CustomProviderData, RoutingProvider } from '../../services/api.js';
 import type { CustomProviderPrefill, ProviderDeepLink } from '../../services/routing-params.js';
 import { PROVIDERS, subscriptionCatalog, type ProviderDef } from '../../services/providers.js';
-import { formatCost, formatNumber, formatTimeAgo } from '../../services/formatters.js';
-import InfoTooltip from '../../components/InfoTooltip.jsx';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import { toast } from '../../services/toast-store.js';
 import { t } from '../../i18n/index.js';
@@ -37,17 +26,19 @@ import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import LocalServerForm from '../../components/LocalServerForm.jsx';
 import type { LocalServerType } from '../../services/api.js';
-import Sparkline from '../../components/Sparkline.jsx';
-import { attemptSuccessRate } from '../../services/api/analytics.js';
-import { Badge, Button, Modal, Skel, cx } from '../../components/ui.js';
+import { Badge, Button, Modal, cx } from '../../components/ui.js';
 import { useResource } from '../../lib/use-resource.js';
 import { useSignal } from '../../lib/signal.js';
 
 type ProviderPageKind = 'subscriptions' | 'byok' | 'local';
 type ViewMode = 'list' | 'grid';
+/** Which part of the page to render: the registered connections, the
+ *  supported-provider catalog, or both stacked (the default). */
+type PageView = 'connections' | 'catalog' | 'both';
 
 interface ProviderConnectionsPageProps {
   kind: ProviderPageKind;
+  view?: PageView;
 }
 
 interface AgentRow {
@@ -60,14 +51,13 @@ interface PageCopy {
   subtitle: string;
   addLabel: string;
   customAddLabel?: string;
+  /** Catalog page the list's add button opens (pages split into list + catalog). */
+  addPath?: string;
+  addPageLabel?: string;
+  emptyLabel?: string;
   connectedHeading: string;
   supportedHeading: string;
   authType: AuthType;
-  /** Cost metric (stat card + per-row column) — BYOK only. Subscriptions and
-   *  local providers have no real cost figure to show. */
-  metricLabel?: string;
-  metricTooltip?: string;
-  rowMetricHeading?: string;
   activeLabel: (count: number) => string;
 }
 
@@ -79,6 +69,9 @@ const pageCopy = (kind: ProviderPageKind): PageCopy => {
       heading: t('providers.kind.subscriptions'),
       subtitle: t('providers.page.subscriptions.subtitle'),
       addLabel: t('providers.connect'),
+      addPath: '/providers/subscriptions/add',
+      addPageLabel: t('providers.page.connectProvider'),
+      emptyLabel: t('providers.page.noSubscriptionConnections'),
       connectedHeading: t('providers.page.subscriptions.connectedHeading'),
       supportedHeading: t('providers.page.subscriptions.supportedHeading'),
       authType: 'subscription',
@@ -91,12 +84,12 @@ const pageCopy = (kind: ProviderPageKind): PageCopy => {
       subtitle: t('providers.page.byok.subtitle'),
       addLabel: t('providers.connect'),
       customAddLabel: t('providers.page.addCustomProvider'),
+      addPath: '/providers/usage-based/add',
+      addPageLabel: t('providers.page.addProvider'),
+      emptyLabel: t('providers.page.noConnections'),
       connectedHeading: t('providers.page.byok.connectedHeading'),
       supportedHeading: t('providers.page.byok.supportedHeading'),
       authType: 'api_key',
-      metricLabel: t('providers.page.totalApiCost30d'),
-      metricTooltip: t('providers.page.totalApiCostTooltip'),
-      rowMetricHeading: t('providers.page.cost30d'),
       activeLabel: (n) => t('providers.page.activeKeys', n),
     };
   return {
@@ -105,13 +98,14 @@ const pageCopy = (kind: ProviderPageKind): PageCopy => {
     subtitle: t('providers.page.local.subtitle'),
     addLabel: t('providers.connect'),
     connectedHeading: t('providers.page.local.connectedHeading'),
-    supportedHeading: t('providers.page.local.supportedHeading'),
+    supportedHeading: '',
+    addPath: '/providers/local/add',
+    addPageLabel: t('providers.page.addAiServer'),
+    emptyLabel: t('providers.page.noLocalServers'),
     authType: 'local',
     activeLabel: (n) => t('providers.page.activeConnections', n),
   };
 };
-
-const CONNECTIONS_COLLAPSE_THRESHOLD = 6;
 
 const providerListForKind = (
   kind: ProviderPageKind,
@@ -139,11 +133,6 @@ const providerDisplayName = (
   customProviders: readonly CustomProviderData[],
 ): string =>
   customProviderName(providerId, customProviders) ?? standardProviderName(providerId) ?? providerId;
-
-const formatRate = (rate: number | null) => (rate == null ? '—' : `${(rate * 100).toFixed(1)}%`);
-
-/** Shimmer placeholder shown in usage cells while the usage fetch is in flight. */
-const UsageShimmer = ({ width }: { width?: number }) => <Skel width={width ?? 56} height={12} />;
 
 const StatusBadge = ({ active }: { active: boolean }) =>
   active ? (
@@ -219,6 +208,102 @@ function LocalServerList({
   );
 }
 
+/** A local server's address: scheme, host, port and path prefix. */
+const localServerUrl = (cp: CustomProviderData): string => {
+  const c = cp.local_config;
+  return c ? `${c.scheme}://${c.host}:${c.port}${c.path_prefix}` : cp.base_url;
+};
+
+/** The registered local servers; the column headers show even when empty. */
+function LocalServersTable({
+  servers,
+  connectionFor,
+  canManage,
+  onEdit,
+  onOpen,
+}: {
+  servers: CustomProviderData[];
+  connectionFor: (cp: CustomProviderData) => { id: string; is_active: boolean } | undefined;
+  canManage: boolean;
+  onEdit: (cp: CustomProviderData) => void;
+  onOpen: (connectionId: string) => void;
+}) {
+  return (
+    <div className="table-wrap mb-6">
+      <table className="data">
+        <thead>
+          <tr>
+            <th>{t('providers.page.colName')}</th>
+            <th>{t('providers.page.colUrl')}</th>
+            <th>{t('providers.page.colStatus')}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {servers.map((cp) => {
+            const connection = connectionFor(cp);
+            return (
+              <tr
+                key={cp.id}
+                className={connection ? 'cursor-pointer' : undefined}
+                onClick={() => connection && onOpen(connection.id)}
+              >
+                <td>
+                  <span className="flex items-center gap-2.5">
+                    <ProviderMark providerId={cp.local_type ?? cp.id} name={cp.name} />
+                    <span className="row-title">{cp.name}</span>
+                  </span>
+                </td>
+                <td className="font-mono text-xs text-muted">{localServerUrl(cp)}</td>
+                <td>
+                  <StatusBadge active={connection?.is_active ?? false} />
+                </td>
+                <td className="row-actions">
+                  <span className="inline-flex items-center justify-end gap-2">
+                    {canManage ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="whitespace-nowrap"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit(cp);
+                        }}
+                      >
+                        {t('providerSetup.localServer.edit')}
+                      </Button>
+                    ) : null}
+                    {connection ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="whitespace-nowrap"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpen(connection.id);
+                        }}
+                      >
+                        {t('providers.page.viewDetails')}
+                      </Button>
+                    ) : null}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+          {servers.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="py-6 text-center text-muted">
+                {t('providers.page.noLocalServers')}
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ActiveLabel({ children }: { children: string }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-ok">
@@ -228,7 +313,10 @@ function ActiveLabel({ children }: { children: string }) {
   );
 }
 
-export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPageProps) {
+export default function ProviderConnectionsPage({
+  kind,
+  view = 'both',
+}: ProviderConnectionsPageProps) {
   useSignal(me);
   const copy = pageCopy(kind);
   const canManage = roleCan.manageProviders();
@@ -246,10 +334,6 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
     null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  // Past this many connections the list is capped inside its own card, so the
-  // supported-provider catalog below stays reachable without a long scroll.
-  const [connectionsExpanded, setConnectionsExpanded] = useState(false);
-  const connectionsScroller = useRef<HTMLDivElement>(null);
 
   // Inline rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -281,17 +365,12 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
     }
   }, [analyticsTick, routingTick]);
 
-  // Distinguish "loading" (shimmer the usage cells) from "loaded-zero" (a real
-  // 0). Only the FIRST load shimmers; SSE-driven refetches keep the prior
-  // numbers on screen so the table doesn't flicker.
-  const usageLoading = usage.loading && usage.data === undefined;
-
   // Coordinate a usage refetch alongside config on connect/disconnect/rename.
   const refetchGlobalProviders = () => Promise.all([config.reload(), usage.reload()]);
 
   // Merge config + usage by (provider, auth_type). While usage is still loading
-  // every row carries zeroed usage; `usageLoading` tells the view to shimmer
-  // instead of rendering those zeros.
+  // every row carries zeroed usage. Usage numbers live on the Overview; here
+  // they only decide whether an inactive connection still lists.
   const mergedProviders = useMemo(
     () => mergeUsage(config.data?.providers ?? [], usage.data),
     [config.data, usage.data],
@@ -364,20 +443,6 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
     }
   }
 
-  const connectionsCollapsible = connectedRows.length > CONNECTIONS_COLLAPSE_THRESHOLD;
-  const connectionsCollapsed = connectionsCollapsible && !connectionsExpanded;
-  const toggleConnections = () => {
-    setConnectionsExpanded((open) => !open);
-    // Expanding takes the cap off, which drops the scroll position. The
-    // at-bottom flag from before it would otherwise survive into the next
-    // collapse and keep the fade hidden at the top of the list.
-    const scroller = connectionsScroller.current;
-    if (scroller) {
-      scroller.scrollTop = 0;
-      scroller.parentElement?.classList.remove('scroll-panel--at-bottom');
-    }
-  };
-
   const connectedByProvider = new Map<string, TenantProviderSummary>();
   for (const summary of connectedSummaries) connectedByProvider.set(summary.provider, summary);
 
@@ -391,55 +456,6 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
   const activeConnectionCount = (providerId: string) =>
     connectedByProvider.get(providerId)?.connections.filter((connection) => connection.is_active)
       .length ?? 0;
-
-  const totalApiCost = connectedSummaries.reduce(
-    (sum, summary) => sum + summary.consumption_cost,
-    0,
-  );
-
-  // Attempt-world totals for the header cards: summed over THIS page's rows
-  // (provider + auth_type grain), so the Subscriptions page never blends an
-  // api_key connection's failures into its numbers, and vice versa.
-  const totalAttempts = connectedSummaries.reduce((sum, s) => sum + s.attempts_30d, 0);
-  const totalAttemptsSucceeded = connectedSummaries.reduce((sum, s) => sum + s.succeeded_30d, 0);
-
-  const connectionDenominator = (summary: TenantProviderSummary) =>
-    Math.max(
-      summary.connections.filter((connection) => connection.is_active || hasUsage(summary)).length,
-      summary.connection_count,
-      1,
-    );
-
-  // Per-connection usage at the (provider, auth_type, label) grain: two
-  // connections of the same provider and type never share numbers. Falls back
-  // to the group's even split only while the label rows are missing.
-  const usageForConnection = (
-    summary: TenantProviderSummary,
-    connection: { label?: string | null },
-  ) => connectionUsage(usage.data, summary.provider, summary.auth_type, connection.label);
-
-  const perConnectionTokens = (
-    summary: TenantProviderSummary,
-    connection: { label?: string | null },
-  ) =>
-    usageForConnection(summary, connection)?.consumption_tokens ??
-    Math.round(summary.consumption_tokens / connectionDenominator(summary));
-
-  const perConnectionCost = (
-    summary: TenantProviderSummary,
-    connection: { label?: string | null },
-  ) =>
-    usageForConnection(summary, connection)?.consumption_cost ??
-    summary.consumption_cost / connectionDenominator(summary);
-
-  const connectionLastUsedAt = (
-    summary: TenantProviderSummary,
-    connection: { label?: string | null },
-  ) =>
-    usageForConnection(summary, connection)?.last_used_at ??
-    (summary.connections.length === 1 ? summary.last_used_at : null);
-
-  const showMetricCard = !!copy.metricLabel && (connectedRows.length > 0 || totalApiCost > 0);
 
   const activeLabel = (count: number) => {
     if (kind === 'local') return t('providers.connected');
@@ -513,6 +529,10 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
   const addParam = searchParams.get('add');
   useEffect(() => {
     if (addParam !== 'true') return;
+    if (view === 'connections' && copy.addPath) {
+      void navigate(`${copy.addPath}?add=true`, { replace: true });
+      return;
+    }
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -585,407 +605,289 @@ export default function ProviderConnectionsPage({ kind }: ProviderConnectionsPag
   return (
     <div className="page wide">
       <title>{copy.title}</title>
-      {copy.customAddLabel && canManage ? (
+      {view === 'connections' && canManage ? (
         <div className="page-head justify-end">
           <div className="page-actions">
-            <Button variant="ghost" size="sm" onClick={() => setShowCustomModal(true)}>
-              <Shapes size={14} aria-hidden="true" />
-              {copy.customAddLabel}
+            <Button size="sm" onClick={() => void navigate(copy.addPath ?? '')}>
+              <Plus size={14} aria-hidden="true" />
+              {copy.addPageLabel}
             </Button>
+            {copy.customAddLabel ? (
+              <Button variant="ghost" size="sm" onClick={() => setShowCustomModal(true)}>
+                <Shapes size={14} aria-hidden="true" />
+                {copy.customAddLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}
 
-      {connectedRows.length > 0 ? (
-        <>
-          <div className="stat-tiles mb-6">
-            {showMetricCard ? (
-              <div className="stat-tile">
-                <div className="stat-label">{copy.metricLabel}</div>
-                <div className="stat-value">
-                  {usageLoading ? (
-                    <UsageShimmer width={72} />
-                  ) : (
-                    (formatCost(totalApiCost) ?? '$0.00')
-                  )}
-                </div>
-              </div>
-            ) : null}
-            <div className="stat-tile">
-              <div className="stat-label inline-flex items-center gap-1">
-                {t('providers.totalAttempts30d')}
-                <InfoTooltip text={t('ui.analytics.totalAttempts')} />
-              </div>
-              <div className="stat-value">{formatNumber(totalAttempts)}</div>
-            </div>
-            <div className="stat-tile">
-              <div className="stat-label inline-flex items-center gap-1">
-                {t('providers.successRate30d')}
-                <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
-              </div>
-              <div className="stat-value">
-                {formatRate(
-                  attemptSuccessRate({
-                    attempts: totalAttempts,
-                    succeeded: totalAttemptsSucceeded,
-                  }),
-                )}
-              </div>
-            </div>
-          </div>
+      {kind === 'local' && view === 'connections' ? (
+        <LocalServersTable
+          servers={(customProviders.data ?? []).filter((cp) => cp.local_type)}
+          connectionFor={(cp) => connectedByProvider.get(`custom:${cp.id}`)?.connections[0]}
+          canManage={canManage}
+          onEdit={(cp) => setLocalEditor({ type: cp.local_type as LocalServerType, editData: cp })}
+          onOpen={goToConnection}
+        />
+      ) : null}
 
-          <h2 className="mb-3 text-sm font-semibold text-ink">{copy.connectedHeading}</h2>
-          <div
-            className={cx(
-              'connections-panel panel mb-6 overflow-hidden',
-              connectionsCollapsed && 'connections-panel--collapsed',
-            )}
-          >
-            <div className="connections-panel__viewport group relative">
-              <div
-                className={cx(
-                  'connections-panel__body overflow-x-auto',
-                  connectionsCollapsed &&
-                    'max-h-[340px] overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-elev',
-                )}
-                id="connected-connections"
-                ref={connectionsScroller}
-                onScroll={toggleScrollFade}
-              >
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>{t('providers.page.colProvider')}</th>
-                      <th>{t('providers.page.colConnection')}</th>
-                      <th>{t('providers.page.colStatus')}</th>
-                      <th>{t('providers.page.colUsage30d')}</th>
-                      {copy.rowMetricHeading ? <th>{copy.rowMetricHeading}</th> : null}
-                      <th>
-                        <span className="inline-flex items-center gap-1">
-                          {t('providers.totalAttempts30d')}
-                          <InfoTooltip text={t('ui.analytics.totalAttempts')} />
+      {view === 'connections' && kind !== 'local' && connectedRows.length === 0 ? (
+        <div className="panel px-4 py-8 text-center text-sm text-muted">{copy.emptyLabel}</div>
+      ) : null}
+
+      {view !== 'catalog' &&
+      !(kind === 'local' && view === 'connections') &&
+      connectedRows.length > 0 ? (
+        <>
+          {view === 'both' ? (
+            <h2 className="mb-3 text-sm font-semibold text-ink">{copy.connectedHeading}</h2>
+          ) : null}
+          <div className="table-wrap mb-6">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>{t('providers.page.colProvider')}</th>
+                  <th>{t('providers.page.colConnection')}</th>
+                  <th>{t('providers.page.colStatus')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {connectedRows.map((row) => {
+                  const authType = row.summary.auth_type ?? copy.authType;
+
+                  return (
+                    <tr
+                      key={row.connection.id}
+                      className="group/row cursor-pointer"
+                      tabIndex={0}
+                      onClick={() => goToConnection(row.connection.id)}
+                      onKeyDown={(event: KeyboardEvent<HTMLTableRowElement>) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          goToConnection(row.connection.id);
+                        }
+                      }}
+                    >
+                      <td>
+                        <span className="flex items-center gap-2.5">
+                          <ProviderMark providerId={row.summary.provider} name={row.name} />
+                          <span className="row-title">{row.name}</span>
+                          {row.summary.provider.startsWith('custom:') && kind !== 'local' ? (
+                            <Badge tone="outline">{t('providers.custom')}</Badge>
+                          ) : null}
                         </span>
-                      </th>
-                      <th>
-                        <span className="inline-flex items-center gap-1">
-                          {t('providers.successRate30d')}
-                          <InfoTooltip text={t('ui.analytics.connectionSuccessRate30d')} />
-                        </span>
-                      </th>
-                      <th>{t('providers.lastUsed')}</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {connectedRows.map((row) => {
-                      const u = usageForConnection(row.summary, row.connection);
-                      const spark = u?.sparkline_7d ?? row.summary.sparkline_7d;
-                      const lastUsed = connectionLastUsedAt(row.summary, row.connection);
-                      const authType = row.summary.auth_type ?? copy.authType;
-                      return (
-                        <tr
-                          key={row.connection.id}
-                          className="group/row cursor-pointer"
-                          tabIndex={0}
-                          onClick={() => goToConnection(row.connection.id)}
-                          onKeyDown={(event: KeyboardEvent<HTMLTableRowElement>) => {
-                            if (event.target !== event.currentTarget) return;
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              goToConnection(row.connection.id);
-                            }
+                      </td>
+                      <td className="text-muted" onClick={(e) => e.stopPropagation()}>
+                        {renamingId === row.connection.id ? (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                className="field h-7 w-32"
+                                aria-invalid={renameError ? true : undefined}
+                                value={renameValue}
+                                autoFocus
+                                onChange={(e) => {
+                                  setRenameValue(e.currentTarget.value);
+                                  setRenameError('');
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter')
+                                    void submitRename(
+                                      row.summary.provider,
+                                      row.connection.label,
+                                      authType,
+                                      e,
+                                    );
+                                  if (e.key === 'Escape') cancelRename(e);
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                disabled={renameBusy}
+                                onClick={(e) =>
+                                  void submitRename(
+                                    row.summary.provider,
+                                    row.connection.label,
+                                    authType,
+                                    e,
+                                  )
+                                }
+                              >
+                                {t('common.save')}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={cancelRename}>
+                                {t('common.cancel')}
+                              </Button>
+                            </div>
+                            {renameError ? (
+                              <div className="mt-0.5 text-xs text-danger">{renameError}</div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="inline-flex cursor-default items-center gap-1.5">
+                            {row.connection.label}
+                            {canManage ? (
+                              <button
+                                type="button"
+                                className="inline-flex cursor-pointer items-center rounded-control border-0 bg-transparent p-0.5 text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-ink focus-visible:opacity-100"
+                                onClick={(e) =>
+                                  startRename(row.connection.id, row.connection.label, e)
+                                }
+                                aria-label={t('providers.page.renameAria', {
+                                  label: row.connection.label,
+                                })}
+                              >
+                                <Pencil size={13} aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <StatusBadge active={row.connection.is_active} />
+                      </td>
+                      <td className="row-actions">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="whitespace-nowrap"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            goToConnection(row.connection.id);
                           }}
                         >
-                          <td>
-                            <span className="flex items-center gap-2.5">
-                              <ProviderMark providerId={row.summary.provider} name={row.name} />
-                              <span className="row-title">{row.name}</span>
-                              {row.summary.provider.startsWith('custom:') && kind !== 'local' ? (
-                                <Badge tone="outline">{t('providers.custom')}</Badge>
-                              ) : null}
-                            </span>
-                          </td>
-                          <td className="text-muted" onClick={(e) => e.stopPropagation()}>
-                            {renamingId === row.connection.id ? (
-                              <>
-                                <div className="flex items-center gap-1.5">
-                                  <input
-                                    type="text"
-                                    className="field h-7 w-32"
-                                    aria-invalid={renameError ? true : undefined}
-                                    value={renameValue}
-                                    autoFocus
-                                    onChange={(e) => {
-                                      setRenameValue(e.currentTarget.value);
-                                      setRenameError('');
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter')
-                                        void submitRename(
-                                          row.summary.provider,
-                                          row.connection.label,
-                                          authType,
-                                          e,
-                                        );
-                                      if (e.key === 'Escape') cancelRename(e);
-                                    }}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    disabled={renameBusy}
-                                    onClick={(e) =>
-                                      void submitRename(
-                                        row.summary.provider,
-                                        row.connection.label,
-                                        authType,
-                                        e,
-                                      )
-                                    }
-                                  >
-                                    {t('common.save')}
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={cancelRename}>
-                                    {t('common.cancel')}
-                                  </Button>
-                                </div>
-                                {renameError ? (
-                                  <div className="mt-0.5 text-xs text-danger">{renameError}</div>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="inline-flex cursor-default items-center gap-1.5">
-                                {row.connection.label}
-                                {canManage ? (
-                                  <button
-                                    type="button"
-                                    className="inline-flex cursor-pointer items-center rounded-control border-0 bg-transparent p-0.5 text-muted opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-ink focus-visible:opacity-100"
-                                    onClick={(e) =>
-                                      startRename(row.connection.id, row.connection.label, e)
-                                    }
-                                    aria-label={t('providers.page.renameAria', {
-                                      label: row.connection.label,
-                                    })}
-                                  >
-                                    <Pencil size={13} aria-hidden="true" />
-                                  </button>
-                                ) : null}
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <StatusBadge active={row.connection.is_active} />
-                          </td>
-                          <td>
-                            {usageLoading ? (
-                              <UsageShimmer width={96} />
-                            ) : (
-                              <div className="flex items-center gap-2 whitespace-nowrap">
-                                {spark?.length ? (
-                                  <span className="shrink-0">
-                                    <Sparkline data={spark} width={60} height={20} />
-                                  </span>
-                                ) : null}
-                                <span>
-                                  {formatNumber(perConnectionTokens(row.summary, row.connection))}{' '}
-                                  {t('providers.page.tokensSuffix')}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          {copy.rowMetricHeading ? (
-                            <td className="num">
-                              {usageLoading ? (
-                                <UsageShimmer />
-                              ) : (
-                                (formatCost(perConnectionCost(row.summary, row.connection)) ??
-                                '$0.00')
-                              )}
-                            </td>
-                          ) : null}
-                          {/* Attempt reliability at the row's own grain (provider +
-                          auth_type): a subscription row never shows a rate
-                          blended with the provider's api_key traffic. */}
-                          <td className="num">
-                            {usageLoading ? (
-                              <UsageShimmer width={48} />
-                            ) : (
-                              formatNumber(u?.attempts_30d ?? row.summary.attempts_30d)
-                            )}
-                          </td>
-                          <td className="num">
-                            {usageLoading ? (
-                              <UsageShimmer width={48} />
-                            ) : (
-                              formatRate(
-                                attemptSuccessRate({
-                                  attempts: u?.attempts_30d ?? row.summary.attempts_30d,
-                                  succeeded: u?.succeeded_30d ?? row.summary.succeeded_30d,
-                                }),
-                              )
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap text-xs text-muted">
-                            {usageLoading ? (
-                              <UsageShimmer width={48} />
-                            ) : lastUsed ? (
-                              formatTimeAgo(lastUsed)
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td className="row-actions">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="whitespace-nowrap"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                goToConnection(row.connection.id);
-                              }}
-                            >
-                              {t('providers.page.viewDetails')}
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {connectionsCollapsed ? (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-elev to-transparent group-[.scroll-panel--at-bottom]:hidden"
-                />
-              ) : null}
-            </div>
-            {connectionsCollapsible ? (
-              <button
-                type="button"
-                className="connections-panel__toggle flex w-full cursor-pointer items-center justify-center gap-1.5 border-0 border-t border-solid border-line bg-transparent px-3 py-2 text-xs font-medium text-muted hover:bg-s2 hover:text-ink"
-                aria-expanded={connectionsExpanded}
-                aria-controls="connected-connections"
-                onClick={toggleConnections}
-              >
-                {connectionsExpanded
-                  ? t('common.showLess')
-                  : t('providers.page.showAll', { count: connectedRows.length })}
-                <ChevronDown
-                  size={14}
-                  aria-hidden="true"
-                  className={cx('transition-transform', connectionsExpanded && 'rotate-180')}
-                />
-              </button>
-            ) : null}
+                          {t('providers.page.viewDetails')}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </>
       ) : null}
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="m-0 text-sm font-semibold text-ink">{copy.supportedHeading}</h2>
-        <div className="segmented" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'grid'}
-            aria-label={t('providers.page.gridView')}
-            className="inline-flex items-center"
-            onClick={() => setViewMode('grid')}
-          >
-            <LayoutGrid size={14} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'list'}
-            aria-label={t('providers.page.listView')}
-            className="inline-flex items-center"
-            onClick={() => setViewMode('list')}
-          >
-            <List size={14} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+      {view !== 'connections' ? (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            {copy.supportedHeading ? (
+              <h2 className="m-0 text-sm font-semibold text-ink">{copy.supportedHeading}</h2>
+            ) : (
+              <span />
+            )}
+            <div className="segmented" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'grid'}
+                aria-label={t('providers.page.gridView')}
+                className="inline-flex items-center"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'list'}
+                aria-label={t('providers.page.listView')}
+                className="inline-flex items-center"
+                onClick={() => setViewMode('list')}
+              >
+                <List size={14} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
 
-      {viewMode === 'list' ? (
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('providers.page.colProvider')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
+          {viewMode === 'list' ? (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t('providers.page.colProvider')}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {catalogProviders.map((provider) => {
+                    const activeCount = activeConnectionCount(provider.id);
+                    return (
+                      <tr key={provider.id}>
+                        <td>
+                          <span className="flex items-center gap-2.5">
+                            <ProviderMark providerId={provider.id} name={provider.name} />
+                            <span className="row-title">{provider.name}</span>
+                          </span>
+                          {kind === 'local' ? (
+                            <LocalServerList
+                              servers={localServers(provider.id)}
+                              canManage={canManage}
+                              onEdit={(cp) =>
+                                setLocalEditor({
+                                  type: provider.id as LocalServerType,
+                                  editData: cp,
+                                })
+                              }
+                            />
+                          ) : null}
+                        </td>
+                        <td className="row-actions">
+                          <span className="inline-flex items-center justify-end gap-2">
+                            {activeCount > 0 ? (
+                              <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
+                            ) : null}
+                            {kind === 'local'
+                              ? addServerButton(provider.id)
+                              : connectButton(provider.id)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="card-grid">
               {catalogProviders.map((provider) => {
                 const activeCount = activeConnectionCount(provider.id);
                 return (
-                  <tr key={provider.id}>
-                    <td>
-                      <span className="flex items-center gap-2.5">
-                        <ProviderMark providerId={provider.id} name={provider.name} />
-                        <span className="row-title">{provider.name}</span>
+                  <div key={provider.id} className="card flex flex-col gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProviderMark providerId={provider.id} name={provider.name} size={48} />
+                      <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
+                        {provider.name}
                       </span>
-                      {kind === 'local' ? (
-                        <LocalServerList
-                          servers={localServers(provider.id)}
-                          canManage={canManage}
-                          onEdit={(cp) =>
-                            setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
-                          }
-                        />
-                      ) : null}
-                    </td>
-                    <td className="row-actions">
-                      <span className="inline-flex items-center justify-end gap-2">
-                        {activeCount > 0 ? (
-                          <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
-                        ) : null}
-                        {kind === 'local'
-                          ? addServerButton(provider.id)
-                          : connectButton(provider.id)}
-                      </span>
-                    </td>
-                  </tr>
+                    </div>
+                    {kind === 'local' ? (
+                      <LocalServerList
+                        servers={localServers(provider.id)}
+                        canManage={canManage}
+                        onEdit={(cp) =>
+                          setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
+                        }
+                      />
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      {activeCount > 0 ? (
+                        <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
+                      ) : (
+                        <span />
+                      )}
+                      {kind === 'local' ? addServerButton(provider.id) : connectButton(provider.id)}
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="card-grid">
-          {catalogProviders.map((provider) => {
-            const activeCount = activeConnectionCount(provider.id);
-            return (
-              <div key={provider.id} className="card flex flex-col gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <ProviderMark providerId={provider.id} name={provider.name} size={48} />
-                  <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
-                    {provider.name}
-                  </span>
-                </div>
-                {kind === 'local' ? (
-                  <LocalServerList
-                    servers={localServers(provider.id)}
-                    canManage={canManage}
-                    onEdit={(cp) =>
-                      setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
-                    }
-                  />
-                ) : null}
-                <div className="flex items-center justify-between gap-3">
-                  {activeCount > 0 ? (
-                    <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
-                  ) : (
-                    <span />
-                  )}
-                  {kind === 'local' ? addServerButton(provider.id) : connectButton(provider.id)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          )}
+        </>
+      ) : null}
 
       {showModal && firstAgentName ? (
         <ProviderSelectModal

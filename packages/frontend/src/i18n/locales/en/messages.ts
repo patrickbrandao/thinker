@@ -349,6 +349,7 @@ export default {
     unknownProvider: 'Unknown',
     requestHeaders: 'Request Headers',
     header: 'Header',
+    requestLine: 'Request line',
     value: 'Value',
     modelParameters: 'Model Parameters',
     parameter: 'Parameter',

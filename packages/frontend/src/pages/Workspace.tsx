@@ -6,7 +6,6 @@ import ErrorState from '../components/ErrorState.js';
 import ActionMenu from '../components/ActionMenu.js';
 import AddAgentModal from '../components/AddAgentModal.js';
 import DuplicateAgentModal from '../components/DuplicateAgentModal.js';
-import Sparkline from '../components/Sparkline.js';
 import RichText from '../components/RichText.js';
 import { Button, EmptyState, Modal, Skel } from '../components/ui.js';
 import { getAgents, deleteAgent } from '../services/api.js';
@@ -222,7 +221,6 @@ export default function Workspace() {
               <Skel width="30%" height={14} />
               <Skel width="30%" height={14} />
             </div>
-            <Skel width="100%" height={50} />
           </div>
         ))}
       </div>
@@ -304,7 +302,8 @@ export default function Workspace() {
                   {agent.display_name ?? agent.agent_name}
                 </span>
               </div>
-              <div className="flex gap-6">
+              {/* Counters start where the name does: past the 48px icon and its gap. */}
+              <div className={cx('flex gap-6', icon && 'pl-[60px]')}>
                 <div className="flex flex-col">
                   <span className="text-xs text-muted">{t('harnesses.workspace.colTokens')}</span>
                   <span className="font-mono text-sm text-ink">
@@ -317,9 +316,6 @@ export default function Workspace() {
                     {formatNumber(agent.message_count)}
                   </span>
                 </div>
-              </div>
-              <div className="text-accent">
-                <Sparkline data={agent.sparkline} width={280} height={50} />
               </div>
             </Link>
             {canEdit ? (

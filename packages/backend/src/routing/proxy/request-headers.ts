@@ -43,6 +43,75 @@ export function receivedHeaders(req: {
   return out;
 }
 
+// Query parameters that can carry credentials (e.g. Gemini-style `?key=`).
+// Their values are replaced in the recorded path, like SENSITIVE_HEADERS.
+const SENSITIVE_QUERY_PARAMS: ReadonlySet<string> = new Set<string>([
+  'key',
+  'api_key',
+  'apikey',
+  'api-key',
+  'token',
+  'access_token',
+  'secret',
+  'password',
+]);
+
+/**
+ * The request line (`POST /v1/messages HTTP/1.1`) as HTTP/2-style
+ * pseudo-headers, so it is stored with the headers and listed first.
+ * Credential-bearing query values are redacted.
+ */
+export function requestLineHeaders(req: {
+  method?: string;
+  originalUrl?: string;
+  url?: string;
+  httpVersion?: string;
+}): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (req.method) out[':method'] = req.method.toUpperCase();
+  const path = req.originalUrl ?? req.url;
+  if (path) out[':path'] = redactQuery(path);
+  if (req.httpVersion) out[':version'] = `HTTP/${req.httpVersion}`;
+  return out;
+}
+
+function redactQuery(path: string): string {
+  const q = path.indexOf('?');
+  if (q < 0) return path;
+  const params = path
+    .slice(q + 1)
+    .split('&')
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      const name = eq < 0 ? pair : pair.slice(0, eq);
+      let decoded = name;
+      try {
+        decoded = decodeURIComponent(name);
+      } catch {
+        // keep the raw name
+      }
+      return eq >= 0 && SENSITIVE_QUERY_PARAMS.has(decoded.toLowerCase())
+        ? `${name}=${REDACTED}`
+        : pair;
+    });
+  return `${path.slice(0, q)}?${params.join('&')}`;
+}
+
+/**
+ * What gets stored for an inbound request: the request line pseudo-headers
+ * followed by the headers as received, sanitized.
+ */
+export function recordedRequestHeaders(req: {
+  method?: string;
+  originalUrl?: string;
+  url?: string;
+  httpVersion?: string;
+  headers: IncomingHttpHeaders;
+  rawHeaders?: string[];
+}): Record<string, string> | null {
+  return sanitizeRequestHeaders({ ...requestLineHeaders(req), ...receivedHeaders(req) });
+}
+
 function redact(key: string, value: string): string {
   if (key === 'authorization' || key === 'proxy-authorization') {
     const scheme = /^(\S+)\s+\S/.exec(value)?.[1];
