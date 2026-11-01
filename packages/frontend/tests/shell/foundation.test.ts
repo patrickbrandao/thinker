@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { signal, useSignal } from '../../src/lib/signal';
 import { useResource } from '../../src/lib/use-resource';
-import { autoLayout, validEdges } from '../../src/components/flow/layout';
+import { columnLayout, validEdges } from '../../src/components/flow/layout';
 import { t, tMaybe, resetLocaleForTests } from '../../src/i18n';
 import { NAVIGATION, activeNavItem } from '../../src/config/navigation';
 
@@ -61,24 +61,30 @@ describe('navigation', () => {
 });
 
 describe('flow layout', () => {
-  it('places each node one column right of its deepest parent', () => {
+  it('stacks each column, orders it by parents and keeps saved positions', () => {
     const node = (id: string) => ({
       id,
-      type: 'item' as const,
+      type: 'node' as const,
       position: { x: 0, y: 0 },
-      data: { kind: 'item' as const, title: id },
+      data: { kind: 'node' as const, icon: null, title: id },
     });
-    const graph = autoLayout({
-      nodes: [node('a'), node('b'), node('c')],
-      edges: [
-        { id: 'ab', source: 'a', target: 'b' },
-        { id: 'bc', source: 'b', target: 'c' },
-        { id: 'ac', source: 'a', target: 'c' },
-      ],
-    });
-    const x = Object.fromEntries(graph.nodes.map((n) => [n.id, n.position.x]));
-    expect(x.a).toBeLessThan(x.b!);
-    expect(x.b).toBeLessThan(x.c!);
-    expect(validEdges(graph.nodes, [{ id: 'z', source: 'a', target: 'gone' }])).toEqual([]);
+    const column: Record<string, number> = { a: 0, b: 0, x: 1, y: 1, z: 2 };
+    const graph = columnLayout(
+      {
+        nodes: [node('a'), node('b'), node('x'), node('y'), node('z')],
+        edges: [
+          { id: 'by', source: 'b', target: 'y' },
+          { id: 'ax', source: 'a', target: 'x' },
+          { id: 'xz', source: 'x', target: 'z' },
+        ],
+      },
+      { columnOf: (n) => column[n.id]!, heightOf: () => 100, positions: { z: { x: 7, y: 9 } } },
+    );
+    const at = Object.fromEntries(graph.nodes.map((n) => [n.id, n.position]));
+    expect(at.a!.x).toBeLessThan(at.x!.x);
+    // y follows b, which sits below a.
+    expect(at.x!.y).toBeLessThan(at.y!.y);
+    expect(at.z).toEqual({ x: 7, y: 9 });
+    expect(validEdges(graph.nodes, [{ id: 'q', source: 'a', target: 'gone' }])).toEqual([]);
   });
 });

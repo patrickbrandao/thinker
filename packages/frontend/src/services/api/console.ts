@@ -1,4 +1,4 @@
-import { fetchJson } from './core.js';
+import { fetchJson, fetchMutate } from './core.js';
 
 export type SearchResultType =
   'harness' | 'connection' | 'custom_provider' | 'virtual_model' | 'model' | 'member';
@@ -44,44 +44,65 @@ interface Usage {
 export interface Topology {
   range: TopologyRange;
   /** Client addresses that called a harness in the window. */
-  clients?: Array<{ id: string; ip: string; requests: number; errors: number }>;
+  clients: Array<{ id: string; ip: string; requests: number; errors: number }>;
   harnesses: Array<
     Usage & { id: string; name: string; displayName: string | null; platform: string | null }
   >;
-  hubs: Array<
-    Usage & {
-      id: string;
-      kind: 'auto' | 'virtual';
-      agentId: string;
-      agentName: string;
-      name: string;
-      enabled: boolean;
-    }
-  >;
+  /** Provider connections a harness reaches. */
   providers: Array<
     Usage & {
       id: string;
+      connectionId: string;
       provider: string;
       authType: string;
       name: string;
-      connections: Array<{ id: string; label: string; active: boolean }>;
-      models: string[];
+      label: string;
+      active: boolean;
     }
   >;
+  /** Outbound proxy profiles in use (`profileId` null: the global proxy). */
+  proxies: Array<Usage & { id: string; profileId: string | null; name: string }>;
+  egress: Array<Usage & { id: 'internet' | 'local' }>;
   links: TopologyLink[];
+  /** Saved canvas positions, by node id. */
+  positions: Record<string, { x: number; y: number }>;
+}
+
+export interface TopologyLinkModel {
+  /** Virtual model name, or "auto". */
+  via: string;
+  model: string;
+  kind: 'primary' | 'fallback' | 'usage';
+  requests: number;
 }
 
 export interface TopologyLink {
   source: string;
   target: string;
-  kind: 'client' | 'entry' | 'primary' | 'fallback' | 'usage';
-  /** Final model of a routing point → provider link. */
-  model?: string;
+  kind: 'client' | 'primary' | 'fallback' | 'usage' | 'egress';
   requests: number;
   errors: number;
+  costUsd: number;
+  models?: TopologyLinkModel[];
 }
 
-/** Harnesses, routing points, providers and the traffic of the window. */
+/** Clients, harnesses, connections, proxies and the traffic of the window. */
 export function getTopology(range: TopologyRange): Promise<Topology> {
   return fetchJson('/topology', { range }, { cache: false });
+}
+
+/** Saves where the user dropped canvas nodes (per workspace). */
+export function saveTopologyPositions(
+  positions: Array<{ id: string; x: number; y: number }>,
+): Promise<void> {
+  return fetchMutate('/topology/positions', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ positions }),
+  });
+}
+
+/** Drops the saved positions, back to the column layout. */
+export function resetTopologyPositions(): Promise<void> {
+  return fetchMutate('/topology/positions', { method: 'DELETE' });
 }

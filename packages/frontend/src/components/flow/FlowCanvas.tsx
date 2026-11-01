@@ -3,6 +3,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MarkerType,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
@@ -12,48 +13,60 @@ import {
 } from '@xyflow/react';
 import { nodeTypes } from './nodes.jsx';
 import { edgeTypes } from './edges.jsx';
-import { GRID, autoLayout, validEdges } from './layout.js';
-import type { FlowNode, FlowPort, Graph } from './types.js';
+import { GRID, validEdges } from './layout.js';
+import type { FlowNode, Graph } from './types.js';
+import { cx } from '../ui.jsx';
+
+export interface FlowLegendItem {
+  id: string;
+  label: string;
+  dashed?: boolean;
+  error?: boolean;
+}
 
 export interface FlowCanvasProps {
+  /** Nodes come laid out (positions set by the page's adapter). */
   graph: Graph;
-  /** Legend of the ports drawn on the edges. */
-  ports?: FlowPort[];
+  legend?: FlowLegendItem[];
   /** Centered hint, e.g. for an empty graph. */
   hint?: ReactNode;
   onNodeOpen?: (node: FlowNode) => void;
   /** Read-only by default; set to let the user drag nodes. */
   editable?: boolean;
-  /** Called after a drag, with the moved node's new position. */
-  onNodeMoved?: (node: FlowNode) => void;
+  /** Called after a drag, with every moved node at its new position. */
+  onNodesMoved?: (nodes: FlowNode[]) => void;
 }
 
-function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowCanvasProps) {
+const EDGE_DEFAULTS = {
+  type: 'flow',
+  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: 'var(--edge)' },
+} as const;
+
+function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: FlowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
   const flow = useReactFlow();
   const shape = useRef('');
 
   useEffect(() => {
-    const laid = autoLayout(graph, { keepPositions: true });
-    setNodes(laid.nodes);
-    setEdges(validEdges(laid.nodes, laid.edges).map((e) => ({ type: 'flow', ...e })));
+    setNodes(graph.nodes);
+    setEdges(validEdges(graph.nodes, graph.edges).map((e) => ({ ...EDGE_DEFAULTS, ...e })));
     // Re-frame only when the set of nodes changed, so a data refresh keeps
     // the user's pan and zoom. Fit after React Flow measured the new nodes.
-    const next = laid.nodes.map((n) => n.id).join('|');
+    const next = graph.nodes.map((n) => n.id).join('|');
     if (next !== shape.current) {
       shape.current = next;
-      requestAnimationFrame(() => void flow.fitView({ padding: 0.2, duration: 200 }));
+      requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 200 }));
     }
   }, [graph, setNodes, setEdges, flow]);
 
-  // `f` frames the whole graph (skill shortcut), unless typing in a field.
+  // `f` frames the whole graph, unless typing in a field.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (event.key === 'f' && !event.metaKey && !event.ctrlKey) {
-        void flow.fitView({ padding: 0.2, duration: 200 });
+        void flow.fitView({ padding: 0.15, duration: 200 });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -70,7 +83,7 @@ function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowC
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={(_, node) => onNodeOpen?.(node)}
-        onNodeDragStop={(_, node) => onNodeMoved?.(node)}
+        onNodeDragStop={(_, node, moved) => onNodesMoved?.(moved.length ? moved : [node])}
         nodesDraggable={editable === true}
         nodesConnectable={false}
         elementsSelectable
@@ -85,11 +98,14 @@ function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowC
         {nodes.length > 24 ? <MiniMap pannable zoomable position="top-right" /> : null}
       </ReactFlow>
       {hint ? <div className="stage-hint">{hint}</div> : null}
-      {ports?.length ? (
+      {legend?.length ? (
         <div className="stage-legend">
-          {ports.map((port) => (
-            <span key={port.id} style={{ ['--port' as string]: `var(--port-${port.slot})` }}>
-              {port.label}
+          {legend.map((item) => (
+            <span
+              key={item.id}
+              className={cx(item.dashed && 'is-dashed', item.error && 'is-error')}
+            >
+              {item.label}
             </span>
           ))}
         </div>
@@ -100,7 +116,7 @@ function Canvas({ graph, ports, hint, onNodeOpen, editable, onNodeMoved }: FlowC
 
 /**
  * The flow stage (React Flow). Lazy-load the page that uses it so React Flow
- * stays in its own chunk. Pages pass a Graph built by an adapter from API data.
+ * stays in its own chunk. Pages pass a laid-out Graph built by an adapter.
  */
 export default function FlowCanvas(props: FlowCanvasProps) {
   return (

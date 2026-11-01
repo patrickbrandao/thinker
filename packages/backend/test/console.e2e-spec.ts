@@ -75,9 +75,31 @@ it('lists failed requests of the last 24 hours as alerts', async () => {
   expect(other.body.items.map((i: { id: string }) => i.id)).not.toContain(failed);
 });
 
-it('builds the topology with routes and the traffic of the window', async () => {
+it('builds the topology from clients through connections and proxies to the internet', async () => {
   const [agent] = await ds.query(`SELECT id FROM agents WHERE name = 'console-search-bot'`);
   const vm = randomUUID();
+  const openai = randomUUID();
+  const anthropic = randomUUID();
+  const profile = randomUUID();
+  await ds.query(
+    `INSERT INTO tenant_providers (id, tenant_id, provider, auth_type, label)
+     VALUES ($1, $3, 'openai', 'api_key', 'Default'), ($2, $3, 'anthropic', 'api_key', 'Work')`,
+    [openai, anthropic, TEST_TENANT_ID],
+  );
+  await ds.query(`INSERT INTO proxy_profiles (id, tenant_id, name) VALUES ($1, $2, 'Office')`, [
+    profile,
+    TEST_TENANT_ID,
+  ]);
+  await ds.query(
+    `INSERT INTO proxy_bindings (tenant_id, target_type, target_id, position, proxy_id)
+     VALUES ($1, 'profile', $2, 0, NULL)`,
+    [TEST_TENANT_ID, profile],
+  );
+  await ds.query(
+    `INSERT INTO proxy_assignments (tenant_id, target_type, target_id, mode, profile_id)
+     VALUES ($1, 'provider', 'api_key:openai', 'profile', $2)`,
+    [TEST_TENANT_ID, profile],
+  );
   await ds.query(
     `INSERT INTO virtual_models (id, tenant_id, agent_id, name, override_route, fallback_routes)
      VALUES ($1, $2, $3, 'topo-fast', $4, $5)`,
@@ -91,30 +113,32 @@ it('builds the topology with routes and the traffic of the window', async () => 
   );
   await ds.query(
     `INSERT INTO agent_messages (id, tenant_id, agent_id, agent_name, timestamp, status, model,
-                                 provider, auth_type, virtual_model_id, cost_usd,
-                                 input_tokens, output_tokens, caller_attribution)
+                                 provider, auth_type, tenant_provider_id, virtual_model_id,
+                                 cost_usd, input_tokens, output_tokens, caller_attribution)
      VALUES ($1, $3, $4, 'console-search-bot', now(), 'ok', 'gpt-4o-mini', 'openai', 'api_key',
-             $5, 0.5, 100, 50, '{"userAgent":"x","clientIp":"203.0.113.7"}'),
+             $6, $5, 0.5, 100, 50, '{"userAgent":"x","clientIp":"203.0.113.7"}'),
             ($2, $3, $4, 'console-search-bot', now() - interval '3 days', 'ok', 'gpt-4o-mini',
-             'openai', 'api_key', $5, 1, 10, 10, NULL)`,
-    [randomUUID(), randomUUID(), TEST_TENANT_ID, agent.id, vm],
+             'openai', 'api_key', $6, $5, 1, 10, 10, NULL)`,
+    [randomUUID(), randomUUID(), TEST_TENANT_ID, agent.id, vm, openai],
   );
 
   const res = await asA(api().get('/api/v1/topology').query({ range: '24h' })).expect(200);
   const harness = `harness:${agent.id}`;
-  const hub = `virtual:${vm}`;
+  const conn = `connection:${openai}`;
+  const backup = `connection:${anthropic}`;
   expect(res.body.harnesses).toEqual(
     expect.arrayContaining([expect.objectContaining({ id: harness, requests: 1, tokens: 150 })]),
   );
-  expect(res.body.hubs).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ id: `auto:${agent.id}`, kind: 'auto' }),
-      expect.objectContaining({ id: hub, kind: 'virtual', name: 'topo-fast', requests: 1 }),
-    ]),
-  );
+  expect(res.body.providers.find((p: { id: string }) => p.id === conn)).toMatchObject({
+    label: 'Default',
+    requests: 1,
+    costUsd: 0.5,
+  });
+  expect(res.body.proxies).toEqual([
+    expect.objectContaining({ id: `proxy:${profile}`, profileId: profile, name: 'Office' }),
+  ]);
   expect(res.body.links).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ source: harness, target: hub, kind: 'entry', requests: 1 }),
       expect.objectContaining({
         source: 'client:203.0.113.7',
         target: harness,
@@ -122,33 +146,40 @@ it('builds the topology with routes and the traffic of the window', async () => 
         requests: 1,
       }),
       expect.objectContaining({
-        source: hub,
-        target: 'provider:openai:api_key',
+        source: harness,
+        target: conn,
         kind: 'primary',
-        model: 'gpt-4o-mini',
         requests: 1,
+        models: [{ via: 'topo-fast', model: 'gpt-4o-mini', kind: 'primary', requests: 1 }],
       }),
-      expect.objectContaining({
-        source: hub,
-        target: 'provider:anthropic:api_key',
-        kind: 'fallback',
-        model: 'claude-haiku',
-        requests: 0,
-      }),
+      expect.objectContaining({ source: harness, target: backup, kind: 'fallback', requests: 0 }),
+      expect.objectContaining({ source: conn, target: `proxy:${profile}`, kind: 'egress' }),
+      expect.objectContaining({ source: `proxy:${profile}`, target: 'internet', requests: 1 }),
+      expect.objectContaining({ source: backup, target: 'internet', kind: 'egress' }),
     ]),
   );
-  expect(res.body.clients).toEqual(
-    expect.arrayContaining([
-      { id: 'client:203.0.113.7', ip: '203.0.113.7', requests: 1, errors: 0 },
-    ]),
-  );
-  const openai = res.body.providers.find((p: { id: string }) => p.id === 'provider:openai:api_key');
-  expect(openai).toMatchObject({ requests: 1, costUsd: 0.5, models: ['gpt-4o-mini'] });
 
   const week = await asA(api().get('/api/v1/topology').query({ range: '7d' })).expect(200);
   expect(week.body.range).toBe('7d');
-  expect(week.body.hubs.find((h: { id: string }) => h.id === hub).requests).toBe(2);
+  expect(week.body.providers.find((p: { id: string }) => p.id === conn).requests).toBe(2);
 
   const other = await asB(api().get('/api/v1/topology')).expect(200);
   expect(other.body.harnesses.map((h: { id: string }) => h.id)).not.toContain(harness);
+});
+
+it('saves, returns and resets canvas positions per workspace', async () => {
+  await asA(api().put('/api/v1/topology/positions'))
+    .send({
+      positions: [
+        { id: 'internet', x: 120.4, y: 48 },
+        { id: '', x: 1, y: 1 },
+      ],
+    })
+    .expect(204);
+  const res = await asA(api().get('/api/v1/topology')).expect(200);
+  expect(res.body.positions).toEqual({ internet: { x: 120, y: 48 } });
+  const other = await asB(api().get('/api/v1/topology')).expect(200);
+  expect(other.body.positions).toEqual({});
+  await asA(api().delete('/api/v1/topology/positions')).expect(204);
+  expect((await asA(api().get('/api/v1/topology')).expect(200)).body.positions).toEqual({});
 });

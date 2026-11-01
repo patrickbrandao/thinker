@@ -36,6 +36,7 @@ import {
   ProxyServer,
   ProxyUsageDaily,
 } from '../entities/proxy-server.entity';
+import { TopologyPosition } from '../entities/topology-position.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -83,6 +84,7 @@ import { LocalServers1804500000000 } from './migrations/1804500000000-LocalServe
 import { DropTriggerKeyHint1804600000000 } from './migrations/1804600000000-DropTriggerKeyHint';
 import { AddProxyServers1804700000000 } from './migrations/1804700000000-AddProxyServers';
 import { AddProxyProfiles1804800000000 } from './migrations/1804800000000-AddProxyProfiles';
+import { AddTopologyPositions1804900000000 } from './migrations/1804900000000-AddTopologyPositions';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -245,6 +247,7 @@ export const entities = [
   ProxyAssignment,
   ProxyLog,
   ProxyUsageDaily,
+  TopologyPosition,
 ];
 
 export const migrations = [
@@ -413,4 +416,5 @@ export const migrations = [
   DropTriggerKeyHint1804600000000,
   AddProxyServers1804700000000,
   AddProxyProfiles1804800000000,
+  AddTopologyPositions1804900000000,
 ];

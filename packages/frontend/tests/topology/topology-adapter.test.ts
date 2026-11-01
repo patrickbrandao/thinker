@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTopologyGraph } from '../../src/pages/topology-adapter';
+import { buildTopologyGraph, expandIpv6, ipLines } from '../../src/pages/topology-adapter';
 import type { Topology } from '../../src/services/api/console';
 
 const usage = (requests = 0, errors = 0) => ({ requests, errors, costUsd: 0, tokens: 0 });
@@ -11,148 +11,158 @@ const data: Topology = {
     { id: 'harness:a', name: 'bot', displayName: null, platform: 'claude-code', ...usage(3) },
     { id: 'harness:b', name: 'idle', displayName: 'Idle bot', platform: null, ...usage() },
   ],
-  hubs: [
-    {
-      id: 'auto:a',
-      kind: 'auto',
-      agentId: 'a',
-      agentName: 'bot',
-      name: 'auto',
-      enabled: true,
-      ...usage(),
-    },
-    {
-      id: 'virtual:v',
-      kind: 'virtual',
-      agentId: 'a',
-      agentName: 'bot',
-      name: 'fast',
-      enabled: true,
-      ...usage(3, 2),
-    },
-    {
-      id: 'auto:b',
-      kind: 'auto',
-      agentId: 'b',
-      agentName: 'idle',
-      name: 'auto',
-      enabled: true,
-      ...usage(),
-    },
-  ],
   providers: [
     {
-      id: 'provider:openai:api_key',
+      id: 'connection:c1',
+      connectionId: 'c1',
       provider: 'openai',
       authType: 'api_key',
       name: 'openai',
-      connections: [
-        { id: 'c1', label: 'Default', active: true },
-        { id: 'c2', label: 'Backup', active: true },
-      ],
-      models: ['gpt-4o-mini'],
+      label: 'Default',
+      active: true,
       ...usage(3, 2),
     },
     {
-      id: 'provider:anthropic:api_key',
+      id: 'connection:c2',
+      connectionId: 'c2',
       provider: 'anthropic',
       authType: 'api_key',
       name: 'anthropic',
-      connections: [{ id: 'c3', label: 'Default', active: true }],
-      models: [],
+      label: 'Work',
+      active: true,
       ...usage(),
     },
   ],
+  proxies: [{ id: 'proxy:p1', profileId: 'p1', name: 'Office', ...usage(3, 2) }],
+  egress: [{ id: 'internet', ...usage(3, 2) }],
   links: [
-    { source: 'client:10.0.0.5', target: 'harness:a', kind: 'client', requests: 3, errors: 2 },
-    { source: 'harness:a', target: 'auto:a', kind: 'entry', requests: 0, errors: 0 },
-    { source: 'harness:a', target: 'virtual:v', kind: 'entry', requests: 3, errors: 2 },
-    { source: 'harness:b', target: 'auto:b', kind: 'entry', requests: 0, errors: 0 },
     {
-      source: 'virtual:v',
-      target: 'provider:openai:api_key',
-      kind: 'primary',
-      model: 'gpt-4o-mini',
+      source: 'client:10.0.0.5',
+      target: 'harness:a',
+      kind: 'client',
       requests: 3,
       errors: 2,
+      costUsd: 0,
     },
     {
-      source: 'virtual:v',
-      target: 'provider:anthropic:api_key',
+      source: 'harness:a',
+      target: 'connection:c1',
+      kind: 'primary',
+      requests: 3,
+      errors: 2,
+      costUsd: 0,
+      models: [{ via: 'fast', model: 'gpt-4o-mini', kind: 'primary', requests: 3 }],
+    },
+    {
+      source: 'harness:a',
+      target: 'connection:c2',
       kind: 'fallback',
-      model: 'claude-haiku',
       requests: 0,
       errors: 0,
+      costUsd: 0,
+      models: [{ via: 'fast', model: 'claude-haiku', kind: 'fallback', requests: 0 }],
     },
-    { source: 'auto:a', target: 'provider:ghost:api_key', kind: 'usage', requests: 1, errors: 0 },
+    {
+      source: 'connection:c1',
+      target: 'proxy:p1',
+      kind: 'egress',
+      requests: 3,
+      errors: 2,
+      costUsd: 0,
+    },
+    {
+      source: 'connection:c2',
+      target: 'internet',
+      kind: 'egress',
+      requests: 0,
+      errors: 0,
+      costUsd: 0,
+    },
+    { source: 'proxy:p1', target: 'internet', kind: 'egress', requests: 3, errors: 2, costUsd: 0 },
   ],
+  positions: { 'harness:b': { x: 500, y: 600 } },
 };
 
 describe('buildTopologyGraph', () => {
-  it('maps harnesses, routing points and providers to flow nodes', () => {
+  it('lays out one column per kind, left to right', () => {
     const graph = buildTopologyGraph(data);
-    const byId = Object.fromEntries(graph.nodes.map((n) => [n.id, n]));
-    expect(byId['harness:a'].data).toMatchObject({ kind: 'entry', href: '/harnesses/bot' });
-    expect(byId['harness:b'].data.title).toBe('Idle bot');
-    expect(byId['virtual:v'].data).toMatchObject({
-      kind: 'hub',
-      title: 'fast',
-      href: '/harnesses/bot/routing',
-      routes: [
-        { id: 'route:provider:openai:api_key>gpt-4o-mini', label: 'gpt-4o-mini', port: 1 },
-        { id: 'route:provider:anthropic:api_key>claude-haiku', label: 'claude-haiku', port: 2 },
-      ],
-    });
-    expect(byId['client:10.0.0.5'].data).toMatchObject({
-      kind: 'client',
-      title: '10.0.0.5',
-      count: 3,
-    });
-    expect(byId['harness:a'].data.inbound).toBe(true);
-    expect(byId['harness:b'].data.inbound).toBe(false);
-    // Several connections make a pool; one connection links straight to it.
-    expect(byId['provider:openai:api_key'].data).toMatchObject({ kind: 'group', count: 2 });
-    expect(byId['provider:anthropic:api_key'].data).toMatchObject({
-      kind: 'item',
-      href: '/providers/connections/c3',
-    });
+    const x = (id: string) => graph.nodes.find((n) => n.id === id)!.position.x;
+    expect(x('client:10.0.0.5')).toBeLessThan(x('harness:a'));
+    expect(x('harness:a')).toBeLessThan(x('connection:c1'));
+    expect(x('connection:c1')).toBeLessThan(x('proxy:p1'));
+    expect(x('proxy:p1')).toBeLessThan(x('internet'));
   });
 
-  it('colors links by kind, animates traffic and flags mostly failing links', () => {
+  it('keeps saved positions', () => {
     const graph = buildTopologyGraph(data);
-    const edge = (id: string) => graph.edges.find((e) => e.id === id)!;
-    expect(edge('virtual:v>provider:openai:api_key>gpt-4o-mini').data).toMatchObject({
-      port: 1,
-      live: 3,
-      label: '3',
-      state: 'error',
-    });
-    expect(edge('virtual:v>provider:anthropic:api_key>claude-haiku').data).toMatchObject({
-      port: 2,
-      live: 0,
-    });
-    expect(edge('virtual:v>provider:openai:api_key>gpt-4o-mini').sourceHandle).toBe(
-      'route:provider:openai:api_key>gpt-4o-mini',
-    );
-    expect(edge('harness:a>virtual:v').data?.port).toBeUndefined();
-    expect(edge('client:10.0.0.5>harness:a').data).toMatchObject({ live: 3, label: undefined });
-    // A link to a node that is not in the payload is dropped.
-    expect(graph.edges.some((e) => e.target === 'provider:ghost:api_key')).toBe(false);
+    expect(graph.nodes.find((n) => n.id === 'harness:b')!.position).toEqual({ x: 500, y: 600 });
   });
 
-  it('keeps only nodes and links with traffic when asked', () => {
-    const graph = buildTopologyGraph(data, { activeOnly: true });
-    expect(graph.nodes.map((n) => n.id).sort()).toEqual([
-      'auto:a',
-      'client:10.0.0.5',
-      'harness:a',
-      'provider:openai:api_key',
-      'virtual:v',
+  it('draws the client inside the node and the others with the name below', () => {
+    const graph = buildTopologyGraph(data);
+    const client = graph.nodes.find((n) => n.id === 'client:10.0.0.5')!;
+    expect(client.type).toBe('source');
+    expect(client.data.lines).toEqual(['10.0.0.5']);
+    expect(client.data.state).toBe('error');
+    const proxy = graph.nodes.find((n) => n.id === 'proxy:p1')!;
+    expect(proxy.data.subtitle).toBe('Office');
+    const conn = graph.nodes.find((n) => n.id === 'connection:c1')!;
+    expect(conn.data.subtitle).toBe('Default');
+    expect(conn.data.href).toBe('/providers/connections/c1');
+  });
+
+  it('dashes fallbacks and lists the models in the edge tooltip', () => {
+    const graph = buildTopologyGraph(data);
+    const fallback = graph.edges.find((e) => e.id === 'harness:a>connection:c2')!;
+    expect(fallback.data?.dashed).toBe(true);
+    expect(fallback.data?.tooltip).toContain('fast → claude-haiku');
+    const primary = graph.edges.find((e) => e.id === 'harness:a>connection:c1')!;
+    expect(primary.data?.label).toBe('3');
+    expect(primary.data?.state).toBe('error');
+  });
+
+  it('leaves out what carried no traffic with activeOnly', () => {
+    const ids = buildTopologyGraph(data, { activeOnly: true }).nodes.map((n) => n.id);
+    expect(ids).toContain('proxy:p1');
+    expect(ids).not.toContain('harness:b');
+    expect(ids).not.toContain('connection:c2');
+  });
+});
+
+describe('ip lines', () => {
+  it('expands IPv6 without compression and keeps leading zeros', () => {
+    expect(expandIpv6('2804:14::1')).toEqual([
+      '2804',
+      '0014',
+      '0000',
+      '0000',
+      '0000',
+      '0000',
+      '0000',
+      '0001',
     ]);
-    expect(graph.edges.map((e) => e.id).sort()).toEqual([
-      'client:10.0.0.5>harness:a',
-      'harness:a>virtual:v',
-      'virtual:v>provider:openai:api_key>gpt-4o-mini',
+    expect(expandIpv6('::ffff:1.2.3.4')).toEqual([
+      '0000',
+      '0000',
+      '0000',
+      '0000',
+      '0000',
+      'ffff',
+      '0102',
+      '0304',
     ]);
+    expect(expandIpv6('1::2::3')).toBeNull();
+  });
+
+  it('splits IPv6 in pairs of groups and shows mapped IPv4 plainly', () => {
+    expect(ipLines('2804:14:abcd:1::1')).toEqual([
+      '2804:0014:',
+      'abcd:0001:',
+      '0000:0000:',
+      '0000:0001',
+    ]);
+    expect(ipLines('::ffff:203.0.113.7')).toEqual(['203.0.113.7']);
+    expect(ipLines('fe80::1%en0')).toHaveLength(4);
+    expect(ipLines('10.0.0.5')).toEqual(['10.0.0.5']);
   });
 });

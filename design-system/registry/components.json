@@ -582,17 +582,17 @@
         "shell.css"
       ]
     },
-    "edge-error": {
+    "edge-dashed": {
       "classes": [
-        "edge-error"
+        "edge-dashed"
       ],
       "files": [
         "canvas.css"
       ]
     },
-    "edge-live": {
+    "edge-error": {
       "classes": [
-        "edge-live"
+        "edge-error"
       ],
       "files": [
         "canvas.css"
@@ -672,9 +672,25 @@
         "canvas.css"
       ]
     },
-    "flow-node": {
+    "flow-edge-hit": {
       "classes": [
-        "flow-node"
+        "flow-edge-hit"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "flow-edge-label": {
+      "classes": [
+        "flow-edge-label"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "flow-edge-pulse": {
+      "classes": [
+        "flow-edge-pulse"
       ],
       "files": [
         "canvas.css"
@@ -951,12 +967,29 @@
         "shell.css"
       ]
     },
+    "is-dashed": {
+      "classes": [
+        "is-dashed"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-error": {
       "classes": [
         "is-error"
       ],
       "files": [
+        "canvas.css",
         "shell.css"
+      ]
+    },
+    "is-idle": {
+      "classes": [
+        "is-idle"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "is-info": {
@@ -1219,6 +1252,70 @@
         "base.css"
       ]
     },
+    "n8n-box": {
+      "classes": [
+        "n8n-box"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-icon": {
+      "classes": [
+        "n8n-icon"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-name": {
+      "classes": [
+        "n8n-name"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-source": {
+      "classes": [
+        "n8n-source"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-source-icon": {
+      "classes": [
+        "n8n-source-icon"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-source-lines": {
+      "classes": [
+        "n8n-source-lines"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-step": {
+      "classes": [
+        "n8n-step"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "n8n-sub": {
+      "classes": [
+        "n8n-sub"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "narrow": {
       "classes": [
         "narrow"
@@ -1273,126 +1370,6 @@
       ],
       "files": [
         "shell.css"
-      ]
-    },
-    "node-client": {
-      "classes": [
-        "node-client"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-count": {
-      "classes": [
-        "node-count"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-entry": {
-      "classes": [
-        "node-entry"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-group": {
-      "classes": [
-        "node-group"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-hub": {
-      "classes": [
-        "node-hub"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-ip": {
-      "classes": [
-        "node-ip"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-kind": {
-      "classes": [
-        "node-kind"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-line": {
-      "classes": [
-        "node-line"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-metric": {
-      "classes": [
-        "node-metric"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-name": {
-      "classes": [
-        "node-name"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-pill": {
-      "classes": [
-        "node-pill"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-route": {
-      "classes": [
-        "node-route"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-routes": {
-      "classes": [
-        "node-routes"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-sub": {
-      "classes": [
-        "node-sub"
-      ],
-      "files": [
-        "canvas.css"
-      ]
-    },
-    "node-title": {
-      "classes": [
-        "node-title"
-      ],
-      "files": [
-        "canvas.css"
       ]
     },
     "notice": {
@@ -2111,8 +2088,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 207,
-    "classes": 223,
+    "blocks": 204,
+    "classes": 220,
     "canonicalRules": 5,
     "ghostRules": 5
   }

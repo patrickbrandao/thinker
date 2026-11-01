@@ -1,168 +1,260 @@
-import type { FlowEdge, FlowNode, FlowPort, FlowRoute, Graph } from '../components/flow/types.js';
+import { createElement } from 'react';
+import { Bot, BrainCircuit, Globe, House, Network, Plug, Server } from 'lucide-react';
+import { platformIcon } from 'thinker-shared';
+import type { FlowEdge, FlowNode, Graph } from '../components/flow/types.js';
+import type { FlowLegendItem } from '../components/flow/FlowCanvas.jsx';
+import { columnLayout } from '../components/flow/layout.js';
+import { ThemedIcon } from '../components/setup-ui.jsx';
+import { providerIcon } from '../components/ProviderIcon.jsx';
 import type { Topology, TopologyLink } from '../services/api/console.js';
 import { formatCost, formatNumber } from '../services/formatters.js';
 import { PROVIDERS } from '../services/providers.js';
 import { t, tMaybe } from '../i18n/index.js';
 
-/** Color slot of each kind of route link (legend and edges). */
-const LINK_SLOT: Record<Exclude<TopologyLink['kind'], 'entry' | 'client'>, number> = {
-  primary: 1,
-  fallback: 2,
-  usage: 3,
-};
+const ICON = 40;
+const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, egress: 4 } as const;
+/** Vertical room of a step node (box + name + subtitle) and of a one-line source. */
+const STEP_HEIGHT = 144;
+const SOURCE_LINE = 18;
+const SOURCE_GAP = 40;
 
-export function topologyPorts(): FlowPort[] {
-  return (['primary', 'fallback', 'usage'] as const).map((kind) => ({
-    id: kind,
-    label: t(`shell.flow.links.${kind}`),
-    slot: LINK_SLOT[kind],
-  }));
+export function topologyLegend(): FlowLegendItem[] {
+  return [
+    { id: 'route', label: t('shell.flow.links.route') },
+    { id: 'fallback', label: t('shell.flow.links.fallback'), dashed: true },
+    { id: 'error', label: t('shell.flow.links.error'), error: true },
+  ];
 }
 
-function usageMetrics(u: { requests: number; errors: number; costUsd?: number }): string[] {
-  if (u.requests === 0) return [];
-  const lines = [t('shell.flow.metrics.requests', formatNumber(u.requests))];
-  if (u.errors > 0) lines.push(t('shell.flow.metrics.errors', formatNumber(u.errors)));
-  if (u.costUsd && u.costUsd > 0) lines.push(formatCost(u.costUsd) ?? '');
-  return lines.filter(Boolean);
+const lucide = (icon: typeof Bot) => createElement(icon, { size: ICON, strokeWidth: 1.5 });
+
+/** IPv4-mapped addresses show as IPv4; a zone id is dropped. */
+function plainIp(ip: string): string {
+  const bare = ip.split('%')[0] ?? ip;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(bare);
+  return mapped?.[1] ?? bare;
 }
 
-const harnessHref = (name: string, sub = '') => `/harnesses/${encodeURIComponent(name)}${sub}`;
+/** Eight 4-digit groups: no zero compression, leading zeros kept. */
+export function expandIpv6(ip: string): string[] | null {
+  let text = ip.toLowerCase();
+  const v4 = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (v4) {
+    const [a = 0, b = 0, c = 0, d = 0] = v4.slice(1).map(Number);
+    text = `${text.slice(0, v4.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  const groups = [...head, ...Array<string>(Math.max(0, fill)).fill('0'), ...tail];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => g.padStart(4, '0'));
+}
+
+/** Text lines of a client node: IPv6 in pairs of groups, IPv4 on one line. */
+export function ipLines(ip: string): string[] {
+  const plain = plainIp(ip);
+  if (!plain.includes(':')) return [plain];
+  const groups = expandIpv6(plain);
+  if (!groups) return [plain];
+  const lines: string[] = [];
+  for (let i = 0; i < 8; i += 2) lines.push(`${groups[i]}:${groups[i + 1]}${i < 6 ? ':' : ''}`);
+  return lines;
+}
+
+function usageTooltip(
+  title: string,
+  u: { requests: number; errors: number; costUsd?: number; tokens?: number },
+  extra: Array<string | null | undefined> = [],
+): string {
+  const lines = [title, ...extra.filter(Boolean)];
+  if (u.requests > 0) {
+    lines.push(t('shell.flow.metrics.requests', formatNumber(u.requests)));
+    if (u.errors > 0) lines.push(t('shell.flow.metrics.errors', formatNumber(u.errors)));
+    if (u.tokens) lines.push(t('shell.flow.metrics.tokens', formatNumber(u.tokens)));
+    if (u.costUsd) lines.push(formatCost(u.costUsd) ?? '');
+  } else {
+    lines.push(t('shell.flow.metrics.idle'));
+  }
+  return lines.filter(Boolean).join('\n');
+}
+
+const failing = (u: { requests: number; errors: number }) =>
+  u.requests > 0 && u.errors * 2 >= u.requests;
+
+const harnessHref = (name: string) => `/harnesses/${encodeURIComponent(name)}`;
 
 const providerName = (provider: string, fallback: string) =>
   PROVIDERS.find((p) => p.id === provider.toLowerCase())?.name ?? fallback;
 
-const ROUTE_ORDER = { primary: 0, fallback: 1, usage: 2 } as const;
-
-/** Handle of a routing point for one final model (and the provider serving it). */
-const routeHandle = (l: TopologyLink) => `route:${l.target}>${l.model ?? ''}`;
-const isRoute = (l: TopologyLink) => l.kind !== 'entry' && l.kind !== 'client';
+function linkTooltip(l: TopologyLink): string | undefined {
+  const lines: string[] = [];
+  for (const m of [...(l.models ?? [])].sort((a, b) => b.requests - a.requests)) {
+    const tag = m.kind === 'fallback' ? ` (${t('shell.flow.links.fallback').toLowerCase()})` : '';
+    const count = m.requests > 0 ? ` · ${formatNumber(m.requests)}` : '';
+    lines.push(`${m.via} → ${m.model}${tag}${count}`);
+  }
+  if (l.requests > 0) {
+    lines.push(t('shell.flow.metrics.requests', formatNumber(l.requests)));
+    if (l.errors > 0) lines.push(t('shell.flow.metrics.errors', formatNumber(l.errors)));
+    if (l.costUsd > 0) lines.push(formatCost(l.costUsd) ?? '');
+  }
+  return lines.length ? lines.filter(Boolean).join('\n') : undefined;
+}
 
 /**
- * Turns the topology API payload into a flow graph:
- * client address → harness (entry) → routing point (hub: auto, virtual model)
- * → provider (item, or group when it has several connections). A routing
- * point has one output handle per final model, linked to its provider.
+ * Turns the topology API payload into a laid-out flow graph, one column per
+ * kind: client address → harness → provider connection → proxy profile →
+ * internet / local network. Saved positions win over the column layout.
  * With `activeOnly`, nodes and links without traffic in the window are left
- * out (a harness stays when any of its routes carried traffic).
+ * out.
  */
 export function buildTopologyGraph(data: Topology, options: { activeOnly?: boolean } = {}): Graph {
   const links = options.activeOnly ? data.links.filter((l) => l.requests > 0) : data.links;
   const used = new Set(links.flatMap((l) => [l.source, l.target]));
   const keep = (id: string) => !options.activeOnly || used.has(id);
-
-  const providerIds = new Set(data.providers.filter((p) => keep(p.id)).map((p) => p.id));
-  const routesOf = new Map<string, TopologyLink[]>();
-  for (const l of links) {
-    if (!isRoute(l) || !providerIds.has(l.target)) continue;
-    routesOf.set(l.source, [...(routesOf.get(l.source) ?? []), l]);
-  }
-  const called = new Set(links.filter((l) => l.kind === 'client').map((l) => l.target));
+  const targets = new Set(links.map((l) => l.target));
+  const sources = new Set(links.map((l) => l.source));
+  const columns = new Map<string, number>();
 
   const nodes: FlowNode[] = [];
-  for (const c of data.clients ?? []) {
+  const push = (node: Omit<FlowNode, 'position'>, column: number) => {
+    columns.set(node.id, column);
     nodes.push({
-      id: c.id,
-      type: 'client',
+      ...node,
       position: { x: 0, y: 0 },
-      data: { kind: 'client', title: c.ip, count: c.requests },
+      data: { ...node.data, inbound: targets.has(node.id), outbound: sources.has(node.id) },
     });
+  };
+
+  for (const c of data.clients) {
+    if (!keep(c.id)) continue;
+    push(
+      {
+        id: c.id,
+        type: 'source',
+        data: {
+          kind: 'source',
+          icon: createElement(Bot, { size: 22, strokeWidth: 1.6 }),
+          title: c.ip,
+          lines: ipLines(c.ip),
+          tooltip: usageTooltip(plainIp(c.ip), c),
+          state: failing(c) ? 'error' : undefined,
+        },
+      },
+      COLUMN.client,
+    );
   }
   for (const h of data.harnesses) {
     if (!keep(h.id)) continue;
-    nodes.push({
-      id: h.id,
-      type: 'entry',
-      position: { x: 0, y: 0 },
-      data: {
-        kind: 'entry',
-        inbound: called.has(h.id),
-        title: h.displayName || h.name,
-        subtitle: h.platform,
-        metrics: usageMetrics(h),
-        href: harnessHref(h.name),
+    const icon = platformIcon(h.platform, null);
+    push(
+      {
+        id: h.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon: icon ? createElement(ThemedIcon, { src: icon, size: ICON }) : lucide(BrainCircuit),
+          title: h.displayName || h.name,
+          tooltip: usageTooltip(h.displayName || h.name, h, [h.platform]),
+          state: failing(h) ? 'error' : h.requests === 0 ? 'idle' : undefined,
+          href: harnessHref(h.name),
+        },
       },
-    });
-  }
-  // Routing points sit next to their harness, so the canvas rows line up.
-  const harnessOrder = new Map(data.harnesses.map((h, i) => [h.id.slice('harness:'.length), i]));
-  const hubs = [...data.hubs].sort(
-    (a, b) => (harnessOrder.get(a.agentId) ?? 0) - (harnessOrder.get(b.agentId) ?? 0),
-  );
-  for (const hub of hubs) {
-    if (!keep(hub.id)) continue;
-    const routes: FlowRoute[] = [...(routesOf.get(hub.id) ?? [])]
-      .sort(
-        (a, b) =>
-          ROUTE_ORDER[a.kind as keyof typeof ROUTE_ORDER] -
-          ROUTE_ORDER[b.kind as keyof typeof ROUTE_ORDER],
-      )
-      .map((l) => ({
-        id: routeHandle(l),
-        label: l.model ?? l.target,
-        port: LINK_SLOT[l.kind as keyof typeof LINK_SLOT],
-      }));
-    nodes.push({
-      id: hub.id,
-      type: 'hub',
-      position: { x: 0, y: 0 },
-      data: {
-        kind: 'hub',
-        label: t('shell.flow.hubs.virtual'),
-        title: hub.name,
-        subtitle: hub.enabled ? null : t('shell.flow.disabled'),
-        routes,
-        metrics: usageMetrics(hub),
-        href: harnessHref(hub.agentName, '/routing'),
-      },
-    });
+      COLUMN.harness,
+    );
   }
   for (const p of data.providers) {
     if (!keep(p.id)) continue;
-    const pooled = p.connections.length > 1;
-    const single = p.connections.length === 1 ? p.connections[0] : null;
-    nodes.push({
-      id: p.id,
-      type: pooled ? 'group' : 'item',
-      position: { x: 0, y: 0 },
-      data: {
-        kind: pooled ? 'group' : 'item',
-        title: providerName(p.provider, p.name),
-        subtitle: [
-          tMaybe(`shell.flow.auth.${p.authType}`) ?? p.authType,
-          p.connections.length === 0 ? t('shell.flow.notConnected') : null,
-          p.models.length ? t('shell.flow.models', p.models.length) : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        count: pooled ? p.connections.length : undefined,
-        metrics: usageMetrics(p),
-        href: single
-          ? `/providers/connections/${encodeURIComponent(single.id)}`
-          : p.authType === 'subscription'
-            ? '/providers/subscriptions'
-            : p.authType === 'local'
-              ? '/providers/local'
-              : '/providers/usage-based',
+    const name = providerName(p.provider, p.name);
+    const auth = tMaybe(`shell.flow.auth.${p.authType}`) ?? p.authType;
+    push(
+      {
+        id: p.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon:
+            providerIcon(p.provider.toLowerCase(), ICON) ??
+            lucide(p.authType === 'local' ? Server : Plug),
+          title: name,
+          subtitle: p.label,
+          tooltip: usageTooltip(`${name} · ${p.label}`, p, [
+            auth,
+            p.active ? null : t('shell.flow.disabled'),
+          ]),
+          state: failing(p) ? 'error' : p.requests === 0 ? 'idle' : undefined,
+          href: `/providers/connections/${encodeURIComponent(p.connectionId)}`,
+        },
       },
-    });
+      COLUMN.connection,
+    );
+  }
+  for (const proxy of data.proxies) {
+    if (!keep(proxy.id)) continue;
+    const name = proxy.profileId ? proxy.name : t('shell.flow.globalProxy');
+    push(
+      {
+        id: proxy.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon: lucide(Network),
+          title: t('shell.flow.proxy'),
+          subtitle: name,
+          tooltip: usageTooltip(`${t('shell.flow.proxy')} · ${name}`, proxy),
+          state: failing(proxy) ? 'error' : undefined,
+          href: '/proxy-servers',
+        },
+      },
+      COLUMN.proxy,
+    );
+  }
+  for (const end of data.egress) {
+    if (!keep(end.id)) continue;
+    const title = t(`shell.flow.egress.${end.id}`);
+    push(
+      {
+        id: end.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon: lucide(end.id === 'local' ? House : Globe),
+          title,
+          tooltip: usageTooltip(title, end),
+        },
+      },
+      COLUMN.egress,
+    );
   }
 
   const ids = new Set(nodes.map((n) => n.id));
   const edges: FlowEdge[] = links
     .filter((l) => ids.has(l.source) && ids.has(l.target))
     .map((l) => ({
-      id: l.model ? `${l.source}>${l.target}>${l.model}` : `${l.source}>${l.target}`,
+      id: `${l.source}>${l.target}`,
       source: l.source,
       target: l.target,
-      ...(isRoute(l) ? { sourceHandle: routeHandle(l) } : {}),
       data: {
-        port: isRoute(l) ? LINK_SLOT[l.kind as keyof typeof LINK_SLOT] : undefined,
         live: l.requests,
-        // The client node already shows its count.
-        label: l.requests > 0 && l.kind !== 'client' ? formatNumber(l.requests) : undefined,
-        state: l.requests > 0 && l.errors * 2 >= l.requests ? 'error' : undefined,
+        label: l.requests > 0 ? formatNumber(l.requests) : undefined,
+        tooltip: linkTooltip(l),
+        dashed: l.kind === 'fallback',
+        state: failing(l) ? 'error' : undefined,
       },
     }));
-  return { nodes, edges };
+
+  return columnLayout(
+    { nodes, edges },
+    {
+      columnOf: (node) => columns.get(node.id) ?? 0,
+      heightOf: (node) =>
+        node.type === 'source'
+          ? (node.data.lines?.length ?? 1) * SOURCE_LINE + SOURCE_GAP
+          : STEP_HEIGHT,
+      positions: data.positions,
+    },
+  );
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { ConsoleService } from './console.service';
@@ -29,7 +29,36 @@ export class ConsoleController {
   async topology(@TenantCtx() ctx: TenantContext, @Query('range') range?: string) {
     const window: TopologyRange =
       range && range in TOPOLOGY_RANGES ? (range as TopologyRange) : '24h';
-    if (!ctx.tenantId) return { range: window, harnesses: [], hubs: [], providers: [], links: [] };
+    if (!ctx.tenantId) {
+      return {
+        range: window,
+        clients: [],
+        harnesses: [],
+        providers: [],
+        proxies: [],
+        egress: [],
+        links: [],
+        positions: {},
+      };
+    }
     return this.topologyService.build(ctx.tenantId, window);
+  }
+
+  @Put('topology/positions')
+  @MinRole('member')
+  @HttpCode(204)
+  async savePositions(
+    @TenantCtx() ctx: TenantContext,
+    @Body() body: { positions?: Array<{ id: string; x: number; y: number }> },
+  ) {
+    if (!ctx.tenantId || !Array.isArray(body?.positions)) return;
+    await this.topologyService.savePositions(ctx.tenantId, body.positions);
+  }
+
+  @Delete('topology/positions')
+  @MinRole('member')
+  @HttpCode(204)
+  async resetPositions(@TenantCtx() ctx: TenantContext) {
+    if (ctx.tenantId) await this.topologyService.resetPositions(ctx.tenantId);
   }
 }

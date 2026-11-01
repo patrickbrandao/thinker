@@ -1,58 +1,53 @@
+import type { ReactNode } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 /**
- * Vocabulary of the flow canvas (skill: canvas.md), mapped to Thinker:
+ * Vocabulary of the flow canvas, n8n style: square nodes with the icon
+ * inside and the name below, linked left to right.
  *
- *   entry ──(live traffic)──▶ hub ══(port)══▶ item / group
+ *   source ──▶ node ──▶ … ──▶ sink
  *
- * entry: where traffic comes from (a harness); its edges animate while live.
- * hub:   a routing point (auto, a virtual model, a tier) with one output port
- *        per kind of link.
- * item:  a leaf (a provider connection, a model).
- * group: a leaf standing for a set (a provider pool), with a counter.
- * client: a one-line source in front of the entries (a client address).
+ * source: where requests come in (a client address); the text goes inside
+ *         the node and its left side is rounder, n8n's trigger shape.
+ * node:   any other step (a harness, a provider connection, a proxy profile,
+ *         the internet).
  *
  * Pages build a Graph from API data with an adapter; the canvas never knows
  * the domain.
  */
-export type FlowNodeKind = 'client' | 'entry' | 'hub' | 'item' | 'group';
-
-/** A named output of a hub, drawn as its own colored handle. */
-export interface FlowRoute {
-  id: string;
-  label: string;
-  /** Port slot 1–12 (`--port-N`) of the handle. */
-  port?: number;
-}
+export type FlowNodeKind = 'source' | 'node';
 
 export interface FlowNodeData extends Record<string, unknown> {
   kind: FlowNodeKind;
-  /** Header label; defaults to the kind's name. */
-  label?: string;
+  /** Drawn inside the node. */
+  icon: ReactNode;
+  /** Name below the node (`node`), or the text lines inside it (`source`). */
   title: string;
+  /** For sources: lines drawn inside the node, next to the icon. */
+  lines?: string[];
+  /** Second, dimmer line below the name. */
   subtitle?: string | null;
-  /** Port slot 1–12 (`--port-N`) used for the accent of the node. */
-  port?: number;
-  /** Short metric lines, e.g. "1.2k req" or "3 err". */
-  metrics?: string[];
-  /** For groups and clients: how many members or requests the node stands for. */
-  count?: number;
-  /** For hubs: one output handle per route; edges name it as `sourceHandle`. */
-  routes?: FlowRoute[];
-  /** For entries: draw an input handle (something links into it). */
+  /** Hover text (metrics and details). */
+  tooltip?: string;
+  /** Draw an input handle (something links into it). */
   inbound?: boolean;
-  /** Where "Open" in the drawer goes. */
+  /** Draw an output handle (it links to something). */
+  outbound?: boolean;
+  state?: 'error' | 'idle';
+  /** Where a double-click goes. */
   href?: string;
 }
 
 export type FlowNode = Node<FlowNodeData, FlowNodeKind>;
 
 export interface FlowEdgeData extends Record<string, unknown> {
-  port?: number;
   /** Live traffic on this link (requests in the window); animates when > 0. */
   live?: number;
   label?: string;
-  state?: 'saving' | 'error';
+  /** Hover text, e.g. the models carried by the link. */
+  tooltip?: string;
+  dashed?: boolean;
+  state?: 'error';
 }
 
 export type FlowEdge = Edge<FlowEdgeData>;
@@ -60,11 +55,4 @@ export type FlowEdge = Edge<FlowEdgeData>;
 export interface Graph {
   nodes: FlowNode[];
   edges: FlowEdge[];
-}
-
-/** A port: an id the API understands, a label and a color slot. */
-export interface FlowPort {
-  id: string;
-  label: string;
-  slot: number;
 }
