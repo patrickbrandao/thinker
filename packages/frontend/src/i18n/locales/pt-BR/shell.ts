@@ -64,7 +64,7 @@ const shell: Catalog<typeof en> = {
     auth: { api_key: 'Chave de API', subscription: 'Assinatura', local: 'Local' },
     proxy: 'Proxy',
     globalProxy: 'Global',
-    egress: { internet: 'Internet', local: 'Rede local' },
+    egress: { internet: 'Internet', gateway: 'Local Gateway', local: 'Rede local' },
     disabled: 'desativado',
     metrics: {
       requests: (n: string) => `${n} req`,

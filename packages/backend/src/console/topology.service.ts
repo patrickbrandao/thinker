@@ -53,9 +53,15 @@ export interface TopologyProxy extends Usage {
   name: string;
 }
 
-/** Where traffic finally leaves: the internet or the local network (local servers). */
+/**
+ * Where traffic finally leaves: `internet` behind a proxy, `gateway` (the
+ * instance's own internet access: direct connections and a profile's Direct
+ * fallback) or `local` (local servers).
+ */
+export type EgressId = 'internet' | 'gateway' | 'local';
+
 export interface TopologyEgress extends Usage {
-  id: 'internet' | 'local';
+  id: EgressId;
 }
 
 export type LinkKind = 'client' | 'primary' | 'fallback' | 'usage' | 'egress';
@@ -151,6 +157,10 @@ interface UsageRow {
   recent_requests: number;
   cost: string | number | null;
   tokens: string | number | null;
+  direct_attempts: number;
+  direct_errors: number;
+  direct_recent: number;
+  direct_cost: string | number | null;
 }
 
 /**
@@ -220,12 +230,16 @@ export class TopologyService {
       ]) as Promise<Array<{ id: string; name: string; local_type: string | null }>>,
       this.ds.query(
         `SELECT p.id, p.name,
-                  EXISTS (SELECT 1 FROM proxy_bindings b
-                           WHERE b.tenant_id = p.tenant_id AND b.target_type = 'profile'
-                             AND b.target_id = p.id) AS has_items
-             FROM proxy_profiles p WHERE p.tenant_id = $1`,
+                  COALESCE(bool_or(b.proxy_id IS NOT NULL), false) AS has_proxy,
+                  COALESCE(bool_or(b.target_id IS NOT NULL AND b.proxy_id IS NULL), false)
+                    AS has_direct
+             FROM proxy_profiles p
+             LEFT JOIN proxy_bindings b ON b.tenant_id = p.tenant_id
+                  AND b.target_type = 'profile' AND b.target_id = p.id
+            WHERE p.tenant_id = $1
+            GROUP BY p.id, p.name`,
         [tenantId],
-      ) as Promise<Array<{ id: string; name: string; has_items: boolean }>>,
+      ) as Promise<Array<{ id: string; name: string; has_proxy: boolean; has_direct: boolean }>>,
       this.ds.query(
         `SELECT target_type, target_id, mode, profile_id FROM proxy_assignments
             WHERE tenant_id = $1 AND target_type IN ('provider', 'connection')`,
@@ -243,7 +257,16 @@ export class TopologyService {
                   count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
                                      AND superseded = false)::int AS recent_requests,
                   COALESCE(sum(cost_usd), 0) AS cost,
-                  COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens
+                  COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens,
+                  -- Attempts that left straight from the instance (a profile's Direct item).
+                  count(*) FILTER (WHERE egress->>'kind' = 'direct')::int AS direct_attempts,
+                  count(*) FILTER (WHERE egress->>'kind' = 'direct' AND status = ANY($3))::int
+                    AS direct_errors,
+                  count(*) FILTER (WHERE egress->>'kind' = 'direct'
+                                     AND timestamp >= now() - interval '1 minute')::int
+                    AS direct_recent,
+                  COALESCE(sum(cost_usd) FILTER (WHERE egress->>'kind' = 'direct'), 0)
+                    AS direct_cost
              FROM agent_messages
             WHERE tenant_id = $1 AND agent_id IS NOT NULL
               AND timestamp >= now() - make_interval(hours => $2)
@@ -366,6 +389,7 @@ export class TopologyService {
     }
 
     // Traffic of the window; a row without a connection falls on the first match.
+    const directOf = new Map<string, Usage>();
     for (const row of usage) {
       const harness = harnesses.get(harnessNodeId(row.agent_id));
       if (!harness) continue;
@@ -387,6 +411,15 @@ export class TopologyService {
         } as ModelRoute)[0];
       if (!provider) continue;
       add(provider, { ...u, requests: row.attempts, recent: row.recent_attempts });
+      const direct = directOf.get(provider.id) ?? zero();
+      add(direct, {
+        requests: row.direct_attempts,
+        errors: row.direct_errors,
+        costUsd: Number(row.direct_cost) || 0,
+        tokens: 0,
+        recent: row.direct_recent,
+      });
+      directOf.set(provider.id, direct);
       const edge = link(harness.id, provider.id, 'usage');
       edge.requests += row.attempts;
       edge.recent += row.recent_attempts;
@@ -426,6 +459,7 @@ export class TopologyService {
     const profileById = new Map(profiles.map((p) => [p.id, p]));
     const globalProxy = getGlobalProxyConfig() !== null;
     const proxies = new Map<string, TopologyProxy>();
+    const proxyDirect = new Map<string, Usage>();
     const egress = new Map<string, TopologyEgress>();
     const flow = (source: string, target: string, from: Usage) => {
       const edge = link(source, target, 'egress');
@@ -434,7 +468,7 @@ export class TopologyService {
       edge.costUsd += from.costUsd;
       edge.recent += from.recent;
     };
-    const reach = (id: 'internet' | 'local', from: Usage) => {
+    const reach = (id: EgressId, from: Usage) => {
       const node = egress.get(id) ?? { id, ...zero() };
       add(node, from);
       egress.set(id, node);
@@ -451,12 +485,13 @@ export class TopologyService {
           : undefined;
       // An empty profile and "global" both fall back to the global proxy, which
       // local servers never use.
-      const proxyId = profile?.has_items
+      const hasItems = !!profile && (profile.has_proxy || profile.has_direct);
+      const proxyId = hasItems
         ? profileNodeId(profile.id)
         : assignment?.mode !== 'direct' && globalProxy && kind !== 'local'
           ? GLOBAL_PROXY_NODE
           : null;
-      const end = kind === 'local' ? 'local' : 'internet';
+      const end = kind === 'local' ? 'local' : 'gateway';
       if (!proxyId) {
         flow(p.id, end, p);
         reach(end, p);
@@ -464,17 +499,38 @@ export class TopologyService {
       }
       const proxy = proxies.get(proxyId) ?? {
         id: proxyId,
-        profileId: profile?.has_items ? profile.id : null,
-        name: profile?.has_items ? profile.name : 'Global',
+        profileId: hasItems ? profile.id : null,
+        name: hasItems ? profile.name : 'Global',
         ...zero(),
       };
       add(proxy, p);
       proxies.set(proxyId, proxy);
+      const direct = proxyDirect.get(proxyId) ?? zero();
+      add(direct, directOf.get(p.id) ?? zero());
+      proxyDirect.set(proxyId, direct);
       flow(p.id, proxyId, p);
     }
+    // A profile sends through its proxies to the internet and, when its chain
+    // has a Direct item, straight out of the gateway; the split comes from where
+    // each attempt left (`agent_messages.egress`).
     for (const proxy of proxies.values()) {
-      flow(proxy.id, 'internet', proxy);
-      reach('internet', proxy);
+      const profile = proxy.profileId ? profileById.get(proxy.profileId) : undefined;
+      const direct = proxyDirect.get(proxy.id) ?? zero();
+      const viaProxy: Usage = {
+        requests: proxy.requests - direct.requests,
+        errors: Math.max(0, proxy.errors - direct.errors),
+        costUsd: Math.max(0, proxy.costUsd - direct.costUsd),
+        tokens: proxy.tokens,
+        recent: Math.max(0, proxy.recent - direct.recent),
+      };
+      if (!profile || profile.has_proxy || viaProxy.requests > 0) {
+        flow(proxy.id, 'internet', viaProxy);
+        reach('internet', viaProxy);
+      }
+      if (profile?.has_direct || direct.requests > 0) {
+        flow(proxy.id, 'gateway', direct);
+        reach('gateway', direct);
+      }
     }
 
     return {

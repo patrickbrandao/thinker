@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { Bot, BrainCircuit, Globe, House, Network, Plug, Server } from 'lucide-react';
+import { Bot, BrainCircuit, Globe, GlobeLock, House, Plug, Server, Waypoints } from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
 import type { FlowEdge, FlowNode, Graph } from '../components/flow/types.js';
 import type { FlowLegendItem } from '../components/flow/FlowCanvas.jsx';
@@ -13,6 +13,7 @@ import { t, tMaybe } from '../i18n/index.js';
 
 const ICON = 40;
 const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, egress: 4 } as const;
+const EGRESS_ICON = { internet: Globe, gateway: GlobeLock, local: House } as const;
 /** Vertical room of a step node (box + name + subtitle) and of a one-line source. */
 const STEP_HEIGHT = 144;
 const SOURCE_LINE = 18;
@@ -216,7 +217,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
         type: 'node',
         data: {
           kind: 'node',
-          icon: lucide(Network),
+          icon: lucide(Waypoints),
           title: t('shell.flow.proxy'),
           subtitle: name,
           tooltip: usageTooltip(`${t('shell.flow.proxy')} · ${name}`, proxy),
@@ -236,7 +237,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
         type: 'node',
         data: {
           kind: 'node',
-          icon: lucide(end.id === 'local' ? House : Globe),
+          icon: lucide(EGRESS_ICON[end.id]),
           title,
           tooltip: usageTooltip(title, end),
           state: nodeState(end),

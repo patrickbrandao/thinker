@@ -287,6 +287,10 @@
     color: var(--text);
   }
   .react-flow__minimap {
+    --xy-minimap-background-color: var(--bg-elev);
+    --xy-minimap-mask-background-color: rgb(0 0 0 / 0.35);
+    --xy-minimap-node-background-color: var(--border-strong);
+    --xy-minimap-node-stroke-color: transparent;
     background: var(--bg-elev);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);

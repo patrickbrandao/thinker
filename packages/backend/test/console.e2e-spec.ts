@@ -161,7 +161,9 @@ it('builds the topology from clients through connections and proxies to the inte
         requests: 1,
         recent: 1,
       }),
-      expect.objectContaining({ source: backup, target: 'internet', kind: 'egress' }),
+      expect.objectContaining({ source: backup, target: 'gateway', kind: 'egress' }),
+      // The profile's chain is a single Direct item: it also leaves through the gateway.
+      expect.objectContaining({ source: `proxy:${profile}`, target: 'gateway', requests: 0 }),
     ]),
   );
 
