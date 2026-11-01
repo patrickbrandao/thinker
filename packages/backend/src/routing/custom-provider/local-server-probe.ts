@@ -28,11 +28,26 @@ export type ProbeFetch = (url: string, init: RequestInit) => Promise<Response>;
 export class LocalProbeError extends Error {}
 
 const EMBEDDING_NAME = /(?:^|[/_\-:])embed(?:ding|dings|ed)?(?:[/_\-:.]|$)|embedder|reranker/i;
+/**
+ * Architectures LM Studio lists as `llm` that can't chat: image diffusion and
+ * encoder-only (BERT family) models.
+ */
+const NON_CHAT_ARCH = /bert|^sd\d|^flux|diffusion|^clip|^t5$|whisper/i;
 /** Ollama `/api/show` calls per probe; the rest are listed without details. */
 const OLLAMA_SHOW_LIMIT = 40;
 const OLLAMA_SHOW_CONCURRENCY = 4;
 
+/** How to start each server, for the "nothing is listening" error. */
+const START_HINT: Record<LocalServerType, (port: number) => string> = {
+  ollama: () => 'Start it with `ollama serve` (or open the Ollama app).',
+  lmstudio: (port) =>
+    `Start it with \`lms server start --port ${port}\`, or turn on the server in LM Studio's Developer tab.`,
+  llamacpp: (port) => `Start it with \`llama-server -m <model.gguf> --port ${port}\`.`,
+};
+
 interface ProbeCtx {
+  type: LocalServerType;
+  port: number;
   root: string;
   headers: Record<string, string>;
   timeoutMs: number;
@@ -64,7 +79,13 @@ async function getJson<T>(
     // AbortSignal.timeout aborts with a TimeoutError; report it as a timeout.
     const error =
       e?.name === 'TimeoutError' ? Object.assign(new Error(e.message), { name: 'AbortError' }) : e;
-    throw new LocalProbeError(timeoutAware(classifyProbeError({ url, error }).message, ctx));
+    const probe = classifyProbeError({ url, error });
+    if (probe.kind === 'connection_refused') {
+      throw new LocalProbeError(
+        `No server is listening on ${url}.\n${START_HINT[ctx.type](ctx.port)}`,
+      );
+    }
+    throw new LocalProbeError(timeoutAware(probe.message, ctx));
   }
   if (!res.ok) {
     if (opts.optional) return null;
@@ -179,6 +200,7 @@ interface LmStudioV1Models {
   models?: {
     type?: string;
     key?: string;
+    architecture?: string;
     max_context_length?: number | null;
     loaded_instances?: { id?: string; config?: { context_length?: number } }[];
     capabilities?: { vision?: boolean; trained_for_tool_use?: boolean; reasoning?: unknown };
@@ -204,7 +226,13 @@ async function probeLmStudio(ctx: ProbeCtx): Promise<LocalProbeResult> {
   if (v1?.models) {
     return {
       models: v1.models
-        .filter((m) => m.type === 'llm' && typeof m.key === 'string' && m.key)
+        .filter(
+          (m) =>
+            m.type === 'llm' &&
+            typeof m.key === 'string' &&
+            m.key &&
+            !NON_CHAT_ARCH.test(m.architecture ?? ''),
+        )
         .map((m) => {
           const instance = m.loaded_instances?.[0];
           return {
@@ -316,6 +344,8 @@ export async function probeLocalServer(
   fetchImpl: ProbeFetch,
 ): Promise<LocalProbeResult> {
   const ctx: ProbeCtx = {
+    type,
+    port: config.port,
     root: localServerRootUrl(config),
     headers: buildLocalServerHeaders(apiKey ?? ''),
     timeoutMs: config.probe_timeout_ms,

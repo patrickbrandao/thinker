@@ -157,8 +157,12 @@ export default function LocalServerForm(props: Props) {
       setProbe(result);
       const names = result.models.map((m) => m.model_name);
       setSelected((prev) => {
-        // A new server starts with everything selected; an edit keeps its picks.
-        if (!isEdit && !probe) return new Set(names);
+        // A new server starts with the models already in memory (or everything,
+        // when none is loaded or the server doesn't say); an edit keeps its picks.
+        if (!isEdit && !probe) {
+          const loaded = result.models.filter((m) => m.loaded).map((m) => m.model_name);
+          return new Set(loaded.length ? loaded : names);
+        }
         const available = new Set(names);
         return new Set([...prev].filter((n) => available.has(n)));
       });
@@ -344,7 +348,11 @@ export default function LocalServerForm(props: Props) {
         </div>
         <Field
           label={t('providerSetup.localServer.pathPrefix')}
-          hint={t('providerSetup.localServer.pathPrefixHint')}
+          hint={t(
+            props.type === 'llamacpp'
+              ? 'providerSetup.localServer.pathPrefixHintLlamacpp'
+              : 'providerSetup.localServer.pathPrefixHint',
+          )}
           htmlFor={id('prefix')}
         >
           <input

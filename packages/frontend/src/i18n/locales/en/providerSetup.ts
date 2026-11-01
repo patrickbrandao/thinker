@@ -143,7 +143,8 @@ export default {
     host: 'Host',
     port: 'Port',
     pathPrefix: 'Path prefix',
-    pathPrefixHint:
+    pathPrefixHint: 'Only behind a reverse proxy. Leave empty otherwise.',
+    pathPrefixHintLlamacpp:
       'Only behind a reverse proxy or llama-server --api-prefix. Leave empty otherwise.',
     apiKey: 'API key (optional)',
     apiKeyHint: 'Sent as a Bearer token, for servers that require one.',

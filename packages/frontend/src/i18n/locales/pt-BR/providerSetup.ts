@@ -150,7 +150,8 @@ const ptBR: Catalog<typeof en> = {
     host: 'Host',
     port: 'Porta',
     pathPrefix: 'Prefixo de caminho',
-    pathPrefixHint:
+    pathPrefixHint: 'Só atrás de um proxy reverso. Caso contrário, deixe vazio.',
+    pathPrefixHintLlamacpp:
       'Só atrás de um proxy reverso ou do --api-prefix do llama-server. Caso contrário, deixe vazio.',
     apiKey: 'Chave de API (opcional)',
     apiKeyHint: 'Enviada como token Bearer, para servidores que exigem uma.',
