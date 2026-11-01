@@ -464,6 +464,8 @@ export default function LocalServerForm(props: Props) {
                 </span>
                 <span
                   aria-hidden="true"
+                  // `.switch` draws its on state from aria-checked.
+                  aria-checked={on}
                   className={cx(
                     'switch provider-toggle__switch shrink-0',
                     on && 'provider-toggle__switch--on',
