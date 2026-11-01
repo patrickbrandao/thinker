@@ -25,6 +25,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   title: string;
   /** For sources: lines drawn inside the node, next to the icon. */
   lines?: string[];
+  /** For sources: smaller text, for long lines (an IPv6 address). */
+  dense?: boolean;
   /** Second, dimmer line below the name. */
   subtitle?: string | null;
   /** Hover text (metrics and details). */
@@ -33,7 +35,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   inbound?: boolean;
   /** Draw an output handle (it links to something). */
   outbound?: boolean;
-  state?: 'error' | 'idle';
+  /** Border: `active` (traffic, no errors), `error` (errors in the window) or `idle`. */
+  state?: 'active' | 'error' | 'idle';
   /** Where a double-click goes. */
   href?: string;
 }
@@ -44,9 +47,17 @@ export interface FlowEdgeData extends Record<string, unknown> {
   /** Live traffic on this link (requests in the window); animates when > 0. */
   live?: number;
   label?: string;
+  /** Where the label sits along the line, 0 (source) to 1 (target); default 0.2. */
+  labelAt?: number;
   /** Hover text, e.g. the models carried by the link. */
   tooltip?: string;
   dashed?: boolean;
+  /** Configured but without traffic in the window: gray, dashed and faded. */
+  idle?: boolean;
+  /** Arrow at the target end (entry links); other links join handle to handle. */
+  arrow?: boolean;
+  /** Stroke width in px; defaults to the base width. */
+  width?: number;
   state?: 'error';
 }
 

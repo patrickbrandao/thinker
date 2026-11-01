@@ -598,6 +598,14 @@
         "canvas.css"
       ]
     },
+    "edge-idle": {
+      "classes": [
+        "edge-idle"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "edge-saving": {
       "classes": [
         "edge-saving"
@@ -947,6 +955,7 @@
         "is-active"
       ],
       "files": [
+        "canvas.css",
         "shell.css"
       ]
     },
@@ -970,6 +979,14 @@
     "is-dashed": {
       "classes": [
         "is-dashed"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "is-dense": {
+      "classes": [
+        "is-dense"
       ],
       "files": [
         "canvas.css"
@@ -2088,8 +2105,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 204,
-    "classes": 220,
+    "blocks": 206,
+    "classes": 222,
     "canonicalRules": 5,
     "ghostRules": 5
   }

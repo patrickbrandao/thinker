@@ -22,6 +22,7 @@ export interface FlowLegendItem {
   label: string;
   dashed?: boolean;
   error?: boolean;
+  idle?: boolean;
 }
 
 export interface FlowCanvasProps {
@@ -37,10 +38,14 @@ export interface FlowCanvasProps {
   onNodesMoved?: (nodes: FlowNode[]) => void;
 }
 
-const EDGE_DEFAULTS = {
-  type: 'flow',
-  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: 'var(--edge)' },
-} as const;
+// Sized in pixels (14 stroke units of the base 1.6 line), so it keeps its size on thicker lines.
+const ARROW = {
+  type: MarkerType.ArrowClosed,
+  width: 22.4,
+  height: 22.4,
+  color: 'var(--edge)',
+  markerUnits: 'userSpaceOnUse',
+};
 
 function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: FlowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
@@ -50,7 +55,13 @@ function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: Flo
 
   useEffect(() => {
     setNodes(graph.nodes);
-    setEdges(validEdges(graph.nodes, graph.edges).map((e) => ({ ...EDGE_DEFAULTS, ...e })));
+    setEdges(
+      validEdges(graph.nodes, graph.edges).map((e) => ({
+        type: 'flow',
+        ...(e.data?.arrow ? { markerEnd: ARROW } : {}),
+        ...e,
+      })),
+    );
     // Re-frame only when the set of nodes changed, so a data refresh keeps
     // the user's pan and zoom. Fit after React Flow measured the new nodes.
     const next = graph.nodes.map((n) => n.id).join('|');
@@ -103,7 +114,11 @@ function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: Flo
           {legend.map((item) => (
             <span
               key={item.id}
-              className={cx(item.dashed && 'is-dashed', item.error && 'is-error')}
+              className={cx(
+                item.dashed && 'is-dashed',
+                item.error && 'is-error',
+                item.idle && 'is-idle',
+              )}
             >
               {item.label}
             </span>

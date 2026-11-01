@@ -14,6 +14,8 @@ export interface Usage {
   errors: number;
   costUsd: number;
   tokens: number;
+  /** Requests of the last minute, whatever the window (sizes the links). */
+  recent: number;
 }
 
 /** A client address that called a harness in the window. */
@@ -22,6 +24,7 @@ export interface TopologyClient {
   ip: string;
   requests: number;
   errors: number;
+  recent: number;
 }
 
 export interface TopologyHarness extends Usage {
@@ -72,6 +75,8 @@ export interface TopologyLink {
   requests: number;
   errors: number;
   costUsd: number;
+  /** Requests of the last minute. */
+  recent: number;
   models?: TopologyLinkModel[];
 }
 
@@ -88,12 +93,13 @@ export interface Topology {
 }
 
 const CUSTOM_PREFIX = 'custom:';
-const zero = (): Usage => ({ requests: 0, errors: 0, costUsd: 0, tokens: 0 });
+const zero = (): Usage => ({ requests: 0, errors: 0, costUsd: 0, tokens: 0, recent: 0 });
 const add = (target: Usage, u: Usage) => {
   target.requests += u.requests;
   target.errors += u.errors;
   target.costUsd += u.costUsd;
   target.tokens += u.tokens;
+  target.recent += u.recent;
 };
 
 export const clientNodeId = (ip: string) => `client:${ip}`;
@@ -141,6 +147,8 @@ interface UsageRow {
   attempts: number;
   requests: number;
   errors: number;
+  recent_attempts: number;
+  recent_requests: number;
   cost: string | number | null;
   tokens: string | number | null;
 }
@@ -159,81 +167,111 @@ export class TopologyService {
 
   async build(tenantId: string, range: TopologyRange): Promise<Topology> {
     const hours = TOPOLOGY_RANGES[range];
-    const [agents, virtuals, connections, customs, profiles, assignments, usage, callers, saved] =
-      await Promise.all([
-        this.ds.query(
-          `SELECT id, name, display_name, agent_platform
+    const [
+      agents,
+      virtuals,
+      autoRoutes,
+      connections,
+      customs,
+      profiles,
+      assignments,
+      usage,
+      callers,
+      saved,
+    ] = await Promise.all([
+      this.ds.query(
+        `SELECT id, name, display_name, agent_platform
              FROM agents
             WHERE tenant_id = $1 AND deleted_at IS NULL AND is_playground = false
             ORDER BY name`,
-          [tenantId],
-        ) as Promise<
-          Array<{
-            id: string;
-            name: string;
-            display_name: string | null;
-            agent_platform: string | null;
-          }>
-        >,
-        this.ds.query(
-          `SELECT id, agent_id, name, enabled, override_route, fallback_routes
+        [tenantId],
+      ) as Promise<
+        Array<{
+          id: string;
+          name: string;
+          display_name: string | null;
+          agent_platform: string | null;
+        }>
+      >,
+      this.ds.query(
+        `SELECT id, agent_id, name, enabled, override_route, fallback_routes
              FROM virtual_models WHERE tenant_id = $1 ORDER BY sort_order, name`,
-          [tenantId],
-        ) as Promise<RouteRow[]>,
-        this.ds.query(
-          `SELECT id, provider, auth_type, label, is_active
+        [tenantId],
+      ) as Promise<RouteRow[]>,
+      // Auto routing (tiers and active specificity), drawn only for harnesses without traffic.
+      this.ds.query(
+        `SELECT t.agent_id, COALESCE(t.override_route, t.auto_assigned_route) AS override_route,
+                  t.fallback_routes
+             FROM tier_assignments t JOIN agents a ON a.id = t.agent_id
+            WHERE a.tenant_id = $1 AND a.deleted_at IS NULL
+           UNION ALL
+           SELECT s.agent_id, COALESCE(s.override_route, s.auto_assigned_route), s.fallback_routes
+             FROM specificity_assignments s JOIN agents a ON a.id = s.agent_id
+            WHERE a.tenant_id = $1 AND a.deleted_at IS NULL AND s.is_active = true`,
+        [tenantId],
+      ) as Promise<Array<Pick<RouteRow, 'agent_id' | 'override_route' | 'fallback_routes'>>>,
+      this.ds.query(
+        `SELECT id, provider, auth_type, label, is_active
              FROM tenant_providers WHERE tenant_id = $1 ORDER BY provider, priority, label`,
-          [tenantId],
-        ) as Promise<ConnectionRow[]>,
-        this.ds.query(`SELECT id, name, local_type FROM custom_providers WHERE tenant_id = $1`, [
-          tenantId,
-        ]) as Promise<Array<{ id: string; name: string; local_type: string | null }>>,
-        this.ds.query(
-          `SELECT p.id, p.name,
+        [tenantId],
+      ) as Promise<ConnectionRow[]>,
+      this.ds.query(`SELECT id, name, local_type FROM custom_providers WHERE tenant_id = $1`, [
+        tenantId,
+      ]) as Promise<Array<{ id: string; name: string; local_type: string | null }>>,
+      this.ds.query(
+        `SELECT p.id, p.name,
                   EXISTS (SELECT 1 FROM proxy_bindings b
                            WHERE b.tenant_id = p.tenant_id AND b.target_type = 'profile'
                              AND b.target_id = p.id) AS has_items
              FROM proxy_profiles p WHERE p.tenant_id = $1`,
-          [tenantId],
-        ) as Promise<Array<{ id: string; name: string; has_items: boolean }>>,
-        this.ds.query(
-          `SELECT target_type, target_id, mode, profile_id FROM proxy_assignments
+        [tenantId],
+      ) as Promise<Array<{ id: string; name: string; has_items: boolean }>>,
+      this.ds.query(
+        `SELECT target_type, target_id, mode, profile_id FROM proxy_assignments
             WHERE tenant_id = $1 AND target_type IN ('provider', 'connection')`,
-          [tenantId],
-        ) as Promise<
-          Array<{ target_type: string; target_id: string; mode: string; profile_id: string | null }>
-        >,
-        this.ds.query(
-          `SELECT agent_id, virtual_model_id, tenant_provider_id, provider, auth_type, model,
+        [tenantId],
+      ) as Promise<
+        Array<{ target_type: string; target_id: string; mode: string; profile_id: string | null }>
+      >,
+      this.ds.query(
+        `SELECT agent_id, virtual_model_id, tenant_provider_id, provider, auth_type, model,
                   count(*)::int AS attempts,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3))::int AS errors,
+                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute')::int
+                    AS recent_attempts,
+                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
+                                     AND superseded = false)::int AS recent_requests,
                   COALESCE(sum(cost_usd), 0) AS cost,
                   COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens
              FROM agent_messages
             WHERE tenant_id = $1 AND agent_id IS NOT NULL
               AND timestamp >= now() - make_interval(hours => $2)
             GROUP BY agent_id, virtual_model_id, tenant_provider_id, provider, auth_type, model`,
-          [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
-        ) as Promise<UsageRow[]>,
-        // The proxy stamps the client address into caller_attribution (JSON text).
-        this.ds.query(
-          `SELECT agent_id, ip,
+        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+      ) as Promise<UsageRow[]>,
+      // The proxy stamps the client address into caller_attribution (JSON text).
+      this.ds.query(
+        `SELECT agent_id, ip,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
-                  count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors
-             FROM (SELECT agent_id, superseded, status,
+                  count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors,
+                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
+                                     AND superseded = false)::int AS recent
+             FROM (SELECT agent_id, superseded, status, timestamp,
                           substring(caller_attribution from '"clientIp":"([^"]+)"') AS ip
                      FROM agent_messages
                     WHERE tenant_id = $1 AND agent_id IS NOT NULL
                       AND timestamp >= now() - make_interval(hours => $2)) m
             WHERE ip IS NOT NULL
             GROUP BY agent_id, ip`,
-          [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
-        ) as Promise<Array<{ agent_id: string; ip: string; requests: number; errors: number }>>,
-        this.ds.query(`SELECT node_id, x, y FROM topology_positions WHERE tenant_id = $1`, [
-          tenantId,
-        ]) as Promise<Array<{ node_id: string; x: number; y: number }>>,
-      ]);
+        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+      ) as Promise<
+        Array<{ agent_id: string; ip: string; requests: number; errors: number; recent: number }>
+      >,
+      this.ds.query(`SELECT node_id, x, y FROM topology_positions WHERE tenant_id = $1`, [
+        tenantId,
+      ]) as Promise<Array<{ node_id: string; x: number; y: number }>>,
+    ]);
 
     const customById = new Map(customs.map((c) => [`${CUSTOM_PREFIX}${c.id}`.toLowerCase(), c]));
     const harnesses = new Map<string, TopologyHarness>();
@@ -281,7 +319,7 @@ export class TopologyService {
       const key = `${source}>${target}`;
       let edge = links.get(key);
       if (!edge) {
-        edge = { source, target, kind, requests: 0, errors: 0, costUsd: 0 };
+        edge = { source, target, kind, requests: 0, errors: 0, costUsd: 0, recent: 0 };
         links.set(key, edge);
       } else if (KIND_RANK[kind] > KIND_RANK[edge.kind]) {
         edge.kind = kind;
@@ -305,20 +343,26 @@ export class TopologyService {
       }
     };
 
-    // Configured routes of the virtual models.
-    for (const v of virtuals) {
-      const harnessId = harnessNodeId(v.agent_id);
-      if (!harnesses.has(harnessId) || !v.enabled) continue;
+    // Configured routes: primary and fallbacks to every connection that can serve them.
+    const addRoutes = (
+      harnessId: string,
+      via: string,
+      row: Pick<RouteRow, 'override_route' | 'fallback_routes'>,
+    ) => {
       const routes: Array<[ModelRoute, 'primary' | 'fallback']> = [
-        ...(v.override_route ? [[v.override_route, 'primary'] as [ModelRoute, 'primary']] : []),
-        ...(v.fallback_routes ?? []).map((r) => [r, 'fallback'] as [ModelRoute, 'fallback']),
+        ...(row.override_route ? [[row.override_route, 'primary'] as [ModelRoute, 'primary']] : []),
+        ...(row.fallback_routes ?? []).map((r) => [r, 'fallback'] as [ModelRoute, 'fallback']),
       ];
       for (const [route, kind] of routes) {
         if (!route?.provider || !route.model) continue;
         for (const p of connectionsOf(route)) {
-          addModel(link(harnessId, p.id, kind), v.name, route.model, kind);
+          addModel(link(harnessId, p.id, kind), via, route.model, kind);
         }
       }
+    };
+    for (const v of virtuals) {
+      const harnessId = harnessNodeId(v.agent_id);
+      if (harnesses.has(harnessId) && v.enabled) addRoutes(harnessId, v.name, v);
     }
 
     // Traffic of the window; a row without a connection falls on the first match.
@@ -330,6 +374,7 @@ export class TopologyService {
         errors: row.errors,
         costUsd: Number(row.cost) || 0,
         tokens: Number(row.tokens) || 0,
+        recent: row.recent_requests,
       };
       add(harness, u);
       if (!row.provider) continue;
@@ -341,13 +386,20 @@ export class TopologyService {
           model: '',
         } as ModelRoute)[0];
       if (!provider) continue;
-      add(provider, { ...u, requests: row.attempts });
+      add(provider, { ...u, requests: row.attempts, recent: row.recent_attempts });
       const edge = link(harness.id, provider.id, 'usage');
       edge.requests += row.attempts;
+      edge.recent += row.recent_attempts;
       edge.errors += row.errors;
       edge.costUsd += u.costUsd;
       const via = (row.virtual_model_id && virtualNames.get(row.virtual_model_id)) || 'auto';
       if (row.model) addModel(edge, via, row.model, 'usage', row.attempts);
+    }
+
+    // A harness without traffic shows its auto routes, so it is never left unlinked.
+    for (const row of autoRoutes) {
+      const harness = harnesses.get(harnessNodeId(row.agent_id));
+      if (harness && harness.requests === 0) addRoutes(harness.id, 'auto', row);
     }
 
     // Client addresses, each linked to the harnesses it called.
@@ -355,13 +407,15 @@ export class TopologyService {
     for (const row of callers) {
       if (!harnesses.has(harnessNodeId(row.agent_id))) continue;
       const id = clientNodeId(row.ip);
-      const client = clients.get(id) ?? { id, ip: row.ip, requests: 0, errors: 0 };
+      const client = clients.get(id) ?? { id, ip: row.ip, requests: 0, errors: 0, recent: 0 };
       client.requests += row.requests;
       client.errors += row.errors;
+      client.recent += row.recent;
       clients.set(id, client);
       const edge = link(id, harnessNodeId(row.agent_id), 'client');
       edge.requests += row.requests;
       edge.errors += row.errors;
+      edge.recent += row.recent;
     }
 
     // Only connections a harness reaches stay; each one leads to its egress.
@@ -378,6 +432,7 @@ export class TopologyService {
       edge.requests += from.requests;
       edge.errors += from.errors;
       edge.costUsd += from.costUsd;
+      edge.recent += from.recent;
     };
     const reach = (id: 'internet' | 'local', from: Usage) => {
       const node = egress.get(id) ?? { id, ...zero() };

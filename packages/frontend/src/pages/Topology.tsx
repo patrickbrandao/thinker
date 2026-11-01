@@ -49,6 +49,13 @@ export default function Topology() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ping]);
 
+  // Link widths follow the last minute: refresh so they settle once traffic stops.
+  useEffect(() => {
+    const timer = window.setInterval(() => void topology.reload(), 30_000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
+
   const graph = useMemo(
     () =>
       topology.data

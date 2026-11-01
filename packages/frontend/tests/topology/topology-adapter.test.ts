@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { buildTopologyGraph, expandIpv6, ipLines } from '../../src/pages/topology-adapter';
+import {
+  buildTopologyGraph,
+  expandIpv6,
+  ipLines,
+  linkWidths,
+} from '../../src/pages/topology-adapter';
 import type { Topology } from '../../src/services/api/console';
 
-const usage = (requests = 0, errors = 0) => ({ requests, errors, costUsd: 0, tokens: 0 });
+const usage = (requests = 0, errors = 0, recent = 0) => ({
+  requests,
+  errors,
+  costUsd: 0,
+  tokens: 0,
+  recent,
+});
 
 const data: Topology = {
   range: '24h',
-  clients: [{ id: 'client:10.0.0.5', ip: '10.0.0.5', requests: 3, errors: 2 }],
+  clients: [{ id: 'client:10.0.0.5', ip: '10.0.0.5', requests: 3, errors: 2, recent: 2 }],
   harnesses: [
     { id: 'harness:a', name: 'bot', displayName: null, platform: 'claude-code', ...usage(3) },
     { id: 'harness:b', name: 'idle', displayName: 'Idle bot', platform: null, ...usage() },
@@ -43,6 +54,7 @@ const data: Topology = {
       requests: 3,
       errors: 2,
       costUsd: 0,
+      recent: 2,
     },
     {
       source: 'harness:a',
@@ -51,6 +63,7 @@ const data: Topology = {
       requests: 3,
       errors: 2,
       costUsd: 0,
+      recent: 0,
       models: [{ via: 'fast', model: 'gpt-4o-mini', kind: 'primary', requests: 3 }],
     },
     {
@@ -60,6 +73,7 @@ const data: Topology = {
       requests: 0,
       errors: 0,
       costUsd: 0,
+      recent: 0,
       models: [{ via: 'fast', model: 'claude-haiku', kind: 'fallback', requests: 0 }],
     },
     {
@@ -69,6 +83,7 @@ const data: Topology = {
       requests: 3,
       errors: 2,
       costUsd: 0,
+      recent: 0,
     },
     {
       source: 'connection:c2',
@@ -77,8 +92,17 @@ const data: Topology = {
       requests: 0,
       errors: 0,
       costUsd: 0,
+      recent: 0,
     },
-    { source: 'proxy:p1', target: 'internet', kind: 'egress', requests: 3, errors: 2, costUsd: 0 },
+    {
+      source: 'proxy:p1',
+      target: 'internet',
+      kind: 'egress',
+      requests: 3,
+      errors: 2,
+      costUsd: 0,
+      recent: 1,
+    },
   ],
   positions: { 'harness:b': { x: 500, y: 600 } },
 };
@@ -121,11 +145,40 @@ describe('buildTopologyGraph', () => {
     expect(primary.data?.state).toBe('error');
   });
 
+  it('colors borders by traffic and errors', () => {
+    const graph = buildTopologyGraph({
+      ...data,
+      harnesses: [{ ...data.harnesses[0]!, ...usage(3, 0) }, data.harnesses[1]!],
+    });
+    const state = (id: string) => graph.nodes.find((n) => n.id === id)!.data.state;
+    expect(state('harness:a')).toBe('active');
+    expect(state('harness:b')).toBe('idle');
+    expect(state('connection:c1')).toBe('error');
+  });
+
+  it('draws an arrow only into the harness and sizes lines by the last minute', () => {
+    const graph = buildTopologyGraph(data);
+    const edge = (id: string) => graph.edges.find((e) => e.id === id)!.data!;
+    expect(edge('client:10.0.0.5>harness:a').arrow).toBe(true);
+    expect(edge('harness:a>connection:c1').arrow).toBe(false);
+    expect(edge('client:10.0.0.5>harness:a').width).toBeCloseTo(6.4);
+    expect(edge('proxy:p1>internet').width).toBeCloseTo(4);
+    expect(edge('harness:a>connection:c1').width).toBeCloseTo(1.6);
+  });
+
   it('leaves out what carried no traffic with activeOnly', () => {
     const ids = buildTopologyGraph(data, { activeOnly: true }).nodes.map((n) => n.id);
     expect(ids).toContain('proxy:p1');
     expect(ids).not.toContain('harness:b');
     expect(ids).not.toContain('connection:c2');
+  });
+});
+
+describe('linkWidths', () => {
+  it('keeps the base width when every link carries the same', () => {
+    expect(linkWidths([0, 0])(0)).toBe(1.6);
+    expect(linkWidths([5, 5])(5)).toBe(1.6);
+    expect(linkWidths([2, 10])(10)).toBeCloseTo(6.4);
   });
 });
 
@@ -154,15 +207,10 @@ describe('ip lines', () => {
     expect(expandIpv6('1::2::3')).toBeNull();
   });
 
-  it('splits IPv6 in pairs of groups and shows mapped IPv4 plainly', () => {
-    expect(ipLines('2804:14:abcd:1::1')).toEqual([
-      '2804:0014:',
-      'abcd:0001:',
-      '0000:0000:',
-      '0000:0001',
-    ]);
+  it('splits IPv6 in two lines of four groups and shows mapped IPv4 plainly', () => {
+    expect(ipLines('2804:14:abcd:1::1')).toEqual(['2804:0014:abcd:0001', '0000:0000:0000:0001']);
     expect(ipLines('::ffff:203.0.113.7')).toEqual(['203.0.113.7']);
-    expect(ipLines('fe80::1%en0')).toHaveLength(4);
+    expect(ipLines('fe80::1%en0')).toHaveLength(2);
     expect(ipLines('10.0.0.5')).toEqual(['10.0.0.5']);
   });
 });

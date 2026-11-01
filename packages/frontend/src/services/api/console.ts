@@ -39,12 +39,14 @@ interface Usage {
   errors: number;
   costUsd: number;
   tokens: number;
+  /** Requests of the last minute, whatever the window. */
+  recent: number;
 }
 
 export interface Topology {
   range: TopologyRange;
   /** Client addresses that called a harness in the window. */
-  clients: Array<{ id: string; ip: string; requests: number; errors: number }>;
+  clients: Array<{ id: string; ip: string; requests: number; errors: number; recent: number }>;
   harnesses: Array<
     Usage & { id: string; name: string; displayName: string | null; platform: string | null }
   >;
@@ -83,6 +85,8 @@ export interface TopologyLink {
   requests: number;
   errors: number;
   costUsd: number;
+  /** Requests of the last minute (sizes the line). */
+  recent: number;
   models?: TopologyLinkModel[];
 }
 

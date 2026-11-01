@@ -11,7 +11,7 @@ function SourceNodeView({ data, selected }: NodeProps<FlowNode>) {
       title={data.tooltip}
     >
       <span className="n8n-source-icon">{data.icon}</span>
-      <span className="n8n-source-lines">
+      <span className={cx('n8n-source-lines', data.dense && 'is-dense')}>
         {(data.lines ?? [data.title]).map((line, i) => (
           <span key={i}>{line}</span>
         ))}
