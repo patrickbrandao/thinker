@@ -64,6 +64,7 @@ const ptBR: Catalog<typeof en> = {
     activeKeys: (n: number) => (n === 1 ? `${n} chave ativa` : `${n} chaves ativas`),
     colName: 'Nome',
     colUrl: 'URL',
+    colModels: 'Modelos',
     colProvider: 'Provedor',
     colConnection: 'Conexão',
     colStatus: 'Status',

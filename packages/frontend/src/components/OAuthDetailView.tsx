@@ -378,25 +378,13 @@ export default function OAuthDetailView(props: Props) {
               <>
                 <p className="text-sm text-dim">{t('providerSetup.oauth.windowOpened')}</p>
                 {isOpenAiProvider ? (
-                  <>
-                    <p className="text-sm text-dim">
-                      {t('providerSetup.oauth.copyUrlBefore')}{' '}
-                      <span className="font-medium text-ink">
-                        {t('providerSetup.oauth.copyUrlEmphasis')}
-                      </span>{' '}
-                      {t('providerSetup.oauth.copyUrlAfter')}
-                    </p>
-                    <video
-                      src="/images/oauth-callback-example.mp4"
-                      poster="/images/oauth-callback-example.png"
-                      preload="auto"
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full rounded-control border border-line"
-                    />
-                  </>
+                  <p className="text-sm text-dim">
+                    {t('providerSetup.oauth.copyUrlBefore')}{' '}
+                    <span className="font-medium text-ink">
+                      {t('providerSetup.oauth.copyUrlEmphasis')}
+                    </span>{' '}
+                    {t('providerSetup.oauth.copyUrlAfter')}
+                  </p>
                 ) : null}
               </>
             )}

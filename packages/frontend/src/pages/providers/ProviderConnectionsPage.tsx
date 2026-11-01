@@ -235,6 +235,7 @@ function LocalServersTable({
           <tr>
             <th>{t('providers.page.colName')}</th>
             <th>{t('providers.page.colUrl')}</th>
+            <th className="num">{t('providers.page.colModels')}</th>
             <th>{t('providers.page.colStatus')}</th>
             <th />
           </tr>
@@ -255,6 +256,7 @@ function LocalServersTable({
                   </span>
                 </td>
                 <td className="font-mono text-xs text-muted">{localServerUrl(cp)}</td>
+                <td className="num">{cp.models.length}</td>
                 <td>
                   <StatusBadge active={connection?.is_active ?? false} />
                 </td>
@@ -293,7 +295,7 @@ function LocalServersTable({
           })}
           {servers.length === 0 ? (
             <tr>
-              <td colSpan={4} className="py-6 text-center text-muted">
+              <td colSpan={5} className="py-6 text-center text-muted">
                 {t('providers.page.noLocalServers')}
               </td>
             </tr>
@@ -649,6 +651,7 @@ export default function ProviderConnectionsPage({
                 <tr>
                   <th>{t('providers.page.colProvider')}</th>
                   <th>{t('providers.page.colConnection')}</th>
+                  <th className="num">{t('providers.page.colModels')}</th>
                   <th>{t('providers.page.colStatus')}</th>
                   <th />
                 </tr>
@@ -747,6 +750,7 @@ export default function ProviderConnectionsPage({
                           </span>
                         )}
                       </td>
+                      <td className="num">{row.connection.cached_model_count}</td>
                       <td>
                         <StatusBadge active={row.connection.is_active} />
                       </td>

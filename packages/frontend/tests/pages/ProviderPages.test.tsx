@@ -456,6 +456,9 @@ describe('provider pages', () => {
     const custom = screen.getByText('Add custom provider').closest('button')!;
     // "Add provider" sits left of "Add custom provider".
     expect(add.compareDocumentPosition(custom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Each connection shows how many models it serves.
+    expect(screen.getByText('Models')).toBeDefined();
+    expect(screen.getByText('3')).toBeDefined();
     expect(screen.queryByText('My usage-based connections')).toBeNull();
     expect(screen.queryByText('Supported usage-based providers')).toBeNull();
     // Usage stats moved to the Overview.
@@ -519,6 +522,7 @@ describe('provider pages', () => {
     expect(screen.getByText('http://10.0.0.5:11434/ollama')).toBeDefined();
     expect(screen.getByText('Name')).toBeDefined();
     expect(screen.getByText('URL')).toBeDefined();
+    expect(screen.getByText('Models')).toBeDefined();
     expect(screen.getByText('Edit')).toBeDefined();
     expect(screen.queryByText('My local connections')).toBeNull();
     expect(screen.queryByLabelText('List view')).toBeNull();
