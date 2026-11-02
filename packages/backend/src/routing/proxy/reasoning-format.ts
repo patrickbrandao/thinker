@@ -35,7 +35,7 @@ const COPILOT_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.free
 const REASONING_CONTENT_AWARE_ENDPOINTS = new Set([
   'openrouter',
   'opencode-go',
-  'opencode-zen',
+  'opencode',
   'custom',
 ]);
 
@@ -64,13 +64,13 @@ const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
  * Some reasoning APIs reject follow-up turns that don't echo back the previous
  * assistant's `reasoning_content`. Preserve it for:
  *  - the native `deepseek` and `moonshot` endpoints (always)
- *  - aggregator/gateway endpoints (OpenRouter, OpenCode Go, OpenCode Zen and
+ *  - aggregator/gateway endpoints (OpenRouter, OpenCode Go, OpenCode and
  *    custom OpenAI-compatible providers) serving a reasoning model over the
  *    DeepSeek dialect.
  * Strict OpenAI-compatible endpoints (Mistral, native OpenAI, etc.) keep
  * stripping the field even if a community fine-tune slug contains "deepseek".
  *
- * On a gateway the slug alone can't answer this — Zen serves `big-pickle`
+ * On a gateway the slug alone can't answer this — OpenCode serves `big-pickle`
  * (DeepSeek dialect) and `claude-opus-5` (translated) off the same endpoint —
  * so the decision is: never for a translated family, then the catalog's
  * reasoning capability, then the known reasoning families for slugs the

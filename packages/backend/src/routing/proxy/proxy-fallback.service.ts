@@ -124,6 +124,12 @@ import {
 // honored (capped at MAX) regardless of this default.
 const RATE_LIMIT_COOLDOWN_DEFAULT_MS = 15_000;
 const RATE_LIMIT_COOLDOWN_MAX_MS = 5 * 60_000;
+// A 429 that reports an exhausted quota (OpenCode's free daily limit, Go
+// allowance or budget) stays exhausted until the stated reset, often hours
+// away, so its Retry-After is honored up to a day instead of five minutes.
+const QUOTA_COOLDOWN_MAX_MS = 24 * 60 * 60_000;
+const QUOTA_EXHAUSTED_RE =
+  /freeusagelimiterror|gousagelimiterror|budgetlimiterror|creditlimitexceeded|insufficient_quota/i;
 const MAX_RATE_LIMIT_COOLDOWNS = 2_000;
 // Statuses that move a custom provider's request on to the next key of its pool.
 const KEY_POOL_ROTATE_STATUSES = new Set([401, 403, 429]);
@@ -620,7 +626,7 @@ export class ProxyFallbackService {
         opts,
         forward,
       );
-      this.recordRateLimitCooldown(opts, result.response);
+      await this.recordRateLimitCooldown(opts, result.response);
       // Still 401 after any OAuth refresh: the credential is stale (refresh
       // rejected, or the account itself is refused). Skip it until it changes.
       if (result.response.status === 401) {
@@ -780,11 +786,26 @@ export class ProxyFallbackService {
     };
   }
 
-  private recordRateLimitCooldown(opts: ForwardProviderOptions, response: Response): void {
-    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response);
+  private async recordRateLimitCooldown(
+    opts: ForwardProviderOptions,
+    response: Response,
+  ): Promise<void> {
+    const quotaExhausted =
+      response.status === 429 &&
+      QUOTA_EXHAUSTED_RE.test(
+        await response
+          .clone()
+          .text()
+          .catch(() => ''),
+      );
+    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response, quotaExhausted);
   }
 
-  private recordRateLimitCooldownForKey(key: string | null, response: Response): void {
+  private recordRateLimitCooldownForKey(
+    key: string | null,
+    response: Response,
+    quotaExhausted = false,
+  ): void {
     if (response.status !== 429 || !key) return;
     if (this.rateLimitCooldowns.size >= MAX_RATE_LIMIT_COOLDOWNS) {
       this.evictExpiredRateLimitCooldowns();
@@ -792,7 +813,10 @@ export class ProxyFallbackService {
         this.evictOldestRateLimitCooldown();
       }
     }
-    const ttlMs = this.parseRetryAfterMs(response.headers.get('retry-after'));
+    const ttlMs = this.parseRetryAfterMs(
+      response.headers.get('retry-after'),
+      quotaExhausted ? QUOTA_COOLDOWN_MAX_MS : RATE_LIMIT_COOLDOWN_MAX_MS,
+    );
     this.rateLimitCooldowns.set(key, Date.now() + ttlMs);
   }
 
@@ -813,11 +837,11 @@ export class ProxyFallbackService {
     if (oldestKey) this.rateLimitCooldowns.delete(oldestKey);
   }
 
-  private parseRetryAfterMs(retryAfter: string | null): number {
+  private parseRetryAfterMs(retryAfter: string | null, maxMs = RATE_LIMIT_COOLDOWN_MAX_MS): number {
     if (!retryAfter) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
     const seconds = Number(retryAfter);
     if (Number.isFinite(seconds) && seconds > 0) {
-      return Math.min(seconds * 1000, RATE_LIMIT_COOLDOWN_MAX_MS);
+      return Math.min(seconds * 1000, maxMs);
     }
     // HTTP-date form (RFC 9110): honor the provider's stated instant the same
     // way as the numeric-seconds form — respect the actual delta, capped at
@@ -827,7 +851,7 @@ export class ProxyFallbackService {
     if (Number.isNaN(retryAt)) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
     const deltaMs = retryAt - Date.now();
     if (deltaMs <= 0) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
-    return Math.min(deltaMs, RATE_LIMIT_COOLDOWN_MAX_MS);
+    return Math.min(deltaMs, maxMs);
   }
 
   private rateLimitCooldownKey(opts: {

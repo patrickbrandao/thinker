@@ -3,6 +3,7 @@ import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { type AuthType, type ModelModality } from 'thinker-shared';
+import { OPENCODE_FREE_KEY } from '../common/constants/subscription-clients';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
@@ -61,12 +62,7 @@ function isQwenProvider(providerId: string): boolean {
 
 function modelsDevModelIdPrefix(providerId: string): string | undefined {
   const lower = providerId.toLowerCase();
-  return lower === 'opencode-go' || lower === 'opencode-zen' ? lower : undefined;
-}
-
-function prefersModelsDevCatalog(providerId: string): boolean {
-  const lower = providerId.toLowerCase();
-  return lower === 'opencode-zen';
+  return lower === 'opencode-go' || lower === 'opencode' ? lower : undefined;
 }
 
 function nonChatFilterKey(providerId: string, authType: AuthType): string {
@@ -258,9 +254,13 @@ export class ModelDiscoveryService {
       const models = buildModelsDevFallback(this.modelsDevSync, provider.provider, {
         idPrefix: modelsDevModelIdPrefix(provider.provider),
       });
+      // The free OpenCode key reaches only the models without a price.
+      if (lowerProvider === 'opencode' && apiKey === OPENCODE_FREE_KEY) {
+        return models.filter((m) => m.inputPricePerToken === 0 && m.outputPricePerToken === 0);
+      }
       if (lowerProvider !== 'opencode-go') return models;
-      // OpenCode Go is surfaced as a subscription gateway with per-request
-      // quota cost from the docs catalog, not token pricing from models.dev.
+      // OpenCode Go is a subscription: its quota cost is recorded per request
+      // from the OpenCode catalog, so the picker does not show token prices.
       return models.map((model) => ({
         ...model,
         inputPricePerToken: 0,
@@ -277,16 +277,6 @@ export class ModelDiscoveryService {
         this.logger.log(
           `Subscription provider ${provider.provider} — using ${raw.length} curated models`,
         );
-      }
-    } else if (
-      provider.auth_type !== 'subscription' &&
-      prefersModelsDevCatalog(provider.provider)
-    ) {
-      raw = buildModelsDevModels();
-      if (raw.length > 0) {
-        this.logger.log(`Using ${raw.length} models from models.dev for ${provider.provider}`);
-      } else {
-        raw = await fetchProviderModels();
       }
     } else {
       raw = await fetchProviderModels();

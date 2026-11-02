@@ -18,8 +18,7 @@ import {
 } from '../routing/proxy/oauth-credentials';
 import { ProviderKeyService } from '../routing/routing-core/provider-key.service';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
-import { OpencodeGoCatalogService } from '../model-discovery/opencode-go-catalog.service';
-import { PROVIDER_BY_ID_OR_ALIAS } from '../common/constants/providers';
+import { OpencodeCatalogService } from '../model-discovery/opencode-catalog.service';
 import { PlaygroundAgentService } from './playground-agent.service';
 import { OpenaiOauthService } from '../routing/oauth/openai/openai-oauth.service';
 import { MinimaxOauthService } from '../routing/oauth/minimax/minimax-oauth.service';
@@ -66,7 +65,7 @@ export class PlaygroundService {
     @InjectRepository(CustomProvider)
     private readonly customProviderRepo: Repository<CustomProvider>,
     private readonly customProviders: CustomProviderService,
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    private readonly opencodeCatalog: OpencodeCatalogService,
     @Optional() private readonly egress?: ProxyEgressService,
     @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
@@ -365,27 +364,23 @@ export class PlaygroundService {
         .canonicalizeAgentMessageKeys(ctx.tenantId ?? '', dto.provider, dto.model)
         .then(({ provider }) => provider ?? dto.provider)
         .catch(() => dto.provider);
+      const opencode = await this.opencodeCatalog.costInputs(canonicalProvider, dto.model);
       const cost = computeTokenCost({
         inputTokens,
         outputTokens,
         cacheReadTokens,
         cacheCreationTokens,
         model: dto.model,
-        pricing: this.pricingCache.getByModel(dto.model, dto.provider),
-        isSubscription: authType === 'subscription',
+        pricing: opencode?.pricing ?? this.pricingCache.getByModel(dto.model, dto.provider),
+        isSubscription: authType === 'subscription' && !opencode?.pricing,
         // Same source order as the proxy recorder: a playground run against
         // the same provider must not report a different cost. That parity is
         // the whole point, so each input is resolved the way the recorder
         // resolves it — the local check on the canonical provider, because a
         // tile-connected llama.cpp arrives as `custom:<uuid>`, and the
-        // per-request rate from the OpenCode Go catalogue.
+        // list price from the OpenCode catalogue.
         isLocalProvider: authType === 'local' || isLocalOnlyProvider(canonicalProvider),
-        perRequestCostUsd:
-          authType === 'subscription' &&
-          PROVIDER_BY_ID_OR_ALIAS.get(canonicalProvider.toLowerCase())?.id === 'opencode-go'
-            ? await this.opencodeGoCatalog.resolveCostPerRequest(dto.model)
-            : null,
-        reportedCostUsd: usage?.reported_cost_usd,
+        reportedCostUsd: opencode?.ignoreReportedCost ? undefined : usage?.reported_cost_usd,
         // The request start, not the completion time. A stream that opens at
         // 09:59 UTC and closes at 10:01 crossed out of a DeepSeek peak window
         // mid-answer; the proxy recorder bills such a run from `startedAt`, so

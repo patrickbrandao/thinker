@@ -1,3 +1,4 @@
+import { OpencodeCatalogService } from '../../../model-discovery/opencode-catalog.service';
 import { ProxyMessageRecorder } from '../proxy-message-recorder';
 import { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import { IngestEventBusService } from '../../../common/services/ingest-event-bus.service';
@@ -44,17 +45,14 @@ describe('ProxyMessageRecorder', () => {
           }),
         ),
     } as never;
-    const opencodeGoCatalog = {
-      getCostPerRequest: jest.fn().mockReturnValue(null),
-      resolveCostPerRequest: jest.fn().mockResolvedValue(null),
-    } as never;
+    const opencodeCatalog = { costInputs: jest.fn().mockResolvedValue(null) } as never;
     const providerService = { getProviders: getProvidersMock } as never;
     recorder = new ProxyMessageRecorder(
       repo,
       pricingCache,
       eventBus,
       customProviders,
-      opencodeGoCatalog,
+      opencodeCatalog,
       providerService,
     );
   });
@@ -2238,16 +2236,13 @@ describe('ProxyMessageRecorder with real CustomProviderService', () => {
       eventBus,
     );
 
-    const mockOpencodeGoCatalog = {
-      getCostPerRequest: jest.fn().mockReturnValue(null),
-      resolveCostPerRequest: jest.fn().mockResolvedValue(null),
-    } as never;
+    const mockOpencodeCatalog = { costInputs: jest.fn().mockResolvedValue(null) } as never;
     const recorder = new ProxyMessageRecorder(
       messageRepo,
       pricingCache,
       eventBus,
       customProviders,
-      mockOpencodeGoCatalog,
+      mockOpencodeCatalog,
     );
     return { recorder, insertMock };
   }
@@ -2326,11 +2321,19 @@ describe('ProxyMessageRecorder with real CustomProviderService', () => {
     }
   });
 });
-
-describe('ProxyMessageRecorder OpenCode Go subscription cost', () => {
+describe('ProxyMessageRecorder OpenCode catalog cost', () => {
   let recorder: ProxyMessageRecorder;
   let insertMock: jest.Mock;
-  let getCostPerRequestMock: jest.Mock;
+  let resolvePricing: jest.SpyInstance;
+
+  // $10 / $20 per million tokens: 700 in + 150 out = $0.01.
+  const PRICING = {
+    model_name: 'glm-5.3',
+    provider: 'opencode-go',
+    input_price_per_token: 0.00001,
+    output_price_per_token: 0.00002,
+    display_name: 'GLM-5.3',
+  };
 
   beforeEach(() => {
     insertMock = jest.fn();
@@ -2349,127 +2352,75 @@ describe('ProxyMessageRecorder OpenCode Go subscription cost', () => {
           }),
         ),
     } as never;
-    getCostPerRequestMock = jest.fn().mockResolvedValue(0.01364);
-    const opencodeGoCatalog = {
-      getCostPerRequest: jest.fn().mockReturnValue(0.01364),
-      resolveCostPerRequest: getCostPerRequestMock,
-    } as never;
-    recorder = new ProxyMessageRecorder(
-      repo,
-      pricingCache,
-      eventBus,
-      customProviders,
-      opencodeGoCatalog,
-    );
+    const catalog = new OpencodeCatalogService(null);
+    resolvePricing = jest.spyOn(catalog, 'resolvePricing').mockResolvedValue(PRICING);
+    recorder = new ProxyMessageRecorder(repo, pricingCache, eventBus, customProviders, catalog);
   });
 
   afterEach(() => {
     recorder.onModuleDestroy();
   });
 
-  it('records the catalog per-request cost for an opencode-go subscription success', async () => {
+  it('records the list-price quota equivalent for an OpenCode Go subscription', async () => {
     await recorder.recordSuccessMessage(
       ctx,
-      'glm-5.1',
+      'glm-5.3',
       'standard',
       'scored',
-      { prompt_tokens: 700, completion_tokens: 150 },
+      { prompt_tokens: 700, completion_tokens: 150, reported_cost_usd: 0 },
       { provider: 'opencode-go', authType: 'subscription' },
     );
 
-    expect(getCostPerRequestMock).toHaveBeenCalledWith('glm-5.1');
-    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(resolvePricing).toHaveBeenCalledWith('opencode-go', 'glm-5.3');
     expect(insertMock.mock.calls[0][0]).toMatchObject({
-      model: 'glm-5.1',
       provider: 'opencode-go',
       auth_type: 'subscription',
-      cost_usd: 0.01364,
+      cost_usd: 0.01,
     });
   });
 
-  it('records the catalog per-request cost for an opencode-go subscription fallback success', async () => {
-    await recorder.recordFallbackSuccess(ctx, 'glm-5.1', 'standard', {
-      provider: 'opencode-go',
+  it('resolves a provider stored under an alias', async () => {
+    await recorder.recordFallbackSuccess(ctx, 'glm-5.3', 'standard', {
+      provider: 'opencodego',
       authType: 'subscription',
-      fallbackFromModel: 'kimi-k2.5',
+      fallbackFromModel: 'kimi-k3',
       fallbackIndex: 0,
       usage: { prompt_tokens: 700, completion_tokens: 150 },
     });
 
-    expect(getCostPerRequestMock).toHaveBeenCalledWith('glm-5.1');
-    expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(insertMock.mock.calls[0][0]).toMatchObject({
-      model: 'glm-5.1',
-      provider: 'opencode-go',
-      auth_type: 'subscription',
-      cost_usd: 0.01364,
-      fallback_from_model: 'kimi-k2.5',
-    });
+    expect(resolvePricing).toHaveBeenCalledWith('opencode-go', 'glm-5.3');
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ cost_usd: 0.01 });
   });
 
-  it('falls back to $0 when the catalog has no cost for the model (cold-start safety)', async () => {
-    getCostPerRequestMock.mockResolvedValueOnce(null);
+  it('records $0 for a Go subscription when the catalog has no price', async () => {
+    resolvePricing.mockResolvedValueOnce(undefined);
     await recorder.recordSuccessMessage(
       ctx,
-      'glm-5.1',
+      'glm-5.3',
       'standard',
       'scored',
       { prompt_tokens: 100, completion_tokens: 50 },
       { provider: 'opencode-go', authType: 'subscription' },
     );
 
-    expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(insertMock.mock.calls[0][0]).toMatchObject({
-      cost_usd: 0,
-      auth_type: 'subscription',
-    });
-  });
-
-  it('does not consult the catalog for non-subscription opencode-go calls', async () => {
-    await recorder.recordSuccessMessage(
-      ctx,
-      'glm-5.1',
-      'standard',
-      'scored',
-      { prompt_tokens: 100, completion_tokens: 50 },
-      { provider: 'opencode-go', authType: 'api_key' },
-    );
-
-    expect(getCostPerRequestMock).not.toHaveBeenCalled();
-  });
-
-  it('records the catalog cost when the provider is stored under an alias (e.g. "opencodego")', async () => {
-    await recorder.recordSuccessMessage(
-      ctx,
-      'glm-5.1',
-      'standard',
-      'scored',
-      { prompt_tokens: 700, completion_tokens: 150 },
-      { provider: 'opencodego', authType: 'subscription' },
-    );
-
-    expect(getCostPerRequestMock).toHaveBeenCalledWith('glm-5.1');
-    expect(insertMock.mock.calls[0][0]).toMatchObject({
-      cost_usd: 0.01364,
-      auth_type: 'subscription',
-    });
-  });
-
-  it('records $0 when provider is null and authType is subscription (defensive)', async () => {
-    await recorder.recordSuccessMessage(
-      ctx,
-      'glm-5.1',
-      'standard',
-      'scored',
-      { prompt_tokens: 100, completion_tokens: 50 },
-      { provider: undefined, authType: 'subscription' },
-    );
-
-    expect(getCostPerRequestMock).not.toHaveBeenCalled();
     expect(insertMock.mock.calls[0][0]).toMatchObject({ cost_usd: 0 });
   });
 
-  it('does not consult the catalog for other providers on subscription auth', async () => {
+  it('lets the cost OpenCode reports outrank its list price', async () => {
+    await recorder.recordSuccessMessage(
+      ctx,
+      'opencode/glm-5.3',
+      'standard',
+      'scored',
+      { prompt_tokens: 700, completion_tokens: 150, reported_cost_usd: 0.02 },
+      { provider: 'opencode', authType: 'api_key' },
+    );
+
+    expect(resolvePricing).toHaveBeenCalledWith('opencode', 'opencode/glm-5.3');
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ cost_usd: 0.02 });
+  });
+
+  it('does not consult the catalog for other providers', async () => {
     await recorder.recordSuccessMessage(
       ctx,
       'claude-opus-4',
@@ -2479,8 +2430,7 @@ describe('ProxyMessageRecorder OpenCode Go subscription cost', () => {
       { provider: 'anthropic', authType: 'subscription' },
     );
 
-    expect(getCostPerRequestMock).not.toHaveBeenCalled();
-    // Flat-fee subscription path: cost stays 0, not derived from token math.
+    expect(resolvePricing).not.toHaveBeenCalled();
     expect(insertMock.mock.calls[0][0]).toMatchObject({ cost_usd: 0 });
   });
 });

@@ -1875,11 +1875,11 @@ describe('proxy-response-handler', () => {
       );
     });
 
-    it('normalizes Zen reasoning streams when the cache exposes a model catalog', async () => {
+    it('normalizes OpenCode reasoning streams when the cache exposes a model catalog', async () => {
       const { res } = mockResponse();
       const forward = mockForward();
       const client = mockProviderClient();
-      const meta = makeMeta({ provider: 'opencode-zen', model: 'opencode-zen/big-pickle' });
+      const meta = makeMeta({ provider: 'opencode', model: 'opencode/big-pickle' });
       const reasoningCache = {
         store: jest.fn(),
         modelCatalog: { isReasoningModel: () => true },
@@ -2677,7 +2677,7 @@ describe('proxy-response-handler', () => {
       expect(res.json).toHaveBeenCalledWith(body);
     });
 
-    it('caches Zen reasoning_content when the cache exposes a model catalog', async () => {
+    it('caches OpenCode reasoning_content when the cache exposes a model catalog', async () => {
       const { res } = mockResponse();
       const client = mockProviderClient();
       const reasoningCache = {
@@ -2700,7 +2700,7 @@ describe('proxy-response-handler', () => {
         ],
       };
       const forward = mockForward(body);
-      const meta = makeMeta({ provider: 'opencode-zen', model: 'opencode-zen/big-pickle' });
+      const meta = makeMeta({ provider: 'opencode', model: 'opencode/big-pickle' });
 
       await handleNonStreamResponse(
         res as any,

@@ -22,7 +22,7 @@ class FakeSync {
     private readonly byProvider: Record<string, ModelsDevModelEntry> = {},
     private readonly byModel: Record<string, ModelsDevModelEntry> = {},
     /** models.dev keys these endpoints; anything else has no catalog of its own. */
-    private readonly supportedProviders: string[] = ['opencode-zen', 'opencode-go'],
+    private readonly supportedProviders: string[] = ['opencode', 'opencode-go'],
   ) {}
 
   isProviderSupported(providerId: string): boolean {
@@ -46,25 +46,21 @@ function catalogWith(sync: FakeSync): ModelsDevReasoningCatalog {
 
 describe('ModelsDevReasoningCatalog', () => {
   it('resolves a gateway slug after stripping the gateway prefix', () => {
-    const sync = new FakeSync({ 'opencode-zen:big-pickle': entry(true) });
+    const sync = new FakeSync({ 'opencode:big-pickle': entry(true) });
 
-    expect(catalogWith(sync).isReasoningModel('opencode-zen', 'opencode-zen/big-pickle')).toBe(
-      true,
-    );
+    expect(catalogWith(sync).isReasoningModel('opencode', 'opencode/big-pickle')).toBe(true);
   });
 
   it('reports a catalogued non-reasoning model as false', () => {
-    const sync = new FakeSync({ 'opencode-zen:kimi-k2': entry(false) });
+    const sync = new FakeSync({ 'opencode:kimi-k2': entry(false) });
 
-    expect(catalogWith(sync).isReasoningModel('opencode-zen', 'opencode-zen/kimi-k2')).toBe(false);
+    expect(catalogWith(sync).isReasoningModel('opencode', 'opencode/kimi-k2')).toBe(false);
   });
 
   it('returns undefined when the catalog has never seen the model', () => {
     const sync = new FakeSync();
 
-    expect(catalogWith(sync).isReasoningModel('opencode-zen', 'opencode-zen/unknown-slug')).toBe(
-      undefined,
-    );
+    expect(catalogWith(sync).isReasoningModel('opencode', 'opencode/unknown-slug')).toBe(undefined);
   });
 
   it('keeps the vendor prefix for OpenRouter before falling back to the bare id', () => {
@@ -103,19 +99,17 @@ describe('ModelsDevReasoningCatalog', () => {
   });
 
   it('stays silent for a gateway models.dev keys, rather than guessing across providers', () => {
-    // A same-named model under an unrelated provider must not answer for Zen:
+    // A same-named model under an unrelated provider must not answer for OpenCode:
     // a definitive false here would strip the field that the family fallback
     // would have preserved.
     const sync = new FakeSync({}, { 'glm-5': entry(false) });
 
-    expect(catalogWith(sync).isReasoningModel('opencode-zen', 'opencode-zen/glm-5')).toBe(
-      undefined,
-    );
+    expect(catalogWith(sync).isReasoningModel('opencode', 'opencode/glm-5')).toBe(undefined);
     expect(sync.crossProviderLookups).toEqual([]);
   });
 
   it('returns undefined when no sync service is wired', () => {
-    expect(new ModelsDevReasoningCatalog().isReasoningModel('opencode-zen', 'anything')).toBe(
+    expect(new ModelsDevReasoningCatalog().isReasoningModel('opencode', 'anything')).toBe(
       undefined,
     );
   });

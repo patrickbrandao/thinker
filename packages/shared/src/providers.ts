@@ -440,16 +440,17 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPlaceholder: '',
   },
   {
-    id: 'opencode-zen',
-    displayName: 'OpenCode Zen',
-    aliases: ['opencodezen'],
+    id: 'opencode',
+    displayName: 'OpenCode',
+    // Formerly "OpenCode Zen"; the old ids keep resolving.
+    aliases: ['opencode-zen', 'opencodezen'],
     openRouterPrefixes: [],
     requiresApiKey: true,
     localOnly: false,
     color: '#211E1E',
     keyPrefix: '',
     minKeyLength: 20,
-    keyPlaceholder: 'OpenCode Zen API key',
+    keyPlaceholder: 'OpenCode API key',
   },
   {
     id: 'openrouter',

@@ -17,6 +17,7 @@ import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
 import OAuthDetailView from './OAuthDetailView.js';
 import AnthropicOAuthDetailView from './AnthropicOAuthDetailView.js';
 import DeviceCodeDetailView from './DeviceCodeDetailView.js';
+import OpencodeGoUsageMeter from './OpencodeGoUsageMeter.js';
 import { getRoutingProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
 import { Badge, Button, cx } from './ui.js';
 
@@ -366,6 +367,9 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
 
       {/* Device-code subscription */}
       {showConnectFlow && isDeviceCodeFlow ? <DeviceCodeDetailView {...flowProps} /> : null}
+      {connected && isSubMode && props.provId === 'opencode-go' ? (
+        <OpencodeGoUsageMeter agentName={props.agentName} />
+      ) : null}
 
       {/* Ollama (no key) */}
       {isOllama ? (

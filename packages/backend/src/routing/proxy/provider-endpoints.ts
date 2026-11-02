@@ -4,6 +4,8 @@ import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import {
   CODEX_CLI_ORIGINATOR,
   CODEX_CLI_USER_AGENT,
+  OPENCODE_CLIENT_NAME,
+  OPENCODE_USER_AGENT,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
   buildClaudeCodeSubscriptionHeaders,
@@ -190,10 +192,8 @@ const QWEN_TOKEN_PLAN_BASE = 'https://token-plan.ap-southeast-1.maas.aliyuncs.co
 const ZAI_SUBSCRIPTION_BASE = getZaiCodingPlanBaseUrl('global');
 // OpenCode serves inference per wire protocol under /inference (models.dev
 // `opencode` / `opencode-go` entries); the older /zen paths are retired there.
-const OPENCODE_GO_OPENAI_BASE = 'https://opencode.ai/inference/go/openai';
-const OPENCODE_GO_ANTHROPIC_BASE = 'https://opencode.ai/inference/go/anthropic';
-const OPENCODE_ZEN_OPENAI_BASE = 'https://opencode.ai/inference/openai';
-const OPENCODE_ZEN_GOOGLE_BASE = 'https://opencode.ai/inference/google';
+const OPENCODE_INFERENCE_BASE = 'https://opencode.ai/inference';
+const OPENCODE_GO_INFERENCE_BASE = 'https://opencode.ai/inference/go';
 const KILO_GATEWAY_BASE = 'https://api.kilo.ai/api/gateway';
 const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
 const NVIDIA_NIM_BASE = 'https://integrate.api.nvidia.com';
@@ -604,69 +604,63 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildPath: () => '/',
     format: 'kiro',
   },
-  'opencode-go': {
-    baseUrl: OPENCODE_GO_OPENAI_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: openaiPath,
-    format: 'openai',
-    ...openaiStreamUsage,
-  },
-  // x-api-key covers pasted OpenCode API keys; a Console OAuth access token
-  // authenticates as Bearer (what opencode's Anthropic client sends for OAuth).
-  'opencode-go-anthropic': {
-    baseUrl: OPENCODE_GO_ANTHROPIC_BASE,
-    buildHeaders: (apiKey: string) => ({
-      ...anthropicApiKeyHeaders(apiKey),
-      Authorization: `Bearer ${apiKey}`,
-    }),
-    buildPath: () => '/v1/messages',
-    format: 'anthropic',
-  },
-  // OpenCode Go's Responses-only models (Grok 4.5, GPT 5.6 Luna, Muse Spark)
-  // reject /v1/chat/completions — the docs Endpoints table sends them to
-  // /v1/responses instead.
-  'opencode-go-responses': {
-    baseUrl: OPENCODE_GO_OPENAI_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: () => '/v1/responses',
-    format: 'chatgpt',
-    forwardResponsesStream: true,
-    acceptsMaxOutputTokens: true,
-  },
-  // OpenCode Zen's /v1/chat/completions is a unified OpenAI-compatible
-  // endpoint that handles Claude, GPT, and the long tail of OpenAI-compatible
-  // models (Qwen, GLM, Kimi, MiniMax, …) on a single Bearer-auth route.
-  //
-  // Gemini models on Zen are currently broken upstream — Zen forwards our
-  // `Authorization: Bearer` header to Vertex AI verbatim, which rejects the
-  // request with OVERLOADED_CREDENTIALS because Zen also attaches its own
-  // GCP credentials. This is a Zen-side gateway bug; switching to `x-api-key`
-  // only makes Zen reject with "Missing API key" before the request even
-  // reaches GCP. There is no client-side workaround until Zen stops
-  // tunneling our auth header through.
-  'opencode-zen': {
-    baseUrl: OPENCODE_ZEN_OPENAI_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: () => '/v1/chat/completions',
-    format: 'openai',
-    ...openaiStreamUsage,
-  },
-  // TODO(opencode-zen): collapse this back into the single `opencode-zen`
-  // entry once Zen's gateway stops tunneling the client Authorization header
-  // through to Vertex AI on /v1/chat/completions. The unified path already
-  // works for Claude, GPT, and the OpenAI-compatible long tail; Gemini is
-  // the only family that still needs the Google-native combo today.
-  'opencode-zen-google': {
-    baseUrl: OPENCODE_ZEN_GOOGLE_BASE,
-    buildHeaders: (apiKey: string) => ({
-      'x-goog-api-key': apiKey,
-      'Content-Type': 'application/json',
-    }),
-    buildPath: (model: string) => `/v1beta/models/${model}:generateContent`,
-    buildStreamPath: (model: string) => `/v1beta/models/${model}:streamGenerateContent`,
-    format: 'google',
-  },
+  // OpenCode (pay-as-you-go and free models) and OpenCode Go serve each model
+  // on one wire protocol, per their `/inference[/go]/v1/models` catalog;
+  // ProviderClient picks the entry. ADR 0009.
+  ...opencodeEndpoints('opencode', OPENCODE_INFERENCE_BASE),
+  ...opencodeEndpoints('opencode-go', OPENCODE_GO_INFERENCE_BASE),
 };
+
+// The free models answer only the OpenCode client, so every OpenCode request
+// identifies as it (ADR 0009); the session header rides in provider-hooks.
+const opencodeClientHeaders = {
+  'User-Agent': OPENCODE_USER_AGENT,
+  'x-opencode-client': OPENCODE_CLIENT_NAME,
+};
+
+function opencodeEndpoints(id: string, base: string): Record<string, ProviderEndpoint> {
+  const withClient =
+    (build: (apiKey: string) => Record<string, string>) =>
+    (apiKey: string): Record<string, string> => ({ ...build(apiKey), ...opencodeClientHeaders });
+  return {
+    [id]: {
+      baseUrl: `${base}/openai`,
+      buildHeaders: withClient(openaiHeaders),
+      buildPath: () => '/v1/chat/completions',
+      format: 'openai',
+      ...openaiStreamUsage,
+    },
+    [`${id}-responses`]: {
+      baseUrl: `${base}/openai`,
+      buildHeaders: withClient(openaiHeaders),
+      buildPath: () => '/v1/responses',
+      format: 'chatgpt',
+      forwardResponsesStream: true,
+      acceptsMaxOutputTokens: true,
+    },
+    // x-api-key covers pasted OpenCode API keys; a Console OAuth access token
+    // authenticates as Bearer (what opencode's Anthropic client sends for OAuth).
+    [`${id}-anthropic`]: {
+      baseUrl: `${base}/anthropic`,
+      buildHeaders: withClient((apiKey: string) => ({
+        ...anthropicApiKeyHeaders(apiKey),
+        Authorization: `Bearer ${apiKey}`,
+      })),
+      buildPath: () => '/v1/messages',
+      format: 'anthropic',
+    },
+    [`${id}-google`]: {
+      baseUrl: `${base}/google`,
+      buildHeaders: withClient((apiKey: string) => ({
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+      })),
+      buildPath: (model: string) => `/v1beta/models/${model}:generateContent`,
+      buildStreamPath: (model: string) => `/v1beta/models/${model}:streamGenerateContent`,
+      format: 'google',
+    },
+  };
+}
 
 /** Build a ProviderEndpoint for a custom provider with the given base URL. */
 export function buildCustomEndpoint(

@@ -6,7 +6,7 @@ import { CustomProvider } from '../entities/custom-provider.entity';
 import { ModelPricesModule } from '../model-prices/model-prices.module';
 import { ProviderModelFetcherService } from './provider-model-fetcher.service';
 import { ModelDiscoveryService } from './model-discovery.service';
-import { OpencodeGoCatalogService } from './opencode-go-catalog.service';
+import { OpencodeCatalogService } from './opencode-catalog.service';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
 
 @Module({
@@ -17,9 +17,9 @@ import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
   providers: [
     ProviderModelFetcherService,
     ModelDiscoveryService,
-    OpencodeGoCatalogService,
+    OpencodeCatalogService,
     CopilotTokenService,
   ],
-  exports: [ModelDiscoveryService, ProviderModelFetcherService, OpencodeGoCatalogService],
+  exports: [ModelDiscoveryService, ProviderModelFetcherService, OpencodeCatalogService],
 })
 export class ModelDiscoveryModule {}

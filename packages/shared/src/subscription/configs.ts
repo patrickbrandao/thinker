@@ -265,11 +265,23 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     // OpenCode Console device login; a pasted OpenCode API key also works.
     subscriptionAuthMode: 'device_code' as const,
     subscriptionKeyPlaceholder: 'Paste your OpenCode API key',
-    // Model list is discovered from OpenCode Go's live /models endpoint; models.dev
-    // and the docs catalog provide metadata, quota cost, and fallback data.
+    // Model list, protocol and quota pricing come from OpenCode Go's public
+    // catalog at /inference/go/v1/models.
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 200000,
       supportsPromptCaching: false,
+      supportsBatching: false,
+    }),
+  }),
+  // Not a plan: the Console login authenticates pay-as-you-go OpenCode the
+  // way an API key does, billed at list price from the OpenCode catalog.
+  opencode: Object.freeze({
+    supportsSubscription: true as const,
+    subscriptionLabel: 'OpenCode Console',
+    subscriptionAuthMode: 'device_code' as const,
+    subscriptionCapabilities: Object.freeze({
+      maxContextWindow: 1000000,
+      supportsPromptCaching: true,
       supportsBatching: false,
     }),
   }),

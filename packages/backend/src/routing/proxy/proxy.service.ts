@@ -105,6 +105,7 @@ const contextSnapshots = new WeakMap<readonly DiscoveredModel[], RouteSnapshot>(
  */
 const SCORING_EXCLUDED_ROLES = new Set(['system', 'developer']);
 const SCORING_RECENT_MESSAGES = 10;
+const LEGACY_OPENCODE_PREFIX = 'opencode-zen/';
 
 export interface RoutingMeta {
   tier: TierSlot | 'direct';
@@ -881,6 +882,11 @@ export class ProxyService {
     tenantId: string,
     requestedModel: string,
   ): Promise<ResolvedRouting | null> {
+    // Harness configs written before OpenCode Zen became OpenCode still send
+    // `opencode-zen/<model>`; the catalog now publishes `opencode/<model>`.
+    if (requestedModel.startsWith(LEGACY_OPENCODE_PREFIX)) {
+      requestedModel = `opencode/${requestedModel.slice(LEGACY_OPENCODE_PREFIX.length)}`;
+    }
     const models = await this.modelDiscovery.getModelsForAgent(tenantId, agentId);
     const catalogRoute = routeForOpenAiModelId(requestedModel, models);
     if (catalogRoute) return this.explicitRouting(agentId, tenantId, catalogRoute);

@@ -129,6 +129,27 @@ describe('ProviderKeyForm', () => {
     vi.clearAllMocks();
   });
 
+  describe('keyless free models', () => {
+    it('connects with the free key when the provider offers one', async () => {
+      const def = makeProviderDef({ id: 'opencode', name: 'OpenCode', freeKey: 'public' });
+      const { onUpdate } = mount({ provDef: def });
+      fireEvent.click(screen.getByText('Use free models (no key)'));
+      await flush();
+      expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
+        provider: 'opencode',
+        apiKey: 'public',
+        authType: 'api_key',
+        label: 'Free',
+      });
+      expect(onUpdate).toHaveBeenCalled();
+    });
+
+    it('offers no keyless connect without a free key', () => {
+      mount({ provDef: makeProviderDef() });
+      expect(screen.queryByText('Use free models (no key)')).toBeNull();
+    });
+  });
+
   describe('field label', () => {
     it('shows "API Key" when NOT in subscription mode (api-key provider)', () => {
       const def = makeProviderDef({ id: 'openai', name: 'OpenAI' });

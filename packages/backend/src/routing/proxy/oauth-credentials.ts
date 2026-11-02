@@ -6,6 +6,7 @@ import { parseOAuthTokenBlob, REJECTED_TOKEN_EXPIRY } from '../oauth/core';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
 import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
+import { opencodeCatalogProvider } from '../../model-discovery/opencode-catalog.service';
 
 export interface OAuthServiceSet {
   openaiOauth: OpenaiOauthService;
@@ -107,12 +108,14 @@ export async function refreshRejectedOAuthCredential(
     );
     return unwrapped ? { apiKey: unwrapped } : null;
   }
-  if ((lower === 'opencode-go' || lower === 'opencodego') && services.opencodeOauth) {
+  const opencodeProvider = opencodeCatalogProvider(lower);
+  if (opencodeProvider && services.opencodeOauth) {
     const unwrapped = await services.opencodeOauth.unwrapToken(
       expiredRawValue,
       agentId,
       tenantId,
       keyLabel,
+      opencodeProvider,
     );
     return unwrapped ? { apiKey: unwrapped } : null;
   }
@@ -171,9 +174,16 @@ export async function resolveApiKey(
       if (unwrapped) return { apiKey: unwrapped };
       if (parseOAuthTokenBlob(apiKey)) return { apiKey: null };
     }
-    // OpenCode Go takes either a Console OAuth blob or a pasted API key.
-    if ((lower === 'opencode-go' || lower === 'opencodego') && opencodeOauth) {
-      const unwrapped = await opencodeOauth.unwrapToken(apiKey, agentId, tenantId, keyLabel);
+    // OpenCode and OpenCode Go take either a Console OAuth blob or a pasted API key.
+    const opencodeProvider = opencodeCatalogProvider(lower);
+    if (opencodeProvider && opencodeOauth) {
+      const unwrapped = await opencodeOauth.unwrapToken(
+        apiKey,
+        agentId,
+        tenantId,
+        keyLabel,
+        opencodeProvider,
+      );
       if (unwrapped) return { apiKey: unwrapped };
       if (parseOAuthTokenBlob(apiKey)) return { apiKey: null };
     }

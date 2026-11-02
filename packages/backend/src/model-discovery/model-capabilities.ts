@@ -30,7 +30,7 @@ const STREAMING_ENDPOINT_PROVIDERS = new Set([
   'ollama-cloud',
   'openai',
   'opencode-go',
-  'opencode-zen',
+  'opencode',
   'openrouter',
   'qwen',
   'xai',

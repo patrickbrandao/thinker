@@ -61,7 +61,11 @@ import { dropUnsupportedAnthropicTools } from './anthropic-messages-adapter';
 import { responsesToolNames, ResponsesToolNames } from './responses-tools';
 import { forwardKiroChat } from './kiro-adapter';
 import { markProviderSent, timeProviderResponse } from './request-timeline';
-import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
+import {
+  OpencodeCatalogService,
+  type OpencodeApiFormat,
+  type OpencodeCatalogProvider,
+} from '../../model-discovery/opencode-catalog.service';
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
 import { isBedrockProvider } from '../bedrock-region';
@@ -365,7 +369,7 @@ export class ProviderClient {
 
   constructor(
     @Optional()
-    private readonly opencodeGoCatalog?: OpencodeGoCatalogService,
+    private readonly opencodeCatalog?: OpencodeCatalogService,
     @Optional()
     private readonly modelRegistry?: ProviderModelRegistryService,
     @Optional()
@@ -627,17 +631,8 @@ export class ProviderClient {
         resolved = 'copilot-responses';
       }
     }
-    if (resolved === 'opencode-go') {
-      const bareOpenCodeModel = stripVendorPrefix(model).toLowerCase();
-      const catalogFormat = await this.resolveOpencodeGoFormat(bareOpenCodeModel);
-      if (catalogFormat === 'responses') {
-        resolved = 'opencode-go-responses';
-      } else {
-        const knownAnthropicFamily = this.isKnownOpencodeGoAnthropicFamily(bareOpenCodeModel);
-        if (catalogFormat === 'anthropic' || (!catalogFormat && knownAnthropicFamily)) {
-          resolved = 'opencode-go-anthropic';
-        }
-      }
+    if (resolved === 'opencode-go' || resolved === 'opencode') {
+      resolved = await this.resolveOpencodeEndpoint(resolved, model);
     }
     if (resolved === 'commandcode') {
       const bareCommandCodeModel = model.startsWith('commandcode/')
@@ -647,39 +642,31 @@ export class ProviderClient {
         resolved = 'commandcode-anthropic';
       }
     }
-    if (
-      resolved === 'opencode-zen' &&
-      stripVendorPrefix(model).toLowerCase().startsWith('gemini-')
-    ) {
-      // TODO(opencode-zen): once Zen's gateway stops forwarding the client
-      // Authorization header to Vertex AI, drop this branch and let Gemini
-      // ride the unified /v1/chat/completions route like every other family.
-      // Today, sending `Authorization: Bearer <zen_key>` against the unified
-      // path triggers GCP OVERLOADED_CREDENTIALS (Zen also attaches its own
-      // GCP creds upstream). The dedicated Gemini route uses Google's
-      // `x-goog-api-key` header against `/v1beta/models/{id}:generateContent`,
-      // which Zen documents at https://opencode.ai/docs/zen/ and does not
-      // leak through to Vertex AI.
-      resolved = 'opencode-zen-google';
-    }
     return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
   }
 
-  private async resolveOpencodeGoFormat(
-    bareModel: string,
-  ): Promise<'openai' | 'anthropic' | 'responses' | null> {
-    if (!this.opencodeGoCatalog) return null;
-    try {
-      return await this.opencodeGoCatalog.resolveFormat(bareModel);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`OpenCode Go catalog format lookup failed: ${message}`);
-      return null;
+  /**
+   * OpenCode and OpenCode Go serve each model on one wire protocol, published
+   * in their catalog. Without the catalog (fetch failed), the model family
+   * picks it: Claude, MiniMax and Qwen 3.7+ speak Messages, GPT/Grok/Muse speak
+   * Responses, Gemini speaks Google, the rest Chat Completions.
+   */
+  private async resolveOpencodeEndpoint(
+    provider: OpencodeCatalogProvider,
+    model: string,
+  ): Promise<string> {
+    const bare = stripVendorPrefix(model).toLowerCase();
+    let format: OpencodeApiFormat | null = null;
+    if (this.opencodeCatalog) {
+      try {
+        format = await this.opencodeCatalog.resolveFormat(provider, bare);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`${provider} catalog format lookup failed: ${message}`);
+      }
     }
-  }
-
-  private isKnownOpencodeGoAnthropicFamily(bareModel: string): boolean {
-    return bareModel.startsWith('minimax-') || bareModel.startsWith('qwen3.7');
+    format ??= opencodeFamilyFormat(provider, bare);
+    return format === 'openai' ? provider : `${provider}-${format}`;
   }
 
   private resolveCopilotEndpointFromMetadata(
@@ -1077,4 +1064,15 @@ export class ProviderClient {
   readonly createAnthropicStreamTransformer = createAnthropicTransformer;
   readonly createReasoningContentStreamTransformer = reasoningContentStreamTransformer;
   readonly collectChatGptSseResponse = chatGptSseCollector;
+}
+
+function opencodeFamilyFormat(
+  provider: OpencodeCatalogProvider,
+  bareModel: string,
+): OpencodeApiFormat {
+  if (bareModel.startsWith('claude-')) return 'anthropic';
+  if (provider === 'opencode-go' && /^(minimax-|qwen3\.)/.test(bareModel)) return 'anthropic';
+  if (/^(gpt-|grok-|muse-)/.test(bareModel)) return 'responses';
+  if (bareModel.startsWith('gemini-')) return 'google';
+  return 'openai';
 }

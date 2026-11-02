@@ -139,7 +139,7 @@ O container não faz nenhuma chamada de saída por conta própria: sem telemetri
 | --- | --- |
 | `openrouter.ai` (`/api/v1/models`) | No boot e uma vez por dia |
 | `models.dev` (`/api.json`) | No boot e uma vez por dia |
-| `raw.githubusercontent.com` (documento do OpenCode Go) | Só com um provedor OpenCode Go cadastrado; cache de 1 hora |
+| `opencode.ai` (catálogo do OpenCode e do OpenCode Go) | Só com um provedor OpenCode cadastrado; cache de 1 hora |
 | URL de metadados do cliente MCP (CIMD) | Quando um cliente MCP faz login por OAuth: o servidor busca o documento na URL HTTPS que o cliente informa como `client_id`. Só endereços públicos, salvo `THINKER_CIMD_ALLOW_PRIVATE=true`. Desligue o MCP com `MCP_ENABLED=false`. |
 
 `THINKER_CATALOG_SYNC=false` desliga os três primeiros, por exemplo num host isolado da internet; os preços passam a vir só dos dados embutidos, e a maioria dos modelos aparece com `$0`. Lista completa em [privacidade](https://github.com/patrickbrandao/thinker/blob/main/docs/usuario/privacidade.md).

@@ -23,7 +23,9 @@ const MODEL_PREFIX_MAP: [RegExp, string][] = [
   [/^commandcode\//, 'commandcode'],
   [/^pioneer\//, 'pioneer'],
   [/^opencode-go\//, 'opencode-go'],
-  [/^opencode-zen\//, 'opencode-zen'],
+  [/^opencode\//, 'opencode'],
+  // Model ids published before OpenCode Zen was renamed to OpenCode.
+  [/^opencode-zen\//, 'opencode'],
   [/^kiro\//, 'kiro'],
   [/^llamacpp\//, 'llamacpp'],
   [/^[a-z][\w-]*\//, 'openrouter'],
@@ -36,7 +38,7 @@ export { MODEL_PREFIX_MAP };
  * provider's API, so the id after the prefix is the underlying provider's
  * own model id (e.g. `opencode-go/deepseek-v4-pro` -> `deepseek-v4-pro`).
  */
-const GATEWAY_MODEL_PREFIXES = ['opencode-go/', 'opencode-zen/'] as const;
+const GATEWAY_MODEL_PREFIXES = ['opencode-go/', 'opencode/', 'opencode-zen/'] as const;
 
 const BEDROCK_PROVIDER_TOKENS = new Map<string, string>();
 for (const provider of SHARED_PROVIDERS) {

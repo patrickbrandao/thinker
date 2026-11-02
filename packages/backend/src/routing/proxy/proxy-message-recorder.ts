@@ -28,7 +28,7 @@ import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { CallerAttribution } from './caller-classifier';
 import type { ProviderAttemptRef, ProviderAttemptStart, ProxyApiMode } from './proxy-types';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
-import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
+import { OpencodeCatalogService } from '../../model-discovery/opencode-catalog.service';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
 import { ProviderService } from '../routing-core/provider.service';
@@ -370,7 +370,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     private readonly pricingCache: ModelPricingCacheService,
     private readonly eventBus: IngestEventBusService,
     private readonly customProviders: CustomProviderService,
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    private readonly opencodeCatalog: OpencodeCatalogService,
     @Optional()
     private readonly providerService?: ProviderService,
     @Optional()
@@ -464,6 +464,9 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         ? await this.copilotTokenPricing(ctx, tenantProviderId, model, usage.prompt_tokens)
         : undefined;
 
+    const opencode = isCopilot ? null : await this.opencodeCatalog.costInputs(provider, model);
+    const catalogPricing = copilotPricing ?? opencode?.pricing;
+
     return computeTokenCost({
       inputTokens: usage?.prompt_tokens ?? 0,
       outputTokens: usage?.completion_tokens ?? 0,
@@ -473,16 +476,14 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       // Priced on the raw keys: a custom provider's rates are stored under
       // `custom:<uuid>/<model>`, which is exactly what canonicalization strips.
       pricing:
-        copilotPricing ??
+        catalogPricing ??
         (!isCopilot && usage ? this.pricingCache.getByModel(model, provider) : undefined),
-      isSubscription: authType === 'subscription' && !copilotPricing,
+      isSubscription: authType === 'subscription' && !catalogPricing,
       isLocalProvider:
         authType === 'local' || isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
-      perRequestCostUsd: copilotPricing
-        ? null
-        : await this.perRequestSubscriptionCost(provider, authType, model),
       // Copilot's usage.cost is a premium-request multiplier, not USD.
-      reportedCostUsd: isCopilot ? undefined : usage?.reported_cost_usd,
+      reportedCostUsd:
+        isCopilot || opencode?.ignoreReportedCost ? undefined : usage?.reported_cost_usd,
       at,
     });
   }
@@ -1303,27 +1304,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     await this.persistRequest(ctx, requestId, requestRow, true, apiMode);
     await this.persistAttempt(requestRow, attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
-  }
-
-  /**
-   * Resolve the per-request USD cost for subscription providers that bill
-   * against a dollar quota (today: OpenCode Go). Returns `null` for every
-   * other provider, leaving the existing "subscription → $0" path intact.
-   * Canonicalizes the provider through the registry so aliases (e.g.
-   * `opencodego`, `OpenCode-Go`) resolve identically. Awaits the catalog
-   * `list()` once if its in-memory index is still cold so the first request
-   * after a process restart doesn't undercount as $0.
-   */
-  private async perRequestSubscriptionCost(
-    provider: string | null | undefined,
-    authType: string | null | undefined,
-    model: string | null | undefined,
-  ): Promise<number | null> {
-    if (authType !== 'subscription') return null;
-    if (!provider) return null;
-    const canonical = PROVIDER_BY_ID_OR_ALIAS.get(provider.toLowerCase())?.id;
-    if (canonical !== 'opencode-go') return null;
-    return this.opencodeGoCatalog.resolveCostPerRequest(model);
   }
 
   private evictExpiredCooldowns(): void {

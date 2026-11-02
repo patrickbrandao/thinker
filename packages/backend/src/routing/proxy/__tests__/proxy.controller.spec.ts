@@ -210,8 +210,7 @@ describe('ProxyController', () => {
       { emit: jest.fn() } as unknown as IngestEventBusService,
       mockCustomProviders as never,
       {
-        getCostPerRequest: jest.fn().mockReturnValue(null),
-        resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+        costInputs: jest.fn().mockResolvedValue(null),
       } as never,
     );
     controller = new ProxyController(
@@ -3642,8 +3641,7 @@ describe('ProxyController', () => {
             ),
         } as never,
         {
-          getCostPerRequest: jest.fn().mockReturnValue(null),
-          resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+          costInputs: jest.fn().mockResolvedValue(null),
         } as never,
       );
 
@@ -3676,8 +3674,7 @@ describe('ProxyController', () => {
             ),
         } as never,
         {
-          getCostPerRequest: jest.fn().mockReturnValue(null),
-          resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+          costInputs: jest.fn().mockResolvedValue(null),
         } as never,
       );
 
