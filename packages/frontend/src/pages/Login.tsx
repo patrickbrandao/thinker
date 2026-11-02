@@ -163,7 +163,7 @@ export default function Login() {
       <meta name="description" content={t('auth.login.metaDescription')} />
 
       <div className="login-mark">
-        <img src={branding.logoUrl} alt={branding.title} height={128} />
+        <img src={branding.logoUrl} alt={branding.title} height={96} />
       </div>
 
       <SocialButtons enabledProviders={socialProviders} lastUsed={lastAuthMethod} />
