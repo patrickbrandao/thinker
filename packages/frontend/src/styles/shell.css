@@ -958,7 +958,11 @@
   .login-mark {
     display: flex;
     justify-content: center;
-    margin-bottom: 20px;
+    margin: 20px 0 40px;
+  }
+  .login-mark img {
+    height: 96px;
+    width: auto;
   }
   .logo-light {
     display: inline;
