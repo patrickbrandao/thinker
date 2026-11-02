@@ -75,6 +75,7 @@ import { AnthropicOauthService } from '../oauth/anthropic/anthropic-oauth.servic
 import { GeminiOauthService } from '../oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ProviderClient, ForwardResult } from './provider-client';
 import { resolveEndpointKey } from './provider-endpoints';
@@ -184,6 +185,7 @@ export class ProxyFallbackService {
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly reasoningCache: ReasoningContentCache,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   /**
@@ -491,6 +493,7 @@ export class ProxyFallbackService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
       egress: this.egress,
     };
@@ -877,6 +880,7 @@ export class ProxyFallbackService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
     );
     if (!refreshed?.apiKey || refreshed.apiKey === opts.apiKey) {

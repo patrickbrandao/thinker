@@ -874,18 +874,16 @@ describe('PROVIDERS', () => {
     expect(getRoutingProviderApiKeyUrl('pioneer')).toBe('https://pioneer.ai');
   });
 
-  it('OpenCode Go is subscription-only with a sign-in URL', () => {
+  it('OpenCode Go is subscription-only with Console device login and an API-key alternative', () => {
     const og = PROVIDERS.find((p) => p.id === 'opencode-go')!;
     expect(og).toBeDefined();
     expect(og.supportsSubscription).toBe(true);
     expect(og.subscriptionOnly).toBe(true);
-    expect(og.subscriptionAuthMode).toBe('token');
+    expect(og.subscriptionAuthMode).toBe('device_code');
     expect(og.subscriptionLabel).toBe('OpenCode Go (beta)');
-    expect(og.subscriptionKeyPlaceholder).toBe('Paste your OpenCode API key');
-    expect(og.subscriptionSignInUrl).toBe('https://opencode.ai/auth');
-    expect(og.subscriptionSignInLabel).toBe('Sign in to OpenCode Go');
-    expect(og.subscriptionSignInHint).toMatch(/Sign in to OpenCode Go/);
-    expect(og.subscriptionSignInHint).not.toMatch(/Zen/i);
+    expect(og.subscriptionTokenAlternative?.prefix).toBe('');
+    expect(og.subscriptionTokenAlternative?.placeholder).toBe('Paste your OpenCode API key');
+    expect(og.subscriptionTokenAlternative?.dividerLabel).toBe('Or paste an OpenCode API key');
     expect(og.beta).toBe(true);
   });
 
@@ -927,7 +925,7 @@ describe('PROVIDERS', () => {
     expect(getSubscriptionProviderKeyUrl('kiro')).toBe('https://app.kiro.dev');
   });
 
-  it('OpenCode Go subscription key is validated with generic min-length check', () => {
+  it('OpenCode Go pasted API key is validated with the provider key length', () => {
     const og = PROVIDERS.find((p) => p.id === 'opencode-go')!;
     expect(validateSubscriptionKey(og, '')).toEqual({
       valid: false,
@@ -935,7 +933,7 @@ describe('PROVIDERS', () => {
     });
     expect(validateSubscriptionKey(og, 'short')).toEqual({
       valid: false,
-      error: 'Token is too short (minimum 10 characters)',
+      error: 'Token is too short (minimum 20 characters)',
     });
     expect(validateSubscriptionKey(og, 'a-valid-opencode-token-1234')).toEqual({
       valid: true,

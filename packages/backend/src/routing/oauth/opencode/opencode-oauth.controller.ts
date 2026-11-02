@@ -1,0 +1,88 @@
+import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
+import { OutboundProviderScope } from '../../../proxy-servers/outbound-provider-scope.interceptor';
+import { TenantCtx, TenantContext } from '../../../common/decorators/tenant-context.decorator';
+import { OpencodeOauthService } from './opencode-oauth.service';
+import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
+import { ProviderService } from '../../routing-core/provider.service';
+import { optionalTrimmedStringQuery } from '../core/query-params';
+import { MinRole } from '../../../common/decorators/roles.decorator';
+import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+
+@MinRole('admin', { includeReads: true })
+@UseInterceptors(OutboundProviderScope('opencode-go'))
+@Controller('api/v1/oauth/opencode')
+export class OpencodeOauthController {
+  constructor(
+    private readonly oauthService: OpencodeOauthService,
+    private readonly resolveAgent: ResolveAgentService,
+    private readonly providerService: ProviderService,
+  ) {}
+
+  @Post('start')
+  async start(@Query('agentName') agentName: string, @TenantCtx() ctx: TenantContext) {
+    if (!agentName) {
+      throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
+    }
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
+    try {
+      return await this.oauthService.startAuthorization(agent.id, agent.tenant_id, ctx.userId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start OpenCode login';
+      throw new HttpException(message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+  }
+
+  @Get('poll')
+  async poll(@Query('flowId') flowId: string, @TenantCtx() ctx: TenantContext) {
+    if (!flowId) {
+      throw new HttpException('flowId query parameter is required', HttpStatus.BAD_REQUEST);
+    }
+    if (!ctx.tenantId) {
+      throw new NotFoundException('Tenant not found');
+    }
+    try {
+      return await this.oauthService.pollAuthorization(flowId, ctx.tenantId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to poll OpenCode login';
+      throw new HttpException(message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+  }
+
+  @Post('revoke')
+  async revoke(
+    @Query('agentName') agentName: string,
+    @Query('label') label: string | string[] | undefined,
+    @TenantCtx() ctx: TenantContext,
+  ) {
+    if (!agentName) {
+      throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
+    }
+    const keyLabel = optionalTrimmedStringQuery(label, 'label');
+    const agent = await this.resolveAgent.resolve(
+      ctx.tenantId,
+      agentName,
+      PROVIDER_CONNECTION_SCOPE,
+    );
+    const { notifications } = await this.providerService.removeProvider(
+      agent.id,
+      agent.tenant_id,
+      'opencode-go',
+      'subscription',
+      keyLabel,
+    );
+    return { ok: true, notifications };
+  }
+}

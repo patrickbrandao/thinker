@@ -22,7 +22,7 @@ Se você já paga por um dos planos abaixo, o Thinker pode rotear pela assinatur
 | [Kiro](https://app.kiro.dev) | Assinatura Kiro | Código de dispositivo | Lista fixa do Kiro |
 | [xAI](https://x.ai) | Assinatura Grok | OAuth (navegador) | Catálogo dinâmico da xAI |
 | [Ollama Cloud](https://ollama.com) | Assinatura Ollama Cloud | Token de assinatura | Catálogo dinâmico de tags do Ollama Cloud |
-| [OpenCode Go](https://opencode.ai) | OpenCode Go (beta) | Token de assinatura | Catálogo dinâmico do OpenCode Go |
+| [OpenCode Go](https://opencode.ai) | OpenCode Go (beta) | Login no OpenCode Console (device code) ou chave de API | Catálogo dinâmico do OpenCode Go |
 
 ## Conectar uma assinatura
 
@@ -93,7 +93,9 @@ Cole uma chave de API do Ollama Cloud. Ele aceita formatos genéricos de chave; 
 
 ### OpenCode Go
 
-Entre no OpenCode Go, copie a chave de API e cole no Thinker. A descoberta de modelos é dinâmica e, conforme o modelo, o Thinker roteia por formato compatível com OpenAI ou com Anthropic.
+Clique em **Connect with OpenCode Go**: o Thinker abre a página do OpenCode Console com um código de dispositivo, o mesmo fluxo do `opencode auth login opencode`. Aprove o acesso na organização que tem o Go. O Thinker guarda o token de acesso e o refresh token e renova os dois antes de expirar (o refresh token é trocado a cada renovação). Se a sessão do Console for revogada, conecte de novo.
+
+Ainda dá para colar uma chave de API do OpenCode (conta de serviço) no campo abaixo do botão. A descoberta de modelos é dinâmica e, conforme o modelo, o Thinker roteia para `https://opencode.ai/inference/go/openai` (Chat Completions e Responses) ou `https://opencode.ai/inference/go/anthropic` (Messages).
 
 ## Por que combinar assinaturas e chaves de API
 

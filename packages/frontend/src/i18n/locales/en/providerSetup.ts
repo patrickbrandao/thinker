@@ -257,7 +257,7 @@ export default {
     signInWithGoogle: 'Sign in with Google',
     pasteYourKey: 'Paste your {{ name }} API key',
     signInTo: 'Sign in to {{ name }}',
-    opencodeSignInHint: 'Sign in to OpenCode Go to get your API key.',
+    opencodeDivider: 'Or paste an OpenCode API key',
     commandCodeRequirement: 'Requires Command Code Pro or higher.',
     geminiClosed:
       'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',

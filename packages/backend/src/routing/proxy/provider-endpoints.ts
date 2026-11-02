@@ -188,8 +188,12 @@ const XIAOMI_MIMO_BASE = 'https://api.xiaomimimo.com';
 const XIAOMI_TOKEN_PLAN_BASE = getXiaomiTokenPlanBaseUrl();
 const QWEN_TOKEN_PLAN_BASE = 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode';
 const ZAI_SUBSCRIPTION_BASE = getZaiCodingPlanBaseUrl('global');
-const OPENCODE_GO_BASE = 'https://opencode.ai/zen/go';
-const OPENCODE_ZEN_BASE = 'https://opencode.ai/zen';
+// OpenCode serves inference per wire protocol under /inference (models.dev
+// `opencode` / `opencode-go` entries); the older /zen paths are retired there.
+const OPENCODE_GO_OPENAI_BASE = 'https://opencode.ai/inference/go/openai';
+const OPENCODE_GO_ANTHROPIC_BASE = 'https://opencode.ai/inference/go/anthropic';
+const OPENCODE_ZEN_OPENAI_BASE = 'https://opencode.ai/inference/openai';
+const OPENCODE_ZEN_GOOGLE_BASE = 'https://opencode.ai/inference/google';
 const KILO_GATEWAY_BASE = 'https://api.kilo.ai/api/gateway';
 const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
 const NVIDIA_NIM_BASE = 'https://integrate.api.nvidia.com';
@@ -601,15 +605,20 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     format: 'kiro',
   },
   'opencode-go': {
-    baseUrl: OPENCODE_GO_BASE,
+    baseUrl: OPENCODE_GO_OPENAI_BASE,
     buildHeaders: openaiHeaders,
     buildPath: openaiPath,
     format: 'openai',
     ...openaiStreamUsage,
   },
+  // x-api-key covers pasted OpenCode API keys; a Console OAuth access token
+  // authenticates as Bearer (what opencode's Anthropic client sends for OAuth).
   'opencode-go-anthropic': {
-    baseUrl: OPENCODE_GO_BASE,
-    buildHeaders: anthropicApiKeyHeaders,
+    baseUrl: OPENCODE_GO_ANTHROPIC_BASE,
+    buildHeaders: (apiKey: string) => ({
+      ...anthropicApiKeyHeaders(apiKey),
+      Authorization: `Bearer ${apiKey}`,
+    }),
     buildPath: () => '/v1/messages',
     format: 'anthropic',
   },
@@ -617,7 +626,7 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   // reject /v1/chat/completions — the docs Endpoints table sends them to
   // /v1/responses instead.
   'opencode-go-responses': {
-    baseUrl: OPENCODE_GO_BASE,
+    baseUrl: OPENCODE_GO_OPENAI_BASE,
     buildHeaders: openaiHeaders,
     buildPath: () => '/v1/responses',
     format: 'chatgpt',
@@ -636,7 +645,7 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   // reaches GCP. There is no client-side workaround until Zen stops
   // tunneling our auth header through.
   'opencode-zen': {
-    baseUrl: OPENCODE_ZEN_BASE,
+    baseUrl: OPENCODE_ZEN_OPENAI_BASE,
     buildHeaders: openaiHeaders,
     buildPath: () => '/v1/chat/completions',
     format: 'openai',
@@ -648,12 +657,13 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   // works for Claude, GPT, and the OpenAI-compatible long tail; Gemini is
   // the only family that still needs the Google-native combo today.
   'opencode-zen-google': {
-    baseUrl: OPENCODE_ZEN_BASE,
+    baseUrl: OPENCODE_ZEN_GOOGLE_BASE,
     buildHeaders: (apiKey: string) => ({
       'x-goog-api-key': apiKey,
       'Content-Type': 'application/json',
     }),
-    buildPath: (model: string) => `/v1/models/${model}:generateContent`,
+    buildPath: (model: string) => `/v1beta/models/${model}:generateContent`,
+    buildStreamPath: (model: string) => `/v1beta/models/${model}:streamGenerateContent`,
     format: 'google',
   },
 };

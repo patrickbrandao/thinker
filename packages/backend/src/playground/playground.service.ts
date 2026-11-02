@@ -27,6 +27,7 @@ import { AnthropicOauthService } from '../routing/oauth/anthropic/anthropic-oaut
 import { GeminiOauthService } from '../routing/oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../routing/oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../routing/oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../routing/oauth/opencode/opencode-oauth.service';
 import { ModelPricingCacheService } from '../model-prices/model-pricing-cache.service';
 import { computeTokenCost } from '../common/utils/cost-calculator';
 import { scrubSecrets } from '../common/utils/secret-scrub';
@@ -67,6 +68,7 @@ export class PlaygroundService {
     private readonly customProviders: CustomProviderService,
     private readonly opencodeGoCatalog: OpencodeGoCatalogService,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   /**
@@ -144,6 +146,7 @@ export class PlaygroundService {
           this.kiroOauth,
           this.xaiOauth,
           providerKeyLabel,
+          this.opencodeOauth,
         ),
       );
       if (resolved.apiKey === null) {
@@ -246,6 +249,7 @@ export class PlaygroundService {
               geminiOauth: this.geminiOauth,
               kiroOauth: this.kiroOauth,
               xaiOauth: this.xaiOauth,
+              opencodeOauth: this.opencodeOauth,
             },
           ),
         );

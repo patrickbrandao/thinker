@@ -262,7 +262,8 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
   'opencode-go': Object.freeze({
     supportsSubscription: true as const,
     subscriptionLabel: 'OpenCode Go (beta)',
-    subscriptionAuthMode: 'token' as const,
+    // OpenCode Console device login; a pasted OpenCode API key also works.
+    subscriptionAuthMode: 'device_code' as const,
     subscriptionKeyPlaceholder: 'Paste your OpenCode API key',
     // Model list is discovered from OpenCode Go's live /models endpoint; models.dev
     // and the docs catalog provide metadata, quota cost, and fallback data.

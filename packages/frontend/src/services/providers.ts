@@ -519,16 +519,16 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subtitle: 'DeepSeek, Qwen, GLM, Kimi, MiMo',
     supportsSubscription: true,
     subscriptionLabel: 'OpenCode Go (beta)',
-    subscriptionAuthMode: 'token',
-    get subscriptionKeyPlaceholder() {
-      return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
-    },
-    subscriptionSignInUrl: 'https://opencode.ai/auth',
-    get subscriptionSignInLabel() {
-      return t('providerSetup.catalog.signInTo', { name: 'OpenCode Go' });
-    },
-    get subscriptionSignInHint() {
-      return t('providerSetup.catalog.opencodeSignInHint');
+    // OpenCode Console device login; a pasted OpenCode API key stays available.
+    subscriptionAuthMode: 'device_code',
+    subscriptionTokenAlternative: {
+      prefix: '',
+      get placeholder() {
+        return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
+      },
+      get dividerLabel() {
+        return t('providerSetup.catalog.opencodeDivider');
+      },
     },
     subscriptionOnly: true,
     beta: true,

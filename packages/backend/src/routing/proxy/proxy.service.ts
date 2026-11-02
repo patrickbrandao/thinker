@@ -10,6 +10,7 @@ import { AnthropicOauthService } from '../oauth/anthropic/anthropic-oauth.servic
 import { GeminiOauthService } from '../oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
 import { ForwardResult } from './provider-client';
 import { SessionMomentumService } from './session-momentum.service';
 import { LimitCheckService } from '../../notifications/services/limit-check.service';
@@ -281,6 +282,7 @@ export class ProxyService {
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   async proxyRequest(opts: ProxyRequestOptions): Promise<ProxyResult> {
@@ -991,6 +993,7 @@ export class ProxyService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
       egress: this.egress,
     };
