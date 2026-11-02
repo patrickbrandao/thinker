@@ -1,12 +1,9 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { brandingSignal, loadBranding } from '../services/branding.js';
+import { useSignal } from '../lib/signal.js';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import SocialButtons from '../components/SocialButtons.jsx';
-import {
-  AuthDivider,
-  AuthFooter,
-  AuthHeader,
-  authLinkButtonClass,
-} from '../components/auth-ui.jsx';
+import { AuthDivider, AuthFooter, authLinkButtonClass } from '../components/auth-ui.jsx';
 import { Button, Field } from '../components/ui.jsx';
 import { authClient } from '../services/auth-client.js';
 import { appendSearch, getAuthDestination } from '../services/auth-redirects.js';
@@ -24,6 +21,10 @@ const DevSignInButton = import.meta.env.DEV
   : null;
 
 export default function Login() {
+  const branding = useSignal(brandingSignal);
+  useEffect(() => {
+    void loadBranding();
+  }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -160,13 +161,16 @@ export default function Login() {
     <>
       <title>{t('common.pageTitle', { page: t('auth.login.pageTitle') })}</title>
       <meta name="description" content={t('auth.login.metaDescription')} />
-      <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
+
+      <div className="login-mark">
+        <img src={branding.logoUrl} alt={branding.title} height={128} />
+      </div>
 
       <SocialButtons enabledProviders={socialProviders} lastUsed={lastAuthMethod} />
 
       {socialProviders.length > 0 ? <AuthDivider /> : null}
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+      <form className="login-form flex flex-col gap-3" onSubmit={handleSubmit}>
         {import.meta.env.DEV && DevSignInButton ? (
           <Suspense fallback={null}>
             <DevSignInButton disabled={loading} onSignIn={signInAsDev} />

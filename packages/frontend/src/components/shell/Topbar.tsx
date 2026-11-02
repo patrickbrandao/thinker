@@ -22,6 +22,7 @@ import {
 import { THINKER_DOCS_URL, THINKER_PROVIDERS_DOCS_URL } from '../../services/thinker-links.js';
 import { effectiveTheme, themePreference, toggleTheme } from '../../lib/theme.js';
 import { useSignal } from '../../lib/signal.js';
+import { brandingSignal } from '../../services/branding.js';
 import { themedIcon } from '../setup-ui.js';
 import { t } from '../../i18n/index.js';
 import { IconButton, Menu, MenuItem } from '../ui.jsx';
@@ -58,6 +59,7 @@ export default function Topbar({
   const platformIcon = agentPlatformIcon();
   const crumbIcon = platformIcon ? themedIcon(platformIcon, dark) : null;
   const version = __THINKER_VERSION__;
+  const { hideInfo } = useSignal(brandingSignal);
 
   return (
     <header className="topbar">
@@ -132,21 +134,23 @@ export default function Topbar({
       </nav>
 
       <div className="topbar-actions">
-        {version ? (
+        {version && !hideInfo ? (
           <span className="topbar-version" title={t('nav.version', { version })}>
             v{version}
           </span>
         ) : null}
-        <a
-          href={docsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="icon-btn"
-          aria-label={t('nav.docs')}
-          title={t('nav.docs')}
-        >
-          <BookOpen aria-hidden="true" />
-        </a>
+        {hideInfo ? null : (
+          <a
+            href={docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="icon-btn"
+            aria-label={t('nav.docs')}
+            title={t('nav.docs')}
+          >
+            <BookOpen aria-hidden="true" />
+          </a>
+        )}
         <IconButton label={t('shell.topbar.search')} onClick={onOpenSearch}>
           <Search />
         </IconButton>

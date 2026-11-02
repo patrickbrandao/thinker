@@ -51,9 +51,9 @@ describe('Login', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
   });
 
-  it('renders welcome message', () => {
+  it('shows no heading above the form, only the layout logo', () => {
     render(<Login />);
-    expect(screen.getByText('Welcome back')).toBeDefined();
+    expect(screen.queryByText('Welcome back')).toBeNull();
   });
 
   it('renders email and password inputs', () => {

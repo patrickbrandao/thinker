@@ -51,6 +51,14 @@ O Thinker grava o corpo das requisições e respostas dos provedores (por harnes
 | `THINKER_RECORDING_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | vazio | Armazenamento compatível com S3. Use-o em deploy com mais de uma réplica. |
 | `THINKER_RECORDING_S3_FORCE_PATH_STYLE` | `false` | `true` para S3 com endereçamento por caminho (MinIO e similares). |
 
+## Identidade visual do painel
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `THINKER_TITLE` | `Thinker` | Título mostrado ao lado da logomarca, no canto superior esquerdo do painel. |
+| `THINKER_LOGO_URL` | logomarca do Thinker | URL da logomarca do canto superior esquerdo e da tela de login. Aceita caminho relativo ou URL `http(s)` absoluta; a origem da URL absoluta é liberada no `img-src` da CSP. |
+| `THINKER_HIDE_INFO` | `false` | `true` esconde a versão do Thinker e o link da documentação no topo do painel. |
+
 ## Catálogos públicos de modelos e preços
 
 | Variável | Padrão | Descrição |

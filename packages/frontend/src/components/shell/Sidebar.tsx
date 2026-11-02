@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
 import { NAVIGATION, isNavActive, navLabel } from '../../config/navigation.js';
 import { roleCan } from '../../services/session-store.js';
-import { THINKER_LOGO_URL, THINKER_LOGO_DARK_URL } from '../../services/thinker-links.js';
+import { brandingSignal, loadBranding } from '../../services/branding.js';
+import { useSignal } from '../../lib/signal.js';
 import { t } from '../../i18n/index.js';
 import { cx } from '../ui.jsx';
 import AddAgentModal from '../AddAgentModal.jsx';
@@ -25,13 +26,17 @@ export default function Sidebar({
 }) {
   const { pathname } = useLocation();
   const [addOpen, setAddOpen] = useState(false);
+  const branding = useSignal(brandingSignal);
+  useEffect(() => {
+    void loadBranding();
+  }, []);
 
   return (
     <aside className="sidebar" aria-label={t('nav.navigation')}>
       <div className="sidebar-brand">
         <Link to="/overview" className="logo-word" onClick={onNavigate}>
-          <img src={THINKER_LOGO_URL} alt="Thinker" className="logo-light" />
-          <img src={THINKER_LOGO_DARK_URL} alt="" className="logo-dark" />
+          <img src={branding.logoUrl} alt="" />
+          <span className="logo-text">{branding.title}</span>
         </Link>
         {/* Collapsed, the toggle takes the logo's place. */}
         <button
