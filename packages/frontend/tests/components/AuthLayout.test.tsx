@@ -44,7 +44,7 @@ describe('AuthLayout', () => {
       </AuthLayout>,
     );
     const srcs = [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
-    expect(srcs).toEqual(['/brand/thinker-logo.svg?v=1', '/brand/thinker-logo-dark.svg?v=1']);
+    expect(srcs).toEqual(['/brand/thinker-logo.png?v=2', '/brand/thinker-logo-dark.png?v=2']);
     expect(container.querySelector('img')?.getAttribute('alt')).toBe('Thinker');
     expect(container.querySelector('a')).toBeNull();
   });

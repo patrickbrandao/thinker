@@ -3,7 +3,7 @@
   "description": "Open-source LLM gateway for agents and apps (community-maintained template, not tested in CI).",
   "repository": "https://github.com/patrickbrandao/thinker",
   "website": "https://github.com/patrickbrandao/thinker",
-  "logo": "https://raw.githubusercontent.com/patrickbrandao/thinker/main/.github/assets/thinker-logo.svg",
+  "logo": "https://raw.githubusercontent.com/patrickbrandao/thinker/main/.github/assets/thinker-logo.png",
   "success_url": "/setup",
   "stack": "container",
   "keywords": [

@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/thinker-logo-dark.svg" />
-    <source media="(prefers-color-scheme: light)" srcset=".github/assets/thinker-logo.svg" />
-    <img src=".github/assets/thinker-logo.svg" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/thinker-logo-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/thinker-logo.png" />
+    <img src=".github/assets/thinker-logo.png" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
   </picture>
 </p>
 <p align="center">
