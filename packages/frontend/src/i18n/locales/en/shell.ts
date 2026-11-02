@@ -60,6 +60,7 @@ export default {
     auth: { api_key: 'API key', subscription: 'Subscription', local: 'Local' },
     proxy: 'Proxy',
     globalProxy: 'Global',
+    proxyServer: 'Proxy server',
     egress: { internet: 'Internet', gateway: 'Local Gateway', local: 'Local network' },
     disabled: 'disabled',
     metrics: {

@@ -169,6 +169,9 @@
   .n8n-source-lines.is-dense {
     font-size: 11px;
   }
+  .n8n-box.is-round {
+    border-radius: 50%;
+  }
   .n8n-box.is-idle {
     border-style: dashed;
   }

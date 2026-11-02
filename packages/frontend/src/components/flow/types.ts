@@ -37,6 +37,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   outbound?: boolean;
   /** Border: `active` (traffic, no errors), `error` (errors in the window) or `idle`. */
   state?: 'active' | 'error' | 'idle';
+  /** For steps: a circle instead of a square (where traffic ends). */
+  round?: boolean;
   /** Where a double-click goes. */
   href?: string;
 }

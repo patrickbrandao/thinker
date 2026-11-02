@@ -81,6 +81,7 @@ it('builds the topology from clients through connections and proxies to the inte
   const openai = randomUUID();
   const anthropic = randomUUID();
   const profile = randomUUID();
+  const squid = randomUUID();
   await ds.query(
     `INSERT INTO tenant_providers (id, tenant_id, provider, auth_type, label)
      VALUES ($1, $3, 'openai', 'api_key', 'Default'), ($2, $3, 'anthropic', 'api_key', 'Work')`,
@@ -91,9 +92,14 @@ it('builds the topology from clients through connections and proxies to the inte
     TEST_TENANT_ID,
   ]);
   await ds.query(
+    `INSERT INTO proxy_servers (id, tenant_id, name, host, port)
+     VALUES ($1, $2, 'Squid', '10.0.0.1', 3128)`,
+    [squid, TEST_TENANT_ID],
+  );
+  await ds.query(
     `INSERT INTO proxy_bindings (tenant_id, target_type, target_id, position, proxy_id)
-     VALUES ($1, 'profile', $2, 0, NULL)`,
-    [TEST_TENANT_ID, profile],
+     VALUES ($1, 'profile', $2, 1, $3), ($1, 'profile', $2, 2, NULL)`,
+    [TEST_TENANT_ID, profile, squid],
   );
   await ds.query(
     `INSERT INTO proxy_assignments (tenant_id, target_type, target_id, mode, profile_id)
@@ -137,6 +143,9 @@ it('builds the topology from clients through connections and proxies to the inte
   expect(res.body.proxies).toEqual([
     expect.objectContaining({ id: `proxy:${profile}`, profileId: profile, name: 'Office' }),
   ]);
+  expect(res.body.servers).toEqual([
+    expect.objectContaining({ id: `server:${squid}`, name: 'Squid', host: '10.0.0.1', port: 3128 }),
+  ]);
   expect(res.body.links).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -155,14 +164,16 @@ it('builds the topology from clients through connections and proxies to the inte
       }),
       expect.objectContaining({ source: harness, target: backup, kind: 'fallback', requests: 0 }),
       expect.objectContaining({ source: conn, target: `proxy:${profile}`, kind: 'egress' }),
+      // Attempts without an egress record fall on the chain's first server.
       expect.objectContaining({
         source: `proxy:${profile}`,
-        target: 'internet',
+        target: `server:${squid}`,
         requests: 1,
         recent: 1,
       }),
+      expect.objectContaining({ source: `server:${squid}`, target: 'internet', requests: 1 }),
       expect.objectContaining({ source: backup, target: 'gateway', kind: 'egress' }),
-      // The profile's chain is a single Direct item: it also leaves through the gateway.
+      // The chain ends with a Direct item: the profile also leaves through the gateway.
       expect.objectContaining({ source: `proxy:${profile}`, target: 'gateway', requests: 0 }),
     ]),
   );

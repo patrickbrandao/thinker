@@ -1058,6 +1058,14 @@
         "base.css"
       ]
     },
+    "is-round": {
+      "classes": [
+        "is-round"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-selected": {
       "classes": [
         "is-selected"
@@ -2105,8 +2113,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 206,
-    "classes": 222,
+    "blocks": 207,
+    "classes": 223,
     "canonicalRules": 5,
     "ghostRules": 5
   }
