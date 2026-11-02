@@ -64,6 +64,17 @@ export interface Topology {
   >;
   /** Outbound proxy profiles in use (`profileId` null: the global proxy). */
   proxies: Array<Usage & { id: string; profileId: string | null; name: string }>;
+  /** Proxy servers of the profiles' chains, each linked to the internet. */
+  servers: Array<
+    Usage & {
+      id: string;
+      proxyId: string;
+      name: string;
+      host: string | null;
+      port: number | null;
+      enabled: boolean;
+    }
+  >;
   /** `internet` behind a proxy, `gateway` (direct from the instance) or `local` (local servers). */
   egress: Array<Usage & { id: 'internet' | 'gateway' | 'local' }>;
   links: TopologyLink[];

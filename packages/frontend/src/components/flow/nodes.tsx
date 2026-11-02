@@ -25,7 +25,14 @@ function SourceNodeView({ data, selected }: NodeProps<FlowNode>) {
 function StepNodeView({ data, selected }: NodeProps<FlowNode>) {
   return (
     <div className="n8n-step" title={data.tooltip}>
-      <div className={cx('n8n-box', data.state && `is-${data.state}`, selected && 'is-selected')}>
+      <div
+        className={cx(
+          'n8n-box',
+          data.round && 'is-round',
+          data.state && `is-${data.state}`,
+          selected && 'is-selected',
+        )}
+      >
         {data.inbound ? <Handle type="target" position={Position.Left} /> : null}
         <span className="n8n-icon">{data.icon}</span>
         {data.outbound ? <Handle type="source" position={Position.Right} /> : null}

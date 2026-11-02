@@ -36,6 +36,7 @@ export class ConsoleController {
         harnesses: [],
         providers: [],
         proxies: [],
+        servers: [],
         egress: [],
         links: [],
         positions: {},

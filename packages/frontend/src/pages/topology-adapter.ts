@@ -1,5 +1,15 @@
 import { createElement } from 'react';
-import { Bot, BrainCircuit, Globe, GlobeLock, House, Plug, Server, Waypoints } from 'lucide-react';
+import {
+  Bot,
+  BrainCircuit,
+  Globe,
+  GlobeLock,
+  House,
+  Plug,
+  Server,
+  ServerCog,
+  Waypoints,
+} from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
 import type { FlowEdge, FlowNode, Graph } from '../components/flow/types.js';
 import type { FlowLegendItem } from '../components/flow/FlowCanvas.jsx';
@@ -12,7 +22,7 @@ import { PROVIDERS } from '../services/providers.js';
 import { t, tMaybe } from '../i18n/index.js';
 
 const ICON = 40;
-const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, egress: 4 } as const;
+const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, server: 4, egress: 5 } as const;
 const EGRESS_ICON = { internet: Globe, gateway: GlobeLock, local: House } as const;
 /** Vertical room of a step node (box + name + subtitle) and of a one-line source. */
 const STEP_HEIGHT = 144;
@@ -122,7 +132,7 @@ function linkTooltip(l: TopologyLink): string | undefined {
 /**
  * Turns the topology API payload into a laid-out flow graph, one column per
  * kind: client address → harness → provider connection → proxy profile →
- * internet / local network. Saved positions win over the column layout.
+ * proxy server → internet, local gateway or local network (drawn round). Saved positions win over the column layout.
  * With `activeOnly`, nodes and links without traffic in the window are left
  * out.
  */
@@ -228,6 +238,29 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
       COLUMN.proxy,
     );
   }
+  for (const server of data.servers ?? []) {
+    if (!keep(server.id)) continue;
+    const address = server.host ? `${server.host}:${server.port ?? ''}` : null;
+    push(
+      {
+        id: server.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon: lucide(ServerCog),
+          title: server.name,
+          subtitle: address,
+          tooltip: usageTooltip(`${t('shell.flow.proxyServer')} · ${server.name}`, server, [
+            address,
+            server.enabled ? null : t('shell.flow.disabled'),
+          ]),
+          state: nodeState(server),
+          href: '/proxy-servers',
+        },
+      },
+      COLUMN.server,
+    );
+  }
   for (const end of data.egress) {
     if (!keep(end.id)) continue;
     const title = t(`shell.flow.egress.${end.id}`);
@@ -239,6 +272,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           kind: 'node',
           icon: lucide(EGRESS_ICON[end.id]),
           title,
+          round: true,
           tooltip: usageTooltip(title, end),
           state: nodeState(end),
         },
