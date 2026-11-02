@@ -21,12 +21,12 @@ export const THINKER_ISSUES_URL = `${THINKER_REPO_URL}/issues`;
  * a one-year immutable cache and no hash in the name, so the `v` query is the
  * cache key: bump BRAND_ASSET_VERSION whenever a drawing changes.
  */
-const BRAND_ASSET_VERSION = '1';
+const BRAND_ASSET_VERSION = '2';
 const brandAsset = (name: string) => `/brand/${name}?v=${BRAND_ASSET_VERSION}`;
 
 /** Symbol + "Thinker" wordmark, for light backgrounds. */
-export const THINKER_LOGO_URL = brandAsset('thinker-logo.svg');
+export const THINKER_LOGO_URL = brandAsset('thinker-logo.png');
 /** Symbol + "Thinker" wordmark, for dark backgrounds. */
-export const THINKER_LOGO_DARK_URL = brandAsset('thinker-logo-dark.svg');
-/** Symbol only, for light backgrounds. */
-export const THINKER_MARK_URL = brandAsset('thinker-mark.svg');
+export const THINKER_LOGO_DARK_URL = brandAsset('thinker-logo-dark.png');
+/** Symbol only, for light and dark backgrounds. */
+export const THINKER_MARK_URL = brandAsset('thinker-mark.png');

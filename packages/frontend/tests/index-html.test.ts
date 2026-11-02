@@ -13,8 +13,8 @@ describe('index.html', () => {
   });
 
   it('uses the Thinker brand icons', () => {
-    expect(html).toContain('href="/brand/favicon.svg?v=1"');
-    expect(html).toContain('href="/brand/apple-touch-icon.png?v=1"');
+    expect(html).toContain('href="/brand/favicon-32.png?v=2"');
+    expect(html).toContain('href="/brand/apple-touch-icon.png?v=2"');
   });
 
   it('points nowhere outside the instance (no absolute URLs, no og:image)', () => {
