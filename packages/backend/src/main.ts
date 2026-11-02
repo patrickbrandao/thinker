@@ -1,5 +1,6 @@
 // First: pin the process clock to UTC before any Date exists (#58).
 import { overriddenTimeZone } from './common/utils/pin-utc';
+import { logoOrigin, readBranding } from './branding/branding';
 import { NestFactory } from '@nestjs/core';
 import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -83,6 +84,7 @@ export async function bootstrap() {
   const betterAuthUrl = process.env['BETTER_AUTH_URL'] || '';
   const hstsEnabled = /^https:\/\//i.test(betterAuthUrl);
   const isDev = process.env['NODE_ENV'] !== 'production';
+  const customLogoOrigin = logoOrigin(readBranding().logoUrl);
 
   app.use(
     helmet({
@@ -92,7 +94,7 @@ export async function bootstrap() {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:'],
+          imgSrc: ["'self'", 'data:', ...(customLogoOrigin ? [customLogoOrigin] : [])],
           connectSrc: ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],

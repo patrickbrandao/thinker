@@ -30,3 +30,5 @@ export const THINKER_LOGO_URL = brandAsset('thinker-logo.png');
 export const THINKER_LOGO_DARK_URL = brandAsset('thinker-logo-dark.png');
 /** Symbol only, for light and dark backgrounds. */
 export const THINKER_MARK_URL = brandAsset('thinker-mark.png');
+/** Symbol only, 512 × 512, for large displays such as the login screen. */
+export const THINKER_MARK_512_URL = brandAsset('thinker-mark-512.png');

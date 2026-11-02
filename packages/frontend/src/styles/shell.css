@@ -58,12 +58,18 @@
     flex-shrink: 0;
   }
   .sidebar-brand img {
-    height: 22px;
+    height: 28px;
   }
   .sidebar-brand .logo-word {
     display: flex;
     align-items: center;
+    gap: 8px;
     min-width: 0;
+  }
+  .sidebar-brand .logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
   }
   .sidebar-brand .collapse-btn {
     margin-left: auto;
@@ -944,6 +950,15 @@
   }
   .auth-logo img {
     height: 30px;
+  }
+  /* The login screen shows only the symbol, without the wordmark. */
+  .auth-card:has(.login-form) .auth-logo {
+    display: none;
+  }
+  .login-mark {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
   }
   .logo-light {
     display: inline;
