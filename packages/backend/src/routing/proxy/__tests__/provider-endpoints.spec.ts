@@ -183,8 +183,8 @@ describe('resolveEndpointKey', () => {
     expect(known).toContain('opencode-go');
     expect(known).toContain('opencode-go-anthropic');
     expect(known).toContain('opencode-go-responses');
-    expect(known).toContain('opencode-zen');
-    expect(known).toContain('opencode-zen-google');
+    expect(known).toContain('opencode');
+    expect(known).toContain('opencode-google');
   });
 
   it('resolves ollama-cloud to ollama-cloud', () => {
@@ -198,10 +198,10 @@ describe('resolveEndpointKey', () => {
     expect(resolveEndpointKey('opencodego')).toBe('opencode-go');
   });
 
-  it('resolves opencode-zen and its opencodezen alias', () => {
-    expect(resolveEndpointKey('opencode-zen')).toBe('opencode-zen');
-    expect(resolveEndpointKey('OpenCode-Zen')).toBe('opencode-zen');
-    expect(resolveEndpointKey('opencodezen')).toBe('opencode-zen');
+  it('resolves opencode and its opencodezen alias', () => {
+    expect(resolveEndpointKey('opencode')).toBe('opencode');
+    expect(resolveEndpointKey('OpenCode-Zen')).toBe('opencode');
+    expect(resolveEndpointKey('opencodezen')).toBe('opencode');
   });
 
   it('resolves kilo and its aliases', () => {
@@ -785,7 +785,7 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-go uses Bearer auth headers', () => {
     const headers = PROVIDER_ENDPOINTS['opencode-go'].buildHeaders('og-token');
-    expect(headers).toEqual({
+    expect(headers).toMatchObject({
       Authorization: 'Bearer og-token',
       'Content-Type': 'application/json',
     });
@@ -800,7 +800,7 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-go-anthropic sends x-api-key and Bearer so API keys and Console OAuth tokens both work', () => {
     const headers = PROVIDER_ENDPOINTS['opencode-go-anthropic'].buildHeaders('og-token');
-    expect(headers).toEqual({
+    expect(headers).toMatchObject({
       'x-api-key': 'og-token',
       Authorization: 'Bearer og-token',
       'Content-Type': 'application/json',
@@ -815,36 +815,47 @@ describe('PROVIDER_ENDPOINTS', () => {
     expect(ep.buildPath('grok-4.5')).toBe('/v1/responses');
     expect(ep.forwardResponsesStream).toBe(true);
     expect(ep.acceptsMaxOutputTokens).toBe(true);
-    expect(ep.buildHeaders('og-token')).toEqual({
+    expect(ep.buildHeaders('og-token')).toMatchObject({
       Authorization: 'Bearer og-token',
       'Content-Type': 'application/json',
     });
   });
 
-  it('opencode-zen uses OpenCode Zen base URL with OpenAI format', () => {
-    const ep = PROVIDER_ENDPOINTS['opencode-zen'];
+  it('opencode uses OpenCode base URL with OpenAI format', () => {
+    const ep = PROVIDER_ENDPOINTS['opencode'];
     expect(ep.baseUrl).toBe('https://opencode.ai/inference/openai');
     expect(ep.format).toBe('openai');
     expect(ep.buildPath('qwen3.6-plus')).toBe('/v1/chat/completions');
   });
 
-  it('opencode-zen uses Bearer auth headers', () => {
-    const headers = PROVIDER_ENDPOINTS['opencode-zen'].buildHeaders('oz-token');
-    expect(headers).toEqual({
+  it('identifies every OpenCode endpoint as the OpenCode client', () => {
+    const keys = Object.keys(PROVIDER_ENDPOINTS).filter((k) => /^opencode(-go)?(-|$)/.test(k));
+    expect(keys).toHaveLength(8);
+    for (const key of keys) {
+      expect(PROVIDER_ENDPOINTS[key].buildHeaders('k')).toMatchObject({
+        'User-Agent': expect.stringMatching(/^opencode\//),
+        'x-opencode-client': 'cli',
+      });
+    }
+  });
+
+  it('opencode uses Bearer auth headers', () => {
+    const headers = PROVIDER_ENDPOINTS['opencode'].buildHeaders('oz-token');
+    expect(headers).toMatchObject({
       Authorization: 'Bearer oz-token',
       'Content-Type': 'application/json',
     });
   });
 
-  it('opencode-zen-google uses Google generateContent path with x-goog-api-key auth', () => {
-    const ep = PROVIDER_ENDPOINTS['opencode-zen-google'];
+  it('opencode-google uses Google generateContent path with x-goog-api-key auth', () => {
+    const ep = PROVIDER_ENDPOINTS['opencode-google'];
     expect(ep.baseUrl).toBe('https://opencode.ai/inference/google');
     expect(ep.format).toBe('google');
     expect(ep.buildPath('gemini-3-flash')).toBe('/v1beta/models/gemini-3-flash:generateContent');
     expect(ep.buildStreamPath?.('gemini-3-flash')).toBe(
       '/v1beta/models/gemini-3-flash:streamGenerateContent',
     );
-    expect(ep.buildHeaders('oz-token')).toEqual({
+    expect(ep.buildHeaders('oz-token')).toMatchObject({
       'x-goog-api-key': 'oz-token',
       'Content-Type': 'application/json',
     });
@@ -933,7 +944,7 @@ describe('PROVIDER_ENDPOINTS', () => {
       'ollama-cloud',
       'commandcode',
       'opencode-go',
-      'opencode-zen',
+      'opencode',
     ];
 
     for (const key of endpointKeys) {
@@ -957,7 +968,7 @@ describe('PROVIDER_ENDPOINTS', () => {
       'qwen-subscription-responses',
       'opencode-go-anthropic',
       'opencode-go-responses',
-      'opencode-zen-google',
+      'opencode-google',
     ];
 
     for (const key of endpointKeys) {
@@ -1081,11 +1092,11 @@ describe('buildProviderExtraHeaders', () => {
     expect(buildProviderExtraHeaders('unknown', 'sess-abc')).toBeUndefined();
   });
 
-  it('returns x-opencode-session for opencode-go and opencode-zen', () => {
+  it('returns x-opencode-session for opencode-go and opencode', () => {
     expect(buildProviderExtraHeaders('opencode-go', 'v1:scoped-session')).toEqual({
       'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
-    expect(buildProviderExtraHeaders('opencode-zen', 'v1:scoped-session')).toEqual({
+    expect(buildProviderExtraHeaders('opencode', 'v1:scoped-session')).toEqual({
       'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
     });
   });
@@ -1129,6 +1140,6 @@ describe('buildProviderExtraHeaders', () => {
 
   it('returns undefined for opencode without any key', () => {
     expect(buildProviderExtraHeaders('opencode-go')).toBeUndefined();
-    expect(buildProviderExtraHeaders('opencode-zen')).toBeUndefined();
+    expect(buildProviderExtraHeaders('opencode')).toBeUndefined();
   });
 });

@@ -309,6 +309,27 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
     }
   };
 
+  // Keyless connect: the provider's free key serves only its free models.
+  const handleConnectFree = async () => {
+    if (!provDef.freeKey) return;
+    props.setBusy(true);
+    try {
+      await connectProvider(props.agentName, {
+        provider: provId,
+        apiKey: provDef.freeKey,
+        authType: selectedAuthType,
+        label: t('providerSetup.keyForm.freeLabel'),
+      });
+      toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
+      props.onBack();
+      props.onUpdate();
+    } catch {
+      // error toast from fetchMutate
+    } finally {
+      props.setBusy(false);
+    }
+  };
+
   const handleUpdateKey = async (label?: string) => {
     if (!validateEndpointRegion()) return;
     const result = validateKey(props.keyInput);
@@ -450,6 +471,23 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         >
           {t('providerSetup.shared.connect')}
         </Button>
+        {provDef.freeKey && !isSubMode ? (
+          <>
+            <p className="hint provider-detail__free-divider">
+              {t('providerSetup.keyForm.freeDivider')}
+            </p>
+            <Button
+              block
+              variant="ghost"
+              className="provider-detail__action"
+              busy={props.busy}
+              onClick={() => void handleConnectFree()}
+            >
+              {t('providerSetup.keyForm.connectFree')}
+            </Button>
+            <p className="hint">{t('providerSetup.keyForm.freeHint')}</p>
+          </>
+        ) : null}
       </>
     );
   }

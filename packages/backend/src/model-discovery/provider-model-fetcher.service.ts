@@ -8,6 +8,7 @@ import {
   CODEX_CLI_VERSION,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  OPENCODE_FREE_KEY,
   buildClaudeCodeSubscriptionHeaders,
 } from '../common/constants/subscription-clients';
 import {
@@ -28,7 +29,11 @@ import {
 import { getZaiCodingPlanBaseUrl, normalizeZaiCodingPlanBaseUrl } from '../routing/zai-region';
 import { buildLocalServerHeaders, getLocalServerBaseUrl } from '../common/constants/local-servers';
 import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
-import { OpencodeGoCatalogService } from './opencode-go-catalog.service';
+import {
+  OpencodeCatalogService,
+  type OpencodeCatalogEntry,
+  type OpencodeCatalogProvider,
+} from './opencode-catalog.service';
 import { PROVIDER_ENDPOINTS } from '../routing/proxy/provider-endpoints';
 import {
   buildKiroHeaders,
@@ -63,7 +68,6 @@ const HUGGING_FACE_MODELS_URL = 'https://router.huggingface.co/v1/models';
 const FIREWORKS_MODELS_PAGE_SIZE = 200;
 const FIREWORKS_MODELS_MAX_PAGES = 20;
 const NOUS_PORTAL_MODELS_URL = 'https://inference-api.nousresearch.com/v1/models';
-const OPENCODE_GO_MODELS_URL = 'https://opencode.ai/zen/go/v1/models';
 const PIONEER_MODELS_URL = 'https://api.pioneer.ai/v1/models';
 const PIONEER_BASE_MODELS_URL = 'https://api.pioneer.ai/base-models';
 const META_MODELS_URL = 'https://api.meta.ai/v1/models';
@@ -852,20 +856,6 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
   });
 }
 
-/* ── OpenCode Zen (aggregator, OpenAI-compatible /models) ── */
-
-// Prefix every Zen catalog entry with `opencode-zen/` so the discovered model
-// remains an explicit route through the Zen gateway. Forwarding strips the
-// prefix before calling Zen, while provider inference and legacy provider-less
-// lookups can still distinguish Zen models from the same native IDs exposed by
-// directly-connected providers.
-const parseOpencodeZen = createModelParser<OpenAIModelEntry>({
-  arrayKey: 'data',
-  filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
-  getId: (entry) => `opencode-zen/${entry.id}`,
-  getDisplayName: (entry) => entry.id,
-});
-
 /* ── Provider configs ── */
 
 export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
@@ -1070,14 +1060,7 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     }),
     parse: parseCopilot,
   },
-  'opencode-zen': {
-    endpoint: 'https://opencode.ai/zen/v1/models',
-    buildHeaders: bearerHeaders,
-    parse: parseOpencodeZen,
-  },
 };
-
-const OPENCODE_GO_CONTEXT_WINDOW = 200000;
 
 export interface ProviderModelFetchOptions {
   forceRefresh?: boolean;
@@ -1094,8 +1077,8 @@ export class ProviderModelFetcherService {
 
   constructor(
     @Optional()
-    @Inject(OpencodeGoCatalogService)
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService | null = null,
+    @Inject(OpencodeCatalogService)
+    private readonly opencodeCatalog: OpencodeCatalogService | null = null,
   ) {}
 
   async fetch(
@@ -1123,8 +1106,8 @@ export class ProviderModelFetcherService {
       configKey = 'qwen-subscription';
     } else if (configKey === 'zai' && authType === 'subscription') {
       configKey = 'zai-subscription';
-    } else if (configKey === 'opencode-go') {
-      return this.fetchOpencodeGoModels(apiKey, options?.forceRefresh === true);
+    } else if (configKey === 'opencode' || configKey === 'opencode-go') {
+      return this.fetchOpencodeModels(configKey, apiKey, options?.forceRefresh === true);
     } else if (configKey === 'cline-pass') {
       return this.fetchClinePassModels();
     } else if (configKey === 'gemini' && authType === 'subscription') {
@@ -1401,69 +1384,24 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private async fetchOpencodeGoModels(
+  /**
+   * OpenCode and OpenCode Go publish their catalogs with protocol and list
+   * prices at `/inference[/go]/v1/models`. The free key (`public`) reaches
+   * only the models without a price, so a keyless OpenCode lists just those.
+   */
+  private async fetchOpencodeModels(
+    provider: OpencodeCatalogProvider,
     apiKey: string,
     forceRefresh = false,
   ): Promise<DiscoveredModel[]> {
-    const live = await this.fetchOpencodeGoLiveModels(apiKey);
-    if (live.length > 0) return live;
-    return this.fetchOpencodeGoDocsCatalog(forceRefresh);
-  }
-
-  private async fetchOpencodeGoLiveModels(apiKey: string): Promise<DiscoveredModel[]> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await outboundFetch(OPENCODE_GO_MODELS_URL, {
-        headers: apiKey ? bearerHeaders(apiKey) : {},
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        this.logger.warn(`OpenCode Go returned ${res.status} from ${OPENCODE_GO_MODELS_URL}`);
-        return [];
-      }
-
-      const body = await res.json();
-      const models = parseOpenAI(body, 'opencode-go').map((model) => {
-        const id = `opencode-go/${model.id}`;
-        return {
-          ...model,
-          id,
-          displayName: id,
-          provider: 'opencode-go',
-          contextWindow: OPENCODE_GO_CONTEXT_WINDOW,
-          inputPricePerToken: 0,
-          outputPricePerToken: 0,
-          capabilityReasoning: true,
-          capabilityCode: true,
-        };
-      });
-      return filterNonChatModels(models, 'opencode-go');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to fetch OpenCode Go models: ${message}`);
-      return [];
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private async fetchOpencodeGoDocsCatalog(forceRefresh = false): Promise<DiscoveredModel[]> {
-    if (!this.opencodeGoCatalog) return [];
+    if (!this.opencodeCatalog) return [];
     const entries = forceRefresh
-      ? await this.opencodeGoCatalog.refresh()
-      : await this.opencodeGoCatalog.list();
-    return entries.map((entry) => ({
-      id: `opencode-go/${entry.id}`,
-      displayName: entry.displayName,
-      provider: 'opencode-go',
-      contextWindow: OPENCODE_GO_CONTEXT_WINDOW,
-      inputPricePerToken: 0,
-      outputPricePerToken: 0,
-      capabilityReasoning: true,
-      capabilityCode: true,
-      qualityScore: 3,
-    }));
+      ? await this.opencodeCatalog.refresh(provider)
+      : await this.opencodeCatalog.list(provider);
+    const freeOnly = provider === 'opencode' && apiKey === OPENCODE_FREE_KEY;
+    return entries
+      .filter((entry) => !freeOnly || entry.free)
+      .map((entry) => opencodeDiscoveredModel(provider, entry));
   }
 
   private async fetchKiroModels(apiKey: string): Promise<DiscoveredModel[]> {
@@ -1573,4 +1511,36 @@ export class ProviderModelFetcherService {
       clearTimeout(timeout);
     }
   }
+}
+
+function opencodeDiscoveredModel(
+  provider: OpencodeCatalogProvider,
+  entry: OpencodeCatalogEntry,
+): DiscoveredModel {
+  const inputModalities = entry.inputModalities.some((m) => m.startsWith('image'))
+    ? (['text', 'image'] as const)
+    : (['text'] as const);
+  return {
+    id: `${provider}/${entry.id}`,
+    displayName: entry.name,
+    provider,
+    contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    ...(provider === 'opencode-go'
+      ? // A subscription: quota cost is recorded per request, not shown as a price.
+        { inputPricePerToken: 0, outputPricePerToken: 0 }
+      : {
+          inputPricePerToken: entry.inputPricePerToken,
+          outputPricePerToken: entry.outputPricePerToken,
+        }),
+    ...(provider !== 'opencode-go' && entry.cacheReadPricePerToken != null
+      ? { cacheReadPricePerToken: entry.cacheReadPricePerToken }
+      : {}),
+    ...(provider !== 'opencode-go' && entry.cacheWritePricePerToken != null
+      ? { cacheWritePricePerToken: entry.cacheWritePricePerToken }
+      : {}),
+    capabilityReasoning: entry.reasoning,
+    capabilityCode: true,
+    inputModalities,
+    qualityScore: 3,
+  };
 }

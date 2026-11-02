@@ -11,7 +11,7 @@ export interface MetadataIdentity {
  *
  * A gateway id resolves to the underlying vendor first: the gateway proxies
  * that vendor's model, so the vendor's own catalog is the primary source and
- * `opencode-zen/claude-opus-5` keeps reading Anthropic's entry.
+ * `opencode/claude-opus-5` keeps reading Anthropic's entry.
  *
  * The gateway's own catalog is the fallback, because a gateway also serves ids
  * the vendor never published. OpenCode Go serves `deepseek-v4.1-flash` while

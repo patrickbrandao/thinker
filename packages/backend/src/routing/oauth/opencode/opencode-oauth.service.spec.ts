@@ -184,4 +184,52 @@ describe('OpencodeOauthService', () => {
       await expect(service.unwrapToken(raw, 'agent-1', 'tenant-1')).resolves.toBe(null);
     });
   });
+
+  it('stores a Console login for OpenCode under its own provider', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        device_code: 'dev-2',
+        user_code: 'WXYZ',
+        verification_uri_complete: 'device?code=WXYZ',
+        expires_in: 600,
+      }),
+    );
+    const { flowId } = await service.startAuthorization('agent-1', 'tenant-1', null, 'opencode');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { access_token: 'acc', refresh_token: 'ref', expires_in: 3600 }),
+    );
+    await service.pollAuthorization(flowId, 'tenant-1');
+    expect(upsertProvider.mock.calls[0][2]).toBe('opencode');
+  });
+
+  describe('readGoUsage', () => {
+    const raw = JSON.stringify({ t: 'acc-1', r: 'ref-1', e: now + 3_600_000, u: 'org-1' });
+
+    it('reads the three allowance windows with the org header', async () => {
+      fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        expect(url).toBe('https://opencode.ai/zen/go/v1/usage');
+        expect(init?.headers).toMatchObject({
+          Authorization: 'Bearer acc-1',
+          'x-opencode-org-id': 'org-1',
+        });
+        return jsonResponse(200, {
+          usage: {
+            rolling: { status: 'ok', percent: 12.5, resetsAt: '2026-11-02T20:00:00Z' },
+            weekly: { status: 'rate-limited', percent: 100, resetsAt: '2026-11-09T00:00:00Z' },
+          },
+        });
+      });
+      await expect(service.readGoUsage(raw, 'agent-1', 'tenant-1')).resolves.toEqual({
+        rolling: { percent: 12.5, limited: false, resetsAt: '2026-11-02T20:00:00Z' },
+        weekly: { percent: 100, limited: true, resetsAt: '2026-11-09T00:00:00Z' },
+        monthly: null,
+      });
+    });
+
+    it('has no meter for a pasted API key or a workspace without Go', async () => {
+      await expect(service.readGoUsage('sk-oc-key', 'agent-1', 'tenant-1')).resolves.toBeNull();
+      fetchMock.mockResolvedValueOnce(jsonResponse(403, {}));
+      await expect(service.readGoUsage(raw, 'agent-1', 'tenant-1')).resolves.toBeNull();
+    });
+  });
 });

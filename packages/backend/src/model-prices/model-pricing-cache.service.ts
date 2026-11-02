@@ -81,7 +81,7 @@ export class ModelPricingCacheService implements OnApplicationBootstrap {
 
   /**
    * Display name → registry id, for callers holding a `PricingEntry.provider`
-   * rather than an id. Seven of them ("OpenCode Zen", "Google Vertex AI",
+   * rather than an id. Seven of them ("OpenCode", "Google Vertex AI",
    * "GitHub Copilot"…) match neither the id nor any alias, so without this they
    * would silently fall back to the shared entry — the exact mispricing the
    * scoped map exists to prevent.

@@ -11,11 +11,22 @@
  * Copilot (`https://api.githubcopilot.com/...`): GitHub validates the
  * `Editor-Version` and `Editor-Plugin-Version` headers; both are bumped
  * together when GitHub deprecates an older pair.
+ *
+ * OpenCode (`https://opencode.ai/inference/...`): the free models answer only
+ * the OpenCode client, recognized by its user agent and `x-opencode-*`
+ * headers, so every OpenCode request carries them (ADR 0009). Bump
+ * `OPENCODE_CLIENT_VERSION` to track the `anomalyco/opencode` release.
  */
 
 export const CODEX_CLI_VERSION = '0.159.2';
 export const CODEX_CLI_ORIGINATOR = 'codex_cli_rs';
 export const CODEX_CLI_USER_AGENT = 'codex_cli_rs/0.0.0 (Unknown 0; unknown) unknown';
+
+export const OPENCODE_CLIENT_VERSION = '2.2.5';
+export const OPENCODE_CLIENT_NAME = 'cli';
+export const OPENCODE_USER_AGENT = `opencode/latest/${OPENCODE_CLIENT_VERSION}/${OPENCODE_CLIENT_NAME}`;
+/** The key OpenCode sends when it has none: unlocks only the free models. */
+export const OPENCODE_FREE_KEY = 'public';
 
 export const CLAUDE_CODE_USER_AGENT = 'claude-cli/2.1.280 (external, sdk-cli)';
 export const CLAUDE_CODE_STAINLESS_PACKAGE_VERSION = '0.80.0';

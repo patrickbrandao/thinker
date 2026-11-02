@@ -74,8 +74,7 @@ function makeRecorder(repo: { insert: jest.Mock; findOne: jest.Mock; find: jest.
         })),
     } as never,
     {
-      getCostPerRequest: jest.fn().mockReturnValue(null),
-      resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+      costInputs: jest.fn().mockResolvedValue(null),
     } as never,
   );
 }

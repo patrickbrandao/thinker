@@ -44,7 +44,7 @@ const PROVIDER_ID_MAP: Readonly<Record<string, string>> = {
   copilot: 'github-copilot',
   groq: 'groq',
   'opencode-go': 'opencode-go',
-  'opencode-zen': 'opencode',
+  opencode: 'opencode',
   'ollama-cloud': 'ollama-cloud',
 };
 

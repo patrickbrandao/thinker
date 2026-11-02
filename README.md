@@ -91,7 +91,7 @@ O Thinker conecta dezenas de provedores embutidos e qualquer endpoint customizad
 | [**LM Studio**](https://lmstudio.ai/)                                                    |    🖥️ Local     | —                            | Modelos GGUF locais, porta `1234`                                  |
 | [**llama.cpp**](https://github.com/ggml-org/llama.cpp)                                   |    🖥️ Local     | —                            | Modelos GGUF locais, porta `8080`                                  |
 | [**OpenRouter**](https://openrouter.ai/)                                                 |       ✅        | —                            | 300+ models across labs                                         |
-| [**OpenCode Zen**](https://opencode.ai/)                                                 |       ✅        | —                            | Curated Claude, GPT, DeepSeek, MiMo, Nemotron                   |
+| [**OpenCode**](https://opencode.ai/)                                                     |       ✅        | —                            | Pay-as-you-go Claude, GPT, Gemini and free models (no key)      |
 | [**Kilo**](https://kilo.ai/)                                                             |       ✅        | —                            | Kilo Gateway catalog                                            |
 | [**Cerebras**](https://www.cerebras.ai/)                                                 |       ✅        | —                            | GPT-OSS, GLM, Gemma on Cerebras inference                       |
 | [**Fireworks AI**](https://fireworks.ai/)                                                |       ✅        | —                            | DeepSeek V4, Kimi K2.7, Qwen 3.7, Nemotron                      |

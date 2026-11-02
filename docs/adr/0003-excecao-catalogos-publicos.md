@@ -1,6 +1,6 @@
 # ADR 0003 — Exceção para catálogos públicos de modelos e preços
 
-- **Status:** aceito
+- **Status:** aceito; alterado pelo [ADR 0009](0009-opencode-catalogo-proprio-e-modelos-gratuitos.md), que tira `raw.githubusercontent.com` da lista (o OpenCode Go passa a usar o catálogo do próprio provedor)
 - **Data:** 2026-10-10
 - **Issue:** #11 (opção A)
 

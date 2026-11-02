@@ -95,7 +95,19 @@ Cole uma chave de API do Ollama Cloud. Ele aceita formatos genéricos de chave; 
 
 Clique em **Connect with OpenCode Go**: o Thinker abre a página do OpenCode Console com um código de dispositivo, o mesmo fluxo do `opencode auth login opencode`. Aprove o acesso na organização que tem o Go. O Thinker guarda o token de acesso e o refresh token e renova os dois antes de expirar (o refresh token é trocado a cada renovação). Se a sessão do Console for revogada, conecte de novo.
 
-Ainda dá para colar uma chave de API do OpenCode (conta de serviço) no campo abaixo do botão. A descoberta de modelos é dinâmica e, conforme o modelo, o Thinker roteia para `https://opencode.ai/inference/go/openai` (Chat Completions e Responses) ou `https://opencode.ai/inference/go/anthropic` (Messages).
+Ainda dá para colar uma chave de API do OpenCode (conta de serviço) no campo abaixo do botão. Os modelos, o protocolo de cada um e os preços vêm do catálogo público `https://opencode.ai/inference/go/v1/models`. Conforme o modelo, o Thinker roteia para `https://opencode.ai/inference/go/openai` (Chat Completions e Responses), `/inference/go/anthropic` (Messages) ou `/inference/go/google`. O custo gravado é o equivalente em dólar consumido da cota, a preço de lista.
+
+Com o login do Console, a página do provedor mostra o uso da cota nas janelas de 5 horas, semana e mês. Uma requisição barrada pela cota (`GoUsageLimitError`) passa para o próximo modelo da cadeia, e a rota espera o horário de reset informado pelo OpenCode.
+
+### OpenCode (por uso e modelos gratuitos)
+
+O antigo "OpenCode Zen" agora se chama **OpenCode** (id `opencode`). Ele aceita três formas de conexão:
+
+- **Chave de API** do OpenCode Console, cobrada por uso em créditos pré-pagos.
+- **Login no OpenCode Console** (aba de assinatura, mesmo fluxo de device code do Go).
+- **Sem chave**: o botão **Use free models (no key)** conecta só os modelos gratuitos do OpenCode, com o limite diário definido por ele (reinicia às 00:00 UTC). Alguns desses modelos podem usar os dados para treinamento.
+
+Os modelos `opencode-zen/<modelo>` das configs antigas continuam funcionando, mas os novos IDs são `opencode/<modelo>`. Detalhes e riscos no [ADR 0009](../adr/0009-opencode-catalogo-proprio-e-modelos-gratuitos.md).
 
 ## Por que combinar assinaturas e chaves de API
 

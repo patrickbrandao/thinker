@@ -78,6 +78,11 @@ export interface ProviderDef {
   subscriptionSignInHint?: string;
   /** Show a beta badge next to the provider name. */
   beta?: boolean;
+  /**
+   * Key the provider accepts in place of a real one to serve its free models
+   * (OpenCode's `public`). Offers a keyless connect beside the key field.
+   */
+  freeKey?: string;
 }
 
 /** UI-only overlay fields for each provider. The id must match a `SHARED_PROVIDERS` entry. */
@@ -108,6 +113,7 @@ interface ProviderUIOverlay {
   subscriptionSignInLabel?: string;
   subscriptionSignInHint?: string;
   beta?: boolean;
+  freeKey?: string;
 }
 
 /**
@@ -534,11 +540,16 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     beta: true,
     models: [],
   },
-  'opencode-zen': {
-    initial: 'OZ',
+  opencode: {
+    initial: 'OC',
     get subtitle() {
-      return t('providerSetup.catalog.subtitles.opencodeZen');
+      return t('providerSetup.catalog.subtitles.opencode');
     },
+    // OpenCode Console device login beside the API key, and keyless free models.
+    supportsSubscription: true,
+    subscriptionLabel: 'OpenCode Console',
+    subscriptionAuthMode: 'device_code',
+    freeKey: 'public',
     models: [],
   },
   openrouter: {
@@ -626,8 +637,8 @@ const PROVIDER_ORDER = [
   'ollama',
   'ollama-cloud',
   'openai',
+  'opencode',
   'opencode-go',
-  'opencode-zen',
   'openrouter',
   'pioneer',
   'xai',

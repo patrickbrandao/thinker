@@ -44,7 +44,7 @@ interface ExtraHeaderKeys {
   agentKey?: string;
 }
 
-// OpenCode Go/Zen pin a session to one upstream provider via
+// OpenCode Go and OpenCode pin a session to one upstream provider via
 // x-opencode-session and reject some models without it, so unlike the
 // observability-only hints above the header must ride on every request:
 // fall back to the per-agent key when the caller sent no x-session-key.
@@ -65,7 +65,7 @@ const PROVIDER_EXTRA_HEADER_BUILDERS: Record<
   openrouter: ({ sessionKey }) =>
     !sessionKey || sessionKey === 'default' ? undefined : { 'x-session-id': sessionKey },
   'opencode-go': opencodeSessionHeader,
-  'opencode-zen': opencodeSessionHeader,
+  opencode: opencodeSessionHeader,
 };
 
 export function buildProviderExtraHeaders(

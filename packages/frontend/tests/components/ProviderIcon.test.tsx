@@ -28,7 +28,7 @@ const KNOWN_PROVIDERS = [
   'xiaomi',
   'zai',
   'opencode-go',
-  'opencode-zen',
+  'opencode',
 ];
 
 describe('providerIcon', () => {

@@ -1380,11 +1380,7 @@ describe('sanitizeOpenAiBody provider-specific fields', () => {
   });
 
   it('keeps reasoning_content without model capability checks', () => {
-    const result = sanitizeOpenAiBody(
-      bodyWithReasoning(),
-      'opencode-zen',
-      'opencode-zen/big-pickle',
-    );
+    const result = sanitizeOpenAiBody(bodyWithReasoning(), 'opencode', 'opencode/big-pickle');
 
     const messages = result.messages as Array<Record<string, unknown>>;
     expect(messages[0].reasoning_content).toBe('upstream thinking');

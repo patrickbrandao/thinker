@@ -44,7 +44,7 @@ let stubUsage: { prompt_tokens: number; completion_tokens: number } | null = nul
  * Streaming shape the stubbed provider emits, or null for the non-streaming
  * JSON body. Mutated per variant.
  *  - 'usage'    : content deltas + a final `stream_options.include_usage` chunk + [DONE]
- *  - 'no-usage' : content deltas + [DONE], never any usage (opencode-zen free-model shape)
+ *  - 'no-usage' : content deltas + [DONE], never any usage (opencode free-model shape)
  */
 let stubStream: 'usage' | 'no-usage' | null = null;
 
@@ -348,7 +348,7 @@ describe('Message log completeness — #2513 regression', () => {
   }, 180000);
 
   it('records N distinct rows for streaming requests with no usage chunk', async () => {
-    // opencode-zen free-model shape: content deltas + [DONE], never usage.
+    // opencode free-model shape: content deltas + [DONE], never usage.
     await truncate();
     stubUsage = null;
     stubStream = 'no-usage';

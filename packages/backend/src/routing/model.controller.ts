@@ -4,7 +4,7 @@ import { ResolveAgentService } from './routing-core/resolve-agent.service';
 import { CustomProviderService } from './custom-provider/custom-provider.service';
 import { ProviderParamSpecService } from './routing-core/provider-param-spec.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
-import { OpencodeGoCatalogService } from '../model-discovery/opencode-go-catalog.service';
+import { OpencodeCatalogService } from '../model-discovery/opencode-catalog.service';
 import { OllamaSyncService } from '../database/ollama-sync.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelsDevSyncService } from '../database/models-dev-sync.service';
@@ -66,7 +66,7 @@ export class ModelController {
     private readonly pricingSync: PricingSyncService,
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly modelsDevSync: ModelsDevSyncService,
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    private readonly opencodeCatalog: OpencodeCatalogService,
     private readonly routingCache: RoutingCacheService,
   ) {}
 
@@ -135,7 +135,7 @@ export class ModelController {
     // same model is a question about the names the picker prints, not the ids.
     const publishedGatewayIds = await publishedOpencodeGoIds(
       models,
-      this.opencodeGoCatalog,
+      { list: () => this.opencodeCatalog.list('opencode-go') },
       this.modelsDevSync,
     );
 
@@ -157,19 +157,12 @@ export class ModelController {
         } = await resolveModelCapabilityMetadata(m, this.providerParamSpecs, this.modelsDevSync);
         const inputModalities =
           knownInputModalities ?? inputModalitiesFromCapabilities(modelCapabilities);
-        // OpenCode Go bills a per-request slice of its dollar quota rather than
-        // per token, so surface that cost; other subscriptions stay flat-fee.
-        const costPerRequest =
-          m.provider === 'opencode-go'
-            ? await this.opencodeGoCatalog.resolveCostPerRequest(m.id)
-            : null;
         return {
           model_name: m.id,
           provider: m.provider,
           auth_type: authType,
           input_price_per_token: m.inputPricePerToken,
           output_price_per_token: m.outputPricePerToken,
-          ...(costPerRequest != null ? { cost_per_request: costPerRequest } : {}),
           context_window: m.contextWindow,
           capability_reasoning: m.capabilityReasoning,
           capability_code: m.capabilityCode,

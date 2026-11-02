@@ -17,17 +17,22 @@ import {
 /**
  * OpenCode Console device login (OAuth 2.0 Device Authorization Grant), the
  * same flow `opencode auth login opencode` runs. The access token is
- * organization-scoped and authenticates OpenCode Go inference as a Bearer
- * token; refresh tokens rotate on every refresh.
+ * organization-scoped and authenticates OpenCode and OpenCode Go inference as
+ * a Bearer token; refresh tokens rotate on every refresh.
  */
 export const OPENCODE_CONSOLE_SERVER = 'https://opencode.ai/console';
+/** OpenCode Go allowance meter: rolling 5-hour, weekly and monthly windows. */
+export const OPENCODE_GO_USAGE_URL = 'https://opencode.ai/zen/go/v1/usage';
+const USAGE_TIMEOUT_MS = 15_000;
 const CLIENT_ID = 'opencode-cli';
-const PROVIDER_ID = 'opencode-go';
+/** Providers a Console login connects; each keeps its own subscription row. */
+export type OpencodeConsoleProvider = 'opencode' | 'opencode-go';
 const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const SLOW_DOWN_STEP_MS = 5000;
 
 interface PendingOpencodeOAuth {
+  provider: OpencodeConsoleProvider;
   deviceCode: string;
   agentId: string;
   tenantId: string;
@@ -58,6 +63,26 @@ export interface OpencodeOAuthStartResult {
   verificationUri: string;
   expiresAt: number;
   pollIntervalMs: number;
+}
+
+export interface OpencodeGoUsageWindow {
+  /** Share of the window's allowance already spent, 0–100. */
+  percent: number;
+  /** True while requests are blocked until `resetsAt`. */
+  limited: boolean;
+  resetsAt: string | null;
+}
+
+export interface OpencodeGoUsage {
+  rolling: OpencodeGoUsageWindow | null;
+  weekly: OpencodeGoUsageWindow | null;
+  monthly: OpencodeGoUsageWindow | null;
+}
+
+interface RawUsageWindow {
+  status?: string;
+  percent?: number;
+  resetsAt?: string;
 }
 
 export interface OpencodeOAuthPollResult {
@@ -96,6 +121,7 @@ export class OpencodeOauthService {
     agentId: string,
     tenantId: string,
     createdByUserId?: string | null,
+    provider: OpencodeConsoleProvider = 'opencode-go',
   ): Promise<OpencodeOAuthStartResult> {
     this.cleanupExpired();
     const response = await postJson(`${OPENCODE_CONSOLE_SERVER}/auth/device/code`, {
@@ -124,6 +150,7 @@ export class OpencodeOauthService {
     const expiresAt = Date.now() + payload.expires_in * 1000;
     const pollIntervalMs = toPollIntervalMs(payload.interval, DEFAULT_POLL_INTERVAL_MS);
     this.pending.set(flowId, {
+      provider,
       deviceCode: payload.device_code,
       agentId,
       tenantId,
@@ -177,11 +204,11 @@ export class OpencodeOauthService {
       e: Date.now() + payload.expires_in * 1000,
       ...(payload.org_id ? { u: payload.org_id } : {}),
     };
-    const label = await this.providerService.nextOAuthLabel(pending.tenantId, PROVIDER_ID);
+    const label = await this.providerService.nextOAuthLabel(pending.tenantId, pending.provider);
     const { provider: savedProvider } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
-      PROVIDER_ID,
+      pending.provider,
       serializeOAuthTokenBlob(blob),
       'subscription',
       undefined,
@@ -235,13 +262,14 @@ export class OpencodeOauthService {
     agentId: string,
     tenantId: string,
     keyLabel?: string,
+    provider: OpencodeConsoleProvider = 'opencode-go',
   ): Promise<string | null> {
     const blob = parseOAuthTokenBlob(rawValue);
     if (!blob?.t || !blob.r) return null;
     if (Date.now() < blob.e - 60_000) return blob.t;
     try {
       const resolved = await coordinateOAuthRefresh<OAuthTokenBlob>({
-        key: oauthRefreshKey(PROVIDER_ID, tenantId, keyLabel),
+        key: oauthRefreshKey(provider, tenantId, keyLabel),
         logger: this.logger,
         callerBlob: blob,
         parse: parseOAuthTokenBlob,
@@ -249,7 +277,7 @@ export class OpencodeOauthService {
         withLock: subscriptionCredentialLock(
           (t, p, l, fn) => this.providerService.withSubscriptionCredentialLock(t, p, l, fn),
           tenantId,
-          PROVIDER_ID,
+          provider,
           keyLabel,
           serializeOAuthTokenBlob,
         ),
@@ -259,6 +287,47 @@ export class OpencodeOauthService {
       this.logger.error(`Failed to refresh OpenCode OAuth token for agent=${agentId}: ${err}`);
       return Date.now() < blob.e ? blob.t : null;
     }
+  }
+
+  /**
+   * The Go allowance meter for a stored Console login, or null when the
+   * credential cannot read it: a pasted API key (no organization to name) or
+   * a workspace without Go (403).
+   */
+  async readGoUsage(
+    rawValue: string,
+    agentId: string,
+    tenantId: string,
+    keyLabel?: string,
+  ): Promise<OpencodeGoUsage | null> {
+    const orgId = parseOAuthTokenBlob(rawValue)?.u;
+    if (!orgId) return null;
+    const token = await this.unwrapToken(rawValue, agentId, tenantId, keyLabel, 'opencode-go');
+    if (!token) return null;
+    const response = await outboundFetch(OPENCODE_GO_USAGE_URL, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-opencode-org-id': orgId,
+      },
+      signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
+    });
+    if (response.status === 403) return null;
+    if (!response.ok) throw new Error(`OpenCode Go usage returned ${response.status}`);
+    const body = parseJson<{ usage?: Record<string, RawUsageWindow> }>(await response.text());
+    const window = (raw: RawUsageWindow | undefined): OpencodeGoUsageWindow | null =>
+      raw && typeof raw.percent === 'number'
+        ? {
+            percent: raw.percent,
+            limited: raw.status === 'rate-limited',
+            resetsAt: typeof raw.resetsAt === 'string' ? raw.resetsAt : null,
+          }
+        : null;
+    return {
+      rolling: window(body?.usage?.rolling),
+      weekly: window(body?.usage?.weekly),
+      monthly: window(body?.usage?.monthly),
+    };
   }
 
   getPendingCount(): number {

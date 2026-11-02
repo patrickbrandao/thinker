@@ -179,10 +179,10 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     authTypes: ['api_key', 'subscription'],
   },
   {
-    id: 'opencode-zen',
-    displayName: 'OpenCode Zen',
-    aliases: ['opencodezen'],
-    authTypes: ['api_key'],
+    id: 'opencode',
+    displayName: 'OpenCode',
+    aliases: ['opencode-zen', 'opencodezen'],
+    authTypes: ['api_key', 'subscription'],
   },
   {
     id: 'openrouter',

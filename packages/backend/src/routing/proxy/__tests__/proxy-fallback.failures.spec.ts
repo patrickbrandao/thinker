@@ -417,11 +417,14 @@ describe('ProxyFallbackService.tryFallbacks — failure chain by status code', (
     // A fresh service (beforeEach) means exactly one cooldown entry exists after
     // the call. Returns the duration in ms measured from just before the call,
     // so assertions allow small upper-bound slack for test runtime.
-    const recordCooldownTtl = async (retryAfter: string | null): Promise<number> => {
+    const recordCooldownTtl = async (
+      retryAfter: string | null,
+      errorBody = 'rate limit',
+    ): Promise<number> => {
       const headers: Record<string, string> = {};
       if (retryAfter !== null) headers['retry-after'] = retryAfter;
       providerClient.forward.mockResolvedValueOnce({
-        response: new Response('rate limit', { status: 429, headers }),
+        response: new Response(errorBody, { status: 429, headers }),
         isGoogle: false,
         isAnthropic: true,
         isChatGpt: false,
@@ -446,6 +449,21 @@ describe('ProxyFallbackService.tryFallbacks — failure chain by status code', (
       const [expiresAt] = [...cooldowns.values()];
       return expiresAt - before;
     };
+
+    it('caps a plain 429 Retry-After at five minutes', async () => {
+      expect(await recordCooldownTtl('51379')).toBeLessThanOrEqual(5 * 60_000);
+    });
+
+    it('honors a quota-exhausted Retry-After until the stated reset', async () => {
+      // OpenCode's free tier resets at 00:00 UTC; retrying every five minutes
+      // only burns a request per agent on an answer that cannot change.
+      const ttl = await recordCooldownTtl(
+        '51379',
+        '{"type":"error","error":{"type":"FreeUsageLimitError","message":"Free usage limit reached."}}',
+      );
+      expect(ttl).toBeGreaterThanOrEqual(51_379_000);
+      expect(ttl).toBeLessThan(51_380_000);
+    });
 
     it('uses the short 15s default when the 429 carries no Retry-After', async () => {
       const ttl = await recordCooldownTtl(null);
