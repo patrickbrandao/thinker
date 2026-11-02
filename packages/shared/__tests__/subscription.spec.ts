@@ -218,7 +218,7 @@ describe('getSubscriptionProviderConfig', () => {
     expect(config).toMatchObject({
       supportsSubscription: true,
       subscriptionLabel: 'OpenCode Go (beta)',
-      subscriptionAuthMode: 'token',
+      subscriptionAuthMode: 'device_code',
       subscriptionKeyPlaceholder: 'Paste your OpenCode API key',
     });
     expect(config?.subscriptionCapabilities).toMatchObject({

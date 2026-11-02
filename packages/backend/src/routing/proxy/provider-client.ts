@@ -657,7 +657,7 @@ export class ProviderClient {
       // Today, sending `Authorization: Bearer <zen_key>` against the unified
       // path triggers GCP OVERLOADED_CREDENTIALS (Zen also attaches its own
       // GCP creds upstream). The dedicated Gemini route uses Google's
-      // `x-goog-api-key` header against `/v1/models/{id}:generateContent`,
+      // `x-goog-api-key` header against `/v1beta/models/{id}:generateContent`,
       // which Zen documents at https://opencode.ai/docs/zen/ and does not
       // leak through to Vertex AI.
       resolved = 'opencode-zen-google';

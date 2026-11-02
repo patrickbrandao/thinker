@@ -778,7 +778,7 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-go uses OpenCode base URL with OpenAI format', () => {
     const ep = PROVIDER_ENDPOINTS['opencode-go'];
-    expect(ep.baseUrl).toBe('https://opencode.ai/zen/go');
+    expect(ep.baseUrl).toBe('https://opencode.ai/inference/go/openai');
     expect(ep.format).toBe('openai');
     expect(ep.buildPath('glm-5.1')).toBe('/v1/chat/completions');
   });
@@ -793,24 +793,24 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-go-anthropic uses Anthropic format with /v1/messages', () => {
     const ep = PROVIDER_ENDPOINTS['opencode-go-anthropic'];
-    expect(ep.baseUrl).toBe('https://opencode.ai/zen/go');
+    expect(ep.baseUrl).toBe('https://opencode.ai/inference/go/anthropic');
     expect(ep.format).toBe('anthropic');
     expect(ep.buildPath('minimax-m2.7')).toBe('/v1/messages');
   });
 
-  it('opencode-go-anthropic uses x-api-key (not Bearer) with anthropic-version header', () => {
+  it('opencode-go-anthropic sends x-api-key and Bearer so API keys and Console OAuth tokens both work', () => {
     const headers = PROVIDER_ENDPOINTS['opencode-go-anthropic'].buildHeaders('og-token');
     expect(headers).toEqual({
       'x-api-key': 'og-token',
+      Authorization: 'Bearer og-token',
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
     });
-    expect(headers['Authorization']).toBeUndefined();
   });
 
   it('opencode-go-responses targets /v1/responses with chatgpt format and Bearer auth', () => {
     const ep = PROVIDER_ENDPOINTS['opencode-go-responses'];
-    expect(ep.baseUrl).toBe('https://opencode.ai/zen/go');
+    expect(ep.baseUrl).toBe('https://opencode.ai/inference/go/openai');
     expect(ep.format).toBe('chatgpt');
     expect(ep.buildPath('grok-4.5')).toBe('/v1/responses');
     expect(ep.forwardResponsesStream).toBe(true);
@@ -823,7 +823,7 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-zen uses OpenCode Zen base URL with OpenAI format', () => {
     const ep = PROVIDER_ENDPOINTS['opencode-zen'];
-    expect(ep.baseUrl).toBe('https://opencode.ai/zen');
+    expect(ep.baseUrl).toBe('https://opencode.ai/inference/openai');
     expect(ep.format).toBe('openai');
     expect(ep.buildPath('qwen3.6-plus')).toBe('/v1/chat/completions');
   });
@@ -838,9 +838,12 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('opencode-zen-google uses Google generateContent path with x-goog-api-key auth', () => {
     const ep = PROVIDER_ENDPOINTS['opencode-zen-google'];
-    expect(ep.baseUrl).toBe('https://opencode.ai/zen');
+    expect(ep.baseUrl).toBe('https://opencode.ai/inference/google');
     expect(ep.format).toBe('google');
-    expect(ep.buildPath('gemini-3-flash')).toBe('/v1/models/gemini-3-flash:generateContent');
+    expect(ep.buildPath('gemini-3-flash')).toBe('/v1beta/models/gemini-3-flash:generateContent');
+    expect(ep.buildStreamPath?.('gemini-3-flash')).toBe(
+      '/v1beta/models/gemini-3-flash:streamGenerateContent',
+    );
     expect(ep.buildHeaders('oz-token')).toEqual({
       'x-goog-api-key': 'oz-token',
       'Content-Type': 'application/json',

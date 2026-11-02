@@ -135,7 +135,7 @@ export default function DeviceCodeDetailView(props: Props) {
         // needs to route to the right MiniMax host (api.minimax.io vs
         // api.minimaxi.com). Stick the picker's current value on the row so
         // the proxy fallback honors CN tokens.
-        region: selectedRegion,
+        ...(hasRegion && { region: selectedRegion }),
         ...(label && { label }),
       });
       toast.success(t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }));
@@ -438,15 +438,17 @@ export default function DeviceCodeDetailView(props: Props) {
                   <span className="h-px flex-1 bg-line" />
                 </div>
                 <input
-                  id="minimax-alt-token"
+                  id={`${props.provId}-alt-token`}
                   className="field font-mono"
                   aria-invalid={altError ? true : undefined}
                   type="text"
                   autoComplete="off"
                   placeholder={alt.placeholder}
-                  aria-label={t('providerSetup.device.codingPlanToken', {
-                    name: props.provDef.name,
-                  })}
+                  aria-label={
+                    hasRegion
+                      ? t('providerSetup.device.codingPlanToken', { name: props.provDef.name })
+                      : alt.placeholder
+                  }
                   value={altToken}
                   disabled={props.busy}
                   onChange={(e) => {

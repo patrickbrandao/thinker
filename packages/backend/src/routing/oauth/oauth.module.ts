@@ -16,6 +16,8 @@ import { OAuthPendingFlowStore } from './core';
 import { GeminiOauthService } from './gemini/gemini-oauth.service';
 import { GeminiOauthController } from './gemini/gemini-oauth.controller';
 import { CodeAssistClientService } from './gemini/codeassist-client.service';
+import { OpencodeOauthService } from './opencode/opencode-oauth.service';
+import { OpencodeOauthController } from './opencode/opencode-oauth.controller';
 
 @Module({
   imports: [RoutingCoreModule, ModelDiscoveryModule],
@@ -26,6 +28,7 @@ import { CodeAssistClientService } from './gemini/codeassist-client.service';
     GeminiOauthController,
     KiroOauthController,
     XaiOauthController,
+    OpencodeOauthController,
   ],
   providers: [
     OpenaiOauthService,
@@ -37,6 +40,7 @@ import { CodeAssistClientService } from './gemini/codeassist-client.service';
     OAuthPendingFlowStore,
     GeminiOauthService,
     CodeAssistClientService,
+    OpencodeOauthService,
   ],
   exports: [
     OpenaiOauthService,
@@ -46,6 +50,7 @@ import { CodeAssistClientService } from './gemini/codeassist-client.service';
     GeminiOauthService,
     KiroOauthService,
     XaiOauthService,
+    OpencodeOauthService,
   ],
 })
 export class OAuthModule {}

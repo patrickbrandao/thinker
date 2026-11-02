@@ -89,6 +89,26 @@ export function revokeMinimaxOAuth(agentName: string, label?: string) {
   );
 }
 
+export function startOpencodeOAuth(agentName: string) {
+  return fetchMutate<MinimaxOAuthStartResponse>(
+    `/oauth/opencode/start?agentName=${encodeURIComponent(agentName)}`,
+    { method: 'POST' },
+  );
+}
+
+export function pollOpencodeOAuth(flowId: string) {
+  return fetchJson<MinimaxOAuthPollResponse>(`/oauth/opencode/poll`, { flowId });
+}
+
+export function revokeOpencodeOAuth(agentName: string, label?: string) {
+  const params = new URLSearchParams({ agentName });
+  if (label) params.set('label', label);
+  return fetchMutate<{ ok: boolean; notifications?: string[] }>(
+    `/oauth/opencode/revoke?${params.toString()}`,
+    { method: 'POST' },
+  );
+}
+
 export function startKiroOAuth(agentName: string, options: KiroOAuthStartOptions = {}) {
   const params = new URLSearchParams({ agentName });
   const startUrl = options.startUrl?.trim();
@@ -245,6 +265,12 @@ const DEVICE_CODE_PROVIDERS: Record<string, DeviceCodeApi> = {
     },
     poll: pollKiroOAuth,
     revoke: revokeKiroOAuth,
+    hasRegion: false,
+  },
+  'opencode-go': {
+    start: (agentName) => startOpencodeOAuth(agentName),
+    poll: pollOpencodeOAuth,
+    revoke: revokeOpencodeOAuth,
     hasRegion: false,
   },
 };

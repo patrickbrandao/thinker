@@ -169,7 +169,8 @@ export class ModelDiscoveryService {
         lowerProvider === 'anthropic' ||
         lowerProvider === 'minimax' ||
         lowerProvider === 'kiro' ||
-        lowerProvider === 'xai'
+        lowerProvider === 'xai' ||
+        lowerProvider === 'opencode-go'
       ) {
         // Kiro's token blob is an OAuthTokenBlob superset (source 'kiro-oidc',
         // plus client credentials), so the generic unwrap reads its access

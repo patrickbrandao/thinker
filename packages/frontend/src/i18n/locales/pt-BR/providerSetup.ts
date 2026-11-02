@@ -265,7 +265,7 @@ const ptBR: Catalog<typeof en> = {
     signInWithGoogle: 'Entrar com Google',
     pasteYourKey: 'Cole a chave de API do {{ name }}',
     signInTo: 'Entrar no {{ name }}',
-    opencodeSignInHint: 'Entre no OpenCode Go para obter sua chave de API.',
+    opencodeDivider: 'Ou cole uma chave de API do OpenCode',
     commandCodeRequirement: 'Requer o Command Code Pro ou superior.',
     geminiClosed:
       'O Google não permite mais novos logins do Gemini em apps fora do Google. As conexões existentes continuam funcionando. Para adicionar o Gemini, conecte uma chave de API do Gemini em Provedores por uso.',

@@ -264,6 +264,7 @@ export async function resolveRouteCredentials(
       oauth.kiroOauth,
       oauth.xaiOauth,
       providerKeyLabel,
+      oauth.opencodeOauth,
     ),
   );
 
