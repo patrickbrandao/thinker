@@ -14,6 +14,11 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` e issues (também planeja milestones e abre as issues) |
 | DevOps | `devops.md` | herda | CI, imagem multi-arch, Docker Hub, releases | Sim (infra) |
 | Docs PT-BR | `docs-ptbr.md` | Sonnet | Documentação e notas de release | Só docs |
+| Pesquisadores de sistemas externos (68) | `api-*.md`, `sub-*.md`, `local-*.md`, `harness-*.md` | herda | Um por entidade externa: mantém o dossiê em [`docs/externos/`](externos/README.md) e abre issues `externo` | Não (só o próprio dossiê) |
+
+## Pesquisadores de sistemas externos
+
+Cada provedor (por forma de acesso: API ou assinatura), runtime local e harness suportado tem um agente próprio que estuda a fonte da verdade e mantém uma especificação para o Principal. O procedimento comum está em [`.claude/external-research.md`](../.claude/external-research.md); a lista completa, o formato do dossiê e como acionar estão em [`docs/externos/README.md`](externos/README.md). Uma entidade nova ganha agente, dossiê e linha no índice de `docs/externos/`, não nesta tabela.
 
 ## Execuções agendadas
 
