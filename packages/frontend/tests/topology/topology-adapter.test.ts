@@ -201,6 +201,19 @@ describe('buildTopologyGraph', () => {
     expect(ids).not.toContain('harness:b');
     expect(ids).not.toContain('connection:c2');
   });
+
+  it('counts the requests in flight on each lit line in live', () => {
+    const edges = buildTopologyGraph(data, { live: true }).edges;
+    const edge = (id: string) => edges.find((e) => e.id === id)?.data;
+    // Lit (in flight or just ended): the count is what still waits for an answer.
+    expect(edge('client:10.0.0.5>harness:a')).toMatchObject({ label: '2', idle: false });
+    // Just ended, nothing waiting: lit without a count.
+    expect(edge('harness:a>connection:c1')).toMatchObject({ label: undefined, idle: false });
+    expect(edge('harness:a>connection:c2')).toMatchObject({ idle: true });
+    expect(buildTopologyGraph(data, { live: true }).nodes).toHaveLength(
+      buildTopologyGraph(data).nodes.length,
+    );
+  });
 });
 
 describe('linkWidths', () => {

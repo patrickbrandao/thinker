@@ -29,12 +29,18 @@ function StepNodeView({ data, selected }: NodeProps<FlowNode>) {
         className={cx(
           'n8n-box',
           data.round && 'is-round',
+          data.badge ? 'has-badge' : null,
           data.state && `is-${data.state}`,
           selected && 'is-selected',
         )}
       >
         {data.inbound ? <Handle type="target" position={Position.Left} /> : null}
         <span className="n8n-icon">{data.icon}</span>
+        {data.badge ? (
+          <span className="n8n-badge" role="img" aria-label={data.badgeLabel}>
+            {data.badge}
+          </span>
+        ) : null}
         {data.outbound ? <Handle type="source" position={Position.Right} /> : null}
       </div>
       <div className="n8n-name">{data.title}</div>

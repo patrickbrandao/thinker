@@ -32,14 +32,18 @@ export function getAlerts(): Promise<{ items: AlertItem[]; total: number }> {
   return fetchJson('/alerts', undefined, { cache: false });
 }
 
-export type TopologyRange = '1h' | '24h' | '7d' | '30d';
+/**
+ * A recent window: `<n>m` (1-120), `<n>h` (1-24) or `<n>d` (1-60); or `live`,
+ * the requests in flight and those that ended in the last 3 seconds.
+ */
+export type TopologyRange = `${number}${'m' | 'h' | 'd'}` | 'live' | 'interval';
 
 interface Usage {
   requests: number;
   errors: number;
   costUsd: number;
   tokens: number;
-  /** Requests of the last minute, whatever the window. */
+  /** Requests of the last minute, whatever the window; in `live`, those still in flight. */
   recent: number;
 }
 
@@ -103,8 +107,11 @@ export interface TopologyLink {
 }
 
 /** Clients, harnesses, connections, proxies and the traffic of the window. */
-export function getTopology(range: TopologyRange): Promise<Topology> {
-  return fetchJson('/topology', { range }, { cache: false });
+export function getTopology(
+  range: TopologyRange,
+  interval?: { from: string; to: string },
+): Promise<Topology> {
+  return fetchJson('/topology', { range, ...interval }, { cache: false });
 }
 
 /** Saves where the user dropped canvas nodes (per workspace). */

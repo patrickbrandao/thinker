@@ -1,8 +1,11 @@
 import type { FlowEdge, FlowNode, Graph } from './types.js';
 
-/** Grid the canvas snaps to; positions are kept on it. */
+/** Grid of the background dots and of the automatic layout. */
 export const GRID = 24;
-const COLUMN_GAP = 264;
+/** Step a dragged node snaps to: half the grid, so a drag moves in finer steps. */
+export const DRAG_SNAP = GRID / 2;
+/** Horizontal step between columns; a multiple of DRAG_SNAP, so columns stay evenly spaced. */
+const COLUMN_GAP = 396;
 
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
@@ -55,7 +58,7 @@ export function columnLayout(graph: Graph, options: ColumnLayoutOptions): Graph 
   ordered.forEach((column, c) => {
     let y = (tallest - (heights[c] ?? 0)) / 2;
     for (const node of column) {
-      placed.set(node.id, { x: snap(c * COLUMN_GAP), y: snap(y) });
+      placed.set(node.id, { x: c * COLUMN_GAP, y: snap(y) });
       y += options.heightOf(node);
     }
   });

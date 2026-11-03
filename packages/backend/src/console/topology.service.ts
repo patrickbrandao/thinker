@@ -1,20 +1,55 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import type { ModelRoute } from 'thinker-shared';
+import { PENDING_STATUS, type ModelRoute } from 'thinker-shared';
 import { ERROR_MESSAGE_STATUSES } from '../analytics/services/query-helpers';
 import { getGlobalProxyConfig } from '../common/outbound/outbound-proxy';
 import { authKindOf, defaultTargetOf } from '../proxy-servers/proxy-egress.service';
 
-export const TOPOLOGY_RANGES = { '1h': 1, '24h': 24, '7d': 24 * 7, '30d': 24 * 30 } as const;
-export type TopologyRange = keyof typeof TOPOLOGY_RANGES;
+/** Units of a range (`<n>m`, `<n>h`, `<n>d`): minutes per step and the largest count. */
+export const TOPOLOGY_UNITS = {
+  m: { minutes: 1, max: 120 },
+  h: { minutes: 60, max: 24 },
+  d: { minutes: 60 * 24, max: 60 },
+} as const;
+/**
+ * A recent window such as `5m`, `24h` or `7d`, or `live`: only requests still
+ * being processed, and those that ended in the last few seconds.
+ */
+export type TopologyRange = `${number}${keyof typeof TOPOLOGY_UNITS}` | 'live' | 'interval';
+/** Bounds of the `interval` range. */
+export interface TopologyInterval {
+  from: Date;
+  to: Date;
+}
+/** How long a finished request keeps its path lit in `live`. */
+const LIVE_LINGER = "interval '3 seconds'";
+/** Oldest request `live` still waits on: older pending rows are taken as stale. */
+const LIVE_MAX_MINUTES = 60;
+
+/** Bounds of an `interval` range, or undefined unless both are dates and start precedes end. */
+export function topologyInterval(from?: string, to?: string): TopologyInterval | undefined {
+  const start = from ? new Date(from) : null;
+  const end = to ? new Date(to) : null;
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+  return start < end ? { from: start, to: end } : undefined;
+}
+
+/** Minutes of a range, or null when it is malformed or out of bounds. */
+export function topologyMinutes(range: string): number | null {
+  const match = /^([1-9]\d{0,2})([mhd])$/.exec(range);
+  if (!match) return null;
+  const unit = TOPOLOGY_UNITS[match[2] as keyof typeof TOPOLOGY_UNITS];
+  const count = Number(match[1]);
+  return count <= unit.max ? count * unit.minutes : null;
+}
 
 export interface Usage {
   requests: number;
   errors: number;
   costUsd: number;
   tokens: number;
-  /** Requests of the last minute, whatever the window (sizes the links). */
+  /** Requests of the last minute, whatever the window (sizes the links); in `live`, those in flight. */
   recent: number;
 }
 
@@ -91,7 +126,7 @@ export interface TopologyLink {
   requests: number;
   errors: number;
   costUsd: number;
-  /** Requests of the last minute. */
+  /** Requests of the last minute; in `live`, those in flight. */
   recent: number;
   models?: TopologyLinkModel[];
 }
@@ -198,8 +233,42 @@ interface EgressRow {
 export class TopologyService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
-  async build(tenantId: string, range: TopologyRange): Promise<Topology> {
-    const hours = TOPOLOGY_RANGES[range];
+  async build(
+    tenantId: string,
+    range: TopologyRange,
+    interval?: TopologyInterval,
+  ): Promise<Topology> {
+    const live = range === 'live';
+    const between = range === 'interval' && interval ? interval : null;
+    const minutes = live ? LIVE_MAX_MINUTES : (topologyMinutes(range) ?? 24 * 60);
+    // Rows of the window, and the ones counted as `recent`. In `live` the window
+    // is what is in flight or ended within the linger, and `recent` counts what
+    // is still waiting for an answer.
+    // In `interval` ($2 the start, $4 the end) a request counts when it started
+    // or ended inside the bounds; one that started over an hour earlier is left out.
+    const inWindow = (t = '') =>
+      between
+        ? `${t}timestamp >= $2::timestamptz - interval '1 hour' AND ${t}timestamp <= $4::timestamptz
+           AND (${t}timestamp >= $2::timestamptz
+                OR ${t}timestamp + make_interval(secs => COALESCE(${t}duration_ms, 0) / 1000.0)
+                   >= $2::timestamptz)`
+        : live
+          ? `${t}timestamp >= now() - make_interval(mins => $2)
+           AND (${t}status = '${PENDING_STATUS}'
+                OR ${t}timestamp + make_interval(secs => COALESCE(${t}duration_ms, 0) / 1000.0)
+                   >= now() - ${LIVE_LINGER})`
+          : `${t}timestamp >= now() - make_interval(mins => $2)`;
+    const params = between
+      ? [
+          tenantId,
+          between.from.toISOString(),
+          [...ERROR_MESSAGE_STATUSES],
+          between.to.toISOString(),
+        ]
+      : [tenantId, minutes, [...ERROR_MESSAGE_STATUSES]];
+    const recentOnly = live
+      ? `status = '${PENDING_STATUS}'`
+      : `timestamp >= now() - interval '1 minute'`;
     const [
       agents,
       virtuals,
@@ -290,17 +359,16 @@ export class TopologyService {
                   count(*)::int AS attempts,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3))::int AS errors,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute')::int
-                    AS recent_attempts,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
-                                     AND superseded = false)::int AS recent_requests,
+                  count(*) FILTER (WHERE ${recentOnly})::int AS recent_attempts,
+                  count(*) FILTER (WHERE ${recentOnly} AND superseded = false)::int
+                    AS recent_requests,
                   COALESCE(sum(cost_usd), 0) AS cost,
                   COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens
              FROM agent_messages
             WHERE tenant_id = $1 AND agent_id IS NOT NULL
-              AND timestamp >= now() - make_interval(hours => $2)
+              AND ${inWindow()}
             GROUP BY agent_id, virtual_model_id, tenant_provider_id, provider, auth_type, model`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        params,
       ) as Promise<UsageRow[]>,
       // Where each attempt left: a proxy server, a profile's Direct item or the
       // global proxy. Failed hops (a proxy refused, fell to the next) count apart.
@@ -310,12 +378,12 @@ export class TopologyService {
                   max(egress->>'name') AS name,
                   count(*)::int AS attempts,
                   count(*) FILTER (WHERE status = ANY($3))::int AS errors,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute')::int AS recent,
+                  count(*) FILTER (WHERE ${recentOnly})::int AS recent,
                   COALESCE(sum(cost_usd), 0) AS cost,
                   0 AS failed_hops
              FROM agent_messages
             WHERE tenant_id = $1 AND agent_id IS NOT NULL AND egress IS NOT NULL
-              AND timestamp >= now() - make_interval(hours => $2)
+              AND ${inWindow()}
             GROUP BY tenant_provider_id, provider, auth_type, egress->>'kind', egress->>'proxy_id'
            UNION ALL
            SELECT m.tenant_provider_id, m.provider, m.auth_type, 'proxy', h->>'proxy_id',
@@ -323,27 +391,39 @@ export class TopologyService {
              FROM agent_messages m, jsonb_array_elements(m.egress_hops) h
             WHERE m.tenant_id = $1 AND m.agent_id IS NOT NULL
               AND jsonb_typeof(m.egress_hops) = 'array'
-              AND m.timestamp >= now() - make_interval(hours => $2)
+              AND ${inWindow('m.')}
               AND h->>'kind' = 'proxy' AND h->>'proxy_id' IS NOT NULL
               AND h->>'result' NOT IN ('ok', 'skipped_disabled')
             GROUP BY m.tenant_provider_id, m.provider, m.auth_type, h->>'proxy_id'`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        params,
       ) as Promise<EgressRow[]>,
       // The proxy stamps the client address into caller_attribution (JSON text).
+      // In `live` it comes from the Request, written pending at ingress, so the
+      // client's line lights up before any provider is called.
       this.ds.query(
-        `SELECT agent_id, ip,
+        live
+          ? `SELECT agent_id, ip,
+                    count(*)::int AS requests,
+                    count(*) FILTER (WHERE status = ANY($3))::int AS errors,
+                    count(*) FILTER (WHERE ${recentOnly})::int AS recent
+               FROM (SELECT agent_id, status, timestamp, duration_ms,
+                            substring(caller_attribution::text from '"clientIp":"([^"]+)"') AS ip
+                       FROM requests
+                      WHERE tenant_id = $1 AND agent_id IS NOT NULL AND ${inWindow()}) m
+              WHERE ip IS NOT NULL
+              GROUP BY agent_id, ip`
+          : `SELECT agent_id, ip,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
-                                     AND superseded = false)::int AS recent
+                  count(*) FILTER (WHERE ${recentOnly} AND superseded = false)::int AS recent
              FROM (SELECT agent_id, superseded, status, timestamp,
                           substring(caller_attribution from '"clientIp":"([^"]+)"') AS ip
                      FROM agent_messages
                     WHERE tenant_id = $1 AND agent_id IS NOT NULL
-                      AND timestamp >= now() - make_interval(hours => $2)) m
+                      AND ${inWindow()}) m
             WHERE ip IS NOT NULL
             GROUP BY agent_id, ip`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        params,
       ) as Promise<
         Array<{ agent_id: string; ip: string; requests: number; errors: number; recent: number }>
       >,
