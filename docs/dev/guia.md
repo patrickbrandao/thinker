@@ -388,6 +388,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** (guiado po
 | Revisão de PR | `reviewer` |
 | CI, Dockerfile, imagem multi-arquitetura, releases, templates de deploy | `devops` |
 | Documentação e notas de release em português | `docs-ptbr` |
+| Regras atuais de um sistema externo (provedor por API ou assinatura, runtime local, harness) | o pesquisador da entidade (`api-*`, `sub-*`, `local-*`, `harness-*`), ver [`docs/externos/`](../externos/README.md) |
 
 **Política de merge** ([ADR 0002](../adr/0002-politica-de-merge.md)): a `main` é protegida; todo trabalho vai em branch com PR (Conventional Commits). O Principal faz o squash merge quando os três gates passam:
 

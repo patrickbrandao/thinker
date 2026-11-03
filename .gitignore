@@ -29,6 +29,7 @@ coverage/
 !.claude/skills/
 !.claude/agents/
 !.claude/settings.json
+!.claude/external-research.md
 .continue/
 .cursor/
 .goose/
