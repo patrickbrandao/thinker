@@ -2,7 +2,12 @@ import { Body, Controller, Delete, Get, HttpCode, Put, Query } from '@nestjs/com
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { ConsoleService } from './console.service';
-import { TOPOLOGY_RANGES, TopologyService, type TopologyRange } from './topology.service';
+import {
+  TopologyService,
+  topologyInterval,
+  topologyMinutes,
+  type TopologyRange,
+} from './topology.service';
 
 /** Topbar search (⌘K), alerts bell and topology view of the dashboard. */
 @Controller('api/v1')
@@ -26,9 +31,17 @@ export class ConsoleController {
   }
 
   @Get('topology')
-  async topology(@TenantCtx() ctx: TenantContext, @Query('range') range?: string) {
+  async topology(
+    @TenantCtx() ctx: TenantContext,
+    @Query('range') range?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const interval = range === 'interval' ? topologyInterval(from, to) : undefined;
     const window: TopologyRange =
-      range && range in TOPOLOGY_RANGES ? (range as TopologyRange) : '24h';
+      range === 'live' || interval || (range && topologyMinutes(range) !== null)
+        ? (range as TopologyRange)
+        : '24h';
     if (!ctx.tenantId) {
       return {
         range: window,
@@ -42,7 +55,7 @@ export class ConsoleController {
         positions: {},
       };
     }
-    return this.topologyService.build(ctx.tenantId, window);
+    return this.topologyService.build(ctx.tenantId, window, interval);
   }
 
   @Put('topology/positions')

@@ -2,12 +2,15 @@ import { createElement } from 'react';
 import {
   Bot,
   BrainCircuit,
+  CreditCard,
   Globe,
   GlobeLock,
+  HandPlatter,
+  HardDrive,
   House,
+  KeyRound,
   Plug,
   Server,
-  ServerCog,
   Waypoints,
 } from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
@@ -24,6 +27,12 @@ import { t, tMaybe } from '../i18n/index.js';
 const ICON = 40;
 const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, server: 4, egress: 5 } as const;
 const EGRESS_ICON = { internet: Globe, gateway: GlobeLock, local: House } as const;
+/** Kind of provider connection, with the sidebar icon of its page. */
+const AUTH_ICON: Record<string, typeof Bot> = {
+  local: HardDrive,
+  api_key: KeyRound,
+  subscription: CreditCard,
+};
 /** Vertical room of a step node (box + name + subtitle) and of a one-line source. */
 const STEP_HEIGHT = 144;
 const SOURCE_LINE = 18;
@@ -134,9 +143,14 @@ function linkTooltip(l: TopologyLink): string | undefined {
  * kind: client address → harness → provider connection → proxy profile →
  * proxy server → internet, local gateway or local network (drawn round). Saved positions win over the column layout.
  * With `activeOnly`, nodes and links without traffic in the window are left
- * out.
+ * out. With `live` (data of the `live` range), a link is lit while a request on
+ * it is in flight or just ended, and counts the requests still waiting for an
+ * answer (`recent`).
  */
-export function buildTopologyGraph(data: Topology, options: { activeOnly?: boolean } = {}): Graph {
+export function buildTopologyGraph(
+  data: Topology,
+  options: { activeOnly?: boolean; live?: boolean } = {},
+): Graph {
   const links = options.activeOnly ? data.links.filter((l) => l.requests > 0) : data.links;
   const used = new Set(links.flatMap((l) => [l.source, l.target]));
   const keep = (id: string) => !options.activeOnly || used.has(id);
@@ -196,6 +210,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
     if (!keep(p.id)) continue;
     const name = providerName(p.provider, p.name);
     const auth = tMaybe(`shell.flow.auth.${p.authType}`) ?? p.authType;
+    const authIcon = AUTH_ICON[p.authType];
     push(
       {
         id: p.id,
@@ -205,6 +220,8 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
           icon:
             providerIcon(p.provider.toLowerCase(), ICON) ??
             lucide(p.authType === 'local' ? Server : Plug),
+          badge: authIcon ? createElement(authIcon, { size: 14, strokeWidth: 2 }) : undefined,
+          badgeLabel: auth,
           title: name,
           subtitle: p.label,
           tooltip: usageTooltip(`${name} · ${p.label}`, p, [
@@ -247,7 +264,7 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
         type: 'node',
         data: {
           kind: 'node',
-          icon: lucide(ServerCog),
+          icon: lucide(HandPlatter),
           title: server.name,
           subtitle: address,
           tooltip: usageTooltip(`${t('shell.flow.proxyServer')} · ${server.name}`, server, [
@@ -290,7 +307,13 @@ export function buildTopologyGraph(data: Topology, options: { activeOnly?: boole
     target: l.target,
     data: {
       live: l.requests,
-      label: l.requests > 0 ? formatNumber(l.requests) : undefined,
+      label: options.live
+        ? l.recent > 0
+          ? formatNumber(l.recent)
+          : undefined
+        : l.requests > 0
+          ? formatNumber(l.requests)
+          : undefined,
       tooltip: linkTooltip(l),
       dashed: l.kind === 'fallback',
       idle: l.requests === 0,

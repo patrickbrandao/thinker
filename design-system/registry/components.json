@@ -636,6 +636,7 @@
       ],
       "files": [
         "base.css",
+        "canvas.css",
         "shell.css"
       ]
     },
@@ -742,6 +743,14 @@
       ],
       "files": [
         "shell.css"
+      ]
+    },
+    "has-badge": {
+      "classes": [
+        "has-badge"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "hint": {
@@ -1075,6 +1084,14 @@
         "canvas.css"
       ]
     },
+    "is-selecting": {
+      "classes": [
+        "is-selecting"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-success": {
       "classes": [
         "is-success"
@@ -1205,6 +1222,14 @@
         "shell.css"
       ]
     },
+    "lucide": {
+      "classes": [
+        "lucide"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "menu": {
       "classes": [
         "menu"
@@ -1299,6 +1324,14 @@
       ],
       "files": [
         "base.css"
+      ]
+    },
+    "n8n-badge": {
+      "classes": [
+        "n8n-badge"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "n8n-box": {
@@ -1568,7 +1601,8 @@
         "react-flow__edge-textbg",
         "react-flow__handle",
         "react-flow__minimap",
-        "react-flow__node"
+        "react-flow__node",
+        "react-flow__pane"
       ],
       "files": [
         "canvas.css"
@@ -1721,6 +1755,14 @@
     "stage-legend": {
       "classes": [
         "stage-legend"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "stage-range": {
+      "classes": [
+        "stage-range"
       ],
       "files": [
         "canvas.css"
@@ -2137,8 +2179,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 210,
-    "classes": 226,
+    "blocks": 215,
+    "classes": 232,
     "canonicalRules": 5,
     "ghostRules": 5
   }

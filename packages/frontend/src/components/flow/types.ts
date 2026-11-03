@@ -21,6 +21,10 @@ export interface FlowNodeData extends Record<string, unknown> {
   kind: FlowNodeKind;
   /** Drawn inside the node. */
   icon: ReactNode;
+  /** For steps: a small icon below the main one. */
+  badge?: ReactNode;
+  /** Accessible name of the badge. */
+  badgeLabel?: string;
   /** Name below the node (`node`), or the text lines inside it (`source`). */
   title: string;
   /** For sources: lines drawn inside the node, next to the icon. */

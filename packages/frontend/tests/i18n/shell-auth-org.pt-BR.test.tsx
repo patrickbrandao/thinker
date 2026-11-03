@@ -103,7 +103,8 @@ describe('shell, auth and organization screens in pt-BR', () => {
 
   it('renders the sign-in page in Portuguese', async () => {
     inRouter(<Login />, '/login');
-    expect(screen.getByText('Que bom ver você de novo')).toBeTruthy();
+    // The page shows only the logo mark, no welcome heading.
+    expect(screen.getByRole('img', { name: 'Thinker' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Digite sua senha')).toBeTruthy();
     expect(screen.getByText('Esqueceu a senha?')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeTruthy();

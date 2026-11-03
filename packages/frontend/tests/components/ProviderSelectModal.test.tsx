@@ -1413,7 +1413,10 @@ describe('ProviderSelectModal', () => {
       // Simulate the done page sending a postMessage
       await new Promise((r) => setTimeout(r, 50));
       window.dispatchEvent(
-        new MessageEvent('message', { data: { type: 'thinker-oauth-success' } }),
+        new MessageEvent('message', {
+          data: { type: 'thinker-oauth-success' },
+          origin: window.location.origin,
+        }),
       );
 
       await waitFor(() => {
@@ -1447,7 +1450,12 @@ describe('ProviderSelectModal', () => {
       });
 
       // Error message arrives — paste field still visible, no crash
-      window.dispatchEvent(new MessageEvent('message', { data: { type: 'thinker-oauth-error' } }));
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'thinker-oauth-error' },
+          origin: window.location.origin,
+        }),
+      );
       await new Promise((r) => setTimeout(r, 50));
       expect(
         screen.getByPlaceholderText('http://localhost:1455/auth/callback?code=...'),

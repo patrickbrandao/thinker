@@ -10,13 +10,49 @@
     height: 100%;
   }
   .stage-head {
+    /* The range slider is sized against the bar's width. */
+    container-type: inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    padding: 6px 16px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-elev);
+  }
+  .stage-head .stage-actions {
+    flex: 1;
+    justify-content: flex-start;
+    min-height: 36px;
+  }
+  /* Recent window: unit select, then a slider a quarter of the bar wide. */
+  .stage-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage-head input[type='datetime-local'].field {
+    width: auto;
+    height: 26px;
+    padding-block: 0;
+    font-size: 12px;
+  }
+  .stage-head select.field {
+    width: auto;
+    height: 26px;
+    padding-block: 0;
+    font-size: 12px;
+  }
+  .stage-range input[type='range'] {
+    width: 25cqw;
+    min-width: 120px;
+    cursor: pointer;
+  }
+  .stage-range output {
+    min-width: 52px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
   }
   .stage-head h1 {
     font-size: 16px;
@@ -26,7 +62,6 @@
     font-size: 12px;
   }
   .stage-head .stage-actions {
-    margin-left: auto;
     display: flex;
     gap: 8px;
   }
@@ -111,6 +146,16 @@
   .n8n-icon {
     display: flex;
     color: var(--text);
+  }
+  /* A small icon below the main one (kind of provider), in the same box size. */
+  .n8n-box.has-badge {
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 4px;
+  }
+  .n8n-badge {
+    display: flex;
+    color: var(--text-muted);
   }
   .n8n-icon img,
   .n8n-icon svg {
@@ -289,6 +334,16 @@
     background: var(--surface-2);
     color: var(--text);
   }
+  .react-flow__controls-button svg.lucide {
+    max-width: 14px;
+    max-height: 14px;
+    fill: none;
+  }
+  /* Select mode: box drawn in the accent. */
+  .react-flow {
+    --xy-selection-background-color: var(--ring-accent);
+    --xy-selection-border: 1px dashed var(--accent);
+  }
   .react-flow__minimap {
     --xy-minimap-background-color: var(--bg-elev);
     --xy-minimap-mask-background-color: rgb(0 0 0 / 0.35);
@@ -301,4 +356,10 @@
   .react-flow__attribution {
     display: none;
   }
+}
+
+/* Unlayered, to beat the `cursor: pointer` of React Flow's unlayered base.css:
+   select mode shows the plain arrow on empty space. */
+.stage-wrap.is-selecting .react-flow__pane {
+  cursor: default;
 }
