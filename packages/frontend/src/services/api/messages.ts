@@ -136,6 +136,8 @@ export interface MessageDetailResponse {
 
 export interface MessageListParams extends Record<string, string | undefined> {
   range?: string;
+  /** Harness session id: its requests and those of its subagent sessions. */
+  session?: string;
   provider?: string;
   /** Comma-separated tenant_providers ids (connection filter). */
   connections?: string;

@@ -38,8 +38,13 @@ export class ThinkerRequest {
   @Column('varchar', { nullable: true })
   session_key!: string | null;
 
+  /** Session the harness named in its headers (see harness-session.ts). */
   @Column('varchar', { nullable: true })
   session_id!: string | null;
+
+  /** Session that spawned `session_id` (an OpenCode subagent's main session). */
+  @Column('varchar', { nullable: true })
+  parent_session_id!: string | null;
 
   @Column(timestampType())
   timestamp!: string;

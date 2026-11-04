@@ -53,6 +53,11 @@ export class MessagesQueryDto {
   @IsString()
   range?: string;
 
+  /** Harness session id: its requests and those of its subagent sessions. */
+  @IsOptional()
+  @IsString()
+  session?: string;
+
   @IsOptional()
   @IsString()
   provider?: string;

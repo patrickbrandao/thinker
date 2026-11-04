@@ -314,18 +314,18 @@ Tabs: src/components/ui.tsx
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1027  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1027  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1036  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1202
-.liquid-metal::after { padding: 5px }  ← shell.css:1203
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1031  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1031  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1040  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1206
+.liquid-metal::after { padding: 5px }  ← shell.css:1207
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1020 loses to shell.css:1027
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1020 loses to shell.css:1027
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1032 loses to shell.css:1036
-.liquid-metal::after { inset: -2px }  at shell.css:1158 loses to shell.css:1202
-.liquid-metal::after { padding: 2px }  at shell.css:1160 loses to shell.css:1203
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1024 loses to shell.css:1031
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1024 loses to shell.css:1031
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1036 loses to shell.css:1040
+.liquid-metal::after { inset: -2px }  at shell.css:1162 loses to shell.css:1206
+.liquid-metal::after { padding: 2px }  at shell.css:1164 loses to shell.css:1207
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

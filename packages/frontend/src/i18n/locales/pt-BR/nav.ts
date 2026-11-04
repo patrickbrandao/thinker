@@ -8,6 +8,7 @@ const ptBR: Catalog<typeof en> = {
   dashboardContent: 'Conteúdo do painel',
   navigation: 'Navegação',
   overview: 'Visão geral',
+  sessions: 'Sessões',
   requests: 'Requisições',
   harnesses: 'Harnesses',
   createHarness: 'Criar harness',
