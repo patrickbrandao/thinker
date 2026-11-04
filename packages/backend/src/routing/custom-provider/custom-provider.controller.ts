@@ -22,6 +22,7 @@ import {
 } from '../dto/custom-provider.dto';
 import { AgentNameParamDto } from '../dto/routing.dto';
 import { MinRole } from '../../common/decorators/roles.decorator';
+import { providerKeyDisplay } from '../../common/utils/provider-key-mask';
 import { canUsePrivateDestinations } from '../../common/utils/private-url-policy';
 import type { TenantProvider } from '../../entities/tenant-provider.entity';
 import { PROVIDER_CONNECTION_SCOPE } from '../routing-core/resolve-agent.service';
@@ -36,7 +37,7 @@ function keyPool(rows: readonly TenantProvider[], providerKey: string) {
   return rows
     .filter((r) => r.provider === providerKey && r.is_active && !!r.api_key_encrypted)
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
-    .map((r) => ({ label: r.label, key_prefix: r.key_prefix ?? null, priority: r.priority }));
+    .map((r) => ({ label: r.label, ...providerKeyDisplay(r), priority: r.priority }));
 }
 
 /** API shape of one custom provider (local servers included). The API key never leaves. */

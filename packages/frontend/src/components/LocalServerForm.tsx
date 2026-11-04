@@ -34,6 +34,8 @@ interface Props {
   /** After Remove server; defaults to onSaved. */
   onDeleted?: () => void;
   onCancel: () => void;
+  /** Inside a window whose title already names the server: no title row. */
+  embedded?: boolean;
 }
 
 interface FormState {
@@ -271,29 +273,32 @@ export default function LocalServerForm(props: Props) {
   // Edits keep the stored model list until a new test replaces it.
   const listed: LocalProbeModel[] = probe?.models ?? props.editData?.models ?? [];
   const id = (field: string) => `ls-${props.type}-${field}`;
+  const defaultsHint = defaults.data
+    ? t('providerSetup.localServer.defaultsHint', {
+        port: String(defaults.data.default_port),
+        env: defaults.data.env,
+      })
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex size-8 items-center justify-center">
-          {providerIcon(props.type, 28)}
-        </span>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-ink">
-            {isEdit
-              ? t('providerSetup.localServer.editTitle', { type: typeName })
-              : t('providerSetup.localServer.addTitle', { type: typeName })}
-          </div>
-          <div className="text-xs text-muted">
-            {defaults.data
-              ? t('providerSetup.localServer.defaultsHint', {
-                  port: String(defaults.data.default_port),
-                  env: defaults.data.env,
-                })
-              : null}
+      {props.embedded ? (
+        <div className="text-xs text-muted">{defaultsHint}</div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-8 items-center justify-center">
+            {providerIcon(props.type, 28)}
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-ink">
+              {isEdit
+                ? t('providerSetup.localServer.editTitle', { type: typeName })
+                : t('providerSetup.localServer.addTitle', { type: typeName })}
+            </div>
+            <div className="text-xs text-muted">{defaultsHint}</div>
           </div>
         </div>
-      </div>
+      )}
 
       <form
         className="flex flex-col gap-3"

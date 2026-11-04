@@ -28,6 +28,7 @@ import { useResource } from '../lib/use-resource.js';
 import InfoTooltip from './InfoTooltip.js';
 import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
 import { Button, Modal, cx } from './ui.js';
+import { maskedKeyLabel } from '../services/key-mask.js';
 
 const BASE_URL_PLACEHOLDERS: Record<CustomProviderApiKind, string> = {
   openai: 'https://api.example.com/v1',
@@ -41,6 +42,8 @@ interface Props {
   initialData?: CustomProviderData;
   prefill?: CustomProviderPrefill;
   onDeleted?: () => void;
+  /** Inside a window whose title already names the form: no back button or title. */
+  embedded?: boolean;
 }
 
 interface ModelRow {
@@ -180,8 +183,7 @@ export default function CustomProviderForm(props: Props) {
     minKeyLength: 0,
     keyPlaceholder: 'sk-...',
   };
-  const keyPrefix = activeKeys[0]?.key_prefix;
-  const keyPrefixDisplay = () => (keyPrefix ? `${keyPrefix}${'•'.repeat(8)}` : '••••••••••••');
+  const keyPrefixDisplay = () => maskedKeyLabel(activeKeys[0]);
 
   const handleProbe = async () => {
     const url = baseUrl.trim();
@@ -361,21 +363,27 @@ export default function CustomProviderForm(props: Props) {
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        className="icon-btn modal-back-btn mb-2 self-start"
-        onClick={props.onBack}
-        aria-label={t('providers.customForm.backToProviders')}
-      >
-        <ChevronLeft size={16} aria-hidden="true" />
-      </button>
+      {props.embedded ? (
+        <p className="mb-5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="icon-btn modal-back-btn mb-2 self-start"
+            onClick={props.onBack}
+            aria-label={t('providers.customForm.backToProviders')}
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
 
-      <div className="mb-5">
-        <h2 className="text-base font-semibold text-ink">
-          {isEdit ? t('providers.customForm.editTitle') : t('providers.customForm.addTitle')}
-        </h2>
-        <p className="mt-0.5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
-      </div>
+          <div className="mb-5">
+            <h2 className="text-base font-semibold text-ink">
+              {isEdit ? t('providers.customForm.editTitle') : t('providers.customForm.addTitle')}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
+          </div>
+        </>
+      )}
 
       <form
         className="flex flex-col gap-4"

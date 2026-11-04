@@ -9,6 +9,7 @@ import {
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
+import AuthUrlFallback from './AuthUrlFallback.js';
 import { monitorOAuthPopup } from '../services/oauth-popup.js';
 import { Button, IconButton } from './ui.js';
 
@@ -185,6 +186,8 @@ interface Props {
   addKeyOpen?: boolean;
   setAddKeyOpen?: (open: boolean) => void;
   activeKeys?: RoutingProvider[];
+  /** Only add a new connection: no account list, and success closes the host. */
+  newConnection?: boolean;
 }
 
 export default function OAuthDetailView(props: Props) {
@@ -194,6 +197,8 @@ export default function OAuthDetailView(props: Props) {
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [oauthState, setOauthState] = useState<string | null>(null);
   const [addingAccount, setAddingAccount] = useState(false);
+  // Set when the browser blocked the sign-in window: the URL to open by hand.
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
   const successHandled = useRef(false);
   const latest = useRef(props);
   latest.current = props;
@@ -211,7 +216,8 @@ export default function OAuthDetailView(props: Props) {
   const callbackPlaceholder = isXaiProvider
     ? t('providerSetup.oauth.callbackPlaceholderXai')
     : 'http://localhost:1455/auth/callback?code=...';
-  const showConnectFlow = !props.connected || addingAccount || pasteFlowActive;
+  const showConnectFlow =
+    props.newConnection || !props.connected || addingAccount || pasteFlowActive;
   const via = props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower');
   const flowHasConnected =
     flowKeyCount === null
@@ -234,6 +240,7 @@ export default function OAuthDetailView(props: Props) {
       t('providerSetup.shared.subscriptionConnected', { name: latest.current.provDef.name }),
     );
     latest.current.onUpdate();
+    if (latest.current.newConnection) latest.current.onClose();
   };
 
   const oauthApi = () => getPopupOauthApi(latest.current.provId);
@@ -243,6 +250,7 @@ export default function OAuthDetailView(props: Props) {
     p.setBusy(true);
     setPasteUrl('');
     setPasteError(null);
+    setBlockedUrl(null);
     try {
       const { url } = await oauthApi().getUrl(p.agentName);
       try {
@@ -251,18 +259,17 @@ export default function OAuthDetailView(props: Props) {
         setOauthState(null);
       }
       const popup = window.open(url, 'thinker-oauth', 'width=500,height=700');
-      if (!popup) {
-        toast.error(t('providerSetup.shared.popupBlocked'));
-        if (latest.current.connected) setAddingAccount(false);
-        setOauthState(null);
-        latest.current.setBusy(false);
-        return;
-      }
 
       setPasteFlowActive(true);
       setFlowKeyCount((latest.current.activeKeys ?? []).length);
       successHandled.current = false;
       latest.current.setBusy(false);
+
+      // Blocked: sign in from the URL in any browser, then paste the callback.
+      if (!popup) {
+        setBlockedUrl(url);
+        return;
+      }
 
       // Dispose any in-flight monitor from a previous start before replacing it,
       // so repeated logins don't orphan the earlier poll/listener handle.
@@ -372,6 +379,7 @@ export default function OAuthDetailView(props: Props) {
       <div className="flex flex-col gap-3">
         {pasteFlowActive ? (
           <>
+            {blockedUrl ? <AuthUrlFallback url={blockedUrl} /> : null}
             {isXaiProvider ? (
               <p className="text-sm text-dim">{t('providerSetup.oauth.xaiWindowOpened')}</p>
             ) : (

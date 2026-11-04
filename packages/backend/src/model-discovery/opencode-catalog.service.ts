@@ -1,10 +1,18 @@
-import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PROVIDER_BY_ID } from '../common/constants/providers';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { outboundFetch } from '../common/outbound/outbound-proxy';
+import { OPENCODE_USER_AGENT } from '../common/constants/subscription-clients';
 import type { PricingEntry, PricingTimeTier } from '../model-prices/model-pricing-cache.service';
 
 export type OpencodeCatalogProvider = 'opencode' | 'opencode-go';
@@ -33,28 +41,47 @@ export interface OpencodeCatalogEntry {
 }
 
 /**
- * The provider's own public catalog: model list, wire protocol, base URL and
- * list prices, no auth. Same host as inference, so it is provider traffic,
- * not a phone-home (ADR 0009).
+ * The catalog the OpenCode client reads (`anomalyco/opencode`,
+ * packages/core/src/models-dev.ts): models.dev v2 as published by OpenCode,
+ * limited to the model types the client keeps. One document covers every
+ * provider, `opencode` and `opencode-go` included, with each model's protocol,
+ * base URL and list prices. Fetched only while an OpenCode account exists
+ * (ADR 0009), and never with `THINKER_CATALOG_SYNC=false`.
+ */
+export const OPENCODE_MODELS_URL =
+  'https://models.opencode.ai/experimental/v2.0/api.json?type=chat,decision,image';
+
+/**
+ * The provider's per-service catalogs on the inference host. Same model
+ * records as `OPENCODE_MODELS_URL`, one provider each. Used only when that
+ * source is off (`THINKER_CATALOG_SYNC=false`) or has never answered: the
+ * inference host is provider traffic, so protocol routing keeps working.
  */
 export const OPENCODE_CATALOG_URLS: Record<OpencodeCatalogProvider, string> = {
   opencode: 'https://opencode.ai/inference/v1/models',
   'opencode-go': 'https://opencode.ai/inference/go/v1/models',
 };
 
-const CACHE_TTL_MS = 60 * 60 * 1000;
+/** The client's refresh cadence and freshness window for its catalog. */
+export const OPENCODE_CATALOG_REFRESH_MS = 5 * 60 * 1000;
+const LEGACY_CACHE_TTL_MS = 60 * 60 * 1000;
 // After a fetch failure we reuse the last-known-good list for a shorter window
 // so a sustained outage does not turn into a per-call retry storm.
 const ERROR_BACKOFF_MS = 5 * 60 * 1000;
+/** The client gives the whole fetch, retries and body included, 10 s. */
 const FETCH_TIMEOUT_MS = 10_000;
+/** The client retries transient errors and responses twice, exponential from 200 ms with jitter. */
+const FETCH_RETRIES = 2;
+const RETRY_BASE_MS = 200;
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
-// Catalog `api` keys in the order a model offering several is routed.
-const API_FORMATS: [string, OpencodeApiFormat][] = [
-  ['chat-completions', 'openai'],
-  ['responses', 'responses'],
-  ['messages', 'anthropic'],
-  ['generate-content', 'google'],
-];
+// Catalog `api` keys and the endpoint format each is served on.
+const API_FORMATS: Record<string, OpencodeApiFormat> = {
+  'chat-completions': 'openai',
+  responses: 'responses',
+  messages: 'anthropic',
+  'generate-content': 'google',
+};
 
 const ISO_DAYS: Record<string, number> = {
   mon: 1,
@@ -66,11 +93,19 @@ const ISO_DAYS: Record<string, number> = {
   sun: 7,
 };
 
+const CATALOG_PROVIDERS: OpencodeCatalogProvider[] = ['opencode', 'opencode-go'];
+
 /** Every spelling a `tenant_providers.provider` row can carry, lowercased. */
 const PROVIDER_KEYS: Record<OpencodeCatalogProvider, string[]> = {
   opencode: ['opencode', ...(PROVIDER_BY_ID.get('opencode')?.aliases ?? [])],
   'opencode-go': ['opencode-go', ...(PROVIDER_BY_ID.get('opencode-go')?.aliases ?? [])],
 };
+
+/** Every `tenant_providers.provider` spelling of an OpenCode provider, lowercased. */
+export const OPENCODE_PROVIDER_KEYS: readonly string[] = [
+  ...PROVIDER_KEYS.opencode,
+  ...PROVIDER_KEYS['opencode-go'],
+];
 
 /** Canonical OpenCode catalog for a provider id or alias, if it is one. */
 export function opencodeCatalogProvider(
@@ -78,7 +113,7 @@ export function opencodeCatalogProvider(
 ): OpencodeCatalogProvider | null {
   if (!provider) return null;
   const lower = provider.toLowerCase();
-  for (const key of Object.keys(PROVIDER_KEYS) as OpencodeCatalogProvider[]) {
+  for (const key of CATALOG_PROVIDERS) {
     if (PROVIDER_KEYS[key].includes(lower)) return key;
   }
   return null;
@@ -91,24 +126,39 @@ interface CatalogState {
   inflight: Promise<OpencodeCatalogEntry[]> | null;
 }
 
+/** The shared models.opencode.ai document: one fetch serves both providers. */
+interface SharedState {
+  etag: string | null;
+  /** Last 200 or 304: the copy is current as of then. */
+  checkedAt: number;
+  /** No retry before this after a failure. */
+  retryAt: number;
+  inflight: Promise<boolean> | null;
+}
+
 /**
- * Model catalogs of OpenCode (pay-as-you-go and free models) and OpenCode Go,
- * read from `opencode.ai/inference[/go]/v1/models` and cached for an hour.
+ * Model catalogs of OpenCode (pay-as-you-go and free models) and OpenCode Go.
  * They decide the wire protocol of each model, the list prices with their
  * peak-hour multipliers, and which models are free.
  *
- * A catalog is fetched only for an instance that has that provider
- * registered: every caller but the boot warmup is already scoped to such a
- * provider, and the warmup checks the database first (and is skipped with
- * `THINKER_CATALOG_SYNC=false`).
+ * Like the OpenCode client, the source is the models.dev v2 document on
+ * models.opencode.ai, fetched with the client's User-Agent and ETag, a 10 s
+ * budget and two retries, and re-checked every 5 minutes in the background,
+ * but only while an active OpenCode account (any type) exists. One fetch per
+ * instance feeds both providers. With `THINKER_CATALOG_SYNC=false` that
+ * domain is never contacted and each catalog loads on the provider's first
+ * use from its own inference host, like any provider's /models.
  */
 @Injectable()
-export class OpencodeCatalogService implements OnModuleInit {
+export class OpencodeCatalogService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OpencodeCatalogService.name);
-  private readonly states: Record<OpencodeCatalogProvider, CatalogState> = {
+  private states: Record<OpencodeCatalogProvider, CatalogState> = {
     opencode: emptyState(),
     'opencode-go': emptyState(),
   };
+  private shared: SharedState = emptySharedState();
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
 
   constructor(
     @Optional()
@@ -117,42 +167,56 @@ export class OpencodeCatalogService implements OnModuleInit {
   ) {}
 
   /**
-   * Warm the registered catalogs in the background so the first proxied
-   * request already knows its protocol and price. Fire-and-forget; failures
-   * fall through to the fetch-on-demand path in `list()`.
+   * Start the background refresh: once at boot, then 5 minutes after each
+   * run completes (the client's `Schedule.spaced`). Each run fetches only
+   * while an active OpenCode account exists. Off with `THINKER_CATALOG_SYNC=false`.
    */
   onModuleInit(): void {
-    for (const provider of Object.keys(this.states) as OpencodeCatalogProvider[]) {
-      void this.warmIfRegistered(provider).catch(() => {
-        // `list()` already logs failures and arms the error-backoff window.
-      });
+    if (!isCatalogSyncEnabled()) return;
+    void this.backgroundRefresh();
+  }
+
+  onModuleDestroy(): void {
+    this.destroyed = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  /** One background run; exported for tests. Never throws. */
+  async backgroundRefresh(): Promise<void> {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    try {
+      if (isCatalogSyncEnabled() && (await this.hasActiveAccount())) {
+        await this.syncShared(false);
+      }
+    } catch (err) {
+      // syncShared logs its own failures; this only guards the timer chain.
+      this.logger.debug(`OpenCode catalog background refresh failed: ${errorMessage(err)}`);
+    } finally {
+      if (!this.destroyed) {
+        this.timer = setTimeout(() => void this.backgroundRefresh(), OPENCODE_CATALOG_REFRESH_MS);
+        this.timer.unref?.();
+      }
     }
   }
 
-  private async warmIfRegistered(provider: OpencodeCatalogProvider): Promise<void> {
-    // `THINKER_CATALOG_SYNC=false` keeps the boot silent; the catalog then
-    // loads on the provider's first use, like any provider's /models.
-    if (!isCatalogSyncEnabled()) return;
-    if (!(await this.isRegistered(provider))) return;
-    await this.list(provider);
-  }
-
   /**
-   * Whether any tenant has this provider registered, active or not. Without
-   * a repository (unit tests) or when the lookup fails, answers false: a
-   * skipped warmup only delays the catalog to its first real use.
+   * Whether any tenant has an active OpenCode or OpenCode Go connection.
+   * Without a repository (unit tests) or when the lookup fails, answers
+   * false: a skipped run only delays the catalog to its first real use.
    */
-  private async isRegistered(provider: OpencodeCatalogProvider): Promise<boolean> {
+  private async hasActiveAccount(): Promise<boolean> {
     if (!this.providerRepo) return false;
     try {
       const count = await this.providerRepo
         .createQueryBuilder('p')
-        .where('LOWER(p.provider) IN (:...keys)', { keys: PROVIDER_KEYS[provider] })
+        .where('LOWER(p.provider) IN (:...keys)', { keys: OPENCODE_PROVIDER_KEYS })
+        .andWhere('p.is_active = :active', { active: true })
         .getCount();
       return count > 0;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Could not check for ${provider} providers, skipping warmup: ${message}`);
+      this.logger.warn(`Could not check for OpenCode providers: ${errorMessage(err)}`);
       return false;
     }
   }
@@ -160,15 +224,14 @@ export class OpencodeCatalogService implements OnModuleInit {
   /** The cached catalog, fetching it when the cache is cold or expired. */
   async list(provider: OpencodeCatalogProvider): Promise<OpencodeCatalogEntry[]> {
     const state = this.states[provider];
-    const now = Date.now();
-    if (state.cache && state.cache.expiresAt > now) return state.cache.entries;
+    if (state.cache && state.cache.expiresAt > Date.now()) return state.cache.entries;
     if (state.inflight) return state.inflight;
-    return this.startFetch(provider, now);
+    return this.startFetch(provider, false);
   }
 
-  /** Force a live fetch even when the cache is warm (manual model refresh). */
+  /** Force a live check even when the cache is warm (manual model refresh). */
   async refresh(provider: OpencodeCatalogProvider): Promise<OpencodeCatalogEntry[]> {
-    return this.startFetch(provider, Date.now());
+    return this.startFetch(provider, true);
   }
 
   /**
@@ -235,26 +298,158 @@ export class OpencodeCatalogService implements OnModuleInit {
 
   private startFetch(
     provider: OpencodeCatalogProvider,
-    now: number,
+    force: boolean,
   ): Promise<OpencodeCatalogEntry[]> {
     const state = this.states[provider];
-    const tracked: Promise<OpencodeCatalogEntry[]> = this.fetchAndCache(provider, now).finally(
-      () => {
-        if (state.inflight === tracked) state.inflight = null;
-      },
-    );
+    const tracked: Promise<OpencodeCatalogEntry[]> = this.load(provider, force).finally(() => {
+      if (state.inflight === tracked) state.inflight = null;
+    });
     state.inflight = tracked;
     return tracked;
   }
 
-  private async fetchAndCache(
+  /**
+   * models.opencode.ai first; the inference host only when that source is
+   * off, or failed with no copy of this provider to keep.
+   */
+  private async load(
     provider: OpencodeCatalogProvider,
-    now: number,
+    force: boolean,
   ): Promise<OpencodeCatalogEntry[]> {
     const state = this.states[provider];
-    const url = OPENCODE_CATALOG_URLS[provider];
+    if (isCatalogSyncEnabled()) {
+      const current = await this.syncShared(force);
+      if (current && state.cache) return state.cache.entries;
+      if (state.lastGood) return this.cacheFallback(state, Date.now());
+    }
+    return this.fetchLegacy(provider);
+  }
+
+  /**
+   * Bring the shared copy up to date: a conditional GET unless it was
+   * checked within the refresh window (or `force`), single-flight across
+   * providers. Resolves true when the copy is current (200 or 304).
+   */
+  private syncShared(force: boolean): Promise<boolean> {
+    const shared = this.shared;
+    if (shared.inflight) return shared.inflight;
+    const now = Date.now();
+    if (!force && shared.checkedAt > 0 && now - shared.checkedAt < OPENCODE_CATALOG_REFRESH_MS) {
+      return Promise.resolve(true);
+    }
+    if (!force && now < shared.retryAt) return Promise.resolve(false);
+    const tracked = this.fetchShared().finally(() => {
+      if (shared.inflight === tracked) shared.inflight = null;
+    });
+    shared.inflight = tracked;
+    return tracked;
+  }
+
+  private async fetchShared(): Promise<boolean> {
+    const shared = this.shared;
+    const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+    const etag = shared.etag && this.hasSharedCopy() ? shared.etag : null;
+    const headers = {
+      'user-agent': OPENCODE_USER_AGENT,
+      ...(etag ? { 'if-none-match': etag } : {}),
+    };
     try {
-      const response = await outboundFetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      for (let attempt = 0; ; attempt++) {
+        let response: Response;
+        try {
+          response = await outboundFetch(OPENCODE_MODELS_URL, { headers, signal });
+        } catch (err) {
+          if (signal.aborted || attempt >= FETCH_RETRIES) throw err;
+          await retryDelay(attempt, signal);
+          continue;
+        }
+        if (response.status === 304) {
+          this.markSharedCurrent(etag);
+          return true;
+        }
+        if (response.ok) return this.applyShared(await response.text(), response);
+        void response.body?.cancel().catch(() => undefined);
+        if (!TRANSIENT_STATUSES.has(response.status) || attempt >= FETCH_RETRIES) {
+          throw new Error(`returned ${response.status}`);
+        }
+        await retryDelay(attempt, signal);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `OpenCode catalog fetch from models.opencode.ai failed: ${errorMessage(err)}`,
+      );
+      shared.retryAt = Date.now() + ERROR_BACKOFF_MS;
+      return false;
+    }
+  }
+
+  private applyShared(text: string, response: Response): boolean {
+    const now = Date.now();
+    let parsed: Record<OpencodeCatalogProvider, OpencodeCatalogEntry[]>;
+    try {
+      parsed = parseOpencodeModelsDev(JSON.parse(text));
+    } catch {
+      throw new Error('returned an unreadable body');
+    }
+    if (parsed.opencode.length === 0 && parsed['opencode-go'].length === 0) {
+      throw new Error('parsed zero OpenCode models — format may have changed');
+    }
+    for (const provider of CATALOG_PROVIDERS) {
+      const entries = parsed[provider];
+      if (entries.length === 0) {
+        this.logger.warn(`${provider} is missing from the models.opencode.ai catalog`);
+        continue;
+      }
+      this.store(provider, entries, now + OPENCODE_CATALOG_REFRESH_MS);
+    }
+    this.shared.etag = response.headers?.get('etag') ?? null;
+    this.shared.checkedAt = now;
+    this.shared.retryAt = 0;
+    this.logger.log(
+      `OpenCode catalog loaded from models.opencode.ai: ${parsed.opencode.length} opencode, ` +
+        `${parsed['opencode-go'].length} opencode-go models`,
+    );
+    return true;
+  }
+
+  /** A 304: the copy in memory is still the current one. */
+  private markSharedCurrent(etag: string | null): void {
+    const now = Date.now();
+    this.shared.etag = etag;
+    this.shared.checkedAt = now;
+    this.shared.retryAt = 0;
+    for (const provider of CATALOG_PROVIDERS) {
+      const state = this.states[provider];
+      if (state.lastGood)
+        state.cache = { entries: state.lastGood, expiresAt: now + OPENCODE_CATALOG_REFRESH_MS };
+    }
+  }
+
+  /** An ETag is only worth sending while that copy is still in memory. */
+  private hasSharedCopy(): boolean {
+    return CATALOG_PROVIDERS.some((provider) => this.states[provider].lastGood !== null);
+  }
+
+  private store(
+    provider: OpencodeCatalogProvider,
+    entries: OpencodeCatalogEntry[],
+    expiresAt: number,
+  ) {
+    const state = this.states[provider];
+    state.cache = { entries, expiresAt };
+    state.lastGood = entries;
+    state.byId = new Map(entries.map((entry) => [entry.id, entry]));
+  }
+
+  /** The provider's own catalog on its inference host (see `OPENCODE_CATALOG_URLS`). */
+  private async fetchLegacy(provider: OpencodeCatalogProvider): Promise<OpencodeCatalogEntry[]> {
+    const state = this.states[provider];
+    const now = Date.now();
+    try {
+      const response = await outboundFetch(OPENCODE_CATALOG_URLS[provider], {
+        headers: { 'user-agent': OPENCODE_USER_AGENT },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
       if (!response.ok) {
         this.logger.warn(`${provider} catalog fetch returned ${response.status}`);
         return this.cacheFallback(state, now);
@@ -264,14 +459,11 @@ export class OpencodeCatalogService implements OnModuleInit {
         this.logger.warn(`${provider} catalog parsed zero models — format may have changed`);
         return this.cacheFallback(state, now);
       }
-      state.cache = { entries, expiresAt: now + CACHE_TTL_MS };
-      state.lastGood = entries;
-      state.byId = new Map(entries.map((entry) => [entry.id, entry]));
+      this.store(provider, entries, now + LEGACY_CACHE_TTL_MS);
       this.logger.log(`${provider} catalog loaded: ${entries.length} models`);
       return entries;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`${provider} catalog fetch failed: ${message}`);
+      this.logger.warn(`${provider} catalog fetch failed: ${errorMessage(err)}`);
       return this.cacheFallback(state, now);
     }
   }
@@ -284,13 +476,39 @@ export class OpencodeCatalogService implements OnModuleInit {
 
   /** Test hook: clear in-memory state. */
   resetCache(): void {
-    this.states.opencode = emptyState();
-    this.states['opencode-go'] = emptyState();
+    this.states = { opencode: emptyState(), 'opencode-go': emptyState() };
+    this.shared = emptySharedState();
   }
 }
 
 function emptyState(): CatalogState {
   return { cache: null, lastGood: null, byId: new Map(), inflight: null };
+}
+
+function emptySharedState(): SharedState {
+  return { etag: null, checkedAt: 0, retryAt: 0, inflight: null };
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Exponential from 200 ms with ±20 % jitter, cut short by the fetch budget. */
+function retryDelay(attempt: number, signal: AbortSignal): Promise<void> {
+  const ms = RETRY_BASE_MS * 2 ** attempt * (0.8 + Math.random() * 0.4);
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    timer.unref?.();
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function bareModelId(modelId: string | null | undefined): string | null {
@@ -327,15 +545,40 @@ interface RawModel {
   api?: Record<string, unknown>;
 }
 
+/**
+ * Parse a models.dev v2 document (`OPENCODE_MODELS_URL`): a record of
+ * providers, each with a `models` record. Only `opencode` and `opencode-go`
+ * are read; their model records have the same shape as the inference-host
+ * catalogs.
+ */
+export function parseOpencodeModelsDev(
+  body: unknown,
+): Record<OpencodeCatalogProvider, OpencodeCatalogEntry[]> {
+  const read = (provider: OpencodeCatalogProvider): OpencodeCatalogEntry[] => {
+    const models = (body as Record<string, { models?: unknown } | undefined> | null)?.[provider]
+      ?.models;
+    if (!models || typeof models !== 'object' || Array.isArray(models)) return [];
+    return parseModels(Object.values(models as Record<string, unknown>));
+  };
+  return { opencode: read('opencode'), 'opencode-go': read('opencode-go') };
+}
+
 /** Parse a `/inference[/go]/v1/models` body; skips non-chat and unroutable models. */
 export function parseOpencodeCatalog(body: unknown): OpencodeCatalogEntry[] {
   const data = (body as { data?: unknown })?.data;
-  if (!Array.isArray(data)) return [];
+  return Array.isArray(data) ? parseModels(data) : [];
+}
+
+function parseModels(models: unknown[]): OpencodeCatalogEntry[] {
   const entries: OpencodeCatalogEntry[] = [];
-  for (const raw of data as RawModel[]) {
+  for (const raw of models as RawModel[]) {
     if (typeof raw?.id !== 'string' || !raw.id) continue;
     if (raw.type !== undefined && raw.type !== 'chat') continue;
-    const format = API_FORMATS.find(([key]) => raw.api && key in raw.api)?.[1];
+    // Like the client, the first API listed is the model's default; take the
+    // first one Thinker has an endpoint for.
+    const format = Object.keys(raw.api ?? {})
+      .map((key) => API_FORMATS[key])
+      .find((value): value is OpencodeApiFormat => value !== undefined);
     if (!format) continue;
     const input = perToken(raw.cost?.text?.input?.price);
     const output = perToken(raw.cost?.text?.output?.price);

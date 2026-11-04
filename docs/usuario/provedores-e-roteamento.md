@@ -32,6 +32,8 @@ Cada provedor customizado tem um **alias**, o prefixo que seus modelos mostram e
 
 ### Várias chaves em um provedor customizado (key pool)
 
+Cada conexão recebe um nome `<provedor>-N` (`anthropic-1`, `opencode-2`; `custom-N` nos provedores customizados), com o menor N livre entre as conexões daquele provedor, em todos os tipos de autenticação. Removida a `anthropic-1`, a próxima conexão volta a ser `anthropic-1`. O nome pode ser trocado no formulário. Os runners locais (Ollama, LM Studio, llama.cpp) ficam com `Default`, porque têm uma conexão só. Na atualização, as conexões com os nomes gerados antes (`Default`, `Key N`) são renomeadas para o padrão, junto com as rotas fixadas nelas e o histórico de requisições.
+
 Um provedor customizado com chave de API aceita até 5 chaves, cada uma com um rótulo, todas cifradas com `THINKER_ENCRYPTION_KEY` e restritas à organização. No dashboard, abra o provedor (**Edit custom provider**) e use **Add another key**, as setas para reordenar e a lixeira para remover.
 
 As chaves formam um pool, tentado em ordem: começa pela chave fixada na rota (ou pela primeira da lista) e, se o provedor recusar a chave (401 ou 403) ou limitar a taxa (429), a mesma requisição passa para a próxima chave, antes de ir para o fallback do tier. Uma chave que recebeu 429 fica em espera pelo `Retry-After` (15 s sem o cabeçalho) e uma que recebeu 401 fica de fora por 5 minutos; nesse tempo o Thinker pula essas chaves sem chamar o provedor, a não ser que não sobre outra. Cada chave tentada aparece como uma tentativa no log, com o rótulo da chave.

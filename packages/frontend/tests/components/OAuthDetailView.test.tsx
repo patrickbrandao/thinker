@@ -426,7 +426,7 @@ describe('OAuthDetailView', () => {
     expect(mockSubmitXaiOAuthCallback).not.toHaveBeenCalled();
   });
 
-  it('shows popup-blocked toast when window.open returns null', async () => {
+  it('shows the sign-in URL to open by hand when window.open returns null', async () => {
     mockGetOpenaiOAuthUrl.mockResolvedValue({ url: 'https://oauth.openai.com/authorize' });
     vi.spyOn(window, 'open').mockReturnValue(null);
 
@@ -434,10 +434,11 @@ describe('OAuthDetailView', () => {
     fireEvent.click(screen.getByText('Log in with OpenAI'));
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith(
-        'Popup was blocked by your browser. Allow popups for this site, then try again.',
-      );
+      expect(screen.getByText('https://oauth.openai.com/authorize')).toBeDefined();
     });
+    // The paste-the-callback field is ready for the sign-in done elsewhere.
+    expect(screen.getByPlaceholderText(/localhost:1455\/auth\/callback/)).toBeDefined();
+    expect(mockToastError).not.toHaveBeenCalled();
   });
 
   it('shows the copy-the-callback-URL hint for OpenAI after starting OAuth, without a video', async () => {

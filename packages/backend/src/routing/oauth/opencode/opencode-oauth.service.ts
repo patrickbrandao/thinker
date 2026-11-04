@@ -4,21 +4,24 @@ import { ProviderService } from '../../routing-core/provider.service';
 import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { scrubSecrets } from '../../../common/utils/secret-scrub';
 import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import { OPENCODE_USER_AGENT } from '../../../common/constants/subscription-clients';
 import {
   coordinateOAuthRefresh,
   oauthRefreshKey,
   parseOAuthTokenBlob,
   serializeOAuthTokenBlob,
   subscriptionCredentialLock,
-  toPollIntervalMs,
   type OAuthTokenBlob,
 } from '../core';
 
 /**
- * OpenCode Console device login (OAuth 2.0 Device Authorization Grant), the
- * same flow `opencode auth login opencode` runs. The access token is
- * organization-scoped and authenticates OpenCode and OpenCode Go inference as
- * a Bearer token; refresh tokens rotate on every refresh.
+ * OpenCode Console device login (OAuth 2.0 Device Authorization Grant),
+ * reproducing what the OpenCode 2 client (`anomalyco/opencode`,
+ * packages/core/src/plugin/provider/opencode.ts) sends: the same requests,
+ * headers, poll cadence, follow-up calls and refresh margin, so the Console
+ * sees an OpenCode client. The access token is organization-scoped and
+ * authenticates OpenCode and OpenCode Go inference as a Bearer token; refresh
+ * tokens rotate on every refresh.
  */
 export const OPENCODE_CONSOLE_SERVER = 'https://opencode.ai/console';
 /** OpenCode Go allowance meter: rolling 5-hour, weekly and monthly windows. */
@@ -28,8 +31,17 @@ const CLIENT_ID = 'opencode-cli';
 /** Providers a Console login connects; each keeps its own subscription row. */
 export type OpencodeConsoleProvider = 'opencode' | 'opencode-go';
 const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
-const DEFAULT_POLL_INTERVAL_MS = 5000;
+/** The client adds 5 s to its wait on every slow_down and keeps it. */
 const SLOW_DOWN_STEP_MS = 5000;
+/** The client gives a login attempt 10 minutes, whatever `expires_in` says. */
+const LOGIN_ATTEMPT_MS = 10 * 60_000;
+/** The client refreshes a token used within 5 minutes of its expiry. */
+const REFRESH_MARGIN_MS = 5 * 60_000;
+const REFRESH_TIMEOUT_MS = 30_000;
+/** A connected client reads its Console config every 60 s. */
+export const CONSOLE_CONFIG_INTERVAL_MS = 60_000;
+/** Headers the client sends on every Console call (its HTTP client is mapped to set the UA). */
+const CONSOLE_HEADERS = { accept: 'application/json', 'user-agent': OPENCODE_USER_AGENT };
 
 interface PendingOpencodeOAuth {
   provider: OpencodeConsoleProvider;
@@ -38,7 +50,12 @@ interface PendingOpencodeOAuth {
   tenantId: string;
   createdByUserId: string | null;
   expiresAt: number;
+  /** The client's current wait between polls (grows on slow_down). */
   pollIntervalMs: number;
+  /** No upstream poll before this: the client sleeps one wait before each poll. */
+  nextPollAt: number;
+  /** The upstream poll in progress; polls are strictly sequential, like the client's. */
+  inFlight: Promise<OpencodeOAuthPollResult> | null;
 }
 
 interface DeviceCodeResponse {
@@ -55,6 +72,16 @@ interface TokenResponse {
   expires_in?: number;
   org_id?: string | null;
   error?: string;
+}
+
+interface ConsoleUser {
+  id?: string;
+  email?: string;
+}
+
+interface ConsoleOrg {
+  id: string;
+  name: string;
 }
 
 export interface OpencodeOAuthStartResult {
@@ -91,6 +118,10 @@ export interface OpencodeOAuthPollResult {
   pollIntervalMs?: number;
 }
 
+function errorText(err: unknown): string {
+  return scrubSecrets(err instanceof Error ? err.message : String(err));
+}
+
 function parseJson<T>(text: string): T | null {
   try {
     return JSON.parse(text) as T;
@@ -99,18 +130,63 @@ function parseJson<T>(text: string): T | null {
   }
 }
 
-function postJson(url: string, body: Record<string, string | boolean>) {
+function postJson(url: string, body: Record<string, string | boolean>, signal?: AbortSignal) {
   return outboundFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { ...CONSOLE_HEADERS, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    ...(signal && { signal }),
   });
+}
+
+/** A Console GET with the access token; like the client, any non-2xx fails. */
+async function getConsoleJson<T>(url: string, accessToken: string): Promise<T> {
+  const response = await outboundFetch(url, {
+    headers: { ...CONSOLE_HEADERS, authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(`OpenCode Console ${url} returned ${response.status}`);
+  const body = parseJson<T>(await response.text());
+  if (body === null) throw new Error(`OpenCode Console ${url} returned an unreadable body`);
+  return body;
+}
+
+/**
+ * The Console refused the refresh token (400 `invalid_grant`): the session
+ * was revoked or expired and only a new device login recovers it.
+ */
+export class OpencodeSignedOutError extends Error {
+  constructor() {
+    super('OpenCode Console session ended (invalid_grant); reconnect the login');
+    this.name = 'OpencodeSignedOutError';
+  }
+}
+
+/** Refresh tokens remembered as signed out, bounded like the rejection cooldown. */
+const MAX_SIGNED_OUT = 1_000;
+
+/**
+ * One Console login per workspace and organization: an `opencode` and an
+ * `opencode-go` row signed in to the same org are one client, not two.
+ */
+export function opencodeLoginKey(tenantId: string, orgId: string | undefined, label?: string) {
+  return `${tenantId}\u0000${orgId ?? label ?? ''}`;
 }
 
 @Injectable()
 export class OpencodeOauthService {
   private readonly logger = new Logger(OpencodeOauthService.name);
   private readonly pending = new Map<string, PendingOpencodeOAuth>();
+  /**
+   * Last Console config read per login (`opencodeLoginKey`). Every read goes
+   * through `readConsoleConfig`, which allows one per 60 s, whatever asks.
+   */
+  private readonly configReadAt = new Map<string, number>();
+  /**
+   * Refresh tokens the Console answered `invalid_grant` for. They are never
+   * sent again: the proxy and the background monitor both skip them until a
+   * new login stores a new token. Compared, never logged or persisted.
+   */
+  private readonly signedOut = new Set<string>();
 
   constructor(
     private readonly providerService: ProviderService,
@@ -134,11 +210,13 @@ export class OpencodeOauthService {
       throw new Error('Failed to start OpenCode login');
     }
     const payload = parseJson<DeviceCodeResponse>(text);
+    // The client requires every field, `interval` included (it has no default).
     if (
       !payload?.device_code ||
       !payload.user_code ||
       !payload.verification_uri_complete ||
-      !payload.expires_in
+      typeof payload.expires_in !== 'number' ||
+      typeof payload.interval !== 'number'
     ) {
       throw new Error('OpenCode returned an incomplete device authorization payload.');
     }
@@ -147,8 +225,10 @@ export class OpencodeOauthService {
       throw new Error('OpenCode returned an invalid verification URL.');
     }
     const flowId = randomBytes(16).toString('base64url');
-    const expiresAt = Date.now() + payload.expires_in * 1000;
-    const pollIntervalMs = toPollIntervalMs(payload.interval, DEFAULT_POLL_INTERVAL_MS);
+    const now = Date.now();
+    const expiresAt = now + LOGIN_ATTEMPT_MS;
+    // `interval` is always seconds for the client.
+    const pollIntervalMs = payload.interval * 1000;
     this.pending.set(flowId, {
       provider,
       deviceCode: payload.device_code,
@@ -157,6 +237,8 @@ export class OpencodeOauthService {
       createdByUserId: createdByUserId ?? null,
       expiresAt,
       pollIntervalMs,
+      nextPollAt: now + pollIntervalMs,
+      inFlight: null,
     });
     return {
       flowId,
@@ -167,6 +249,11 @@ export class OpencodeOauthService {
     };
   }
 
+  /**
+   * The dashboard may ask at any time (several tabs, a page back in focus);
+   * the Console is polled only on the client's own cadence: one wait before
+   * each poll, measured from the previous reply, never two at once.
+   */
   async pollAuthorization(flowId: string, tenantId: string): Promise<OpencodeOAuthPollResult> {
     this.cleanupExpired();
     const pending = this.pending.get(flowId);
@@ -177,6 +264,21 @@ export class OpencodeOauthService {
         message: 'OpenCode login session does not match the current account.',
       };
     }
+    if (pending.inFlight) return pending.inFlight;
+    const wait = pending.nextPollAt - Date.now();
+    if (wait > 0) return { status: 'pending', pollIntervalMs: wait };
+    const inFlight = this.pollUpstream(flowId, pending).finally(() => {
+      pending.inFlight = null;
+      pending.nextPollAt = Date.now() + pending.pollIntervalMs;
+    });
+    pending.inFlight = inFlight;
+    return inFlight;
+  }
+
+  private async pollUpstream(
+    flowId: string,
+    pending: PendingOpencodeOAuth,
+  ): Promise<OpencodeOAuthPollResult> {
     // The token endpoint answers pending/slow_down in the body, not the status.
     const response = await postJson(`${OPENCODE_CONSOLE_SERVER}/auth/device/token`, {
       grant_type: DEVICE_GRANT_TYPE,
@@ -198,11 +300,34 @@ export class OpencodeOauthService {
     if (!payload?.access_token || !payload.refresh_token || !payload.expires_in) {
       return { status: 'error', message: 'OpenCode returned an incomplete token payload.' };
     }
+
+    // Like the client: read the account and its organizations, then pick the
+    // token's organization, or the first by name when the token names none.
+    let orgId: string | undefined;
+    try {
+      const [, orgs] = await Promise.all([
+        getConsoleJson<ConsoleUser>(`${OPENCODE_CONSOLE_SERVER}/api/user`, payload.access_token),
+        getConsoleJson<ConsoleOrg[]>(`${OPENCODE_CONSOLE_SERVER}/api/orgs`, payload.access_token),
+      ]);
+      const list = Array.isArray(orgs) ? orgs : [];
+      const org =
+        payload.org_id == null
+          ? list.slice().sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))[0]
+          : list.find((o) => o.id === payload.org_id);
+      if (payload.org_id != null && !org) {
+        return { status: 'error', message: `OpenCode organization not found: ${payload.org_id}` };
+      }
+      orgId = org?.id;
+    } catch (err) {
+      this.logger.error(`OpenCode account lookup after login failed: ${scrubSecrets(String(err))}`);
+      return { status: 'error', message: 'OpenCode login failed reading the account.' };
+    }
+
     const blob: OAuthTokenBlob = {
       t: payload.access_token,
       r: payload.refresh_token,
       e: Date.now() + payload.expires_in * 1000,
-      ...(payload.org_id ? { u: payload.org_id } : {}),
+      ...(orgId ? { u: orgId } : {}),
     };
     const label = await this.providerService.nextOAuthLabel(pending.tenantId, pending.provider);
     const { provider: savedProvider } = await this.providerService.upsertProvider(
@@ -221,23 +346,40 @@ export class OpencodeOauthService {
       this.logger.warn(`Model discovery after OpenCode OAuth failed: ${err}`);
     }
     this.logger.log(`OpenCode OAuth token stored for agent=${pending.agentId}`);
+    // The client reads its Console config as soon as it signs in; the
+    // background monitor takes over from the next minute.
+    void this.readConsoleConfig(
+      opencodeLoginKey(pending.tenantId, orgId, savedProvider?.label ?? label),
+      blob.t,
+      orgId,
+    ).catch((err: unknown) =>
+      this.logger.debug(`OpenCode Console config read after login failed: ${errorText(err)}`),
+    );
     return { status: 'success' };
   }
 
-  /** Refresh grant; the response rotates the refresh token, so both are replaced. */
+  /**
+   * Refresh grant; the response rotates the refresh token, so both are
+   * replaced. A 400 `invalid_grant` throws `OpencodeSignedOutError` and marks
+   * the refresh token as signed out, like the client's `SignedOutError`.
+   */
   async refreshAccessToken(current: OAuthTokenBlob): Promise<OAuthTokenBlob> {
-    const response = await postJson(`${OPENCODE_CONSOLE_SERVER}/auth/device/token`, {
-      grant_type: 'refresh_token',
-      refresh_token: current.r,
-      client_id: CLIENT_ID,
-    });
+    if (this.signedOut.has(current.r)) throw new OpencodeSignedOutError();
+    const response = await postJson(
+      `${OPENCODE_CONSOLE_SERVER}/auth/device/token`,
+      { grant_type: 'refresh_token', refresh_token: current.r, client_id: CLIENT_ID },
+      AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+    );
     const text = await response.text();
     if (!response.ok) {
-      // 400 invalid_grant means the Console session is gone: only a new login recovers.
-      this.logger.error(
-        `OpenCode token refresh failed (${response.status}): ${scrubSecrets(text)}`,
+      if (response.status === 400 && parseJson<TokenResponse>(text)?.error === 'invalid_grant') {
+        if (this.signedOut.size >= MAX_SIGNED_OUT) this.signedOut.clear();
+        this.signedOut.add(current.r);
+        throw new OpencodeSignedOutError();
+      }
+      throw new Error(
+        `OpenCode token refresh failed (${response.status}): ${scrubSecrets(text).slice(0, 200)}`,
       );
-      throw new Error('Token refresh failed');
     }
     const payload = parseJson<TokenResponse>(text);
     if (!payload?.access_token || !payload.refresh_token || !payload.expires_in) {
@@ -250,6 +392,11 @@ export class OpencodeOauthService {
       e: Date.now() + payload.expires_in * 1000,
       ...(orgId ? { u: orgId } : {}),
     };
+  }
+
+  /** True once the Console answered `invalid_grant` for this refresh token. */
+  isSignedOut(refreshToken: string): boolean {
+    return this.signedOut.has(refreshToken);
   }
 
   /**
@@ -266,27 +413,58 @@ export class OpencodeOauthService {
   ): Promise<string | null> {
     const blob = parseOAuthTokenBlob(rawValue);
     if (!blob?.t || !blob.r) return null;
-    if (Date.now() < blob.e - 60_000) return blob.t;
+    // No Console call here: the background monitor reads the config of every
+    // login once a minute, whether or not it is in use.
+    return this.resolveAccessToken(blob, agentId, tenantId, keyLabel, provider);
+  }
+
+  private async resolveAccessToken(
+    blob: OAuthTokenBlob,
+    agentId: string,
+    tenantId: string,
+    keyLabel: string | undefined,
+    provider: OpencodeConsoleProvider,
+  ): Promise<string | null> {
+    if (Date.now() < blob.e - REFRESH_MARGIN_MS) return blob.t;
     try {
-      const resolved = await coordinateOAuthRefresh<OAuthTokenBlob>({
-        key: oauthRefreshKey(provider, tenantId, keyLabel),
-        logger: this.logger,
-        callerBlob: blob,
-        parse: parseOAuthTokenBlob,
-        refresh: (current) => this.refreshAccessToken(current),
-        withLock: subscriptionCredentialLock(
-          (t, p, l, fn) => this.providerService.withSubscriptionCredentialLock(t, p, l, fn),
-          tenantId,
-          provider,
-          keyLabel,
-          serializeOAuthTokenBlob,
-        ),
-      });
-      return resolved.t;
+      return (await this.ensureFreshToken(blob, tenantId, provider, keyLabel)).t;
     } catch (err) {
-      this.logger.error(`Failed to refresh OpenCode OAuth token for agent=${agentId}: ${err}`);
+      this.logger.error(
+        `Failed to refresh OpenCode OAuth token for agent=${agentId}: ${errorText(err)}`,
+      );
       return Date.now() < blob.e ? blob.t : null;
     }
+  }
+
+  /**
+   * The stored login with a usable access token: refreshed when it is within
+   * 5 minutes of expiry (the client's lazy check), under the single-flight
+   * coordinator and the row lock, so a rotation is persisted exactly once
+   * whoever asks (a proxied request or the background monitor). Rejects when
+   * the refresh fails; `OpencodeSignedOutError` means only a new login helps.
+   */
+  async ensureFreshToken(
+    blob: OAuthTokenBlob,
+    tenantId: string,
+    provider: OpencodeConsoleProvider,
+    keyLabel: string | undefined,
+  ): Promise<OAuthTokenBlob> {
+    if (Date.now() < blob.e - REFRESH_MARGIN_MS) return blob;
+    return coordinateOAuthRefresh<OAuthTokenBlob>({
+      key: oauthRefreshKey(provider, tenantId, keyLabel),
+      logger: this.logger,
+      callerBlob: blob,
+      parse: parseOAuthTokenBlob,
+      refresh: (current) => this.refreshAccessToken(current),
+      expirySkewMs: REFRESH_MARGIN_MS,
+      withLock: subscriptionCredentialLock(
+        (t, p, l, fn) => this.providerService.withSubscriptionCredentialLock(t, p, l, fn),
+        tenantId,
+        provider,
+        keyLabel,
+        serializeOAuthTokenBlob,
+      ),
+    });
   }
 
   /**
@@ -306,8 +484,8 @@ export class OpencodeOauthService {
     if (!token) return null;
     const response = await outboundFetch(OPENCODE_GO_USAGE_URL, {
       headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...CONSOLE_HEADERS,
+        authorization: `Bearer ${token}`,
         'x-opencode-org-id': orgId,
       },
       signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
@@ -328,6 +506,49 @@ export class OpencodeOauthService {
       weekly: window(body?.usage?.weekly),
       monthly: window(body?.usage?.monthly),
     };
+  }
+
+  /**
+   * `GET /api/v2/config` as the client sends it on login and every 60 s while
+   * connected (packages/core/src/plugin/provider/opencode.ts, fetchConfig).
+   * At most one read per login per 60 s, whoever triggers it: returns false
+   * without a request inside that window. The body is read and dropped:
+   * Thinker does not apply the Console's remote config (ADR 0009). A non-2xx
+   * other than 404 (the client's "no config") rejects.
+   */
+  async readConsoleConfig(
+    loginKey: string,
+    accessToken: string,
+    orgId: string | undefined,
+  ): Promise<boolean> {
+    const now = Date.now();
+    if (now - (this.configReadAt.get(loginKey) ?? -Infinity) < CONSOLE_CONFIG_INTERVAL_MS) {
+      return false;
+    }
+    this.configReadAt.set(loginKey, now);
+    const response = await outboundFetch(`${OPENCODE_CONSOLE_SERVER}/api/v2/config`, {
+      headers: {
+        ...CONSOLE_HEADERS,
+        authorization: `Bearer ${accessToken}`,
+        ...(orgId && { 'x-org-id': orgId }),
+      },
+      signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+    });
+    await response.text().catch(() => undefined);
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`OpenCode Console config returned ${response.status}`);
+    }
+    return true;
+  }
+
+  /** When `readConsoleConfig` last sent a request for this login, if ever. */
+  consoleConfigReadAt(loginKey: string): number | undefined {
+    return this.configReadAt.get(loginKey);
+  }
+
+  /** Forget a login that no longer exists, so a new one reads at once. */
+  forgetLogin(loginKey: string): void {
+    this.configReadAt.delete(loginKey);
   }
 
   getPendingCount(): number {

@@ -21,6 +21,7 @@ import {
 import { computeCutoff } from '../../common/utils/postgres-sql';
 import { sqlCastFloat, sqlSanitizeCost } from '../../common/utils/postgres-sql';
 import { rangeToInterval } from '../../common/utils/range.util';
+import { providerKeyDisplay } from '../../common/utils/provider-key-mask';
 
 @Controller('api/v1/provider-analytics')
 export class ProviderAnalyticsController {
@@ -416,7 +417,7 @@ export class ProviderAnalyticsController {
         auth_type: conn.auth_type,
         label: conn.label,
         cached_model_count: cachedModelCount,
-        key_prefix: conn.key_prefix,
+        ...providerKeyDisplay(conn),
         connected_at: conn.connected_at,
         is_active: conn.is_active,
         stream_warmup_ms: conn.stream_warmup_ms ?? null,

@@ -28,6 +28,11 @@ export const OPENCODE_USER_AGENT = `opencode/latest/${OPENCODE_CLIENT_VERSION}/$
 /** The key OpenCode sends when it has none: unlocks only the free models. */
 export const OPENCODE_FREE_KEY = 'public';
 
+/** Whether `apiKey` is a provider's shared free key rather than an account's own. */
+export function isSharedFreeKey(provider: string, apiKey: string): boolean {
+  return provider.toLowerCase() === 'opencode' && apiKey === OPENCODE_FREE_KEY;
+}
+
 export const CLAUDE_CODE_USER_AGENT = 'claude-cli/2.1.280 (external, sdk-cli)';
 export const CLAUDE_CODE_STAINLESS_PACKAGE_VERSION = '0.80.0';
 export const CLAUDE_CODE_STAINLESS_RUNTIME_VERSION = 'v24.14.0';

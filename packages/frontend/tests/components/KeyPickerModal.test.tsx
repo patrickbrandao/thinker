@@ -53,21 +53,26 @@ describe('KeyPickerModal', () => {
     expect(onPick).toHaveBeenCalledWith('Work');
   });
 
-  it('shows the masked key prefix beside each label', () => {
+  it('shows the server-side masked key beside each label', () => {
     render(
       <KeyPickerModal
         providerName="Google"
         modelName="Gemini 2.5 Pro"
-        keys={[k({ label: 'Personal', key_prefix: 'AIzaSyBm' })]}
+        keys={[
+          k({
+            label: 'Personal',
+            key_prefix: 'AIzaSyBmXXXX',
+            key_masked: 'AIzaSyBmXXXX********abcd',
+          }),
+        ]}
         onPick={vi.fn()}
         onClose={vi.fn()}
       />,
     );
-    // prefix + 8 dots
-    expect(screen.getByText(/AIzaSyBm•+/)).toBeDefined();
+    expect(screen.getByText('AIzaSyBmXXXX********abcd')).toBeDefined();
   });
 
-  it('falls back to a generic mask when key_prefix is null', () => {
+  it('falls back to a generic mask when the server sent no mask', () => {
     render(
       <KeyPickerModal
         providerName="Google"

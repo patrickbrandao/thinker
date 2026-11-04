@@ -1354,7 +1354,8 @@ describe('PlaygroundService.runStream', () => {
 
     await service.runStream(CTX, makeDto({ provider: 'opencode-go' }), asRes(mockRes()));
     const auto = mocks.providerClient.forward.mock.calls[0][0].extraHeaders;
-    expect(auto['x-opencode-session']).toMatch(/^thinker-[0-9a-f]{32}$/);
+    expect(auto['x-opencode-session']).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(auto['x-opencode-project']).toMatch(/^[0-9a-f]{40}$/);
 
     await service.runStream(
       CTX,
@@ -1362,7 +1363,8 @@ describe('PlaygroundService.runStream', () => {
       asRes(mockRes()),
     );
     const overridden = mocks.providerClient.forward.mock.calls[1][0].extraHeaders;
-    expect(overridden).toEqual({ 'X-OpenCode-Session': 'mine' });
+    expect(overridden['X-OpenCode-Session']).toBe('mine');
+    expect(overridden['x-opencode-session']).toBeUndefined();
   });
 
   it('send() is a no-op once the response has ended (no write after end)', async () => {

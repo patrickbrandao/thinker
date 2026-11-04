@@ -495,6 +495,7 @@ export class ProviderClient {
       thinkingRouteContext: opts.thinkingRouteContext,
       clientAnthropicBeta: opts.clientAnthropicBeta,
       providerResource: opts.providerResource,
+      oauthToken: opts.oauthToken,
       sessionKey: opts.sessionKey,
       providerCacheKey: opts.providerCacheKey,
     });
@@ -724,6 +725,7 @@ export class ProviderClient {
     thinkingRouteContext?: ForwardOptions['thinkingRouteContext'];
     clientAnthropicBeta?: ForwardOptions['clientAnthropicBeta'];
     providerResource?: string;
+    oauthToken?: boolean;
     sessionKey?: string;
     providerCacheKey?: string;
   }): BuiltProviderRequest {
@@ -752,7 +754,7 @@ export class ProviderClient {
         : innerBody;
       return {
         url,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
         requestBody,
       };
     }
@@ -801,7 +803,7 @@ export class ProviderClient {
       return {
         url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
         headers: withClientAnthropicBeta(
-          endpoint.buildHeaders(apiKey, authType),
+          endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
           // Native Messages traffic to Anthropic itself, and nothing else.
           //
           // Host, not the registry key: a tenant can reach Anthropic through a
@@ -901,7 +903,7 @@ export class ProviderClient {
       }
       return {
         url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
         requestBody,
       };
     }
@@ -960,7 +962,7 @@ export class ProviderClient {
     }
     return {
       url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-      headers: endpoint.buildHeaders(apiKey, authType),
+      headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
       requestBody,
     };
   }

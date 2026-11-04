@@ -6,8 +6,8 @@
  * CORS/CSP. All of it is gone; this guards against any of it coming back.
  *
  * The only outbound catalog destinations allowed are the ones in ADR 0003
- * (openrouter.ai and models.dev), plus opencode.ai when an OpenCode provider is
- * registered (its own catalog, ADR 0009).
+ * (openrouter.ai and models.dev), plus OpenCode's hosts when an OpenCode
+ * provider is registered (its catalog on models.opencode.ai, ADR 0009).
  * #39 tightens that: the OpenCode Go doc is fetched only when an OpenCode Go
  * provider is registered, and THINKER_CATALOG_SYNC=false silences all three.
  * #109: with no provider configured, the setup status route no longer probes a
@@ -40,8 +40,12 @@ const HOSTED_GATEWAY_HOSTS = ['app.manifest.build', 'gateway.manifest.build'];
  * left (#22): the dashboard link fallback is now the local default port.
  */
 const BACKEND_HOSTED_GATEWAY_LEFTOVERS: string[] = [];
-/** OpenCode's own host: its catalog is warmed only for a registered provider. */
-const OPENCODE_HOST = 'opencode.ai';
+/**
+ * OpenCode's hosts: the client catalog on models.opencode.ai (warmed only for
+ * a registered provider) and the inference host's own catalog (fallback).
+ */
+const OPENCODE_CATALOG_HOST = 'models.opencode.ai';
+const OPENCODE_HOSTS = new Set([OPENCODE_CATALOG_HOST, 'opencode.ai']);
 const ADR_0003_CATALOG_HOSTS = new Set(['openrouter.ai', 'models.dev']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
@@ -392,7 +396,8 @@ describe('no phone-home egress', () => {
     });
 
     it('does not fetch the OpenCode catalog without an OpenCode provider', () => {
-      expect(remoteFetchHosts(server!.records)).not.toContain(OPENCODE_HOST);
+      const remote = remoteFetchHosts(server!.records);
+      expect(remote.filter((host) => OPENCODE_HOSTS.has(host))).toEqual([]);
     });
 
     it('resolves no remote hostname, so nothing bypasses fetch to reach the network', () => {
@@ -483,11 +488,11 @@ describe('no phone-home egress', () => {
         await server?.stop();
       }, 30_000);
 
-      it('warms the OpenCode Go catalog, and fetches nothing else outside ADR 0003', () => {
+      it('warms the OpenCode catalog, and fetches nothing else outside ADR 0003', () => {
         const remote = remoteFetchHosts(server!.records);
-        expect(remote).toContain(OPENCODE_HOST);
+        expect(remote).toContain(OPENCODE_CATALOG_HOST);
         expect(
-          remote.filter((host) => host !== OPENCODE_HOST && !ADR_0003_CATALOG_HOSTS.has(host)),
+          remote.filter((host) => !OPENCODE_HOSTS.has(host) && !ADR_0003_CATALOG_HOSTS.has(host)),
         ).toEqual([]);
       });
 

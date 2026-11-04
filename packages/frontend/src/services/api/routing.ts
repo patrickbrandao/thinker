@@ -18,7 +18,10 @@ export interface RoutingProvider {
   auth_type: AuthType;
   is_active: boolean;
   has_api_key: boolean;
+  /** Visible leading characters of `key_masked` (server-side, never past half the key). */
   key_prefix?: string | null;
+  /** The key with at least half of it hidden by `*`; null when no key is stored. */
+  key_masked?: string | null;
   /**
    * User-facing key label. Defaults to "Default" for legacy single-key
    * providers; multi-key chains expose user-supplied names like "Personal"
@@ -151,6 +154,15 @@ export function startConnectionReauth(connectionId: string) {
   return fetchMutate<{ id: string; provider: string; label: string }>(
     `/providers/connections/${encodeURIComponent(connectionId)}/reauth`,
     { method: 'POST' },
+  );
+}
+
+/** The connection's full API key. Owner only; the backend logs every reveal. */
+export function revealConnectionKey(connectionId: string) {
+  return fetchMutate<{ id: string; api_key: string }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/reveal-key`,
+    { method: 'POST', cache: 'no-store' },
+    { silent: true },
   );
 }
 
@@ -560,7 +572,12 @@ export interface CustomProviderData {
   local_config?: LocalServerConfig | null;
   has_api_key: boolean;
   /** Key pool in the order the proxy tries it (managed through the provider key endpoints). */
-  keys?: Array<{ label: string; key_prefix: string | null; priority: number }>;
+  keys?: Array<{
+    label: string;
+    key_prefix: string | null;
+    key_masked?: string | null;
+    priority: number;
+  }>;
   /** Primary connection's stream warm-up override in ms; null inherits. */
   stream_warmup_ms?: number | null;
   models: CustomProviderModel[];

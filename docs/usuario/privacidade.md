@@ -12,9 +12,9 @@ São GETs anônimos, sem nenhum dado da sua instância, que alimentam preços, j
 | --- | --- | --- |
 | `openrouter.ai` (`/api/v1/models`) | No boot e uma vez por dia. Ligado por padrão. | `THINKER_CATALOG_SYNC=false` |
 | `models.dev` (`/api.json`) | No boot e uma vez por dia. Ligado por padrão. | `THINKER_CATALOG_SYNC=false` |
-| `opencode.ai` (catálogo do OpenCode e do OpenCode Go) | Só quando existe um provedor OpenCode ou OpenCode Go cadastrado; cache de 1 hora. É o host do próprio provedor. | `THINKER_CATALOG_SYNC=false` só adia a busca para o primeiro uso do provedor |
+| `models.opencode.ai` (catálogo do OpenCode e do OpenCode Go, o mesmo que o cliente OpenCode usa) | Só enquanto existe uma conta OpenCode ou OpenCode Go ativa: no boot e a cada 5 minutos, uma busca por instância, condicional (normalmente responde "sem mudança"). É tráfego do próprio provedor. | `THINKER_CATALOG_SYNC=false` (o catálogo passa a vir de `opencode.ai/inference/...` no primeiro uso do provedor) |
 
-Com `THINKER_CATALOG_SYNC=false` as três buscas somem e os custos vêm do snapshot de preços embutido na imagem (OpenRouter e models.dev do dia do build, baixados só durante o build, nunca em execução); as requisições do OpenCode Go custam `$0`. Indicado para ambientes isolados da internet.
+Com `THINKER_CATALOG_SYNC=false` as buscas de catálogo em `openrouter.ai`, `models.dev` e `models.opencode.ai` somem e os custos vêm do snapshot de preços embutido na imagem (OpenRouter e models.dev do dia do build, baixados só durante o build, nunca em execução); o catálogo do OpenCode e do OpenCode Go vem do host de inferência do próprio provedor, no primeiro uso. Indicado para ambientes isolados da internet.
 
 ## Destinos que você configura
 
@@ -25,6 +25,7 @@ Estes só são contatados porque você os configurou, e só quando o recurso é 
 | APIs de inferência e de listagem de modelos dos **provedores conectados**, incluindo Ollama Cloud (`ollama.com`) e os servidores locais cadastrados (Ollama, LM Studio, llama.cpp) | Requisições roteadas e descoberta de modelos. |
 | URLs dos **provedores customizados**, inclusive em LAN | Idem. |
 | **Fluxos OAuth e de assinatura** dos provedores que você conecta, como `auth.openai.com`, `claude.ai` e `console.anthropic.com`, `accounts.google.com`, `oauth2.googleapis.com` e `cloudcode-pa.googleapis.com`, `github.com` e `api.github.com` (Copilot), `auth.x.ai`, MiniMax e o AWS SSO (Kiro) | Ao conectar ou renovar a assinatura. |
+| **Login no Console do OpenCode** (`opencode.ai/console`) | Só para contas conectadas por login no Console, enquanto existem e estão ativas: renovação do token perto do vencimento e leitura da config do Console a cada minuto, como um cliente OpenCode aberto. Contas com chave colada ou `public` não fazem essas chamadas. Para parar, remova ou desative a conta. |
 | **E-mail de autenticação** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |
 | **Gatilhos de eventos**: as APIs de e-mail (`api.resend.com`, `api.sendgrid.com`, `api.mailgun.net`), `api.telegram.org`, a URL de cada webhook e o servidor Syslog que você cadastrar | Só para os gatilhos cadastrados no workspace e ligados a um harness ou evento. |
 | **Login social** (Google, GitHub, Discord) | Só se o par `*_CLIENT_ID`/`*_CLIENT_SECRET` estiver definido. |

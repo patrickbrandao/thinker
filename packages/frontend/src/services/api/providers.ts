@@ -5,6 +5,8 @@ export interface TenantProviderConnection {
   id: string;
   label: string;
   key_prefix: string | null;
+  /** The key with at least half of it hidden by `*`; null when no key is stored. */
+  key_masked?: string | null;
   priority: number;
   connected_at: string;
   models_fetched_at: string | null;

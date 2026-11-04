@@ -19,8 +19,10 @@ export default {
     connected: '{{ name }} connected',
     subscriptionConnected: '{{ name }} subscription connected',
     subscriptionDisconnected: '{{ name }} subscription disconnected',
-    popupBlocked: 'Popup was blocked by your browser. Allow popups for this site, then try again.',
+    popupBlockedOpenLink:
+      'Your browser blocked the sign-in window. Open this link in another browser, or copy it; this screen keeps waiting.',
     addConnection: 'Add connection',
+    newConnectionFor: 'New connection: {{ name }}',
     reauthConnection: 'Sign in again: {{ label }}',
     reauthNote:
       'The next sign-in replaces the credential of "{{ label }}". Harness access, routes and history stay as they are.',
@@ -40,11 +42,9 @@ export default {
     resetsAt: 'Resets {{ time }}',
   },
   keyForm: {
-    freeDivider: 'or',
-    connectFree: 'Use free models (no key)',
-    freeHint:
-      'Only the free models, with a daily limit set by the provider. Some free models may use your data for training.',
-    freeLabel: 'Free',
+    nameTaken: 'A connection named {{ label }} already exists. Pick another name.',
+    freeKeyHint:
+      'The key {{ key }} gives only the free models, like a fresh OpenCode install, with a daily limit set by the provider. Some of them may use your data for training. Paste your API key to unlock every model.',
     nounApiKey: 'API key',
     nounSetupToken: 'setup token',
     pasteToken: 'Paste token',
@@ -223,6 +223,7 @@ export default {
     connectWith: 'Connect with {{ name }}',
     codingPlanToken: '{{ name }} Coding Plan token',
     connectWithToken: 'Connect with token',
+    connectionMethod: 'How to connect {{ name }}',
     tabOpened:
       'A new tab opened with the {{ name }} authorization page. Approve the request there to finish connecting.',
   },
@@ -270,11 +271,24 @@ export default {
     signInWithGoogle: 'Sign in with Google',
     pasteYourKey: 'Paste your {{ name }} API key',
     signInTo: 'Sign in to {{ name }}',
-    opencodeDivider: 'Or paste an OpenCode API key',
+    opencodeGoMethod: {
+      login: 'OpenCode Console sign-in (recommended)',
+      loginHint:
+        'Sign in through your browser with a device code. The token renews itself and the account page shows the quota meter (5 hours, week, month).',
+      token: 'API key',
+      tokenHint:
+        'Paste a key created in the OpenCode Console. Inference works, but there is no quota meter: a key does not say which organization it belongs to.',
+    },
     commandCodeRequirement: 'Requires Command Code Pro or higher.',
     geminiClosed:
       'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',
-    minimaxDivider: 'Or paste your Coding Plan token',
+    minimaxMethod: {
+      login: 'MiniMax sign-in (recommended)',
+      loginHint: 'Sign in through your browser with a device code. The token renews itself.',
+      token: 'Coding Plan token',
+      tokenHint:
+        'Paste the sk-cp- token from your Coding Plan page. It does not renew; replace it when it changes.',
+    },
     regions: {
       autoDetect: 'Auto-detect',
       chinaBeijing: 'China (Beijing)',

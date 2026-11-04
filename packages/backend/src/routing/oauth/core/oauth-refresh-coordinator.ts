@@ -78,6 +78,8 @@ export interface CoordinatedRefreshParams<T extends RefreshableBlob> {
    * refreshes serialize. Tests can use a no-op wrapper around mock ops.
    */
   readonly withLock: <R>(fn: (ops: CredentialLockOps<T>) => Promise<R>) => Promise<R>;
+  /** How long before expiry a token counts as expiring; defaults to `REFRESH_EXPIRY_SKEW_MS`. */
+  readonly expirySkewMs?: number;
 }
 
 /**
@@ -166,7 +168,8 @@ async function refreshOnce<T extends RefreshableBlob>(
     // whatever its stored expiry says.
     const rejectedToken =
       params.callerBlob.e === REJECTED_TOKEN_EXPIRY && current.t === params.callerBlob.t;
-    if (!rejectedToken && Date.now() < current.e - REFRESH_EXPIRY_SKEW_MS) return current;
+    const skew = params.expirySkewMs ?? REFRESH_EXPIRY_SKEW_MS;
+    if (!rejectedToken && Date.now() < current.e - skew) return current;
 
     const refreshed = await params.refresh(current);
     await persistWithRetry(params, ops.persist, refreshed);

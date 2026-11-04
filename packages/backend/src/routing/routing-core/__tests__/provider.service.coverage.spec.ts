@@ -249,12 +249,12 @@ describe('ProviderService — coverage completion', () => {
     expect(priv().decryptOrNull('not-real-ciphertext')).toBeNull();
   });
 
-  it('nextOAuthLabel falls back to Key N+1 when the candidate range is exhausted', async () => {
+  it('nextOAuthLabel continues past a long run of taken numbers', async () => {
     const rows = Array.from({ length: 99 }, (_, i) =>
-      provRow({ id: `k${i}`, label: `Key ${i + 1}` }),
+      provRow({ id: `k${i}`, label: `anthropic-${i + 1}` }),
     );
     providerRepo.find.mockResolvedValueOnce(rows);
-    expect(await svc.nextOAuthLabel('tenant-1', 'anthropic')).toBe('Key 100');
+    expect(await svc.nextOAuthLabel('tenant-1', 'anthropic')).toBe('anthropic-100');
   });
 
   it('cleanupUnsupportedSubscriptionProviders deactivates unusable subscription rows', async () => {

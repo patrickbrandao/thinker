@@ -53,6 +53,7 @@ import { roleCan } from '../../services/session-store.js';
 import { getModelDisplayName } from '../../services/model-display.js';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import LocalServerForm from '../../components/LocalServerForm.jsx';
+import ConnectionKeyField from '../../components/ConnectionKeyField.jsx';
 import { useResource } from '../../lib/use-resource.js';
 import {
   Badge,
@@ -106,6 +107,7 @@ interface ConnectionInfo {
   label: string;
   cached_model_count: number;
   key_prefix: string | null;
+  key_masked?: string | null;
   connected_at: string;
   is_active: boolean;
   stream_warmup_ms?: number | null;
@@ -1069,6 +1071,16 @@ const ConnectionDetail = () => {
             }}
           />
         )}
+        {c?.key_masked ? (
+          <div className="mt-4 border-t border-line pt-3">
+            <span className="label">{t('providers.detail.credential')}</span>
+            <ConnectionKeyField
+              connectionId={c.id}
+              authType={c.auth_type}
+              keyMasked={c.key_masked}
+            />
+          </div>
+        ) : null}
         {roleCan.manageProviders() && c ? (
           <div className="mt-4 border-t border-line pt-3">
             <OutboundProxyPanel
@@ -1196,6 +1208,13 @@ const ConnectionDetail = () => {
           {c.is_active && credentialMode && firstAgentName ? (
             <div className="connection-credential">
               <span className="label">{t('providers.detail.credential')}</span>
+              {credentialMode === 'key' ? (
+                <ConnectionKeyField
+                  connectionId={c.id}
+                  authType={c.auth_type}
+                  keyMasked={c.key_masked}
+                />
+              ) : null}
               {credentialMode === 'key' ? (
                 <div className="flex items-center gap-2">
                   <input

@@ -19,6 +19,7 @@ import AnthropicOAuthDetailView from './AnthropicOAuthDetailView.js';
 import DeviceCodeDetailView from './DeviceCodeDetailView.js';
 import OpencodeGoUsageMeter from './OpencodeGoUsageMeter.js';
 import { getRoutingProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
+import { maskedKeyLabel } from '../services/key-mask.js';
 import { Badge, Button, cx } from './ui.js';
 
 type SetValue<T> = (value: T) => void;
@@ -43,6 +44,11 @@ export interface ProviderDetailViewProps {
   initialAddKey?: boolean;
   /** Re-authenticating this subscription connection (by label) instead of adding one. */
   reauthLabel?: string;
+  /**
+   * Only set up a new connection: the host shows the provider, and the
+   * existing connections (models, usage, disconnect) live on their own records.
+   */
+  newConnection?: boolean;
 }
 
 const Spinner = () => <span className="spinner" aria-hidden="true" />;
@@ -63,9 +69,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
   const isNoKeyConnected = !!apiKeyRow && apiKeyRow.is_active && !!provDef.noKeyRequired;
 
   const getKeyPrefixDisplay = (at: AuthType): string => {
-    const p = getProviderByAuth(at);
-    if (p?.key_prefix) return `${p.key_prefix}${'•'.repeat(8)}`;
-    return '••••••••••••';
+    return maskedKeyLabel(getProviderByAuth(at));
   };
 
   const isSubMode = authType === 'subscription';
@@ -102,10 +106,13 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
 
   // Closed providers keep existing connections manageable but take no new ones.
   const subscriptionClosed = isSubMode && !!provDef.subscriptionClosedNote;
-  const showConnectFlow = !subscriptionClosed || connected;
+  const newConnection = !!props.newConnection;
+  const showConnectFlow = newConnection ? !subscriptionClosed : !subscriptionClosed || connected;
+  // In a new-connection view the connected-state controls stay hidden.
+  const showConnected = connected && !newConnection;
 
   const showAddKeyButton =
-    connected &&
+    showConnected &&
     supportsMultiKey &&
     !addKeyOpen &&
     (!!props.reauthLabel || (!subscriptionClosed && activeKeys.length < MAX_KEYS_PER_PROVIDER));
@@ -207,56 +214,66 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
     addKeyOpen,
     setAddKeyOpen,
     activeKeys,
+    providerLabels: props.providers
+      .filter((p) => p.provider === props.provId)
+      .map((p) => p.label ?? ''),
+    newConnection,
   };
 
   const apiKeyUrl = getRoutingProviderApiKeyUrl(props.provId);
 
   return (
     <div className="provider-detail flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="modal-back-btn icon-btn"
-          onClick={props.onBack}
-          aria-label={t('providerSetup.shared.backToProviders')}
-          title={t('providerSetup.shared.backToProviders')}
-        >
-          <ChevronLeft size={16} aria-hidden="true" />
-        </button>
-        <h2 className="text-[15px] font-semibold text-ink">
-          {t('providerSetup.shared.connectProvider')}
-        </h2>
-      </div>
-
-      {/* Provider row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center">
-            {providerIcon(props.provId, 28) ?? (
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-control bg-s3 text-[13px] font-semibold text-ink"
-                aria-hidden="true"
-              >
-                {provDef.initial}
-              </span>
-            )}
-          </span>
-          <div className="flex items-center gap-2 truncate text-base font-semibold text-ink">
-            {provDef.name}
-            {provDef.beta ? <Badge tone="accent">{t('providerSetup.shared.beta')}</Badge> : null}
+      {newConnection ? null : (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="modal-back-btn icon-btn"
+              onClick={props.onBack}
+              aria-label={t('providerSetup.shared.backToProviders')}
+              title={t('providerSetup.shared.backToProviders')}
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+            <h2 className="text-[15px] font-semibold text-ink">
+              {t('providerSetup.shared.connectProvider')}
+            </h2>
           </div>
-        </div>
-        {showAddKeyButton ? (
-          <Button size="sm" onClick={() => setAddKeyOpen(true)}>
-            <ListPlus size={14} aria-hidden="true" />
-            {props.reauthLabel
-              ? t('providerSetup.shared.reauthConnection', { label: props.reauthLabel })
-              : isSubMode
-                ? t('providerSetup.shared.addConnection')
-                : t('providerSetup.shared.addAnotherKey')}
-          </Button>
-        ) : null}
-      </div>
+
+          {/* Provider row */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+                {providerIcon(props.provId, 28) ?? (
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-control bg-s3 text-[13px] font-semibold text-ink"
+                    aria-hidden="true"
+                  >
+                    {provDef.initial}
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2 truncate text-base font-semibold text-ink">
+                {provDef.name}
+                {provDef.beta ? (
+                  <Badge tone="accent">{t('providerSetup.shared.beta')}</Badge>
+                ) : null}
+              </div>
+            </div>
+            {showAddKeyButton ? (
+              <Button size="sm" onClick={() => setAddKeyOpen(true)}>
+                <ListPlus size={14} aria-hidden="true" />
+                {props.reauthLabel
+                  ? t('providerSetup.shared.reauthConnection', { label: props.reauthLabel })
+                  : isSubMode
+                    ? t('providerSetup.shared.addConnection')
+                    : t('providerSetup.shared.addAnotherKey')}
+              </Button>
+            ) : null}
+          </div>
+        </>
+      )}
 
       {props.reauthLabel ? (
         <p className="notice is-info text-sm" role="note">
@@ -274,7 +291,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
         <p className="m-0 text-sm text-muted">{provDef.subscriptionRequirementNote}</p>
       ) : null}
 
-      {connected ? (
+      {showConnected ? (
         <div className="provider-detail__models-bar flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-sunken px-3 py-2 text-xs text-muted">
           <span>
             {t('providerSetup.detail.models', modelCount)}
@@ -347,7 +364,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
       {showConnectFlow && isCommandOnly ? (
         <>
           <p className="hint m-0">{t('providerSetup.detail.browserWillOpen')}</p>
-          {connected ? (
+          {showConnected ? (
             disconnectButton
           ) : (
             <Button block className="mt-4" onClick={props.onBack}>
@@ -367,7 +384,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
 
       {/* Device-code subscription */}
       {showConnectFlow && isDeviceCodeFlow ? <DeviceCodeDetailView {...flowProps} /> : null}
-      {connected && isSubMode && props.provId === 'opencode-go' ? (
+      {showConnected && isSubMode && props.provId === 'opencode-go' ? (
         <OpencodeGoUsageMeter agentName={props.agentName} />
       ) : null}
 
@@ -387,7 +404,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
               </a>
             ) : null}
           </div>
-          {connected ? (
+          {showConnected ? (
             disconnectButton
           ) : (
             <Button block className="mt-4" disabled={busy} onClick={handleOllamaConnect}>
@@ -423,6 +440,7 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
           providers={props.providers}
           addKeyOpen={addKeyOpen}
           setAddKeyOpen={setAddKeyOpen}
+          newConnection={newConnection}
           onBack={props.onBack}
           onUpdate={props.onUpdate}
         />
