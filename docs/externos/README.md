@@ -39,31 +39,31 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 
 | Agente | Categoria | Entidade | IDs no Thinker | Dossiê | Revisado em | Lacunas abertas |
 |---|---|---|---|---|---|---|
-| `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | — | — |
-| `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | — | — |
-| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | — | — |
-| `api-byteplus` | API | BytePlus ModelArk | `byteplus` | [dossiê](api/api-byteplus.md) | — | — |
-| `api-cerebras` | API | Cerebras | `cerebras` | [dossiê](api/api-cerebras.md) | — | — |
-| `api-deepseek` | API | DeepSeek | `deepseek` | [dossiê](api/api-deepseek.md) | — | — |
-| `api-fireworks` | API | Fireworks AI | `fireworks` | [dossiê](api/api-fireworks.md) | — | — |
-| `api-groq` | API | Groq | `groq` | [dossiê](api/api-groq.md) | — | — |
-| `api-huggingface` | API | Hugging Face Inference Providers | `huggingface` | [dossiê](api/api-huggingface.md) | — | — |
-| `api-kilo` | API | Kilo Gateway | `kilo` | [dossiê](api/api-kilo.md) | — | — |
-| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | — | — |
-| `api-minimax` | API | MiniMax | `minimax` | [dossiê](api/api-minimax.md) | — | — |
-| `api-meta` | API | Meta (Muse Spark) | `meta` | [dossiê](api/api-meta.md) | — | — |
-| `api-xiaomi` | API | Xiaomi MiMo | `xiaomi` | [dossiê](api/api-xiaomi.md) | — | — |
-| `api-mistral` | API | Mistral | `mistral` | [dossiê](api/api-mistral.md) | — | — |
-| `api-moonshot` | API | Moonshot (Kimi API) | `moonshot` | [dossiê](api/api-moonshot.md) | — | — |
-| `api-nous` | API | NousResearch API | `nous` | [dossiê](api/api-nous.md) | — | — |
-| `api-nvidia` | API | NVIDIA NIM | `nvidia` | [dossiê](api/api-nvidia.md) | — | — |
-| `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | — | — |
-| `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | — | — |
+| `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | 2026-11-04 | 5 |
+| `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | 2026-11-04 | 5 |
+| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 3 |
+| `api-byteplus` | API | BytePlus ModelArk | `byteplus` | [dossiê](api/api-byteplus.md) | 2026-11-04 | 2 |
+| `api-cerebras` | API | Cerebras | `cerebras` | [dossiê](api/api-cerebras.md) | 2026-11-04 | 3 |
+| `api-deepseek` | API | DeepSeek | `deepseek` | [dossiê](api/api-deepseek.md) | 2026-11-04 | 3 |
+| `api-fireworks` | API | Fireworks AI | `fireworks` | [dossiê](api/api-fireworks.md) | 2026-11-04 | 4 |
+| `api-groq` | API | Groq | `groq` | [dossiê](api/api-groq.md) | 2026-11-04 | 3 |
+| `api-huggingface` | API | Hugging Face Inference Providers | `huggingface` | [dossiê](api/api-huggingface.md) | 2026-11-04 | 6 |
+| `api-kilo` | API | Kilo Gateway | `kilo` | [dossiê](api/api-kilo.md) | 2026-11-04 | 4 |
+| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | 2026-11-04 | 8 |
+| `api-minimax` | API | MiniMax | `minimax` | [dossiê](api/api-minimax.md) | 2026-11-04 | 4 |
+| `api-meta` | API | Meta (Muse Spark) | `meta` | [dossiê](api/api-meta.md) | 2026-11-04 | 5 |
+| `api-xiaomi` | API | Xiaomi MiMo | `xiaomi` | [dossiê](api/api-xiaomi.md) | 2026-11-04 | 6 |
+| `api-mistral` | API | Mistral | `mistral` | [dossiê](api/api-mistral.md) | 2026-11-04 | 4 |
+| `api-moonshot` | API | Moonshot (Kimi API) | `moonshot` | [dossiê](api/api-moonshot.md) | 2026-11-04 | 4 |
+| `api-nous` | API | NousResearch API | `nous` | [dossiê](api/api-nous.md) | 2026-11-04 | 4 |
+| `api-nvidia` | API | NVIDIA NIM | `nvidia` | [dossiê](api/api-nvidia.md) | 2026-11-04 | 2 |
+| `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | 2026-11-04 | 6 |
+| `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | 2026-11-04 | 6 |
 | `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-03 | 5 |
-| `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | — | — |
-| `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | — | — |
-| `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | — | — |
-| `api-qwen` | API | Alibaba Cloud (Qwen / Model Studio) | `qwen` | [dossiê](api/api-qwen.md) | — | — |
+| `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | 2026-11-04 | 6 |
+| `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | 2026-11-04 | 4 |
+| `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | 2026-11-04 | 5 |
+| `api-qwen` | API | Alibaba Cloud (Qwen / Model Studio) | `qwen` | [dossiê](api/api-qwen.md) | 2026-11-04 | 6 |
 | `sub-anthropic` | Assinatura | Claude Max / Pro | `anthropic` | [dossiê](assinatura/sub-anthropic.md) | 2026-11-03 | 5 |
 | `sub-byteplus` | Assinatura | BytePlus ModelArk Coding Plan | `byteplus` | [dossiê](assinatura/sub-byteplus.md) | 2026-11-03 | 3 |
 | `sub-openai` | Assinatura | ChatGPT Plus / Pro / Team (Codex) | `openai` | [dossiê](assinatura/sub-openai.md) | 2026-11-03 | 6 |
@@ -84,8 +84,8 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `sub-commandcode` | Assinatura | Command Code | `commandcode` | [dossiê](assinatura/sub-commandcode.md) | 2026-11-03 | 5 |
 | `sub-cline-pass` | Assinatura | ClinePass | `cline-pass` | [dossiê](assinatura/sub-cline-pass.md) | 2026-11-03 | 6 |
 | `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | 2026-11-03 | 4 |
-| `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | — | — |
-| `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | — | — |
+| `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | 2026-11-04 | 4 |
+| `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 5 |
 | `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 5 |
 | `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 4 |
 | `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 6 |
