@@ -18,6 +18,7 @@ import playground from './playground.js';
 import shell from './shell.js';
 import triggers from './triggers.js';
 import proxies from './proxies.js';
+import sessions from './sessions.js';
 
 export default {
   common,
@@ -40,4 +41,5 @@ export default {
   shell,
   triggers,
   proxies,
+  sessions,
 };

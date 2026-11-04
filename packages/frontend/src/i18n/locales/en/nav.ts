@@ -6,6 +6,7 @@ export default {
   dashboardContent: 'Dashboard content',
   navigation: 'Navigation',
   overview: 'Overview',
+  sessions: 'Sessions',
   requests: 'Requests',
   harnesses: 'Harnesses',
   createHarness: 'Create new harness',

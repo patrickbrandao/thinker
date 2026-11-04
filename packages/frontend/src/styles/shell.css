@@ -48,6 +48,10 @@
     border-right: 1px solid var(--border);
     overflow: hidden;
   }
+  /* The account menu (272px) is wider than the sidebar, collapsed or not. */
+  .sidebar:has(.sidebar-foot .menu) {
+    overflow: visible;
+  }
   .sidebar-brand {
     display: flex;
     align-items: center;

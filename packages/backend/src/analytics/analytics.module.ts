@@ -29,6 +29,8 @@ import { ProviderUsageController } from './controllers/provider-usage.controller
 import { TokensController } from './controllers/tokens.controller';
 import { CostsController } from './controllers/costs.controller';
 import { MessagesController } from './controllers/messages.controller';
+import { SessionsController } from './controllers/sessions.controller';
+import { SessionsService } from './services/sessions.service';
 import { AgentsController } from './controllers/agents.controller';
 import { AgentAnalyticsController } from './controllers/agent-analytics.controller';
 import { ProviderAnalyticsController } from './controllers/provider-analytics.controller';
@@ -63,6 +65,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     TokensController,
     CostsController,
     MessagesController,
+    SessionsController,
     AgentsController,
     AgentAnalyticsController,
     ProviderAnalyticsController,
@@ -77,6 +80,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     AgentLifecycleService,
     TimeseriesQueriesService,
     MessagesQueryService,
+    SessionsService,
     MessageDetailsService,
     ErrorBreakdownService,
     MessageFeedbackService,

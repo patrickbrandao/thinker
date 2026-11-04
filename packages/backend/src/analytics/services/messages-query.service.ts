@@ -111,6 +111,8 @@ interface MessageFilterParams {
 
 interface MessageQueryParams extends MessageFilterParams {
   provider?: string;
+  /** Harness session: its own requests and its subagent sessions'. */
+  session?: string;
   /** tenant_providers ids; requests must have touched one of these connections. */
   connections?: string[];
   /**
@@ -296,6 +298,11 @@ export class MessagesQueryService {
     const qb = this.requestRepo!.createQueryBuilder('r');
     const cutoff = params.range ? computeCutoff(rangeToInterval(params.range)) : undefined;
     if (cutoff) qb.where('r.timestamp >= :requestCutoff', { requestCutoff: cutoff });
+    if (params.session) {
+      qb.andWhere('(r.session_id = :requestSession OR r.parent_session_id = :requestSession)', {
+        requestSession: params.session,
+      });
+    }
     if (params.tenantId)
       qb.andWhere('r.tenant_id = :requestTenantId', { requestTenantId: params.tenantId });
     // Still bound without a tenant: the agent and attempt-window subqueries
@@ -598,6 +605,8 @@ export class MessagesQueryService {
     // from this branch as soon as the backfill links it to a real parent.
     const legacyBase = await this.buildBaseMessageQuery(params);
     legacyBase.andWhere('at.request_id IS NULL');
+    // Sessions live on request rows; unlinked attempts never belong to one.
+    if (params.session) legacyBase.andWhere('1 = 0');
     if (resolvedConnections) {
       if (resolvedConnections.length === 0) legacyBase.andWhere('1 = 0');
       else {
@@ -1108,6 +1117,7 @@ export class MessagesQueryService {
   private buildCountCacheKey(params: {
     tenantId: string | null;
     range?: string;
+    session?: string;
     provider?: string;
     connections?: string[];
     models?: string[];
@@ -1129,6 +1139,7 @@ export class MessagesQueryService {
     return [
       params.tenantId ?? 'no-tenant',
       params.range ?? '',
+      params.session ?? '',
       params.provider ?? '',
       params.connections?.join(',') ?? '',
       params.models?.join(',') ?? '',

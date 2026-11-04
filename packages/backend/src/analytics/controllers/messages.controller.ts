@@ -53,6 +53,7 @@ export class MessagesController {
       range: query.range,
       tenantId: ctx.tenantId,
       provider: query.provider,
+      session: query.session,
       connections: splitCsv(query.connections),
       models: splitCsv(query.model),
       service_type: query.service_type,

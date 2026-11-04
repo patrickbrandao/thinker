@@ -13,6 +13,7 @@ import {
 } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ThinkerRequest } from '../../entities/request.entity';
+import { detectHarnessSession } from './harness-session';
 import type { RequestTimeline } from './request-timeline';
 import {
   ModelPricingCacheService,
@@ -287,6 +288,7 @@ function buildRequestRow(
         : FAILED_WITHOUT_MESSAGE
       : null;
   const timestamp = attempt.timestamp ?? new Date().toISOString();
+  const session = detectHarnessSession(attempt.request_headers);
   return {
     id: requestId,
     tenant_id: ctx.tenantId,
@@ -295,7 +297,8 @@ function buildRequestRow(
     agent_name: ctx.agentName,
     trace_id: attempt.trace_id ?? null,
     session_key: attempt.session_key ?? null,
-    session_id: attempt.session_id ?? null,
+    session_id: attempt.session_id ?? session?.id ?? null,
+    parent_session_id: session?.parentId ?? null,
     timestamp,
     duration_ms: attempt.duration_ms ?? null,
     status,
@@ -518,7 +521,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         'agent_name',
         'trace_id',
         'session_key',
-        'session_id',
+        // Only a writer that saw the session headers may set it, never clear it.
+        ...(row.session_id == null ? [] : ['session_id', 'parent_session_id']),
         'duration_ms',
         'status',
         'error_message',

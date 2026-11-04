@@ -2083,7 +2083,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1027
+      "line": 1031
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2092,7 +2092,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1027
+      "line": 1031
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2101,21 +2101,21 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 1036
+      "line": 1040
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-5px",
       "file": "shell.css",
-      "line": 1202
+      "line": 1206
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "5px",
       "file": "shell.css",
-      "line": 1203
+      "line": 1207
     }
   ],
   "ghostRules": [
@@ -2126,8 +2126,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1020,
-      "losesTo": "shell.css:1027"
+      "line": 1024,
+      "losesTo": "shell.css:1031"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2136,8 +2136,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1020,
-      "losesTo": "shell.css:1027"
+      "line": 1024,
+      "losesTo": "shell.css:1031"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2146,24 +2146,24 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 1032,
-      "losesTo": "shell.css:1036"
+      "line": 1036,
+      "losesTo": "shell.css:1040"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-2px",
       "file": "shell.css",
-      "line": 1158,
-      "losesTo": "shell.css:1202"
+      "line": 1162,
+      "losesTo": "shell.css:1206"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "2px",
       "file": "shell.css",
-      "line": 1160,
-      "losesTo": "shell.css:1203"
+      "line": 1164,
+      "losesTo": "shell.css:1207"
     }
   ],
   "componentSheets": {

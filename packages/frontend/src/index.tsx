@@ -36,6 +36,8 @@ const AgentModels = lazyReload(() => import('./pages/AgentModels.jsx'));
 const AgentLimitsRedirect = lazyReload(() => import('./pages/AgentLimitsRedirect.jsx'));
 const AgentMessagesRedirect = lazyReload(() => import('./pages/AgentMessagesRedirect.jsx'));
 const MessageLog = lazyReload(() => import('./pages/MessageLog.jsx'));
+const Sessions = lazyReload(() => import('./pages/Sessions.jsx'));
+const SessionDetail = lazyReload(() => import('./pages/SessionDetail.jsx'));
 const Settings = lazyReload(() => import('./pages/Settings.jsx'));
 const Routing = lazyReload(() => import('./pages/Routing.jsx'));
 const Playground = lazyReload(() => import('./pages/Playground.jsx'));
@@ -139,6 +141,22 @@ function AppRoutes() {
           element={
             <Lazy>
               <GlobalOverview />
+            </Lazy>
+          }
+        />
+        <Route
+          path="sessions"
+          element={
+            <Lazy>
+              <Sessions />
+            </Lazy>
+          }
+        />
+        <Route
+          path="sessions/:sessionId"
+          element={
+            <Lazy>
+              <SessionDetail />
             </Lazy>
           }
         />
