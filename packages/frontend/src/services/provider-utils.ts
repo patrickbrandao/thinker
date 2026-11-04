@@ -14,6 +14,7 @@ export function validateApiKey(
 
   const trimmed = key.replace(/\s/g, '');
   if (!trimmed) return { valid: false, error: t('providerSetup.validation.apiKeyRequired') };
+  if (provider.freeKey && trimmed === provider.freeKey) return { valid: true };
 
   if (provider.keyPrefix && !trimmed.startsWith(provider.keyPrefix)) {
     return {

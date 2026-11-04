@@ -104,7 +104,7 @@ import type {
   StartProviderAttempt,
 } from './proxy-types';
 import type { ProxyApiMode } from './proxy-types';
-import { refreshRejectedOAuthCredential } from './oauth-credentials';
+import { isRefreshableOAuthCredential, refreshRejectedOAuthCredential } from './oauth-credentials';
 import {
   buildCredentialFailureFallback,
   presentCredentialFailure,
@@ -1091,6 +1091,10 @@ export class ProxyFallbackService {
           : {}),
         clientAnthropicBeta: opts.clientAnthropicBeta,
         providerResource,
+        oauthToken:
+          authType === 'subscription' &&
+          !!opts.rawApiKey &&
+          isRefreshableOAuthCredential(opts.rawApiKey),
         attempt,
       });
       if (attempt) attempt.completedAtMs = Date.now();

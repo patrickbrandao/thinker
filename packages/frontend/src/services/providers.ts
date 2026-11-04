@@ -66,7 +66,11 @@ export interface ProviderDef {
   subscriptionTokenAlternative?: {
     prefix: string;
     placeholder: string;
-    dividerLabel: string;
+    /** Radio choice between the sign-in flow and the pasted token, with a line each. */
+    loginLabel: string;
+    loginHint: string;
+    tokenLabel: string;
+    tokenHint: string;
   };
   /** Provider is subscription-only and should not appear in the API Keys tab. */
   subscriptionOnly?: boolean;
@@ -80,7 +84,8 @@ export interface ProviderDef {
   beta?: boolean;
   /**
    * Key the provider accepts in place of a real one to serve its free models
-   * (OpenCode's `public`). Offers a keyless connect beside the key field.
+   * (OpenCode's `public`). Pre-fills the key of a new account and passes the
+   * key-length check.
    */
   freeKey?: string;
 }
@@ -106,7 +111,11 @@ interface ProviderUIOverlay {
   subscriptionTokenAlternative?: {
     prefix: string;
     placeholder: string;
-    dividerLabel: string;
+    /** Radio choice between the sign-in flow and the pasted token, with a line each. */
+    loginLabel: string;
+    loginHint: string;
+    tokenLabel: string;
+    tokenHint: string;
   };
   subscriptionOnly?: boolean;
   subscriptionSignInUrl?: string;
@@ -387,8 +396,17 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionTokenAlternative: {
       prefix: 'sk-cp-',
       placeholder: 'sk-cp-...',
-      get dividerLabel() {
-        return t('providerSetup.catalog.minimaxDivider');
+      get loginLabel() {
+        return t('providerSetup.catalog.minimaxMethod.login');
+      },
+      get loginHint() {
+        return t('providerSetup.catalog.minimaxMethod.loginHint');
+      },
+      get tokenLabel() {
+        return t('providerSetup.catalog.minimaxMethod.token');
+      },
+      get tokenHint() {
+        return t('providerSetup.catalog.minimaxMethod.tokenHint');
       },
     },
     models: [],
@@ -532,8 +550,17 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
       get placeholder() {
         return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
       },
-      get dividerLabel() {
-        return t('providerSetup.catalog.opencodeDivider');
+      get loginLabel() {
+        return t('providerSetup.catalog.opencodeGoMethod.login');
+      },
+      get loginHint() {
+        return t('providerSetup.catalog.opencodeGoMethod.loginHint');
+      },
+      get tokenLabel() {
+        return t('providerSetup.catalog.opencodeGoMethod.token');
+      },
+      get tokenHint() {
+        return t('providerSetup.catalog.opencodeGoMethod.tokenHint');
       },
     },
     subscriptionOnly: true,
@@ -545,7 +572,8 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     get subtitle() {
       return t('providerSetup.catalog.subtitles.opencode');
     },
-    // OpenCode Console device login beside the API key, and keyless free models.
+    // OpenCode Console device login beside the API key; a new API-key account
+    // starts with the free key `public`.
     supportsSubscription: true,
     subscriptionLabel: 'OpenCode Console',
     subscriptionAuthMode: 'device_code',

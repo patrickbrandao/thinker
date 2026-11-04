@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { RoutingCoreModule } from '../routing-core/routing-core.module';
 import { ModelDiscoveryModule } from '../../model-discovery/model-discovery.module';
 import { OpenaiOauthService } from './openai/openai-oauth.service';
@@ -18,9 +20,10 @@ import { GeminiOauthController } from './gemini/gemini-oauth.controller';
 import { CodeAssistClientService } from './gemini/codeassist-client.service';
 import { OpencodeOauthService } from './opencode/opencode-oauth.service';
 import { OpencodeOauthController } from './opencode/opencode-oauth.controller';
+import { OpencodeConsoleMonitor } from './opencode/opencode-console-monitor.service';
 
 @Module({
-  imports: [RoutingCoreModule, ModelDiscoveryModule],
+  imports: [TypeOrmModule.forFeature([TenantProvider]), RoutingCoreModule, ModelDiscoveryModule],
   controllers: [
     OpenaiOauthController,
     MinimaxOauthController,
@@ -41,6 +44,7 @@ import { OpencodeOauthController } from './opencode/opencode-oauth.controller';
     GeminiOauthService,
     CodeAssistClientService,
     OpencodeOauthService,
+    OpencodeConsoleMonitor,
   ],
   exports: [
     OpenaiOauthService,

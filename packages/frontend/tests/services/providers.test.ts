@@ -38,6 +38,12 @@ describe('validateApiKey', () => {
     expect(validateApiKey(ollama, '')).toEqual({ valid: true });
   });
 
+  it("accepts OpenCode's free key despite the minimum key length", () => {
+    const opencode = getProvider('opencode')!;
+    expect(validateApiKey(opencode, 'public')).toEqual({ valid: true });
+    expect(validateApiKey(opencode, 'short').valid).toBe(false);
+  });
+
   it('returns invalid when key is empty', () => {
     const openai = getProvider('openai')!;
     expect(validateApiKey(openai, '')).toEqual({
@@ -382,10 +388,10 @@ describe('validateSubscriptionKey', () => {
 
   it('exposes the MiniMax Coding Plan token alternative on the provider def', () => {
     const minimax = getProvider('minimax')!;
-    expect(minimax.subscriptionTokenAlternative).toEqual({
+    expect(minimax.subscriptionTokenAlternative).toMatchObject({
       prefix: 'sk-cp-',
       placeholder: 'sk-cp-...',
-      dividerLabel: expect.stringContaining('Coding Plan token'),
+      tokenLabel: expect.stringContaining('Coding Plan token'),
     });
   });
 });
@@ -883,7 +889,7 @@ describe('PROVIDERS', () => {
     expect(og.subscriptionLabel).toBe('OpenCode Go (beta)');
     expect(og.subscriptionTokenAlternative?.prefix).toBe('');
     expect(og.subscriptionTokenAlternative?.placeholder).toBe('Paste your OpenCode API key');
-    expect(og.subscriptionTokenAlternative?.dividerLabel).toBe('Or paste an OpenCode API key');
+    expect(og.subscriptionTokenAlternative?.tokenLabel).toBe('API key');
     expect(og.beta).toBe(true);
   });
 
@@ -892,7 +898,7 @@ describe('PROVIDERS', () => {
     expect(og.models).toEqual([]);
   });
 
-  it('OpenCode takes an API key, the Console device login or no key at all', () => {
+  it('OpenCode takes an API key (the free key `public` by default) or the Console device login', () => {
     const oc = PROVIDERS.find((p) => p.id === 'opencode')!;
     expect(oc).toBeDefined();
     expect(oc.name).toBe('OpenCode');

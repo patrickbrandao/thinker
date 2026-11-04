@@ -40,6 +40,7 @@ import {
   isMinimaxRegion,
 } from './oauth/minimax/minimax-oauth-helpers';
 import { MinRole } from '../common/decorators/roles.decorator';
+import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
 import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
 import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
@@ -109,7 +110,7 @@ export class ProviderController {
       auth_type: p.auth_type ?? 'api_key',
       is_active: p.is_active,
       has_api_key: !!p.api_key_encrypted,
-      key_prefix: p.key_prefix ?? null,
+      ...providerKeyDisplay(p),
       label: p.label,
       priority: p.priority,
       region: p.region ?? null,

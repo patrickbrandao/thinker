@@ -104,9 +104,7 @@ describe('Custom Providers (e2e)', () => {
       .put(`/api/v1/routing/${agentName}/custom-providers/${createdId}`)
       .set(headers)
       .send({
-        models: [
-          { model_name: 'new-model', input_price_per_million_tokens: 1.0 },
-        ],
+        models: [{ model_name: 'new-model', input_price_per_million_tokens: 1.0 }],
       })
       .expect(200);
 
@@ -372,11 +370,13 @@ describe('Custom Providers (e2e)', () => {
       .send({
         name: 'Free Provider',
         base_url: 'http://localhost:9001/v1',
-        models: [{
-          model_name: 'free-model',
-          input_price_per_million_tokens: 0,
-          output_price_per_million_tokens: 0,
-        }],
+        models: [
+          {
+            model_name: 'free-model',
+            input_price_per_million_tokens: 0,
+            output_price_per_million_tokens: 0,
+          },
+        ],
       })
       .expect(201);
 
@@ -439,9 +439,11 @@ describe('Custom Providers (e2e)', () => {
         .send({ provider: key, apiKey: 'sk-account-b', label: 'Account B' })
         .expect(201);
 
+      // `key_prefix` is the visible part of the server-side mask: half of a
+      // 12-character key at most.
       expect(await connectionsOf()).toEqual([
-        ['Default', 'sk-accou'],
-        ['Account B', 'sk-accou'],
+        ['Default', 'sk-acc'],
+        ['Account B', 'sk-acc'],
       ]);
     });
 
@@ -465,8 +467,16 @@ describe('Custom Providers (e2e)', () => {
 
       expect(await connectionsOf()).toEqual([
         ['Account A', 'sk-rot2-'],
-        ['Account B', 'sk-accou'],
+        ['Account B', 'sk-acc'],
       ]);
+    });
+
+    it('masks the key in the list and never sends it in full', async () => {
+      const res = await request(server()).get('/api/v1/providers').set(headers).expect(200);
+      const group = res.body.providers.find((p: { provider: string }) => p.provider === key);
+      const conn = group.connections.find((c: { label: string }) => c.label === 'Account A');
+      expect(conn.key_masked).toBe('sk-rot2-********');
+      expect(JSON.stringify(res.body)).not.toContain('sk-rot2-account-a');
     });
 
     it('rejects a connection for a custom provider that does not exist', async () => {

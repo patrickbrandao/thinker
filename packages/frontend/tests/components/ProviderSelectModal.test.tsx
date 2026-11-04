@@ -827,19 +827,20 @@ describe('ProviderSelectModal', () => {
       vi.restoreAllMocks();
     });
 
-    it('toasts when the popup is blocked and skips the start call', async () => {
+    it('keeps the flow going with the URL to open when the popup is blocked', async () => {
       vi.spyOn(window, 'open').mockReturnValue(null);
 
       openSubscription('minimax');
       fireEvent.click(screen.getByText('Connect with MiniMax'));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Popup was blocked by your browser. Allow popups for this site, then try again.',
-        );
+        expect(mockStartMinimaxOAuth).toHaveBeenCalledWith('test-agent', { region: 'global' });
       });
-      expect(mockStartMinimaxOAuth).not.toHaveBeenCalled();
-      expect(screen.getByText('Connect with MiniMax')).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText('https://www.minimax.io/verify')).toBeDefined();
+      });
+      expect(screen.getByText(/Your browser blocked the sign-in window/)).toBeDefined();
+      expect(toast.error).not.toHaveBeenCalled();
 
       vi.restoreAllMocks();
     });
@@ -1252,17 +1253,17 @@ describe('ProviderSelectModal', () => {
       expect(onUpdate).not.toHaveBeenCalled();
     });
 
-    it('shows popup blocked error when window.open returns null', async () => {
+    it('offers the sign-in URL and the paste field when window.open returns null', async () => {
       vi.spyOn(window, 'open').mockReturnValue(null);
 
       openSubscription('openai');
       fireEvent.click(screen.getByText('Log in with OpenAI'));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Popup was blocked by your browser. Allow popups for this site, then try again.',
-        );
+        expect(screen.getByText(/Your browser blocked the sign-in window/)).toBeDefined();
       });
+      expect(screen.getByPlaceholderText(/localhost:1455\/auth\/callback/)).toBeDefined();
+      expect(toast.error).not.toHaveBeenCalled();
 
       vi.restoreAllMocks();
     });

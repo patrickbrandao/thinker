@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 
 /**
@@ -46,12 +46,47 @@ interface ExtraHeaderKeys {
 
 // OpenCode Go and OpenCode pin a session to one upstream provider via
 // x-opencode-session and reject some models without it, so unlike the
-// observability-only hints above the header must ride on every request:
+// observability-only hints above the headers must ride on every request:
 // fall back to the per-agent key when the caller sent no x-session-key.
-const opencodeSessionHeader = ({ sessionKey, agentKey }: ExtraHeaderKeys) => {
-  const id = sessionKey ?? agentKey;
-  return id ? { 'x-opencode-session': id } : undefined;
+// They mirror the OpenCode 2 client (session/model-request.ts): one session
+// id in its four session headers, plus a 40-hex project id.
+const opencodeSessionHeaders = ({ sessionKey, agentKey }: ExtraHeaderKeys) => {
+  const key = sessionKey ?? agentKey;
+  if (!key) return undefined;
+  const sessionId = opencodeSessionId(key);
+  return {
+    'x-opencode-session-id': sessionId,
+    'x-session-affinity': sessionId,
+    'X-Session-Id': sessionId,
+    'x-opencode-project': agentKey
+      ? createHash('sha1').update(agentKey).digest('hex')
+      : OPENCODE_GLOBAL_PROJECT,
+    'x-opencode-session': sessionId,
+  };
 };
+
+const OPENCODE_GLOBAL_PROJECT = 'global';
+const OPENCODE_SESSION_IDS_MAX = 10_000;
+const opencodeSessionIds = new Map<string, string>();
+const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+/**
+ * A stable OpenCode session id per conversation key, minted the first time
+ * the key is seen the way the client mints one (schema/identifier.ts):
+ * `ses_`, 12 hex of the inverted `ms * 0x1000 + counter`, 14 random base62.
+ */
+export function opencodeSessionId(key: string, now = Date.now()): string {
+  const known = opencodeSessionIds.get(key);
+  if (known) return known;
+  const value = ~(BigInt(now) * 0x1000n + 1n) & 0xffffffffffffn;
+  const random = Array.from(randomBytes(14), (byte) => BASE62[byte % 62]).join('');
+  const id = `ses_${value.toString(16).padStart(12, '0')}${random}`;
+  if (opencodeSessionIds.size >= OPENCODE_SESSION_IDS_MAX) {
+    opencodeSessionIds.delete(opencodeSessionIds.keys().next().value!);
+  }
+  opencodeSessionIds.set(key, id);
+  return id;
+}
 
 /**
  * Extra HTTP headers that must be attached at forward-time for specific
@@ -64,8 +99,8 @@ const PROVIDER_EXTRA_HEADER_BUILDERS: Record<
   xai: ({ sessionKey }) => (sessionKey ? { 'x-grok-conv-id': sessionKey } : undefined),
   openrouter: ({ sessionKey }) =>
     !sessionKey || sessionKey === 'default' ? undefined : { 'x-session-id': sessionKey },
-  'opencode-go': opencodeSessionHeader,
-  opencode: opencodeSessionHeader,
+  'opencode-go': opencodeSessionHeaders,
+  opencode: opencodeSessionHeaders,
 };
 
 export function buildProviderExtraHeaders(

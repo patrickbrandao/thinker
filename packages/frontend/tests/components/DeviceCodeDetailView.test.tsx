@@ -47,6 +47,8 @@ import {
   disconnectProvider,
   renameProviderKey,
   revokeMinimaxOAuth,
+  pollMinimaxOAuth,
+  startMinimaxOAuth,
 } from '../../src/services/api.js';
 import { toast } from '../../src/services/toast-store.js';
 import { getProvider } from '../../src/services/provider-utils';
@@ -79,7 +81,7 @@ function Harness({
   );
 }
 
-function renderMinimax() {
+function renderMinimax(method: 'token' | 'login' = 'token') {
   const provDef = getProvider('minimax')!;
   const props = {
     provDef,
@@ -92,7 +94,13 @@ function renderMinimax() {
     onClose: vi.fn(),
   };
   const result = render(<Harness {...props} />);
+  if (method === 'token') chooseTokenMethod();
   return { ...result, props };
+}
+
+/** The pasted token is the second choice of the connection-method radio. */
+function chooseTokenMethod() {
+  fireEvent.click(screen.getByRole('radio', { name: /Coding Plan token/ }));
 }
 
 describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () => {
@@ -130,6 +138,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
         apiKey: validToken,
         authType: 'subscription',
         region: 'global',
+        label: 'minimax-1',
       });
     });
     expect(mockToast.success).toHaveBeenCalledWith('MiniMax subscription connected');
@@ -152,6 +161,7 @@ describe('DeviceCodeDetailView — MiniMax Coding Plan token alternative', () =>
         apiKey: validToken,
         authType: 'subscription',
         region: 'cn',
+        label: 'minimax-1',
       });
     });
   });
@@ -488,12 +498,53 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
     }
   });
 
+  it('polls at once when the page comes back to the foreground', async () => {
+    vi.useFakeTimers();
+    try {
+      (startMinimaxOAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
+        flowId: 'f1',
+        userCode: 'ABCD-1234',
+        verificationUri: 'https://minimax.io/verify',
+        expiresAt: Date.now() + 600_000,
+        pollIntervalMs: 60_000,
+      });
+      const poll = pollMinimaxOAuth as ReturnType<typeof vi.fn>;
+      poll.mockResolvedValue({ status: 'success' });
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+
+      const { props } = renderMinimax('login');
+      fireEvent.click(screen.getByText('Connect with MiniMax'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      // The next scheduled poll is a minute away (a throttled hidden page).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(poll).not.toHaveBeenCalled();
+
+      // Back from approving in another window: the poll runs right away.
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(poll).toHaveBeenCalledWith('f1');
+      expect(props.onUpdate).toHaveBeenCalled();
+      openSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('labels a pasted token when adding another connected MiniMax account', async () => {
     mockConnectProvider.mockResolvedValueOnce(undefined);
+    // The device-code start fails, so the add-account view stays on the token form.
+    (startMinimaxOAuth as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('down'));
     vi.spyOn(window, 'open').mockReturnValue(null);
 
     renderConnectedWithAddKeyOpen();
 
+    await waitFor(() => chooseTokenMethod());
     const input = await waitFor(() => screen.getByLabelText('MiniMax Coding Plan token'));
     const validToken = 'sk-cp-' + 'e'.repeat(40);
     fireEvent.change(input, { target: { value: validToken } });
@@ -505,16 +556,18 @@ describe('DeviceCodeDetailView — addKeyOpen effect', () => {
         apiKey: validToken,
         authType: 'subscription',
         region: 'global',
-        label: 'Key 2',
+        label: 'minimax-1',
       });
     });
   });
 
   it('cancels a connected add-account MiniMax device-code flow', async () => {
+    (startMinimaxOAuth as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('down'));
     vi.spyOn(window, 'open').mockReturnValue(null);
 
     renderConnectedWithAddKeyOpen();
 
+    await waitFor(() => chooseTokenMethod());
     await waitFor(() => {
       expect(screen.getByLabelText('MiniMax Coding Plan token')).toBeDefined();
     });

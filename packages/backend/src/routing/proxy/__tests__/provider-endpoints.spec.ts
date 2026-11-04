@@ -6,7 +6,13 @@ import {
   resolveEndpointKey,
   PROVIDER_ENDPOINTS,
 } from '../provider-endpoints';
-import { buildProviderExtraHeaders, resolveSubscriptionEndpointKey } from '../provider-hooks';
+import {
+  buildProviderExtraHeaders,
+  opencodeSessionId,
+  resolveSubscriptionEndpointKey,
+} from '../provider-hooks';
+
+const OPENCODE_SESSION_ID = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 
 describe('buildCustomEndpoint', () => {
   it('strips trailing /v1 from base URL to avoid double /v1', () => {
@@ -798,14 +804,22 @@ describe('PROVIDER_ENDPOINTS', () => {
     expect(ep.buildPath('minimax-m2.7')).toBe('/v1/messages');
   });
 
-  it('opencode-go-anthropic sends x-api-key and Bearer so API keys and Console OAuth tokens both work', () => {
-    const headers = PROVIDER_ENDPOINTS['opencode-go-anthropic'].buildHeaders('og-token');
-    expect(headers).toMatchObject({
+  it('opencode-go-anthropic sends only x-api-key for a pasted key and only Bearer for an OAuth token', () => {
+    const ep = PROVIDER_ENDPOINTS['opencode-go-anthropic'];
+    const keyHeaders = ep.buildHeaders('og-token', 'subscription');
+    expect(keyHeaders).toMatchObject({
       'x-api-key': 'og-token',
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    });
+    expect(keyHeaders).not.toHaveProperty('Authorization');
+    const oauthHeaders = ep.buildHeaders('og-token', 'subscription', true);
+    expect(oauthHeaders).toMatchObject({
       Authorization: 'Bearer og-token',
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
     });
+    expect(oauthHeaders).not.toHaveProperty('x-api-key');
   });
 
   it('opencode-go-responses targets /v1/responses with chatgpt format and Bearer auth', () => {
@@ -1092,28 +1106,39 @@ describe('buildProviderExtraHeaders', () => {
     expect(buildProviderExtraHeaders('unknown', 'sess-abc')).toBeUndefined();
   });
 
-  it('returns x-opencode-session for opencode-go and opencode', () => {
-    expect(buildProviderExtraHeaders('opencode-go', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-    });
-    expect(buildProviderExtraHeaders('opencode', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-    });
+  const opencodeSessionHeaders = (project: string | RegExp = 'global') => ({
+    'x-opencode-session-id': expect.stringMatching(OPENCODE_SESSION_ID),
+    'x-session-affinity': expect.stringMatching(OPENCODE_SESSION_ID),
+    'X-Session-Id': expect.stringMatching(OPENCODE_SESSION_ID),
+    'x-opencode-project': typeof project === 'string' ? project : expect.stringMatching(project),
+    'x-opencode-session': expect.stringMatching(OPENCODE_SESSION_ID),
+  });
+
+  it('sends the OpenCode client session headers for opencode-go and opencode', () => {
+    const headers = buildProviderExtraHeaders('opencode-go', 'v1:scoped-session');
+    expect(headers).toEqual(opencodeSessionHeaders());
+    const ids = new Set(
+      ['x-opencode-session-id', 'x-session-affinity', 'X-Session-Id', 'x-opencode-session'].map(
+        (name) => headers![name],
+      ),
+    );
+    expect(ids.size).toBe(1);
+    expect(buildProviderExtraHeaders('opencode', 'v1:scoped-session')).toEqual(headers);
   });
 
   it('resolves registry aliases (opencodego / opencodezen) to the canonical builder', () => {
-    expect(buildProviderExtraHeaders('opencodego', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-    });
-    expect(buildProviderExtraHeaders('opencodezen', 'v1:scoped-session')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-    });
+    expect(buildProviderExtraHeaders('opencodego', 'v1:scoped-session')).toEqual(
+      opencodeSessionHeaders(),
+    );
+    expect(buildProviderExtraHeaders('opencodezen', 'v1:scoped-session')).toEqual(
+      opencodeSessionHeaders(),
+    );
   });
 
   it('falls back to the agent scope key for opencode when no session key exists', () => {
-    expect(buildProviderExtraHeaders('opencode-go', undefined, 'tenant-1\u0000agent-1')).toEqual({
-      'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-    });
+    expect(buildProviderExtraHeaders('opencode-go', undefined, 'tenant-1\u0000agent-1')).toEqual(
+      opencodeSessionHeaders(/^[a-f0-9]{40}$/),
+    );
   });
 
   it('prefers the per-conversation key over the agent scope fallback', () => {
@@ -1128,7 +1153,19 @@ describe('buildProviderExtraHeaders', () => {
       'tenant-1\u0000agent-1',
     );
     expect(withSession!['x-opencode-session']).not.toBe(fallbackOnly!['x-opencode-session']);
-    expect(withSession).toEqual(buildProviderExtraHeaders('opencode-go', 'v1:scoped-session'));
+    expect(withSession!['x-opencode-session']).toBe(
+      buildProviderExtraHeaders('opencode-go', 'v1:scoped-session')!['x-opencode-session'],
+    );
+    expect(withSession!['x-opencode-project']).toBe(fallbackOnly!['x-opencode-project']);
+  });
+
+  it('mints session ids like the OpenCode client and keeps them per key', () => {
+    const id = opencodeSessionId('mint-test', 1_700_000_000_000);
+    expect(id).toMatch(OPENCODE_SESSION_ID);
+    const inverted = ~(1_700_000_000_000n * 0x1000n + 1n) & 0xffffffffffffn;
+    expect(id.slice(4, 16)).toBe(inverted.toString(16).padStart(12, '0'));
+    expect(opencodeSessionId('mint-test')).toBe(id);
+    expect(opencodeSessionId('other-key')).not.toBe(id);
   });
 
   it('does not extend the agent scope fallback to xai or openrouter', () => {

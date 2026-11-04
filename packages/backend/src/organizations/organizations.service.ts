@@ -286,7 +286,8 @@ export class OrganizationsService {
     return rows[0];
   }
 
-  private async require(
+  /** The caller's role in the organization, or 403 below `required` (ADR 0006). */
+  async require(
     userId: string,
     tenantId: string,
     required: OrganizationRole,

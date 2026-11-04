@@ -1243,9 +1243,10 @@ describe('ProxyFallbackService', () => {
 
       expect(providerClient.forward).toHaveBeenCalledWith(
         expect.objectContaining({
-          extraHeaders: {
-            'x-opencode-session': expect.stringMatching(/^thinker-[a-f0-9]{32}$/),
-          },
+          extraHeaders: expect.objectContaining({
+            'x-opencode-session': expect.stringMatching(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+            'x-opencode-session-id': expect.stringMatching(/^ses_/),
+          }),
         }),
       );
     });
@@ -1276,7 +1277,7 @@ describe('ProxyFallbackService', () => {
         ([opts]: [{ extraHeaders?: Record<string, string> }]) =>
           opts.extraHeaders?.['x-opencode-session'],
       );
-      expect(calls[0]).toMatch(/^thinker-[a-f0-9]{32}$/);
+      expect(calls[0]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
       expect(calls[1]).toBe(calls[0]);
     });
 

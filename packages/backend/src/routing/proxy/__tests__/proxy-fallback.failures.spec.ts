@@ -451,7 +451,10 @@ describe('ProxyFallbackService.tryFallbacks — failure chain by status code', (
     };
 
     it('caps a plain 429 Retry-After at five minutes', async () => {
-      expect(await recordCooldownTtl('51379')).toBeLessThanOrEqual(5 * 60_000);
+      // The cap is measured from when the cooldown is stored, a few ms after `before`.
+      const ttl = await recordCooldownTtl('51379');
+      expect(ttl).toBeGreaterThanOrEqual(5 * 60_000);
+      expect(ttl).toBeLessThan(5 * 60_000 + 1_000);
     });
 
     it('honors a quota-exhausted Retry-After until the stated reset', async () => {

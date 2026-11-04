@@ -23,8 +23,10 @@ const ptBR: Catalog<typeof en> = {
     connected: '{{ name }} conectado',
     subscriptionConnected: 'Assinatura do {{ name }} conectada',
     subscriptionDisconnected: 'Assinatura do {{ name }} desconectada',
-    popupBlocked: 'O navegador bloqueou o pop-up. Permita pop-ups para este site e tente de novo.',
+    popupBlockedOpenLink:
+      'O navegador bloqueou a janela de login. Abra este link em outro navegador, ou copie-o; esta tela continua aguardando.',
     addConnection: 'Adicionar conexão',
+    newConnectionFor: 'Nova conexão: {{ name }}',
     reauthConnection: 'Autenticar novamente: {{ label }}',
     reauthNote:
       'O próximo login substitui a credencial de "{{ label }}". O acesso dos harnesses, as rotas e o histórico continuam como estão.',
@@ -44,11 +46,9 @@ const ptBR: Catalog<typeof en> = {
     resetsAt: 'Renova em {{ time }}',
   },
   keyForm: {
-    freeDivider: 'ou',
-    connectFree: 'Usar modelos gratuitos (sem chave)',
-    freeHint:
-      'Só os modelos gratuitos, com limite diário definido pelo provedor. Alguns podem usar seus dados para treinamento.',
-    freeLabel: 'Gratuito',
+    nameTaken: 'Já existe uma conexão chamada {{ label }}. Escolha outro nome.',
+    freeKeyHint:
+      'A chave {{ key }} dá só os modelos gratuitos, como numa instalação nova do OpenCode, com limite diário definido pelo provedor. Alguns podem usar seus dados para treinamento. Cole sua chave de API para liberar todos os modelos.',
     nounApiKey: 'chave de API',
     nounSetupToken: 'token de configuração',
     pasteToken: 'Cole o token',
@@ -231,6 +231,7 @@ const ptBR: Catalog<typeof en> = {
     connectWith: 'Conectar com {{ name }}',
     codingPlanToken: 'Token do Coding Plan do {{ name }}',
     connectWithToken: 'Conectar com token',
+    connectionMethod: 'Como conectar {{ name }}',
     tabOpened:
       'Uma nova aba foi aberta com a página de autorização do {{ name }}. Aprove a solicitação lá para concluir a conexão.',
   },
@@ -278,11 +279,24 @@ const ptBR: Catalog<typeof en> = {
     signInWithGoogle: 'Entrar com Google',
     pasteYourKey: 'Cole a chave de API do {{ name }}',
     signInTo: 'Entrar no {{ name }}',
-    opencodeDivider: 'Ou cole uma chave de API do OpenCode',
+    opencodeGoMethod: {
+      login: 'Login no OpenCode Console (recomendado)',
+      loginHint:
+        'Entre pelo navegador com um código de dispositivo. O token renova sozinho e a página da conta mostra o medidor de cota (5 horas, semana, mês).',
+      token: 'Chave de API',
+      tokenHint:
+        'Cole uma chave criada no Console do OpenCode. A inferência funciona, mas sem medidor de cota: a chave não informa a organização.',
+    },
     commandCodeRequirement: 'Requer o Command Code Pro ou superior.',
     geminiClosed:
       'O Google não permite mais novos logins do Gemini em apps fora do Google. As conexões existentes continuam funcionando. Para adicionar o Gemini, conecte uma chave de API do Gemini em Provedores por uso.',
-    minimaxDivider: 'Ou cole seu token do Coding Plan',
+    minimaxMethod: {
+      login: 'Login na MiniMax (recomendado)',
+      loginHint: 'Entre pelo navegador com um código de dispositivo. O token renova sozinho.',
+      token: 'Token do Coding Plan',
+      tokenHint:
+        'Cole o token sk-cp- da página do seu Coding Plan. Ele não renova; troque quando mudar.',
+    },
     regions: {
       autoDetect: 'Detectar automaticamente',
       chinaBeijing: 'China (Pequim)',

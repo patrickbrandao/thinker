@@ -18,6 +18,7 @@ import {
 import { canWrite as operatorCanWrite, McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { ok, result } from '../tool-result';
+import { providerKeyDisplay } from '../../common/utils/provider-key-mask';
 import {
   assertCanUseLocalRunners,
   canUsePrivateDestinations,
@@ -74,7 +75,7 @@ export function registerProviderTools(
               label: p.label,
               region: p.region,
               is_active: p.is_active,
-              key_prefix: p.key_prefix,
+              ...providerKeyDisplay(p),
               cached_model_count: modelCount(p),
               models_fetched_at: p.models_fetched_at,
               connected_at: p.connected_at,

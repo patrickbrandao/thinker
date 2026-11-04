@@ -230,6 +230,7 @@ export class PlaygroundService {
         customEndpoint,
         signal: abort.signal,
         providerResource,
+        oauthToken: authType === 'subscription' && isRefreshableOAuthCredential(rawApiKey),
         egressScope,
       };
       forward = await this.providerClient.forward(forwardOptions);

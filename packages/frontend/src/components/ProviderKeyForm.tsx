@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ListPlus, Trash2 } from 'lucide-react';
 import { MAX_KEYS_PER_PROVIDER as SHARED_MAX_KEYS_PER_PROVIDER } from 'thinker-shared';
 import type { ProviderDef, SubscriptionEndpointRegion } from '../services/providers.js';
 import { validateApiKey, validateSubscriptionKey } from '../services/provider-utils.js';
+import { maskedKeyLabel } from '../services/key-mask.js';
 import {
   connectProvider,
   disconnectProvider,
@@ -75,6 +76,8 @@ export interface ProviderKeyFormProps {
    * provider is removed with its definition, never by dropping its last key.
    */
   canDisconnect?: boolean;
+  /** Only add a new, named connection; the existing ones are managed on their own records. */
+  newConnection?: boolean;
   onBack: () => void;
   onUpdate: () => void;
 }
@@ -162,6 +165,10 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
       .slice()
       .sort((a, b) => a.priority - b.priority);
   }, [props.providers, provId, selectedAuthType]);
+  // Every connection name of this provider, any auth type: new names are `<provider>-N`.
+  const providerLabels = (props.providers ?? [])
+    .filter((p) => p.provider === provId)
+    .map((p) => p.label ?? '');
 
   const isListMode = supportsMultiKey && activeKeys.length > 1;
   const savedEndpointRegion = activeKeys[0]?.region;
@@ -309,27 +316,6 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
     }
   };
 
-  // Keyless connect: the provider's free key serves only its free models.
-  const handleConnectFree = async () => {
-    if (!provDef.freeKey) return;
-    props.setBusy(true);
-    try {
-      await connectProvider(props.agentName, {
-        provider: provId,
-        apiKey: provDef.freeKey,
-        authType: selectedAuthType,
-        label: t('providerSetup.keyForm.freeLabel'),
-      });
-      toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
-      props.onBack();
-      props.onUpdate();
-    } catch {
-      // error toast from fetchMutate
-    } finally {
-      props.setBusy(false);
-    }
-  };
-
   const handleUpdateKey = async (label?: string) => {
     if (!validateEndpointRegion()) return;
     const result = validateKey(props.keyInput);
@@ -420,8 +406,15 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
     }
   };
 
+  // A new account starts with the provider's free key (OpenCode's `public`),
+  // which the user confirms or replaces with a real one.
+  const freeKey = isSubMode ? undefined : provDef.freeKey;
+
   const connectInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    if (!connected && !props.newConnection && freeKey && !props.keyInput) {
+      props.setKeyInput(freeKey);
+    }
     if (connectInputRef.current && !connected) connectInputRef.current.focus();
     // Focus once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -434,6 +427,38 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
     <KeyHelpLink url={whereToGetUrl} owner={credentialOwnerName} noun={credentialNoun} />
   );
   const addPlaceholder = placeholder ?? t('providerSetup.keyForm.pasteApiKey');
+
+  const freeKeyHint = freeKey ? (
+    <p className="hint">{t('providerSetup.keyForm.freeKeyHint', { key: freeKey })}</p>
+  ) : null;
+
+  /* New connection — a named credential next to any existing ones */
+  if (props.newConnection) {
+    return (
+      <AddAnotherKeyAction
+        onAdd={handleAddKey}
+        busy={props.busy}
+        setBusy={props.setBusy}
+        provDef={provDef}
+        placeholder={addPlaceholder}
+        whereToGetUrl={whereToGetUrl}
+        credentialNoun={credentialNoun}
+        credentialOwnerName={credentialOwnerName}
+        existingLabels={providerLabels}
+        open
+        // Cancel and a successful add both close the host.
+        setOpen={(open) => {
+          if (!open) props.onBack();
+        }}
+        isSubscription={isSubMode}
+        endpointRegions={endpointRegions}
+        submitLabel={t('providerSetup.shared.connect')}
+        initialApiKey={freeKey}
+        hint={freeKeyHint}
+        bare
+      />
+    );
+  }
 
   /* Not yet connected — first key */
   if (!connected) {
@@ -460,6 +485,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
             }}
           />
           {keyError}
+          {freeKeyHint}
           {helpLink}
         </div>
         <Button
@@ -471,23 +497,6 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         >
           {t('providerSetup.shared.connect')}
         </Button>
-        {provDef.freeKey && !isSubMode ? (
-          <>
-            <p className="hint provider-detail__free-divider">
-              {t('providerSetup.keyForm.freeDivider')}
-            </p>
-            <Button
-              block
-              variant="ghost"
-              className="provider-detail__action"
-              busy={props.busy}
-              onClick={() => void handleConnectFree()}
-            >
-              {t('providerSetup.keyForm.connectFree')}
-            </Button>
-            <p className="hint">{t('providerSetup.keyForm.freeHint')}</p>
-          </>
-        ) : null}
       </>
     );
   }
@@ -501,6 +510,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         agentName={props.agentName}
         authType={selectedAuthType}
         activeKeys={activeKeys}
+        providerLabels={providerLabels}
         busy={props.busy}
         setBusy={props.setBusy}
         placeholder={addPlaceholder}
@@ -570,7 +580,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
               whereToGetUrl={whereToGetUrl}
               credentialNoun={credentialNoun}
               credentialOwnerName={credentialOwnerName}
-              existingLabels={activeKeys.map((k) => k.label ?? '')}
+              existingLabels={providerLabels}
               open={props.addKeyOpen}
               setOpen={props.setAddKeyOpen}
               isSubscription={isSubMode}
@@ -631,6 +641,14 @@ export interface AddAnotherKeyActionProps {
   isSubscription?: boolean;
   endpointRegions?: SubscriptionEndpointRegion[];
   initialEndpointRegion?: string;
+  /** Submit button text; defaults to "Add key". */
+  submitLabel?: string;
+  /** Render without the inset well, as the whole form of its host. */
+  bare?: boolean;
+  /** Starting key value (a provider's free key); empty by default. */
+  initialApiKey?: string;
+  /** Shown under the key field. */
+  hint?: ReactNode;
 }
 
 /** @internal Exported for testing only. */
@@ -641,7 +659,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
     (props.setOpen ?? setLocalOpen)(v);
   };
   const [label, setLabel] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(props.initialApiKey ?? '');
   const [endpointRegion, setEndpointRegion] = useState<string | undefined>(
     props.initialEndpointRegion ?? props.endpointRegions?.[0]?.value,
   );
@@ -650,7 +668,8 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
   const prevOpen = useRef<boolean | undefined>(undefined);
 
   // Lazy, like the Solid accessor: only computed once the form opens.
-  const defaultLabel = () => suggestNextProviderKeyLabel(props.existingLabels.filter(Boolean));
+  const defaultLabel = () =>
+    suggestNextProviderKeyLabel(props.existingLabels.filter(Boolean), props.provDef.id);
   const selectedEndpointRegionOption = props.endpointRegions?.find(
     (region) => region.value === endpointRegion,
   );
@@ -682,11 +701,18 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
       return;
     }
     const labelToUse = (label.trim() || defaultLabel()).slice(0, MAX_LABEL_LENGTH);
+    // The backend writes a known name into that connection, which would turn
+    // "add" into replacing another account's key.
+    const taken = labelToUse.toLowerCase();
+    if (props.existingLabels.some((existing) => existing.toLowerCase() === taken)) {
+      toast.error(t('providerSetup.keyForm.nameTaken', { label: labelToUse }));
+      return;
+    }
     const ok = await props.onAdd(labelToUse, apiKey.trim(), customEndpointPayload);
     if (ok) {
       setIsOpen(false);
       setLabel('');
-      setApiKey('');
+      setApiKey(props.initialApiKey ?? '');
       setCustomEndpointUrl('');
     }
   };
@@ -712,7 +738,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
 
   const baseUrlPlaceholder = selectedEndpointRegionOption?.baseUrlPlaceholder;
   return (
-    <div className="well mt-3 flex flex-col">
+    <div className={cx('flex flex-col', !props.bare && 'well mt-3')}>
       <label className="label" htmlFor="add-key-label">
         {t('providerSetup.keyForm.name')}
       </label>
@@ -786,6 +812,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
           if (e.key === 'Enter') void submit();
         }}
       />
+      {props.hint}
       <KeyHelpLink
         url={props.whereToGetUrl}
         owner={props.credentialOwnerName}
@@ -796,7 +823,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
           {t('common.cancel')}
         </Button>
         <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
-          {t('providerSetup.keyForm.addKey')}
+          {props.submitLabel ?? t('providerSetup.keyForm.addKey')}
         </Button>
       </div>
     </div>
@@ -809,6 +836,8 @@ interface KeyChainViewProps {
   agentName: string;
   authType: AuthType;
   activeKeys: RoutingProvider[];
+  /** Every connection name of this provider, for the next `<provider>-N`. */
+  providerLabels: string[];
   busy: boolean;
   setBusy: SetValue<boolean>;
   placeholder: string;
@@ -944,10 +973,7 @@ function KeyChainView(props: KeyChainViewProps) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-ink">{k.label}</div>
                   <div className="truncate font-mono text-xs text-muted">
-                    {[
-                      k.key_prefix ? `${k.key_prefix}${'•'.repeat(12)}` : '••••••••••••',
-                      props.endpointRegionLabel(k.region),
-                    ]
+                    {[maskedKeyLabel(k), props.endpointRegionLabel(k.region)]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
@@ -1006,7 +1032,7 @@ function KeyChainView(props: KeyChainViewProps) {
           whereToGetUrl={props.whereToGetUrl}
           credentialNoun={props.credentialNoun}
           credentialOwnerName={props.credentialOwnerName}
-          existingLabels={props.activeKeys.map((k) => k.label ?? '')}
+          existingLabels={props.providerLabels}
           open={props.addKeyOpen}
           setOpen={props.setAddKeyOpen}
           isSubscription={props.authType === 'subscription'}

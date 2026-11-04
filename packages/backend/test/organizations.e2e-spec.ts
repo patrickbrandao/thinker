@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { createTestApp, TEST_API_KEY, TEST_TENANT_ID, TEST_USER_ID } from './helpers';
+import { encrypt, getEncryptionSecret } from '../src/common/utils/crypto.util';
 
 /**
  * Organizations, roles and accounts (ADR 0006). The fixture user owns
@@ -92,6 +93,61 @@ describe('organization context and roles', () => {
       request(app.getHttpServer()).post('/api/v1/routing/test-agent/custom-providers/probe'),
     ).send({});
     expect(asAdmin.status).not.toBe(403);
+  });
+});
+
+describe('provider key reveal (owner only)', () => {
+  const KEY_ID = 'reveal-conn-key';
+  const OAUTH_ID = 'reveal-conn-oauth';
+  const OTHER_ID = 'reveal-conn-other-org';
+  const reveal = (userId: string, id: string, orgId?: string) =>
+    as(
+      userId,
+      request(app.getHttpServer()).post(`/api/v1/providers/connections/${id}/reveal-key`),
+      orgId,
+    );
+
+  beforeAll(async () => {
+    const insert = (id: string, tenant: string, authType: string, secret: string, label: string) =>
+      ds.query(
+        `INSERT INTO tenant_providers
+           (id, tenant_id, provider, auth_type, api_key_encrypted, key_prefix, label, priority, is_active)
+         VALUES ($1, $2, 'openrouter', $3, $4, $5, $6, 0, true)`,
+        [id, tenant, authType, encrypt(secret, getEncryptionSecret()), secret.slice(0, 8), label],
+      );
+    await insert(KEY_ID, TEST_TENANT_ID, 'api_key', 'sk-or-v1-reveal-me-0123456789abcd', 'Reveal');
+    await insert(OAUTH_ID, TEST_TENANT_ID, 'subscription', '{"access_token":"tok"}', 'OAuth');
+    await insert(OTHER_ID, OTHER_ORG, 'api_key', 'sk-or-v1-other-org-secret', 'Other');
+  });
+
+  it('lists only the masked key, for every role', async () => {
+    const res = await as(VIEWER, request(app.getHttpServer()).get('/api/v1/providers')).expect(200);
+    const body = JSON.stringify(res.body);
+    expect(body).toContain('sk-or-v1-rev********abcd');
+    expect(body).not.toContain('sk-or-v1-reveal-me-0123456789abcd');
+  });
+
+  it('reveals the full key to an owner, uncached', async () => {
+    const res = await reveal(TEST_USER_ID, KEY_ID).expect(201);
+    expect(res.body).toEqual({ id: KEY_ID, api_key: 'sk-or-v1-reveal-me-0123456789abcd' });
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('refuses admins, members and viewers', async () => {
+    for (const user of [ADMIN, MEMBER, VIEWER]) {
+      const res = await reveal(user, KEY_ID).expect(403);
+      expect(res.body.code).toBe('insufficient_role');
+    }
+  });
+
+  it('refuses subscription credentials', async () => {
+    const res = await reveal(TEST_USER_ID, OAUTH_ID).expect(400);
+    expect(res.body.code).toBe('credential_not_revealable');
+  });
+
+  it("never reads another organization's connection by id", async () => {
+    await reveal(TEST_USER_ID, OTHER_ID).expect(404);
+    await reveal(OUTSIDER, KEY_ID).expect(404);
   });
 });
 

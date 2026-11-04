@@ -2,8 +2,11 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Header,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -29,6 +32,8 @@ import {
   SetStreamWarmupDto,
 } from './dto/routing.dto';
 import { MinRole } from '../common/decorators/roles.decorator';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 
 /**
  * Tenant-level provider management endpoints.
@@ -49,6 +54,8 @@ import { MinRole } from '../common/decorators/roles.decorator';
 @MinRole('admin')
 @Controller('api/v1/providers')
 export class TenantProvidersController {
+  private readonly logger = new Logger(TenantProvidersController.name);
+
   constructor(
     @InjectRepository(TenantProvider)
     private readonly providerRepo: Repository<TenantProvider>,
@@ -58,6 +65,7 @@ export class TenantProvidersController {
     private readonly discoveryService: ModelDiscoveryService,
     private readonly routingCache: RoutingCacheService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   private requireTenant(ctx: TenantContext): string {
@@ -120,6 +128,31 @@ export class TenantProvidersController {
   }
 
   /**
+   * Reveal a connection's full API key. Owner only: the RolesGuard checks the
+   * role resolved for the request, and the membership is re-checked here so a
+   * credential without a user (or an internal context) never passes. OAuth and
+   * subscription credentials are refused. Every reveal is logged without the key.
+   */
+  @MinRole('owner')
+  @Post('connections/:id/reveal-key')
+  @Header('Cache-Control', 'no-store')
+  async revealKey(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
+    const tenantId = this.requireTenant(ctx);
+    if (!ctx.userId) {
+      throw new ForbiddenException({
+        message: 'Only an organization owner can reveal a provider key.',
+        code: 'insufficient_role',
+      });
+    }
+    await this.organizations.require(ctx.userId, tenantId, 'owner');
+    const { row, apiKey } = await this.providerService.revealApiKey(tenantId, id);
+    this.logger.log(
+      `Provider key revealed: user=${ctx.userId} tenant=${tenantId} connection=${row.id} provider=${row.provider}`,
+    );
+    return { id: row.id, api_key: apiKey };
+  }
+
+  /**
    * Arm a re-authentication: the next subscription sign-in for this
    * connection's provider updates this connection in place.
    */
@@ -178,6 +211,7 @@ export class TenantProvidersController {
           id: string;
           label: string;
           key_prefix: string | null;
+          key_masked: string | null;
           priority: number;
           connected_at: string;
           models_fetched_at: string | null;
@@ -205,12 +239,13 @@ export class TenantProvidersController {
       const modelCount =
         customModelCount.get(p.provider) ??
         (Array.isArray(p.cached_models) ? p.cached_models.length : 0);
+      const display = providerKeyDisplay(p);
 
       if (existing) {
         existing.connections.push({
           id: p.id,
           label: p.label,
-          key_prefix: p.key_prefix,
+          ...display,
           priority: p.priority,
           connected_at: p.connected_at,
           models_fetched_at: p.models_fetched_at,
@@ -227,7 +262,7 @@ export class TenantProvidersController {
             {
               id: p.id,
               label: p.label,
-              key_prefix: p.key_prefix,
+              ...display,
               priority: p.priority,
               connected_at: p.connected_at,
               models_fetched_at: p.models_fetched_at,

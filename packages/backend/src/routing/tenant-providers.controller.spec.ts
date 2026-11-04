@@ -1,4 +1,6 @@
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { TenantProvidersController } from './tenant-providers.controller';
+import { MIN_ROLE_KEY } from '../common/decorators/roles.decorator';
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
 import type { TenantProvider } from '../entities/tenant-provider.entity';
 
@@ -44,6 +46,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -78,6 +81,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -98,6 +102,7 @@ describe('TenantProvidersController', () => {
       providerRepo as never,
       { getAll: jest.fn().mockReturnValue([]) } as never,
       { list: jest.fn().mockResolvedValue([]) } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -129,6 +134,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -146,6 +152,7 @@ describe('TenantProvidersController', () => {
       providerRepo as never,
       { getAll: jest.fn().mockReturnValue([]) } as never,
       customProviderService as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -191,6 +198,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -223,6 +231,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -241,6 +250,7 @@ describe('TenantProvidersController', () => {
       providerRepo as never,
       { getAll: jest.fn().mockReturnValue([]) } as never,
       { list: jest.fn().mockResolvedValue([]) } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -267,6 +277,7 @@ describe('TenantProvidersController', () => {
         ]),
       } as never,
       { list: jest.fn().mockResolvedValue([]) } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -299,6 +310,7 @@ describe('TenantProvidersController', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await controller.listProviders(ctx);
@@ -327,6 +339,7 @@ describe('TenantProvidersController', () => {
       providerRepo as never,
       { getAll: jest.fn().mockReturnValue([]) } as never,
       { list: jest.fn().mockResolvedValue([]) } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -371,6 +384,7 @@ describe('TenantProvidersController mutations (no harness required)', () => {
       discoveryService as never,
       routingCache as never,
       cacheManager as never,
+      {} as never,
     );
     return { controller, providerService, discoveryService, routingCache, cacheManager };
   };
@@ -477,5 +491,72 @@ describe('TenantProvidersController mutations (no harness required)', () => {
     expect(providerService.removeProvider).not.toHaveBeenCalled();
     expect(providerService.renameKey).not.toHaveBeenCalled();
     expect(discoveryService.discoverAllForAgent).not.toHaveBeenCalled();
+  });
+
+  describe('revealKey', () => {
+    const make = (role: string) => {
+      const organizations = {
+        require: jest.fn(async (_u: string, _t: string, required: string) => {
+          if (required === 'owner' && role !== 'owner') {
+            throw new ForbiddenException({ code: 'insufficient_role' });
+          }
+          return role;
+        }),
+      };
+      const providerService = {
+        revealApiKey: jest.fn().mockResolvedValue({
+          row: { id: 'conn-1', provider: 'opencode' },
+          apiKey: 'public',
+        }),
+      };
+      const controller = new TenantProvidersController(
+        {} as never,
+        {} as never,
+        {} as never,
+        providerService as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        organizations as never,
+      );
+      return { controller, organizations, providerService };
+    };
+
+    it('returns the key to an owner and logs the reveal without it', async () => {
+      const { controller, organizations, providerService } = make('owner');
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+
+      await expect(controller.revealKey(ctx, 'conn-1')).resolves.toEqual({
+        id: 'conn-1',
+        api_key: 'public',
+      });
+      expect(organizations.require).toHaveBeenCalledWith('user-1', 'tenant-1', 'owner');
+      expect(providerService.revealApiKey).toHaveBeenCalledWith('tenant-1', 'conn-1');
+      const line = String(log.mock.calls[0]?.[0]);
+      expect(line).toContain('user=user-1');
+      expect(line).toContain('tenant=tenant-1');
+      expect(line).toContain('connection=conn-1');
+      expect(line).not.toContain('public');
+      log.mockRestore();
+    });
+
+    it.each(['admin', 'member', 'viewer'])('refuses a %s', async (role) => {
+      const { controller, providerService } = make(role);
+      await expect(controller.revealKey(ctx, 'conn-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(providerService.revealApiKey).not.toHaveBeenCalled();
+    });
+
+    it('refuses a credential without a user', async () => {
+      const { controller, providerService } = make('owner');
+      await expect(
+        controller.revealKey({ tenantId: 'tenant-1', userId: null }, 'conn-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(providerService.revealApiKey).not.toHaveBeenCalled();
+    });
+
+    it('is declared owner-only for the RolesGuard', () => {
+      const meta = Reflect.getMetadata(MIN_ROLE_KEY, TenantProvidersController.prototype.revealKey);
+      expect(meta).toEqual({ role: 'owner', includeReads: false });
+    });
   });
 });

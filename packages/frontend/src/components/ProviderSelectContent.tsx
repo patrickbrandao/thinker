@@ -28,6 +28,8 @@ export interface ProviderSelectContentProps {
   showFooter?: boolean;
   /** Re-authenticating this subscription connection (by label) instead of adding one. */
   reauthLabel?: string;
+  /** Only set up a new connection; see ProviderDetailView. */
+  newConnection?: boolean;
 }
 
 const noop = () => {};
@@ -209,6 +211,7 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
               goBack();
               props.onUpdate();
             }}
+            newConnection={props.newConnection}
           />
         </div>
       ) : null}
@@ -234,6 +237,7 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
             onPollProviders={props.onPollProviders}
             onClose={closeHandler}
             reauthLabel={props.reauthLabel}
+            newConnection={props.newConnection}
           />
         </div>
       ) : null}

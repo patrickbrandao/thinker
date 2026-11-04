@@ -427,6 +427,47 @@ describe('ProviderService — route-only cleanup paths', () => {
     });
   });
 
+  describe('upsertProvider — unlabeled connections', () => {
+    let originalSecret: string | undefined;
+    beforeEach(() => {
+      originalSecret = process.env.THINKER_ENCRYPTION_KEY;
+      process.env.THINKER_ENCRYPTION_KEY = 'a'.repeat(48);
+    });
+    afterEach(() => {
+      if (originalSecret === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+      else process.env.THINKER_ENCRYPTION_KEY = originalSecret;
+    });
+
+    it('names a new connection <provider>-N with the lowest free N', async () => {
+      providerRepo.findOne.mockResolvedValue(null);
+      providerRepo.find.mockResolvedValue([{ label: 'deepseek-2' }]);
+
+      await svc.upsertProvider(null, 'tenant-1', 'deepseek', 'sk-new');
+
+      const inserted = providerRepo.insert.mock.calls[0][0] as TenantProvider;
+      expect(inserted.label).toBe('deepseek-1');
+    });
+
+    it('updates the primary connection when none is named Default', async () => {
+      const primary = {
+        id: 'p1',
+        tenant_id: 'tenant-1',
+        provider: 'deepseek',
+        auth_type: 'api_key',
+        label: 'deepseek-1',
+        priority: 0,
+        is_active: true,
+      } as unknown as TenantProvider;
+      providerRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(primary);
+
+      const result = await svc.upsertProvider(null, 'tenant-1', 'deepseek', 'sk-rotated');
+
+      expect(result.isNew).toBe(false);
+      expect(providerRepo.insert).not.toHaveBeenCalled();
+      expect(providerRepo.save).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
+    });
+  });
+
   describe('upsertProvider — Bedrock region', () => {
     let originalSecret: string | undefined;
 
@@ -960,7 +1001,7 @@ describe('ProviderService — route-only cleanup paths', () => {
           agent_id: undefined,
           provider: 'google',
           auth_type: 'subscription',
-          label: 'Default',
+          label: 'google-1',
           priority: 0,
           api_key_encrypted: null,
           key_prefix: null,
@@ -1366,34 +1407,28 @@ describe('ProviderService — route-only cleanup paths', () => {
   });
 
   describe('nextOAuthLabel', () => {
-    it('returns undefined when no subscription rows exist', async () => {
+    it('starts at <provider>-1 when the provider has no connections', async () => {
       providerRepo.find.mockResolvedValue([]);
-      const label = await svc.nextOAuthLabel('tenant-1', 'openai');
-      expect(label).toBeUndefined();
+      await expect(svc.nextOAuthLabel('tenant-1', 'openai')).resolves.toBe('openai-1');
     });
 
-    it('returns "Key 2" when one subscription row exists', async () => {
-      providerRepo.find.mockResolvedValue([{ label: 'Default', is_active: true }]);
-      const label = await svc.nextOAuthLabel('tenant-1', 'openai');
-      expect(label).toBe('Key 2');
+    it('takes the next number after the existing ones, ignoring other names', async () => {
+      providerRepo.find.mockResolvedValue([{ label: 'Default' }, { label: 'openai-1' }]);
+      await expect(svc.nextOAuthLabel('tenant-1', 'openai')).resolves.toBe('openai-2');
     });
 
-    it('skips existing labels', async () => {
-      providerRepo.find.mockResolvedValue([
-        { label: 'Default', is_active: true },
-        { label: 'Key 2', is_active: true },
-      ]);
-      const label = await svc.nextOAuthLabel('tenant-1', 'openai');
-      expect(label).toBe('Key 3');
+    it('reuses the lowest free number, case-insensitively', async () => {
+      providerRepo.find.mockResolvedValue([{ label: 'OpenAI-2' }, { label: 'openai-3' }]);
+      await expect(svc.nextOAuthLabel('tenant-1', 'openai')).resolves.toBe('openai-1');
     });
 
-    it('is case-insensitive when checking existing labels', async () => {
-      providerRepo.find.mockResolvedValue([
-        { label: 'Default', is_active: true },
-        { label: 'key 2', is_active: true },
-      ]);
-      const label = await svc.nextOAuthLabel('tenant-1', 'openai');
-      expect(label).toBe('Key 3');
+    it('counts the provider connections of every auth type', async () => {
+      providerRepo.find.mockResolvedValue([]);
+      await svc.nextOAuthLabel('tenant-1', 'anthropic');
+      expect(providerRepo.find).toHaveBeenCalledWith({
+        where: { tenant_id: 'tenant-1', provider: 'anthropic' },
+        select: { label: true },
+      });
     });
   });
 });
@@ -1771,6 +1806,38 @@ describe('ProviderService — symmetric provider↔agent auto-connect', () => {
       expect(enabled).toEqual([{ agent: 'agent-1', provider: 'p-same' }]);
       expect(enabled.some((g) => g.agent === 'agent-2')).toBe(false);
     });
+
+    it("creates a separate connection for each new label with OpenCode's shared free key", async () => {
+      const { svc, providerRepo } = build(['agent-1'], []);
+      const publicEncrypted = encrypt('public', getEncryptionSecret());
+      providerRepo.find.mockResolvedValue([
+        {
+          id: 'p-public-1',
+          provider: 'opencode',
+          auth_type: 'api_key',
+          label: 'Key 1',
+          api_key_encrypted: publicEncrypted,
+          is_active: true,
+          priority: 0,
+        } as unknown as TenantProvider,
+      ]);
+
+      const { provider, isNew } = await svc.upsertProvider(
+        'agent-1',
+        'tenant-1',
+        'opencode',
+        'public',
+        'api_key',
+        undefined,
+        'Key 2',
+      );
+
+      expect(isNew).toBe(true);
+      expect(provider.id).not.toBe('p-public-1');
+      expect(provider.label).toBe('Key 2');
+      expect(provider.priority).toBe(1);
+      expect(providerRepo.insert).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
@@ -1888,12 +1955,12 @@ describe('ProviderService — re-authentication target', () => {
       auth_type: 'subscription',
       label: 'Work',
     });
-    providerRepo.find.mockResolvedValue([{ label: 'Work' }, { label: 'Key 2' }]);
+    providerRepo.find.mockResolvedValue([{ label: 'Work' }, { label: 'openai-1' }]);
 
     await svc.startReauth('t1', 'c1');
 
     await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('Work');
-    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('Key 3');
+    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('openai-2');
   });
 
   it('does not affect other tenants or providers', async () => {
@@ -1905,8 +1972,8 @@ describe('ProviderService — re-authentication target', () => {
     });
     await svc.startReauth('t1', 'c1');
 
-    await expect(svc.nextOAuthLabel('t2', 'openai')).resolves.toBeUndefined();
-    await expect(svc.nextOAuthLabel('t1', 'xai')).resolves.toBeUndefined();
+    await expect(svc.nextOAuthLabel('t2', 'openai')).resolves.toBe('openai-1');
+    await expect(svc.nextOAuthLabel('t1', 'xai')).resolves.toBe('xai-1');
   });
 
   it('rejects API key connections and unknown ids', async () => {
@@ -1936,6 +2003,6 @@ describe('ProviderService — cancelReauth', () => {
     });
     await svc.startReauth('t1', 'c1');
     await svc.cancelReauth('t1', 'c1');
-    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBeUndefined();
+    await expect(svc.nextOAuthLabel('t1', 'openai')).resolves.toBe('openai-1');
   });
 });

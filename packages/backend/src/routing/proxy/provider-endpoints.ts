@@ -29,7 +29,8 @@ import { buildKiroHeaders, KIRO_BASE_URL, KIRO_CHAT_TARGET } from './kiro-adapte
 
 export interface ProviderEndpoint {
   baseUrl: string;
-  buildHeaders: (apiKey: string, authType?: string) => Record<string, string>;
+  /** `oauth` is true when `apiKey` is an access token unwrapped from a stored OAuth login. */
+  buildHeaders: (apiKey: string, authType?: string, oauth?: boolean) => Record<string, string>;
   buildPath: (model: string) => string;
   /**
    * Optional override used when the request is a stream. Some upstreams
@@ -620,8 +621,11 @@ const opencodeClientHeaders = {
 
 function opencodeEndpoints(id: string, base: string): Record<string, ProviderEndpoint> {
   const withClient =
-    (build: (apiKey: string) => Record<string, string>) =>
-    (apiKey: string): Record<string, string> => ({ ...build(apiKey), ...opencodeClientHeaders });
+    (build: (apiKey: string, oauth?: boolean) => Record<string, string>) =>
+    (apiKey: string, _authType?: string, oauth?: boolean): Record<string, string> => ({
+      ...build(apiKey, oauth),
+      ...opencodeClientHeaders,
+    });
   return {
     [id]: {
       baseUrl: `${base}/openai`,
@@ -638,14 +642,13 @@ function opencodeEndpoints(id: string, base: string): Record<string, ProviderEnd
       forwardResponsesStream: true,
       acceptsMaxOutputTokens: true,
     },
-    // x-api-key covers pasted OpenCode API keys; a Console OAuth access token
-    // authenticates as Bearer (what opencode's Anthropic client sends for OAuth).
+    // Like the client: a Console OAuth access token goes only as Bearer, a
+    // pasted OpenCode API key only as x-api-key.
     [`${id}-anthropic`]: {
       baseUrl: `${base}/anthropic`,
-      buildHeaders: withClient((apiKey: string) => ({
-        ...anthropicApiKeyHeaders(apiKey),
-        Authorization: `Bearer ${apiKey}`,
-      })),
+      buildHeaders: withClient((apiKey: string, oauth?: boolean) =>
+        oauth ? anthropicBearerHeaders(apiKey) : anthropicApiKeyHeaders(apiKey),
+      ),
       buildPath: () => '/v1/messages',
       format: 'anthropic',
     },
