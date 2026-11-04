@@ -59,7 +59,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `api-nvidia` | API | NVIDIA NIM | `nvidia` | [dossiê](api/api-nvidia.md) | — | — |
 | `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | — | — |
 | `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | — | — |
-| `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | — | — |
+| `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-03 | 5 |
 | `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | — | — |
 | `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | — | — |
 | `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | — | — |
@@ -76,18 +76,18 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `sub-ollama-cloud` | Assinatura | Ollama Cloud | `ollama-cloud` | [dossiê](assinatura/sub-ollama-cloud.md) | — | — |
 | `sub-kiro` | Assinatura | Kiro | `kiro` | [dossiê](assinatura/sub-kiro.md) | — | — |
 | `sub-zai` | Assinatura | GLM Coding Plan | `zai` | [dossiê](assinatura/sub-zai.md) | — | — |
-| `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | — | — |
+| `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | 2026-11-03 | 8 |
 | `sub-opencode` | Assinatura | OpenCode Console | `opencode` | [dossiê](assinatura/sub-opencode.md) | — | — |
 | `sub-gemini` | Assinatura | Sign in with Google (Gemini Code Assist) | `gemini` | [dossiê](assinatura/sub-gemini.md) | — | — |
 | `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | — | — |
 | `sub-copilot` | Assinatura | GitHub Copilot | `copilot` | [dossiê](assinatura/sub-copilot.md) | — | — |
 | `sub-commandcode` | Assinatura | Command Code | `commandcode` | [dossiê](assinatura/sub-commandcode.md) | — | — |
 | `sub-cline-pass` | Assinatura | ClinePass | `cline-pass` | [dossiê](assinatura/sub-cline-pass.md) | — | — |
-| `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | — | — |
+| `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | 2026-11-03 | 4 |
 | `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | — | — |
 | `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | — | — |
-| `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | — | — |
-| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | — | — |
+| `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 5 |
+| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 4 |
 | `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | — | — |
 | `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | — | — |
 | `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | — | — |
