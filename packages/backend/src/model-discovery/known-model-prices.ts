@@ -21,9 +21,12 @@
  *  - gemma-3-1b-it: Free on Google AI Studio
  */
 
+import { effectiveSeedPrice, lookupPriceSeed } from '../model-prices/provider-price-seeds';
+
 interface KnownPrice {
   input: number;
   output: number;
+  cacheRead?: number;
 }
 
 const PER_MILLION = 1_000_000;
@@ -36,11 +39,16 @@ const PER_MILLION = 1_000_000;
 const KNOWN_PRICES: ReadonlyArray<{ prefix: string; price: KnownPrice }> = [
   { prefix: 'moonshot-v1-', price: { input: 1.66 / PER_MILLION, output: 1.66 / PER_MILLION } },
   { prefix: 'gemma-3-1b-it', price: { input: 0, output: 0 } },
-  // gemini-pro-latest is Google's alias for the current Gemini Pro (2.5 Pro)
-  { prefix: 'gemini-pro-latest', price: { input: 1.25 / PER_MILLION, output: 10.0 / PER_MILLION } },
 ];
 
-export function lookupKnownPrice(modelId: string): KnownPrice | null {
+/**
+ * Curated price for a model: the provider's own seed first (exact id, dated
+ * changes applied, see model-prices/provider-price-seeds.ts), then the
+ * provider-agnostic prefixes above.
+ */
+export function lookupKnownPrice(modelId: string, providerId?: string): KnownPrice | null {
+  const seed = providerId ? lookupPriceSeed(providerId, modelId) : undefined;
+  if (seed) return effectiveSeedPrice(seed);
   for (const entry of KNOWN_PRICES) {
     if (modelId.startsWith(entry.prefix) || modelId === entry.prefix) {
       return entry.price;

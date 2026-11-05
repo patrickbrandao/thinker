@@ -475,6 +475,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       outputTokens: usage?.completion_tokens ?? 0,
       cacheReadTokens: usage?.cache_read_tokens ?? 0,
       cacheCreationTokens: usage?.cache_creation_tokens ?? 0,
+      cacheCreation1hTokens: usage?.cache_creation_1h_tokens ?? 0,
       model,
       // Priced on the raw keys: a custom provider's rates are stored under
       // `custom:<uuid>/<model>`, which is exactly what canonicalization strips.
@@ -484,9 +485,13 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       isSubscription: authType === 'subscription' && !catalogPricing,
       isLocalProvider:
         authType === 'local' || isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
-      // Copilot's usage.cost is a premium-request multiplier, not USD.
+      // Copilot's usage.cost is a premium-request multiplier, not USD, and
+      // ClinePass reports the upstream market price on a flat-fee plan
+      // (sub-cline-pass G2).
       reportedCostUsd:
-        isCopilot || opencode?.ignoreReportedCost ? undefined : usage?.reported_cost_usd,
+        isCopilot || opencode?.ignoreReportedCost || isFlatFeeReportedCost(provider)
+          ? undefined
+          : usage?.reported_cost_usd,
       at,
     });
   }
@@ -1316,4 +1321,9 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       if (now - v >= this.RATE_LIMIT_COOLDOWN_MS) this.rateLimitCooldown.delete(k);
     }
   }
+}
+
+/** Providers whose reported `usage.cost` is a market price, not what the plan charged. */
+export function isFlatFeeReportedCost(provider: string | null | undefined): boolean {
+  return (provider ?? '').toLowerCase() === 'cline-pass';
 }

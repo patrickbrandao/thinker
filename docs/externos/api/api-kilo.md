@@ -119,7 +119,7 @@ Arquivos que citam `kilo`:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `parseKilo` ignora `pricing.input_cache_read` e `input_cache_write` do catálogo (251 de 380 modelos têm cache de leitura); custo de cache fica impreciso. Arquivo: `provider-model-fetcher.service.ts:678`. Mudança: ler os dois campos como o cliente oficial. | `providers` | [#408](https://github.com/patrickbrandao/thinker/issues/408) | aberta |
+| G1 | degradação | `parseKilo` ignora `pricing.input_cache_read` e `input_cache_write` do catálogo (251 de 380 modelos têm cache de leitura); custo de cache fica impreciso. Arquivo: `provider-model-fetcher.service.ts:678`. Mudança: ler os dois campos como o cliente oficial. | `providers` | [#408](https://github.com/patrickbrandao/thinker/issues/408) | resolvida (cache read/write lidos do catálogo) |
 | G2 | degradação | Modelos `kilo-auto/*` (preço `-1` vira `null`), aliases `~vendor/...-latest` e modelos com `expiration_date` não são tratados: sem custo reportado e sem aviso de saída. Mudança: tratar `-1` como dinâmico, expor `expiration_date`, marcar aliases. | `providers` | [#411](https://github.com/patrickbrandao/thinker/issues/411) | aberta |
 | G3 | oportunidade | Migrar a base para `https://ai-gateway.kilo.ai/api/v1` (canônica) e unificar as duas constantes duplicadas; a legada segue equivalente. | `providers` | sem issue (baixo valor imediato) | aberta |
 | G4 | oportunidade | Repassar `X-KiloCode-TaskId` (chave de prompt cache) e `x-kilocode-mode` (roteamento de `kilo-auto/frontier`) recebidos do harness; hoje nenhum é encaminhado. | `backend-dev` | sem issue | aberta |

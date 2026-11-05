@@ -149,7 +149,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | O seed cobra `deepseek-v4-pro` com a tarifa Flash desde 2026-09-14 (`models-dev-sync.service.ts:205-231`), mas a tabela oficial segue com tarifa Pro (cerca de 4,4x maior). Custo do Pro subestimado. Sugestão: remover o cutover. | providers | [#396](https://github.com/patrickbrandao/thinker/issues/396) | aberta |
+| G1 | degradação | O seed cobra `deepseek-v4-pro` com a tarifa Flash desde 2026-09-14 (`models-dev-sync.service.ts:205-231`), mas a tabela oficial segue com tarifa Pro (cerca de 4,4x maior). Custo do Pro subestimado. Sugestão: remover o cutover. | providers | [#396](https://github.com/patrickbrandao/thinker/issues/396) | resolvida (corte para a tarifa Flash removido) |
 | G2 | oportunidade | A rota anthropic nativa (`/anthropic`) e a Responses API existem; o Thinker só usa Chat Completions. Rotear Claude Code por `/anthropic` evitaria traduzir formato e preservaria thinking blocks. Sem issue (ganho incerto). | providers | — | aberta |
 | G3 | oportunidade | Confirmar (teste ao vivo com chave) que o parser SSE ignora comentários `: keep-alive` e linhas vazias de keep-alive em não stream, e que 402 (saldo) é exibido como erro de cota, não de chave. Não verificável sem chave. | backend-dev | — | aberta (não confirmado) |
 

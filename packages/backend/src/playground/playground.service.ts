@@ -1,3 +1,4 @@
+import { isFlatFeeReportedCost } from '../routing/proxy/proxy-message-recorder';
 import { HttpException, Injectable, Logger, Optional } from '@nestjs/common';
 import { runWithOutboundScope, type OutboundScope } from '../common/outbound/outbound-proxy';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
@@ -381,7 +382,10 @@ export class PlaygroundService {
         // tile-connected llama.cpp arrives as `custom:<uuid>`, and the
         // list price from the OpenCode catalogue.
         isLocalProvider: authType === 'local' || isLocalOnlyProvider(canonicalProvider),
-        reportedCostUsd: opencode?.ignoreReportedCost ? undefined : usage?.reported_cost_usd,
+        reportedCostUsd:
+          opencode?.ignoreReportedCost || isFlatFeeReportedCost(dto.provider)
+            ? undefined
+            : usage?.reported_cost_usd,
         // The request start, not the completion time. A stream that opens at
         // 09:59 UTC and closes at 10:01 crossed out of a DeepSeek peak window
         // mid-answer; the proxy recorder bills such a run from `startedAt`, so

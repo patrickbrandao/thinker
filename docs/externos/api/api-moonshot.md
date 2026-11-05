@@ -152,7 +152,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | Sem preço conhecido para `kimi-k3`, `kimi-k3.1-pro`, `kimi-k3.1-pro-highspeed`, K2.x; `KNOWN_PRICES` só tem `moonshot-v1-`. Custo depende de catálogos públicos. Cache write K3 por TTL não modelado. | providers | [#419](https://github.com/patrickbrandao/thinker/issues/419) | aberta |
+| G1 | degradação | Sem preço conhecido para `kimi-k3`, `kimi-k3.1-pro`, `kimi-k3.1-pro-highspeed`, K2.x; `KNOWN_PRICES` só tem `moonshot-v1-`. Custo depende de catálogos públicos. Cache write K3 por TTL não modelado. | providers | [#419](https://github.com/patrickbrandao/thinker/issues/419) | resolvida (preços semeados por provedor em provider-price-seeds.ts) |
 | G2 | degradação | Parâmetros fixos (`temperature`, `top_p`, `n`, penalties) e controle de raciocínio por família (`reasoning_effort` low/high/max em K3, `thinking` em K2, `tool_choice` restrito) sem tratamento para `moonshot`. | providers | [#420](https://github.com/patrickbrandao/thinker/issues/420) | resolvida (política de parâmetros: param-policy.ts) |
 | G3 | oportunidade | Parser genérico ignora `context_length`, `supports_image_in`, `supports_video_in`, `supports_reasoning` de `/v1/models`, que dariam capacidades exatas sem tabela manual. | backend-dev | — | aberta |
 | G4 | oportunidade | Suporte a `prompt_cache_options.ttl` (5m/1h) e ao endpoint `/anthropic/v1/messages` (cache e thinking nativos Anthropic); URL de chave ainda aponta para o domínio antigo `platform.moonshot.ai`. | providers | — | aberta |

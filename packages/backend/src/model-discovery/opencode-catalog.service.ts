@@ -36,6 +36,8 @@ export interface OpencodeCatalogEntry {
   cacheWritePricePerToken: number | null;
   /** Peak-hour bands from the catalog `multipliers` (base prices × factor). */
   timeTiers: PricingTimeTier[] | null;
+  /** Long-context band from the catalog `overrides` (`when.context.gt`). */
+  longContext?: PricingEntry['long_context'];
   /** No input or output price: served without a key on `opencode`. */
   free: boolean;
 }
@@ -273,6 +275,7 @@ export class OpencodeCatalogService implements OnModuleInit, OnModuleDestroy {
       cache_read_price_per_token: entry.cacheReadPricePerToken,
       cache_write_price_per_token: entry.cacheWritePricePerToken,
       time_tiers: entry.timeTiers,
+      long_context: entry.longContext ?? null,
       display_name: entry.name,
     };
   }
@@ -522,9 +525,17 @@ function bareModelId(modelId: string | null | undefined): string | null {
 interface RawPrice {
   price?: number;
   cache?: { read?: number; write?: number };
+  /** Context-band prices (`when.context.gt`), api-opencode G1. */
+  overrides?: {
+    when?: { context?: { gt?: unknown } };
+    price?: number;
+    cache?: { read?: number; write?: number };
+  }[];
 }
 
 interface RawCondition {
+  /** Dated multiplier (`date.gte` / `date.lt`, ISO dates), api-opencode G2. */
+  date?: { gte?: string; lt?: string };
   utc_days?: { in?: string[] };
   utc_hours?: { gte?: string; lt?: string };
   any?: RawCondition[];
@@ -600,10 +611,38 @@ function parseModels(models: unknown[]): OpencodeCatalogEntry[] {
       cacheReadPricePerToken: cacheRead,
       cacheWritePricePerToken: cacheWrite,
       timeTiers: parseMultipliers(raw.cost?.multipliers, input, output, cacheRead, cacheWrite),
+      longContext: parseOverrides(raw.cost?.text?.input, raw.cost?.text?.output),
       free: input === 0 && output === 0,
     });
   }
   return entries;
+}
+
+/**
+ * The first context band of the catalog `overrides`: prices for the whole
+ * request once the prompt exceeds `when.context.gt` tokens. Output may carry
+ * its own band at the same threshold.
+ */
+function parseOverrides(
+  input: RawPrice | undefined,
+  output: RawPrice | undefined,
+): PricingEntry['long_context'] {
+  const band = (input?.overrides ?? []).find(
+    (o) => typeof o?.when?.context?.gt === 'number' && typeof o.price === 'number',
+  );
+  if (!band) return null;
+  const threshold = band.when!.context!.gt as number;
+  const outputBand = (output?.overrides ?? []).find((o) => o?.when?.context?.gt === threshold);
+  const inputPrice = perToken(band.price);
+  const outputPrice = perToken(outputBand?.price ?? output?.price);
+  if (inputPrice == null || outputPrice == null) return null;
+  return {
+    threshold_tokens: threshold,
+    input_price_per_token: inputPrice,
+    output_price_per_token: outputPrice,
+    cache_read_price_per_token: perToken(band.cache?.read ?? input?.cache?.read),
+    cache_write_price_per_token: perToken(band.cache?.write ?? input?.cache?.write),
+  };
 }
 
 function perToken(perMillion: unknown): number | null {
@@ -641,9 +680,14 @@ function parseMultipliers(
     const windows = (when.any ?? [when])
       .map((clause) => hoursWindow(clause.all ?? [clause]))
       .filter((window): window is string => window !== null);
-    if (windows.length === 0) continue;
+    const from = when.date?.gte ?? null;
+    const until = when.date?.lt ?? null;
+    // A dated multiplier (no hours) applies all day from its date.
+    if (windows.length === 0 && !from && !until) continue;
     tiers.push({
       windows,
+      ...(from ? { from } : {}),
+      ...(until ? { until } : {}),
       days: days.length ? days : null,
       input_price_per_token: scale(input, factor),
       output_price_per_token: scale(output, factor),
