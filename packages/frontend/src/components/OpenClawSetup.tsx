@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SNIPPET_CONTEXT_WINDOW } from 'thinker-shared';
 import CodeBlock from './CodeBlock.jsx';
 import { getOpenClawSnippet, getOpenClawWizardSnippet } from '../services/framework-snippets.js';
 import RichText from './RichText.jsx';
@@ -21,9 +22,11 @@ interface Props {
   apiKey: string | null;
   keyPrefix: string | null;
   baseUrl: string;
+  /** Active virtual models of the harness, declared after `auto`. */
+  virtualModels?: readonly string[];
 }
 
-export default function OpenClawSetup({ apiKey, keyPrefix, baseUrl }: Props) {
+export default function OpenClawSetup({ apiKey, keyPrefix, baseUrl, virtualModels = [] }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('cli');
   const [cliKeyRevealed, setCliKeyRevealed] = useState(false);
   const [wizKeyRevealed, setWizKeyRevealed] = useState(false);
@@ -58,8 +61,8 @@ export default function OpenClawSetup({ apiKey, keyPrefix, baseUrl }: Props) {
         <>
           <SetupHint>{t('harnesses.guides.openClawCli')}</SetupHint>
           <SnippetBlock
-            code={getOpenClawSnippet(baseUrl, cliKey)}
-            copyText={getOpenClawSnippet(baseUrl, copyKey)}
+            code={getOpenClawSnippet(baseUrl, cliKey, virtualModels)}
+            copyText={getOpenClawSnippet(baseUrl, copyKey, virtualModels)}
             language="bash"
             reveal={
               apiKey ? (
@@ -70,6 +73,16 @@ export default function OpenClawSetup({ apiKey, keyPrefix, baseUrl }: Props) {
               ) : null
             }
           />
+          <SetupHint>
+            <RichText
+              text={t('harnesses.guides.contextHint')}
+              parts={{
+                name: 'OpenClaw',
+                field: <code className={CHIP}>contextWindow</code>,
+                value: <code className={CHIP}>{SNIPPET_CONTEXT_WINDOW}</code>,
+              }}
+            />
+          </SetupHint>
         </>
       ) : (
         <>

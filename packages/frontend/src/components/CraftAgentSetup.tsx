@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SNIPPET_MAX_TOKENS } from 'thinker-shared';
 import CopyButton from './CopyButton.jsx';
 import RichText from './RichText.jsx';
 import { CHIP, RevealButton, SetupCard, SetupHint, SnippetBlock } from './setup-ui.jsx';
@@ -9,6 +10,23 @@ interface Props {
   keyPrefix: string | null;
   baseUrl: string;
 }
+
+/**
+ * Fields of the Craft connection (`llmConnections[]` in config.json) that
+ * lift its custom-endpoint defaults: 131072 context, 8192 output, no images.
+ */
+const CRAFT_LIMITS = JSON.stringify(
+  {
+    customEndpoint: {
+      api: 'openai-completions',
+      maxTokens: SNIPPET_MAX_TOKENS,
+      supportsImages: true,
+    },
+    models: [{ id: 'auto', contextWindow: 200000, supportsImages: true }],
+  },
+  null,
+  2,
+);
 
 export default function CraftAgentSetup({ apiKey, keyPrefix, baseUrl }: Props) {
   const [keyRevealed, setKeyRevealed] = useState(false);
@@ -40,6 +58,14 @@ export default function CraftAgentSetup({ apiKey, keyPrefix, baseUrl }: Props) {
           ) : null
         }
       />
+
+      <SetupHint>
+        <RichText
+          text={t('harnesses.guides.craftLimits')}
+          parts={{ file: <code className={CHIP}>~/.craft-agent/config.json</code> }}
+        />
+      </SetupHint>
+      <SnippetBlock code={CRAFT_LIMITS} copyText={CRAFT_LIMITS} language="json" />
     </SetupCard>
   );
 }

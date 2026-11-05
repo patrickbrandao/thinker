@@ -21,6 +21,15 @@ export {
   getNanobotConfigSnippet,
   getCodexConfigSnippet,
   getCodexKeyExportSnippet,
+  getCopilotCliProvidersSnippet,
+  getPiModelsSnippet,
+  getDeepSeekHarnessNativeSnippet,
+  getDeepSeekHarnessPiAiSnippet,
+  getClaudeAppConfigSnippet,
+  OPEN_WEBUI_SESSION_HEADERS,
+  ZAPIER_REQUEST_BODY,
+  SNIPPET_CONTEXT_WINDOW,
+  SNIPPET_MAX_TOKENS,
   PLATFORM_SETUP_SNIPPETS,
 } from './setup-snippets';
 export {

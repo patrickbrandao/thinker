@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import RichText from './RichText.jsx';
-import { KeyValue, OnboardField, OnboardFields, SetupCard, SetupHint } from './setup-ui.jsx';
+import { CHIP, KeyValue, OnboardField, OnboardFields, SetupCard, SetupHint } from './setup-ui.jsx';
 import { t } from '../i18n/index.js';
 
 interface Props {
@@ -49,6 +49,17 @@ export default function N8nSetup({ apiKey, keyPrefix, baseUrl }: Props) {
         {/* i18n-ignore: labels mirror the n8n credential fields */}
         <OnboardField label="Model" value="auto" copyable />
       </OnboardFields>
+
+      <SetupHint>
+        <RichText
+          text={t('harnesses.guides.n8nResponses')}
+          parts={{
+            // i18n-ignore: option name in the n8n node
+            option: <strong className="text-ink">Use Responses API</strong>,
+            path: <code className={CHIP}>/v1/responses</code>,
+          }}
+        />
+      </SetupHint>
     </SetupCard>
   );
 }

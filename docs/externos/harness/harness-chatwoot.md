@@ -110,7 +110,7 @@ Pontos no código:
 |---|---|---|---|---|---|
 | G1 | degradação | Captain gera embeddings em `POST /v1/embeddings`; o Thinker não tem a rota (indexação/busca de artigos e FAQ falham) | providers / backend-dev | [#365](https://github.com/patrickbrandao/thinker/issues/365) | resolvida (POST /v1/embeddings em passthrough) |
 | G2 | degradação | Transcrição de áudio em `POST /v1/audio/transcriptions`; o Thinker não tem a rota | providers / backend-dev | [#366](https://github.com/patrickbrandao/thinker/issues/366) | resolvida (POST /v1/audio/transcriptions em passthrough) |
-| G3 | degradação | Endpoint deve ser a origem sem `/v1`; sem snippet nem guia, colar `.../v1` dá 404 (`/v1/v1`) | frontend-dev | [#367](https://github.com/patrickbrandao/thinker/issues/367) | aberta |
+| G3 | degradação | Endpoint deve ser a origem sem `/v1`; sem snippet nem guia, colar `.../v1` dá 404 (`/v1/v1`) | frontend-dev | [#367](https://github.com/patrickbrandao/thinker/issues/367) | resolvida (guia e snippet com endpoint sem /v1) |
 | G4 | oportunidade | Sem cabeçalho de sessão e sem campo de cabeçalhos customizados: toda a instalação do Chatwoot cai na sessão `default`. Possível uso: roteamento por chave `thk_` por conta, ou classificar o chamador pelo `User-Agent` | backend-dev | — (sem issue) | aberta |
 | G5 | oportunidade | Tratar `CAPTAIN_OPENROUTER_DECISION_MODEL_ENDPOINT` (classificador/monitores) como segunda superfície a apontar ao Thinker; formato não verificado | providers | — (sem issue) | aberta |
 
