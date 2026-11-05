@@ -8,9 +8,12 @@
  * - `x-opencode-session-id` / `x-opencode-session`: OpenCode; subagent
  *   sessions add `x-opencode-parent-session-id` / `x-parent-session-id`.
  * - `x-hermes-session-id` / `x-hermes-session-key`: Hermes Agent.
- * - `session_id` / `conversation_id`: Codex CLI (older builds); newer ones
- *   send the conversation id as `x-client-request-id`, read only next to
- *   Codex's `originator` header since other SDKs use it per request.
+ * - `x-deepseek-harness-session-id`: DeepSeek Harness.
+ * - `x-openwebui-chat-id`: Open WebUI (with forwarded user info headers).
+ * - `session-id` (0.150+) / `session_id` / `conversation_id`: Codex CLI;
+ *   subagents add `x-codex-parent-thread-id`. Builds without a session
+ *   header send the conversation id as `x-client-request-id`, read only next
+ *   to Codex's `originator` header since other SDKs use it per request.
  * - `x-session-id` / `x-session-affinity`: generic fallbacks.
  */
 const SESSION_HEADERS = [
@@ -21,13 +24,20 @@ const SESSION_HEADERS = [
   'x-opencode-session',
   'x-hermes-session-id',
   'x-hermes-session-key',
+  'x-deepseek-harness-session-id',
+  'x-openwebui-chat-id',
+  'session-id',
   'session_id',
   'conversation_id',
   'x-session-id',
   'x-session-affinity',
 ] as const;
 
-const PARENT_HEADERS = ['x-opencode-parent-session-id', 'x-parent-session-id'] as const;
+const PARENT_HEADERS = [
+  'x-opencode-parent-session-id',
+  'x-parent-session-id',
+  'x-codex-parent-thread-id',
+] as const;
 
 const MAX_ID_LENGTH = 200;
 

@@ -46,4 +46,11 @@ describe('detectHarnessSession', () => {
       detectHarnessSession({ 'x-opencode-session-id': 's', 'x-parent-session-id': 's' }),
     ).toEqual({ id: 's', parentId: null });
   });
+  it('reads Codex, DeepSeek Harness and Open WebUI session headers', () => {
+    expect(
+      detectHarnessSession({ 'session-id': 'cx', 'x-codex-parent-thread-id': 'cx-main' }),
+    ).toEqual({ id: 'cx', parentId: 'cx-main' });
+    expect(detectHarnessSession({ 'x-deepseek-harness-session-id': 'd-1' })?.id).toBe('d-1');
+    expect(detectHarnessSession({ 'x-openwebui-chat-id': 'chat-1' })?.id).toBe('chat-1');
+  });
 });
