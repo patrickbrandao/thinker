@@ -203,7 +203,7 @@ describe('getSubscriptionProviderConfig', () => {
       supportsSubscription: true,
       subscriptionLabel: 'GLM Coding Plan',
       subscriptionAuthMode: 'token',
-      subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+      subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
     });
   });
 

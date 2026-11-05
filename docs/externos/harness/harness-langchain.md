@@ -110,7 +110,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | LangChain não envia cabeçalho de sessão e o snippet/guia não ensina `x-session-key` em `default_headers`; todo tráfego cai na sessão `default` (sem cache de provedor nem momentum). Causa distinta de #318/#320/#369 (lá o harness envia cabeçalho próprio e o Thinker não lê). | frontend-dev | [#380](https://github.com/patrickbrandao/thinker/issues/380) | aberta |
+| G1 | degradação | LangChain não envia cabeçalho de sessão e o snippet/guia não ensina `x-session-key` em `default_headers`; todo tráfego cai na sessão `default` (sem cache de provedor nem momentum). Causa distinta de #318/#320/#369 (lá o harness envia cabeçalho próprio e o Thinker não lê). | frontend-dev | [#380](https://github.com/patrickbrandao/thinker/issues/380) | resolvida (snippet e guia com x-session-key) |
 | G2 | oportunidade | Python com `base_url` não liga `stream_usage`; o snippet poderia incluir `stream_usage=True` (comentado) para o app receber tokens no streaming. | frontend-dev | — (oportunidade) | aberta |
 | G3 | oportunidade | Sem variante JS do snippet (`@langchain/openai`, `configuration.baseURL`); a aba LangChain só mostra Python. | frontend-dev | — (oportunidade) | aberta |
 | G4 | oportunidade | Guia só cobre `ChatOpenAI`; `ChatAnthropic` (`base_url` / `ANTHROPIC_BASE_URL`) poderia apontar para `/v1/messages` do Thinker, aproveitando prompt cache e thinking nativos. Documentar em `conectar-harnesses.md`. | frontend-dev | — (oportunidade) | aberta |

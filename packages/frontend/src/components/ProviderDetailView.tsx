@@ -287,6 +287,12 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
         </p>
       ) : null}
 
+      {isSubMode && !subscriptionClosed && provDef.subscriptionTermsWarning ? (
+        <p className="notice is-warn text-sm" role="note">
+          {provDef.subscriptionTermsWarning}
+        </p>
+      ) : null}
+
       {isSubMode && provDef.subscriptionRequirementNote ? (
         <p className="m-0 text-sm text-muted">{provDef.subscriptionRequirementNote}</p>
       ) : null}

@@ -4,6 +4,8 @@ Reaproveite um plano pago que você já tem: ChatGPT Plus, Claude Max, GitHub Co
 
 Se você já paga por um dos planos abaixo, o Thinker pode rotear pela assinatura em vez de uma chave de API. A autenticação é OAuth no navegador, código de dispositivo ou token de assinatura, conforme o provedor.
 
+
+> **Termos de uso.** Vários planos restringem o uso a ferramentas de código interativas e podem suspender a conta ou a chave quando o tráfego vem de automação ou de clientes de terceiros: Sign in with Google (Gemini CLI), Qwen Token Plan, Xiaomi MiMo Token Plan, GLM Coding Plan e Grok. O dashboard mostra o aviso de cada um ao conectar. No GLM Coding Plan, use a chave do plano: a chave Standard não consome a cota e cobra do saldo.
 ## Assinaturas suportadas
 
 | Provedor | Plano | Autenticação | Catálogo de modelos |
@@ -53,7 +55,7 @@ Cole uma chave de API do ModelArk Coding Plan, do console da BytePlus. O Thinker
 
 ### Command Code
 
-Cole uma chave de API do Command Code Studio. No Thinker, o Command Code é só por assinatura e exige o plano Pro ou superior. Os modelos são descobertos na API pública de provedor do Command Code.
+Cole uma chave de API do Command Code Studio. No Thinker, o Command Code é só por assinatura e exige um plano com acesso à API (qualquer um, menos o Go, que responde 403 `upgrade_required`). Os modelos são descobertos na API pública de provedor do Command Code.
 
 ### Qwen
 

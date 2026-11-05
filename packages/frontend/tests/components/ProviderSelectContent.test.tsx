@@ -150,7 +150,9 @@ describe('ProviderSelectContent', () => {
     );
     expect(screen.getByText('Z.ai')).toBeDefined();
     await waitFor(() => {
-      const input = container.querySelector('input[placeholder="Paste your Z.ai API key"]');
+      const input = container.querySelector(
+        'input[placeholder="Paste your GLM Coding Plan API key"]',
+      );
       expect(input).not.toBeNull();
     });
   });
@@ -229,7 +231,9 @@ describe('ProviderSelectContent', () => {
       expect(link!.textContent).toContain('Command Code');
     });
     // The Pro-or-higher requirement note is shown for the subscription view.
-    expect(screen.getByText('Requires Command Code Pro or higher.')).toBeDefined();
+    expect(
+      screen.getByText('Requires a Command Code plan with API access (any plan except Go).'),
+    ).toBeDefined();
     // No external sign-in button and no separate api-keys settings link — the
     // only link is the Studio key-form link asserted above.
     expect(container.querySelector('.provider-detail__signin-btn')).toBeNull();

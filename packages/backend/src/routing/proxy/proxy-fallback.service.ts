@@ -112,6 +112,7 @@ import {
   type RouteCredentialDeps,
 } from './route-credentials';
 import { recordingResponseFromText } from './attempt-recording-capture';
+import { parseQuotaSignal, type QuotaSignal } from './quota-reset';
 import {
   CredentialRejectionCooldown,
   type RejectedCredentialRef,
@@ -125,11 +126,12 @@ import {
 const RATE_LIMIT_COOLDOWN_DEFAULT_MS = 15_000;
 const RATE_LIMIT_COOLDOWN_MAX_MS = 5 * 60_000;
 // A 429 that reports an exhausted quota (OpenCode's free daily limit, Go
-// allowance or budget) stays exhausted until the stated reset, often hours
-// away, so its Retry-After is honored up to a day instead of five minutes.
+// allowance or budget, a subscription window) stays exhausted until the stated
+// reset, often hours away, so its reset (from Retry-After or the error body,
+// see quota-reset.ts) is honored up to a day instead of five minutes. Without
+// any reset the route rests for an hour rather than the short default.
 const QUOTA_COOLDOWN_MAX_MS = 24 * 60 * 60_000;
-const QUOTA_EXHAUSTED_RE =
-  /freeusagelimiterror|gousagelimiterror|budgetlimiterror|creditlimitexceeded|insufficient_quota/i;
+const QUOTA_COOLDOWN_DEFAULT_MS = 60 * 60_000;
 const MAX_RATE_LIMIT_COOLDOWNS = 2_000;
 // Statuses that move a custom provider's request on to the next key of its pool.
 const KEY_POOL_ROTATE_STATUSES = new Set([401, 403, 429]);
@@ -790,33 +792,38 @@ export class ProxyFallbackService {
     opts: ForwardProviderOptions,
     response: Response,
   ): Promise<void> {
-    const quotaExhausted =
-      response.status === 429 &&
-      QUOTA_EXHAUSTED_RE.test(
-        await response
-          .clone()
-          .text()
-          .catch(() => ''),
-      );
-    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response, quotaExhausted);
+    // Quota errors arrive as 429, but some plans (MiniMax M Plan) do not
+    // document the status, so any client error body is checked.
+    if (response.status < 400 || response.status >= 500) return;
+    const quota = parseQuotaSignal(
+      await response
+        .clone()
+        .text()
+        .catch(() => ''),
+    );
+    if (response.status !== 429 && !quota?.exhausted) return;
+    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response, quota);
   }
 
   private recordRateLimitCooldownForKey(
     key: string | null,
     response: Response,
-    quotaExhausted = false,
+    quota: QuotaSignal | null = null,
   ): void {
-    if (response.status !== 429 || !key) return;
+    if (!key) return;
+    if (response.status !== 429 && !quota?.exhausted) return;
     if (this.rateLimitCooldowns.size >= MAX_RATE_LIMIT_COOLDOWNS) {
       this.evictExpiredRateLimitCooldowns();
       if (this.rateLimitCooldowns.size >= MAX_RATE_LIMIT_COOLDOWNS) {
         this.evictOldestRateLimitCooldown();
       }
     }
-    const ttlMs = this.parseRetryAfterMs(
-      response.headers.get('retry-after'),
-      quotaExhausted ? QUOTA_COOLDOWN_MAX_MS : RATE_LIMIT_COOLDOWN_MAX_MS,
-    );
+    const retryAfter = response.headers.get('retry-after');
+    const ttlMs = quota?.exhausted
+      ? retryAfter
+        ? this.parseRetryAfterMs(retryAfter, QUOTA_COOLDOWN_MAX_MS)
+        : Math.min(quota.resetInMs ?? QUOTA_COOLDOWN_DEFAULT_MS, QUOTA_COOLDOWN_MAX_MS)
+      : this.parseRetryAfterMs(retryAfter, RATE_LIMIT_COOLDOWN_MAX_MS);
     this.rateLimitCooldowns.set(key, Date.now() + ttlMs);
   }
 

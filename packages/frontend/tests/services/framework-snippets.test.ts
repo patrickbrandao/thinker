@@ -562,7 +562,9 @@ describe('customHeaders weaving', () => {
 
   it('python: omitting customHeaders leaves the snippet unchanged', () => {
     const [lc, openai] = getPythonSnippets('https://api.local/v1', 'k');
-    expect(lc!.code).not.toContain('default_headers');
+    // LangChain only carries the commented x-session-key hint.
+    expect(lc!.code).toContain('# default_headers={"x-session-key": "<conversation id>"},');
+    expect(lc!.code.replace(/#.*$/gm, '')).not.toContain('default_headers');
     expect(openai!.code).not.toContain('default_headers');
   });
 
@@ -606,7 +608,8 @@ describe('customHeaders weaving', () => {
     // Guards the empty-entries branch in renderHeadersDict — passing `{}` must
     // not splice an empty `default_headers={}` into the snippet.
     const [lc, openai] = getPythonSnippets('https://api.local/v1', 'k', {});
-    expect(lc!.code).not.toContain('default_headers');
+    expect(lc!.code).not.toContain('default_headers={}');
+    expect(lc!.code.replace(/#.*$/gm, '')).not.toContain('default_headers');
     expect(openai!.code).not.toContain('default_headers');
   });
 

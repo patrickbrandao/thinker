@@ -287,7 +287,17 @@ const ptBR: Catalog<typeof en> = {
       tokenHint:
         'Cole uma chave criada no Console do OpenCode. A inferência funciona, mas sem medidor de cota: a chave não informa a organização.',
     },
-    commandCodeRequirement: 'Requer o Command Code Pro ou superior.',
+    commandCodeRequirement:
+      'Requer um plano do Command Code com acesso à API (qualquer plano, menos o Go).',
+    termsWarning: {
+      gemini:
+        'Os termos do Google proíbem usar o login do Gemini CLI em software de terceiros; a conta pode ser suspensa. O caminho suportado é uma chave da API Gemini em Provedores por uso.',
+      qwen: 'O Token Plan é para ferramentas de código interativas; scripts automatizados e backends de aplicação não são permitidos. O tráfego por gateway pode ser visto como automação e a chave suspensa.',
+      xiaomi:
+        'A cota do MiMo Token Plan só vale em ferramentas de programação; scripts e backends de aplicação são proibidos e a chave pode ser bloqueada.',
+      zai: 'Use uma chave do GLM Coding Plan: a chave Standard não consome o plano e cobra do saldo. O plano é limitado às ferramentas de código oficialmente suportadas; violações podem gerar limitação ou banimento.',
+      xai: 'O Thinker acessa a assinatura Grok pelo proxy do Grok CLI oficial e se identifica como esse cliente. A xAI não publica termos que autorizem gateways de terceiros; use por sua conta e risco.',
+    },
     geminiClosed:
       'O Google não permite mais novos logins do Gemini em apps fora do Google. As conexões existentes continuam funcionando. Para adicionar o Gemini, conecte uma chave de API do Gemini em Provedores por uso.',
     minimaxMethod: {

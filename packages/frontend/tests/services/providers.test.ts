@@ -575,7 +575,9 @@ describe('PROVIDERS', () => {
     expect(commandcode.subscriptionCredentialKind).toBe('api-key');
     expect(commandcode.subscriptionLabel).toBe('Command Code subscription');
     expect(commandcode.subscriptionKeyPlaceholder).toBe('Paste your Command Code API key');
-    expect(commandcode.subscriptionRequirementNote).toBe('Requires Command Code Pro or higher.');
+    expect(commandcode.subscriptionRequirementNote).toBe(
+      'Requires a Command Code plan with API access (any plan except Go).',
+    );
     expect(commandcode.subscriptionSignInUrl).toBeUndefined();
     expect(commandcode.subscriptionSignInLabel).toBeUndefined();
     expect(commandcode.subscriptionSignInHint).toBeUndefined();
@@ -834,7 +836,7 @@ describe('PROVIDERS', () => {
     expect(zai.supportsSubscription).toBe(true);
     expect(zai.subscriptionLabel).toBe('GLM Coding Plan');
     expect(zai.subscriptionAuthMode).toBe('token');
-    expect(zai.subscriptionKeyPlaceholder).toBe('Paste your Z.ai API key');
+    expect(zai.subscriptionKeyPlaceholder).toBe('Paste your GLM Coding Plan API key');
     expect(zai.subscriptionEndpointRegions).toEqual([
       { value: 'global', label: 'Outside China (api.z.ai)' },
       { value: 'cn', label: 'China Mainland (open.bigmodel.cn)' },

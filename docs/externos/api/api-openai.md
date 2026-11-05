@@ -159,7 +159,7 @@ Pontos no código:
 | G2 | degradação | `gpt-6*` sem reescrita para `max_completion_tokens`; `reasoning_effort: none` emitido em Astra/6.1 Sol (400); `temperature`/`top_p`/`logprobs` mantidos com effort ativo | `providers` | [#441](https://github.com/patrickbrandao/thinker/issues/441) | aberta |
 | G3 | degradação | sem tabela de preços OpenAI: faixa longa >272K, cache write 1,25x/2,5x e `cache_write_tokens_details` ausentes | `providers` | [#442](https://github.com/patrickbrandao/thinker/issues/442) | aberta |
 | G4 | degradação | `gpt-live-1` não é filtrado como não-chat (não confirmado ao vivo) | `providers` | [#443](https://github.com/patrickbrandao/thinker/issues/443) | aberta |
-| G5 | degradação | 429 com `credit_balance_exhausted`/limites de gasto e `slow_down` recebem o cooldown curto genérico; sem uso de `Retry-After` por código. Mesma causa de [#352](https://github.com/patrickbrandao/thinker/issues/352) (sub-openai G4) | `backend-dev` | [#352](https://github.com/patrickbrandao/thinker/issues/352) | aberta |
+| G5 | degradação | 429 com `credit_balance_exhausted`/limites de gasto e `slow_down` recebem o cooldown curto genérico; sem uso de `Retry-After` por código. Mesma causa de [#352](https://github.com/patrickbrandao/thinker/issues/352) (sub-openai G4) | `backend-dev` | [#352](https://github.com/patrickbrandao/thinker/issues/352) | resolvida (cooldown até o reset lido do corpo do erro) |
 | G6 | oportunidade | aceitar/repassar `reasoning_effort: max`, `prompt_cache_options{ttl:12h}`, `prompt_cache_retention`, `service_tier`/Fast, WebSocket mode e `moderation` | `providers` | — | aberta |
 
 ## Histórico
