@@ -116,7 +116,7 @@ Arquivos que citam `nanobot`:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | O Nanobot envia `x-session-affinity` (uuid por processo) e nenhum `x-session-key`; o Thinker não lê o primeiro, então toda conversa cai em `default`. Mesma causa de #318 (OpenCode). Ler `x-session-affinity` como chave de sessão ajuda só por processo; ou o snippet pode sugerir `extraHeaders` com `x-session-key` estático. | backend-dev | [#318](https://github.com/patrickbrandao/thinker/issues/318) (comentado) | aberta |
+| G1 | degradação | O Nanobot envia `x-session-affinity` (uuid por processo) e nenhum `x-session-key`; o Thinker não lê o primeiro, então toda conversa cai em `default`. Mesma causa de #318 (OpenCode). Ler `x-session-affinity` como chave de sessão ajuda só por processo; ou o snippet pode sugerir `extraHeaders` com `x-session-key` estático. | backend-dev | [#318](https://github.com/patrickbrandao/thinker/issues/318) (comentado) | resolvida (sessão de prompt cache e momentum lida dos cabeçalhos do harness) |
 | G2 | oportunidade | Padrões do Nanobot (`maxTokens` 8192, `contextWindowTokens` 200000) não refletem o modelo real roteado; o snippet poderia incluir `maxTokens`/`contextWindowTokens` e avisar do `modelPreset` que vence `agents.defaults`. | frontend-dev | — (sem issue) | aberta |
 | G3 | oportunidade | `classifyCaller` não reconhece o UA `AsyncOpenAI/Python` (regex ancorada em `OpenAI/`), então chamadas do Nanobot ficam sem SDK atribuído. Não confirmado ao vivo. | backend-dev | — (sem issue) | aberta |
 

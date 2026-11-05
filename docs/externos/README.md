@@ -76,7 +76,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `sub-ollama-cloud` | Assinatura | Ollama Cloud | `ollama-cloud` | [dossiê](assinatura/sub-ollama-cloud.md) | 2026-11-03 | 4 |
 | `sub-kiro` | Assinatura | Kiro | `kiro` | [dossiê](assinatura/sub-kiro.md) | 2026-11-03 | 4 |
 | `sub-zai` | Assinatura | GLM Coding Plan | `zai` | [dossiê](assinatura/sub-zai.md) | 2026-11-03 | 5 |
-| `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | 2026-11-03 | 8 |
+| `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | 2026-11-03 | 6 |
 | `sub-opencode` | Assinatura | OpenCode Console | `opencode` | [dossiê](assinatura/sub-opencode.md) | 2026-11-03 | 4 |
 | `sub-gemini` | Assinatura | Sign in with Google (Gemini Code Assist) | `gemini` | [dossiê](assinatura/sub-gemini.md) | 2026-11-03 | 6 |
 | `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | 2026-11-03 | 5 |
@@ -86,21 +86,21 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | 2026-11-03 | 4 |
 | `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | 2026-11-04 | 4 |
 | `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 5 |
-| `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 5 |
-| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 4 |
-| `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 6 |
+| `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 4 |
+| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 3 |
+| `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 5 |
 | `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | 2026-11-03 | 4 |
 | `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | 2026-11-03 | 3 |
-| `harness-nanobot` | Harness | Nanobot | `nanobot` | [dossiê](harness/harness-nanobot.md) | 2026-11-03 | 3 |
+| `harness-nanobot` | Harness | Nanobot | `nanobot` | [dossiê](harness/harness-nanobot.md) | 2026-11-03 | 2 |
 | `harness-craft` | Harness | Craft Agent | `craft` | [dossiê](harness/harness-craft.md) | 2026-11-03 | 4 |
-| `harness-claude-app` | Harness | Claude (desktop app) | `claude-app` | [dossiê](harness/harness-claude-app.md) | 2026-11-03 | 5 |
+| `harness-claude-app` | Harness | Claude (desktop app) | `claude-app` | [dossiê](harness/harness-claude-app.md) | 2026-11-03 | 4 |
 | `harness-n8n` | Harness | n8n | `n8n` | [dossiê](harness/harness-n8n.md) | 2026-11-03 | 4 |
 | `harness-zapier` | Harness | Zapier | `zapier` | [dossiê](harness/harness-zapier.md) | 2026-11-03 | 3 |
 | `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 4 |
 | `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 5 |
-| `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 4 |
-| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 6 |
-| `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 4 |
+| `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 3 |
+| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 5 |
+| `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 3 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 3 |
 | `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 3 |
 | `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 8 |

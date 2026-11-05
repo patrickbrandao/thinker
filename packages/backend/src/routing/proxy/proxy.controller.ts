@@ -33,6 +33,7 @@ import { clientIpInfo } from '../../common/utils/client-ip';
 import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
 import { recordedRequestHeaders } from './request-headers';
+import { detectHarnessSession } from './harness-session';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -274,7 +275,11 @@ export class ProxyController {
   ): Promise<void> {
     const { agentId, tenantId } = req.ingestionContext;
     const body = req.body as Record<string, unknown>;
-    const sessionScope = buildProxySessionScope(tenantId, agentId, req.headers['x-session-key']);
+    const sessionScope = buildProxySessionScope(
+      tenantId,
+      agentId,
+      detectHarnessSession(req.headers)?.id,
+    );
     const { sessionKey } = sessionScope;
     const traceId = this.extractTraceId(req);
     const requestId = randomUUID();
@@ -896,7 +901,7 @@ export class ProxyController {
     return buildProxySessionScope(
       req.ingestionContext.tenantId,
       req.ingestionContext.agentId,
-      req.headers['x-session-key'],
+      detectHarnessSession(req.headers)?.id,
     ).sessionKey;
   }
 
