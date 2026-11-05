@@ -76,6 +76,55 @@ const SUMMARY_COLUMNS = `
 
 type Row = Record<string, unknown>;
 
+export type TimelineBucket = 'hour' | 'day' | 'week';
+
+export interface TimelinePoint {
+  session_id: string;
+  agent_name: string | null;
+  /** Start of the period (UTC, ISO). */
+  bucket: string;
+  requests: number;
+  failed: number;
+  cost: number;
+}
+
+export interface SessionsTimeline {
+  bucket: TimelineBucket;
+  /** Start of the range (UTC, ISO). */
+  from: string;
+  points: TimelinePoint[];
+  /** Sessions matching the filters; only the `shown` most active are plotted. */
+  total_sessions: number;
+  shown_sessions: number;
+}
+
+/** Most active sessions plotted at most; the rest are counted, not drawn. */
+export const TIMELINE_MAX_SESSIONS = 300;
+
+/** Column size per range: hours for a day, days up to a month, weeks above. */
+export function timelineBucket(range: string | undefined): TimelineBucket {
+  if (!range || range === '1h' || range === '6h' || range === '24h') return 'hour';
+  if (range === '90d' || range === '365d') return 'week';
+  return 'day';
+}
+
+/**
+ * HAVING clause for the session filters, over a grouped source aliased `s`
+ * with `root` and `agent_id`. Both look at the whole session (main and
+ * subagents), like the totals shown in the list, not only inside the range.
+ */
+function sessionFilters(filters: { hasErrors?: boolean; hasSubagents?: boolean }): string {
+  const sessionHas = (condition: string) => `EXISTS (
+           SELECT 1 FROM requests x
+            WHERE x.tenant_id = $1 AND x.agent_id IS NOT DISTINCT FROM s.agent_id
+              AND (x.session_id = s.root OR x.parent_session_id = s.root)
+              AND ${condition})`;
+  const having: string[] = [];
+  if (filters.hasErrors) having.push(sessionHas(sqlIsFailedStatus('x.status')));
+  if (filters.hasSubagents) having.push(sessionHas('x.parent_session_id IS NOT NULL'));
+  return having.length ? `\n         HAVING ${having.join(' AND ')}` : '';
+}
+
 const num = (v: unknown) => Number(v ?? 0);
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v));
 
@@ -104,14 +153,8 @@ function toSummary(row: Row): SessionSummary {
 export class SessionsService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
-  /** Sessions with activity in `range`, latest first. */
-  async list(params: {
-    tenantId: string;
-    range?: string;
-    agentName?: string;
-    limit: number;
-    offset: number;
-  }): Promise<{ items: SessionSummary[]; has_more: boolean }> {
+  /** WHERE over `requests r` for the range and harness filters. */
+  private scope(params: { tenantId: string; range?: string; agentName?: string }) {
     const args: unknown[] = [params.tenantId];
     const where = ['r.tenant_id = $1', 'r.session_id IS NOT NULL'];
     if (params.range) {
@@ -124,14 +167,88 @@ export class SessionsService {
         `r.agent_id IN (SELECT id FROM agents WHERE tenant_id = $1 AND name = $${args.length} AND deleted_at IS NULL)`,
       );
     }
+    return { args, where };
+  }
+
+  /**
+   * Per period and session: requests, failures and cost, for the bubble
+   * chart. Same filters as {@link list}; plots the most active sessions only.
+   */
+  async timeline(params: {
+    tenantId: string;
+    range?: string;
+    agentName?: string;
+    hasErrors?: boolean;
+    hasSubagents?: boolean;
+  }): Promise<SessionsTimeline> {
+    const range = params.range || '24h';
+    const bucket = timelineBucket(range);
+    const { args, where } = this.scope({ ...params, range });
+    const from = String(args[1]);
+    args.push(TIMELINE_MAX_SESSIONS);
+    const rows: Row[] = await this.ds.query(
+      `WITH s AS (
+         SELECT COALESCE(r.parent_session_id, r.session_id) AS root, r.agent_id, r.agent_name,
+                r.id, r.status, date_trunc('${bucket}', r.timestamp) AS bucket
+           FROM requests r
+          WHERE ${where.join(' AND ')}
+       ), matching AS (
+         SELECT s.root, s.agent_id, COUNT(*) AS n
+           FROM s
+          GROUP BY s.root, s.agent_id${sessionFilters(params)}
+       ), shown AS (
+         SELECT root, agent_id FROM matching ORDER BY n DESC, root LIMIT $${args.length}
+       ), per AS (
+         SELECT s.root, s.agent_id, MAX(s.agent_name) AS agent_name, s.bucket,
+                COUNT(DISTINCT s.id)::int AS requests,
+                COUNT(DISTINCT s.id) FILTER (WHERE ${sqlIsFailedStatus('s.status')})::int AS failed,
+                COALESCE(SUM(${safeCost}), 0)::float AS cost
+           FROM s
+           JOIN shown sh ON sh.root = s.root AND sh.agent_id IS NOT DISTINCT FROM s.agent_id
+           LEFT JOIN agent_messages m ON m.request_id = s.id
+          GROUP BY s.root, s.agent_id, s.bucket
+       )
+       SELECT per.*, (SELECT COUNT(*) FROM matching)::int AS total
+         FROM per
+        ORDER BY per.bucket, per.root`,
+      args,
+    );
+    const sessions = new Set(rows.map((row) => `${String(row.agent_id)}|${String(row.root)}`));
+    return {
+      bucket,
+      from: `${from.replace(' ', 'T').slice(0, 19)}Z`,
+      points: rows.map((row) => ({
+        session_id: String(row.root),
+        agent_name: (row.agent_name as string | null) ?? null,
+        bucket: iso(row.bucket),
+        requests: num(row.requests),
+        failed: num(row.failed),
+        cost: num(row.cost),
+      })),
+      total_sessions: rows.length ? num(rows[0].total) : 0,
+      shown_sessions: sessions.size,
+    };
+  }
+
+  /** Sessions with activity in `range`, latest first. */
+  async list(params: {
+    tenantId: string;
+    range?: string;
+    agentName?: string;
+    hasErrors?: boolean;
+    hasSubagents?: boolean;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: SessionSummary[]; has_more: boolean }> {
+    const { args, where } = this.scope(params);
     args.push(params.limit + 1, params.offset);
     const rows: Row[] = await this.ds.query(
       `WITH active AS (
-         SELECT COALESCE(r.parent_session_id, r.session_id) AS root, r.agent_id,
-                MAX(r.timestamp) AS seen
-           FROM requests r
-          WHERE ${where.join(' AND ')}
-          GROUP BY 1, 2
+         SELECT s.root, s.agent_id, MAX(s.timestamp) AS seen
+           FROM (SELECT COALESCE(r.parent_session_id, r.session_id) AS root, r.agent_id, r.timestamp
+                   FROM requests r
+                  WHERE ${where.join(' AND ')}) s
+          GROUP BY s.root, s.agent_id${sessionFilters(params)}
           ORDER BY seen DESC
           LIMIT $${args.length - 1} OFFSET $${args.length}
        ), q AS (

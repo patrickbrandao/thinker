@@ -46,6 +46,28 @@ describe('detectHarnessSession', () => {
       detectHarnessSession({ 'x-opencode-session-id': 's', 'x-parent-session-id': 's' }),
     ).toEqual({ id: 's', parentId: null });
   });
+  it('makes a Claude Code subagent a child of the main session', () => {
+    expect(
+      detectHarnessSession({ 'x-claude-code-session-id': 'cc-1', 'x-claude-code-agent-id': 'a7' }),
+    ).toEqual({ id: 'cc-1:a7', parentId: 'cc-1' });
+    // Nested agents fold into the main session too.
+    expect(
+      detectHarnessSession({
+        'x-claude-code-session-id': 'cc-1',
+        'x-claude-code-agent-id': 'a8',
+        'x-claude-code-parent-agent-id': 'a7',
+      }),
+    ).toEqual({ id: 'cc-1:a8', parentId: 'cc-1' });
+    // An explicit x-session-key wins and keeps its own semantics.
+    expect(
+      detectHarnessSession({
+        'x-session-key': 'mine',
+        'x-claude-code-session-id': 'cc-1',
+        'x-claude-code-agent-id': 'a7',
+      }),
+    ).toEqual({ id: 'mine', parentId: null });
+  });
+
   it('reads Codex, DeepSeek Harness and Open WebUI session headers', () => {
     expect(
       detectHarnessSession({ 'session-id': 'cx', 'x-codex-parent-thread-id': 'cx-main' }),

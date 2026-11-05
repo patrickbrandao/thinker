@@ -11,6 +11,25 @@ export default {
   emptyTitle: 'No sessions yet',
   emptyBody:
     'Sessions appear when a harness names its session in a request header (OpenCode, Claude Code, Codex, OpenClaw, Hermes or x-session-key).',
+  view: {
+    list: 'List',
+    chart: 'Chart',
+  },
+  filter: {
+    withErrors: 'With errors',
+    withSubagents: 'With subagents',
+  },
+  chart: {
+    showing: 'Showing the {{ shown }} most active of {{ total }} sessions.',
+    hint: 'One dot per session and period. Above zero: no failures in the period; below: with failures.',
+    legend: 'Cost per session in the period',
+    cost: 'Cost',
+    ok: 'No failures',
+    failed: 'With failures',
+    failures: 'Failures',
+    period: 'Period',
+    aria: 'Sessions per period: {{ count }} sessions',
+  },
   col: {
     session: 'Session',
     harness: 'Harness',

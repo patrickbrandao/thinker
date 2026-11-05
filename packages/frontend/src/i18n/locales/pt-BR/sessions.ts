@@ -13,6 +13,25 @@ const ptBR: Catalog<typeof en> = {
   emptyTitle: 'Nenhuma sessão ainda',
   emptyBody:
     'As sessões aparecem quando um harness informa a sessão em um cabeçalho da requisição (OpenCode, Claude Code, Codex, OpenClaw, Hermes ou x-session-key).',
+  view: {
+    list: 'Lista',
+    chart: 'Gráfico',
+  },
+  filter: {
+    withErrors: 'Com erros',
+    withSubagents: 'Com sub-agentes',
+  },
+  chart: {
+    showing: 'Mostrando as {{ shown }} sessões mais ativas de {{ total }}.',
+    hint: 'Uma bolinha por sessão e período. Acima do zero: sem falhas no período; abaixo: com falhas.',
+    legend: 'Custo por sessão no período',
+    cost: 'Custo',
+    ok: 'Sem falhas',
+    failed: 'Com falhas',
+    failures: 'Falhas',
+    period: 'Período',
+    aria: 'Sessões por período: {{ count }} sessões',
+  },
   col: {
     session: 'Sessão',
     harness: 'Harness',

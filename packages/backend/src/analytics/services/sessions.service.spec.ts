@@ -1,4 +1,4 @@
-import { SessionsService } from './sessions.service';
+import { SessionsService, TIMELINE_MAX_SESSIONS, timelineBucket } from './sessions.service';
 
 const TENANT = 'tenant-1';
 
@@ -101,6 +101,37 @@ describe('SessionsService.list', () => {
     const { service, query } = build();
     await service.list({ tenantId: TENANT, limit: 5, offset: 0 });
     expect(String(query.mock.calls[0][0])).not.toContain('r.timestamp >=');
+  });
+
+  it('filters sessions with errors and with subagents (combinable, whole session)', async () => {
+    const { service, query } = build();
+    await service.list({ tenantId: TENANT, limit: 50, offset: 0 });
+    expect(query.mock.calls[0][0]).not.toContain('HAVING');
+
+    await service.list({ tenantId: TENANT, hasErrors: true, limit: 50, offset: 0 });
+    let sql = query.mock.calls[1][0] as string;
+    expect(sql).toMatch(/HAVING EXISTS/);
+    expect(sql).toContain('x.status');
+    expect(sql).not.toContain('x.parent_session_id IS NOT NULL');
+
+    await service.list({ tenantId: TENANT, hasSubagents: true, limit: 50, offset: 0 });
+    sql = query.mock.calls[2][0] as string;
+    expect(sql).toContain('x.parent_session_id IS NOT NULL');
+
+    await service.list({
+      tenantId: TENANT,
+      range: '7d',
+      hasErrors: true,
+      hasSubagents: true,
+      limit: 10,
+      offset: 20,
+    });
+    const [both, args] = query.mock.calls[3] as [string, unknown[]];
+    expect(both.match(/EXISTS \(/g)).toHaveLength(2);
+    expect(both).toMatch(/HAVING EXISTS[\s\S]*AND EXISTS/);
+    // Both subqueries stay inside the tenant.
+    expect(both.match(/x\.tenant_id = \$1/g)).toHaveLength(2);
+    expect(args.slice(-2)).toEqual([11, 20]);
   });
 
   it('folds subagent sessions into their main session', async () => {
@@ -297,5 +328,59 @@ describe('SessionsService.get', () => {
   it('has no client when no request recorded headers', async () => {
     const { service } = build(answerFor({ summary: [summaryRow()], headers: [] }));
     expect((await service.get(TENANT, 'sess-1', true))!.client).toBeNull();
+  });
+});
+
+describe('SessionsService.timeline', () => {
+  it('picks hours for a day, days up to a month and weeks above', () => {
+    expect(timelineBucket('24h')).toBe('hour');
+    expect(timelineBucket('7d')).toBe('day');
+    expect(timelineBucket('30d')).toBe('day');
+    expect(timelineBucket('90d')).toBe('week');
+    expect(timelineBucket('365d')).toBe('week');
+  });
+
+  it('buckets by the range, caps the sessions and keeps the filters', async () => {
+    const { service, query } = build(() => [
+      {
+        root: 's1',
+        agent_id: 'a1',
+        agent_name: 'bot',
+        bucket: new Date('2026-11-05T00:00:00Z'),
+        requests: 3,
+        failed: 1,
+        cost: '0.25',
+        total: '7',
+      },
+      {
+        root: 's1',
+        agent_id: 'a1',
+        agent_name: 'bot',
+        bucket: new Date('2026-11-06T00:00:00Z'),
+        requests: 1,
+        failed: 0,
+        cost: 0,
+        total: '7',
+      },
+    ]);
+    const out = await service.timeline({ tenantId: TENANT, range: '7d', hasErrors: true });
+    const [sql, args] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("date_trunc('day', r.timestamp)");
+    expect(sql).toContain('HAVING EXISTS');
+    expect(sql).toContain('r.tenant_id = $1');
+    expect(args[0]).toBe(TENANT);
+    expect(args[args.length - 1]).toBe(TIMELINE_MAX_SESSIONS);
+    expect(out.bucket).toBe('day');
+    expect(out.total_sessions).toBe(7);
+    expect(out.shown_sessions).toBe(1);
+    expect(out.points[0]).toEqual({
+      session_id: 's1',
+      agent_name: 'bot',
+      bucket: '2026-11-05T00:00:00.000Z',
+      requests: 3,
+      failed: 1,
+      cost: 0.25,
+    });
+    expect(out.from).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
 });
