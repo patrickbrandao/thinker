@@ -8,6 +8,14 @@ import N8nSetup from './N8nSetup.jsx';
 import ClaudeCodeSetup from './ClaudeCodeSetup.jsx';
 import OpenCodeSetup from './OpenCodeSetup.jsx';
 import CodexSetup from './CodexSetup.jsx';
+import ClaudeAppSetup from './ClaudeAppSetup.jsx';
+import CopilotCliSetup from './CopilotCliSetup.jsx';
+import PiSetup from './PiSetup.jsx';
+import DeepSeekHarnessSetup from './DeepSeekHarnessSetup.jsx';
+import OpenWebUISetup from './OpenWebUISetup.jsx';
+import ChatwootSetup from './ChatwootSetup.jsx';
+import LangflowSetup from './LangflowSetup.jsx';
+import ZapierSetup from './ZapierSetup.jsx';
 import VirtualModelsHint from './VirtualModelsHint.jsx';
 import RichText from './RichText.jsx';
 import { CHIP, monoIconClass, SetupHint, SetupSegment } from './setup-ui.jsx';
@@ -52,6 +60,14 @@ const NAMED_TOOLS: Record<string, string> = {
   'claude-code': 'Claude Code',
   opencode: 'OpenCode',
   codex: 'Codex',
+  'claude-app': 'Claude Desktop',
+  'copilot-cli': 'Copilot CLI',
+  pi: 'Agent Pi',
+  'deepseek-harness': 'DeepSeek Harness',
+  'open-webui': 'Open WebUI',
+  chatwoot: 'Chatwoot',
+  langflow: 'Langflow',
+  zapier: 'Zapier',
 };
 
 /** Agent tabs of the unfiltered view, in display order. */
@@ -89,7 +105,7 @@ function harnessGuide(
 ): ReactNode {
   switch (id) {
     case 'openclaw':
-      return <OpenClawSetup {...props} />;
+      return <OpenClawSetup {...props} virtualModels={virtualModels} />;
     case 'hermes':
       return <HermesSetup {...props} />;
     case 'nanobot':
@@ -104,6 +120,22 @@ function harnessGuide(
       return <OpenCodeSetup {...props} virtualModels={virtualModels} />;
     case 'codex':
       return <CodexSetup {...props} />;
+    case 'claude-app':
+      return <ClaudeAppSetup {...props} virtualModels={virtualModels} />;
+    case 'copilot-cli':
+      return <CopilotCliSetup {...props} virtualModels={virtualModels} />;
+    case 'pi':
+      return <PiSetup {...props} virtualModels={virtualModels} />;
+    case 'deepseek-harness':
+      return <DeepSeekHarnessSetup {...props} virtualModels={virtualModels} />;
+    case 'open-webui':
+      return <OpenWebUISetup {...props} />;
+    case 'chatwoot':
+      return <ChatwootSetup {...props} />;
+    case 'langflow':
+      return <LangflowSetup {...props} />;
+    case 'zapier':
+      return <ZapierSetup {...props} />;
     default:
       return null;
   }

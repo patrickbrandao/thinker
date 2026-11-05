@@ -105,7 +105,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | Sem snippet, guia nem seção de docs do Zapier. O único caminho é Webhooks by Zapier > Custom Request (URL pública, limite de 30 s, sem stream); os apps de IA nativos não aceitam Base URL. O modal de setup do agente Zapier fica vazio. | frontend-dev, docs-ptbr | [#391](https://github.com/patrickbrandao/thinker/issues/391) | aberta |
+| G1 | degradação | Sem snippet, guia nem seção de docs do Zapier. O único caminho é Webhooks by Zapier > Custom Request (URL pública, limite de 30 s, sem stream); os apps de IA nativos não aceitam Base URL. O modal de setup do agente Zapier fica vazio. | frontend-dev, docs-ptbr | [#391](https://github.com/patrickbrandao/thinker/issues/391) | resolvida (guia e snippet Webhooks Custom Request) |
 | G2 | degradação | O Zapier não envia cabeçalho de sessão; só dá para fixar `x-session-key` em Headers. Toda chamada cai na sessão `default`. Mesma causa de #380. | frontend-dev | [#380](https://github.com/patrickbrandao/thinker/issues/380) (comentado) | resolvida (snippet e guia com x-session-key) |
 | G3 | oportunidade | Reconhecer o User-Agent do Zapier em `classifyCaller` para atribuir os logs (hoje `unknown`). Depende de confirmar o UA exato em um log real. | backend-dev | — | aberta |
 

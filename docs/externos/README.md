@@ -41,7 +41,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 |---|---|---|---|---|---|---|
 | `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | 2026-11-04 | 0 |
 | `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | 2026-11-04 | 3 |
-| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 1 |
+| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 2 |
 | `api-byteplus` | API | BytePlus ModelArk | `byteplus` | [dossiê](api/api-byteplus.md) | 2026-11-04 | 2 |
 | `api-cerebras` | API | Cerebras | `cerebras` | [dossiê](api/api-cerebras.md) | 2026-11-04 | 2 |
 | `api-deepseek` | API | DeepSeek | `deepseek` | [dossiê](api/api-deepseek.md) | 2026-11-04 | 2 |
@@ -49,7 +49,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `api-groq` | API | Groq | `groq` | [dossiê](api/api-groq.md) | 2026-11-04 | 0 |
 | `api-huggingface` | API | Hugging Face Inference Providers | `huggingface` | [dossiê](api/api-huggingface.md) | 2026-11-04 | 4 |
 | `api-kilo` | API | Kilo Gateway | `kilo` | [dossiê](api/api-kilo.md) | 2026-11-04 | 3 |
-| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | 2026-11-04 | 1 |
+| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | 2026-11-04 | 2 |
 | `api-minimax` | API | MiniMax | `minimax` | [dossiê](api/api-minimax.md) | 2026-11-04 | 4 |
 | `api-meta` | API | Meta (Muse Spark) | `meta` | [dossiê](api/api-meta.md) | 2026-11-04 | 3 |
 | `api-xiaomi` | API | Xiaomi MiMo | `xiaomi` | [dossiê](api/api-xiaomi.md) | 2026-11-04 | 5 |
@@ -88,22 +88,22 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 3 |
 | `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 4 |
 | `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 3 |
-| `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 4 |
-| `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | 2026-11-03 | 4 |
+| `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 3 |
+| `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | 2026-11-03 | 3 |
 | `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | 2026-11-03 | 2 |
 | `harness-nanobot` | Harness | Nanobot | `nanobot` | [dossiê](harness/harness-nanobot.md) | 2026-11-03 | 2 |
-| `harness-craft` | Harness | Craft Agent | `craft` | [dossiê](harness/harness-craft.md) | 2026-11-03 | 4 |
-| `harness-claude-app` | Harness | Claude (desktop app) | `claude-app` | [dossiê](harness/harness-claude-app.md) | 2026-11-03 | 4 |
-| `harness-n8n` | Harness | n8n | `n8n` | [dossiê](harness/harness-n8n.md) | 2026-11-03 | 3 |
-| `harness-zapier` | Harness | Zapier | `zapier` | [dossiê](harness/harness-zapier.md) | 2026-11-03 | 2 |
-| `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 4 |
-| `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 3 |
-| `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 3 |
-| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 4 |
-| `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 3 |
+| `harness-craft` | Harness | Craft Agent | `craft` | [dossiê](harness/harness-craft.md) | 2026-11-03 | 3 |
+| `harness-claude-app` | Harness | Claude (desktop app) | `claude-app` | [dossiê](harness/harness-claude-app.md) | 2026-11-03 | 3 |
+| `harness-n8n` | Harness | n8n | `n8n` | [dossiê](harness/harness-n8n.md) | 2026-11-03 | 2 |
+| `harness-zapier` | Harness | Zapier | `zapier` | [dossiê](harness/harness-zapier.md) | 2026-11-03 | 1 |
+| `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 3 |
+| `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 2 |
+| `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 2 |
+| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 3 |
+| `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 2 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 2 |
-| `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 3 |
+| `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 2 |
 | `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 4 |
 | `harness-anthropic-sdk` | Harness | Anthropic SDK | `anthropic-sdk` | [dossiê](harness/harness-anthropic-sdk.md) | 2026-11-03 | 3 |
-| `harness-vercel-ai-sdk` | Harness | Vercel AI SDK | `vercel-ai-sdk` | [dossiê](harness/harness-vercel-ai-sdk.md) | 2026-11-03 | 4 |
+| `harness-vercel-ai-sdk` | Harness | Vercel AI SDK | `vercel-ai-sdk` | [dossiê](harness/harness-vercel-ai-sdk.md) | 2026-11-03 | 2 |
 | `harness-langchain` | Harness | LangChain | `langchain` | [dossiê](harness/harness-langchain.md) | 2026-11-03 | 3 |
