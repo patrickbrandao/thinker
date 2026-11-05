@@ -23,11 +23,13 @@ describe('client identity (wave 7)', () => {
   });
 
   it('recognizes the official Anthropic and async/Azure OpenAI SDK user agents', () => {
-    expect(classifyCaller({ 'user-agent': 'AsyncAnthropic/Python 2.4.0' }).sdk).toBe(
+    expect(classifyCaller({ 'user-agent': 'AsyncAnthropic/Python 2.4.0' })?.sdk).toBe(
       'anthropic-python',
     );
-    expect(classifyCaller({ 'user-agent': 'Anthropic/JS 1.4.0' }).sdk).toBe('anthropic-js');
-    expect(classifyCaller({ 'user-agent': 'AsyncOpenAI/Python 3.44.0' }).sdk).toBe('openai-python');
-    expect(classifyCaller({ 'user-agent': 'AzureOpenAI/JS 7.49.0' }).sdk).toBe('openai-js');
+    expect(classifyCaller({ 'user-agent': 'Anthropic/JS 1.4.0' })?.sdk).toBe('anthropic-js');
+    expect(classifyCaller({ 'user-agent': 'AsyncOpenAI/Python 3.44.0' })?.sdk).toBe(
+      'openai-python',
+    );
+    expect(classifyCaller({ 'user-agent': 'AzureOpenAI/JS 7.49.0' })?.sdk).toBe('openai-js');
   });
 });

@@ -164,6 +164,7 @@ function PartCard({ part }: { part: ResponsePart }) {
         title={t('messages.recording.toolCall')}
         badge={
           <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+            {/* i18n-ignore: API tool type */}
             <span className="text-muted">function</span>
             <strong className="text-ink">{part.name ?? t('messages.recording.unknownTool')}</strong>
             {part.id ? <TruncatedId id={part.id} /> : null}

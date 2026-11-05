@@ -180,7 +180,10 @@ export default function Sessions() {
                       </td>
                       <td
                         className="text-right tabular-nums"
-                        title={`${formatNumber(s.input_tokens)} in · ${formatNumber(s.output_tokens)} out`}
+                        title={t('sessions.tokensInOut', {
+                          input: formatNumber(s.input_tokens),
+                          output: formatNumber(s.output_tokens),
+                        })}
                       >
                         {formatNumber(s.input_tokens + s.output_tokens)}
                       </td>

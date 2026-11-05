@@ -7,6 +7,7 @@ export default {
     'Requests grouped by the session id each harness sends in its headers. Subagent sessions count toward their main session.',
   allHarnesses: 'All harnesses',
   total: '{{ count }} sessions',
+  tokensInOut: '{{ input }} in · {{ output }} out',
   emptyTitle: 'No sessions yet',
   emptyBody:
     'Sessions appear when a harness names its session in a request header (OpenCode, Claude Code, Codex, OpenClaw, Hermes or x-session-key).',

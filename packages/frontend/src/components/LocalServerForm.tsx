@@ -325,7 +325,9 @@ export default function LocalServerForm(props: Props) {
               value={current.scheme}
               onChange={(e) => set({ scheme: e.currentTarget.value as 'http' | 'https' })}
             >
+              {/* i18n-ignore: URL scheme */}
               <option value="http">http</option>
+              {/* i18n-ignore: URL scheme */}
               <option value="https">https</option>
             </select>
           </Field>

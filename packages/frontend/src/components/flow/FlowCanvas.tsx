@@ -122,6 +122,7 @@ function Canvas({
         panOnDrag={selecting ? [1, 2] : true}
         selectionOnDrag={selecting}
         selectionMode={SelectionMode.Partial}
+        zoomOnDoubleClick={false}
         snapToGrid
         snapGrid={[DRAG_SNAP, DRAG_SNAP]}
         minZoom={0.2}

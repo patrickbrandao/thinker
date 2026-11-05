@@ -227,7 +227,8 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
 
     await dashboardAuth(api().patch('/api/v1/routing/test-agent/recording'))
       .send({ enabled: false })
-      .expect(200, { enabled: false });
+      .expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ enabled: false, retention_days: null }));
     await agentAuth(api().post('/v1/chat/completions'))
       .send({
         model: modelKey(),
@@ -240,7 +241,8 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
 
     await dashboardAuth(api().patch('/api/v1/routing/test-agent/recording'))
       .send({ enabled: true })
-      .expect(200, { enabled: true });
+      .expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ enabled: true, retention_days: null }));
   });
 
   storageFailureTest(
@@ -375,7 +377,8 @@ function refreshAppReferences(): void {
 async function configureRecordingAgent(): Promise<void> {
   await dashboardAuth(api().patch('/api/v1/routing/test-agent/recording'))
     .send({ enabled: true })
-    .expect(200, { enabled: true });
+    .expect(200)
+    .expect(({ body }) => expect(body).toMatchObject({ enabled: true, retention_days: null }));
 
   const provider = await dashboardAuth(api().post('/api/v1/routing/test-agent/custom-providers'))
     .send({

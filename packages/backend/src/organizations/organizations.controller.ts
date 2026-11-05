@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -146,7 +147,10 @@ export class MeAccountController {
   @Put('active-organization')
   async setActive(@TenantCtx() ctx: TenantContext, @Body() body: { organizationId: string }) {
     const userId = requireUser(ctx);
-    await this.organizations.roleOf(userId, body?.organizationId);
+    if (typeof body?.organizationId !== 'string' || !body.organizationId) {
+      throw new BadRequestException('organizationId is required');
+    }
+    await this.organizations.roleOf(userId, body.organizationId);
     await this.accounts.setActiveOrganization(userId, body.organizationId);
     return { ok: true };
   }
