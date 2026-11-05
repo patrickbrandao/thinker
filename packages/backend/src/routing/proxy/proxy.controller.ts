@@ -1,16 +1,29 @@
 import {
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
   UseFilters,
+  UseInterceptors,
   Logger,
   HttpException,
   Optional,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { outboundFetch } from '../../common/outbound/outbound-proxy';
+import { estimateRequestTokens } from './context-window-fit';
+import { applyParamPolicy } from './param-policy';
+import {
+  countTokensBody,
+  passthroughUrl,
+  resolvePassthroughTarget,
+  type PassthroughKind,
+} from './passthrough';
 import { Request, Response as ExpressResponse } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
@@ -144,6 +157,43 @@ function virtualModelRouting(meta: RoutingMeta | undefined): {
     : {};
 }
 
+/** OpenAI-style error body for the passthrough routes. */
+function passthroughError(message: string, status: number) {
+  return {
+    error: {
+      message,
+      type: status >= 500 ? 'server_error' : 'invalid_request_error',
+      code: null,
+    },
+  };
+}
+
+/** The Anthropic SDKs send `anthropic-version` on every call. */
+function isAnthropicCaller(req: Request): boolean {
+  return typeof req.headers['anthropic-version'] === 'string';
+}
+
+/** One `/v1/models` entry in Anthropic's `ModelInfo` shape. */
+function toAnthropicModel(model: OpenAiModelObject) {
+  return {
+    type: 'model',
+    id: model.id,
+    display_name: model.id,
+    created_at: new Date(model.created * 1000).toISOString(),
+  };
+}
+
+/** `/v1/models` in Anthropic's list shape (harness-anthropic-sdk G2). */
+function toAnthropicModelList(data: OpenAiModelObject[]) {
+  const models = data.map(toAnthropicModel);
+  return {
+    data: models,
+    has_more: false,
+    first_id: models[0]?.id ?? null,
+    last_id: models[models.length - 1]?.id ?? null,
+  };
+}
+
 @Controller('v1')
 @Public()
 @UseGuards(AgentKeyAuthGuard)
@@ -238,10 +288,189 @@ export class ProxyController {
       data.push(entry);
     }
 
+    if (isAnthropicCaller(req) && req.method === 'GET' && !req.params?.id) {
+      return toAnthropicModelList(data) as unknown as OpenAiModelList;
+    }
     return {
       object: 'list',
       data,
     };
+  }
+
+  /**
+   * `GET /v1/models/{id}` (harness-anthropic-sdk G2): one entry of the list,
+   * in Anthropic shape when the caller sends `anthropic-version`.
+   */
+  @Get('models/:id')
+  async model(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const list = await this.models(req);
+    const entry = list.data.find((model) => model.id === id);
+    if (!entry) {
+      res.status(404).json(passthroughError(`Model "${id}" is not available for this agent.`, 404));
+      return;
+    }
+    res.json(isAnthropicCaller(req) ? toAnthropicModel(entry) : entry);
+  }
+
+  /** `POST /v1/embeddings`: passthrough to the provider the model names. */
+  @Post('embeddings')
+  async embeddings(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+  ): Promise<void> {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    await this.passthrough(req, res, 'embeddings', body.model, (target) =>
+      JSON.stringify({ ...body, model: target.model }),
+    );
+  }
+
+  /** `POST /v1/audio/transcriptions` (multipart): passthrough like embeddings. */
+  @Post('audio/transcriptions')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
+  async transcriptions(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+    @UploadedFile() file?: { buffer: Buffer; originalname?: string; mimetype?: string },
+  ): Promise<void> {
+    const fields = (req.body ?? {}) as Record<string, unknown>;
+    if (!file) {
+      res.status(400).json(passthroughError('A `file` part is required.', 400));
+      return;
+    }
+    await this.passthrough(req, res, 'transcriptions', fields.model, (target) => {
+      const form = new FormData();
+      form.append(
+        'file',
+        new Blob([new Uint8Array(file.buffer)], {
+          type: file.mimetype || 'application/octet-stream',
+        }),
+        file.originalname || 'audio',
+      );
+      for (const [key, value] of Object.entries(fields)) {
+        if (key === 'model' || value === undefined) continue;
+        if (Array.isArray(value)) value.forEach((v) => form.append(key, String(v)));
+        else form.append(key, String(value));
+      }
+      form.append('model', target.model);
+      return form;
+    });
+  }
+
+  /**
+   * `POST /v1/messages/count_tokens` (harness-anthropic-sdk G1): forwarded to
+   * Anthropic when the model is a Claude the agent can reach, estimated for
+   * everything else (`auto`, virtual models, other providers).
+   */
+  @Post('messages/count_tokens')
+  async countTokens(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+  ): Promise<void> {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const target = resolvePassthroughTarget(body.model);
+    const url = target ? passthroughUrl(target, 'count_tokens') : null;
+    const { agentId, tenantId } = req.ingestionContext;
+    const credentials =
+      target && url
+        ? await this.proxyService.resolvePassthroughCredentials(agentId, tenantId, target.provider)
+        : null;
+    if (!target || !url || !credentials) {
+      res.json({ input_tokens: estimateRequestTokens(body) });
+      return;
+    }
+    const upstreamBody = countTokensBody(body, target.model);
+    applyParamPolicy(upstreamBody, {
+      endpointKey: target.provider,
+      format: target.endpoint.format,
+      model: target.model,
+    });
+    try {
+      const upstream = await outboundFetch(url, {
+        method: 'POST',
+        headers: target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
+        body: JSON.stringify(upstreamBody),
+      });
+      if (!upstream.ok) {
+        // An estimate beats a failed count: clients use it to plan compaction.
+        res.json({ input_tokens: estimateRequestTokens(body) });
+        return;
+      }
+      res
+        .status(upstream.status)
+        .type('application/json')
+        .send(await upstream.text());
+    } catch {
+      res.json({ input_tokens: estimateRequestTokens(body) });
+    }
+  }
+
+  private async passthrough(
+    req: Request & { ingestionContext: IngestionContext },
+    res: ExpressResponse,
+    kind: PassthroughKind,
+    model: unknown,
+    buildBody: (
+      target: NonNullable<ReturnType<typeof resolvePassthroughTarget>>,
+    ) => string | FormData,
+  ): Promise<void> {
+    const target = resolvePassthroughTarget(model);
+    if (!target) {
+      res
+        .status(400)
+        .json(
+          passthroughError(
+            'Name the model with its provider (for example `openai/text-embedding-3-small`).',
+            400,
+          ),
+        );
+      return;
+    }
+    const url = passthroughUrl(target, kind);
+    if (!url) {
+      res
+        .status(400)
+        .json(
+          passthroughError(`Provider ${target.provider} has no ${kind} route in Thinker.`, 400),
+        );
+      return;
+    }
+    const { agentId, tenantId } = req.ingestionContext;
+    const credentials = await this.proxyService.resolvePassthroughCredentials(
+      agentId,
+      tenantId,
+      target.provider,
+    );
+    if (!credentials) {
+      res
+        .status(400)
+        .json(passthroughError(`This agent has no connection for ${target.provider}.`, 400));
+      return;
+    }
+    const body = buildBody(target);
+    const headers: Record<string, string> = {
+      ...target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
+    };
+    // fetch sets the multipart boundary itself.
+    if (typeof body !== 'string') {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'content-type') delete headers[key];
+      }
+    }
+    try {
+      const upstream = await outboundFetch(url, { method: 'POST', headers, body });
+      const contentType = upstream.headers.get('content-type') ?? 'application/json';
+      res
+        .status(upstream.status)
+        .type(contentType)
+        .send(Buffer.from(await upstream.arrayBuffer()));
+    } catch (err) {
+      this.logger.warn(`Passthrough ${kind} to ${target.provider} failed: ${String(err)}`);
+      res.status(502).json(passthroughError(`Provider ${target.provider} did not answer.`, 502));
+    }
   }
 
   @Post('chat/completions')

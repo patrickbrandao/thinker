@@ -160,7 +160,7 @@ Arquivos que citam `vercel-ai-sdk`:
 | G3 | degradação | Snippet Python (`pip install ai-sdk`, `AIClient`) não corresponde a nenhum SDK da Vercel; remover ou trocar por pacote verificado. | frontend-dev | [#394](https://github.com/patrickbrandao/thinker/issues/394) | aberta |
 | G4 | degradação | O AI SDK não envia cabeçalho de sessão e o snippet/guia não ensina `x-session-key` em `headers` (sessão sempre `default`). Mesma causa de #380. | frontend-dev | comentário em [#380](https://github.com/patrickbrandao/thinker/issues/380) | resolvida (snippet e guia com x-session-key) |
 | G5 | oportunidade | `classifyCaller` não reconhece o UA `ai/<v> ai-sdk-<pacote>/<v>`; registra `sdk: 'unknown'`. Acrescentar regra `^.*\bai/([\d.]+)` -> `vercel-ai-sdk`. Mesma família de #373 e #387. | backend-dev | — (oportunidade, sem issue) | aberta |
-| G6 | oportunidade | `embed`/`embedMany`, `generateImage`, `transcribe` e `generateSpeech` do AI SDK chamam `/v1/embeddings`, `/v1/images/*`, `/v1/audio/*`, que o Thinker não serve (404). Embeddings já registrado em #365 (Chatwoot). | backend-dev | — (ver [#365](https://github.com/patrickbrandao/thinker/issues/365)) | aberta |
+| G6 | oportunidade | `embed`/`embedMany`, `generateImage`, `transcribe` e `generateSpeech` do AI SDK chamam `/v1/embeddings`, `/v1/images/*`, `/v1/audio/*`, que o Thinker não serve (404). Embeddings já registrado em #365 (Chatwoot). | backend-dev | — (ver [#365](https://github.com/patrickbrandao/thinker/issues/365)) | aberta (embeddings e transcrição entraram em #365/#366; imagens e fala seguem sem rota) |
 
 ## Histórico
 

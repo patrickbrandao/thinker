@@ -97,13 +97,13 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `harness-n8n` | Harness | n8n | `n8n` | [dossiê](harness/harness-n8n.md) | 2026-11-03 | 3 |
 | `harness-zapier` | Harness | Zapier | `zapier` | [dossiê](harness/harness-zapier.md) | 2026-11-03 | 2 |
 | `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 4 |
-| `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 5 |
+| `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 3 |
 | `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 3 |
 | `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 4 |
 | `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 3 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 2 |
 | `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 3 |
-| `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 6 |
-| `harness-anthropic-sdk` | Harness | Anthropic SDK | `anthropic-sdk` | [dossiê](harness/harness-anthropic-sdk.md) | 2026-11-03 | 6 |
+| `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 5 |
+| `harness-anthropic-sdk` | Harness | Anthropic SDK | `anthropic-sdk` | [dossiê](harness/harness-anthropic-sdk.md) | 2026-11-03 | 4 |
 | `harness-vercel-ai-sdk` | Harness | Vercel AI SDK | `vercel-ai-sdk` | [dossiê](harness/harness-vercel-ai-sdk.md) | 2026-11-03 | 4 |
 | `harness-langchain` | Harness | LangChain | `langchain` | [dossiê](harness/harness-langchain.md) | 2026-11-03 | 3 |
