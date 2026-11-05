@@ -130,8 +130,8 @@ Arquivos que citam `byteplus`:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | oportunidade | Não há provedor para a API paga do ModelArk (`/api/v3`, chave `ARK_API_KEY`); o id `byteplus` cobre só o Coding Plan. Falta base, caminho `/chat/completions`, descoberta (sem `GET /models` confirmado; usar lista fixa ou plano de controle), tradução de `thinking`, tratamento de 404 `ModelNotOpen`/`ModelIDAccessDisabled` e de 429 `ServerOverloaded`/`*RateLimitExceeded*`, e suporte a endpoint id `ep-...`. | providers | [#397](https://github.com/patrickbrandao/thinker/issues/397) | aberta |
-| G2 | oportunidade | Sem preços/contexto da API paga (tabela de modelos e pricing não lidas); `known-model-prices.ts` não tem Seed 2.0. Depende de G1 e de leitura com navegador real. | providers | (ver #397) | aberta |
+| G1 | oportunidade | Não há provedor para a API paga do ModelArk (`/api/v3`, chave `ARK_API_KEY`); o id `byteplus` cobre só o Coding Plan. Falta base, caminho `/chat/completions`, descoberta (sem `GET /models` confirmado; usar lista fixa ou plano de controle), tradução de `thinking`, tratamento de 404 `ModelNotOpen`/`ModelIDAccessDisabled` e de 429 `ServerOverloaded`/`*RateLimitExceeded*`, e suporte a endpoint id `ep-...`. | providers | [#397](https://github.com/patrickbrandao/thinker/issues/397) | fechada: não planejada por ora (decisão do mantenedor, 2026-11-05) |
+| G2 | oportunidade | Sem preços/contexto da API paga (tabela de modelos e pricing não lidas); `known-model-prices.ts` não tem Seed 2.0. Depende de G1 e de leitura com navegador real. | providers | (ver #397) | fechada: não planejada por ora (decisão do mantenedor, 2026-11-05) |
 
 Relação com `sub-byteplus`: lista desatualizada do Coding Plan é a G1 daquele dossiê (#329); aqui não se repete.
 
