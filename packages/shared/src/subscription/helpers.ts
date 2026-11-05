@@ -15,11 +15,9 @@ function normalizeProviderId(providerId: string): string {
 export function getSubscriptionProviderConfig(
   providerId: string,
 ): Readonly<SubscriptionProviderConfig> | null {
-  return (
-    SUBSCRIPTION_PROVIDER_CONFIGS[
-      normalizeProviderId(providerId) as keyof typeof SUBSCRIPTION_PROVIDER_CONFIGS
-    ] ?? null
-  );
+  const id = normalizeProviderId(providerId);
+  if (!Object.prototype.hasOwnProperty.call(SUBSCRIPTION_PROVIDER_CONFIGS, id)) return null;
+  return SUBSCRIPTION_PROVIDER_CONFIGS[id as keyof typeof SUBSCRIPTION_PROVIDER_CONFIGS] ?? null;
 }
 
 export function supportsSubscriptionProvider(providerId: string): boolean {

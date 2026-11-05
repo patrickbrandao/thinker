@@ -9,6 +9,7 @@ const ptBR: Catalog<typeof en> = {
     'Requisições agrupadas pelo id de sessão que cada harness envia nos cabeçalhos. Sessões de subagentes contam na sessão principal.',
   allHarnesses: 'Todos os harnesses',
   total: '{{ count }} sessões',
+  tokensInOut: '{{ input }} entrada · {{ output }} saída',
   emptyTitle: 'Nenhuma sessão ainda',
   emptyBody:
     'As sessões aparecem quando um harness informa a sessão em um cabeçalho da requisição (OpenCode, Claude Code, Codex, OpenClaw, Hermes ou x-session-key).',

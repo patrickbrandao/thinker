@@ -11,12 +11,7 @@
  */
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import {
-  createTestApp,
-  stubProviderDiscoveryFetch,
-  TEST_AGENT_ID,
-  TEST_API_KEY,
-} from './helpers';
+import { createTestApp, stubProviderDiscoveryFetch, TEST_AGENT_ID, TEST_API_KEY } from './helpers';
 
 let app: INestApplication;
 let restoreDiscoveryFetch: () => void;
@@ -61,14 +56,14 @@ describe('Multi-key per provider — HTTP', () => {
     await auth(api().post('/api/v1/routing/test-agent/providers/deactivate-all')).expect(201);
   });
 
-  it('initial connect (no label) creates a row labeled "Default" with priority 0', async () => {
+  it('initial connect (no label) creates a row labeled "openai-1" with priority 0', async () => {
     await auth(api().post('/api/v1/routing/test-agent/providers'))
       .send({ provider: 'openai', apiKey: 'sk-personal' })
       .expect(201);
 
     const rows = await listActiveOpenAi();
     expect(rows).toHaveLength(1);
-    expect(rows[0].label).toBe('Default');
+    expect(rows[0].label).toBe('openai-1');
     expect(rows[0].priority).toBe(0);
   });
 
@@ -82,7 +77,7 @@ describe('Multi-key per provider — HTTP', () => {
 
     const rows = await listActiveOpenAi();
     expect(rows).toHaveLength(2);
-    expect(rows[0].label).toBe('Default');
+    expect(rows[0].label).toBe('openai-1');
     expect(rows[1].label).toBe('Work');
     expect(rows[1].priority).toBeGreaterThan(rows[0].priority);
   });
@@ -141,11 +136,11 @@ describe('Multi-key per provider — HTTP', () => {
       .expect(201);
 
     const res = await auth(api().put('/api/v1/routing/test-agent/providers/openai/keys/order'))
-      .send({ labels: ['Work', 'Default'] })
+      .send({ labels: ['Work', 'openai-1'] })
       .expect(200);
     expect(res.body[0].label).toBe('Work');
     expect(res.body[0].priority).toBe(0);
-    expect(res.body[1].label).toBe('Default');
+    expect(res.body[1].label).toBe('openai-1');
     expect(res.body[1].priority).toBe(1);
   });
 
@@ -159,7 +154,7 @@ describe('Multi-key per provider — HTTP', () => {
       .send({ provider: 'openai', apiKey: 'sk-del-work', label: 'Work' })
       .expect(201);
 
-    await auth(api().delete('/api/v1/routing/test-agent/providers/openai?label=Default')).expect(
+    await auth(api().delete('/api/v1/routing/test-agent/providers/openai?label=openai-1')).expect(
       200,
     );
 
@@ -176,7 +171,7 @@ describe('Multi-key per provider — HTTP', () => {
 
     await auth(api().delete('/api/v1/routing/test-agent/providers/openai')).expect(200);
     // Legacy semantics: whole-provider deactivation. The active set drops the
-    // Default key entirely (any leftover rows from earlier tests are still
+    // default-named key entirely (any leftover rows from earlier tests are still
     // inactive after the beforeEach `deactivate-all`).
     const active = await listActiveOpenAi();
     expect(active).toHaveLength(0);

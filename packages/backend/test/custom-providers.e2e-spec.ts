@@ -442,14 +442,14 @@ describe('Custom Providers (e2e)', () => {
       // `key_prefix` is the visible part of the server-side mask: half of a
       // 12-character key at most.
       expect(await connectionsOf()).toEqual([
-        ['Default', 'sk-acc'],
+        ['custom-1', 'sk-acc'],
         ['Account B', 'sk-acc'],
       ]);
     });
 
     it('updates the primary connection after it was renamed, without adding a row', async () => {
       await request(server())
-        .patch(`/api/v1/providers/${encodeURIComponent(key)}/keys/Default`)
+        .patch(`/api/v1/providers/${encodeURIComponent(key)}/keys/custom-1`)
         .set(headers)
         .send({ newLabel: 'Account A' })
         .expect(200);

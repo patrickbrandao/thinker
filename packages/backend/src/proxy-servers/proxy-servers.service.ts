@@ -993,7 +993,10 @@ export class ProxyServersService {
     const id = type === 'provider' ? targetId.toLowerCase() : targetId;
     await this.assertTarget(tenantId, type, id);
     const input = (body ?? {}) as { mode?: unknown; profile_id?: unknown };
-    const mode = typeof input.mode === 'string' ? input.mode : 'inherit';
+    if (input.mode !== undefined && typeof input.mode !== 'string') {
+      bad('mode must be inherit, global, direct or profile');
+    }
+    const mode = input.mode ?? 'inherit';
     if (mode === 'inherit') {
       await this.ds.query(
         `DELETE FROM proxy_assignments WHERE tenant_id = $1 AND target_type = $2 AND target_id = $3`,
@@ -1209,30 +1212,35 @@ export class ProxyServersService {
     if (to) add('started_at <= ?', to);
     if (before) add('started_at < ?', before);
     const limit = Math.min(Math.max(Number(query.limit) || 50, 1), 200);
-    const logs = unwrap<Record<string, unknown> & { started_at: string }>(
+    // The cursor is formatted by PostgreSQL (microseconds, UTC wall clock), not
+    // rebuilt from the Date the driver parsed, so it does not depend on the
+    // process time zone or lose precision.
+    const rows = unwrap<Record<string, unknown> & { cursor_at: string }>(
       await this.ds.query(
         `SELECT id, proxy_name, started_at, duration_ms, tunnel_ms, source_type, source_id,
                 source_label, destination, position, result, status_code, bytes_sent,
-                bytes_received, request_id, agent_message_id, error
+                bytes_received, request_id, agent_message_id, error,
+                to_char(started_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
            FROM proxy_logs WHERE ${where.join(' AND ')}
           ORDER BY started_at DESC LIMIT ${limit + 1}`,
         params,
       ),
-    ).map((l) => ({
+    );
+    const hasMore = rows.length > limit;
+    const logs = rows.slice(0, limit).map(({ cursor_at: _cursor, ...l }) => ({
       ...l,
       bytes_sent: Number(l.bytes_sent),
       bytes_received: Number(l.bytes_received),
     }));
-    const hasMore = logs.length > limit;
     return {
-      logs: logs.slice(0, limit),
-      next_before: hasMore ? new Date(String(logs[limit - 1]!.started_at)).toISOString() : null,
+      logs,
+      next_before: hasMore ? rows[limit - 1]!.cursor_at : null,
     };
   }
 
   async stats(tenantId: string | null, id: string, daysParam?: string) {
     const row = await this.row(tenantId, id);
-    const days = Math.min(Math.max(Number(daysParam) || 30, 1), 365);
+    const days = Math.min(Math.max(Math.round(Number(daysParam)) || 30, 1), 365);
     const params = [row.tenant_id, id, days - 1];
     const daily = unwrap<Record<string, string>>(
       await this.ds.query(

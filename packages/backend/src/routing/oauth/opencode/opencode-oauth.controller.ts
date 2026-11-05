@@ -73,12 +73,13 @@ export class OpencodeOauthController {
       agentName,
       PROVIDER_CONNECTION_SCOPE,
     );
+    const consoleKind = consoleProvider(provider);
     try {
       return await this.oauthService.startAuthorization(
         agent.id,
         agent.tenant_id,
         ctx.userId,
-        consoleProvider(provider),
+        consoleKind,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start OpenCode login';

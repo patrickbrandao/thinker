@@ -141,6 +141,8 @@ Uma proteção (`packages/backend/test/e2e-db-guard.ts`) recusa rodar sem `DATAB
 
 Qualquer mudança de comportamento em tempo de execução também passa pelo agente `qa-docker`, contra a imagem construída localmente.
 
+**Teste completo (só quando solicitado).** `npm run test:full` (ou `scripts/test-full.sh`) roda, em ordem: lint, catálogos i18n, registro do design system e typecheck (TypeScript 6 e 7); build de todos os pacotes com checagem de arquivos gerados; testes unitários (backend em UTC e em `America/Sao_Paulo`, frontend, shared, CLI); testes dos scripts; e2e do backend num PostgreSQL descartável nos dois fusos; e os contratos do gateway quando `THINKER_BASE_URL` aponta para uma instância de teste. Ele nunca roda do `ship.sh`. Opções: `--only <estágios>`, `--skip <estágios>`, `--fail-fast`; os logs de cada passo ficam num diretório temporário impresso no resumo. Antes de uma entrega para ambiente crítico, rode também o `qa-docker` na imagem construída. O mapa de cada recurso para os testes que o cobrem está em [`matriz-de-testes.md`](matriz-de-testes.md); ao criar um recurso, acrescente a linha dele lá.
+
 ### Dashboard (console)
 
 O dashboard é React 19 com react-router 7, Vite e Tailwind 4 ([ADR 0007](../adr/0007-console-react.md)). As peças que toda tela usa:

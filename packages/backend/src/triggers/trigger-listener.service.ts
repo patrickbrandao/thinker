@@ -226,7 +226,7 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
         : `${signal.agentName} has been blocked`,
       message: soft
         ? `${signal.agentName} used ${value(signal.actual)} this ${signal.period}, over the ${value(signal.threshold)} threshold. Requests are still being processed.`
-        : `${signal.agentName} reached the ${value(signal.threshold)} ${signal.metric} limit per ${signal.period} (${value(signal.actual)}). New requests are blocked until the period resets${signal.periodReset ? ` on ${signal.periodReset}` : ''}.`,
+        : `${signal.agentName} reached the ${value(signal.threshold)}${signal.metric === 'cost' ? ' cost' : ''} limit per ${signal.period} (${value(signal.actual)}). New requests are blocked until the period resets${signal.periodReset ? ` on ${signal.periodReset}` : ''}.`,
       vars: {
         'rule.id': signal.ruleId,
         'rule.metric': signal.metric,

@@ -31,6 +31,21 @@ async function startServer(name: string, models: string[]): Promise<MockServer> 
     received.push({ url: req.url ?? '', body });
 
     res.writeHead(200, { 'content-type': 'application/json' });
+    // LM Studio's REST listing, which discovery reads first (wave 7).
+    if (req.method === 'GET' && req.url === '/api/v0/models') {
+      res.end(
+        JSON.stringify({
+          object: 'list',
+          data: models.map((id) => ({
+            id,
+            object: 'model',
+            type: 'llm',
+            max_context_length: 32768,
+          })),
+        }),
+      );
+      return;
+    }
     if (req.method === 'GET' && req.url === '/v1/models') {
       res.end(JSON.stringify({ object: 'list', data: models.map((id) => ({ id })) }));
       return;

@@ -447,7 +447,7 @@ describe('x-api-key on the gateway routes (e2e)', () => {
     });
   });
 
-  it('never persists the x-api-key header in recorded request headers', async () => {
+  it('never persists the x-api-key value in recorded request headers (name kept, value redacted)', async () => {
     await api()
       .post('/v1/messages')
       .set('x-api-key', TEST_OTLP_KEY)
@@ -481,8 +481,20 @@ describe('x-api-key on the gateway routes (e2e)', () => {
     expect(attemptRows.length).toBeGreaterThan(0);
     for (const row of [...requestRows, ...attemptRows]) {
       expect(row.headers).toContain('anthropic-version');
-      expect(row.headers.toLowerCase()).not.toContain('x-api-key');
+      // Since #276 every received header is recorded; credential headers keep
+      // their name but their value is replaced, so the key itself never lands.
+      const recorded = JSON.parse(row.headers) as Record<string, string>;
+      expect(recorded['x-api-key']).toBe('[REDACTED]');
       expect(row.headers).not.toContain(TEST_OTLP_KEY);
+    }
+    // And nowhere else in the rows of this request, whatever the column.
+    for (const table of ['requests', 'agent_messages']) {
+      const leaks = (await ds.query(
+        `SELECT 1 FROM ${table} t
+          WHERE t.request_headers::text LIKE '%x-xak-marker%' AND t::text LIKE $1`,
+        [`%${TEST_OTLP_KEY}%`],
+      )) as unknown[];
+      expect(leaks).toHaveLength(0);
     }
   });
 });

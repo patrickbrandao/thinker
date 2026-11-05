@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -366,6 +367,7 @@ export class ProxyController {
    * everything else (`auto`, virtual models, other providers).
    */
   @Post('messages/count_tokens')
+  @HttpCode(200)
   async countTokens(
     @Req() req: Request & { ingestionContext: IngestionContext },
     @Res() res: ExpressResponse,

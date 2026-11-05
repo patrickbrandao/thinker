@@ -1344,6 +1344,10 @@ export class ProviderModelFetcherService {
       return [...mantleModels, ...crisProfiles.filter((profile) => !mantleIds.has(profile.id))];
     }
 
+    if (configKey === 'lmstudio') {
+      return this.fetchLmStudioModels(config, url, apiKey, providerId);
+    }
+
     return this.fetchModelList(url, headers, config, apiKey, providerId, configKey);
   }
 
@@ -1355,6 +1359,18 @@ export class ProviderModelFetcherService {
     providerId: string,
     configKey: string,
   ): Promise<DiscoveredModel[]> {
+    const body = await this.requestModelsJson(url, headers, apiKey, providerId);
+    if (body === undefined) return [];
+    return filterNonChatModels(config.parse(body, providerId), configKey);
+  }
+
+  /** The decoded JSON of a models endpoint, or `undefined` when it is unreachable or not OK. */
+  private async requestModelsJson(
+    url: string,
+    headers: Record<string, string>,
+    apiKey: string,
+    providerId: string,
+  ): Promise<unknown> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -1367,18 +1383,48 @@ export class ProviderModelFetcherService {
 
       if (!res.ok) {
         this.logger.warn(
-          `Provider ${providerId} returned ${res.status} from ${url.replace(apiKey, '***')}`,
+          `Provider ${providerId} returned ${res.status} from ${apiKey ? url.replace(apiKey, '***') : url}`,
         );
-        return [];
+        return undefined;
       }
 
-      const body = await res.json();
-      return filterNonChatModels(config.parse(body, providerId), configKey);
+      return await res.json();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Failed to fetch models from ${providerId}: ${message}`);
-      return [];
+      return undefined;
     }
+  }
+
+  /**
+   * LM Studio: the REST `/api/v0/models` (type, context, tool use) first. A
+   * server that does not expose it (older LM Studio, or a proxy that only
+   * forwards the OpenAI-compatible `/v1`; also a 2xx that is not a model list)
+   * still lists its models on
+   * `/v1/models`, so discovery never ends up empty just because the richer
+   * endpoint is missing (local-lmstudio G1: "with fallback to /v1/models").
+   */
+  private async fetchLmStudioModels(
+    config: FetcherConfig,
+    url: string,
+    apiKey: string,
+    providerId: string,
+  ): Promise<DiscoveredModel[]> {
+    const headers = config.buildHeaders(apiKey);
+    const rich = await this.requestModelsJson(url, headers, apiKey, providerId);
+    // A 2xx that is not a model list (a proxy answering every path alike) is as
+    // unusable as a 404.
+    if (Array.isArray((rich as { data?: unknown } | undefined)?.data)) {
+      return filterNonChatModels(config.parse(rich, providerId), 'lmstudio');
+    }
+    const openai = await this.requestModelsJson(
+      `${getLocalServerBaseUrl('lmstudio')}/v1/models`,
+      headers,
+      apiKey,
+      providerId,
+    );
+    if (openai === undefined) return [];
+    return filterNonChatModels(parseOpenAI(openai, providerId), 'lmstudio');
   }
 
   /**
