@@ -21,6 +21,7 @@ export interface ProviderDef {
   subtitle: string;
   models: { label: string; value: string }[];
   keyPrefix: string;
+  legacyKeyPrefixes?: readonly string[];
   minKeyLength: number;
   keyPlaceholder: string;
   noKeyRequired?: boolean;
@@ -423,7 +424,7 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   },
   xiaomi: {
     initial: 'Mi',
-    subtitle: 'MiMo V2.5 Pro, V2.5, Flash',
+    subtitle: 'MiMo V2.6 Pro, V2.6 Flash',
     supportsSubscription: true,
     subscriptionLabel: 'Xiaomi MiMo Token Plan',
     subscriptionAuthMode: 'token',
@@ -626,6 +627,7 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
     name: shared.displayName,
     color: shared.color,
     keyPrefix: shared.keyPrefix,
+    legacyKeyPrefixes: shared.legacyKeyPrefixes,
     minKeyLength: shared.minKeyLength,
     keyPlaceholder: shared.keyPlaceholder,
     localOnly: shared.localOnly || undefined,
@@ -646,6 +648,7 @@ const PROVIDER_ORDER = [
   'cline-pass',
   'commandcode',
   'deepseek',
+  'pioneer',
   'fireworks',
   'copilot',
   'gemini',
@@ -668,7 +671,6 @@ const PROVIDER_ORDER = [
   'opencode',
   'opencode-go',
   'openrouter',
-  'pioneer',
   'xai',
   'xiaomi',
   'zai',

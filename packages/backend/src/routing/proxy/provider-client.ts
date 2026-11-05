@@ -1,6 +1,10 @@
 import { createHash } from 'crypto';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
-import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
+import {
+  OPENAI_RESPONSES_ONLY_RE,
+  openAiToolsNeedResponses,
+  stripVendorPrefix,
+} from '../../common/constants/openai-models';
 import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
 import {
   PROVIDER_ENDPOINTS,
@@ -8,6 +12,7 @@ import {
   resolveBedrockEndpointKey,
   resolveEndpointKey,
 } from './provider-endpoints';
+import { applyParamPolicy } from './param-policy';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import {
@@ -428,6 +433,7 @@ export class ProviderClient {
       authType,
       model,
       opts.apiMode,
+      body,
     );
     const isGoogle = endpoint.format === 'google';
     const isAnthropic = endpoint.format === 'anthropic';
@@ -499,6 +505,16 @@ export class ProviderClient {
       sessionKey: opts.sessionKey,
       providerCacheKey: opts.providerCacheKey,
     });
+    const policyApplied = applyParamPolicy(requestBody, {
+      endpointKey,
+      format: endpoint.format,
+      model: bareModel,
+    });
+    if (policyApplied.length > 0) {
+      this.logger.debug(
+        `Param policy for ${endpointKey}/${bareModel}: ${policyApplied.join(', ')}`,
+      );
+    }
 
     // The Codex backend only serves prompt-cache hits with session affinity
     // headers the real Codex CLI sends — see CodexSessionAffinity.
@@ -586,6 +602,7 @@ export class ProviderClient {
     authType: string | undefined,
     model: string,
     apiMode: ForwardOptions['apiMode'],
+    body?: Record<string, unknown>,
   ): Promise<{ endpoint: ProviderEndpoint; endpointKey: string }> {
     if (customEndpoint) {
       return { endpoint: customEndpoint, endpointKey: 'custom' };
@@ -615,6 +632,10 @@ export class ProviderClient {
     }
     // OpenAI rejects these models on /v1/chat/completions; forward to /v1/responses.
     if (resolved === 'openai' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
+      resolved = 'openai-responses';
+    }
+    // GPT-6 models reject function tools on /v1/chat/completions (#440).
+    if (resolved === 'openai' && openAiToolsNeedResponses(stripVendorPrefix(model), body)) {
       resolved = 'openai-responses';
     }
     // xAI multi-agent models are Responses API-only; route them to /v1/responses

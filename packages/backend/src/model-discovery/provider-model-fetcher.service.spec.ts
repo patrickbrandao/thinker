@@ -496,14 +496,14 @@ describe('ProviderModelFetcherService', () => {
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,
-      'https://api.pioneer.ai/v1/models',
+      'https://api.fastino.ai/v1/models',
       expect.objectContaining({
         headers: { 'X-API-Key': 'pio_sk_test_key' },
       }),
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
-      'https://api.pioneer.ai/base-models',
+      'https://api.fastino.ai/v1/base-models',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(result.map((m) => m.id)).toEqual(['pioneer/auto', 'claude-sonnet-4-6']);
@@ -938,7 +938,7 @@ describe('ProviderModelFetcherService', () => {
   /* ── xAI provider ── */
 
   describe('xai provider', () => {
-    it('uses the dynamic xAI models endpoint for subscription auth', async () => {
+    it('uses the Grok CLI proxy models endpoint for subscription auth', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -949,9 +949,12 @@ describe('ProviderModelFetcherService', () => {
       const result = await service.fetch('xai', 'xai-test-key', 'subscription');
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        'https://api.x.ai/v1/models',
+        'https://cli-chat-proxy.grok.com/v1/models',
         expect.objectContaining({
-          headers: { Authorization: 'Bearer xai-test-key' },
+          headers: expect.objectContaining({
+            Authorization: 'Bearer xai-test-key',
+            'X-XAI-Token-Auth': 'xai-grok-cli',
+          }),
         }),
       );
       expect(result.map((m) => m.id)).toEqual(['grok-3', 'grok-4']);

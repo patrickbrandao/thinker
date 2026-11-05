@@ -772,7 +772,7 @@ const BASE_URL_TO_PROVIDER: [RegExp, string][] = [
   [/integrate\.api\.nvidia\.com/i, 'nvidia nim'],
   [/api\.ollama\.com/i, 'ollama cloud'],
   [/openrouter\.ai/i, 'openrouter'],
-  [/api\.pioneer\.ai|pioneer\.ai/i, 'pioneer'],
+  [/fastino\.ai|pioneer\.ai/i, 'pioneer'],
   [/siliconflow\.cn|api\.siliconflow/i, 'siliconflow'],
   [/aiplatform\.googleapis\.com/i, 'vertex'],
 ];

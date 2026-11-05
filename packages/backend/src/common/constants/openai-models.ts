@@ -10,6 +10,25 @@
 export const OPENAI_RESPONSES_ONLY_RE =
   /(?:-codex(?!-mini-latest)|^gpt-5[^/]*-pro(?:-|$)|^o1-pro|^o\d(?:-mini)?-deep-research(?:-|$))/i;
 
+/** GPT-6 models that call tools only through /v1/responses. */
+const OPENAI_TOOLS_RESPONSES_ONLY_RE =
+  /^gpt-6(?:\.1)?-(?:astra|terra)(?:-|$)|^gpt-6\.1-sol(?:-|$)/i;
+/** GPT-6 models that call tools on Chat Completions only with effort `none`. */
+const OPENAI_TOOLS_NEED_NO_REASONING_RE = /^gpt-6-(?:sol|luna)(?:-|$)/i;
+
+/**
+ * Whether a Chat Completions request must go to /v1/responses because it
+ * carries function tools the model only runs there (api-openai G1).
+ */
+export function openAiToolsNeedResponses(
+  model: string,
+  body: Record<string, unknown> | undefined,
+): boolean {
+  if (!body || !Array.isArray(body.tools) || body.tools.length === 0) return false;
+  if (OPENAI_TOOLS_RESPONSES_ONLY_RE.test(model)) return true;
+  return OPENAI_TOOLS_NEED_NO_REASONING_RE.test(model) && body.reasoning_effort !== 'none';
+}
+
 /** Strip a single leading vendor prefix ("openai/foo" → "foo"). No-op if none. */
 export function stripVendorPrefix(model: string): string {
   const slashIdx = model.indexOf('/');

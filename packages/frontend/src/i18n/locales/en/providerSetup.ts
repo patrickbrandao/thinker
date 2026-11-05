@@ -253,7 +253,7 @@ export default {
   catalog: {
     subtitles: {
       cerebras: 'GPT-OSS, GLM, Gemma on Cerebras inference',
-      pioneer: 'OpenAI-compatible inference and fine-tuned Pioneer models',
+      pioneer: 'OpenAI-compatible inference and fine-tuned Fastino models (formerly Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Fast inference',
       huggingface: 'Open models through Hugging Face Inference Providers',
       kilo: 'Kilo Gateway unified model access',

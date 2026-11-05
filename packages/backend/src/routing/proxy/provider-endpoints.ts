@@ -8,6 +8,8 @@ import {
   OPENCODE_USER_AGENT,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  GROK_CLI_HEADERS,
+  GROK_CLI_PROXY_BASE,
   buildClaudeCodeSubscriptionHeaders,
 } from '../../common/constants/subscription-clients';
 import { normalizeProviderBaseUrl } from '../provider-base-url';
@@ -200,7 +202,7 @@ const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
 const NVIDIA_NIM_BASE = 'https://integrate.api.nvidia.com';
 const FIREWORKS_INFERENCE_BASE = 'https://api.fireworks.ai/inference';
 const HUGGING_FACE_INFERENCE_BASE = 'https://router.huggingface.co';
-const PIONEER_BASE = 'https://api.pioneer.ai';
+const PIONEER_BASE = 'https://api.fastino.ai';
 const META_BASE = 'https://api.meta.ai';
 const chatgptSubscriptionHeaders = (apiKey: string) => ({
   Authorization: `Bearer ${apiKey}`,
@@ -395,6 +397,16 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildHeaders: openaiHeaders,
     buildPath: () => '/v1/responses',
     format: 'chatgpt',
+  },
+  // Grok subscription (OAuth): the official CLI's proxy, Responses only.
+  'xai-subscription': {
+    baseUrl: GROK_CLI_PROXY_BASE,
+    buildHeaders: (token: string) => ({ ...openaiHeaders(token), ...GROK_CLI_HEADERS }),
+    buildPath: () => '/v1/responses',
+    format: 'chatgpt',
+    forwardResponsesStream: true,
+    acceptsMaxOutputTokens: true,
+    acceptsPromptCacheKey: true,
   },
   minimax: {
     baseUrl: 'https://api.minimax.io',

@@ -408,11 +408,29 @@ export function toGoogleRequest(
     }
   }
 
+  // Gemini 3.6+ (and the 2.5 ids from 2026-12-01) reject `contents` ending in
+  // a non-empty model turn (prefill). Move a trailing text-only model turn into
+  // the system instruction instead (api-gemini G5).
+  let instructionText = systemText;
+  const last = merged[merged.length - 1];
+  if (
+    merged.length > 1 &&
+    last.role === 'model' &&
+    last.parts.every((p) => typeof p.text === 'string')
+  ) {
+    merged.pop();
+    const prefill = last.parts.map((p) => p.text).join('');
+    if (prefill.trim()) {
+      const note = `Begin your response with exactly this text, then continue it:\n${prefill}`;
+      instructionText = instructionText ? `${instructionText}\n\n${note}` : note;
+    }
+  }
+
   const result: Record<string, unknown> = { contents: merged };
 
-  if (systemText) {
+  if (instructionText) {
     result.systemInstruction = {
-      parts: [{ text: systemText }],
+      parts: [{ text: instructionText }],
     };
   }
 

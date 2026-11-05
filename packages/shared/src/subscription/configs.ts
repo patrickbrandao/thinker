@@ -143,13 +143,7 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionAuthMode: 'token' as const,
     subscriptionKeyPlaceholder: 'Paste your MiMo Token Plan API key',
     subscriptionTokenPrefix: 'tp-',
-    knownModels: Object.freeze([
-      'mimo-v2.5-pro',
-      'mimo-v2-pro',
-      'mimo-v2.5',
-      'mimo-v2-omni',
-      'mimo-v2-flash',
-    ]),
+    knownModels: Object.freeze(['mimo-v2.6-pro', 'mimo-v2.6-flash']),
     knownModelsMatch: 'exact' as const,
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 1048576,

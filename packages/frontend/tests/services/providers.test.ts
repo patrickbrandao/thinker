@@ -147,20 +147,21 @@ describe('validateApiKey', () => {
 
   it('validates Pioneer key prefix and length', () => {
     const pioneer = getProvider('pioneer')!;
-    expect(pioneer.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer.keyPlaceholder).toBe('fast_sk_...');
     expect(validateApiKey(pioneer, '')).toEqual({
       valid: false,
       error: 'API key is required',
     });
     expect(validateApiKey(pioneer, 'sk-wrong-prefix-that-is-long-enough')).toEqual({
       valid: false,
-      error: 'Pioneer keys start with "pio_sk_"',
+      error: 'Fastino keys start with "fast_sk_"',
     });
     expect(validateApiKey(pioneer, 'pio_sk_short')).toEqual({
       valid: false,
       error: 'Key is too short (minimum 20 characters)',
     });
     expect(validateApiKey(pioneer, 'pio_sk_' + 'a'.repeat(20))).toEqual({ valid: true });
+    expect(validateApiKey(pioneer, 'fast_sk_' + 'a'.repeat(20))).toEqual({ valid: true });
   });
 
   it('validates AWS Bedrock raw bearer-token and legacy API-key lengths', () => {
@@ -624,11 +625,11 @@ describe('PROVIDERS', () => {
   it('Pioneer is an API-key provider with dynamic models', () => {
     const pioneer = PROVIDERS.find((p) => p.id === 'pioneer')!;
     expect(pioneer).toBeDefined();
-    expect(pioneer.name).toBe('Pioneer');
+    expect(pioneer.name).toBe('Fastino');
     expect(pioneer.supportsSubscription).toBeUndefined();
     expect(pioneer.subscriptionOnly).toBeUndefined();
-    expect(pioneer.keyPrefix).toBe('pio_sk_');
-    expect(pioneer.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer.keyPrefix).toBe('fast_sk_');
+    expect(pioneer.keyPlaceholder).toBe('fast_sk_...');
     expect(pioneer.minKeyLength).toBe(20);
     expect(pioneer.models).toEqual([]);
   });
@@ -877,7 +878,7 @@ describe('PROVIDERS', () => {
   });
 
   it('provides an API key URL for Pioneer', () => {
-    expect(getRoutingProviderApiKeyUrl('pioneer')).toBe('https://pioneer.ai');
+    expect(getRoutingProviderApiKeyUrl('pioneer')).toBe('https://agent.fastino.ai');
   });
 
   it('OpenCode Go is subscription-only with Console device login and an API-key alternative', () => {

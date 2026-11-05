@@ -168,8 +168,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   },
   {
     id: 'pioneer',
-    displayName: 'Pioneer',
-    aliases: ['pioneer-ai', 'pioneer ai'],
+    displayName: 'Fastino',
+    aliases: ['pioneer-ai', 'pioneer ai', 'fastino'],
     authTypes: ['api_key'],
   },
   {

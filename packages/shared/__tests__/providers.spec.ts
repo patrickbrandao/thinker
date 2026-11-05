@@ -215,11 +215,11 @@ describe('SHARED_PROVIDER_BY_ID', () => {
   it('pioneer exposes API-key provider metadata', () => {
     const pioneer = SHARED_PROVIDER_BY_ID.get('pioneer');
     expect(pioneer).toBeDefined();
-    expect(pioneer!.displayName).toBe('Pioneer');
+    expect(pioneer!.displayName).toBe('Fastino');
     expect(pioneer!.openRouterPrefixes).toEqual([]);
-    expect(pioneer!.keyPrefix).toBe('pio_sk_');
+    expect(pioneer!.keyPrefix).toBe('fast_sk_');
     expect(pioneer!.minKeyLength).toBe(20);
-    expect(pioneer!.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer!.keyPlaceholder).toBe('fast_sk_...');
   });
 
   it('nous exposes subscription-gateway provider metadata', () => {

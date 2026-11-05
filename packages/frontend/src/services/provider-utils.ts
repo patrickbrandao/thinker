@@ -16,7 +16,8 @@ export function validateApiKey(
   if (!trimmed) return { valid: false, error: t('providerSetup.validation.apiKeyRequired') };
   if (provider.freeKey && trimmed === provider.freeKey) return { valid: true };
 
-  if (provider.keyPrefix && !trimmed.startsWith(provider.keyPrefix)) {
+  const prefixes = [provider.keyPrefix, ...(provider.legacyKeyPrefixes ?? [])].filter(Boolean);
+  if (prefixes.length && !prefixes.some((prefix) => trimmed.startsWith(prefix))) {
     return {
       valid: false,
       error: t('providerSetup.validation.keyPrefix', {

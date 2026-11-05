@@ -33,6 +33,22 @@ export function isSharedFreeKey(provider: string, apiKey: string): boolean {
   return provider.toLowerCase() === 'opencode' && apiKey === OPENCODE_FREE_KEY;
 }
 
+/**
+ * Grok Build (`xai-org/grok-build`): the subscription token is accepted only
+ * by `cli-chat-proxy.grok.com` with the CLI's own headers (sub-xai G1). The
+ * maintainer chose to follow the official client and warn in the UI.
+ */
+export const GROK_CLI_VERSION = '1.0.45';
+export const GROK_CLI_PROXY_BASE = 'https://cli-chat-proxy.grok.com';
+export const GROK_CLI_HEADERS: Readonly<Record<string, string>> = Object.freeze({
+  'X-XAI-Token-Auth': 'xai-grok-cli',
+  'x-authenticateresponse': 'authenticate-response',
+  'x-grok-client-version': GROK_CLI_VERSION,
+  'x-grok-client-mode': 'headless',
+  'x-grok-client-identifier': 'grok-shell',
+  'User-Agent': `grok-shell/${GROK_CLI_VERSION}`,
+});
+
 export const CLAUDE_CODE_USER_AGENT = 'claude-cli/2.1.280 (external, sdk-cli)';
 export const CLAUDE_CODE_STAINLESS_PACKAGE_VERSION = '0.80.0';
 export const CLAUDE_CODE_STAINLESS_RUNTIME_VERSION = 'v24.14.0';

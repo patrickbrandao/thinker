@@ -23,6 +23,7 @@ const SUBSCRIPTION_ENDPOINT_OVERRIDES: Record<string, string> = {
   moonshot: 'moonshot-subscription',
   qwen: 'qwen-subscription',
   zai: 'zai-subscription',
+  xai: 'xai-subscription',
   // Gemini's per-API-key endpoint is registered under the legacy key
   // `'google'`, so the override is keyed there too. The OAuth flow shifts
   // to CodeAssist (gemini-subscription).

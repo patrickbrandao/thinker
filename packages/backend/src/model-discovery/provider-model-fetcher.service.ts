@@ -8,6 +8,8 @@ import {
   CODEX_CLI_VERSION,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  GROK_CLI_HEADERS,
+  GROK_CLI_PROXY_BASE,
   OPENCODE_FREE_KEY,
   buildClaudeCodeSubscriptionHeaders,
 } from '../common/constants/subscription-clients';
@@ -68,8 +70,8 @@ const HUGGING_FACE_MODELS_URL = 'https://router.huggingface.co/v1/models';
 const FIREWORKS_MODELS_PAGE_SIZE = 200;
 const FIREWORKS_MODELS_MAX_PAGES = 20;
 const NOUS_PORTAL_MODELS_URL = 'https://inference-api.nousresearch.com/v1/models';
-const PIONEER_MODELS_URL = 'https://api.pioneer.ai/v1/models';
-const PIONEER_BASE_MODELS_URL = 'https://api.pioneer.ai/base-models';
+const PIONEER_MODELS_URL = 'https://api.fastino.ai/v1/models';
+const PIONEER_BASE_MODELS_URL = 'https://api.fastino.ai/v1/base-models';
 const META_MODELS_URL = 'https://api.meta.ai/v1/models';
 // Same host the ClinePass inference endpoint uses, so discovery only talks to
 // the provider the operator configured (ADR 0003).
@@ -355,6 +357,9 @@ const parseQwenTokenPlan = createModelParser<OpenAIModelEntry>({
 });
 
 const XIAOMI_MIMO_CONTEXT_WINDOWS = new Map<string, number>([
+  ['mimo-v2.6-pro', 1048576],
+  ['mimo-v2.6-flash', 1048576],
+  ['mimo-v2.6-pro-ultraspeed', 1048576],
   ['mimo-v2.5-pro', 1048576],
   ['mimo-v2-pro', 1048576],
   ['mimo-v2.5', 1048576],
@@ -949,6 +954,11 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: bearerHeaders,
     parse: parseOpenAI,
   },
+  'xai-subscription': {
+    endpoint: `${GROK_CLI_PROXY_BASE}/v1/models`,
+    buildHeaders: (token: string) => ({ ...bearerHeaders(token), ...GROK_CLI_HEADERS }),
+    parse: parseOpenAI,
+  },
   minimax: {
     endpoint: `${MINIMAX_BASE_URLS.global}/v1/models`,
     buildHeaders: bearerHeaders,
@@ -1106,6 +1116,8 @@ export class ProviderModelFetcherService {
       configKey = 'qwen-subscription';
     } else if (configKey === 'zai' && authType === 'subscription') {
       configKey = 'zai-subscription';
+    } else if (configKey === 'xai' && authType === 'subscription') {
+      configKey = 'xai-subscription';
     } else if (configKey === 'opencode' || configKey === 'opencode-go') {
       return this.fetchOpencodeModels(configKey, apiKey, options?.forceRefresh === true);
     } else if (configKey === 'cline-pass') {
