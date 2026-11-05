@@ -261,7 +261,7 @@ const ptBR: Catalog<typeof en> = {
   catalog: {
     subtitles: {
       cerebras: 'GPT-OSS, GLM, Gemma na inferência da Cerebras',
-      pioneer: 'Inferência compatível com OpenAI e modelos Pioneer ajustados',
+      pioneer: 'Inferência compatível com OpenAI e modelos Fastino ajustados (antiga Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Inferência rápida',
       huggingface: 'Modelos abertos pelos Inference Providers do Hugging Face',
       kilo: 'Acesso unificado a modelos pelo Kilo Gateway',

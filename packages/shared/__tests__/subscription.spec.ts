@@ -130,13 +130,7 @@ describe('getSubscriptionProviderConfig', () => {
       subscriptionTokenPrefix: 'tp-',
       knownModelsMatch: 'exact',
     });
-    expect(config?.knownModels).toEqual([
-      'mimo-v2.5-pro',
-      'mimo-v2-pro',
-      'mimo-v2.5',
-      'mimo-v2-omni',
-      'mimo-v2-flash',
-    ]);
+    expect(config?.knownModels).toEqual(['mimo-v2.6-pro', 'mimo-v2.6-flash']);
   });
 
   it('returns config for Qwen Token Plan', () => {
@@ -392,13 +386,7 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for Xiaomi MiMo Token Plan', () => {
     const models = getSubscriptionKnownModels('xiaomi');
-    expect(models).toEqual([
-      'mimo-v2.5-pro',
-      'mimo-v2-pro',
-      'mimo-v2.5',
-      'mimo-v2-omni',
-      'mimo-v2-flash',
-    ]);
+    expect(models).toEqual(['mimo-v2.6-pro', 'mimo-v2.6-flash']);
   });
 
   it('returns null known models for Qwen Token Plan (relies on live /v1/models discovery)', () => {

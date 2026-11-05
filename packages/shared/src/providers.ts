@@ -29,6 +29,8 @@ export interface SharedProviderEntry {
   color: string;
   /** Expected API-key prefix (used for validation / placeholder). */
   keyPrefix: string;
+  /** Older prefixes still accepted (keys issued before a rebrand). */
+  legacyKeyPrefixes?: readonly string[];
   /** Minimum plausible API-key length. */
   minKeyLength: number;
   /** Placeholder shown in the UI's API-key input. */
@@ -417,15 +419,16 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
   },
   {
     id: 'pioneer',
-    displayName: 'Pioneer',
-    aliases: ['pioneer-ai', 'pioneer ai'],
+    displayName: 'Fastino',
+    aliases: ['pioneer-ai', 'pioneer ai', 'fastino'],
     openRouterPrefixes: [],
     requiresApiKey: true,
     localOnly: false,
     color: '#EA580C',
-    keyPrefix: 'pio_sk_',
+    keyPrefix: 'fast_sk_',
+    legacyKeyPrefixes: ['pio_sk_'],
     minKeyLength: 20,
-    keyPlaceholder: 'pio_sk_...',
+    keyPlaceholder: 'fast_sk_...',
   },
   {
     id: 'opencode-go',

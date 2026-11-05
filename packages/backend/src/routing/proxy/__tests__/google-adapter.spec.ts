@@ -63,6 +63,7 @@ describe('Google Adapter', () => {
         messages: [
           { role: 'user', content: 'Hi' },
           { role: 'assistant', content: 'Hello!' },
+          { role: 'user', content: 'How are you?' },
         ],
       };
       const result = toGoogleRequest(body, 'gemini-2.0-flash');
@@ -2744,6 +2745,26 @@ describe('Google Adapter', () => {
         name: 'write_file',
         response: { result: 'ok' },
       });
+    });
+  });
+
+  describe('assistant prefill', () => {
+    it('moves a trailing assistant text turn into the system instruction', () => {
+      const result = toGoogleRequest(
+        {
+          messages: [
+            { role: 'system', content: 'Be terse.' },
+            { role: 'user', content: 'Give JSON' },
+            { role: 'assistant', content: '{"a":' },
+          ],
+        },
+        'gemini-3.6-flash',
+      );
+      const contents = result.contents as Array<{ role: string }>;
+      expect(contents.map((c) => c.role)).toEqual(['user']);
+      const sys = result.systemInstruction as { parts: Array<{ text: string }> };
+      expect(sys.parts[0].text).toContain('Be terse.');
+      expect(sys.parts[0].text).toContain('{"a":');
     });
   });
 });

@@ -33,7 +33,7 @@ import { clientIpInfo } from '../../common/utils/client-ip';
 import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
 import { recordedRequestHeaders } from './request-headers';
-import { detectHarnessSession } from './harness-session';
+import { detectHarnessSession, stripHarnessPrivateFields } from './harness-session';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -275,6 +275,7 @@ export class ProxyController {
   ): Promise<void> {
     const { agentId, tenantId } = req.ingestionContext;
     const body = req.body as Record<string, unknown>;
+    stripHarnessPrivateFields(body);
     const sessionScope = buildProxySessionScope(
       tenantId,
       agentId,

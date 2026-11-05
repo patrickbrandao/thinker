@@ -14,13 +14,13 @@ Se você já paga por um dos planos abaixo, o Thinker pode rotear pela assinatur
 | [BytePlus](https://www.byteplus.com/en/activity/codingplan) | ModelArk Coding Plan | Token de assinatura | Lista fixa do ModelArk Coding Plan |
 | [Command Code](https://commandcode.ai/studio) | Assinatura Command Code | Token de assinatura | Catálogo dinâmico da API do provedor |
 | [Qwen](https://home.qwencloud.com/api-keys) | Qwen Token Plan | Token de assinatura | Catálogo dinâmico do Token Plan |
-| [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo Token Plan | Token de assinatura | Lista fixa do MiMo Token Plan |
+| [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo Token Plan | Token de assinatura | Lista fixa do MiMo Token Plan (`mimo-v2.6-pro`, `mimo-v2.6-flash`) |
 | [Moonshot](https://www.kimi.com/code/console) | Kimi Coding Plan | Token de assinatura | Lista fixa do Kimi Coding Plan |
 | [Z.ai](https://z.ai) | GLM Coding Plan | Token de assinatura | Lista fixa do GLM Coding Plan |
 | [Google](https://ai.google.dev) | Login com Google | OAuth (navegador) | Lista fixa do Gemini CodeAssist |
 | [MiniMax](https://www.minimax.io) | MiniMax Coding Plan | Código de dispositivo ou token | Lista fixa do MiniMax Coding Plan |
 | [Kiro](https://app.kiro.dev) | Assinatura Kiro | Código de dispositivo | Lista fixa do Kiro |
-| [xAI](https://x.ai) | Assinatura Grok | OAuth (navegador) | Catálogo dinâmico da xAI |
+| [xAI](https://x.ai) | Assinatura Grok | OAuth (navegador) | Catálogo dinâmico do proxy do Grok CLI |
 | [Ollama Cloud](https://ollama.com) | Assinatura Ollama Cloud | Token de assinatura | Catálogo dinâmico de tags do Ollama Cloud |
 | [OpenCode Go](https://opencode.ai) | OpenCode Go (beta) | Login no OpenCode Console (device code) ou chave de API | Catálogo dinâmico do OpenCode Go |
 
@@ -59,6 +59,8 @@ Cole uma chave de API do Command Code Studio. No Thinker, o Command Code é só 
 
 Cole uma chave do Qwen Token Plan (prefixo `sk-sp-`). O Thinker descobre os modelos no endpoint do Token Plan e roteia requisições de chat completions e de estilo responses onde houver suporte.
 
+**Limite:** o Thinker fala só com o Token Plan do Alibaba Model Studio em Singapura (`token-plan.ap-southeast-1.maas.aliyuncs.com`). As chaves do QwenCloud (`token-plan.maas.qwencloudapi.com`) e dos endpoints de Pequim e do 千问AI não são intercambiáveis com esse host e respondem 401/403. Use uma chave Token Plan criada no Model Studio internacional (Singapura).
+
 ### Xiaomi MiMo
 
 Cole uma chave do MiMo Token Plan (prefixo `tp-`). O Thinker roteia pelo endpoint compatível com OpenAI do Token Plan e deixa o operador escolher o host da China, de Singapura ou da Europa.
@@ -85,7 +87,7 @@ Fluxo de código de dispositivo do Kiro. A assinatura expõe `kiro/auto` e rotas
 
 ### xAI
 
-OAuth no navegador para assinaturas Grok; a lista de modelos vem do endpoint de modelos compatível com OpenAI da xAI.
+OAuth no navegador para assinaturas Grok (SuperGrok ou X Premium+). O token da assinatura só é aceito pelo proxy do cliente oficial, `cli-chat-proxy.grok.com`, então o Thinker envia a inferência (Responses) e a descoberta de modelos para esse host com os cabeçalhos de identificação do Grok CLI. **Aviso:** isso apresenta o Thinker como o cliente oficial; a xAI não publica termos que autorizem gateways de terceiros, e a conta pode sofrer ação. Use por sua conta e risco. A API por chave (`xai-...`) segue em `api.x.ai`.
 
 ### Ollama Cloud
 

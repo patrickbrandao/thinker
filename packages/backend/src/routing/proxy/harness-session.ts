@@ -72,3 +72,22 @@ export function detectHarnessSession(
   const parentId = pick(headers, PARENT_HEADERS);
   return { id, parentId: parentId && parentId !== id ? parentId : null };
 }
+
+/**
+ * Top-level body fields some harnesses add for their own gateway and no
+ * provider accepts. DeepSeek Harness sends `dsh_session_log` (up to 8 MiB of
+ * session transcript) and `dsh_plugin_packages`; Anthropic answers 400 to
+ * unknown fields, and the log must not reach a third party or our request
+ * log (harness-deepseek-harness G2).
+ */
+const HARNESS_PRIVATE_FIELD_PREFIXES = ['dsh_'] as const;
+
+/** Remove harness-private top-level fields from a request body, in place. */
+export function stripHarnessPrivateFields(body: Record<string, unknown> | null | undefined): void {
+  if (!body || typeof body !== 'object') return;
+  for (const key of Object.keys(body)) {
+    if (HARNESS_PRIVATE_FIELD_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      delete body[key];
+    }
+  }
+}

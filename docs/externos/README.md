@@ -39,7 +39,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 
 | Agente | Categoria | Entidade | IDs no Thinker | Dossiê | Revisado em | Lacunas abertas |
 |---|---|---|---|---|---|---|
-| `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | 2026-11-04 | 5 |
+| `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | 2026-11-04 | 3 |
 | `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | 2026-11-04 | 5 |
 | `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 3 |
 | `api-byteplus` | API | BytePlus ModelArk | `byteplus` | [dossiê](api/api-byteplus.md) | 2026-11-04 | 2 |
@@ -49,16 +49,16 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `api-groq` | API | Groq | `groq` | [dossiê](api/api-groq.md) | 2026-11-04 | 3 |
 | `api-huggingface` | API | Hugging Face Inference Providers | `huggingface` | [dossiê](api/api-huggingface.md) | 2026-11-04 | 6 |
 | `api-kilo` | API | Kilo Gateway | `kilo` | [dossiê](api/api-kilo.md) | 2026-11-04 | 4 |
-| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | 2026-11-04 | 8 |
+| `api-gemini` | API | Google Gemini API | `gemini`, `google` | [dossiê](api/api-gemini.md) | 2026-11-04 | 7 |
 | `api-minimax` | API | MiniMax | `minimax` | [dossiê](api/api-minimax.md) | 2026-11-04 | 4 |
 | `api-meta` | API | Meta (Muse Spark) | `meta` | [dossiê](api/api-meta.md) | 2026-11-04 | 5 |
-| `api-xiaomi` | API | Xiaomi MiMo | `xiaomi` | [dossiê](api/api-xiaomi.md) | 2026-11-04 | 6 |
+| `api-xiaomi` | API | Xiaomi MiMo | `xiaomi` | [dossiê](api/api-xiaomi.md) | 2026-11-04 | 5 |
 | `api-mistral` | API | Mistral | `mistral` | [dossiê](api/api-mistral.md) | 2026-11-04 | 4 |
 | `api-moonshot` | API | Moonshot (Kimi API) | `moonshot` | [dossiê](api/api-moonshot.md) | 2026-11-04 | 4 |
 | `api-nous` | API | NousResearch API | `nous` | [dossiê](api/api-nous.md) | 2026-11-04 | 4 |
 | `api-nvidia` | API | NVIDIA NIM | `nvidia` | [dossiê](api/api-nvidia.md) | 2026-11-04 | 2 |
-| `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | 2026-11-04 | 6 |
-| `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | 2026-11-04 | 6 |
+| `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | 2026-11-04 | 5 |
+| `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | 2026-11-04 | 3 |
 | `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-03 | 5 |
 | `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | 2026-11-04 | 6 |
 | `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | 2026-11-04 | 4 |
@@ -69,8 +69,8 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `sub-openai` | Assinatura | ChatGPT Plus / Pro / Team (Codex) | `openai` | [dossiê](assinatura/sub-openai.md) | 2026-11-03 | 6 |
 | `sub-minimax` | Assinatura | MiniMax Coding Plan | `minimax` | [dossiê](assinatura/sub-minimax.md) | 2026-11-03 | 5 |
 | `sub-mistral` | Assinatura | Mistral Vibe | `mistral` | [dossiê](assinatura/sub-mistral.md) | 2026-11-03 | 4 |
-| `sub-xiaomi` | Assinatura | Xiaomi MiMo Token Plan | `xiaomi` | [dossiê](assinatura/sub-xiaomi.md) | 2026-11-03 | 6 |
-| `sub-qwen` | Assinatura | Qwen Token Plan | `qwen` | [dossiê](assinatura/sub-qwen.md) | 2026-11-03 | 7 |
+| `sub-xiaomi` | Assinatura | Xiaomi MiMo Token Plan | `xiaomi` | [dossiê](assinatura/sub-xiaomi.md) | 2026-11-03 | 4 |
+| `sub-qwen` | Assinatura | Qwen Token Plan | `qwen` | [dossiê](assinatura/sub-qwen.md) | 2026-11-03 | 6 |
 | `sub-moonshot` | Assinatura | Kimi Coding Plan | `moonshot` | [dossiê](assinatura/sub-moonshot.md) | 2026-11-03 | 4 |
 | `sub-nous` | Assinatura | NousResearch subscription | `nous` | [dossiê](assinatura/sub-nous.md) | 2026-11-03 | 5 |
 | `sub-ollama-cloud` | Assinatura | Ollama Cloud | `ollama-cloud` | [dossiê](assinatura/sub-ollama-cloud.md) | 2026-11-03 | 4 |
@@ -79,7 +79,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | 2026-11-03 | 6 |
 | `sub-opencode` | Assinatura | OpenCode Console | `opencode` | [dossiê](assinatura/sub-opencode.md) | 2026-11-03 | 4 |
 | `sub-gemini` | Assinatura | Sign in with Google (Gemini Code Assist) | `gemini` | [dossiê](assinatura/sub-gemini.md) | 2026-11-03 | 6 |
-| `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | 2026-11-03 | 5 |
+| `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | 2026-11-03 | 4 |
 | `sub-copilot` | Assinatura | GitHub Copilot | `copilot` | [dossiê](assinatura/sub-copilot.md) | 2026-11-03 | 7 |
 | `sub-commandcode` | Assinatura | Command Code | `commandcode` | [dossiê](assinatura/sub-commandcode.md) | 2026-11-03 | 5 |
 | `sub-cline-pass` | Assinatura | ClinePass | `cline-pass` | [dossiê](assinatura/sub-cline-pass.md) | 2026-11-03 | 6 |
@@ -99,7 +99,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 4 |
 | `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 5 |
 | `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 3 |
-| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 5 |
+| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 4 |
 | `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 3 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 3 |
 | `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 3 |

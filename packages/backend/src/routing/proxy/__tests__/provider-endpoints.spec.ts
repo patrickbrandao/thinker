@@ -475,7 +475,7 @@ describe('PROVIDER_ENDPOINTS', () => {
 
   it('pioneer uses the OpenAI-compatible API endpoint with X-API-Key auth', () => {
     const ep = PROVIDER_ENDPOINTS['pioneer'];
-    expect(ep.baseUrl).toBe('https://api.pioneer.ai');
+    expect(ep.baseUrl).toBe('https://api.fastino.ai');
     expect(ep.format).toBe('openai');
     expect(ep.buildPath('pioneer/auto')).toBe('/v1/chat/completions');
     expect(ep.buildHeaders('pio_sk_test_key')).toEqual({

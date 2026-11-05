@@ -1,4 +1,4 @@
-import { detectHarnessSession } from './harness-session';
+import { detectHarnessSession, stripHarnessPrivateFields } from './harness-session';
 
 describe('detectHarnessSession', () => {
   it('returns null without a session header', () => {
@@ -52,5 +52,17 @@ describe('detectHarnessSession', () => {
     ).toEqual({ id: 'cx', parentId: 'cx-main' });
     expect(detectHarnessSession({ 'x-deepseek-harness-session-id': 'd-1' })?.id).toBe('d-1');
     expect(detectHarnessSession({ 'x-openwebui-chat-id': 'chat-1' })?.id).toBe('chat-1');
+  });
+});
+
+describe('stripHarnessPrivateFields', () => {
+  it('drops DeepSeek Harness dsh_* fields and keeps the rest', () => {
+    const body: Record<string, unknown> = {
+      model: 'm',
+      dsh_session_log: 'x',
+      dsh_plugin_packages: [],
+    };
+    stripHarnessPrivateFields(body);
+    expect(body).toEqual({ model: 'm' });
   });
 });
