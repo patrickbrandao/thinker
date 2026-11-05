@@ -13,6 +13,12 @@ export interface TenantProviderConnection {
   cached_model_count: number;
   is_active: boolean;
   stream_warmup_ms?: number | null;
+  region?: string | null;
+  /** API-key connections: the connection's own base URL (null = official). */
+  base_url?: string | null;
+  /** The official URL used when `base_url` is null. */
+  default_base_url?: string | null;
+  supports_base_url?: boolean;
 }
 
 /**

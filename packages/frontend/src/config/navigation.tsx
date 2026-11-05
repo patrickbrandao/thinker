@@ -16,6 +16,7 @@ import {
   Zap,
   type LucideIcon,
   Network,
+  Boxes,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
 
@@ -68,6 +69,7 @@ export const NAVIGATION: NavGroup[] = [
         icon: CreditCard,
         match: ['/providers/connections'],
       },
+      { key: 'models', to: '/providers/models', label: 'nav.models', icon: Boxes },
     ],
   },
   {

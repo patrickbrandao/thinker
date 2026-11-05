@@ -37,6 +37,7 @@ import {
   isXiaomiTokenPlanRegion,
 } from '../routing/xiaomi-region';
 import { getZaiCodingPlanBaseUrl } from '../routing/zai-region';
+import { defaultAccountBaseUrl } from '../routing/account-base-url';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
 import {
   findOpenRouterPrefix,
@@ -225,6 +226,11 @@ export class ModelDiscoveryService {
       endpointOverride = getXiaomiTokenPlanBaseUrl(provider.region);
     }
 
+    // An API-key connection's own base URL replaces the official base of the
+    // models endpoint too (see routing/account-base-url.ts).
+    const accountBaseUrl =
+      provider.auth_type === 'api_key' && provider.base_url ? provider.base_url : null;
+
     if (options.forceRefresh && !options.skipModelsDevRefresh) {
       await this.refreshModelsDevCache();
     }
@@ -239,6 +245,14 @@ export class ModelDiscoveryService {
       // Bedrock keeps its last discovered CRIS profiles if the control plane fails.
       ...(isBedrockProvider(provider.provider)
         ? { previousModels: provider.cached_models ?? [] }
+        : {}),
+      ...(accountBaseUrl
+        ? {
+            accountBaseUrl: {
+              base: accountBaseUrl,
+              official: defaultAccountBaseUrl(provider.provider, 'api_key', provider.region),
+            },
+          }
         : {}),
     };
     const fetchProviderModels = () =>

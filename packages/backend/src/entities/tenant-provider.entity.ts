@@ -39,6 +39,10 @@ export class TenantProvider {
   @Column('varchar', { nullable: true, default: null })
   region!: string | null;
 
+  /** API-key connections only: replaces the provider's base URL (null = official). */
+  @Column('varchar', { nullable: true, default: null })
+  base_url!: string | null;
+
   @Column('boolean', { default: true })
   is_active!: boolean;
 

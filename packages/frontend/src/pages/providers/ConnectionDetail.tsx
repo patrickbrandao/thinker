@@ -1,3 +1,4 @@
+import AccountBaseUrlField from '../../components/AccountBaseUrlField.js';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
@@ -23,6 +24,7 @@ import {
   disconnectConnection,
   refreshConnectionModels,
   setConnectionStreamWarmup,
+  setConnectionBaseUrl,
   connectProvider,
   getProviders as getAgentProviders,
   startConnectionReauth,
@@ -106,6 +108,9 @@ interface ConnectionInfo {
   connected_at: string;
   is_active: boolean;
   stream_warmup_ms?: number | null;
+  base_url?: string | null;
+  default_base_url?: string | null;
+  supports_base_url?: boolean;
   last_used_at: string | null;
 }
 
@@ -463,8 +468,28 @@ const ConnectionDetail = () => {
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deletingConnection, setDeletingConnection] = useState(false);
 
+  const [baseUrlValue, setBaseUrlValue] = useState('');
+  const [savingBaseUrl, setSavingBaseUrl] = useState(false);
+  const [baseUrlError, setBaseUrlError] = useState('');
+  const handleSaveBaseUrl = async () => {
+    if (!conn) return;
+    setSavingBaseUrl(true);
+    setBaseUrlError('');
+    try {
+      await setConnectionBaseUrl(conn.id, baseUrlValue.trim() || null);
+      toast.success(t('providers.detail.baseUrlSaved'));
+      void detail.reload();
+    } catch (e: any) {
+      setBaseUrlError(e?.message ?? t('providers.detail.saveFailed'));
+    } finally {
+      setSavingBaseUrl(false);
+    }
+  };
+
   const openManageModal = () => {
     if (conn) setRenameValue(conn.label);
+    setBaseUrlValue(conn?.base_url ?? '');
+    setBaseUrlError('');
     setRenameError('');
     setWarmupValue(warmupMsToSecondsInput(conn?.stream_warmup_ms));
     setWarmupError('');
@@ -1141,6 +1166,32 @@ const ConnectionDetail = () => {
             </div>
             {renameError ? <p className="form-error mt-1">{renameError}</p> : null}
           </div>
+
+          {c.supports_base_url ? (
+            <div>
+              <AccountBaseUrlField
+                id="connection-base-url"
+                provider={c.provider}
+                defaultUrl={c.default_base_url ?? null}
+                value={baseUrlValue}
+                onChange={(v) => {
+                  setBaseUrlValue(v);
+                  setBaseUrlError('');
+                }}
+                disabled={savingBaseUrl}
+              />
+              <div className="mt-2 flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={savingBaseUrl || baseUrlValue.trim() === (c.base_url ?? '')}
+                  onClick={() => void handleSaveBaseUrl()}
+                >
+                  {savingBaseUrl ? t('providers.detail.applying') : t('providers.detail.apply')}
+                </Button>
+              </div>
+              {baseUrlError ? <p className="form-error mt-1">{baseUrlError}</p> : null}
+            </div>
+          ) : null}
 
           {/* Stream warm-up override (#244) */}
           <div>

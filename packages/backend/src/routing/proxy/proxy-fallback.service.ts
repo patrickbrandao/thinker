@@ -53,6 +53,8 @@ interface ForwardProviderOptions {
   tenantId?: string;
   resourceUrl?: string;
   providerRegion?: string | null;
+  /** The connection's own base URL (API-key connections only). */
+  providerBaseUrl?: string | null;
   apiMode?: ProxyApiMode;
   signatureLookup?: SignatureLookup;
   thinkingLookup?: ThinkingBlockLookup;
@@ -380,6 +382,7 @@ export class ProxyFallbackService {
           apiMode,
           resourceUrl: credentials.resourceUrl,
           providerRegion: credentials.providerRegion,
+          providerBaseUrl: credentials.providerBaseUrl,
           signatureLookup,
           thinkingLookup,
           clientAnthropicBeta,
@@ -576,6 +579,7 @@ export class ProxyFallbackService {
         providerKeyLabel: k.label,
         tenantProviderId: k.id,
         providerRegion: k.region,
+        providerBaseUrl: k.baseUrl ?? null,
       })),
     ];
   }
@@ -1014,6 +1018,7 @@ export class ProxyFallbackService {
       authType,
       model: opts.model,
       providerRegion,
+      providerBaseUrl: opts.providerBaseUrl,
       resourceUrl,
       customProvider,
       logger: this.logger,

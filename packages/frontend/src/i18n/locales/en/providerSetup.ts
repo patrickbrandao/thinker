@@ -1,5 +1,33 @@
 /** Provider connection flows: key form, OAuth, device code, local servers, provider catalog. */
 export default {
+  wizard: {
+    steps: 'Steps',
+    stepType: 'Type',
+    stepParams: 'Parameters',
+    chooseType: 'Which kind of account?',
+    next: 'Next',
+    back: 'Back',
+    typeChosen: 'Type:',
+    variant: {
+      zen: { label: 'Zen (paid)', hint: 'Your OpenCode API key, billed per use.' },
+      free: { label: 'Free', hint: 'The public key `public`: only the free models.' },
+      console: { label: 'Console', hint: 'Sign in to the OpenCode Console.' },
+      go: { label: 'Go', hint: 'OpenCode Go plan: sign in or paste its key.' },
+      minimaxLogin: { label: 'Sign in', hint: 'Log in with your MiniMax account.' },
+      minimaxToken: { label: 'Paste token', hint: 'Paste a Coding Plan token (sk-cp-…).' },
+      vertexExpress: { label: 'Express mode', hint: 'API key only; a few Gemini models.' },
+      vertexProject: {
+        label: 'Project',
+        hint: 'Google Cloud project and location (project/location).',
+      },
+    },
+  },
+  baseUrlField: {
+    label: 'Base URL',
+    restore: 'Restore default',
+    hint: 'Empty keeps the official URL shown.',
+    warning: 'The API key will be sent to this URL.',
+  },
   shared: {
     connectProvider: 'Connect provider',
     backToProviders: 'Back to providers',

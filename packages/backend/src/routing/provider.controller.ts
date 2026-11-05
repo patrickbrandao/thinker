@@ -45,6 +45,8 @@ import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
 import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
 import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
+import { checkAccountBaseUrl } from './account-base-url-check';
+import { supportsAccountBaseUrl } from './account-base-url';
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -188,6 +190,16 @@ export class ProviderController {
       }
     }
 
+    const accountBaseUrl =
+      body.accountBaseUrl !== undefined
+        ? await checkAccountBaseUrl(body.accountBaseUrl, ctx)
+        : undefined;
+    if (accountBaseUrl && !supportsAccountBaseUrl(lowerProvider, body.authType)) {
+      throw new BadRequestException(
+        'Only API-key connections of a built-in provider take a base URL',
+      );
+    }
+
     // Sync Ollama models before connecting so tier assignment has data
     if (body.provider.toLowerCase() === 'ollama') {
       await this.ollamaSync.sync();
@@ -196,7 +208,7 @@ export class ProviderController {
     // The service handles enabled-provider rows itself: new rows fan out to
     // every owned agent, updates re-enable the connecting agent via
     // afterProviderChange — no controller-side insert needed.
-    const { provider: result } = await this.providerService.upsertProvider(
+    let { provider: result } = await this.providerService.upsertProvider(
       agent.id,
       agent.tenant_id,
       body.provider,
@@ -206,6 +218,9 @@ export class ProviderController {
       label,
       ctx.userId,
     );
+    if (accountBaseUrl !== undefined) {
+      result = await this.providerService.setBaseUrl(agent.tenant_id, result.id, accountBaseUrl);
+    }
 
     // Discover models before returning so the frontend sees updated model
     // availability immediately (typically ~1-3s). Route choices remain

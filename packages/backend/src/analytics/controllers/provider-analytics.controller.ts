@@ -1,3 +1,4 @@
+import { baseUrlFields } from '../../routing/account-base-url-check';
 import { Controller, Get, Query } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -421,6 +422,7 @@ export class ProviderAnalyticsController {
         connected_at: conn.connected_at,
         is_active: conn.is_active,
         stream_warmup_ms: conn.stream_warmup_ms ?? null,
+        ...baseUrlFields(conn),
         last_used_at: lastUsedAt,
       },
       agents: (() => {

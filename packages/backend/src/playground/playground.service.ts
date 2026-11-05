@@ -90,6 +90,7 @@ export class PlaygroundService {
     // with the proxy for minimax/qwen/zai/copilot/custom.
     let oauthResourceUrl: string | undefined;
     let providerRegion: string | null | undefined;
+    let providerBaseUrl: string | null | undefined;
     let egressScope: OutboundScope | undefined;
     try {
       // The Playground always runs under the reserved per-tenant "Playground"
@@ -131,6 +132,7 @@ export class PlaygroundService {
       rawApiKey = key.apiKey;
       providerKeyLabel = key.label;
       providerRegion = key.region;
+      providerBaseUrl = key.baseUrl ?? null;
       egressScope = await this.egress?.scopeForConnection(agent.tenant_id, dto.provider, key.id);
       const resolved = await runWithOutboundScope(egressScope, () =>
         resolveApiKey(
@@ -212,6 +214,7 @@ export class PlaygroundService {
       authType,
       model: dto.model,
       providerRegion,
+      providerBaseUrl,
       resourceUrl: oauthResourceUrl,
       customProvider,
       logger: this.logger,
