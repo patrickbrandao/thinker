@@ -35,11 +35,17 @@ describe('lookupKnownPrice', () => {
     expect(result!.output).toBe(0);
   });
 
-  it('should return pricing for gemini-pro-latest', () => {
-    const result = lookupKnownPrice('gemini-pro-latest');
-    expect(result).not.toBeNull();
-    expect(result!.input).toBeCloseTo(1.25 / 1_000_000, 12);
-    expect(result!.output).toBeCloseTo(10.0 / 1_000_000, 12);
+  it('no longer pins gemini-pro-latest to the 2.5 Pro price', () => {
+    expect(lookupKnownPrice('gemini-pro-latest')).toBeNull();
+  });
+
+  it('prices provider seeds only for their own provider, with dated changes', () => {
+    expect(lookupKnownPrice('muse-spark-1.3', 'meta')?.input).toBeCloseTo(1.25 / 1_000_000, 12);
+    expect(lookupKnownPrice('muse-spark-1.3')).toBeNull();
+    expect(lookupKnownPrice('openai/gpt-oss-120b', 'groq')?.output).toBeCloseTo(
+      0.6 / 1_000_000,
+      12,
+    );
   });
 
   it('should return null for unknown model', () => {

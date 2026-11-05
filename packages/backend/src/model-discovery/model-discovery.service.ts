@@ -739,7 +739,8 @@ export class ModelDiscoveryService {
         : model;
     const pricingProvider = isBedrock ? providerId : metadataProvider;
     const pricingModel = isBedrock ? model.id : metadataModel;
-    const known = lookupKnownPrice(pricingModel) ?? lookupKnownPrice(model.id);
+    const known =
+      lookupKnownPrice(pricingModel, providerId) ?? lookupKnownPrice(model.id, providerId);
     if (known) {
       return this.computeScore(
         this.applyCapabilities(
@@ -747,6 +748,7 @@ export class ModelDiscoveryService {
             ...modelWithMetadataName,
             inputPricePerToken: known.input,
             outputPricePerToken: known.output,
+            ...(known.cacheRead !== undefined ? { cacheReadPricePerToken: known.cacheRead } : {}),
           },
           providerId,
         ),

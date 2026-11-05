@@ -110,7 +110,7 @@ Pontos no código:
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
 | G1 | degradação | Faltam `muse-spark-1.3`, `muse-spark-1.3-contributor` e `muse-wonder-1.0`; o filtro fixo esconde modelos novos de `/v1/models`. | providers | [#406](https://github.com/patrickbrandao/thinker/issues/406) | resolvida (lista de modelos atualizada) |
-| G2 | degradação | Sem preços dos modelos Muse (tabela acima), custo fica sem valor. | providers | [#407](https://github.com/patrickbrandao/thinker/issues/407) | aberta |
+| G2 | degradação | Sem preços dos modelos Muse (tabela acima), custo fica sem valor. | providers | [#407](https://github.com/patrickbrandao/thinker/issues/407) | resolvida (preços semeados por provedor em provider-price-seeds.ts) |
 | G3 | oportunidade | Parâmetros que dão 400 (`stop`, `n>1`, `logit_bias`, `reasoning_effort: none` etc.): Thinker não os remove; pode quebrar clientes. Verificar com chave real. | backend-dev | — | aberta |
 | G4 | oportunidade | Usar `/v1/messages` ou `/v1/responses` para preservar raciocínio entre turnos (Chat Completions não preserva). | providers | — | aberta |
 | G5 | oportunidade | Prefixo de chave `LLM_` não confirmado pela doc (não confirmado); pode rejeitar chaves válidas. | providers | — | aberta |

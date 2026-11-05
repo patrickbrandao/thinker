@@ -219,13 +219,13 @@ describe('ModelDiscoveryService', () => {
       expect(sol).toMatchObject({
         contextWindow: 272000,
         contextWindowSource: 'subscription_config',
-        inputPricePerToken: 0.000001,
+        // OpenAI's own GPT-5.6 Sol seed outranks the models.dev price.
+        inputPricePerToken: 0.000004,
         capabilityCode: true,
         qualityScore: 4,
       });
-      expect(mockComputeScore).toHaveBeenCalledWith(
-        expect.objectContaining({ context_window: 400000 }),
-      );
+      // The OpenAI price seed wins before models.dev, so only the configured
+      // window reaches the scorer.
       expect(mockComputeScore).toHaveBeenCalledWith(
         expect.objectContaining({ context_window: 272000 }),
       );

@@ -108,7 +108,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | A listagem traz `input_cache_read`, `input_cache_write` e `input_cache_write_1h` (276, 91 e 17 modelos) e `parseOpenRouter` só lê `prompt`/`completion`: custo de cache impreciso. Arquivo: `provider-model-fetcher.service.ts:627-665`. Mesma causa de #408 (Kilo). | providers | [#417](https://github.com/patrickbrandao/thinker/issues/417) | aberta |
+| G1 | degradação | A listagem traz `input_cache_read`, `input_cache_write` e `input_cache_write_1h` (276, 91 e 17 modelos) e `parseOpenRouter` só lê `prompt`/`completion`: custo de cache impreciso. Arquivo: `provider-model-fetcher.service.ts:627-665`. Mesma causa de #408 (Kilo). | providers | [#417](https://github.com/patrickbrandao/thinker/issues/417) | resolvida (cache read/write lidos do catálogo) |
 | G2 | degradação | 11 modelos trazem `expiration_date` (3 em 2026-11-05, 3 em 11-08, 3 em 11-11) e o Thinker os continua oferecendo; após a data falham. Filtrar vencidos na descoberta. | providers | [#418](https://github.com/patrickbrandao/thinker/issues/418) | resolvida (filtro de não-chat/aposentados na descoberta) |
 | G3 | oportunidade | `/v1/messages` (Anthropic) e `/v1/responses` estão disponíveis em 274 modelos; o Thinker só fala Chat Completions. Rotas Anthropic/Responses poderiam passar sem tradução. Não registrada como issue (ganho incerto, compatibilidade não confirmada). | providers | — | aberta |
 | G4 | oportunidade | Overrides de preço por faixa (`pricing.overrides`, 68 modelos) e `reasoning`/`reasoning_effort` por modelo não são usados (`capabilityReasoning` fixo em `false`). Mesma classe de #317 (OpenCode). Sem issue. | providers | — | aberta |

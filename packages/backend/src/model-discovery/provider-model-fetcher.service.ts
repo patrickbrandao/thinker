@@ -274,6 +274,16 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
     if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
     const fastest = fastestLiveHuggingFaceProvider(entry.providers);
     if (!fastest) return [];
+    // `:fastest` may land on a provider that publishes no price or context;
+    // estimate from another live provider rather than show the model as free
+    // (api-huggingface G2).
+    const live = (Array.isArray(entry.providers) ? entry.providers : []).filter(
+      (p): p is HuggingFaceProviderEntry => !!p && typeof p === 'object' && p.status === 'live',
+    );
+    const priced = fastest.pricing ? fastest : live.find((p) => p.pricing);
+    const contextLength =
+      fastest.context_length ??
+      live.find((p) => typeof p.context_length === 'number')?.context_length;
 
     const inputModalities = parseModalities(entry.architecture?.input_modalities);
     const outputModalities = parseModalities(entry.architecture?.output_modalities);
@@ -289,9 +299,9 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.id,
         provider,
-        contextWindow: fastest.context_length ?? DEFAULT_CONTEXT_WINDOW,
-        inputPricePerToken: perMillionToPerToken(fastest.pricing?.input),
-        outputPricePerToken: perMillionToPerToken(fastest.pricing?.output),
+        contextWindow: contextLength ?? DEFAULT_CONTEXT_WINDOW,
+        inputPricePerToken: perMillionToPerToken(priced?.pricing?.input),
+        outputPricePerToken: perMillionToPerToken(priced?.pricing?.output),
         capabilityReasoning: false,
         capabilityCode: fastest.supports_tools === true,
         capabilities,
@@ -673,7 +683,7 @@ interface OpenRouterModelEntry {
   expiration_date?: string | null;
   context_length?: number;
   architecture?: { input_modalities?: string[]; output_modalities?: string[] };
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: OpenRouterStylePricing;
 }
 
 interface FireworksModelEntry {
@@ -731,6 +741,7 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
           completion !== null && Number.isFinite(completion) && completion >= 0 ? completion : null,
+        ...openRouterCachePrices(entry.pricing),
         capabilityReasoning: false,
         capabilityCode: false,
         ...(inputModalities ? { inputModalities } : {}),
@@ -740,13 +751,38 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
     });
 }
 
+/** OpenRouter-style `pricing` (Kilo, Nous, OpenRouter): per-token strings. */
+interface OpenRouterStylePricing {
+  prompt?: string;
+  completion?: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+}
+
+/** Cache read/write rates of an OpenRouter-style `pricing` (api-kilo G1, api-nous G1). */
+function openRouterCachePrices(
+  pricing: OpenRouterStylePricing | undefined,
+): Pick<DiscoveredModel, 'cacheReadPricePerToken' | 'cacheWritePricePerToken'> {
+  const read = Number(pricing?.input_cache_read);
+  const write = Number(pricing?.input_cache_write);
+  return {
+    ...(pricing?.input_cache_read && Number.isFinite(read) && read >= 0
+      ? { cacheReadPricePerToken: read }
+      : {}),
+    ...(pricing?.input_cache_write && Number.isFinite(write) && write >= 0
+      ? { cacheWritePricePerToken: write }
+      : {}),
+  };
+}
+
 interface KiloModelEntry {
   id: string;
+  expiration_date?: string | null;
   name?: string;
   context_length?: number;
   architecture?: { output_modalities?: string[] };
   top_provider?: { context_length?: number };
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: OpenRouterStylePricing;
   supported_parameters?: string[];
 }
 
@@ -757,6 +793,11 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
     .filter((m: unknown) => {
       const entry = m as KiloModelEntry;
       if (typeof entry.id !== 'string' || entry.id.length === 0) return false;
+      // Expired models are retired by the gateway (api-kilo G2).
+      if (typeof entry.expiration_date === 'string') {
+        const expiresAt = Date.parse(entry.expiration_date);
+        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return false;
+      }
       const output = entry.architecture?.output_modalities?.map((o) => o.toLowerCase());
       if (output && output.length > 0 && !output.every((o) => o === 'text')) {
         return false;
@@ -778,6 +819,7 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
           completion !== null && Number.isFinite(completion) && completion >= 0 ? completion : null,
+        ...openRouterCachePrices(entry.pricing),
         capabilityReasoning:
           supported.includes('reasoning') || supported.includes('include_reasoning'),
         capabilityCode: supported.includes('tools'),

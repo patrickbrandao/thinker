@@ -1,3 +1,4 @@
+import { oneHourCacheCreation } from './anthropic-adapter';
 import { Response as ExpressResponse } from 'express';
 import type { EventSourceMessage } from 'eventsource-parser';
 import {
@@ -27,6 +28,8 @@ export interface StreamUsage {
   completion_tokens: number;
   cache_read_tokens?: number;
   cache_creation_tokens?: number;
+  /** Subset of `cache_creation_tokens` cached with Anthropic's one-hour TTL. */
+  cache_creation_1h_tokens?: number;
   reported_cost_usd?: number;
 }
 
@@ -130,6 +133,9 @@ export function parseUsageObject(usage: unknown): StreamUsage | null {
       completion_tokens: typeof u.completion_tokens === 'number' ? u.completion_tokens : 0,
       cache_read_tokens: cacheRead,
       cache_creation_tokens: cacheCreation,
+      ...(typeof u.cache_creation_1h_tokens === 'number' && u.cache_creation_1h_tokens > 0
+        ? { cache_creation_1h_tokens: u.cache_creation_1h_tokens }
+        : {}),
       ...(reportedCostUsd !== undefined ? { reported_cost_usd: reportedCostUsd } : {}),
     };
   }
@@ -171,6 +177,9 @@ export function parseUsageObject(usage: unknown): StreamUsage | null {
       completion_tokens: typeof u.output_tokens === 'number' ? u.output_tokens : 0,
       cache_read_tokens: isAnthropicNative ? nativeCacheRead : cacheRead || undefined,
       cache_creation_tokens: isAnthropicNative ? nativeCacheCreation : nestedCacheCreation,
+      ...(isAnthropicNative && oneHourCacheCreation(u) > 0
+        ? { cache_creation_1h_tokens: oneHourCacheCreation(u) }
+        : {}),
       ...(reportedCostUsd !== undefined ? { reported_cost_usd: reportedCostUsd } : {}),
     };
   }

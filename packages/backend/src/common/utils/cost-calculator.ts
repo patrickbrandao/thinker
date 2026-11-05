@@ -5,6 +5,11 @@ export interface CostInput {
   outputTokens: number;
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
+  /**
+   * The part of `cacheCreationTokens` written with Anthropic's one-hour TTL,
+   * billed at 2x the input price instead of the 5-minute write rate.
+   */
+  cacheCreation1hTokens?: number;
   model: string | null | undefined;
   pricing: PricingEntry | undefined;
   /**
@@ -88,6 +93,10 @@ function weekMinutes(at: Date): number {
  * a zero-length arc, which contains nothing.
  */
 function tierCovers(tier: PricingTimeTier, at: Date): boolean {
+  if (tier.from && at.getTime() < Date.parse(`${tier.from}T00:00:00Z`)) return false;
+  if (tier.until && at.getTime() >= Date.parse(`${tier.until}T00:00:00Z`)) return false;
+  // A tier bounded only by dates covers the whole day.
+  if (tier.windows.length === 0) return !!(tier.from || tier.until);
   const now = weekMinutes(at);
   const days = tier.days?.length ? tier.days : EVERY_DAY;
   for (const window of tier.windows) {
@@ -179,12 +188,22 @@ export function computeTokenCost(input: CostInput): number | null {
   // (peak-hour billing); a tier missing its own input/output prices is
   // ignored rather than half-applied.
   const timeTier = resolveTimeTier(pricing, input.at ?? new Date());
-  const effective =
+  const timed =
     timeTier != null &&
     timeTier.input_price_per_token != null &&
     timeTier.output_price_per_token != null
       ? timeTier
       : pricing;
+  // Long-context rates price the whole request once the prompt crosses the
+  // threshold (they replace the base or time-tier rates).
+  const long = pricing.long_context;
+  const effective =
+    long &&
+    Number.isFinite(long.threshold_tokens) &&
+    long.threshold_tokens > 0 &&
+    input.inputTokens > long.threshold_tokens
+      ? long
+      : timed;
 
   const inputPrice = Number(effective.input_price_per_token);
   const outputPrice = Number(effective.output_price_per_token);
@@ -206,10 +225,16 @@ export function computeTokenCost(input: CostInput): number | null {
       ? Number(effective.cache_write_price_per_token)
       : inputPrice;
 
+  const cacheCreation1hTokens = Math.min(
+    cacheCreationTokens,
+    Math.max(0, input.cacheCreation1hTokens ?? 0),
+  );
+
   const cost =
     uncachedInputTokens * inputPrice +
     cacheReadTokens * cacheReadPrice +
-    cacheCreationTokens * cacheWritePrice +
+    (cacheCreationTokens - cacheCreation1hTokens) * cacheWritePrice +
+    (cacheCreation1hTokens > 0 ? cacheCreation1hTokens * inputPrice * 2 : 0) +
     input.outputTokens * outputPrice;
 
   return cost < 0 ? null : cost;

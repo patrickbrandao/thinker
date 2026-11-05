@@ -777,6 +777,7 @@ export function fromAnthropicResponse(
   // prompt_tokens = total input (including cache), cached_tokens = subset from cache.
   const cacheRead = usage?.cache_read_input_tokens ?? 0;
   const cacheCreation = usage?.cache_creation_input_tokens ?? 0;
+  const cacheCreation1h = oneHourCacheCreation(resp.usage);
   const totalInput = (usage?.input_tokens ?? 0) + cacheRead + cacheCreation;
   const totalOutput = usage?.output_tokens ?? 0;
 
@@ -804,6 +805,7 @@ export function fromAnthropicResponse(
           prompt_tokens_details: { cached_tokens: cacheRead },
           cache_read_tokens: cacheRead,
           cache_creation_tokens: cacheCreation,
+          ...(cacheCreation1h > 0 ? { cache_creation_1h_tokens: cacheCreation1h } : {}),
         }
       : undefined,
     ...(extracted ? { _extractedThinkingBlocks: extracted } : {}),
@@ -875,6 +877,7 @@ interface StreamState {
   inputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  cacheCreation1hTokens?: number;
   toolCallIndex: number;
   blockToToolIndex: Map<number, number>;
   thinkingBlocksByIndex: Map<number, ThinkingBlock>;
@@ -888,6 +891,7 @@ function handleMessageStart(state: StreamState, data: Record<string, unknown>): 
   state.inputTokens = usage?.input_tokens ?? 0;
   state.cacheReadTokens = usage?.cache_read_input_tokens ?? 0;
   state.cacheCreationTokens = usage?.cache_creation_input_tokens ?? 0;
+  state.cacheCreation1hTokens = oneHourCacheCreation(msg?.usage);
   return makeChunkSse(state.model, { role: 'assistant', content: '' }, null);
 }
 
@@ -903,6 +907,19 @@ function applyMessageDeltaUsage(
   if (typeof usage.cache_creation_input_tokens === 'number') {
     state.cacheCreationTokens = usage.cache_creation_input_tokens;
   }
+  const oneHour = oneHourCacheCreation(usage);
+  if (oneHour > 0) state.cacheCreation1hTokens = oneHour;
+}
+
+/**
+ * Tokens written with the one-hour cache TTL (`usage.cache_creation
+ * .ephemeral_1h_input_tokens`), billed at 2x input (api-anthropic G2).
+ */
+export function oneHourCacheCreation(usage: unknown): number {
+  const creation = (usage as { cache_creation?: { ephemeral_1h_input_tokens?: unknown } } | null)
+    ?.cache_creation;
+  const value = creation?.ephemeral_1h_input_tokens;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 function handleContentBlockStart(state: StreamState, data: Record<string, unknown>): string | null {
@@ -1022,6 +1039,9 @@ function handleMessageDelta(state: StreamState, data: Record<string, unknown>): 
     prompt_tokens_details: { cached_tokens: state.cacheReadTokens },
     cache_read_tokens: state.cacheReadTokens,
     cache_creation_tokens: state.cacheCreationTokens,
+    ...(state.cacheCreation1hTokens
+      ? { cache_creation_1h_tokens: state.cacheCreation1hTokens }
+      : {}),
   });
   return finishChunk + usageChunk;
 }
