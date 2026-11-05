@@ -797,6 +797,12 @@ export class ProviderClient {
       let url = `${endpoint.baseUrl}${path}`;
       if (stream) url += '?alt=sse';
       const innerBody = toGoogleRequest(requestSource, bareModel, ctx.signatureLookup);
+      // New paid Gemini API projects store requests by default since
+      // 2026-10-26; Thinker opts out unless THINKER_GEMINI_STORE=true
+      // (api-gemini G9, maintainer decision 2026-11-05).
+      if (endpointKey === 'google' && process.env.THINKER_GEMINI_STORE !== 'true') {
+        innerBody.store = false;
+      }
       const requestBody = endpoint.codeAssistEnvelope
         ? // CodeAssist routes by `cloudaicompanionProject` rather than URL
           // path; the project id was stashed in the OAuth blob's `u` field
