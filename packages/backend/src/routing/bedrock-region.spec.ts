@@ -22,7 +22,7 @@ describe('bedrock-region', () => {
   it('accepts Bedrock Mantle-supported AWS regions', () => {
     expect(isBedrockRegion('us-east-1')).toBe(true);
     expect(isBedrockRegion('eu-west-1')).toBe(true);
-    expect(isBedrockRegion('eu-west-3')).toBe(false);
+    expect(isBedrockRegion('cn-north-1')).toBe(false);
     expect(isBedrockRegion('global')).toBe(false);
     expect(isBedrockRegion('https://example.com')).toBe(false);
   });
@@ -56,7 +56,7 @@ describe('bedrock-region', () => {
   });
 
   it('ignores short-term Bedrock API key regions that Mantle does not support', () => {
-    expect(detectBedrockRegionFromApiKey(makeShortTermBedrockKey('eu-west-3'))).toBeNull();
+    expect(detectBedrockRegionFromApiKey(makeShortTermBedrockKey('cn-north-1'))).toBeNull();
   });
 
   it('returns null for opaque or malformed keys', () => {
@@ -88,7 +88,7 @@ describe('bedrock-region', () => {
     expect(getBedrockRuntimeBaseUrl('eu-west-1')).toBe(
       'https://bedrock-runtime.eu-west-1.amazonaws.com',
     );
-    expect(getBedrockRuntimeBaseUrl('eu-west-3')).toBe(
+    expect(getBedrockRuntimeBaseUrl('cn-north-1')).toBe(
       'https://bedrock-runtime.us-east-1.amazonaws.com',
     );
     expect(getBedrockControlPlaneBaseUrl('ap-south-1')).toBe(

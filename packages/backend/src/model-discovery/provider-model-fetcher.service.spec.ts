@@ -1398,7 +1398,7 @@ describe('ProviderModelFetcherService', () => {
     await service.fetch('zai', 'zai-key');
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://open.bigmodel.cn/api/paas/v4/models',
+      'https://api.z.ai/api/paas/v4/models',
       expect.any(Object),
     );
   });
@@ -3036,7 +3036,7 @@ describe('ProviderModelFetcherService', () => {
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer tid=test-token',
-            'Editor-Version': 'vscode/1.100.0',
+            'Editor-Version': 'vscode/1.144.0',
             'Copilot-Integration-Id': 'vscode-chat',
           }),
         }),

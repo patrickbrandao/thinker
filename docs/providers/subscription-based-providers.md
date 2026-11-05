@@ -79,6 +79,8 @@ Cole um token do GLM Coding Plan da Z.ai. O Thinker roteia para o endpoint de co
 
 OAuth no navegador para o fluxo CodeAssist do Google. A rota de assinatura usa uma lista fixa de modelos Gemini CodeAssist, e não o catálogo da API pública do Gemini.
 
+**Limite:** o onboarding do Thinker cobre só o nível gratuito (free tier) do Gemini Code Assist. Contas Standard e Enterprise (Workspace), que exigem um projeto do Google Cloud, e contas que pedem `VALIDATION_REQUIRED` não são configuradas pelo Thinker; para elas, use uma chave da API Gemini em Provedores por uso ou o Vertex AI.
+
 ### MiniMax
 
 O Thinker suporta o fluxo de código de dispositivo do MiniMax Coding Plan. Quem tem um token do Coding Plan também pode colar o token direto, quando a interface oferece a alternativa.
@@ -90,6 +92,10 @@ Fluxo de código de dispositivo do Kiro. A assinatura expõe `kiro/auto` e rotas
 ### xAI
 
 OAuth no navegador para assinaturas Grok (SuperGrok ou X Premium+). O token da assinatura só é aceito pelo proxy do cliente oficial, `cli-chat-proxy.grok.com`, então o Thinker envia a inferência (Responses) e a descoberta de modelos para esse host com os cabeçalhos de identificação do Grok CLI. **Aviso:** isso apresenta o Thinker como o cliente oficial; a xAI não publica termos que autorizem gateways de terceiros, e a conta pode sofrer ação. Use por sua conta e risco. A API por chave (`xai-...`) segue em `api.x.ai`.
+
+### NousResearch
+
+Cole uma chave ou token do Nous Portal. **Limite:** o login oficial do Nous é por device code, com um JWT de vida curta e um refresh de uso único que o Thinker não implementa. Um token de acesso colado expira (em geral em minutos) e a conexão para de responder até você colar outro; prefira uma chave de API do Portal (`NOUS_API_KEY`), que não expira, e confira no Portal se ela consome a franquia do plano ou créditos.
 
 ### Ollama Cloud
 

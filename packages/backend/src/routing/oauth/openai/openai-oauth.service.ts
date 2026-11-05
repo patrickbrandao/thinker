@@ -27,6 +27,13 @@ export class OpenaiOauthService extends RedirectPkceOauthBaseService {
       tokenUrl: 'https://auth.openai.com/oauth/token',
       revokeUrl: 'https://auth.openai.com/oauth/revoke',
       scope: 'openid profile email offline_access',
+      // Codex CLI login extras: organizations in the id_token and the simplified
+      // flow, so Team/Business accounts pick a workspace (sub-openai G5).
+      extraAuthorizeParams: {
+        id_token_add_organizations: 'true',
+        codex_cli_simplified_flow: 'true',
+        originator: 'codex_cli_rs',
+      },
       callbackPort: 1455,
     });
   }

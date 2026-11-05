@@ -610,7 +610,7 @@ export const LOCAL_SERVER_HINTS: Readonly<Record<string, LocalServerHint>> = {
     persistsBindAcrossLaunches: true,
   },
   llamacpp: {
-    defaultPort: 8080,
+    defaultPort: 9931,
     setupCommand: 'llama-server -m <your-model>.gguf --port 8080',
     setupNote: 'Replace <your-model>.gguf with the path to a GGUF model on your machine.',
     installUrl: 'https://github.com/ggml-org/llama.cpp#obtaining-and-quantizing-models',

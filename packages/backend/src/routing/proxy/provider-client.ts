@@ -541,6 +541,9 @@ export class ProviderClient {
         `Param policy for ${endpointKey}/${bareModel}: ${policyApplied.join(', ')}`,
       );
     }
+    if (endpointKey === 'copilot' || endpointKey === 'copilot-responses') {
+      Object.assign(headers, copilotRequestHeaders(requestBody));
+    }
 
     // The Codex backend only serves prompt-cache hits with session affinity
     // headers the real Codex CLI sends — see CodexSessionAffinity.
@@ -1126,4 +1129,28 @@ function opencodeFamilyFormat(
   if (/^(gpt-|grok-|muse-)/.test(bareModel)) return 'responses';
   if (bareModel.startsWith('gemini-')) return 'google';
   return 'openai';
+}
+
+/**
+ * Per-request Copilot headers the official client sends (sub-copilot G3):
+ * `Copilot-Vision-Request` when the turn carries an image, and `X-Initiator`
+ * (`user` for a fresh user turn, `agent` for tool continuations).
+ */
+export function copilotRequestHeaders(body: Record<string, unknown>): Record<string, string> {
+  const items = (
+    Array.isArray(body.messages) ? body.messages : Array.isArray(body.input) ? body.input : []
+  ) as Array<Record<string, unknown>>;
+  const hasImage = items.some(
+    (item) =>
+      Array.isArray(item?.content) &&
+      (item.content as Array<{ type?: unknown }>).some(
+        (part) => part?.type === 'image_url' || part?.type === 'input_image',
+      ),
+  );
+  const last = items[items.length - 1];
+  const fromUser = last?.role === 'user' && last?.type !== 'function_call_output';
+  return {
+    ...(hasImage ? { 'Copilot-Vision-Request': 'true' } : {}),
+    'X-Initiator': fromUser ? 'user' : 'agent',
+  };
 }

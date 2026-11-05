@@ -1,3 +1,4 @@
+import { parseVertexDeployment } from './vertex-deployment';
 import {
   BadRequestException,
   Body,
@@ -168,6 +169,13 @@ export class ProviderController {
       } else if (subscriptionRegionConfig) {
         if (!subscriptionRegionConfig.isRegion(body.region)) {
           throw new BadRequestException(subscriptionRegionConfig.validationMessage);
+        }
+      } else if (lowerProvider === 'vertex') {
+        // `express` (or empty) keeps express mode; otherwise `project/location`.
+        if (body.region && body.region !== 'express' && !parseVertexDeployment(body.region)) {
+          throw new BadRequestException(
+            'Vertex AI needs project/location (for example my-project/us-central1) or express',
+          );
         }
       } else if (isMinimaxApiKey) {
         if (!isMinimaxRegion(body.region)) {

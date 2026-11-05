@@ -586,9 +586,12 @@ describe('PROVIDER_ENDPOINTS', () => {
     expect(ep.buildHeaders('ghu_token')).toEqual({
       Authorization: 'Bearer ghu_token',
       'Content-Type': 'application/json',
-      'Editor-Version': 'vscode/1.100.0',
-      'Editor-Plugin-Version': 'copilot/1.300.0',
+      'Editor-Version': 'vscode/1.144.0',
+      'Editor-Plugin-Version': 'copilot-chat/0.72.0',
       'Copilot-Integration-Id': 'vscode-chat',
+      'User-Agent': 'GitHubCopilotChat/0.72.0',
+      'OpenAI-Intent': 'conversation-panel',
+      'X-GitHub-Api-Version': '2025-05-01',
     });
   });
 
@@ -600,8 +603,8 @@ describe('PROVIDER_ENDPOINTS', () => {
     expect(ep.buildHeaders('ghu_token')).toEqual({
       Authorization: 'Bearer ghu_token',
       'Content-Type': 'application/json',
-      'Editor-Version': 'vscode/1.100.0',
-      'Editor-Plugin-Version': 'copilot/1.300.0',
+      'Editor-Version': 'vscode/1.144.0',
+      'Editor-Plugin-Version': 'copilot-chat/0.72.0',
       'Copilot-Integration-Id': 'vscode-chat',
     });
   });

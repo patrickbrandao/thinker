@@ -18,7 +18,7 @@
  * `OPENCODE_CLIENT_VERSION` to track the `anomalyco/opencode` release.
  */
 
-export const CODEX_CLI_VERSION = '0.159.2';
+export const CODEX_CLI_VERSION = '0.166.0';
 export const CODEX_CLI_ORIGINATOR = 'codex_cli_rs';
 export const CODEX_CLI_USER_AGENT = 'codex_cli_rs/0.0.0 (Unknown 0; unknown) unknown';
 
@@ -49,7 +49,7 @@ export const GROK_CLI_HEADERS: Readonly<Record<string, string>> = Object.freeze(
   'User-Agent': `grok-shell/${GROK_CLI_VERSION}`,
 });
 
-export const CLAUDE_CODE_USER_AGENT = 'claude-cli/2.1.280 (external, sdk-cli)';
+export const CLAUDE_CODE_USER_AGENT = 'claude-cli/2.1.318 (external, sdk-cli)';
 export const CLAUDE_CODE_STAINLESS_PACKAGE_VERSION = '0.80.0';
 export const CLAUDE_CODE_STAINLESS_RUNTIME_VERSION = 'v24.14.0';
 export const CLAUDE_CODE_BETA_FLAGS = [
@@ -104,5 +104,9 @@ export const buildClaudeCodeSubscriptionHeaders = (apiKey: string): Record<strin
   'x-stainless-timeout': '600',
 });
 
-export const COPILOT_EDITOR_VERSION = 'vscode/1.100.0';
-export const COPILOT_PLUGIN_VERSION = 'copilot/1.300.0';
+// Copilot Chat 0.72.0 in VS Code 1.144.0 (sub-copilot G1).
+export const COPILOT_EDITOR_VERSION = 'vscode/1.144.0';
+export const COPILOT_PLUGIN_VERSION = 'copilot-chat/0.72.0';
+export const COPILOT_USER_AGENT = 'GitHubCopilotChat/0.72.0';
+/** Mistral Vibe CLI identity for the Vibe subscription (sub-mistral G2). */
+export const MISTRAL_VIBE_USER_AGENT = 'Mistral-Vibe/3.0.4';

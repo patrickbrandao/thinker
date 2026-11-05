@@ -8,7 +8,8 @@ import { getContainerHostAlias } from '../utils/container-host';
  */
 export const LOCAL_SERVER_DEFAULT_PORTS = {
   lmstudio: 1234,
-  llamacpp: 8080,
+  // llama-server default since ggml-org/llama.cpp#30159 (the Docker image keeps 8080).
+  llamacpp: 9931,
 } as const;
 
 export type LocalServerId = keyof typeof LOCAL_SERVER_DEFAULT_PORTS;

@@ -21,7 +21,7 @@ O nome distingue os servidores no seletor de modelos, nas rotas e nos logs. Mode
 
 Do lado do servidor (ligue-o em `0.0.0.0`, não em `127.0.0.1`, senão o Thinker não o enxerga):
 
-- **Ollama:** `OLLAMA_HOST=0.0.0.0:11434 ollama serve` e `ollama pull llama3.1:8b`. Porta padrão 11434.
+- **Ollama:** `OLLAMA_HOST=0.0.0.0:11434 ollama serve` e `ollama pull llama3.1:8b`. Porta padrão 11434. O Ollama roda cada modelo com uma janela de contexto própria (4096 tokens por padrão) e **corta o prompt sem erro** quando ele passa disso; o máximo do modelo não vale. Suba a janela com `OLLAMA_CONTEXT_LENGTH=32768 ollama serve` ou com `PARAMETER num_ctx` num Modelfile. O teste de conexão mostra a janela efetiva quando o modelo está carregado (ou o `num_ctx` do Modelfile), e é ela que o Thinker usa para o roteamento ciente de contexto.
 - **LM Studio:** ligue "Serve on Local Network" (ou `lms server start --bind 0.0.0.0 --port 1234 --cors`). Porta padrão 1234; com "Require Authentication", informe o token como chave de API.
 - **llama.cpp:** `./llama-server -m modelo.gguf --host 0.0.0.0` (porta padrão 9931 nas versões a partir de outubro de 2026; builds antigos e as imagens Docker de exemplo usam 8080). `--api-key` vira a chave de API do servidor.
 - **Outro servidor OpenAI-compatível (vLLM e similares):** **Add custom provider**, informe a URL (por exemplo `http://host.docker.internal:8000/v1`) e use **Fetch models**.

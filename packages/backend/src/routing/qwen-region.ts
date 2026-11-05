@@ -13,6 +13,7 @@ const QWEN_WORKSPACE_REGION_CODES: ReadonlySet<string> = new Set([
   'ap-northeast-1',
   'cn-hongkong',
   'eu-central-1',
+  'us-east-1',
 ]);
 const QWEN_REGION_DETECTION_ORDER = ['singapore', 'us', 'beijing'] as const;
 const QWEN_DETECTION_TIMEOUT_MS = 3000;

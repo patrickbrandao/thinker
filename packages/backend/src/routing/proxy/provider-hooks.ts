@@ -102,6 +102,8 @@ const PROVIDER_EXTRA_HEADER_BUILDERS: Record<
     !sessionKey || sessionKey === 'default' ? undefined : { 'x-session-id': sessionKey },
   'opencode-go': opencodeSessionHeaders,
   opencode: opencodeSessionHeaders,
+  // Vibe's session affinity hint (sub-mistral G2).
+  mistral: ({ sessionKey }) => (sessionKey ? { 'x-affinity': sessionKey } : undefined),
 };
 
 export function buildProviderExtraHeaders(
