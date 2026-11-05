@@ -64,7 +64,7 @@ describe('qwen-region', () => {
     ).toBeNull();
     expect(
       normalizeQwenCompatibleBaseUrl(
-        'https://workspace-123.eu-west-3.maas.aliyuncs.com/compatible-mode',
+        'https://workspace-123.cn-north-1.maas.aliyuncs.com/compatible-mode',
       ),
     ).toBeNull();
   });

@@ -32,7 +32,7 @@ describe('ProviderModelFetcherService — LM Studio and llama.cpp', () => {
   });
 
   it.each([
-    ['lmstudio', 'http://127.0.0.1:41234/v1/models'],
+    ['lmstudio', 'http://127.0.0.1:41234/api/v0/models'],
     ['llamacpp', 'http://127.0.0.1:48080/v1/models'],
   ])('lists %s models from %s', async (provider, url) => {
     fetchSpy.mockResolvedValue(

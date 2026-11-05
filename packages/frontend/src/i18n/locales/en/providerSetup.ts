@@ -325,6 +325,8 @@ export default {
       mimoCn: 'China (token-plan-cn)',
       mimoSgp: 'Singapore (token-plan-sgp)',
       mimoAms: 'Europe (token-plan-ams)',
+      vertexExpress: 'Express mode (API key only; a few models)',
+      vertexProject: 'Project and location (project/location)',
       zaiGlobal: 'Outside China (api.z.ai)',
       zaiCn: 'China Mainland (open.bigmodel.cn)',
     },

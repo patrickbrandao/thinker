@@ -334,6 +334,8 @@ const ptBR: Catalog<typeof en> = {
       mimoCn: 'China (token-plan-cn)',
       mimoSgp: 'Singapura (token-plan-sgp)',
       mimoAms: 'Europa (token-plan-ams)',
+      vertexExpress: 'Modo express (só a chave; poucos modelos)',
+      vertexProject: 'Projeto e localização (projeto/localização)',
       zaiGlobal: 'Fora da China (api.z.ai)',
       zaiCn: 'China continental (open.bigmodel.cn)',
     },

@@ -94,11 +94,21 @@ function detectSdk(
   stainlessVersion: string | undefined,
 ): SdkInfo {
   if (ua) {
-    const openai = ua.match(/^OpenAI\/(\w+)\s+([\d.]+)/i);
+    // `<ClientClass>/<Lang> <version>`: OpenAI, AsyncOpenAI, AzureOpenAI (harness-openai-sdk G4).
+    const openai = ua.match(/^(?:Async|Azure)?OpenAI\/(\w+)\s+([\d.]+)/i);
     if (openai) {
       return { sdk: `openai-${openai[1].toLowerCase()}`, sdkVersion: openai[2] };
     }
 
+    // Official SDKs send `Anthropic/JS 1.4.0` / `AsyncAnthropic/Python 2.4.0`
+    // (harness-anthropic-sdk G3); the older `anthropic-sdk-*` form stays.
+    const anthropicOfficial = ua.match(/^(?:Async)?Anthropic\/(Python|JS)\s+([\d.]+)/i);
+    if (anthropicOfficial) {
+      return {
+        sdk: `anthropic-${anthropicOfficial[1].toLowerCase()}`,
+        sdkVersion: anthropicOfficial[2],
+      };
+    }
     const anthropic = ua.match(/^anthropic-(?:sdk|ai)[/-]([\w-]+)[/\s]([\d.]+)/i);
     if (anthropic) {
       return { sdk: `anthropic-${anthropic[1].toLowerCase()}`, sdkVersion: anthropic[2] };

@@ -120,7 +120,7 @@ Outros arquivos que citam `mistral`:
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
 | G1 | degradação | `maxContextWindow` de 200000 na assinatura `mistral`; o modelo padrão do Vibe declara 262144 (`configs.ts:133`, `model-fallback.ts:188`). Subir para 262144. | providers | [#336](https://github.com/patrickbrandao/thinker/issues/336) | resolvida (janela de contexto por modelo) |
-| G2 | degradação | Thinker não envia `User-Agent: Mistral-Vibe/<versão>` nem `x-affinity` (só `Authorization`/`Content-Type`, `provider-endpoints.ts:86-89`); perda de afinidade de cache e identificação (impacto não confirmado). | providers | [#337](https://github.com/patrickbrandao/thinker/issues/337) | aberta |
+| G2 | degradação | Thinker não envia `User-Agent: Mistral-Vibe/<versão>` nem `x-affinity` (só `Authorization`/`Content-Type`, `provider-endpoints.ts:86-89`); perda de afinidade de cache e identificação (impacto não confirmado). | providers | [#337](https://github.com/patrickbrandao/thinker/issues/337) | resolvida (User-Agent Mistral-Vibe e x-affinity) |
 | G3 | oportunidade | Só `mistral-vibe-cli-latest` é conhecido; `mistral-vibe-cli-fast` (modelo pequeno meterado pelo plano) fica de fora, assim como qualquer outro modelo liberado à chave. Validar com conta real antes (a chave vale também na API padrão). | providers | — | aberta |
 | G4 | oportunidade | Sem leitura de plano/uso: `GET {console}/api/vibe/whoami` valida a chave e devolve plano e `has_paid_vibe_entitlement`; permitiria validar no cadastro e avisar que cota esgotada sem pay-as-you-go pausa o uso. Também falta aviso sobre cobrança possivelmente como API pay-as-you-go no tráfego de terceiros. | backend-dev | — | aberta |
 

@@ -41,12 +41,12 @@ describe('local servers', () => {
   it('defaults to the documented ports on the container host alias', () => {
     mockGetContainerHostAlias.mockReturnValue('host.docker.internal');
     expect(getLocalServerBaseUrl('lmstudio')).toBe('http://host.docker.internal:1234');
-    expect(getLocalServerBaseUrl('llamacpp')).toBe('http://host.docker.internal:8080');
+    expect(getLocalServerBaseUrl('llamacpp')).toBe('http://host.docker.internal:9931');
   });
 
   it('uses localhost outside a container', () => {
     expect(getLocalServerBaseUrl('lmstudio')).toBe('http://localhost:1234');
-    expect(getLocalServerBaseUrl('llamacpp')).toBe('http://localhost:8080');
+    expect(getLocalServerBaseUrl('llamacpp')).toBe('http://localhost:9931');
   });
 
   it('reads the override on every call and strips a trailing /v1', () => {
@@ -115,7 +115,7 @@ describe('local servers', () => {
       expect(warn).toHaveBeenCalledTimes(1);
 
       process.env['THINKER_LLAMACPP_BASE_URL'] = 'llama-box:9090';
-      expect(getLocalServerBaseUrl('llamacpp')).toBe('http://localhost:8080');
+      expect(getLocalServerBaseUrl('llamacpp')).toBe('http://localhost:9931');
       expect(warn).toHaveBeenCalledTimes(2);
     });
 

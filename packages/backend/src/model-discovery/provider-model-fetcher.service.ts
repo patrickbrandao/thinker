@@ -828,6 +828,32 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
     });
 }
 
+interface LmStudioModelEntry extends OpenAIModelEntry {
+  type?: string;
+  max_context_length?: number;
+  loaded_context_length?: number;
+  capabilities?: string[];
+}
+
+/** LM Studio `/api/v0/models`: chat models (`llm`, `vlm`) with their windows. */
+const parseLmStudio = createModelParser<LmStudioModelEntry>({
+  arrayKey: 'data',
+  filter: (entry) =>
+    typeof entry.id === 'string' &&
+    entry.id.length > 0 &&
+    (entry.type === undefined || entry.type === 'llm' || entry.type === 'vlm'),
+  getId: (entry) => entry.id,
+  getDisplayName: (_entry, id) => id,
+  contextWindow: (entry) =>
+    (typeof entry.loaded_context_length === 'number' && entry.loaded_context_length > 0
+      ? entry.loaded_context_length
+      : undefined) ??
+    (typeof entry.max_context_length === 'number' && entry.max_context_length > 0
+      ? entry.max_context_length
+      : DEFAULT_CONTEXT_WINDOW),
+  capabilityCode: (entry) => entry.capabilities?.includes('tool_use') === true,
+});
+
 interface OllamaModelEntry {
   name: string;
   details?: { family?: string; parameter_size?: string };
@@ -1110,7 +1136,8 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     parse: parseQwenTokenPlan,
   },
   zai: {
-    endpoint: 'https://open.bigmodel.cn/api/paas/v4/models',
+    // Same host as inference: global keys belong to api.z.ai (api-zai G1).
+    endpoint: 'https://api.z.ai/api/paas/v4/models',
     buildHeaders: bearerHeaders,
     parse: parseOpenAI,
   },
@@ -1160,11 +1187,12 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: bearerHeaders,
     parse: parseOllama,
   },
-  // LM Studio and llama-server list loaded models on OpenAI's `/v1/models`.
+  // LM Studio's REST `/api/v0/models` carries type, context and state, which
+  // OpenAI's `/v1/models` lacks (local-lmstudio G1); llama-server lists on `/v1/models`.
   lmstudio: {
-    endpoint: () => `${getLocalServerBaseUrl('lmstudio')}/v1/models`,
+    endpoint: () => `${getLocalServerBaseUrl('lmstudio')}/api/v0/models`,
     buildHeaders: buildLocalServerHeaders,
-    parse: parseOpenAI,
+    parse: parseLmStudio,
   },
   llamacpp: {
     endpoint: () => `${getLocalServerBaseUrl('llamacpp')}/v1/models`,

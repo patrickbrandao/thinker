@@ -40,8 +40,8 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | Agente | Categoria | Entidade | IDs no Thinker | Dossiê | Revisado em | Lacunas abertas |
 |---|---|---|---|---|---|---|
 | `api-anthropic` | API | Anthropic | `anthropic` | [dossiê](api/api-anthropic.md) | 2026-11-04 | 0 |
-| `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | 2026-11-04 | 5 |
-| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 2 |
+| `api-bedrock` | API | AWS Bedrock | `bedrock` | [dossiê](api/api-bedrock.md) | 2026-11-04 | 3 |
+| `api-vertex` | API | Google Vertex AI | `vertex` | [dossiê](api/api-vertex.md) | 2026-11-04 | 1 |
 | `api-byteplus` | API | BytePlus ModelArk | `byteplus` | [dossiê](api/api-byteplus.md) | 2026-11-04 | 2 |
 | `api-cerebras` | API | Cerebras | `cerebras` | [dossiê](api/api-cerebras.md) | 2026-11-04 | 2 |
 | `api-deepseek` | API | DeepSeek | `deepseek` | [dossiê](api/api-deepseek.md) | 2026-11-04 | 2 |
@@ -62,30 +62,30 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-03 | 3 |
 | `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | 2026-11-04 | 5 |
 | `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | 2026-11-04 | 3 |
-| `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | 2026-11-04 | 3 |
-| `api-qwen` | API | Alibaba Cloud (Qwen / Model Studio) | `qwen` | [dossiê](api/api-qwen.md) | 2026-11-04 | 6 |
+| `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | 2026-11-04 | 2 |
+| `api-qwen` | API | Alibaba Cloud (Qwen / Model Studio) | `qwen` | [dossiê](api/api-qwen.md) | 2026-11-04 | 5 |
 | `sub-anthropic` | Assinatura | Claude Max / Pro | `anthropic` | [dossiê](assinatura/sub-anthropic.md) | 2026-11-03 | 4 |
 | `sub-byteplus` | Assinatura | BytePlus ModelArk Coding Plan | `byteplus` | [dossiê](assinatura/sub-byteplus.md) | 2026-11-03 | 2 |
-| `sub-openai` | Assinatura | ChatGPT Plus / Pro / Team (Codex) | `openai` | [dossiê](assinatura/sub-openai.md) | 2026-11-03 | 3 |
+| `sub-openai` | Assinatura | ChatGPT Plus / Pro / Team (Codex) | `openai` | [dossiê](assinatura/sub-openai.md) | 2026-11-03 | 1 |
 | `sub-minimax` | Assinatura | MiniMax Coding Plan | `minimax` | [dossiê](assinatura/sub-minimax.md) | 2026-11-03 | 3 |
-| `sub-mistral` | Assinatura | Mistral Vibe | `mistral` | [dossiê](assinatura/sub-mistral.md) | 2026-11-03 | 3 |
-| `sub-xiaomi` | Assinatura | Xiaomi MiMo Token Plan | `xiaomi` | [dossiê](assinatura/sub-xiaomi.md) | 2026-11-03 | 3 |
+| `sub-mistral` | Assinatura | Mistral Vibe | `mistral` | [dossiê](assinatura/sub-mistral.md) | 2026-11-03 | 2 |
+| `sub-xiaomi` | Assinatura | Xiaomi MiMo Token Plan | `xiaomi` | [dossiê](assinatura/sub-xiaomi.md) | 2026-11-03 | 2 |
 | `sub-qwen` | Assinatura | Qwen Token Plan | `qwen` | [dossiê](assinatura/sub-qwen.md) | 2026-11-03 | 3 |
 | `sub-moonshot` | Assinatura | Kimi Coding Plan | `moonshot` | [dossiê](assinatura/sub-moonshot.md) | 2026-11-03 | 2 |
-| `sub-nous` | Assinatura | NousResearch subscription | `nous` | [dossiê](assinatura/sub-nous.md) | 2026-11-03 | 5 |
+| `sub-nous` | Assinatura | NousResearch subscription | `nous` | [dossiê](assinatura/sub-nous.md) | 2026-11-03 | 4 |
 | `sub-ollama-cloud` | Assinatura | Ollama Cloud | `ollama-cloud` | [dossiê](assinatura/sub-ollama-cloud.md) | 2026-11-03 | 3 |
 | `sub-kiro` | Assinatura | Kiro | `kiro` | [dossiê](assinatura/sub-kiro.md) | 2026-11-03 | 3 |
 | `sub-zai` | Assinatura | GLM Coding Plan | `zai` | [dossiê](assinatura/sub-zai.md) | 2026-11-03 | 2 |
 | `sub-opencode-go` | Assinatura | OpenCode Go | `opencode-go` | [dossiê](assinatura/sub-opencode-go.md) | 2026-11-03 | 4 |
-| `sub-opencode` | Assinatura | OpenCode Console | `opencode` | [dossiê](assinatura/sub-opencode.md) | 2026-11-03 | 4 |
-| `sub-gemini` | Assinatura | Sign in with Google (Gemini Code Assist) | `gemini` | [dossiê](assinatura/sub-gemini.md) | 2026-11-03 | 3 |
-| `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | 2026-11-03 | 3 |
-| `sub-copilot` | Assinatura | GitHub Copilot | `copilot` | [dossiê](assinatura/sub-copilot.md) | 2026-11-03 | 6 |
+| `sub-opencode` | Assinatura | OpenCode Console | `opencode` | [dossiê](assinatura/sub-opencode.md) | 2026-11-03 | 3 |
+| `sub-gemini` | Assinatura | Sign in with Google (Gemini Code Assist) | `gemini` | [dossiê](assinatura/sub-gemini.md) | 2026-11-03 | 2 |
+| `sub-xai` | Assinatura | Grok subscription | `xai` | [dossiê](assinatura/sub-xai.md) | 2026-11-03 | 2 |
+| `sub-copilot` | Assinatura | GitHub Copilot | `copilot` | [dossiê](assinatura/sub-copilot.md) | 2026-11-03 | 4 |
 | `sub-commandcode` | Assinatura | Command Code | `commandcode` | [dossiê](assinatura/sub-commandcode.md) | 2026-11-03 | 4 |
 | `sub-cline-pass` | Assinatura | ClinePass | `cline-pass` | [dossiê](assinatura/sub-cline-pass.md) | 2026-11-03 | 4 |
-| `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | 2026-11-03 | 4 |
-| `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | 2026-11-04 | 2 |
-| `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 5 |
+| `local-lmstudio` | Local | LM Studio | `lmstudio` | [dossiê](local/local-lmstudio.md) | 2026-11-03 | 3 |
+| `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | 2026-11-04 | 1 |
+| `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 3 |
 | `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 4 |
 | `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 3 |
 | `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 4 |
@@ -103,7 +103,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 3 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 2 |
 | `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 3 |
-| `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 5 |
-| `harness-anthropic-sdk` | Harness | Anthropic SDK | `anthropic-sdk` | [dossiê](harness/harness-anthropic-sdk.md) | 2026-11-03 | 4 |
+| `harness-openai-sdk` | Harness | OpenAI SDK | `openai-sdk` | [dossiê](harness/harness-openai-sdk.md) | 2026-11-03 | 4 |
+| `harness-anthropic-sdk` | Harness | Anthropic SDK | `anthropic-sdk` | [dossiê](harness/harness-anthropic-sdk.md) | 2026-11-03 | 3 |
 | `harness-vercel-ai-sdk` | Harness | Vercel AI SDK | `vercel-ai-sdk` | [dossiê](harness/harness-vercel-ai-sdk.md) | 2026-11-03 | 4 |
 | `harness-langchain` | Harness | LangChain | `langchain` | [dossiê](harness/harness-langchain.md) | 2026-11-03 | 3 |

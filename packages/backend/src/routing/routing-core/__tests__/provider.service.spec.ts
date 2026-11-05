@@ -505,7 +505,7 @@ describe('ProviderService — route-only cleanup paths', () => {
         'agent-1',
         'user-1',
         'bedrock',
-        makeShortTermBedrockKey('eu-west-3'),
+        makeShortTermBedrockKey('cn-north-1'),
       );
 
       const inserted = providerRepo.insert.mock.calls[0][0] as TenantProvider;
@@ -519,7 +519,7 @@ describe('ProviderService — route-only cleanup paths', () => {
         'agent-1',
         'user-1',
         'bedrock',
-        makeShortTermBedrockKey('eu-west-3'),
+        makeShortTermBedrockKey('cn-north-1'),
         'api_key',
         'us-west-2',
       );

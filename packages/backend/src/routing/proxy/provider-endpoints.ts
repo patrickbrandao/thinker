@@ -8,6 +8,8 @@ import {
   OPENCODE_USER_AGENT,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  COPILOT_USER_AGENT,
+  MISTRAL_VIBE_USER_AGENT,
   GROK_CLI_HEADERS,
   GROK_CLI_PROXY_BASE,
   buildClaudeCodeSubscriptionHeaders,
@@ -204,12 +206,39 @@ const FIREWORKS_INFERENCE_BASE = 'https://api.fireworks.ai/inference';
 const HUGGING_FACE_INFERENCE_BASE = 'https://router.huggingface.co';
 const PIONEER_BASE = 'https://api.fastino.ai';
 const META_BASE = 'https://api.meta.ai';
-const chatgptSubscriptionHeaders = (apiKey: string) => ({
-  Authorization: `Bearer ${apiKey}`,
-  'Content-Type': 'application/json',
-  originator: CODEX_CLI_ORIGINATOR,
-  'user-agent': CODEX_CLI_USER_AGENT,
-});
+/**
+ * The `chatgpt_account_id` claim of a ChatGPT access token, which the Codex
+ * CLI sends as `ChatGPT-Account-ID` so multi-workspace accounts (Team,
+ * Business) land on the right workspace (sub-openai G5).
+ */
+export function chatgptAccountId(token: string): string | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    const auth = claims['https://api.openai.com/auth'] as
+      { chatgpt_account_id?: unknown } | undefined;
+    return typeof auth?.chatgpt_account_id === 'string' && auth.chatgpt_account_id
+      ? auth.chatgpt_account_id
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const chatgptSubscriptionHeaders = (apiKey: string) => {
+  const accountId = chatgptAccountId(apiKey);
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    originator: CODEX_CLI_ORIGINATOR,
+    'user-agent': CODEX_CLI_USER_AGENT,
+    ...(accountId ? { 'ChatGPT-Account-ID': accountId } : {}),
+  };
+};
 
 export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   openai: {
@@ -242,7 +271,11 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   bedrock: {
     baseUrl: getBedrockMantleBaseUrl(),
     buildHeaders: openaiHeaders,
-    buildPath: openaiPath,
+    // GPT models served only on Mantle use the `/openai/v1` prefix (api-bedrock G1).
+    buildPath: (model: string) =>
+      BEDROCK_NAMESPACED_GPT_MODEL_RE.test(stripVendorPrefix(model))
+        ? '/openai/v1/chat/completions'
+        : '/v1/chat/completions',
     format: 'openai',
     ...openaiStreamUsage,
   },
@@ -373,7 +406,11 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   },
   mistral: {
     baseUrl: 'https://api.mistral.ai',
-    buildHeaders: openaiHeaders,
+    // The Vibe subscription key identifies as the Vibe CLI (sub-mistral G2).
+    buildHeaders: (apiKey: string, authType?: string) => ({
+      ...openaiHeaders(apiKey),
+      ...(authType === 'subscription' ? { 'User-Agent': MISTRAL_VIBE_USER_AGENT } : {}),
+    }),
     buildPath: openaiPath,
     format: 'openai',
     ...openaiStreamUsage,
@@ -564,6 +601,9 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
       'Editor-Version': COPILOT_EDITOR_VERSION,
       'Editor-Plugin-Version': COPILOT_PLUGIN_VERSION,
       'Copilot-Integration-Id': 'vscode-chat',
+      'User-Agent': COPILOT_USER_AGENT,
+      'OpenAI-Intent': 'conversation-panel',
+      'X-GitHub-Api-Version': '2025-05-01',
     }),
     buildPath: () => '/chat/completions',
     format: 'openai',

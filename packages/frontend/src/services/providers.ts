@@ -205,6 +205,12 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   vertex: {
     initial: 'GV',
     subtitle: 'Gemini via Google Cloud Vertex AI',
+    // Express mode serves only a few models; the rest need a project and
+    // location, stored as `project/location` in the region (api-vertex G3).
+    apiKeyEndpointRegions: [
+      region('express', regionLabel('vertexExpress')),
+      region('project', regionLabel('vertexProject'), 'my-project/us-central1'),
+    ],
     models: [],
   },
   bedrock: {
