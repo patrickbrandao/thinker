@@ -4,7 +4,14 @@ import { resolveToolCallIndex } from 'thinker-shared';
 import { DEFAULT_INSTRUCTIONS } from './chatgpt-helpers';
 import { OpenAIMessage } from './proxy-types';
 import { deduplicateCallIds } from './responses-call-ids';
-import { chatToolName, chatTools, responsesToolNames, ResponsesToolNames } from './responses-tools';
+import {
+  chatToolName,
+  chatTools,
+  customToolArguments,
+  customToolInput,
+  responsesToolNames,
+  ResponsesToolNames,
+} from './responses-tools';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -79,7 +86,26 @@ function responseInputItemToMessage(item: JsonRecord, names: ResponsesToolNames)
     ];
   }
 
-  if (item.type === 'function_call_output') {
+  if (item.type === 'custom_tool_call') {
+    return [
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: typeof item.call_id === 'string' ? item.call_id : randomUUID(),
+            type: 'function',
+            function: {
+              name: typeof item.name === 'string' ? item.name : 'unknown',
+              arguments: customToolArguments(item.input),
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  if (item.type === 'function_call_output' || item.type === 'custom_tool_call_output') {
     return [
       {
         role: 'tool',
@@ -156,6 +182,14 @@ export function toChatCompletionsRequest(body: JsonRecord): JsonRecord {
   }
 
   if (body.max_output_tokens !== undefined) chatBody.max_tokens = body.max_output_tokens;
+  // harness-openai-sdk G3: carry the reasoning effort, verbosity and cache key.
+  if (isRecord(body.reasoning) && typeof body.reasoning.effort === 'string') {
+    chatBody.reasoning_effort = body.reasoning.effort;
+  }
+  if (isRecord(body.text) && typeof body.text.verbosity === 'string') {
+    chatBody.verbosity = body.text.verbosity;
+  }
+  if (typeof body.prompt_cache_key === 'string') chatBody.prompt_cache_key = body.prompt_cache_key;
   const responseFormat = toChatResponseFormat(body.text);
   if (responseFormat) chatBody.response_format = responseFormat;
   if (Array.isArray(body.tools)) chatBody.tools = chatTools(body.tools, names);
@@ -369,6 +403,20 @@ export function fromChatCompletionResponse(
   if (Array.isArray(message.tool_calls)) {
     for (const toolCall of message.tool_calls) {
       if (!isRecord(toolCall) || !isRecord(toolCall.function)) continue;
+      const toolName = typeof toolCall.function.name === 'string' ? toolCall.function.name : '';
+      if (options.toolNames?.get(toolName)?.custom) {
+        output.push({
+          type: 'custom_tool_call',
+          id: `ctc_${randomUUID().replace(/-/g, '')}`,
+          call_id: typeof toolCall.id === 'string' ? toolCall.id : randomUUID(),
+          name: toolName,
+          input: customToolInput(
+            typeof toolCall.function.arguments === 'string' ? toolCall.function.arguments : '',
+          ),
+          status: itemStatus,
+        });
+        continue;
+      }
       output.push({
         type: 'function_call',
         id: `fc_${randomUUID().replace(/-/g, '')}`,
@@ -830,6 +878,16 @@ function functionCallItem(
   state: ResponsesStreamState,
   status: string,
 ): JsonRecord {
+  if (state.toolNames?.get(call.name)?.custom) {
+    return {
+      type: 'custom_tool_call',
+      id: call.id,
+      call_id: call.callId,
+      name: call.name,
+      input: status === 'in_progress' ? '' : customToolInput(call.arguments),
+      status,
+    };
+  }
   return {
     type: 'function_call',
     id: call.id,
@@ -883,6 +941,8 @@ function toolCallDeltas(toolCalls: unknown, state: ResponsesStreamState): string
     if (state.toolNames ? !state.toolNames.has(call.name) : !call.arguments) continue;
     const first = call.outputIndex === undefined;
     events.push(...openFunctionCall(call, state));
+    // A custom tool's input arrives whole in output_item.done.
+    if (state.toolNames?.get(call.name)?.custom) continue;
     const text = first ? call.arguments : args;
     if (text)
       events.push(
@@ -1005,13 +1065,17 @@ function finalizeResponsesStream(state: ResponsesStreamState): string | null {
     events.push(...openFunctionCall(call, state));
     const item = functionCallItem(call, state, itemStatus);
     toolOutput.push({ index: call.outputIndex!, item });
+    if (item.type === 'function_call') {
+      events.push(
+        formatResponsesEvent('response.function_call_arguments.done', {
+          type: 'response.function_call_arguments.done',
+          item_id: call.id,
+          output_index: call.outputIndex,
+          arguments: call.arguments,
+        }),
+      );
+    }
     events.push(
-      formatResponsesEvent('response.function_call_arguments.done', {
-        type: 'response.function_call_arguments.done',
-        item_id: call.id,
-        output_index: call.outputIndex,
-        arguments: call.arguments,
-      }),
       formatResponsesEvent('response.output_item.done', {
         type: 'response.output_item.done',
         output_index: call.outputIndex,

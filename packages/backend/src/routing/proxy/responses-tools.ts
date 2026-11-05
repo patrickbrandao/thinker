@@ -4,6 +4,33 @@ type JsonRecord = Record<string, unknown>;
 export interface ResponsesToolName {
   name: string;
   namespace?: string;
+  /** A freeform Responses `custom` tool (Codex `apply_patch`), sent to Chat as a function. */
+  custom?: true;
+}
+
+/** The single string argument a `custom` tool's function stand-in takes. */
+const CUSTOM_TOOL_PARAMETERS = {
+  type: 'object',
+  properties: {
+    input: { type: 'string', description: 'The raw tool input, exactly as the tool expects it.' },
+  },
+  required: ['input'],
+  additionalProperties: false,
+};
+
+/** Arguments JSON of a custom tool call's function stand-in. */
+export function customToolArguments(input: unknown): string {
+  return JSON.stringify({ input: typeof input === 'string' ? input : '' });
+}
+
+/** The raw input back out of a custom tool's function arguments. */
+export function customToolInput(argumentsJson: string): string {
+  try {
+    const parsed = JSON.parse(argumentsJson) as { input?: unknown };
+    return typeof parsed.input === 'string' ? parsed.input : argumentsJson;
+  } catch {
+    return argumentsJson;
+  }
 }
 export type ResponsesToolNames = ReadonlyMap<string, ResponsesToolName>;
 
@@ -45,6 +72,9 @@ export function responsesToolNames(tools: unknown): ResponsesToolNames {
     if (isRecord(tool) && tool.type === 'function' && typeof tool.name === 'string') {
       names.set(tool.name, { name: tool.name });
     }
+    if (isRecord(tool) && tool.type === 'custom' && typeof tool.name === 'string') {
+      names.set(tool.name, { name: tool.name, custom: true });
+    }
   }
   return names;
 }
@@ -66,6 +96,24 @@ export function chatTools(tools: unknown[], names: ResponsesToolNames): JsonReco
         tool.tools.filter(isRecord).map((fn) => ({ ...fn, namespace: tool.name })),
         names,
       );
+    }
+    if (tool.type === 'custom' && typeof tool.name === 'string') {
+      // harness-codex G2: a freeform tool becomes a one-string-argument function.
+      const format = isRecord(tool.format) ? tool.format : undefined;
+      const grammar =
+        format && typeof format.definition === 'string'
+          ? `\n\nInput format (${String(format.syntax ?? format.type)}):\n${format.definition}`
+          : '';
+      return [
+        {
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: `${typeof tool.description === 'string' ? tool.description : ''}${grammar}`,
+            parameters: CUSTOM_TOOL_PARAMETERS,
+          },
+        },
+      ];
     }
     if (tool.type !== 'function') return [];
     return [

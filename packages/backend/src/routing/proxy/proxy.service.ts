@@ -707,6 +707,24 @@ export class ProxyService {
               typeof item === 'string' ||
               (!!item && typeof item === 'object' && !Array.isArray(item)),
           ));
+      // Stateless gateway: Responses state kept upstream cannot be resolved
+      // (harness-openai-sdk G3, harness-vercel-ai-sdk G2).
+      for (const field of ['previous_response_id', 'conversation'] as const) {
+        if (body[field] !== undefined && body[field] !== null) {
+          throw new ThinkerError('M303', HttpStatus.BAD_REQUEST, { field });
+        }
+      }
+      if (
+        Array.isArray(body.input) &&
+        body.input.some(
+          (item) =>
+            !!item &&
+            typeof item === 'object' &&
+            (item as { type?: unknown }).type === 'item_reference',
+        )
+      ) {
+        throw new ThinkerError('M303', HttpStatus.BAD_REQUEST, { field: 'item_reference' });
+      }
       if (hasInstructions || hasInput) return;
       throw new ThinkerError('M300', HttpStatus.BAD_REQUEST);
     }

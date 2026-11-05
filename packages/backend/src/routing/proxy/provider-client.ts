@@ -40,6 +40,7 @@ import {
   applyAnthropicMessagesMutations,
   hasMessageCacheControl,
   toGoogleRequest,
+  googleResponseFailure,
   toAnthropicRequest,
   toResponsesRequest,
   sanitizeOpenAiBody,
@@ -213,6 +214,30 @@ function isEmptyChatCompletion(body: unknown): boolean {
       isRecord(choice.message) &&
       !hasChatCompletionOutput(choice.message),
   );
+}
+
+/** Turn a blocked or failed Gemini answer into an error (api-gemini G4). */
+async function qualifyGoogleResponse(
+  response: Response,
+  codeAssist: boolean,
+  attempt?: ProviderAttemptRef,
+): Promise<Response> {
+  if (response.status !== HttpStatus.OK) return response;
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return response;
+  }
+  if (!isRecord(body)) return response;
+  const inner = codeAssist && isRecord(body.response) ? body.response : body;
+  const failure = googleResponseFailure(inner);
+  if (!failure) return response;
+  await attempt?.finishRecording?.({ type: 'json', body });
+  return new Response(JSON.stringify(failure.body), {
+    status: failure.status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 async function qualifyEmptyChatCompletion(
@@ -509,6 +534,7 @@ export class ProviderClient {
       endpointKey,
       format: endpoint.format,
       model: bareModel,
+      source: chatBody ?? body,
     });
     if (policyApplied.length > 0) {
       this.logger.debug(
@@ -580,7 +606,9 @@ export class ProviderClient {
       endpoint.format === 'openai' &&
       (opts.apiMode === undefined || opts.apiMode === 'chat_completions')
         ? await qualifyEmptyChatCompletion(result.response, attempt)
-        : result.response;
+        : !stream && endpoint.format === 'google'
+          ? await qualifyGoogleResponse(result.response, !!endpoint.codeAssistEnvelope, attempt)
+          : result.response;
     const qualifiedResult =
       endpointKey === 'openai-subscription'
         ? {

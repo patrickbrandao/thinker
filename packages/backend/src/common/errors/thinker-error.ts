@@ -58,6 +58,7 @@ export const THINKER_CODE_TO_REASON: Record<RecordableThinkerCode, ThinkerBlocke
   M300: 'thinker_invalid_request',
   M301: 'virtual_model_unavailable',
   M302: 'model_not_available',
+  M303: 'thinker_invalid_request',
   M500: 'thinker_internal_error',
 };
 

@@ -56,6 +56,25 @@ describe('provider-client-converters', () => {
       expect(sanitizeOpenAiBody(body, 'deepseek', 'deepseek-chat').messages).toEqual(body.messages);
     });
 
+    it('forwards reasoning_effort to Mistral, Hugging Face and Ollama', () => {
+      for (const endpoint of ['mistral', 'huggingface', 'ollama', 'ollama-cloud']) {
+        const result = sanitizeOpenAiBody({ reasoning_effort: 'high' }, endpoint, 'm');
+        expect(result).toHaveProperty('reasoning_effort', 'high');
+      }
+    });
+
+    it('turns Anthropic thinking into an effort on Mistral and Ollama', () => {
+      expect(sanitizeOpenAiBody({ thinking: { type: 'disabled' } }, 'ollama', 'qwen3')).toEqual({
+        reasoning_effort: 'none',
+      });
+      expect(
+        sanitizeOpenAiBody({ thinking: { type: 'enabled', budget_tokens: 2048 } }, 'mistral', 'm'),
+      ).toEqual({ reasoning_effort: 'high' });
+      expect(
+        sanitizeOpenAiBody({ thinking: { type: 'enabled', budget_tokens: 2048 } }, 'ollama', 'm'),
+      ).toEqual({});
+    });
+
     it('should strip OpenAI-only fields for non-passthrough providers', () => {
       const body = {
         messages: [{ role: 'user', content: 'Hi' }],
@@ -71,7 +90,7 @@ describe('provider-client-converters', () => {
         temperature: 0.5,
       };
 
-      const result = sanitizeOpenAiBody(body, 'mistral', 'mistral-large');
+      const result = sanitizeOpenAiBody(body, 'fireworks', 'mistral-large');
 
       expect(result).not.toHaveProperty('store');
       expect(result).not.toHaveProperty('metadata');

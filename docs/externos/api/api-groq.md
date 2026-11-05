@@ -99,7 +99,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `logprobs`, `top_logprobs`, `logit_bias`, `n>1`, `messages[].name` seguem no pedido e dão 400 | providers | [#413](https://github.com/patrickbrandao/thinker/issues/413) | aberta |
+| G1 | degradação | `logprobs`, `top_logprobs`, `logit_bias`, `n>1`, `messages[].name` seguem no pedido e dão 400 | providers | [#413](https://github.com/patrickbrandao/thinker/issues/413) | resolvida (política de parâmetros: param-policy.ts) |
 | G2 | degradação | contexto e saída máxima do `/models` não são lidos | providers | [#414](https://github.com/patrickbrandao/thinker/issues/414) | aberta |
 | G3 | degradação | sem preços Groq em `known-model-prices.ts`; custo depende do models.dev | providers | [#415](https://github.com/patrickbrandao/thinker/issues/415) | aberta |
 

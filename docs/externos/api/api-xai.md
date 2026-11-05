@@ -119,7 +119,7 @@ Código da assinatura (OAuth), tratado em `sub-xai`: `packages/backend/src/routi
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `presence_penalty`, `frequency_penalty` e `stop` são repassados e a doc diz que modelos de raciocínio retornam erro; remover para `grok-*` de raciocínio em `xai` e `xai-responses` (`provider-client-converters.ts`) | providers | [#433](https://github.com/patrickbrandao/thinker/issues/433) | aberta |
+| G1 | degradação | `presence_penalty`, `frequency_penalty` e `stop` são repassados e a doc diz que modelos de raciocínio retornam erro; remover para `grok-*` de raciocínio em `xai` e `xai-responses` (`provider-client-converters.ts`) | providers | [#433](https://github.com/patrickbrandao/thinker/issues/433) | resolvida (política de parâmetros: param-policy.ts) |
 | G2 | degradação | `xai-responses` não mapeia `reasoning.effort` (`mapReasoningEffort` só OpenAI, `provider-client.ts:864`); o esforço do cliente se perde em modelos usados via Responses/multi-agent (formato do campo na Responses do xAI não confirmado) | providers | — (não aberta: depende de confirmar o formato) | aberta |
 | G3 | oportunidade | Preço em faixa longa (prompt >= 200k) e `cost_in_usd_ticks` em `usage` não são aproveitados; custo calculado com tarifa curta subestima pedidos longos | backend-dev | — | aberta |
 | G4 | oportunidade | `service_tier: "priority"`, `safety_identifier` e itens `reasoning.encrypted_content` (grok-4.7 devolve sempre) não são encaminhados/preservados | providers | — | aberta |
