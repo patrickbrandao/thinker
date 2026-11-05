@@ -1023,6 +1023,26 @@ export class ProxyService {
     };
   }
 
+  /**
+   * The agent's credential for a passthrough route (embeddings, transcription,
+   * count_tokens): an API key first, then a subscription. Null when the agent
+   * has neither for the provider.
+   */
+  async resolvePassthroughCredentials(
+    agentId: string,
+    tenantId: string,
+    provider: string,
+  ): Promise<{ apiKey: string; authType: AuthType } | null> {
+    for (const authType of ['api_key', 'subscription'] as AuthType[]) {
+      const credentials = await this.resolveCredentials(agentId, tenantId, {
+        provider,
+        auth_type: authType,
+      });
+      if (credentials.ok) return { apiKey: credentials.apiKey, authType };
+    }
+    return null;
+  }
+
   private resolveCredentials(
     agentId: string,
     tenantId: string,

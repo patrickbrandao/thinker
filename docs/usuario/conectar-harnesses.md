@@ -150,6 +150,12 @@ O Thinker agrupa as requisições de uma conversa (cache de prompt, momentum de 
 - **Langflow:** os componentes padrão não aceitam cabeçalhos customizados, então as chamadas ficam na sessão `default`.
 - **Cline:** o provedor OpenAI Compatible do Cline não manda id de sessão nem cabeçalhos por conversa. Dá para fixar `x-session-key` nos cabeçalhos do provedor, mas o valor vale para todas as conversas daquele perfil. Sem isso, as requisições do Cline ficam na sessão `default`.
 
+## Embeddings, transcrição e contagem de tokens
+
+- `POST /v1/embeddings` e `POST /v1/audio/transcriptions` (multipart, campo `file`) vão direto ao provedor do modelo, sem roteamento: use o id com o provedor, por exemplo `openai/text-embedding-3-small` ou `groq/whisper-large-v3`, e tenha uma conexão desse provedor habilitada no harness. `auto` e modelos virtuais não valem aqui.
+- `POST /v1/messages/count_tokens` (SDK da Anthropic, Claude Code): com um modelo Claude e conexão Anthropic, o Thinker repassa à Anthropic; com `auto`, um virtual ou outro provedor, devolve uma estimativa (cerca de 4 caracteres por token).
+- `GET /v1/models` responde no formato da Anthropic quando o cliente manda `anthropic-version`, e `GET /v1/models/{id}` devolve um modelo só.
+
 ## Escolher um modelo virtual
 
 Um [modelo virtual](provedores-e-roteamento.md#modelos-virtuais) é um nome que você cria no harness (por exemplo `deepseek/flash`) e que o Thinker roteia pela cadeia dele. Em qualquer harness, ele entra no mesmo lugar do `auto`:

@@ -251,7 +251,7 @@ Usuário (Better Auth) ──→ organization_members ──→ Tenant (organiza
 
 ## Roteamento e proxy
 
-O proxy (`routing/proxy/`) expõe `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages` e `GET /v1/models`. A precedência fica em `ProxyService.resolveRouting` ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), seção 5):
+O proxy (`routing/proxy/`) expõe `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages` e `GET /v1/models` (e `GET /v1/models/{id}`; no formato Anthropic quando o cliente manda `anthropic-version`). Rotas de passthrough (`routing/proxy/passthrough.ts`), sem roteamento por complexidade, fallback nem modelos virtuais: `POST /v1/embeddings` e `POST /v1/audio/transcriptions` (multipart) vão ao provedor que o `model` nomeia (`provedor/modelo` ou inferido do id), com a credencial do agente para ele; `POST /v1/messages/count_tokens` vai à Anthropic quando o modelo é um Claude alcançável e, nos demais casos (inclusive `auto`), devolve a estimativa de `estimateRequestTokens`. A precedência fica em `ProxyService.resolveRouting` ([ADR 0004](../adr/0004-modelos-virtuais-por-harness.md), seção 5):
 
 1. **Modelo virtual** (`ResolveService.resolveVirtualModel`): um virtual ativo do agente cujo nome é igual ao `model`, sem diferenciar maiúsculas e sem outra normalização.
 2. **`auto`** → um heartbeat (`auto` com `HEARTBEAT_OK`) vai direto ao tier `simple`; os demais vão a `resolveLazy`: complexidade, se `agents.complexity_routing_enabled` (padrão `false`), com `scoring/` classificando em `simple`, `standard`, `complex` ou `reasoning`; com a opção desligada, tudo vai ao tier `default`. **ID real** → rota explícita (`resolveExplicitModel`). **Desconhecido** → `M302`.
