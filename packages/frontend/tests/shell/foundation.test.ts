@@ -59,6 +59,15 @@ describe('navigation', () => {
     expect(activeNavItem('/harnesses/bot/routing')?.key).toBe('harnesses');
     expect(NAVIGATION.flatMap((g) => g.items.map((i) => i.key))).not.toContain('organization');
   });
+
+  it('puts Harnesses alone in the CLIENTS section', () => {
+    const clients = NAVIGATION.find((g) => g.key === 'clients');
+    expect(clients?.label).toBe('nav.sectionClients');
+    expect(clients?.items.map((i) => i.key)).toEqual(['harnesses']);
+    expect(NAVIGATION.find((g) => g.key === 'main')?.items.map((i) => i.key)).not.toContain(
+      'harnesses',
+    );
+  });
 });
 
 describe('flow layout', () => {

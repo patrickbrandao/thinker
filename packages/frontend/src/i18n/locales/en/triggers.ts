@@ -219,6 +219,7 @@ export default {
   },
   test: {
     title: 'Test trigger',
+    crumb: 'Test',
     back: '← Triggers',
     subtitle:
       'Pick a trigger and an event, adjust the simulated variables and send it once. The message goes to the real destination, so you can watch it arrive.',

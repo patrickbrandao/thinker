@@ -47,9 +47,13 @@ export const NAVIGATION: NavGroup[] = [
       { key: 'overview', to: '/overview', label: 'nav.overview', icon: LayoutDashboard },
       { key: 'sessions', to: '/sessions', label: 'nav.sessions', icon: MessagesSquare },
       { key: 'requests', to: '/messages', label: 'nav.requests', icon: ScrollText },
-      { key: 'harnesses', to: '/harnesses', label: 'nav.harnesses', icon: BrainCircuit },
       { key: 'topology', to: '/topology', label: 'nav.topology', icon: LayoutArrowRight },
     ],
+  },
+  {
+    key: 'clients',
+    label: 'nav.sectionClients',
+    items: [{ key: 'harnesses', to: '/harnesses', label: 'nav.harnesses', icon: BrainCircuit }],
   },
   {
     key: 'providers',

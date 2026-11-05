@@ -223,6 +223,7 @@ const ptBR: Catalog<typeof en> = {
   },
   test: {
     title: 'Testar trigger',
+    crumb: 'Teste',
     back: '← Triggers',
     subtitle:
       'Escolha um trigger e um evento, ajuste as variáveis simuladas e envie uma vez. A mensagem vai para o destino real, então dá para ver ela chegando.',

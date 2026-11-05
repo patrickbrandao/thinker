@@ -1,8 +1,8 @@
-import { Link, Outlet, useLocation, useParams } from 'react-router';
+import { Outlet, useLocation, useParams } from 'react-router';
 import { Tabs, type TabItem } from '../components/ui.js';
 import { agentPath } from '../services/routing.js';
 import { agentDisplayName, agentDisplayNameSignal } from '../services/agent-display-name.js';
-import { agentPlatformIcon, agentPlatformSignal } from '../services/agent-platform-store.js';
+import { agentPlatformSignal } from '../services/agent-platform-store.js';
 import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
 
@@ -25,8 +25,8 @@ function safeDecode(value: string): string {
 }
 
 /**
- * AgentDetail — the tabbed shell of a harness: back-link, platform icon and
- * name, then Overview / Routing / Models / Providers / Limits / Triggers / Connection / Settings tabs. The tab
+ * AgentDetail — the tabbed shell of a harness (the top bar already shows
+ * Harnesses › icon › name): Overview / Routing / Models / Providers / Limits / Triggers / Connection / Settings tabs. The tab
  * content is the nested route, rendered through <Outlet />.
  */
 export default function AgentDetail() {
@@ -39,7 +39,6 @@ export default function AgentDetail() {
   const agentName = safeDecode(params.agentName ?? '');
   const path = (sub: string) => agentPath(agentName, sub);
   const name = agentDisplayName() ?? agentName;
-  const icon = agentPlatformIcon();
 
   const pathname = location.pathname;
   const active: TabKey =
@@ -74,18 +73,7 @@ export default function AgentDetail() {
     <div className="page wide">
       <title>{`${name} | Thinker`}</title>
 
-      <Link to="/harnesses" className="text-sm text-muted hover:text-ink">
-        {t('harnesses.detail.back')}
-      </Link>
-
-      <div className="mt-2 flex min-w-0 items-center gap-3">
-        {icon ? (
-          <img src={icon} alt="" width={28} height={28} className="shrink-0 rounded-control" />
-        ) : null}
-        <h1 className="truncate">{name}</h1>
-      </div>
-
-      <Tabs items={tabs} value={active} label={name} className="mb-5 mt-3" />
+      <Tabs items={tabs} value={active} label={name} className="mb-5" />
 
       <Outlet />
     </div>

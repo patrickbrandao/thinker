@@ -17,7 +17,7 @@ import { getEmailProviderApiKeyUrl } from '../../services/provider-api-key-urls.
 import { toast } from '../../services/toast-store.js';
 import { useNavigate } from 'react-router';
 import { createTrigger, updateTrigger, type TriggerView } from '../../services/api/triggers.js';
-import { Button, Field, IconButton, Modal, Switch } from '../ui.js';
+import { Button, Field, FloatingWindow, IconButton, Switch } from '../ui.js';
 import OutboundProxyPanel from '../proxy/OutboundProxyPanel.js';
 import {
   buildPayload,
@@ -159,8 +159,38 @@ export default function TriggerEditor({
 
   const keyUrl = form.type === 'email' ? getEmailProviderApiKeyUrl(form.email.provider) : undefined;
 
+  const footer = readOnly ? undefined : (
+    <>
+      {trigger ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          title={t('triggers.editor.testHint')}
+          onClick={() => {
+            onClose();
+            navigate(triggerTestPath(trigger.id));
+          }}
+        >
+          {t('triggers.editor.sendTest')}
+        </Button>
+      ) : null}
+      <Button variant="ghost" size="sm" onClick={onClose}>
+        {t('common.cancel')}
+      </Button>
+      <Button size="sm" busy={saving} onClick={() => void handleSave()}>
+        {isCreate ? t('triggers.editor.createSubmit') : t('common.saveChanges')}
+      </Button>
+    </>
+  );
+
   return (
-    <Modal open={open} title={title} onClose={onClose} wide>
+    <FloatingWindow
+      open={open}
+      title={title}
+      onClose={onClose}
+      className="floating-window--wide trigger-editor"
+      footer={footer}
+    >
       <fieldset disabled={readOnly} className="m-0 grid min-w-0 gap-4 border-0 p-0">
         <div className="grid gap-4 sm:grid-cols-[1fr_180px_auto] sm:items-start">
           <Field label={t('triggers.editor.name')} htmlFor="trigger-name" error={errors.name}>
@@ -280,7 +310,7 @@ export default function TriggerEditor({
             <Field label={t('triggers.editor.email.body')} htmlFor="trigger-email-body">
               <textarea
                 id="trigger-email-body"
-                className="field min-h-[96px] font-mono"
+                className="field trigger-template min-h-[96px] font-mono"
                 value={form.email.body}
                 onChange={(e) => patchIn('email', { body: e.currentTarget.value })}
               />
@@ -346,7 +376,7 @@ export default function TriggerEditor({
             <Field label={t('triggers.editor.webhook.body')} htmlFor="trigger-webhook-body">
               <textarea
                 id="trigger-webhook-body"
-                className="field min-h-[96px] font-mono"
+                className="field trigger-template min-h-[96px] font-mono"
                 value={form.webhook.body}
                 onChange={(e) => patchIn('webhook', { body: e.currentTarget.value })}
               />
@@ -401,7 +431,7 @@ export default function TriggerEditor({
             >
               <textarea
                 id="trigger-telegram-text"
-                className="field min-h-[96px] font-mono"
+                className="field trigger-template min-h-[96px] font-mono"
                 value={form.telegram.text}
                 onChange={(e) => patchIn('telegram', { text: e.currentTarget.value })}
               />
@@ -513,14 +543,14 @@ export default function TriggerEditor({
             <Field label={t('triggers.editor.syslog.message')} htmlFor="trigger-syslog-message">
               <textarea
                 id="trigger-syslog-message"
-                className="field min-h-[72px] font-mono"
+                className="field trigger-template min-h-[72px] font-mono"
                 value={form.syslog.message}
                 onChange={(e) => patchIn('syslog', { message: e.currentTarget.value })}
               />
             </Field>
             <div>
               <span className="label">{t('triggers.editor.syslog.severities')}</span>
-              <div className="table-wrap">
+              <div className="table-wrap scroll-section">
                 <table className="data">
                   <thead>
                     <tr>
@@ -612,7 +642,7 @@ export default function TriggerEditor({
 
         <div>
           <span className="label">{t('triggers.editor.workspaceEvents.title')}</span>
-          <div className="flex flex-wrap gap-4">
+          <div className="scroll-section flex flex-wrap gap-4">
             {WORKSPACE_TRIGGER_EVENTS.map((event) => (
               <label key={event} className="check">
                 <input
@@ -646,31 +676,7 @@ export default function TriggerEditor({
           />
         </div>
       ) : null}
-
-      {!readOnly ? (
-        <div className="actions">
-          {trigger ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              title={t('triggers.editor.testHint')}
-              onClick={() => {
-                onClose();
-                navigate(triggerTestPath(trigger.id));
-              }}
-            >
-              {t('triggers.editor.sendTest')}
-            </Button>
-          ) : null}
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button size="sm" busy={saving} onClick={() => void handleSave()}>
-            {isCreate ? t('triggers.editor.createSubmit') : t('common.saveChanges')}
-          </Button>
-        </div>
-      ) : null}
-    </Modal>
+    </FloatingWindow>
   );
 }
 
@@ -691,7 +697,7 @@ function HeaderEditor({
   return (
     <div>
       <span className="label">{t('triggers.editor.webhook.headers')}</span>
-      <div className="flex flex-col gap-2">
+      <div className="scroll-section flex flex-col gap-2">
         {headers.length === 0 ? (
           <p className="text-sm text-muted">{t('triggers.editor.webhook.noHeaders')}</p>
         ) : null}
@@ -771,7 +777,7 @@ function VariablesHelp() {
         {t('triggers.editor.variables.title')}
       </summary>
       <p className="hint mb-2">{t('triggers.editor.variables.hint')}</p>
-      <ul className="m-0 grid list-none gap-1 p-0 sm:grid-cols-2">
+      <ul className="scroll-section m-0 grid list-none gap-1 p-0 sm:grid-cols-2">
         {TRIGGER_VARIABLES.map((v) => (
           <li key={v.name} className="min-w-0">
             <button

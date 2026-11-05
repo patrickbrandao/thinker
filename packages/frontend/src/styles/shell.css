@@ -620,6 +620,15 @@
     padding: 12px 18px;
     border-top: 1px solid var(--border);
   }
+  /* Variable-height sections inside a floating window scroll on their own. */
+  .floating-window .scroll-section {
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .trigger-editor .trigger-template {
+    resize: vertical;
+    max-height: 320px;
+  }
   .floating-window-head {
     flex: none;
     cursor: move;
