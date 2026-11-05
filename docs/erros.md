@@ -71,6 +71,10 @@ As duas correções ficam na tela Routing do harness. O cabeçalho `X-Thinker-Vi
 
 **Modelo indisponível.** O modelo pedido não está disponível para este agente. Use `GET /v1/models` para listar os IDs disponíveis, ou habilite o provedor para o agente no dashboard.
 
+## M303
+
+**Estado de resposta não suportado.** A requisição da Responses API trouxe `previous_response_id`, `conversation` ou um item `item_reference`. O Thinker não guarda respostas, então não consegue resolver essas referências. Reenvie a conversa inteira em `input` com `store: false` (no Vercel AI SDK, `providerOptions: { openai: { store: false } }`).
+
 ## M500
 
 **Erro interno.** Algo falhou no Thinker. Tente de novo em instantes; se persistir, veja os logs do servidor.

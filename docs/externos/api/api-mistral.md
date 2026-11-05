@@ -129,8 +129,8 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | oportunidade | `reasoning_effort` (Small 4, Medium 3.5, Large 4) é removido para `mistral`; `thinking` Anthropic vai sem tradução (`provider-client-converters.ts:468`) | providers | [#434](https://github.com/patrickbrandao/thinker/issues/434) | aberta |
-| G2 | degradação | Raciocínio volta como lista de blocos em `content`, sem conversão para `reasoning_content` nem para blocos thinking da Anthropic (não confirmado em tráfego real) | providers | [#435](https://github.com/patrickbrandao/thinker/issues/435) | aberta |
+| G1 | oportunidade | `reasoning_effort` (Small 4, Medium 3.5, Large 4) é removido para `mistral`; `thinking` Anthropic vai sem tradução (`provider-client-converters.ts:468`) | providers | [#434](https://github.com/patrickbrandao/thinker/issues/434) | resolvida (normalização de reasoning na entrada e na saída) |
+| G2 | degradação | Raciocínio volta como lista de blocos em `content`, sem conversão para `reasoning_content` nem para blocos thinking da Anthropic (não confirmado em tráfego real) | providers | [#435](https://github.com/patrickbrandao/thinker/issues/435) | resolvida (normalização de reasoning na entrada e na saída) |
 | G3 | degradação | `parseMistral` oculta modelos com `deprecation`, mas Medium 3.5 e Large 3 seguem ativos até 2027-04-30; Large 4 precisa entrar na descoberta | providers | [#436](https://github.com/patrickbrandao/thinker/issues/436) | aberta |
 | G4 | degradação | Regex de inferência não cobre `ministral-`, `magistral-`, `devstral-`, `voxtral-` | providers | [#437](https://github.com/patrickbrandao/thinker/issues/437) | aberta |
 

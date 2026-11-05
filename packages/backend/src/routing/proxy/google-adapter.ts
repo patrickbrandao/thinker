@@ -211,6 +211,12 @@ function messageToContent(
       } else if (block.type === 'image_url' || block.type === 'input_image') {
         const imagePart = imageUrlToGooglePart(block.image_url);
         if (imagePart) parts.push(imagePart);
+      } else if (block.type === 'file') {
+        // A PDF attachment (Chat `file` part with an inline data URL).
+        const fileData = (block as { file?: { file_data?: unknown } }).file?.file_data;
+        const match =
+          typeof fileData === 'string' ? /^data:([^;]+);base64,(.*)$/s.exec(fileData) : null;
+        if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
       }
     }
   }
@@ -261,7 +267,14 @@ function messageToContent(
     // Resolve the real function name from the tool_call history. Falling back
     // to the id (or 'unknown') is wrong semantically but avoids hard failures
     // for clients that drop tool_calls from history; Gemini 2.x tolerates it.
-    const functionName = toolNamesById.get(toolCallId) || 'unknown';
+    const functionName = toolNamesById.get(toolCallId);
+    // Gemini 3.x/4 require every functionResponse to match an earlier call by
+    // id and name (api-gemini G3). A result whose call is gone from the
+    // history (pruned, compacted, another model's turn) goes in as text.
+    if (!functionName) {
+      const label = toolCallId ? ` ${toolCallId}` : '';
+      return { role: 'user', parts: [{ text: `Tool result${label}:\n${toolResult}` }] };
+    }
     const functionResponse: GeminiFunctionResponse = {
       name: functionName,
       response: { result: toolResult },
@@ -562,8 +575,15 @@ function mapFinishReason(candidate: Record<string, unknown>, hasToolCalls = fals
   }
   const map: Record<string, string> = {
     MAX_TOKENS: 'length',
+    CONTINUATION: 'length',
     SAFETY: 'content_filter',
     RECITATION: 'content_filter',
+    BLOCKLIST: 'content_filter',
+    PROHIBITED_CONTENT: 'content_filter',
+    SPII: 'content_filter',
+    IMAGE_SAFETY: 'content_filter',
+    IMAGE_PROHIBITED_CONTENT: 'content_filter',
+    IMAGE_RECITATION: 'content_filter',
   };
   return map[reason] ?? 'stop';
 }
@@ -727,4 +747,54 @@ export function finishGoogleStream(state: GoogleStreamState, model: string): str
   if (state.usageSent || !state.usage) return null;
   state.usageSent = true;
   return usageChunk(state, state.usage, model);
+}
+
+/**
+ * Finish reasons that mean the model failed rather than finished (api-gemini
+ * G4): the turn is unusable, so another route should get the request.
+ */
+const GOOGLE_FAILURE_FINISH_REASONS = new Set([
+  'MALFORMED_FUNCTION_CALL',
+  'MISSING_THOUGHT_SIGNATURE',
+  'UNEXPECTED_TOOL_CALL',
+  'TOO_MANY_TOOL_CALLS',
+  'MALFORMED_RESPONSE',
+]);
+
+/**
+ * An OpenAI-shaped error for a non-streaming Gemini body that carries no
+ * usable answer: a blocked prompt (400) or a failed generation (502, eligible
+ * for fallback). Null when the body is a normal answer.
+ */
+export function googleResponseFailure(
+  googleResp: Record<string, unknown>,
+): { status: number; body: Record<string, unknown> } | null {
+  const candidates = Array.isArray(googleResp.candidates) ? googleResp.candidates : [];
+  const feedback = googleResp.promptFeedback as { blockReason?: unknown } | undefined;
+  if (candidates.length === 0 && typeof feedback?.blockReason === 'string') {
+    return {
+      status: 400,
+      body: {
+        error: {
+          message: `Gemini blocked the prompt (${feedback.blockReason}).`,
+          type: 'invalid_request_error',
+          code: 'prompt_blocked',
+        },
+      },
+    };
+  }
+  const reason = (candidates[0] as { finishReason?: unknown } | undefined)?.finishReason;
+  if (typeof reason === 'string' && GOOGLE_FAILURE_FINISH_REASONS.has(reason)) {
+    return {
+      status: 502,
+      body: {
+        error: {
+          message: `Gemini stopped with ${reason}.`,
+          type: 'server_error',
+          code: reason.toLowerCase(),
+        },
+      },
+    };
+  }
+  return null;
 }

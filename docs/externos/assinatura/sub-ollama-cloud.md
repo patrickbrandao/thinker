@@ -129,7 +129,7 @@ Arquivos que citam `ollama-cloud`:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `tool_choice`, `user`, `n`, `logit_bias`, `logprobs` não são suportados em `/v1/chat/completions`, mas seguem no pedido (só `thinking` é removido). Se ignorados, tool forçada falha em silêncio; se rejeitados, 400 `(não confirmado)`. | providers | [#338](https://github.com/patrickbrandao/thinker/issues/338) | aberta |
+| G1 | degradação | `tool_choice`, `user`, `n`, `logit_bias`, `logprobs` não são suportados em `/v1/chat/completions`, mas seguem no pedido (só `thinking` é removido). Se ignorados, tool forçada falha em silêncio; se rejeitados, 400 `(não confirmado)`. | providers | [#338](https://github.com/patrickbrandao/thinker/issues/338) | resolvida (política de parâmetros: param-policy.ts) |
 | G2 | oportunidade | Cobrança agora é por créditos em tokens; `parseOllama` grava preço 0, então o custo no Thinker fica 0 mesmo consumindo créditos. Preços por modelo não estão em fonte pública vista (`(não confirmado)`); avaliar models.dev. | providers | — | aberta |
 | G3 | oportunidade | `/v1/messages` nativo (thinking, tools, sem cache) permitiria passthrough Anthropic sem conversão; exige `anthropic-version` e Bearer. | providers | — | aberta |
 | G4 | oportunidade | Concorrência de 3 (Pro/Pay as you go) ou 10 (Max) com fila finita; limitar paralelismo por conexão evitaria rejeições. Código da rejeição desconhecido. | backend-dev | — | aberta |

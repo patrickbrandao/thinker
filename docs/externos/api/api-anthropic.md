@@ -189,7 +189,7 @@ Pontos no código:
 | G2 | degradação | Custo de escrita de cache usa um preço só; escrita de 1h custa 2x (não 1,25x) e o detalhe `cache_creation.ephemeral_1h_input_tokens` não é lido. Leitura 0,05x e 0,025x dos modelos 5.x depende do catálogo (não confirmado) | backend-dev | [#402](https://github.com/patrickbrandao/thinker/issues/402) | aberta |
 | G3 | quebra | `temperature`/`top_p`/`top_k` seguem no pedido e dão 400 em Claude 4.7+ com valor não padrão. Mudança: remover por família de modelo | providers | [#403](https://github.com/patrickbrandao/thinker/issues/403) | resolvida (política de parâmetros: sampling removido em Claude 4.7+) |
 | G4 | quebra | `tool_choice` `any`/`tool` (de `required`/função nomeada ou do corpo nativo) dá 400 em Fable 5.1, Mythos 5.1, Opus 5.5 e Sonnet 5.5. Mudança: rebaixar para `auto` ou erro claro | providers | [#404](https://github.com/patrickbrandao/thinker/issues/404) | resolvida (tool_choice any/tool rebaixado para auto) |
-| G5 | oportunidade | `reasoning_effort` do Chat Completions não vira `output_config.effort` e `thinking` não é traduzido por modelo (`enabled` com `budget_tokens` dá 400 em 4.7+; `disabled` dá 400 em Fable/Opus 5.5/Sonnet 5.5) | providers | [#405](https://github.com/patrickbrandao/thinker/issues/405) | aberta |
+| G5 | oportunidade | `reasoning_effort` do Chat Completions não vira `output_config.effort` e `thinking` não é traduzido por modelo (`enabled` com `budget_tokens` dá 400 em 4.7+; `disabled` dá 400 em Fable/Opus 5.5/Sonnet 5.5) | providers | [#405](https://github.com/patrickbrandao/thinker/issues/405) | resolvida (normalização de reasoning na entrada e na saída) |
 
 Observações sem lacuna aberta:
 

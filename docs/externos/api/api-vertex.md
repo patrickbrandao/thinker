@@ -94,7 +94,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | O vertex reutiliza o tradutor `format: 'google'`; valem para ele as lacunas do Gemini API: thinking não vira `thinkingConfig`, `functionResponse` sem id, `thoughtSignature` descartada, `finishReason` novos | providers | #421, #422, #423, #424 (mesma causa, `api-gemini`) | aberta |
+| G1 | degradação | O vertex reutiliza o tradutor `format: 'google'`; valem para ele as lacunas do Gemini API: thinking não vira `thinkingConfig`, `functionResponse` sem id, `thoughtSignature` descartada, `finishReason` novos | providers | #421, #422, #423, #424 (mesma causa, `api-gemini`) | aberta (#421, #423 e #424 resolvidas; falta #422, que precisa de validação com chave) |
 | G2 | degradação | `gemini-2.5-*` aposentados em 2026-10-20, `gemini-3.6-flash` em 2026-11-19; Thinker não sinaliza ids aposentados | providers | #430 | aberta |
 | G3 | degradação | Sem UI para projeto/localização; express cobre só 8 modelos, o resto do catálogo atual exige modo projeto | frontend-dev | #431 | aberta |
 | G4 | oportunidade | Claude em Vertex (rawPredict/streamRawPredict) e rota OpenAI-compatível não são usados; docs não esclarecem endpoints | providers | — | aberta (investigar com conta real) |

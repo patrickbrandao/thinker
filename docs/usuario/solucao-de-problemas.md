@@ -16,6 +16,7 @@ Erros gerados pelo próprio Thinker (e não pelo provedor) aparecem como `[🦚 
 | `M201`, `M202`, `M203` | Limite de requisições por tenant, por IP ou de concorrência. | Aguarde; ajuste `THINKER_RATE_MAX_REQUESTS`, `THINKER_IP_RATE_MAX_REQUESTS` ou `THINKER_CONCURRENCY_MAX`. |
 | `M300` | Falta `messages` no corpo. | Envie o campo `messages`. |
 | `M302` | O modelo pedido não está disponível para o harness. | Use um ID de `GET /v1/models` ou habilite o provedor. |
+| `M303` | `previous_response_id`, `conversation` ou `item_reference` na Responses API. O Thinker não guarda respostas. | Reenvie a conversa inteira em `input` com `store: false` (no Vercel AI SDK, `providerOptions: { openai: { store: false } }`). |
 | `M500` | Erro interno. | Veja `docker compose logs thinker`. |
 
 Quando todos os modelos do tier falham, o cliente recebe o erro do provedor da última tentativa, sem código `M###`. Consulte o log de requisições do harness para ver cada tentativa.

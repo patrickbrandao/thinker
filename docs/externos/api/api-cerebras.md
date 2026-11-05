@@ -113,7 +113,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | Cerebras devolve reasoning em `message.reasoning` / `delta.reasoning`, não `reasoning_content`; o Thinker não normaliza, então o raciocínio de `gpt-oss-120b`/`qwen-3.8-27b` não chega a clientes como `reasoning_content` (e pode ser perdido em conversão para Anthropic). Sugestão: mapear `reasoning` para `reasoning_content` no parse de provider `cerebras`. Causa distinta das lacunas de outros providers (nenhuma issue existente sobre Cerebras). | backend-dev | #416 | aberta |
+| G1 | degradação | Cerebras devolve reasoning em `message.reasoning` / `delta.reasoning`, não `reasoning_content`; o Thinker não normaliza, então o raciocínio de `gpt-oss-120b`/`qwen-3.8-27b` não chega a clientes como `reasoning_content` (e pode ser perdido em conversão para Anthropic). Sugestão: mapear `reasoning` para `reasoning_content` no parse de provider `cerebras`. Causa distinta das lacunas de outros providers (nenhuma issue existente sobre Cerebras). | backend-dev | #416 | resolvida (normalização de reasoning na entrada e na saída) |
 | G2 | oportunidade | Sem preços conhecidos para Cerebras (pricing sem tabela pública; depende do sync models.dev). Verificar com conta real e, se preciso, adicionar em `known-model-prices.ts`. | providers | — | aberta |
 | G3 | oportunidade | `reasoning_effort` por modelo (`none` só em `qwen-3.8-27b`/`gemma-4-31b`; `max` em `kimi-k3`/`glm-5.3-flash`) e `clear_thinking` não são tratados; valor inválido retorna 400. | providers | — | aberta |
 

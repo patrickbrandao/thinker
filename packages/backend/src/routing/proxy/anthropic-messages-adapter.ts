@@ -181,6 +181,53 @@ function flushToolImages(messages: OpenAIMessage[], pendingToolImages: JsonRecor
   pendingToolImages.length = 0;
 }
 
+/**
+ * A `document` / `search_result` block as chat parts (harness-anthropic-sdk
+ * G5). Plain text and nested content become text; a base64 PDF becomes an
+ * OpenAI `file` part; anything else is named in a text note instead of being
+ * dropped without a trace.
+ */
+function documentBlockToParts(block: JsonRecord): JsonRecord[] {
+  const title = typeof block.title === 'string' && block.title ? `${block.title}\n` : '';
+  if (block.type === 'search_result') {
+    const source = typeof block.source === 'string' ? ` (${block.source})` : '';
+    const text = Array.isArray(block.content) ? systemToString(block.content) : '';
+    return [{ type: 'text', text: `${title}${text}${source}`.trim() }];
+  }
+  const source = isRecord(block.source) ? block.source : {};
+  if (source.type === 'text' && typeof source.data === 'string') {
+    return [{ type: 'text', text: `${title}${source.data}` }];
+  }
+  if (source.type === 'content') {
+    const content = source.content;
+    if (typeof content === 'string') return [{ type: 'text', text: `${title}${content}` }];
+    if (Array.isArray(content)) {
+      return content.filter(isRecord).flatMap((part): JsonRecord[] => {
+        if (part.type === 'text' && typeof part.text === 'string')
+          return [{ type: 'text', text: part.text }];
+        const image = part.type === 'image' ? imageBlockToImagePart(part) : null;
+        return image ? [image] : [];
+      });
+    }
+  }
+  if (source.type === 'base64' && typeof source.data === 'string') {
+    const mediaType = typeof source.media_type === 'string' ? source.media_type : 'application/pdf';
+    const filename = typeof block.title === 'string' && block.title ? block.title : 'document.pdf';
+    return [
+      { type: 'file', file: { filename, file_data: `data:${mediaType};base64,${source.data}` } },
+    ];
+  }
+  if (source.type === 'url' && typeof source.url === 'string') {
+    return [{ type: 'text', text: `${title}[Document: ${source.url}]` }];
+  }
+  return [
+    {
+      type: 'text',
+      text: `[A document attachment (source type "${String(source.type ?? 'unknown')}") was omitted: this route cannot carry it.]`,
+    },
+  ];
+}
+
 function buildUserMessages(content: unknown, pendingToolImages: JsonRecord[]): OpenAIMessage[] {
   // Walk Anthropic content blocks in input order and emit chat_completions
   // messages without reshuffling. Each `tool_result` becomes a standalone
@@ -229,6 +276,14 @@ function buildUserMessages(content: unknown, pendingToolImages: JsonRecord[]): O
       flushToolImages(messages, pendingToolImages);
       const part = imageBlockToImagePart(block);
       if (part) pendingParts.push(part);
+    } else if (block.type === 'document' || block.type === 'search_result') {
+      flushToolImages(messages, pendingToolImages);
+      // Keep a document apart from the text around it once parts are joined.
+      pendingParts.push(
+        ...documentBlockToParts(block).map((part) =>
+          part.type === 'text' ? { ...part, text: `\n\n${String(part.text)}\n\n` } : part,
+        ),
+      );
     }
   }
   flushPendingUser();
@@ -321,12 +376,20 @@ export function messagesToChatCompletionsRequest(body: JsonRecord): JsonRecord {
   const messages: OpenAIMessage[] = [];
   const pendingToolImages: JsonRecord[] = [];
 
-  const systemText = systemToString(body.system);
-  if (systemText) messages.push({ role: 'system', content: systemText });
-
+  // API 2026-10-21 allows `role: system` inside `messages`. Many Chat hosts
+  // reject a system message mid-conversation, so its text joins the leading
+  // system message instead of turning into user text (harness-anthropic-sdk G4).
+  const systemParts = [systemToString(body.system)];
   const inputMessages = Array.isArray(body.messages) ? body.messages : [];
   for (const item of inputMessages) {
+    if (isRecord(item) && item.role === 'system') systemParts.push(systemToString(item.content));
+  }
+  const systemText = systemParts.filter(Boolean).join('\n\n');
+  if (systemText) messages.push({ role: 'system', content: systemText });
+
+  for (const item of inputMessages) {
     if (!isRecord(item)) continue;
+    if (item.role === 'system') continue;
     const role = item.role === 'assistant' ? 'assistant' : 'user';
     if (role === 'assistant') {
       flushToolImages(messages, pendingToolImages);
