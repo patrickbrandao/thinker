@@ -23,6 +23,7 @@ Do the work yourself by default; it is usually faster than delegating. Use a sub
 | Need | Agent |
 |---|---|
 | Upstream changes / should we port X? | `manifest-tracker` |
+| LiteLLM: features, comparison, how does LiteLLM do X? | `litellm-expert` |
 | Large cross-cutting design | `architect` |
 | NestJS / TypeORM / auth / proxy code | `backend-dev` |
 | React dashboard | `frontend-dev` |

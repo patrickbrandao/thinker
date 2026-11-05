@@ -111,7 +111,7 @@ DATABASE_URL=postgresql://usuario:senha@localhost:PORTA/thinker_dev_<aleatorio>
 SEED_DATA=true
 ```
 
-**Use um banco novo por sessão** e dê a ele um nome único (`thinker_<contexto>_<aleatório>`), para instâncias concorrentes não poluírem os dados umas das outras. Suba um PostgreSQL descartável pelo Docker numa **porta livre** (não use as portas 5432/5433 nem contêineres de outros projetos). `SEED_DATA=true` (só em dev/teste; ignorado com `NODE_ENV=production`) cria o admin `admin@thinker.example.com` / `thinker`, o harness `demo-agent` e dados de exemplo.
+**Use um banco novo por sessão** e dê a ele um nome único (`thinker_<contexto>_<aleatório>`), para instâncias concorrentes não poluírem os dados umas das outras. Suba um PostgreSQL descartável pelo Docker numa **porta livre** (não use as portas 5432/5433 nem contêineres de outros projetos). `SEED_DATA=true` (só em dev/teste; ignorado com `NODE_ENV=production`) cria o admin `admin@thinker.example.com` / `thinker123`, o harness `demo-agent` e dados de exemplo.
 
 ### Testes
 

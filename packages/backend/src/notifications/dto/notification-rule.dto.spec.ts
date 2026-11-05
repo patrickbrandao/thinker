@@ -170,3 +170,50 @@ describe('UpdateNotificationRuleDto', () => {
     expect(dto.is_active).toBe(false);
   });
 });
+
+describe('threshold minimum per metric', () => {
+  const base = { agent_name: 'demo-agent', period: 'day' };
+
+  it('accepts cents for cost limits', async () => {
+    for (const threshold of [0.5, 0.01, 12.34]) {
+      const dto = plainToInstance(CreateNotificationRuleDto, {
+        ...base,
+        metric_type: 'cost',
+        threshold,
+      });
+      expect(await validate(dto)).toHaveLength(0);
+    }
+  });
+
+  it('rejects cost thresholds of 0 or with more than 2 decimals', async () => {
+    for (const threshold of [0, 0.001, 1.005]) {
+      const dto = plainToInstance(CreateNotificationRuleDto, {
+        ...base,
+        metric_type: 'cost',
+        threshold,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(JSON.stringify(errors[0].constraints)).toContain('minimum 0.01');
+    }
+  });
+
+  it('rejects fractional token thresholds', async () => {
+    const dto = plainToInstance(CreateNotificationRuleDto, {
+      ...base,
+      metric_type: 'tokens',
+      threshold: 0.5,
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(JSON.stringify(errors[0].constraints)).toContain('whole number');
+  });
+
+  it('accepts cents on update when the metric is cost', async () => {
+    const dto = plainToInstance(UpdateNotificationRuleDto, {
+      metric_type: 'cost',
+      threshold: 0.25,
+    });
+    expect(await validate(dto)).toHaveLength(0);
+  });
+});

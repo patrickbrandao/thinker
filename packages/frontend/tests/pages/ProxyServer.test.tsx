@@ -69,7 +69,7 @@ const saveChanges = () => screen.getByRole('button', { name: 'Save changes' });
 async function openExisting(over = {}, tab = '') {
   api.getProxy.mockResolvedValue(existing(over));
   renderPage(`/proxy-servers/p1${tab}`);
-  await screen.findByRole('heading', { name: 'Alpha' });
+  await screen.findByRole('tablist', { name: 'Alpha' });
 }
 
 describe('ProxyServer page', () => {
@@ -107,7 +107,7 @@ describe('ProxyServer page', () => {
       expect(await screen.findByText('proxy not found')).toBeTruthy();
       expect(screen.getByRole('link', { name: '← Proxy configuration' })).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-      expect(await screen.findByRole('heading', { name: 'Alpha' })).toBeTruthy();
+      expect(await screen.findByRole('tablist', { name: 'Alpha' })).toBeTruthy();
     });
 
     it('shows name, status, endpoint and the debug badge in the header', async () => {
@@ -121,7 +121,7 @@ describe('ProxyServer page', () => {
   describe('creating a proxy', () => {
     it('opens a blank form with defaults and without the existing-proxy panels or tabs', () => {
       renderPage('/proxy-servers/new');
-      expect(screen.getByRole('heading', { name: 'New proxy server' })).toBeTruthy();
+      expect(screen.queryByRole('heading', { name: 'New proxy server' })).toBeNull();
       expect(api.getProxy).not.toHaveBeenCalled();
       expect(screen.queryByRole('tablist')).toBeNull();
       expect(nameInput().value).toBe('');
@@ -377,7 +377,7 @@ describe('ProxyServer page', () => {
       await user.clear(nameInput());
       await user.type(nameInput(), 'Renamed');
       fireEvent.click(saveChanges());
-      expect(await screen.findByRole('heading', { name: 'Renamed' })).toBeTruthy();
+      expect(await screen.findByRole('tablist', { name: 'Renamed' })).toBeTruthy();
       expect(screen.getByTestId('where').textContent).toBe('/proxy-servers/p1');
     });
   });
@@ -577,7 +577,7 @@ describe('ProxyServer page', () => {
       resetLocaleForTests('pt-BR');
       api.getProxy.mockResolvedValue(existing({ suggested_test_url: 'https://x.io/' }));
       renderPage('/proxy-servers/p1');
-      await screen.findByRole('heading', { name: 'Alpha' });
+      await screen.findByRole('tablist', { name: 'Alpha' });
       expect(screen.getByLabelText(t('proxies.form.host'))).toBeTruthy();
       expect(screen.getByRole('tab', { name: t('proxies.tabs.logs') })).toBeTruthy();
       expect(screen.getByRole('button', { name: t('proxies.test.run') })).toBeTruthy();

@@ -1180,7 +1180,7 @@ describe('ConnectionDetail (analytics)', () => {
 
     renderPage(<ConnectionDetail />);
 
-    await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
+    await waitFor(() => expect(screen.getAllByText('Custom').length).toBeGreaterThan(0));
     // "Custom" appears both as the badge and as the connection label.
     expect(screen.getAllByText('Custom').length).toBeGreaterThan(0);
     expect(screen.getByText('Inactive')).toBeDefined();
@@ -1189,8 +1189,8 @@ describe('ConnectionDetail (analytics)', () => {
     expect(screen.getByText('No harnesses have used this provider yet.')).toBeDefined();
     // Manage button is present even for inactive connections.
     expect(screen.getByText('Manage')).toBeDefined();
-    // back link points to subscriptions for subscription auth type
-    expect(screen.getByText(/Subscriptions/)).toBeDefined();
+    // The back link lives in the top bar breadcrumb now, not in the page.
+    expect(screen.queryByText(/← Subscriptions/)).toBeNull();
   });
 
   it('requires typing an inactive connection name before deleting usage history', async () => {
@@ -1330,7 +1330,7 @@ describe('ConnectionDetail (analytics)', () => {
     });
 
     renderPage(<ConnectionDetail />);
-    await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
+    await waitFor(() => expect(screen.getAllByText('Custom').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
     // Custom providers open the CustomProviderForm in edit mode
@@ -1353,7 +1353,7 @@ describe('ConnectionDetail (analytics)', () => {
   it('closes the custom provider edit modal and refetches on onCreated', async () => {
     setupCustomConnectionDetail();
     renderPage(<ConnectionDetail />);
-    await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
+    await waitFor(() => expect(screen.getAllByText('Custom').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
     await waitFor(() => expect(screen.getByTestId('custom-provider-form')).toBeDefined());
@@ -1369,7 +1369,7 @@ describe('ConnectionDetail (analytics)', () => {
   it('closes the custom provider edit modal on onBack', async () => {
     setupCustomConnectionDetail();
     renderPage(<ConnectionDetail />);
-    await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
+    await waitFor(() => expect(screen.getAllByText('Custom').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
     await waitFor(() => expect(screen.getByTestId('custom-provider-form')).toBeDefined());
@@ -1383,7 +1383,7 @@ describe('ConnectionDetail (analytics)', () => {
   it('closes the custom provider edit modal and navigates back on onDeleted', async () => {
     setupCustomConnectionDetail();
     renderPage(<ConnectionDetail />);
-    await waitFor(() => expect(screen.getByText('Custom Provider')).toBeDefined());
+    await waitFor(() => expect(screen.getAllByText('Custom').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
     await waitFor(() => expect(screen.getByTestId('custom-provider-form')).toBeDefined());

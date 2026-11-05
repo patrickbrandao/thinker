@@ -142,6 +142,8 @@ describe('shell, auth and organization screens in pt-BR', () => {
     expect(screen.getByRole('link', { name: 'Por uso' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Assinaturas' })).toBeTruthy();
     expect(screen.getByText('PROVEDORES')).toBeTruthy();
+    expect(screen.getByText('CLIENTES')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Harnesses' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeTruthy();
   });
 

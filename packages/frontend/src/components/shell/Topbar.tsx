@@ -19,6 +19,7 @@ import {
   connectionBreadcrumbBackLabel,
   connectionBreadcrumbSignal,
 } from '../../services/connection-breadcrumb-store.js';
+import { pageBreadcrumbSignal } from '../../services/page-breadcrumb-store.js';
 import { THINKER_DOCS_URL, THINKER_PROVIDERS_DOCS_URL } from '../../services/thinker-links.js';
 import { effectiveTheme, themePreference, toggleTheme } from '../../lib/theme.js';
 import { useSignal } from '../../lib/signal.js';
@@ -42,6 +43,7 @@ export default function Topbar({
   const displayName = useSignal(agentDisplayNameSignal);
   useSignal(agentPlatformSignal);
   const connection = useSignal(connectionBreadcrumbSignal);
+  const pageCrumb = useSignal(pageBreadcrumbSignal);
   useSignal(themePreference);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
 
@@ -115,6 +117,15 @@ export default function Topbar({
             {connection.providerId ? providerIcon(connection.providerId, 14) : null}
             <span className="crumb-current">{connection.name}</span>
             {connection.label ? <span className="badge">{connection.label}</span> : null}
+          </>
+        ) : section && pageCrumb.name && pageCrumb.path === pathname ? (
+          <>
+            <Link to={section.to} className="inline-flex items-center gap-1.5">
+              <section.icon aria-hidden="true" />
+              {navLabel(section)}
+            </Link>
+            <ChevronRight aria-hidden="true" />
+            <span className="crumb-current">{pageCrumb.name}</span>
           </>
         ) : addPageLabel && section ? (
           <>

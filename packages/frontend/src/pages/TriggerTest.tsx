@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { FlaskConical, RotateCcw, Send } from 'lucide-react';
 import { TRIGGER_EVENT_TYPES, type TriggerEventType } from 'thinker-shared';
 import ErrorState from '../components/ErrorState.js';
@@ -23,6 +23,7 @@ import {
   type WebhookTriggerConfigView,
 } from '../services/api/triggers.js';
 import { roleCan } from '../services/session-store.js';
+import { setPageBreadcrumb } from '../services/page-breadcrumb-store.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 
@@ -91,6 +92,10 @@ export default function TriggerTest() {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TriggerTestResult | null>(null);
 
+  useEffect(() => {
+    setPageBreadcrumb(t('triggers.test.crumb'), '/triggers/test');
+    return () => setPageBreadcrumb(null);
+  }, []);
   useEffect(() => setVars(defaults), [defaults]);
   useEffect(() => setResult(null), [triggerId]);
 
@@ -118,14 +123,7 @@ export default function TriggerTest() {
     <div className="page">
       <title>{t('common.pageTitle', { page: t('triggers.test.title') })}</title>
 
-      <Link to="/triggers" className="text-sm text-muted hover:text-ink">
-        {t('triggers.test.back')}
-      </Link>
-      <h1 className="mt-2 flex items-center gap-2">
-        <FlaskConical aria-hidden="true" className="size-5 text-muted" />
-        {t('triggers.test.title')}
-      </h1>
-      <p className="mb-5 mt-1 max-w-3xl text-sm text-muted">{t('triggers.test.subtitle')}</p>
+      <p className="mb-5 max-w-3xl text-sm text-muted">{t('triggers.test.subtitle')}</p>
 
       {!canManage ? (
         <div className="notice is-info">

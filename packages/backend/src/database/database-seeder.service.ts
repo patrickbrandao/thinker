@@ -201,7 +201,7 @@ export class DatabaseSeederService implements OnModuleInit {
       auth.api.signUpEmail({
         body: {
           email: 'admin@thinker.example.com',
-          password: 'thinker',
+          password: 'thinker123',
           name: 'Admin',
         },
       }),
@@ -269,6 +269,13 @@ export class DatabaseSeederService implements OnModuleInit {
       email: 'admin@thinker.example.com',
       is_active: true,
     });
+    // Membership is what the dashboard reads; without it the admin lands on
+    // "No organization".
+    await this.dataSource.query(
+      `INSERT INTO organization_members (tenant_id, user_id, role) VALUES ($1, $2, 'owner')
+       ON CONFLICT DO NOTHING`,
+      [SEED_TENANT_ID, userId],
+    );
 
     await this.agentRepo.insert({
       id: SEED_AGENT_ID,

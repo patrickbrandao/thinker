@@ -102,7 +102,7 @@ The frontend runs on `http://localhost:3000` and proxies API requests to the bac
 
 `npm run dev` is filtered to exactly `thinker-frontend` — adding a new workspace with a `dev` script will not silently join the dev set.
 
-5. With `SEED_DATA=true`, you can log in with `admin@thinker.example.com` / `thinker`.
+5. With `SEED_DATA=true`, you can log in with `admin@thinker.example.com` / `thinker123`.
 
 ## Testing Routing with AI agents
 

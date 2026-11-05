@@ -16,12 +16,7 @@ import { platformIcon } from 'thinker-shared';
 import { PROVIDERS } from '../../services/providers.js';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import FilterSelect from '../../components/FilterSelect.jsx';
-import {
-  formatNumber,
-  formatCost,
-  formatTimeAgo,
-  customProviderColor,
-} from '../../services/formatters.js';
+import { formatNumber, formatCost, formatTimeAgo } from '../../services/formatters.js';
 import { getAgents, getCustomProviders as fetchCustomProviders } from '../../services/api.js';
 import {
   renameConnection,
@@ -259,7 +254,6 @@ const ConnectionDetail = () => {
       : (provider ?? '');
 
   const backLink = backLinkFor(authType);
-  const backLabel = backLabelFor(authType);
 
   // Set breadcrumb for the topbar; cleared when the page unmounts.
   useEffect(() => {
@@ -687,7 +681,6 @@ const ConnectionDetail = () => {
   const c = conn;
   const data = detail.data;
   const b = breakdown.data;
-  const icon32 = providerIcon(c.provider, 32);
   const totalCost = (() => {
     const ts = agentCostTimeseries.data;
     if (!ts) return undefined;
@@ -713,29 +706,9 @@ const ConnectionDetail = () => {
         {t('providers.detail.pageTitle', { provider: providerDisplayName, label: c.label })}
       </title>
 
-      <div className="mb-4">
-        <Link to={backLink} className="text-sm text-muted no-underline hover:text-ink">
-          ← {backLabel}
-        </Link>
-      </div>
-
       <div className="page-head">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="flex size-8 shrink-0 items-center">
-              {icon32 ?? (
-                <span
-                  className="inline-flex size-8 items-center justify-center rounded-control text-base font-bold text-on-accent"
-                  style={{ background: customProviderColor(providerDisplayName) }}
-                >
-                  {providerDisplayName.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </span>
-            <h1 className="flex flex-wrap items-baseline gap-2">
-              {providerDisplayName}
-              <span className="text-sm font-normal text-muted">{c.label}</span>
-            </h1>
             <div className="flex items-center gap-2">
               {isCustomProvider ? <Badge tone="outline">{t('providers.custom')}</Badge> : null}
               {c.is_active ? (
