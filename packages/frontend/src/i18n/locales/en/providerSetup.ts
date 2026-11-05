@@ -279,7 +279,16 @@ export default {
       tokenHint:
         'Paste a key created in the OpenCode Console. Inference works, but there is no quota meter: a key does not say which organization it belongs to.',
     },
-    commandCodeRequirement: 'Requires Command Code Pro or higher.',
+    commandCodeRequirement: 'Requires a Command Code plan with API access (any plan except Go).',
+    termsWarning: {
+      gemini:
+        "Google's terms forbid using the Gemini CLI sign-in from third-party software; the account may be suspended. A Gemini API key under Usage-based providers is the supported path.",
+      qwen: 'The Token Plan is meant for interactive coding tools; automated scripts and app backends are not allowed. Gateway traffic may be treated as automation and the key suspended.',
+      xiaomi:
+        'The MiMo Token Plan quota only covers coding tools; scripts and app backends are forbidden and the key may be blocked.',
+      zai: 'Use a GLM Coding Plan key: a Standard key does not draw on the plan and bills your balance. The plan is limited to officially supported coding tools; violations may lead to throttling or a ban.',
+      xai: 'Thinker reaches the Grok subscription through the official Grok CLI proxy and identifies as that client. xAI publishes no terms allowing third-party gateways; use at your own risk.',
+    },
     geminiClosed:
       'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',
     minimaxMethod: {

@@ -233,7 +233,7 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     supportsSubscription: true as const,
     subscriptionLabel: 'GLM Coding Plan',
     subscriptionAuthMode: 'token' as const,
-    subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+    subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
     knownModels: Object.freeze([
       'glm-5.3',
       'glm-5.3-flash',

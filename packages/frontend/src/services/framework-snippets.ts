@@ -231,7 +231,11 @@ export function getPythonSnippets(
   apiKey: string,
   customHeaders?: CustomHeaders,
 ): Snippet[] {
-  const langchainHeaders = headerLine(customHeaders, 'py-kwarg', 'default_headers');
+  // LangChain sends no session id of its own: a per-conversation
+  // x-session-key groups the conversation in Thinker (harness-langchain G1).
+  const langchainHeaders =
+    headerLine(customHeaders, 'py-kwarg', 'default_headers') ||
+    '\n    # default_headers={"x-session-key": "<conversation id>"},';
   const openaiHeaders = headerLine(customHeaders, 'py-kwarg', 'default_headers');
   return [
     {

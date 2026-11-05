@@ -104,7 +104,11 @@ function getN8nSnippet(baseUrl: string, apiKey: string): string {
 # LLM Chain. Create an OpenAI credential with:
 #   Base URL: ${baseUrl}
 #   API Key:  ${apiKey}
-#   Model:    auto`;
+#   Model:    auto
+# n8n sends no session id: in the credential, use "Add Custom Header" with
+#   Name:  x-session-key
+#   Value: a name for this workflow (one credential per workflow keeps
+#          each workflow's requests together).`;
 }
 
 /** Which platforms have a first-class setup snippet, and which function renders it. */

@@ -22,8 +22,10 @@ interface Props {
   baseUrl: string;
 }
 
+// A named provider entry: only it can declare `session_affinity_header`, which
+// makes Hermes send its conversation id so Thinker groups each conversation.
 const yaml = (baseUrl: string, key: string) =>
-  `model:\n  provider: custom\n  base_url: ${baseUrl}\n  api_key: ${key}\n  default: auto`;
+  `providers:\n  thinker:\n    api: ${baseUrl}\n    api_key: ${key}\n    session_affinity_header: x-session-key\nmodel:\n  provider: custom:thinker\n  default: auto`;
 
 export default function HermesSetup({ apiKey, keyPrefix, baseUrl }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('cli');

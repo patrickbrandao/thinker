@@ -415,7 +415,7 @@ describe('ProviderKeyForm', () => {
         supportsSubscription: true,
         subscriptionAuthMode: 'token',
         subscriptionCredentialKind: 'api-key',
-        subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+        subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
         subscriptionEndpointRegions: [
           { value: 'global', label: 'Outside China (api.z.ai)' },
           { value: 'cn', label: 'China Mainland (open.bigmodel.cn)' },

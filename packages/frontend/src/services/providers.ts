@@ -34,6 +34,8 @@ export interface ProviderDef {
   subscriptionKeyPlaceholder?: string;
   /** Optional note shown near the subscription credential field. */
   subscriptionRequirementNote?: string;
+  /** Terms-of-use risk shown as a warning on the subscription connection. */
+  subscriptionTermsWarning?: string;
   /**
    * Set when the provider accepts no new subscription connections. Existing
    * connections keep working and stay manageable; this note replaces the
@@ -101,6 +103,7 @@ interface ProviderUIOverlay {
   subscriptionLabel?: string;
   subscriptionKeyPlaceholder?: string;
   subscriptionRequirementNote?: string;
+  subscriptionTermsWarning?: string;
   subscriptionClosedNote?: string;
   subscriptionCredentialKind?: 'setup-token' | 'api-key';
   subscriptionCredentialName?: string;
@@ -148,6 +151,9 @@ const regionLabel = (key: string) => () => tMaybe(`providerSetup.catalog.regions
 
 const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   qwen: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.qwen');
+    },
     initial: 'Al',
     subtitle: 'Qwen 3.7, DeepSeek, Kimi, GLM via Alibaba Cloud',
     apiKeyEndpointRegions: [
@@ -321,6 +327,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   gemini: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.gemini');
+    },
     initial: 'G',
     subtitle: 'Gemini 3.5 Flash, 3.1 Flash-Lite, Gemini 2.5',
     supportsSubscription: true,
@@ -423,6 +432,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     })),
   },
   xiaomi: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.xiaomi');
+    },
     initial: 'Mi',
     subtitle: 'MiMo V2.6 Pro, V2.6 Flash',
     supportsSubscription: true,
@@ -589,6 +601,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   xai: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.xai');
+    },
     initial: 'X',
     subtitle: 'Grok 4.5, Grok 4.3, Grok Build',
     supportsSubscription: true,
@@ -599,13 +614,16 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   zai: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.zai');
+    },
     initial: 'Z',
     subtitle: 'GLM 5.2, GLM 5.1, GLM 5 Turbo',
     supportsSubscription: true,
     subscriptionLabel: 'GLM Coding Plan',
     subscriptionAuthMode: 'token',
     get subscriptionKeyPlaceholder() {
-      return t('providerSetup.catalog.pasteYourKey', { name: 'Z.ai' });
+      return t('providerSetup.catalog.pasteYourKey', { name: 'GLM Coding Plan' });
     },
     subscriptionCredentialKind: 'api-key',
     subscriptionEndpointRegions: [

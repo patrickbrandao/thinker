@@ -92,12 +92,17 @@ openclaw gateway restart
 **Hermes**, em `config.yaml` (abra com `hermes config edit`):
 
 ```yaml
+providers:
+  thinker:
+    api: http://localhost:2099/v1
+    api_key: thk_SUA_CHAVE
+    session_affinity_header: x-session-key
 model:
-  provider: custom
-  base_url: http://localhost:2099/v1
-  api_key: thk_SUA_CHAVE
+  provider: custom:thinker
   default: auto
 ```
+
+A entrada nomeada em `providers:` é a única que aceita `session_affinity_header`. Com ele o Hermes manda o id da conversa em `x-session-key` e o Thinker agrupa cada conversa (cache de prompt e momentum de roteamento); sem ele tudo cai na sessão `default`.
 
 Nanobot e Craft Agent também falam Chat Completions; o assistente do dashboard gera o trecho certo para cada um.
 
@@ -131,6 +136,19 @@ msg = client.messages.create(
 Para o SDK da Anthropic, defina só `api_key` (vira `x-api-key`) **ou** `auth_token` (vira Bearer), nunca os dois com valores diferentes (`M006`).
 
 **Vercel AI SDK, LangChain, n8n e cURL** usam a superfície Chat Completions: URL base `http://localhost:2099/v1` e a chave `thk_`. No n8n, use o node OpenAI Chat Model com uma credencial OpenAI cuja Base URL aponta para o Thinker.
+
+### Sessão
+
+O Thinker agrupa as requisições de uma conversa (cache de prompt, momentum de roteamento e o menu Sessões) pelo cabeçalho de sessão que o harness manda. Claude Code, Codex, OpenCode, DeepSeek Harness e Open WebUI (com `ENABLE_FORWARD_USER_INFO_HEADERS=true`) mandam o próprio cabeçalho, e o Thinker o lê sem configuração. Os demais não mandam nada; para eles, envie `x-session-key` com um valor por conversa:
+
+- **LangChain:** `default_headers={"x-session-key": "<id da conversa>"}` no `ChatOpenAI` (Python) ou `configuration: { defaultHeaders: { "x-session-key": "..." } }` (JS).
+- **n8n:** na credencial OpenAI, "Add Custom Header" com nome `x-session-key` e um valor fixo. O n8n só aceita um valor por credencial, então use uma credencial por workflow para separar os workflows; não existe valor por execução.
+- **Hermes:** `session_affinity_header: x-session-key` na entrada `providers.thinker` (acima).
+- **SDKs OpenAI e Anthropic:** `default_headers` (Python) ou `defaultHeaders` (JS) no cliente; no OpenAI SDK também vale a variável `OPENAI_CUSTOM_HEADERS`.
+- **Vercel AI SDK:** `headers: { "x-session-key": "..." }` em `createOpenAI`.
+- **Zapier:** em Webhooks, um cabeçalho `x-session-key` fixo por Zap.
+- **Langflow:** os componentes padrão não aceitam cabeçalhos customizados, então as chamadas ficam na sessão `default`.
+- **Cline:** o provedor OpenAI Compatible do Cline não manda id de sessão nem cabeçalhos por conversa. Dá para fixar `x-session-key` nos cabeçalhos do provedor, mas o valor vale para todas as conversas daquele perfil. Sem isso, as requisições do Cline ficam na sessão `default`.
 
 ## Escolher um modelo virtual
 
