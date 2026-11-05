@@ -217,17 +217,17 @@ describe('ModelDiscoveryService', () => {
       const sol = result.find((model) => model.id === 'gpt-5.6-sol');
 
       expect(sol).toMatchObject({
-        contextWindow: 1050000,
+        contextWindow: 272000,
         contextWindowSource: 'subscription_config',
         inputPricePerToken: 0.000001,
         capabilityCode: true,
-        qualityScore: 5,
+        qualityScore: 4,
       });
       expect(mockComputeScore).toHaveBeenCalledWith(
         expect.objectContaining({ context_window: 400000 }),
       );
       expect(mockComputeScore).toHaveBeenCalledWith(
-        expect.objectContaining({ context_window: 1050000 }),
+        expect.objectContaining({ context_window: 272000 }),
       );
       expect(provider.cached_models).toEqual(result);
     });
@@ -1002,7 +1002,7 @@ describe('ModelDiscoveryService', () => {
       const result = await service.getModelsForAgent('tenant-1');
 
       expect(result.map((model) => [model.id, model.contextWindow])).toEqual([
-        ['gpt-5.6-sol', 1050000],
+        ['gpt-5.6-sol', 272000],
         ['gpt-5.6-terra', 272000],
         ['gpt-5.6-luna', 272000],
       ]);
@@ -2933,8 +2933,8 @@ describe('ModelDiscoveryService', () => {
 
       const result = supplementWithKnownModels(raw, 'openai');
 
-      // 1 discovered + 11 ChatGPT-account supported knownModels
-      expect(result.length).toBe(12);
+      // 1 discovered + 12 ChatGPT-account supported knownModels
+      expect(result.length).toBe(13);
       expect(result[0].id).toBe('gpt-oss-120b');
       expect(result.map((m) => m.id)).toContain('gpt-6-astra');
       expect(result.map((m) => m.id)).toContain('gpt-6.1-sol');
@@ -3002,19 +3002,16 @@ describe('ModelDiscoveryService', () => {
 
       const result = supplementWithKnownModels(raw, 'minimax');
 
-      expect(result.map((m) => m.id)).toContain('MiniMax-M2.1');
-      expect(result.map((m) => m.id)).toContain('MiniMax-M2');
-      expect(result.map((m) => m.id)).not.toContain('MiniMax-M2.5');
+      expect(result.map((m) => m.id)).toEqual(['MiniMax-M2.5-highspeed', 'MiniMax-M3.1-Flash']);
     });
 
-    it('should supplement Z.ai known models including glm-5.1', () => {
+    it('should supplement Z.ai known models with the GLM Coding Plan pair', () => {
       const raw: DiscoveredModel[] = [makeModel({ id: 'glm-4.7', provider: 'zai' })];
 
       const result = supplementWithKnownModels(raw, 'zai');
 
-      expect(result.map((m) => m.id)).toContain('glm-5.1');
-      expect(result.map((m) => m.id)).toContain('glm-5-turbo');
-      expect(result.map((m) => m.id)).toContain('glm-4.5-air');
+      expect(result.map((m) => m.id)).toContain('glm-5.3');
+      expect(result.map((m) => m.id)).toContain('glm-5.3-flash');
       expect(result.filter((m) => m.id === 'glm-4.7')).toHaveLength(1);
     });
   });

@@ -2219,7 +2219,7 @@ describe('ProviderModelFetcherService', () => {
       expect(result[0].id).toBe('gemini-2.0-flash-001');
     });
 
-    it('should embed key in URL and send no headers', async () => {
+    it('sends the key in x-goog-api-key, never in the URL, and asks for 1000 per page', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: async () => ({ models: [] }),
@@ -2228,8 +2228,8 @@ describe('ProviderModelFetcherService', () => {
       await service.fetch('gemini', 'my-gem-key');
 
       expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining('key=my-gem-key'),
-        expect.objectContaining({ headers: {} }),
+        'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+        expect.objectContaining({ headers: { 'x-goog-api-key': 'my-gem-key' } }),
       );
     });
 
@@ -3195,22 +3195,6 @@ describe('ProviderModelFetcherService', () => {
 
     const result = await service.fetch('OpenAI', 'key');
     expect(result).toHaveLength(1);
-  });
-
-  /* ── Endpoint function (gemini) ── */
-
-  it('should call endpoint function when endpoint is a function', async () => {
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: async () => ({ models: [] }),
-    });
-
-    await service.fetch('gemini', 'special&key');
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('key=special%26key'),
-      expect.anything(),
-    );
   });
 
   /* ── Non-ok response masks api key ── */

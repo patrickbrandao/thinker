@@ -395,13 +395,13 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   },
   minimax: {
     initial: 'Mm',
-    subtitle: 'MiniMax M3, M2.7, M2.5',
+    subtitle: 'MiniMax M3.1 Flash',
     apiKeyEndpointRegions: [
       region('global', regionLabel('global')),
       region('cn', regionLabel('china')),
     ],
     supportsSubscription: true,
-    subscriptionLabel: 'MiniMax Coding Plan',
+    subscriptionLabel: 'MiniMax M Plan',
     subscriptionAuthMode: 'device_code',
     subscriptionTokenAlternative: {
       prefix: 'sk-cp-',

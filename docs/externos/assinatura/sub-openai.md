@@ -177,8 +177,8 @@ Pontos no código:
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
 | G1 | degradação | `CODEX_CLI_VERSION` 0.159.2; estável atual 0.166.0; `client_version` filtra modelos | `providers` | [#348](https://github.com/patrickbrandao/thinker/issues/348) | aberta |
-| G2 | degradação | `knownModels` exato sem `gpt-6.1-terra`; `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex-spark` fora do catálogo 0.166.0 | `providers` | [#350](https://github.com/patrickbrandao/thinker/issues/350) | aberta |
-| G3 | degradação | contexto fixo de 1.050.000 sobrepõe o `context_window` (Codex: 272K, teto 872K; valor ao vivo não confirmado) | `providers` | [#351](https://github.com/patrickbrandao/thinker/issues/351) | aberta |
+| G2 | degradação | `knownModels` exato sem `gpt-6.1-terra`; `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex-spark` fora do catálogo 0.166.0 | `providers` | [#350](https://github.com/patrickbrandao/thinker/issues/350) | resolvida (lista de modelos atualizada) |
+| G3 | degradação | contexto fixo de 1.050.000 sobrepõe o `context_window` (Codex: 272K, teto 872K; valor ao vivo não confirmado) | `providers` | [#351](https://github.com/patrickbrandao/thinker/issues/351) | resolvida (janela de contexto por modelo) |
 | G4 | degradação | 429 `usage_limit_reached` recebe cooldown de 15 s; `resets_at` ignorado | `backend-dev` | [#352](https://github.com/patrickbrandao/thinker/issues/352) | resolvida (cooldown até o reset lido do corpo do erro) |
 | G5 | degradação | sem `ChatGPT-Account-ID`, sem `id_token_add_organizations`/`codex_cli_simplified_flow` e escopos `api.connectors.*` (contas multi-workspace; não confirmado) | `providers` | [#353](https://github.com/patrickbrandao/thinker/issues/353) | aberta |
 | G6 | oportunidade | ler `x-codex-*` e `GET /wham/usage` para mostrar uso restante e `resets_at` da assinatura; enviar `x-client-request-id`, `x-openai-subagent` e User-Agent real | `backend-dev` | — | aberta |

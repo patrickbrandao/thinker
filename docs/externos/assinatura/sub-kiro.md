@@ -130,7 +130,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `knownModels` do Kiro (`configs.ts:222-231`) tem `kiro/claude-sonnet-4` (EOL 2026-10-14) e não tem os modelos lançados desde fev/2026 (Sonnet 5/5.5, Opus 4.7/4.8/5/5.5, Haiku 5.5, GPT-5.6, Kimi K3). A descoberta ao vivo cobre contas conectadas; o fallback fica velho. Sugestão: remover Sonnet 4.0, incluir os ativos (ids exatos via `ListAvailableModels`), revisar contexto por modelo | providers | [#335](https://github.com/patrickbrandao/thinker/issues/335) | aberta |
+| G1 | degradação | `knownModels` do Kiro (`configs.ts:222-231`) tem `kiro/claude-sonnet-4` (EOL 2026-10-14) e não tem os modelos lançados desde fev/2026 (Sonnet 5/5.5, Opus 4.7/4.8/5/5.5, Haiku 5.5, GPT-5.6, Kimi K3). A descoberta ao vivo cobre contas conectadas; o fallback fica velho. Sugestão: remover Sonnet 4.0, incluir os ativos (ids exatos via `ListAvailableModels`), revisar contexto por modelo | providers | [#335](https://github.com/patrickbrandao/thinker/issues/335) | resolvida (lista de modelos atualizada) |
 | G2 | oportunidade | Aceitar `KIRO_API_KEY` (Pro/Pro+/Pro Max/Power) como credencial além do device flow, a via oficial para automação. Falta confirmar endpoint e header que a chave usa | providers | — | aberta |
 | G3 | oportunidade | Contabilizar créditos: `meteringEvent` é ignorado e o preço é 0; multiplicadores por modelo estão publicados. Permitiria custo e cota restante reais por assinatura | backend-dev | — | aberta |
 | G4 | oportunidade | Avisar o usuário no cadastro do Kiro sobre o risco de suspensão relatado por usuários e a ausência de termos que cubram tráfego via gateway (comparar com #324 do Gemini) | frontend-dev | — | aberta |

@@ -149,7 +149,7 @@ Arquivos que citam `zai`:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `knownModels` tem 10 ids, mas o plano só inclui `glm-5.3` e `glm-5.3-flash` (os demais são redirecionados); `maxContextWindow` 204800 não reflete o contexto de 1M documentado. Trocar a lista e confirmar a janela com conta real. | providers | [#345](https://github.com/patrickbrandao/thinker/issues/345) | aberta |
+| G1 | degradação | `knownModels` tem 10 ids, mas o plano só inclui `glm-5.3` e `glm-5.3-flash` (os demais são redirecionados); `maxContextWindow` 204800 não reflete o contexto de 1M documentado. Trocar a lista e confirmar a janela com conta real. | providers | [#345](https://github.com/patrickbrandao/thinker/issues/345) | resolvida (lista de modelos atualizada) |
 | G2 | degradação | 429 de cota (1308, 1310, 1316-1321, 1309) cai no cooldown de 15 s, pois `QUOTA_EXHAUSTED_RE` não reconhece o formato do Z.ai; tentativas repetidas por horas. 1311 e 1313 também sem tratamento. | backend-dev | [#346](https://github.com/patrickbrandao/thinker/issues/346) | resolvida (cooldown até o reset lido do corpo do erro) |
 | G3 | degradação | Placeholder não distingue chave do Coding Plan de chave Standard (esta não consome o plano e pode cobrar saldo); sem aviso de que o uso fora das ferramentas suportadas pode gerar limitação ou ban. | frontend-dev | [#347](https://github.com/patrickbrandao/thinker/issues/347) | resolvida (aviso de termos fixo no modal de conexão e na doc) |
 | G4 | oportunidade | Medidor de uso do plano (janelas 5 h e semanal) via `GET /api/monitor/usage/quota/limit`, endpoint não documentado e de autenticação incerta; validar com conta real antes de implementar. Sem issue. | backend-dev | — | aberta |

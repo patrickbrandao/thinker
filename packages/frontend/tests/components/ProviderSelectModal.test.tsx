@@ -1055,7 +1055,7 @@ describe('ProviderSelectModal', () => {
       };
       openSubscription('minimax', [subProvider]);
       expect(screen.getByText('Disconnect')).toBeDefined();
-      expect(screen.getByText(/Connected via MiniMax Coding Plan/)).toBeDefined();
+      expect(screen.getByText(/Connected via MiniMax M Plan/)).toBeDefined();
     });
 
     it('disconnects MiniMax through its provider-specific cleanup endpoint', async () => {

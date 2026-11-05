@@ -110,7 +110,7 @@ Pontos no código:
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | A página do plano lista Dola-Seed-2.0-pro/lite, GLM-5.3-Flash e DeepSeek-V4; `knownModels` (correspondência exata) não tem os novos e o filtro de descoberta (`provider-model-fetcher.service.ts:342-345`) os esconde. Possíveis descontinuados (kimi-k2.5, glm-5.1, gpt-oss-120b, bytedance-seed-code) seguem listados. Atualizar a lista após conferir `/models` com chave real; considerar não filtrar. | `providers` | [#329](https://github.com/patrickbrandao/thinker/issues/329) | aberta |
+| G1 | degradação | A página do plano lista Dola-Seed-2.0-pro/lite, GLM-5.3-Flash e DeepSeek-V4; `knownModels` (correspondência exata) não tem os novos e o filtro de descoberta (`provider-model-fetcher.service.ts:342-345`) os esconde. Possíveis descontinuados (kimi-k2.5, glm-5.1, gpt-oss-120b, bytedance-seed-code) seguem listados. Atualizar a lista após conferir `/models` com chave real; considerar não filtrar. | `providers` | [#329](https://github.com/patrickbrandao/thinker/issues/329) | resolvida (lista de modelos atualizada) |
 | G2 | oportunidade | Janelas de uso (5 h / semana / mês) e cota restante não são exibidas; não há endpoint documentado. Investigar com conta real se o console expõe uma API de uso. | `providers` | (sem issue) | aberta |
 | G3 | oportunidade | `maxContextWindow` fixo em 256000 para todo o plano, mas `ark-code-latest`, `deepseek-v3.2`, `gpt-oss-120b` têm 128K-131K (terceiro). Usar contexto por modelo. | `providers` | (sem issue) | aberta |
 

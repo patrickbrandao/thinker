@@ -36,6 +36,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 200000,
       modelContextWindows: Object.freeze({
+        'claude-fable-5': 1000000,
+        'claude-haiku-5-5': 1000000,
+        'claude-opus-4-7': 1000000,
         'claude-opus-4-8': 1000000,
         'claude-opus-5': 1000000,
         'claude-sonnet-5': 1000000,
@@ -51,6 +54,10 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionKeyPlaceholder: 'Paste your ModelArk Coding Plan API key',
     knownModels: Object.freeze([
       'ark-code-latest',
+      'dola-seed-2.0-pro',
+      'dola-seed-2.0-lite',
+      'dola-seed-2.0-code',
+      'glm-5.3-flash',
       'bytedance-seed-code',
       'glm-5.1',
       'glm-4.7',
@@ -74,6 +81,7 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     knownModels: Object.freeze([
       'gpt-6-astra',
       'gpt-6.1-sol',
+      'gpt-6.1-terra',
       'gpt-6-sol',
       'gpt-6-luna',
       'gpt-5.6-sol',
@@ -88,13 +96,16 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 200000,
       modelContextWindows: Object.freeze({
-        'gpt-6-astra': 1050000,
-        'gpt-6.1-sol': 1050000,
-        'gpt-6-sol': 1050000,
-        'gpt-6-luna': 1050000,
-        'gpt-5.6-sol': 1050000,
-        'gpt-5.6-terra': 1050000,
-        'gpt-5.6-luna': 1050000,
+        // The Codex backend serves 272K (gpt-6.1-terra 500K), not the API's
+        // 1.05M (codex-rs models-manager/models.json, 0.166.0).
+        'gpt-6-astra': 272000,
+        'gpt-6.1-sol': 272000,
+        'gpt-6.1-terra': 500000,
+        'gpt-6-sol': 272000,
+        'gpt-6-luna': 272000,
+        'gpt-5.6-sol': 272000,
+        'gpt-5.6-terra': 272000,
+        'gpt-5.6-luna': 272000,
       }),
       supportsPromptCaching: true,
       supportsBatching: false,
@@ -102,19 +113,11 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
   }),
   minimax: Object.freeze({
     supportsSubscription: true as const,
-    subscriptionLabel: 'MiniMax Coding Plan',
+    subscriptionLabel: 'MiniMax M Plan',
     subscriptionAuthMode: 'device_code' as const,
-    knownModels: Object.freeze([
-      'MiniMax-M3.1-Flash',
-      'MiniMax-M3',
-      'MiniMax-M2.7',
-      'MiniMax-M2.7-highspeed',
-      'MiniMax-M2.5',
-      'MiniMax-M2.5-highspeed',
-      'MiniMax-M2.1',
-      'MiniMax-M2.1-highspeed',
-      'MiniMax-M2',
-    ]),
+    // The M Plan serves only M3.1 Flash for text on every tier (Go, Explore,
+    // Build); other ids answer 2061/2068/2069 (sub-minimax G2).
+    knownModels: Object.freeze(['MiniMax-M3.1-Flash']),
     subscriptionCapabilities: Object.freeze({
       // MiniMax-M3's 1M window (MSA); M2.x models keep their own lower
       // per-model contexts from the pricing cache — this is only the cap.
@@ -132,7 +135,8 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     knownModels: Object.freeze(['mistral-vibe-cli-latest']),
     knownModelsMatch: 'exact' as const,
     subscriptionCapabilities: Object.freeze({
-      maxContextWindow: 200000,
+      // Medium 3.5 behind the alias: 256K (mistral-vibe vibe_schema.py).
+      maxContextWindow: 262144,
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
@@ -158,7 +162,19 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionKeyPlaceholder: 'Paste your Qwen Token Plan API key',
     subscriptionTokenPrefix: 'sk-sp-',
     subscriptionCapabilities: Object.freeze({
-      maxContextWindow: 991000,
+      // Per-model windows from the Qwen Code Token Plan preset (v0.26.6).
+      maxContextWindow: 1000000,
+      modelContextWindows: Object.freeze({
+        'kimi-k2.5': 262144,
+        'kimi-k2.6': 262144,
+        'kimi-k2.7-code': 262144,
+        'glm-5.1': 202752,
+        // Exact ids: prefix matching would hand glm-5.1/5.2/5.3 this value.
+        'glm-5': 202752,
+        'glm-5.2': 1000000,
+        'glm-5.3': 1000000,
+        'MiniMax-M2.5': 196608,
+      }),
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
@@ -170,12 +186,23 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionKeyPlaceholder: 'Paste your Kimi Code API key',
     // Wire-format ids expected by https://api.kimi.com/coding — see
     // https://www.kimi.com/code/docs/en/kimi-code/models
-    knownModels: Object.freeze(['k3', 'k3-256k', 'kimi-for-coding', 'kimi-for-coding-highspeed']),
+    knownModels: Object.freeze([
+      'k3.1-pro',
+      'k3.1-pro-highspeed',
+      'k3',
+      'k3-256k',
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+    ]),
     knownModelsMatch: 'exact' as const,
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 262144,
       modelContextWindows: Object.freeze({
+        'k3.1-pro': 1048576,
         k3: 1048576,
+        // K2.8 Preview: up to 1M; the highspeed variant keeps 256K.
+        'kimi-for-coding': 1048576,
+        'kimi-for-coding-highspeed': 262144,
         // Explicit entry: context-window resolution prefix-matches, so without
         // this k3-256k would inherit the 1M window of its k3 sibling.
         'k3-256k': 262144,
@@ -214,8 +241,12 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionAuthMode: 'device_code' as const,
     knownModels: Object.freeze([
       'kiro/auto',
+      'kiro/claude-opus-5.5',
+      'kiro/claude-sonnet-5.5',
+      'kiro/claude-opus-5',
+      'kiro/claude-sonnet-5',
+      'kiro/claude-opus-4.8',
       'kiro/claude-sonnet-4.5',
-      'kiro/claude-sonnet-4',
       'kiro/claude-haiku-4.5',
       'kiro/deepseek-3.2',
       'kiro/minimax-m2.5',
@@ -225,6 +256,11 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     ]),
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 1000000,
+      // Sonnet 4.5 and Haiku 4.5 keep 200K; the 5.x line and Opus 4.8 have 1M.
+      modelContextWindows: Object.freeze({
+        'kiro/claude-sonnet-4.5': 200000,
+        'kiro/claude-haiku-4.5': 200000,
+      }),
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
@@ -234,21 +270,12 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionLabel: 'GLM Coding Plan',
     subscriptionAuthMode: 'token' as const,
     subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
-    knownModels: Object.freeze([
-      'glm-5.3',
-      'glm-5.3-flash',
-      'glm-5.2',
-      'glm-5.1',
-      'glm-5-turbo',
-      'glm-5',
-      'glm-4.7',
-      'glm-4.6',
-      'glm-4.5',
-      'glm-4.5-air',
-    ]),
+    // The plan only serves GLM-5.3 and GLM-5.3-Flash; older ids are redirected
+    // or answer 1311 (sub-zai G1).
+    knownModels: Object.freeze(['glm-5.3', 'glm-5.3-flash']),
     subscriptionCapabilities: Object.freeze({
-      // Z.ai advertises "200K" as 200 * 1024 = 204800, not 200000 like other providers.
-      maxContextWindow: 204800,
+      // docs.z.ai/devpack/latest-model: 1M context window.
+      maxContextWindow: 1000000,
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
@@ -290,6 +317,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     // 404 on the CodeAssist API.
     knownModels: Object.freeze([
       'gemini-3.5-flash',
+      // Code Assist serves gemini-3.5-flash as gemini-3-flash for accounts
+      // without the GA experiment (gemini-cli getBackendModelMappings).
+      'gemini-3-flash',
       'gemini-3.1-flash-lite',
       'gemini-2.5-pro',
       'gemini-2.5-flash',
@@ -306,9 +336,10 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     supportsSubscription: true as const,
     subscriptionLabel: 'Grok subscription',
     subscriptionAuthMode: 'popup_oauth' as const,
-    knownModels: Object.freeze(['grok-4.7', 'grok-4.6', 'grok-4.5']),
+    knownModels: Object.freeze(['grok-4.7', 'grok-4.6', 'grok-4.5', 'grok-build-0.1']),
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 500000,
+      modelContextWindows: Object.freeze({ 'grok-build-0.1': 256000 }),
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
@@ -318,16 +349,20 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionLabel: 'GitHub Copilot subscription',
     subscriptionAuthMode: 'device_code' as const,
     knownModels: Object.freeze([
-      'copilot/claude-opus-4.6',
+      'copilot/claude-opus-5.5',
+      'copilot/claude-sonnet-5.5',
       'copilot/claude-sonnet-4.6',
       'copilot/claude-haiku-4.5',
-      'copilot/gpt-5.4',
+      'copilot/gpt-6.1-sol',
+      'copilot/gpt-6.1-terra',
       'copilot/gpt-5.2-codex',
-      'copilot/gpt-5-mini',
       'copilot/gpt-4.1',
       'copilot/gpt-4o',
       'copilot/gpt-4o-mini',
-      'copilot/gemini-3.1-pro-preview',
+      'copilot/gemini-4-argon',
+      'copilot/gemini-3.8-flash',
+      'copilot/grok-4.7',
+      'copilot/kimi-k3',
       'copilot/grok-code-fast-1',
     ]),
     subscriptionCapabilities: Object.freeze({
@@ -354,17 +389,21 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionAuthMode: 'token' as const,
     subscriptionKeyPlaceholder: 'Paste your ClinePass API key',
     knownModels: Object.freeze([
-      'cline-pass/glm-5.2',
-      'cline-pass/kimi-k2.7-code',
-      'cline-pass/kimi-k2.6',
-      'cline-pass/kimi-k3',
+      'cline-pass/mimo-v2.6-pro',
+      'cline-pass/mimo-v2.6-flash',
+      'cline-pass/deepseek-v4.1-flash',
+      'cline-pass/deepseek-v4.1-flash-1017',
       'cline-pass/deepseek-v4-pro',
-      'cline-pass/deepseek-v4-flash',
-      'cline-pass/mimo-v2.5',
-      'cline-pass/mimo-v2.5-pro',
+      'cline-pass/kimi-k3.1-pro',
+      'cline-pass/kimi-k3',
+      'cline-pass/minimax-m3.1-flash',
       'cline-pass/minimax-m3',
+      'cline-pass/glm-5.3',
+      'cline-pass/glm-5.3-flash',
+      'cline-pass/qwen3.8-max',
       'cline-pass/qwen3.7-max',
       'cline-pass/qwen3.7-plus',
+      'cline-pass/muse-spark-1.3-contributor',
     ]),
     knownModelsMatch: 'exact' as const,
     subscriptionCapabilities: Object.freeze({

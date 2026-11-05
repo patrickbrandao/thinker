@@ -503,6 +503,9 @@ describe('PROVIDERS', () => {
     const meta = PROVIDERS.find((provider) => provider.id === 'meta')!;
     expect(meta.name).toBe('Meta');
     expect(meta.models.map((model) => model.value)).toEqual([
+      'muse-spark-1.3',
+      'muse-spark-1.3-contributor',
+      'muse-wonder-1.0',
       'muse-spark-1.2',
       'muse-spark-1.2-contributor',
       'muse-spark-1.1',
@@ -651,7 +654,7 @@ describe('PROVIDERS', () => {
   it('MiniMax supports subscription with device-code flow', () => {
     const minimax = PROVIDERS.find((p) => p.id === 'minimax')!;
     expect(minimax.supportsSubscription).toBe(true);
-    expect(minimax.subscriptionLabel).toBe('MiniMax Coding Plan');
+    expect(minimax.subscriptionLabel).toBe('MiniMax M Plan');
     expect(minimax.subscriptionAuthMode).toBe('device_code');
   });
 

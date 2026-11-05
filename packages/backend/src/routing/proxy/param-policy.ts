@@ -302,8 +302,10 @@ const RULES: ParamRule[] = [
   },
   {
     // docs/externos/assinatura/sub-ollama-cloud.md G1 (#338)
+    // local-ollama G3: the same OpenAI-compat limits apply to a local Ollama.
     id: 'ollama-cloud-unsupported',
-    applies: (ctx) => ctx.endpointKey === 'ollama-cloud' && isOpenAiWire(ctx),
+    applies: (ctx) =>
+      (ctx.endpointKey === 'ollama-cloud' || ctx.endpointKey === 'ollama') && isOpenAiWire(ctx),
     apply: (body) => {
       const dropped = deleteFields(body, ['user', 'n', 'logit_bias', 'logprobs', 'top_logprobs']);
       return deleteFields(body, ['tool_choice']) || dropped;
@@ -340,6 +342,16 @@ const RULES: ParamRule[] = [
         changed = true;
       }
       return changed;
+    },
+  },
+  {
+    // docs/externos/assinatura/sub-moonshot.md G1 (#342): the Kimi Coding Plan
+    // K3 / K3.1 Pro answer 400 when thinking is turned off.
+    id: 'kimi-coding-k3-thinking',
+    applies: (ctx) => ctx.endpointKey === 'moonshot-subscription' && KIMI_K3_RE.test(ctx.model),
+    apply: (body) => {
+      const thinking = body.thinking as Record<string, unknown> | undefined;
+      return thinking?.type === 'disabled' ? deleteFields(body, ['thinking']) : false;
     },
   },
   {

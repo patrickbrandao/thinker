@@ -172,6 +172,8 @@ interface PioneerBaseModelEntry {
   output_price_per_million?: number | null;
   supports_inference?: boolean;
   is_chat_model?: boolean;
+  /** `decoder` (chat), `encoder`, `systemone`, ... */
+  task_type?: string;
   supports_image_input?: boolean;
 }
 
@@ -317,7 +319,14 @@ function enrichPioneerModels(
   models: DiscoveredModel[],
   catalog: Map<string, PioneerBaseModelEntry>,
 ): DiscoveredModel[] {
-  return models.map((model) => {
+  // Only `decoder` base models answer chat completions (encoders, GLiDE
+  // `systemone`); models absent from the catalog (fine-tunes) stay (api-pioneer G4).
+  const chat = models.filter((model) => {
+    const base = catalog.get(model.id);
+    if (!base) return true;
+    return typeof base.task_type !== 'string' || base.task_type === 'decoder';
+  });
+  return chat.map((model) => {
     const base = catalog.get(model.id);
     if (!base) return model;
     return {
@@ -341,10 +350,10 @@ const parseCommandCode = createModelParser<CommandCodeModelEntry>({
   capabilityCode: true,
 });
 
-const parseBytePlusCodingPlan = (body: unknown, provider: string): DiscoveredModel[] => {
-  const known = new Set(getSubscriptionKnownModels('byteplus') ?? []);
-  return parseOpenAI(body, provider).filter((model) => known.has(model.id));
-};
+// `/api/coding/v3/models` is already scoped to the plan, so everything it lists
+// is usable; `knownModels` is only the fallback when the listing fails (sub-byteplus G1).
+const parseBytePlusCodingPlan = (body: unknown, provider: string): DiscoveredModel[] =>
+  parseOpenAI(body, provider);
 
 const parseQwenTokenPlan = createModelParser<OpenAIModelEntry>({
   arrayKey: 'data',
@@ -431,15 +440,15 @@ export const UNIVERSAL_NON_CHAT_RE =
  */
 export const PROVIDER_NON_CHAT: Record<string, RegExp> = {
   openai:
-    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|^gpt-3\.5-turbo-instruct|audio|^chatgpt-image|^gpt-image-|search-api)/i,
+    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|^gpt-3\.5-turbo-instruct|audio|^chatgpt-image|^gpt-image-|search-api|^gpt-live-)/i,
   'openai-subscription':
-    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|audio|^chatgpt-image|^gpt-image-)/i,
+    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|audio|^chatgpt-image|^gpt-image-|^gpt-live-)/i,
   // `flash-lite-preview-MM-YYYY` matches deprecated dated snapshots
   // (e.g. gemini-2.5-flash-lite-preview-09-2025). The unsuffixed
   // `gemini-3.1-flash-lite-preview` is the canonical preview alias and
   // must NOT be filtered.
   gemini:
-    /(?:^aqs-|nano-banana|^deep-research|computer-use|^lyria|^gemini-2\.0-flash-lite$|flash-lite-preview-\d{2}-\d{4}$|robotics)/i,
+    /(?:^aqs-|nano-banana|^deep-research|computer-use|^lyria|^gemini-2\.0-flash-lite$|flash-lite-preview-\d{2}-\d{4}$|robotics|^gemini-omni|transcribe)/i,
   // Vertex serves the same non-chat families as the Gemini API, plus Imagen
   // and Veo under their own names.
   vertex:
@@ -464,11 +473,13 @@ export const PROVIDER_NON_CHAT: Record<string, RegExp> = {
     /(?:flux|cosmos|detector|gliner|calibration|embed|retriever|parse|tts|translate|safety|guard|reward|nvclip|vila|neva)/i,
   xiaomi: /(?:asr|tts)/i,
   'xiaomi-subscription': /(?:asr|tts)/i,
-  'qwen-subscription': /(?:^qwen-image-|^wan.*image)/i,
+  'qwen-subscription': /(?:^qwen-image-|^wan.*(?:image|video)|^happyhorse-|^qwen-audio-)/i,
   xai: /imagine/i,
+  // The Coding Plan listing also carries image/video generators.
+  byteplus: /(?:seedream|seedance|seededit|-t2i|-i2v|-t2v)/i,
   copilot: /accounts\/[^/]+\/routers\//i,
   bedrock: /(?:^|[./])voxtral-/i,
-  pioneer: /(?:gliner|gliguard|privacy-filter|^fastino\/)/i,
+  pioneer: /(?:gliner|gliguard|privacy-filter)/i,
 };
 
 /**
@@ -492,6 +503,28 @@ export const PROVIDER_BLOCKLIST: Record<string, ReadonlySet<string>> = {
 };
 
 /** Filter models that are not compatible with chat completions. */
+/**
+ * Model retirements with a known date, per provider (api-vertex G2). After the
+ * date the id answers 404, so discovery stops offering it.
+ */
+const PROVIDER_RETIREMENTS: Record<string, Record<string, string>> = {
+  vertex: {
+    'gemini-2.0-flash': '2026-06-01',
+    'gemini-2.0-flash-lite': '2026-06-01',
+    'gemini-2.5-pro': '2026-10-20',
+    'gemini-2.5-flash': '2026-10-20',
+    'gemini-2.5-flash-lite': '2026-10-20',
+    'gemini-3.6-flash': '2026-11-19',
+    'gemini-3.7-flash': '2027-01-28',
+    'gemini-2.5-flash-image': '2027-03-15',
+  },
+};
+
+function isRetired(configKey: string, modelId: string, now = Date.now()): boolean {
+  const date = PROVIDER_RETIREMENTS[configKey]?.[modelId.replace(/^google\//, '')];
+  return !!date && Date.parse(`${date}T00:00:00Z`) <= now;
+}
+
 export function filterNonChatModels(
   models: DiscoveredModel[],
   configKey: string,
@@ -500,6 +533,7 @@ export function filterNonChatModels(
   const blocklist = PROVIDER_BLOCKLIST[configKey];
   return models.filter((m) => {
     if (UNIVERSAL_NON_CHAT_RE.test(m.id)) return false;
+    if (isRetired(configKey, m.id)) return false;
     if (providerFilter && providerFilter.test(m.id)) return false;
     if (blocklist && blocklist.has(m.id)) return false;
     return true;
@@ -530,7 +564,11 @@ const parseMistral = createModelParser<MistralModelEntry>({
   arrayKey: 'data',
   filter: (entry) => {
     if (typeof entry.id !== 'string' || entry.id.length === 0) return false;
-    if (entry.deprecation != null) return false;
+    // Deprecated models keep answering until retirement (api-mistral G3).
+    if (entry.deprecation != null) {
+      const retiresAt = Date.parse(String(entry.deprecation));
+      if (!Number.isFinite(retiresAt) || retiresAt <= Date.now()) return false;
+    }
     if (entry.capabilities && entry.capabilities.completion_chat === false) return false;
     return true;
   },
@@ -547,14 +585,39 @@ interface AnthropicModelEntry {
   id: string;
   display_name?: string;
   type?: string;
+  /** Per-model input window (api-anthropic G1). */
+  max_input_tokens?: number;
+  lifecycle?: string;
 }
 
 const parseAnthropic = createModelParser<AnthropicModelEntry>({
   arrayKey: 'data',
-  filter: (entry) => typeof entry.id === 'string' && entry.type === 'model',
+  filter: (entry) =>
+    typeof entry.id === 'string' && entry.type === 'model' && entry.lifecycle !== 'retired',
   getId: (entry) => entry.id,
   getDisplayName: (entry, id) => entry.display_name || id,
-  contextWindow: ANTHROPIC_DEFAULT_CONTEXT,
+  contextWindow: (entry) =>
+    typeof entry.max_input_tokens === 'number' && entry.max_input_tokens > 0
+      ? entry.max_input_tokens
+      : ANTHROPIC_DEFAULT_CONTEXT,
+});
+
+interface GroqModelEntry extends OpenAIModelEntry {
+  context_window?: number;
+}
+
+// Groq's /models carries the window per model (api-groq G2).
+const parseGroq = createModelParser<GroqModelEntry>({
+  arrayKey: 'data',
+  filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
+  getId: (entry) => entry.id,
+  getDisplayName: (_entry, id) => id,
+  contextWindow: (entry) =>
+    typeof entry.context_window === 'number' && entry.context_window > 0
+      ? entry.context_window
+      : DEFAULT_CONTEXT_WINDOW,
+  inputModalities: (entry) => parseModalities(entry.input_modalities),
+  outputModalities: (entry) => parseModalities(entry.output_modalities),
 });
 
 interface GeminiModelEntry {
@@ -562,6 +625,7 @@ interface GeminiModelEntry {
   displayName?: string;
   supportedGenerationMethods?: string[];
   inputTokenLimit?: number;
+  thinking?: boolean;
 }
 
 const GEMINI_VERSION_SUFFIX_RE = /-\d{3}$/;
@@ -587,7 +651,7 @@ function parseGemini(body: unknown, provider: string): DiscoveredModel[] {
         contextWindow: entry.inputTokenLimit ?? GEMINI_DEFAULT_CONTEXT,
         inputPricePerToken: null,
         outputPricePerToken: null,
-        capabilityReasoning: false,
+        capabilityReasoning: entry.thinking === true,
         capabilityCode: false,
         qualityScore: 3,
       };
@@ -606,6 +670,7 @@ function parseGemini(body: unknown, provider: string): DiscoveredModel[] {
 interface OpenRouterModelEntry {
   id: string;
   name?: string;
+  expiration_date?: string | null;
   context_length?: number;
   architecture?: { input_modalities?: string[]; output_modalities?: string[] };
   pricing?: { prompt?: string; completion?: string };
@@ -640,6 +705,11 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
       // never through the synchronous chat completions proxy — listing them
       // advertises models that are guaranteed to 404.
       if (entry.id.endsWith(':batch')) return false;
+      // Models past `expiration_date` are retired (api-nous G2).
+      if (typeof entry.expiration_date === 'string') {
+        const expiresAt = Date.parse(entry.expiration_date);
+        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return false;
+      }
       const output = entry.architecture?.output_modalities?.map((o) => o.toLowerCase());
       if (output && output.length > 0 && !output.every((o) => o === 'text')) {
         return false;
@@ -902,7 +972,7 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
   groq: {
     endpoint: 'https://api.groq.com/openai/v1/models',
     buildHeaders: bearerHeaders,
-    parse: parseOpenAI,
+    parse: parseGroq,
   },
   huggingface: {
     endpoint: HUGGING_FACE_MODELS_URL,
@@ -1028,9 +1098,9 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     parse: parseOpenAI,
   },
   gemini: {
-    endpoint: (key: string) =>
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-    buildHeaders: () => ({}),
+    // The key rides in `x-goog-api-key`, never in the URL (api-gemini G7).
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+    buildHeaders: (key: string) => ({ 'x-goog-api-key': key }),
     parse: parseGemini,
   },
   openrouter: {
