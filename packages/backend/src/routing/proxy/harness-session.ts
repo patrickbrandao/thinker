@@ -5,6 +5,9 @@
  * - `x-session-key`: Thinker's own convention (OpenClaw plugin, SDK apps).
  * - `x-openclaw-session-key`: OpenClaw gateway.
  * - `x-claude-code-session-id`: Claude Code (2.1.86+), on every request.
+ *   Subagents (Task tool, agent teams) keep the main session id and add
+ *   `x-claude-code-agent-id` (2.1.139+): they become `<session>:<agent>`
+ *   children of the main session, nested agents included.
  * - `x-opencode-session-id` / `x-opencode-session`: OpenCode; subagent
  *   sessions add `x-opencode-parent-session-id` / `x-parent-session-id`.
  * - `x-hermes-session-id` / `x-hermes-session-key`: Hermes Agent.
@@ -69,6 +72,10 @@ export function detectHarnessSession(
   const codex = headers['originator'] ? ['x-client-request-id'] : [];
   const id = pick(headers, [...SESSION_HEADERS, ...codex]);
   if (!id) return null;
+  const claudeAgent = pick(headers, ['x-claude-code-agent-id']);
+  if (claudeAgent && pick(headers, ['x-claude-code-session-id']) === id) {
+    return { id: `${id}:${claudeAgent}`.slice(0, MAX_ID_LENGTH), parentId: id };
+  }
   const parentId = pick(headers, PARENT_HEADERS);
   return { id, parentId: parentId && parentId !== id ? parentId : null };
 }

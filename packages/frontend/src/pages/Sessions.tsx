@@ -4,11 +4,12 @@ import { platformIcon } from 'thinker-shared';
 import ErrorState from '../components/ErrorState.js';
 import Select, { type SelectOption } from '../components/Select.js';
 import { ThemedIcon } from '../components/setup-ui.js';
-import { Badge, Button, Skel } from '../components/ui.js';
+import { Badge, Button, cx, Skel, Tabs } from '../components/ui.js';
+import SessionsBubbleChart from '../components/sessions/SessionsBubbleChart.js';
 import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { getAgents } from '../services/api.js';
-import { getSessions } from '../services/api/sessions.js';
+import { getSessions, getSessionsTimeline } from '../services/api/sessions.js';
 import { formatDateTime, formatNumber, formatTimeAgo } from '../services/formatters.js';
 import { getModelDisplayName } from '../services/model-display.js';
 import { costLabel, isActive, shortId, spanLabel } from './sessions/session-format.js';
@@ -27,6 +28,15 @@ export default function Sessions() {
   const navigate = useNavigate();
   const range = searchParams.get('range') || '7d';
   const agent = searchParams.get('agent') || '';
+  const withErrors = searchParams.get('errors') === '1';
+  const withSubagents = searchParams.get('subagents') === '1';
+  const view: 'list' | 'chart' = searchParams.get('view') === 'chart' ? 'chart' : 'list';
+  const filters = {
+    range,
+    agent_name: agent || undefined,
+    has_errors: withErrors ? 'true' : undefined,
+    has_subagents: withSubagents ? 'true' : undefined,
+  };
   const [page, setPage] = useState(0);
 
   const setParam = (key: string, value: string) => {
@@ -55,12 +65,27 @@ export default function Sessions() {
   const sessions = useResource(
     () =>
       getSessions({
-        range,
-        agent_name: agent || undefined,
+        ...filters,
         limit: String(PAGE_SIZE),
         offset: String(page * PAGE_SIZE),
       }),
-    [range, agent, page],
+    [range, agent, withErrors, withSubagents, page],
+    { enabled: view === 'list' },
+  );
+  const timeline = useResource(
+    () => getSessionsTimeline(filters),
+    [range, agent, withErrors, withSubagents],
+    { enabled: view === 'chart' },
+  );
+  const chip = (key: string, on: boolean, label: string) => (
+    <button
+      type="button"
+      className={cx('feedback-tag btn btn-sm', on ? 'feedback-tag--selected' : 'btn-ghost')}
+      aria-pressed={on}
+      onClick={() => setParam(key, on ? '' : '1')}
+    >
+      {label}
+    </button>
   );
 
   const harnessIcon = (name: string | null) => {
@@ -94,6 +119,8 @@ export default function Sessions() {
       <div className="page-head">
         <p className="m-0 max-w-2xl text-sm text-muted">{t('sessions.subtitle')}</p>
         <div className="page-actions w-full lg:w-auto lg:justify-end">
+          {chip('errors', withErrors, t('sessions.filter.withErrors'))}
+          {chip('subagents', withSubagents, t('sessions.filter.withSubagents'))}
           <div className="w-full sm:w-44">
             <Select value={agent} onChange={(v) => setParam('agent', v)} options={agentOptions} />
           </div>
@@ -103,7 +130,34 @@ export default function Sessions() {
         </div>
       </div>
 
-      {sessions.error ? (
+      <Tabs<'list' | 'chart'>
+        className="mb-4"
+        label={t('sessions.title')}
+        value={view}
+        onChange={(v) => setParam('view', v === 'chart' ? 'chart' : '')}
+        items={[
+          { key: 'list', label: t('sessions.view.list') },
+          { key: 'chart', label: t('sessions.view.chart') },
+        ]}
+      />
+
+      {view === 'chart' ? (
+        timeline.error ? (
+          <ErrorState error={timeline.error} onRetry={() => void timeline.reload()} />
+        ) : !timeline.data ? (
+          <Skel height={360} />
+        ) : timeline.data.points.length === 0 ? (
+          <div className="empty">
+            <h3>{t('sessions.emptyTitle')}</h3>
+            <p className="max-w-md text-sm">{t('sessions.emptyBody')}</p>
+          </div>
+        ) : (
+          <SessionsBubbleChart
+            data={timeline.data}
+            onOpen={(id) => navigate(`/sessions/${encodeURIComponent(id)}`)}
+          />
+        )
+      ) : sessions.error ? (
         <ErrorState error={sessions.error} onRetry={() => void sessions.reload()} />
       ) : sessions.loading && !sessions.data ? (
         <div className="flex flex-col gap-2">

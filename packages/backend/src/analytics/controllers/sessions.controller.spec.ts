@@ -17,6 +17,7 @@ function build() {
   const sessions = {
     list: jest.fn().mockResolvedValue({ items: [], has_more: false }),
     get: jest.fn().mockResolvedValue({ id: 's1' }),
+    timeline: jest.fn().mockResolvedValue({ points: [] }),
   };
   return { controller: new SessionsController(sessions as never), sessions };
 }
@@ -40,9 +41,22 @@ describe('SessionsController.list', () => {
       tenantId: 'org-1',
       range: undefined,
       agentName: undefined,
+      hasErrors: false,
+      hasSubagents: false,
       limit: 50,
       offset: 0,
     });
+  });
+
+  it('passes the has_errors and has_subagents filters through', () => {
+    const { controller, sessions } = build();
+    controller.list(query({ has_errors: 'true', has_subagents: 'true' }), ctx());
+    expect(sessions.list).toHaveBeenCalledWith(
+      expect.objectContaining({ hasErrors: true, hasSubagents: true }),
+    );
+    expect(
+      validateSync(plainToInstance(SessionsQueryDto, { has_errors: 'yes' })).length,
+    ).toBeGreaterThan(0);
   });
 
   it.each([
@@ -64,6 +78,8 @@ describe('SessionsController.list', () => {
       tenantId: 'org-1',
       range: '7d',
       agentName: 'bot',
+      hasErrors: false,
+      hasSubagents: false,
       limit: 50,
       offset: 100,
     });
@@ -137,5 +153,28 @@ describe('SessionsController.get', () => {
   it('returns the session', async () => {
     const { controller } = build();
     await expect(controller.get('s1', ctx())).resolves.toEqual({ id: 's1' });
+  });
+});
+
+describe('SessionsController.timeline', () => {
+  it('forwards the same filters as the list', () => {
+    const { controller, sessions } = build();
+    controller.timeline(
+      query({ range: '30d', agent_name: 'bot', has_errors: 'true', has_subagents: 'false' }),
+      ctx(),
+    );
+    expect(sessions.timeline).toHaveBeenCalledWith({
+      tenantId: 'org-1',
+      range: '30d',
+      agentName: 'bot',
+      hasErrors: true,
+      hasSubagents: false,
+    });
+  });
+
+  it('is empty without an organization', () => {
+    const { controller, sessions } = build();
+    expect(controller.timeline(query(), ctx({ tenantId: null }))).toMatchObject({ points: [] });
+    expect(sessions.timeline).not.toHaveBeenCalled();
   });
 });

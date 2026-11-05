@@ -38,12 +38,32 @@ export interface SessionDetail extends SessionSummary {
   client: { user_agent: string | null; project: string | null; client: string | null } | null;
 }
 
-export function getSessions(params: {
+/** One session in one period of the bubble chart. */
+export interface TimelinePoint {
+  session_id: string;
+  agent_name: string | null;
+  bucket: string;
+  requests: number;
+  failed: number;
+  cost: number;
+}
+
+export interface SessionsTimeline {
+  bucket: 'hour' | 'day' | 'week';
+  from: string | null;
+  points: TimelinePoint[];
+  total_sessions: number;
+  shown_sessions: number;
+}
+
+export type SessionFilters = {
   range?: string;
   agent_name?: string;
-  limit?: string;
-  offset?: string;
-}) {
+  has_errors?: string;
+  has_subagents?: string;
+};
+
+export function getSessions(params: SessionFilters & { limit?: string; offset?: string }) {
   return fetchJson<{ items: SessionSummary[]; has_more: boolean }>('/sessions', params, {
     cache: false,
   });
@@ -53,4 +73,8 @@ export function getSession(id: string) {
   return fetchJson<SessionDetail>(`/sessions/${encodeURIComponent(id)}`, undefined, {
     cache: false,
   });
+}
+
+export function getSessionsTimeline(params: SessionFilters) {
+  return fetchJson<SessionsTimeline>('/sessions/timeline', params, { cache: false });
 }
