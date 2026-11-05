@@ -59,6 +59,12 @@ export interface MetaModelApiModel {
 export const META_MODEL_API_CONTEXT_WINDOW = 1_048_576;
 
 export const META_MODEL_API_MODELS: readonly MetaModelApiModel[] = [
+  { id: 'muse-spark-1.3', displayName: 'Muse Spark 1.3' },
+  {
+    id: 'muse-spark-1.3-contributor',
+    displayName: 'Muse Spark 1.3 Contributor (inputs and outputs may train Meta)',
+  },
+  { id: 'muse-wonder-1.0', displayName: 'Muse Wonder 1.0 (preview)' },
   { id: 'muse-spark-1.2', displayName: 'Muse Spark 1.2' },
   {
     id: 'muse-spark-1.2-contributor',

@@ -11,10 +11,13 @@ const MODEL_PREFIX_MAP: [RegExp, string][] = [
   [/^gemini-|^gemma-/, 'gemini'],
   [/^deepseek-/, 'deepseek'],
   [/^grok-/, 'xai'],
-  [/^mistral-|^codestral|^pixtral|^open-mistral/, 'mistral'],
-  // `k3` / `k3-256k` are the bare wire ids of the Kimi Coding Plan — match
-  // exactly `k3` or `k3-<suffix>` so unrelated ids (k3pro, k30) stay unmatched.
-  [/^kimi-|^moonshot-|^k3(-|$)/, 'moonshot'],
+  [
+    /^mistral-|^codestral|^pixtral|^open-mistral|^ministral-|^magistral-|^devstral-|^voxtral-/,
+    'mistral',
+  ],
+  // `k3`, `k3-256k` and `k3.1-pro` are bare wire ids of the Kimi Coding Plan:
+  // match `k3`, `k3-<suffix>` or `k3.1-pro*` so unrelated ids (k3pro, k30) stay unmatched.
+  [/^kimi-|^moonshot-|^k3(?:-|\.1-pro|$)/, 'moonshot'],
   [/^minimax-/i, 'minimax'],
   [/^mimo-v/i, 'xiaomi'],
   [/^glm-/, 'zai'],

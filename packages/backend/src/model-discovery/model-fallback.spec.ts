@@ -339,7 +339,7 @@ describe('buildSubscriptionFallbackModels', () => {
     expect(result.find((model) => model.id === 'claude-opus-5-5')?.contextWindow).toBe(1000000);
     expect(result.find((model) => model.id === 'claude-sonnet-5')?.contextWindow).toBe(1000000);
     expect(result.find((model) => model.id === 'claude-sonnet-5-5')?.contextWindow).toBe(1000000);
-    expect(result.find((model) => model.id === 'claude-haiku-5-5')?.contextWindow).toBe(200000);
+    expect(result.find((model) => model.id === 'claude-haiku-5-5')?.contextWindow).toBe(1000000);
     expect(result.every((model) => model.contextWindowSource === 'subscription_config')).toBe(true);
   });
 
@@ -347,15 +347,18 @@ describe('buildSubscriptionFallbackModels', () => {
     const result = buildSubscriptionFallbackModels('moonshot');
 
     expect(result.map((model) => model.id)).toEqual([
+      'k3.1-pro',
+      'k3.1-pro-highspeed',
       'k3',
       'k3-256k',
       'kimi-for-coding',
       'kimi-for-coding-highspeed',
     ]);
+    expect(result.find((model) => model.id === 'k3.1-pro-highspeed')?.contextWindow).toBe(1048576);
     expect(result.find((model) => model.id === 'k3')?.contextWindow).toBe(1048576);
     // k3-256k must not inherit the 1M window of its k3 prefix sibling.
     expect(result.find((model) => model.id === 'k3-256k')?.contextWindow).toBe(262144);
-    expect(result.find((model) => model.id === 'kimi-for-coding')?.contextWindow).toBe(262144);
+    expect(result.find((model) => model.id === 'kimi-for-coding')?.contextWindow).toBe(1048576);
     expect(result.find((model) => model.id === 'kimi-for-coding-highspeed')?.contextWindow).toBe(
       262144,
     );
@@ -364,14 +367,6 @@ describe('buildSubscriptionFallbackModels', () => {
   it('preserves curated model casing', () => {
     expect(buildSubscriptionFallbackModels('minimax').map((model) => model.id)).toEqual([
       'MiniMax-M3.1-Flash',
-      'MiniMax-M3',
-      'MiniMax-M2.7',
-      'MiniMax-M2.7-highspeed',
-      'MiniMax-M2.5',
-      'MiniMax-M2.5-highspeed',
-      'MiniMax-M2.1',
-      'MiniMax-M2.1-highspeed',
-      'MiniMax-M2',
     ]);
   });
 });
@@ -456,7 +451,7 @@ describe('reconcileCachedSubscriptionContextWindow', () => {
     id: 'gpt-5.6-sol',
     displayName: 'GPT-5.6 Sol',
     provider: 'openai',
-    contextWindow: 272000,
+    contextWindow: 200000,
     inputPricePerToken: 0,
     outputPricePerToken: 0,
     capabilityReasoning: true,
@@ -470,7 +465,7 @@ describe('reconcileCachedSubscriptionContextWindow', () => {
         { ...model, contextWindowSource: 'subscription_config' },
         'openai',
       ),
-    ).toMatchObject({ contextWindow: 1050000, contextWindowSource: 'subscription_config' });
+    ).toMatchObject({ contextWindow: 272000, contextWindowSource: 'subscription_config' });
   });
 
   it('preserves a context window reported by the provider', () => {
@@ -511,7 +506,7 @@ describe('reconcileCachedSubscriptionContextWindow', () => {
   it('returns an already-current row unchanged', () => {
     const cached = {
       ...model,
-      contextWindow: 1050000,
+      contextWindow: 272000,
       contextWindowSource: 'subscription_config' as const,
     };
 

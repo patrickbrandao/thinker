@@ -114,7 +114,7 @@ Pontos no código:
 |---|---|---|---|---|---|
 | G1 | quebra | Token da assinatura vai para `api.x.ai` sem cabeçalhos; o cliente oficial usa `cli-chat-proxy.grok.com` com `X-XAI-Token-Auth`, `x-authenticateresponse`, `x-grok-client-*`. Criar endpoint `xai-subscription`(+`-responses`). Precisa de teste com conta real | providers | [#354](https://github.com/patrickbrandao/thinker/issues/354) | resolvida (endpoint xai-subscription em cli-chat-proxy.grok.com com cabeçalhos do Grok CLI; aviso de risco na doc) |
 | G2 | degradação | Faltam escopos `conversations:*`, `workspaces:*` e `referrer=grok-build` | providers | [#355](https://github.com/patrickbrandao/thinker/issues/355) | aberta |
-| G3 | degradação | Descoberta de modelos em `api.x.ai/v1/models`; fallback sem `grok-build-0.1` e variantes `-build`; contexto fixo 500k | providers | [#356](https://github.com/patrickbrandao/thinker/issues/356) | aberta |
+| G3 | degradação | Descoberta de modelos em `api.x.ai/v1/models`; fallback sem `grok-build-0.1` e variantes `-build`; contexto fixo 500k | providers | [#356](https://github.com/patrickbrandao/thinker/issues/356) | resolvida (lista de modelos atualizada) |
 | G4 | oportunidade | Ler uso/créditos da assinatura em `/v1/billing?format=credits` e plano em `/v1/settings` para o medidor | backend-dev | — | aberta |
 | G5 | oportunidade | Device code (`/oauth2/device/code`) funcionaria em Docker/SSH sem callback local | providers | — | aberta |
 

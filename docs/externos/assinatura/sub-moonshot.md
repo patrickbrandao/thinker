@@ -119,8 +119,8 @@ Outros arquivos que citam `moonshot`: `model-capabilities.ts`, `reasoning-format
 
 | ID | Severidade | Lacuna | Dono | Issue | Status |
 |---|---|---|---|---|---|
-| G1 | degradação | `k3.1-pro` e `k3.1-pro-highspeed` (novos) fora de `knownModels` (filtro exato os esconde) e sem casar na inferência de provedor; K3.1 Pro exige thinking ligado (400 sem). Sugestão: adicionar ids, janelas e inferência `k3.1-`, não desligar thinking. | providers | #342 | aberta |
-| G2 | degradação | `kimi-for-coding` agora é K2.8 Preview com contexto de até 1M; Thinker assume 262144. Sugestão: confirmar `context_length` real em `/models` com conta e ajustar `modelContextWindows`. | providers | #344 | aberta |
+| G1 | degradação | `k3.1-pro` e `k3.1-pro-highspeed` (novos) fora de `knownModels` (filtro exato os esconde) e sem casar na inferência de provedor; K3.1 Pro exige thinking ligado (400 sem). Sugestão: adicionar ids, janelas e inferência `k3.1-`, não desligar thinking. | providers | #342 | resolvida (lista de modelos atualizada) |
+| G2 | degradação | `kimi-for-coding` agora é K2.8 Preview com contexto de até 1M; Thinker assume 262144. Sugestão: confirmar `context_length` real em `/models` com conta e ajustar `modelContextWindows`. | providers | #344 | resolvida (janela de contexto por modelo) |
 | G3 | oportunidade | Ler cotas (`/usages`: 5h, 7d, mês) para exibir uso restante. | backend-dev | sem issue (oportunidade) | aberta |
 | G4 | oportunidade | Região overseas `api.kimi.ai` não suportada (base fixa em `.com`); Thinker não envia UA de produto, enquanto os termos exigem manter o identificador real. Verificar com conta real se chaves globais funcionam em `.com` e se UA genérico é aceito. | providers | sem issue (oportunidade) | aberta |
 
