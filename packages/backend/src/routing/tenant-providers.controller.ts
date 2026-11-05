@@ -30,10 +30,14 @@ import {
   RemoveProviderQueryDto,
   RenameProviderKeyDto,
   SetStreamWarmupDto,
+  SetBaseUrlDto,
 } from './dto/routing.dto';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { providerKeyDisplay } from '../common/utils/provider-key-mask';
+import { checkAccountBaseUrl, baseUrlFields } from './account-base-url-check';
+import { defaultAccountBaseUrl, supportsAccountBaseUrl } from './account-base-url';
+import { buildProviderModels } from './provider-models';
 
 /**
  * Tenant-level provider management endpoints.
@@ -81,6 +85,42 @@ export class TenantProvidersController {
     this.routingCache.invalidateTenant(tenantId);
   }
 
+  /**
+   * Every model the workspace's connections offer (Providers → Models), with
+   * the accounts serving each one. Active connections only, unless
+   * `include_inactive=true`.
+   */
+  @Get('models')
+  async listModels(
+    @TenantCtx() ctx: TenantContext,
+    @Query('include_inactive') includeInactive?: string,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const [rows, customProviders] = await Promise.all([
+      this.providerRepo.find({ where: { tenant_id: tenantId } }),
+      this.customProviderService.list(tenantId),
+    ]);
+    return {
+      models: buildProviderModels(rows, customProviders, includeInactive === 'true'),
+    };
+  }
+
+  /** Official base URL of a provider (and region), for the base URL field's placeholder. */
+  @Get('default-base-url')
+  defaultBaseUrl(
+    @Query('provider') provider: string,
+    @Query('auth_type') authType?: string,
+    @Query('region') region?: string,
+  ) {
+    const supports = !!provider && supportsAccountBaseUrl(provider, authType || 'api_key');
+    return {
+      supports_base_url: supports,
+      default_base_url: supports
+        ? defaultAccountBaseUrl(provider, authType || 'api_key', region || null)
+        : null,
+    };
+  }
+
   @Post('refresh-models')
   async refreshModels(@TenantCtx() ctx: TenantContext) {
     const tenantId = this.requireTenant(ctx);
@@ -111,6 +151,33 @@ export class TenantProvidersController {
       auth_type: updated.auth_type,
       label: updated.label,
       priority: updated.priority,
+    };
+  }
+
+  /**
+   * Set or clear an API-key connection's base URL. Same URL rules as custom
+   * providers: SSRF validation with THINKER_PROVIDER_PRIVATE_URLS. Models are
+   * discovered again against the new URL.
+   */
+  @Patch('connections/:id/base-url')
+  async setBaseUrl(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetBaseUrlDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const baseUrl = await checkAccountBaseUrl(body.base_url, ctx);
+    const updated = await this.providerService.setBaseUrl(tenantId, id, baseUrl);
+    await this.invalidateTenantRouting(tenantId);
+    try {
+      await this.discoveryService.discoverModels(updated);
+    } catch {
+      // Non-fatal: "Refresh models" retries.
+    }
+    return {
+      id: updated.id,
+      base_url: updated.base_url ?? null,
+      default_base_url: defaultAccountBaseUrl(updated.provider, updated.auth_type, updated.region),
     };
   }
 
@@ -218,6 +285,10 @@ export class TenantProvidersController {
           cached_model_count: number;
           is_active: boolean;
           stream_warmup_ms: number | null;
+          region: string | null;
+          base_url: string | null;
+          default_base_url: string | null;
+          supports_base_url: boolean;
         }>;
         total_models: number;
       }
@@ -252,6 +323,7 @@ export class TenantProvidersController {
           cached_model_count: modelCount,
           is_active: p.is_active,
           stream_warmup_ms: p.stream_warmup_ms ?? null,
+          ...baseUrlFields(p),
         });
         existing.total_models = Math.max(existing.total_models, modelCount);
       } else {
@@ -269,6 +341,7 @@ export class TenantProvidersController {
               cached_model_count: modelCount,
               is_active: p.is_active,
               stream_warmup_ms: p.stream_warmup_ms ?? null,
+              ...baseUrlFields(p),
             },
           ],
           total_models: modelCount,

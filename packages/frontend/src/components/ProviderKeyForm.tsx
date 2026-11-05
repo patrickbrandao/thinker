@@ -1,3 +1,5 @@
+import { useProviderWizard } from './ProviderWizard.js';
+import AccountBaseUrlField from './AccountBaseUrlField.js';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ListPlus, Trash2 } from 'lucide-react';
 import { MAX_KEYS_PER_PROVIDER as SHARED_MAX_KEYS_PER_PROVIDER } from 'thinker-shared';
@@ -105,6 +107,7 @@ function TrashIcon() {
 
 const ProviderKeyForm = (props: ProviderKeyFormProps) => {
   const { provDef, provId, isSubMode, connected, selectedAuthType } = props;
+  const wizard = useProviderWizard();
   const isPopupOAuth = provDef.subscriptionAuthMode === 'popup_oauth';
   const shouldRevokeOpenaiOAuth =
     provId === 'openai' && isPopupOAuth && selectedAuthType === 'subscription';
@@ -381,7 +384,12 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
   // validate paste tokens with a different prefix/format than their api_key
   // counterparts. Branch the validator so the chain-add flow doesn't reject
   // a valid setup token using the api-key rules.
-  const handleAddKey = async (label: string, apiKey: string, region?: string) => {
+  const handleAddKey = async (
+    label: string,
+    apiKey: string,
+    region?: string,
+    accountBaseUrl?: string,
+  ) => {
     const result = validateKey(apiKey);
     if (!result.valid) {
       toast.error(result.error!);
@@ -395,6 +403,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         authType: selectedAuthType,
         label,
         ...(region && { region }),
+        ...(accountBaseUrl && { accountBaseUrl }),
       });
       toast.success(t('providerSetup.keyForm.keyAdded', { name: provDef.name, label }));
       props.onUpdate();
@@ -434,6 +443,8 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
 
   /* New connection — a named credential next to any existing ones */
   if (props.newConnection) {
+    const preset = wizard?.preset ?? {};
+    const startKey = preset.apiKey !== undefined ? preset.apiKey : freeKey;
     return (
       <AddAnotherKeyAction
         onAdd={handleAddKey}
@@ -453,8 +464,15 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         isSubscription={isSubMode}
         endpointRegions={endpointRegions}
         submitLabel={t('providerSetup.shared.connect')}
-        initialApiKey={freeKey}
-        hint={freeKeyHint}
+        initialApiKey={startKey}
+        hint={startKey && startKey === freeKey ? freeKeyHint : null}
+        initialEndpointRegion={preset.endpointRegion}
+        lockEndpointRegion={!!preset.endpointRegion}
+        baseUrlFor={
+          !isSubMode && !provId.startsWith('custom:') && !provDef.noKeyRequired ? provId : undefined
+        }
+        onCancel={wizard?.onBack}
+        cancelLabel={wizard?.onBack ? t('providerSetup.wizard.back') : undefined}
         bare
       />
     );
@@ -626,7 +644,12 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
 
 /** @internal Exported for testing only. */
 export interface AddAnotherKeyActionProps {
-  onAdd: (label: string, apiKey: string, region?: string) => Promise<boolean>;
+  onAdd: (
+    label: string,
+    apiKey: string,
+    region?: string,
+    accountBaseUrl?: string,
+  ) => Promise<boolean>;
   busy: boolean;
   setBusy: SetValue<boolean>;
   provDef: ProviderDef;
@@ -649,6 +672,13 @@ export interface AddAnotherKeyActionProps {
   initialApiKey?: string;
   /** Shown under the key field. */
   hint?: ReactNode;
+  /** Hide the region select: the wizard's part 1 already fixed it. */
+  lockEndpointRegion?: boolean;
+  /** Provider id whose official base URL the optional "Base URL" field shows. */
+  baseUrlFor?: string;
+  /** Replaces closing the form (the wizard goes back to part 1). */
+  onCancel?: () => void;
+  cancelLabel?: string;
 }
 
 /** @internal Exported for testing only. */
@@ -664,6 +694,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
     props.initialEndpointRegion ?? props.endpointRegions?.[0]?.value,
   );
   const [customEndpointUrl, setCustomEndpointUrl] = useState('');
+  const [accountBaseUrl, setAccountBaseUrl] = useState('');
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const prevOpen = useRef<boolean | undefined>(undefined);
 
@@ -708,7 +739,12 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
       toast.error(t('providerSetup.keyForm.nameTaken', { label: labelToUse }));
       return;
     }
-    const ok = await props.onAdd(labelToUse, apiKey.trim(), customEndpointPayload);
+    const ok = await props.onAdd(
+      labelToUse,
+      apiKey.trim(),
+      customEndpointPayload,
+      accountBaseUrl.trim() || undefined,
+    );
     if (ok) {
       setIsOpen(false);
       setLabel('');
@@ -752,7 +788,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
         placeholder={defaultLabel()}
         onChange={(e) => setLabel(e.currentTarget.value)}
       />
-      {props.endpointRegions?.length ? (
+      {props.endpointRegions?.length && !props.lockEndpointRegion ? (
         <>
           <label className="label mt-2" htmlFor="add-key-endpoint">
             {t('providerSetup.shared.region')}
@@ -789,6 +825,23 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
           ) : null}
         </>
       ) : null}
+      {props.lockEndpointRegion && baseUrlPlaceholder ? (
+        <>
+          <label className="label mt-2" htmlFor="add-key-base-url">
+            {selectedEndpointRegionOption?.label ?? t('providerSetup.shared.baseUrl')}
+          </label>
+          <input
+            id="add-key-base-url"
+            className="field"
+            type="text"
+            autoComplete="off"
+            placeholder={baseUrlPlaceholder}
+            value={customEndpointUrl}
+            disabled={props.busy}
+            onChange={(e) => setCustomEndpointUrl(e.currentTarget.value)}
+          />
+        </>
+      ) : null}
       <label className="label mt-2" htmlFor="add-key-value">
         {t('providerSetup.keyForm.credential', {
           owner: props.credentialOwnerName,
@@ -818,9 +871,23 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
         owner={props.credentialOwnerName}
         noun={props.credentialNoun}
       />
+      {props.baseUrlFor ? (
+        <AccountBaseUrlField
+          provider={props.baseUrlFor}
+          region={customEndpointPayload}
+          value={accountBaseUrl}
+          onChange={setAccountBaseUrl}
+          disabled={props.busy}
+        />
+      ) : null}
       <div className="mt-3 flex justify-between gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} disabled={props.busy}>
-          {t('common.cancel')}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => (props.onCancel ? props.onCancel() : setIsOpen(false))}
+          disabled={props.busy}
+        >
+          {props.cancelLabel ?? t('common.cancel')}
         </Button>
         <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
           {props.submitLabel ?? t('providerSetup.keyForm.addKey')}

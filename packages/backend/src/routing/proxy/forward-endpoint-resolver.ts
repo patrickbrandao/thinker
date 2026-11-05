@@ -54,6 +54,11 @@ export interface ResolveForwardEndpointParams {
   model: string;
   /** Persisted region for the credential (e.g. `cn`), when known. */
   providerRegion?: string | null;
+  /**
+   * The API-key connection's own base URL. Wins over the region and the
+   * built-in endpoint; only the base changes, the API paths stay the same.
+   */
+  providerBaseUrl?: string | null;
   /** OAuth resource_url (MiniMax region base URL), when present. */
   resourceUrl?: string;
   /**
@@ -87,6 +92,7 @@ export function resolveForwardEndpoint(
     authType,
     model,
     providerRegion,
+    providerBaseUrl,
     resourceUrl,
     customProvider,
     logger,
@@ -140,6 +146,12 @@ export function resolveForwardEndpoint(
       );
       forwardModel = CustomProviderService.rawModelName(model);
     }
+  } else if (providerBaseUrl && authType === 'api_key' && resolveEndpointKey(provider)) {
+    const key = resolveEndpointKey(provider)!;
+    customEndpoint = buildEndpointOverride(
+      providerBaseUrl,
+      key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key,
+    );
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
     customEndpoint = buildEndpointOverride(

@@ -4,6 +4,34 @@ import type { Catalog } from '../../types.js';
 const modelos = (n: number) => `${n} modelo${n === 1 ? '' : 's'}`;
 
 const ptBR: Catalog<typeof en> = {
+  wizard: {
+    steps: 'Passos',
+    stepType: 'Tipo',
+    stepParams: 'Parâmetros',
+    chooseType: 'Qual tipo de conta?',
+    next: 'Avançar',
+    back: 'Voltar',
+    typeChosen: 'Tipo:',
+    variant: {
+      zen: { label: 'Zen (pago)', hint: 'Sua chave de API do OpenCode, cobrada por uso.' },
+      free: { label: 'Grátis', hint: 'A chave pública `public`: só os modelos gratuitos.' },
+      console: { label: 'Console', hint: 'Entrar no OpenCode Console.' },
+      go: { label: 'Go', hint: 'Plano OpenCode Go: entrar ou colar a chave.' },
+      minimaxLogin: { label: 'Entrar', hint: 'Login com a sua conta MiniMax.' },
+      minimaxToken: { label: 'Colar token', hint: 'Colar um token do Coding Plan (sk-cp-…).' },
+      vertexExpress: { label: 'Modo express', hint: 'Só a chave de API; poucos modelos Gemini.' },
+      vertexProject: {
+        label: 'Projeto',
+        hint: 'Projeto e localização do Google Cloud (projeto/local).',
+      },
+    },
+  },
+  baseUrlField: {
+    label: 'URL base',
+    restore: 'Restaurar padrão',
+    hint: 'Vazio mantém a URL oficial mostrada.',
+    warning: 'A chave de API será enviada para esta URL.',
+  },
   shared: {
     connectProvider: 'Conectar provedor',
     backToProviders: 'Voltar para os provedores',

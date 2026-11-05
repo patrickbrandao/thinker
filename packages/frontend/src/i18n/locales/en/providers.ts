@@ -133,6 +133,7 @@ export default {
     warmupHint:
       'Optional. How long a streaming request waits for the first token before failing over. Leave empty to use the default.',
     warmupSaved: 'Stream warm-up saved',
+    baseUrlSaved: 'Base URL saved; models are being discovered again.',
     credential: 'Credential',
     credentialKeyHint:
       'Replace the key on this same connection. Harness access, routes and history stay as they are.',
@@ -273,5 +274,48 @@ export default {
     subscriptionsDesc: 'Use your existing paid plans. You can add several from the same provider.',
     byokDesc: 'Connect providers you pay per token or per usage with your own API keys.',
     localDesc: 'Connect to LLM servers running on your machine.',
+  },
+  models: {
+    subtitle:
+      'Every model your connections offer, with the accounts that serve it, price, context window and capabilities.',
+    refresh: 'Refresh models',
+    refreshed: 'Models refreshed',
+    search: 'Search models',
+    allProviders: 'All providers',
+    allTypes: 'All types',
+    allCapabilities: 'All capabilities',
+    includeInactive: 'Include inactive accounts',
+    count: '{{ shown }} of {{ total }} models',
+    viewByModel: 'By model',
+    viewByAccount: 'By account',
+    emptyTitle: 'No models',
+    emptyBody: 'Connect a provider, or refresh the models of your connections.',
+    reasoning: 'Reasoning',
+    kind: {
+      api_key: 'API key',
+      subscription: 'Subscription',
+      local: 'Local',
+    },
+    col: {
+      model: 'Model',
+      provider: 'Provider',
+      accounts: 'Accounts',
+      account: 'Account',
+      type: 'Type',
+      price: 'Input / output per 1M',
+      context: 'Context',
+      capabilities: 'Capabilities',
+    },
+    detail: {
+      id: 'Model id',
+      longContext: 'Long context',
+      longContextValue: 'Above {{ tokens }} tokens: {{ input }} / {{ output }}',
+      input: 'Input',
+      output: 'Output',
+      endpoints: 'Endpoints',
+      discovered: 'Discovered',
+      priceHint:
+        'Prices are per million tokens as each account reports them; subscriptions and local servers have no per-token price.',
+    },
   },
 };

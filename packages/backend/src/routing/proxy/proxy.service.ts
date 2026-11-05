@@ -519,6 +519,7 @@ export class ProxyService {
       apiMode,
       resourceUrl: credentials.resourceUrl,
       providerRegion: credentials.providerRegion,
+      providerBaseUrl: credentials.providerBaseUrl,
       signatureLookup,
       thinkingLookup,
       clientAnthropicBeta: headers?.['anthropic-beta'],

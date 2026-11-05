@@ -15,6 +15,7 @@ export default {
   local: 'Local',
   usageBased: 'Usage-based',
   subscriptions: 'Subscriptions',
+  models: 'Models',
   sectionIntegrations: 'INTEGRATIONS',
   mcpServer: 'MCP server',
   sectionTools: 'TOOLS',

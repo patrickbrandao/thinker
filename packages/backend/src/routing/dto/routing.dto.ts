@@ -109,6 +109,16 @@ export class ConnectProviderDto {
   @IsString()
   base_url?: string;
 
+  /**
+   * API-key connections: base URL replacing the provider's official one
+   * (`tenant_providers.base_url`). Not the Qwen `baseUrl` above, which
+   * selects a Qwen endpoint stored as the region.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  accountBaseUrl?: string;
+
   @IsOptional()
   @IsString()
   @IsNotEmpty()
@@ -268,6 +278,14 @@ export class SetStreamWarmupDto {
   @Min(MIN_STREAM_WARMUP_OVERRIDE_MS)
   @Max(MAX_STREAM_WARMUP_OVERRIDE_MS)
   stream_warmup_ms!: number | null;
+}
+
+/** Body for setting (string) or clearing (null) an API-key connection's base URL. */
+export class SetBaseUrlDto {
+  @ValidateIf((_obj, value) => value !== null)
+  @IsString()
+  @MaxLength(2048)
+  base_url!: string | null;
 }
 
 export function responseModeFromDto(body: SetResponseModeDto): ResponseMode | undefined {

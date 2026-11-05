@@ -50,6 +50,8 @@ export type ResolvedRouteCredentials =
       rawApiKey: string;
       resourceUrl?: string;
       providerRegion?: string | null;
+      /** The selected API-key connection's own base URL (`tenant_providers.base_url`). */
+      providerBaseUrl?: string | null;
       tenantProviderId: string | null;
       /**
        * Label of the `tenant_providers` row that was actually selected — the
@@ -298,6 +300,7 @@ export async function resolveRouteCredentials(
     rawApiKey,
     resourceUrl: unwrapped.resourceUrl,
     providerRegion: key.region,
+    providerBaseUrl: key.baseUrl ?? null,
     tenantProviderId,
     // The selected row's own label, not `args.providerKeyLabel`: selection may
     // have fallen back to the default key when the pin matched nothing.

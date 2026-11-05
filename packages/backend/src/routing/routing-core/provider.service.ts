@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere, EntityManager } from 'typeorm';
+import { supportsAccountBaseUrl } from '../account-base-url';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
@@ -702,6 +703,30 @@ export class ProviderService {
     });
     if (!row) throw new NotFoundException('Provider connection not found');
     row.stream_warmup_ms = streamWarmupMs;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    return row;
+  }
+
+  /**
+   * Set or clear (null) an API-key connection's base URL. The caller has
+   * normalized and SSRF-checked it (routing/account-base-url.ts).
+   */
+  async setBaseUrl(
+    tenantId: string,
+    connectionId: string,
+    baseUrl: string | null,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    if (baseUrl !== null && !supportsAccountBaseUrl(row.provider, row.auth_type)) {
+      throw new BadRequestException(
+        'Only API-key connections of a built-in provider take a base URL',
+      );
+    }
+    row.base_url = baseUrl;
     row.updated_at = new Date().toISOString();
     await this.providerRepo.save(row);
     return row;

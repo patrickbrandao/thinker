@@ -57,6 +57,7 @@ const ConnectProvider = lazyReload(() => import('./pages/ConnectProvider.jsx'));
 const Subscriptions = lazyReload(() => import('./pages/providers/Subscriptions.jsx'));
 const Byok = lazyReload(() => import('./pages/providers/Byok.jsx'));
 const ByokAdd = lazyReload(() => import('./pages/providers/ByokAdd.jsx'));
+const ProviderModels = lazyReload(() => import('./pages/providers/ProviderModels.jsx'));
 const SubscriptionsAdd = lazyReload(() => import('./pages/providers/SubscriptionsAdd.jsx'));
 const LocalAdd = lazyReload(() => import('./pages/providers/LocalAdd.jsx'));
 const LocalProviders = lazyReload(() => import('./pages/providers/Local.jsx'));
@@ -237,6 +238,14 @@ function AppRoutes() {
           element={
             <Lazy>
               <LocalProviders />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/models"
+          element={
+            <Lazy>
+              <ProviderModels />
             </Lazy>
           }
         />

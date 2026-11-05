@@ -1,3 +1,4 @@
+import { useProviderWizard } from './ProviderWizard.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ProviderDef } from '../services/providers.js';
 import {
@@ -123,7 +124,8 @@ export default function DeviceCodeDetailView(props: Props) {
   const via = props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower');
   const alt = props.provDef.subscriptionTokenAlternative;
   // With a token alternative the user picks the channel first; the sign-in is the default.
-  const [method, setMethod] = useState<'login' | 'token'>('login');
+  const wizardMethod = useProviderWizard()?.preset.subscriptionMethod;
+  const [method, setMethod] = useState<'login' | 'token'>(wizardMethod ?? 'login');
   const showLogin = !alt || method === 'login';
   const kiroErrorId = kiroConfigError ? 'kiro-identity-error' : undefined;
 
@@ -387,7 +389,7 @@ export default function DeviceCodeDetailView(props: Props) {
           </div>
         ) : (
           <>
-            {alt ? (
+            {alt && !wizardMethod ? (
               <fieldset className="flex flex-col gap-2" disabled={props.busy}>
                 <legend className="sr-only">
                   {t('providerSetup.device.connectionMethod', { name: props.provDef.name })}

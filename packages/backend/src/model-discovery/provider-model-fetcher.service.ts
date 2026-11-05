@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DiscoveredModel, FetcherConfig, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { rebaseUrl } from '../routing/account-base-url';
+import { validatePublicUrl } from '../common/utils/url-validation';
 import { parseModalities } from './model-capabilities';
 import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../common/constants/ollama';
 import {
@@ -1213,6 +1215,11 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
 };
 
 export interface ProviderModelFetchOptions {
+  /**
+   * The connection's own base URL and the official one it replaces: a models
+   * URL under the official base moves under the connection's base.
+   */
+  accountBaseUrl?: { base: string; official: string | null };
   forceRefresh?: boolean;
   /**
    * Bedrock only: the connection's last discovered models. Their CRIS profiles
@@ -1323,6 +1330,18 @@ export class ProviderModelFetcherService {
         url = `${xiaomiBaseUrl}/v1/models`;
       } else {
         this.logger.warn('Ignoring invalid Xiaomi MiMo Token Plan endpoint override');
+      }
+    }
+
+    if (options?.accountBaseUrl) {
+      url = rebaseUrl(url, options.accountBaseUrl.official, options.accountBaseUrl.base);
+      try {
+        await validatePublicUrl(url, { allowPrivate: true });
+      } catch (err) {
+        this.logger.warn(
+          `Ignoring model discovery on a blocked base URL: ${(err as Error).message}`,
+        );
+        return [];
       }
     }
 

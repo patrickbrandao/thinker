@@ -189,6 +189,7 @@ describe('route-credentials', () => {
         rawApiKey: 'sk-live',
         resourceUrl: undefined,
         providerRegion: 'us',
+        providerBaseUrl: null,
         tenantProviderId: 'up-1',
         keyLabel: 'Work',
         streamWarmupMs: null,

@@ -65,6 +65,8 @@ export function connectProvider(
     region?: string;
     baseUrl?: string;
     base_url?: string;
+    /** API-key connections: replaces the provider's official base URL. */
+    accountBaseUrl?: string;
   },
 ) {
   return fetchMutate<{
@@ -181,6 +183,25 @@ export function setConnectionStreamWarmup(connectionId: string, streamWarmupMs: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stream_warmup_ms: streamWarmupMs }),
     },
+  );
+}
+
+export function setConnectionBaseUrl(connectionId: string, baseUrl: string | null) {
+  return fetchMutate<{ id: string; base_url: string | null; default_base_url: string | null }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/base-url`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base_url: baseUrl }),
+    },
+  );
+}
+
+/** Official base URL of a provider (and region) for the base URL placeholder. */
+export function getDefaultBaseUrl(provider: string, authType: string, region?: string) {
+  return fetchJson<{ supports_base_url: boolean; default_base_url: string | null }>(
+    '/providers/default-base-url',
+    { provider, auth_type: authType, ...(region ? { region } : {}) },
   );
 }
 

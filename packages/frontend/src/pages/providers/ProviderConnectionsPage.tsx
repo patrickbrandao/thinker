@@ -1,3 +1,4 @@
+import { ProviderWizard } from '../../components/ProviderWizard.js';
 import { useEffect, useMemo, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { LayoutGrid, List, Pencil, Plus, Shapes } from 'lucide-react';
@@ -103,10 +104,10 @@ const providerListForKind = (
   kind: ProviderPageKind,
   hasConnection: (providerId: string) => boolean,
 ): ProviderDef[] => {
-  // OpenCode credits (API key, or the free key `public`) are usage-based; only the
-  // OpenCode Go plan is a subscription. Existing OpenCode Console logins stay listed.
+  // One OpenCode card per page: on Subscriptions it opens the wizard's
+  // Console / Go choice, so the separate OpenCode Go card is hidden.
   if (kind === 'subscriptions')
-    return subscriptionCatalog(PROVIDERS, hasConnection).filter((p) => p.id !== 'opencode');
+    return subscriptionCatalog(PROVIDERS, hasConnection).filter((p) => p.id !== 'opencode-go');
   if (kind === 'local') return PROVIDERS.filter((provider) => provider.localOnly);
   return PROVIDERS.filter((provider) => !provider.subscriptionOnly && !provider.localOnly);
 };
@@ -832,16 +833,23 @@ export default function ProviderConnectionsPage({
         icon={deepLink ? <ProviderMark providerId={deepLink.providerId} name="" /> : null}
       >
         {deepLink ? (
-          <ProviderSelectContent
+          <ProviderWizard
             key={deepLink.providerId}
-            agentName={firstAgentName}
-            providers={modalProviders.data ?? []}
-            customProviders={customProviders.data ?? []}
-            providerDeepLink={deepLink}
-            initialTab={copy.authType}
-            onUpdate={handleModalUpdate}
-            onClose={handleNewConnectionClose}
-            newConnection
+            providerId={deepLink.providerId}
+            authType={deepLink.authType ?? copy.authType}
+            render={(providerId) => (
+              <ProviderSelectContent
+                key={providerId}
+                agentName={firstAgentName}
+                providers={modalProviders.data ?? []}
+                customProviders={customProviders.data ?? []}
+                providerDeepLink={{ ...deepLink, providerId }}
+                initialTab={copy.authType}
+                onUpdate={handleModalUpdate}
+                onClose={handleNewConnectionClose}
+                newConnection
+              />
+            )}
           />
         ) : null}
       </FloatingWindow>
