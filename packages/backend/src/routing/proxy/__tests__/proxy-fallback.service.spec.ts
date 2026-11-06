@@ -770,6 +770,25 @@ describe('ProxyFallbackService', () => {
         expect(await result.response.text()).toContain('overloaded');
       });
 
+      it('stamps the served provider and the connection idle timeout on the hop', async () => {
+        const started: { id: string; served?: unknown } = { id: 'att' };
+        providerClient.forward.mockResolvedValue(
+          reply(200, '{"id":"gen-7","provider":"DeepInfra","model":"x/y","choices":[]}'),
+        );
+        const result = await service.tryForwardToProvider(
+          forwardOpts({
+            streamIdleTimeoutMs: 900_000,
+            startProviderAttempt: jest.fn(() => started as never),
+          }),
+        );
+        expect(result.streamIdleTimeoutMs).toBe(900_000);
+        expect(started.served).toEqual({
+          provider: 'DeepInfra',
+          generationId: 'gen-7',
+          model: 'x/y',
+        });
+      });
+
       it('keeps a 200 with choices untouched', async () => {
         providerClient.forward.mockResolvedValue(
           reply(200, '{"choices":[{"message":{"content":"hi"}}],"error":null}'),

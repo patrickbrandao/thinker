@@ -108,6 +108,12 @@ export interface ForwardResult {
    * they selected up front.
    */
   servedByKey?: { tenantProviderId: string; keyLabel: string };
+  /**
+   * Longest gap between two upstream chunks for this call: the connection's
+   * override, else a local server's request timeout. Unset: the global
+   * STREAM_IDLE_TIMEOUT_MS.
+   */
+  streamIdleTimeoutMs?: number;
 }
 
 function wireFormat(endpoint: ProviderEndpoint): ProviderWireFormat | undefined {
@@ -603,7 +609,12 @@ export class ProviderClient {
       endpoint.requiresSsrfRevalidation === true,
       endpoint.timeoutMs,
     );
-    const result = { ...fetched, response: timeProviderResponse(fetched.response, attempt) };
+    const result = {
+      ...fetched,
+      response: timeProviderResponse(fetched.response, attempt),
+      // A local server may legitimately pause as long as its request runs.
+      ...(endpoint.timeoutMs ? { streamIdleTimeoutMs: endpoint.timeoutMs } : {}),
+    };
     const response =
       !stream &&
       endpoint.format === 'openai' &&

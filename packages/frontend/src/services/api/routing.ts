@@ -186,6 +186,17 @@ export function setConnectionStreamWarmup(connectionId: string, streamWarmupMs: 
   );
 }
 
+export function setConnectionStreamIdle(connectionId: string, streamIdleTimeoutMs: number | null) {
+  return fetchMutate<{ id: string; stream_idle_timeout_ms: number | null }>(
+    `/providers/connections/${encodeURIComponent(connectionId)}/stream-idle`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stream_idle_timeout_ms: streamIdleTimeoutMs }),
+    },
+  );
+}
+
 export function setConnectionBaseUrl(connectionId: string, baseUrl: string | null) {
   return fetchMutate<{ id: string; base_url: string | null; default_base_url: string | null }>(
     `/providers/connections/${encodeURIComponent(connectionId)}/base-url`,
@@ -601,6 +612,8 @@ export interface CustomProviderData {
   }>;
   /** Primary connection's stream warm-up override in ms; null inherits. */
   stream_warmup_ms?: number | null;
+  /** Primary connection's stream idle timeout override in ms; null inherits. */
+  stream_idle_timeout_ms?: number | null;
   models: CustomProviderModel[];
   created_at: string;
 }

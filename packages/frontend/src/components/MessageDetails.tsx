@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { ArrowDown, ArrowRight, CircleX } from 'lucide-react';
 import {
   getMessageDetails,
@@ -16,6 +17,7 @@ import { routingTierLabel } from './message-table-types.js';
 import { RequestTimelineChart } from './RequestTimelineChart.js';
 import { t, tMaybe } from '../i18n/index.js';
 import { cx } from './ui.js';
+import CopyButton from './CopyButton.js';
 
 export interface MessageDetailsProps {
   messageId: string;
@@ -30,14 +32,50 @@ type DetailMessage = Awaited<ReturnType<typeof getMessageDetails>>['message'] & 
   }>;
 };
 
-function MetaField({ label, value }: { label: string; value: string | null | undefined }) {
+function MetaField({
+  label,
+  value,
+  to,
+  copyable,
+}: {
+  label: string;
+  value: string | null | undefined;
+  /** Renders the value as a link (e.g. a filtered Requests deep link). */
+  to?: string;
+  copyable?: boolean;
+}) {
   if (!value) return null;
   return (
     <span className="msg-detail__meta-item inline-flex min-w-0 items-baseline gap-1.5 text-xs text-ink">
       <span className="msg-detail__meta-label text-muted">{label}</span>
-      <span className="break-all">{value}</span>
+      {to ? (
+        <Link to={to} className="break-all text-accent hover:underline">
+          {value}
+        </Link>
+      ) : (
+        <span className="break-all">{value}</span>
+      )}
+      {copyable ? (
+        <CopyButton text={value} className="size-5 shrink-0 self-center [&_svg]:size-3.5" />
+      ) : null}
     </span>
   );
+}
+
+/** Model id without a leading `provider/` segment, for comparing served vs requested. */
+function bareModelId(model: string): string {
+  const slash = model.indexOf('/');
+  return (slash >= 0 ? model.slice(slash + 1) : model).toLowerCase();
+}
+
+/** The model the upstream reported, only when it differs from the routed one. */
+function servedModelIfDifferent(
+  servedModel: string | null | undefined,
+  model: string | null | undefined,
+): string | null {
+  if (!servedModel) return null;
+  if (model && bareModelId(servedModel) === bareModelId(model)) return null;
+  return servedModel;
 }
 
 function MiscategorizeControl({
@@ -293,6 +331,24 @@ function DetailsBody({ m }: { m: DetailMessage }) {
           <MetaField
             label={t('messages.details.field.apiKey')}
             value={m.provider_key_label ?? t('messages.details.defaultKey')}
+          />
+          <MetaField
+            label={t('messages.details.field.servedBy')}
+            value={m.served_provider}
+            to={
+              m.served_provider
+                ? `/messages?served_provider=${encodeURIComponent(m.served_provider)}`
+                : undefined
+            }
+          />
+          <MetaField
+            label={t('messages.details.field.upstreamId')}
+            value={m.upstream_generation_id}
+            copyable
+          />
+          <MetaField
+            label={t('messages.details.field.servedModel')}
+            value={servedModelIfDifferent(m.served_model, m.model)}
           />
           <MetaField
             label={t('messages.details.field.model')}

@@ -693,6 +693,21 @@ export class ProviderService {
     return { row, apiKey };
   }
 
+  async setStreamIdleTimeout(
+    tenantId: string,
+    connectionId: string,
+    streamIdleTimeoutMs: number | null,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    row.stream_idle_timeout_ms = streamIdleTimeoutMs;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    return row;
+  }
+
   async setStreamWarmup(
     tenantId: string,
     connectionId: string,

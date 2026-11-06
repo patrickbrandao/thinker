@@ -422,6 +422,7 @@ export class ProviderAnalyticsController {
         connected_at: conn.connected_at,
         is_active: conn.is_active,
         stream_warmup_ms: conn.stream_warmup_ms ?? null,
+        stream_idle_timeout_ms: conn.stream_idle_timeout_ms ?? null,
         ...baseUrlFields(conn),
         last_used_at: lastUsedAt,
       },

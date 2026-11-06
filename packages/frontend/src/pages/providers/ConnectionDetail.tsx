@@ -24,6 +24,7 @@ import {
   disconnectConnection,
   refreshConnectionModels,
   setConnectionStreamWarmup,
+  setConnectionStreamIdle,
   setConnectionBaseUrl,
   connectProvider,
   getProviders as getAgentProviders,
@@ -42,9 +43,14 @@ import { t, tMaybe } from '../../i18n/index.js';
 import {
   MAX_STREAM_WARMUP_SECONDS,
   MIN_STREAM_WARMUP_SECONDS,
+  MAX_STREAM_IDLE_SECONDS,
+  MIN_STREAM_IDLE_SECONDS,
   parseWarmupSeconds,
+  parseIdleSeconds,
   warmupMsToSecondsInput,
+  idleMsToSecondsInput,
   streamWarmupError,
+  streamIdleError,
 } from '../../services/stream-warmup.js';
 import { roleCan } from '../../services/session-store.js';
 import { getModelDisplayName } from '../../services/model-display.js';
@@ -108,6 +114,7 @@ interface ConnectionInfo {
   connected_at: string;
   is_active: boolean;
   stream_warmup_ms?: number | null;
+  stream_idle_timeout_ms?: number | null;
   base_url?: string | null;
   default_base_url?: string | null;
   supports_base_url?: boolean;
@@ -464,6 +471,9 @@ const ConnectionDetail = () => {
   const [warmupValue, setWarmupValue] = useState('');
   const [savingWarmup, setSavingWarmup] = useState(false);
   const [warmupError, setWarmupError] = useState('');
+  const [idleValue, setIdleValue] = useState('');
+  const [savingIdle, setSavingIdle] = useState(false);
+  const [idleError, setIdleError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deletingConnection, setDeletingConnection] = useState(false);
@@ -493,6 +503,8 @@ const ConnectionDetail = () => {
     setRenameError('');
     setWarmupValue(warmupMsToSecondsInput(conn?.stream_warmup_ms));
     setWarmupError('');
+    setIdleValue(idleMsToSecondsInput(conn?.stream_idle_timeout_ms));
+    setIdleError('');
     setShowDeleteConfirm(false);
     setDeleteConfirmName('');
     setShowManageModal(true);
@@ -550,6 +562,28 @@ const ConnectionDetail = () => {
       setWarmupError(e?.message ?? t('providers.detail.saveFailed'));
     } finally {
       setSavingWarmup(false);
+    }
+  };
+
+  const idleUnchanged = parseIdleSeconds(idleValue) === (conn?.stream_idle_timeout_ms ?? null);
+
+  const handleSaveIdle = async () => {
+    if (!conn) return;
+    const ms = parseIdleSeconds(idleValue);
+    if (ms === undefined) {
+      setIdleError(streamIdleError());
+      return;
+    }
+    setSavingIdle(true);
+    setIdleError('');
+    try {
+      await setConnectionStreamIdle(conn.id, ms);
+      toast.success(t('providers.detail.idleSaved'));
+      void detail.reload();
+    } catch (e: any) {
+      setIdleError(e?.message ?? t('providers.detail.saveFailed'));
+    } finally {
+      setSavingIdle(false);
     }
   };
 
@@ -1227,6 +1261,42 @@ const ConnectionDetail = () => {
             </div>
             <p className="hint">{t('providers.detail.warmupHint')}</p>
             {warmupError ? <p className="form-error mt-1">{warmupError}</p> : null}
+          </div>
+
+          {/* Stream idle timeout override */}
+          <div>
+            <label className="label" htmlFor="connection-stream-idle">
+              {t('providers.detail.streamIdle')}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="connection-stream-idle"
+                type="number"
+                min={MIN_STREAM_IDLE_SECONDS}
+                max={MAX_STREAM_IDLE_SECONDS}
+                step="1"
+                placeholder={t('providers.detail.inherit')}
+                className="field flex-1"
+                aria-invalid={idleError ? true : undefined}
+                value={idleValue}
+                onChange={(e) => {
+                  setIdleValue(e.currentTarget.value);
+                  setIdleError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSaveIdle();
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={savingIdle || idleUnchanged}
+                onClick={() => void handleSaveIdle()}
+              >
+                {savingIdle ? t('providers.detail.applying') : t('providers.detail.apply')}
+              </Button>
+            </div>
+            <p className="hint">{t('providers.detail.idleHint')}</p>
+            {idleError ? <p className="form-error mt-1">{idleError}</p> : null}
           </div>
 
           {c.is_active && credentialMode && firstAgentName ? (

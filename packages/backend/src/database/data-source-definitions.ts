@@ -89,6 +89,7 @@ import { RenameOpencodeZenToOpencode1805000000000 } from './migrations/180500000
 import { AddRequestHarnessSessions1805200000000 } from './migrations/1805200000000-AddRequestHarnessSessions';
 import { RenameDefaultConnectionLabels1805300000000 } from './migrations/1805300000000-RenameDefaultConnectionLabels';
 import { AddTenantProviderBaseUrl1805400000000 } from './migrations/1805400000000-AddTenantProviderBaseUrl';
+import { AddServedProviderAndStreamIdle1805500000000 } from './migrations/1805500000000-AddServedProviderAndStreamIdle';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -425,4 +426,5 @@ export const migrations = [
   AddRequestHarnessSessions1805200000000,
   RenameDefaultConnectionLabels1805300000000,
   AddTenantProviderBaseUrl1805400000000,
+  AddServedProviderAndStreamIdle1805500000000,
 ];

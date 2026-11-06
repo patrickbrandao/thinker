@@ -40,6 +40,8 @@ export default {
       origin: 'Origin filter',
       period: 'Period filter',
       allTiers: 'All tiers',
+      servedBy: 'Served by filter',
+      servedByPlaceholder: 'Served by, e.g. DeepInfra',
     },
     range: {
       all: 'All time',
@@ -269,6 +271,9 @@ export default {
       provider: 'Provider',
       auth: 'Auth',
       apiKey: 'API Key',
+      servedBy: 'Served by',
+      upstreamId: 'Upstream ID',
+      servedModel: 'Served model',
       model: 'Model',
       modelId: 'Model ID',
       trace: 'Trace',

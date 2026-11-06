@@ -542,6 +542,7 @@ export async function handleStreamResponse(
             ? ('openai_responses' as const)
             : ('openai_chat_completions' as const)),
     ...(capture ? { onUpstreamChunk: (chunk: string) => capture.appendRaw(chunk) } : {}),
+    ...(forward.streamIdleTimeoutMs ? { idleTimeoutMs: forward.streamIdleTimeoutMs } : {}),
   };
 
   const messagesTransformer =

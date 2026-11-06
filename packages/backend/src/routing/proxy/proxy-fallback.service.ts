@@ -75,6 +75,8 @@ interface ForwardProviderOptions {
    * only when nothing else is left to try.
    */
   hasNextRoute?: boolean;
+  /** The connection's stream idle timeout override (tenant_providers). */
+  streamIdleTimeoutMs?: number | null;
   tenantProviderId?: string | null;
   startProviderAttempt?: StartProviderAttempt;
 }
@@ -98,6 +100,8 @@ import { ReasoningContentCache } from './reasoning-content-cache';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
 import { peekStreamStart, streamWarmupMsFor } from './stream-warmup';
+import { noteServedFromBody, servedSniffer } from './served-provider';
+import { validStreamIdleOverride } from './stream-writer';
 import {
   EMBEDDED_UPSTREAM_ERROR_HEADER,
   embeddedErrorResponse,
@@ -419,6 +423,7 @@ export class ProxyFallbackService {
           local: authType === 'local',
         }),
         hasNextRoute: i < fallbackModels.length - 1,
+        streamIdleTimeoutMs: credentials.streamIdleTimeoutMs,
       });
       // A custom provider's key pool may have rotated to another key.
       if (forward.servedByKey) {
@@ -653,6 +658,8 @@ export class ProxyFallbackService {
       if (result.response.status === 401) {
         this.credentialRejections.reject(this.credentialRef(opts, apiKey));
       }
+      const idle = validStreamIdleOverride(opts.streamIdleTimeoutMs);
+      if (idle !== undefined) result.streamIdleTimeoutMs = idle;
       const buffered = await this.bufferNonStreamBody(result, opts);
       const peeked = await this.peekStreamBody(buffered, opts);
       // An error rebuilt from a 200 body or stream start counts like a real
@@ -701,9 +708,10 @@ export class ProxyFallbackService {
       contentType: response.headers.get('content-type'),
     });
     if (peek.ok) {
+      const sniffer = servedSniffer(attempt);
       return {
         ...forward,
-        response: new Response(peek.stream, {
+        response: new Response(sniffer ? peek.stream.pipeThrough(sniffer) : peek.stream, {
           status: response.status,
           statusText: response.statusText,
           headers: response.headers,
@@ -712,6 +720,7 @@ export class ProxyFallbackService {
     }
     if (attempt) attempt.completedAtMs = Date.now();
     if (peek.reason === 'upstream_error') {
+      noteServedFromBody(attempt, peek.body);
       this.logger.warn(
         `Provider stream error before the first content: provider=${opts.provider} model=${opts.model} status=${peek.status}`,
       );
@@ -756,6 +765,7 @@ export class ProxyFallbackService {
       const body = await response.arrayBuffer();
       // The attempt ends when its body does, not when headers arrived.
       if (attempt) attempt.completedAtMs = Date.now();
+      noteServedFromBody(attempt, body);
       // A 200 with no content and zero tokens is a failed hop (#129).
       if (isEmptyResponseFallbackEnabled() && isEmptySuccessPayload(body)) {
         this.logger.warn(

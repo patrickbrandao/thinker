@@ -96,6 +96,7 @@ Cada servidor local guarda a própria configuração (host, porta, prefixo, chav
 | `THINKER_UPSTREAM_RETRY_DELAY_MS` | `1000` | Espera antes de cada nova tentativa (0 a 60000). |
 | `THINKER_UPSTREAM_RETRY_STATUSES` | `500,502,503` | Status que contam como transitórios. O 504 fica fora de propósito: repetir um timeout dobra a espera. |
 | `THINKER_LIVE_CONTEXT` | `true` | Relê a cada 60 s o contexto real (`n_ctx`) de servidores llama.cpp e usa o menor entre ele e o cadastrado. `THINKER_LIVE_CONTEXT_TTL_MS`, `THINKER_LIVE_CONTEXT_FAIL_TTL_MS` (30000), `THINKER_LIVE_CONTEXT_TIMEOUT_MS` (1500) e `THINKER_LIVE_CONTEXT_STALE_MS` (600000) ajustam o cache. |
+| `THINKER_SERVED_PROVIDER_CAPTURE` | `true` | Grava em cada tentativa quem de fato serviu (o campo `provider` do OpenRouter), o id da geração e o modelo respondido. Aparece como "Served by" no detalhe da mensagem e pode ser filtrado na lista. |
 | `STREAM_IDLE_TIMEOUT_MS` | `180000` | Silêncio máximo entre eventos de streaming antes de falhar a tentativa (HTTP 504). |
 | `CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS` | `60000` | Espera por texto ou saída de ferramenta úteis do ChatGPT Codex. |
 | `THINKER_CONCURRENCY_MAX` | `10` | Requisições simultâneas por tenant, por processo (erro M203). |

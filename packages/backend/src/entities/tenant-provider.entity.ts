@@ -50,6 +50,14 @@ export class TenantProvider {
   @Column('integer', { nullable: true, default: null })
   stream_warmup_ms!: number | null;
 
+  /**
+   * Stream idle timeout override in ms: the longest gap between two upstream
+   * chunks. Null inherits the local server's request timeout, then
+   * STREAM_IDLE_TIMEOUT_MS.
+   */
+  @Column('integer', { nullable: true, default: null })
+  stream_idle_timeout_ms!: number | null;
+
   @Column(timestampType(), { default: timestampDefault() })
   connected_at!: string;
 

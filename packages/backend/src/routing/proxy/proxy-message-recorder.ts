@@ -359,6 +359,17 @@ function egressColumns(attempt: ProviderAttemptRef): Partial<AgentMessage> {
   };
 }
 
+/** What the upstream says served the attempt (served-provider.ts). */
+function servedColumns(attempt: ProviderAttemptRef): Partial<AgentMessage> {
+  const served = attempt.served;
+  if (!served) return {};
+  return {
+    ...(served.provider ? { served_provider: served.provider } : {}),
+    ...(served.generationId ? { upstream_generation_id: served.generationId } : {}),
+    ...(served.model ? { served_model: served.model } : {}),
+  };
+}
+
 @Injectable()
 export class ProxyMessageRecorder implements OnModuleDestroy {
   private readonly logger = new Logger(ProxyMessageRecorder.name);
@@ -592,6 +603,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           ...row,
           ...attemptIdentity(attempt, attempt.attemptNumber),
           ...egressColumns(attempt),
+          ...servedColumns(attempt),
           duration_ms: Math.max(0, (attempt.completedAtMs ?? Date.now()) - attempt.startedAtMs),
         }
       : row;
@@ -773,6 +785,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         duration_ms: Math.max(0, (attempt.completedAtMs ?? Date.now()) - attempt.startedAtMs),
         ...classified,
         ...egressColumns(attempt),
+        ...servedColumns(attempt),
       },
     );
   }

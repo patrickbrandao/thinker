@@ -35,6 +35,19 @@ export interface StreamUsage {
 
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 180_000;
 
+/** Bounds of a per-connection idle timeout override. */
+export const MIN_STREAM_IDLE_OVERRIDE_MS = 1_000;
+export const MAX_STREAM_IDLE_OVERRIDE_MS = 3_600_000;
+
+export function validStreamIdleOverride(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= MIN_STREAM_IDLE_OVERRIDE_MS &&
+    value <= MAX_STREAM_IDLE_OVERRIDE_MS
+    ? value
+    : undefined;
+}
+
 export function parseStreamIdleTimeoutMs(rawValue = process.env.STREAM_IDLE_TIMEOUT_MS): number {
   if (!rawValue) return DEFAULT_STREAM_IDLE_TIMEOUT_MS;
   const parsed = Number.parseInt(rawValue, 10);

@@ -524,6 +524,7 @@ export class ProxyService {
         !explicitModelOverride &&
         !!paramMergeContext &&
         this.effectiveFallbackRoutes(resolved).length > 0,
+      streamIdleTimeoutMs: credentials.streamIdleTimeoutMs,
     });
     // A custom provider's key pool may have rotated to another key; stamp the
     // connection that actually served the call.
