@@ -49,6 +49,18 @@ const EVENT_LABELS: Record<string, TranslationKey> = {
   'request.debug.failed': 'triggers.events.requestDebugFailed',
   'harness.created': 'triggers.events.harnessCreated',
   'harness.deleted': 'triggers.events.harnessDeleted',
+  'model.added': 'triggers.events.modelAdded',
+  'model.removed': 'triggers.events.modelRemoved',
+  'model.error': 'triggers.events.modelError',
+  'oauth.refresh_failed': 'triggers.events.oauthRefreshFailed',
+  'trigger.failed': 'triggers.events.triggerFailed',
+  'audit.created': 'triggers.events.auditCreated',
+  'audit.updated': 'triggers.events.auditUpdated',
+  'audit.deleted': 'triggers.events.auditDeleted',
+  'user.login': 'triggers.events.userLogin',
+  'user.logout': 'triggers.events.userLogout',
+  'user.login_failed': 'triggers.events.userLoginFailed',
+  'user.password_changed': 'triggers.events.userPasswordChanged',
   test: 'triggers.events.test',
 };
 

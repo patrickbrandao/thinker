@@ -1,3 +1,4 @@
+import { Audit } from '../alerts/audit.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { canUsePrivateDestinations } from '../common/utils/private-url-policy';
@@ -49,18 +50,29 @@ export class TriggersController {
   }
 
   @MinRole('admin')
+  @Audit({ entity: 'trigger', action: 'created' })
   @Post('triggers')
   create(@TenantCtx() ctx: TenantContext, @Body() body: TriggerInput) {
     return this.triggers.create(ctx, body ?? {}, canUsePrivateDestinations(ctx));
   }
 
   @MinRole('admin')
+  @Audit({
+    entity: 'trigger',
+    action: 'updated',
+    lookup: { table: 'triggers', nameColumn: 'name' },
+  })
   @Patch('triggers/:id')
   update(@TenantCtx() ctx: TenantContext, @Param('id') id: string, @Body() body: TriggerInput) {
     return this.triggers.update(ctx.tenantId, id, body ?? {}, canUsePrivateDestinations(ctx));
   }
 
   @MinRole('admin')
+  @Audit({
+    entity: 'trigger',
+    action: 'deleted',
+    lookup: { table: 'triggers', nameColumn: 'name' },
+  })
   @Delete('triggers/:id')
   remove(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
     return this.triggers.remove(ctx.tenantId, id);
@@ -81,6 +93,12 @@ export class TriggersController {
     return this.triggers.getBindings(ctx.tenantId, agentName);
   }
 
+  @Audit({
+    entity: 'harness_triggers',
+    action: 'updated',
+    idParam: 'agentName',
+    nameParams: ['agentName'],
+  })
   @Put('agents/:agentName/triggers')
   setBindings(
     @TenantCtx() ctx: TenantContext,

@@ -1,3 +1,4 @@
+import { Audit } from '../../alerts/audit.decorator';
 import {
   BadRequestException,
   Body,
@@ -93,6 +94,7 @@ export class AgentsController {
     return { agents };
   }
 
+  @Audit({ entity: 'harness', action: 'created' })
   @Post('agents')
   async createAgent(@TenantCtx() ctx: TenantContext, @Body() body: CreateAgentDto) {
     const slug = slugify(body.name);
@@ -182,6 +184,7 @@ export class AgentsController {
     return { copied, suggested_name };
   }
 
+  @Audit({ entity: 'harness', action: 'created' })
   @Post('agents/:agentName/duplicate')
   async duplicateAgent(
     @TenantCtx() ctx: TenantContext,
@@ -247,6 +250,7 @@ export class AgentsController {
     };
   }
 
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
   @Post('agents/:agentName/rotate-key')
   async rotateAgentKey(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     // Guard: playground agents cannot have their key rotated through the user-facing
@@ -258,6 +262,7 @@ export class AgentsController {
     return { apiKey: result.apiKey };
   }
 
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
   @Patch('agents/:agentName')
   async updateAgent(
     @TenantCtx() ctx: TenantContext,
@@ -297,6 +302,7 @@ export class AgentsController {
     return result;
   }
 
+  @Audit({ entity: 'harness', action: 'deleted', idParam: 'agentName', nameParams: ['agentName'] })
   @Delete('agents/:agentName')
   async deleteAgent(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     const deleted = await this.lifecycle.deleteAgent(ctx.tenantId, agentName);

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { alertCatalogFailure } from '../common/services/alert-sink';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { describeCatalogSyncSetting, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { normalizeProviderName, type ModelCapability, type ModelModality } from 'thinker-shared';
@@ -838,11 +839,13 @@ export class ModelsDevSyncService implements OnModuleInit {
 
       if (!res.ok) {
         this.logger.error(`models.dev API returned ${res.status}`);
+        alertCatalogFailure('models.dev', `models.dev API returned HTTP ${res.status}`);
         return null;
       }
       return (await res.json()) as RawModelsDevResponse;
     } catch (err) {
       this.logger.error(`Failed to fetch models.dev data: ${err}`);
+      alertCatalogFailure('models.dev', `Failed to fetch models.dev data: ${err}`);
       return null;
     }
   }

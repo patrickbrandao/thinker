@@ -840,6 +840,22 @@
     font-size: 13px;
     font-weight: 500;
   }
+  .alerts-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .alerts-table tr.is-unread td:first-child {
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
   .alerts-foot {
     padding: 8px 14px;
     text-align: center;

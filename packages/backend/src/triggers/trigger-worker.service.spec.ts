@@ -386,6 +386,29 @@ describe('TriggerWorkerService', () => {
         expect(update.sql).toContain('next_attempt_at = NULL');
       });
 
+      it('raises trigger.failed once a delivery gives up, never about itself or recursively', async () => {
+        deliverMock.mockResolvedValue(FAIL);
+        const record = jest.fn();
+        const { query, dispatch } = setup({ trigger: trigger({ max_retries: 0 }) });
+        const worker = new TriggerWorkerService(
+          { query } as unknown as DataSource,
+          dispatch,
+          { get: (_k: string, f?: string) => f } as unknown as ConfigService,
+          undefined,
+          { record } as never,
+        );
+        await worker.process(queueRow() as never);
+        expect(record).toHaveBeenCalledTimes(1);
+        expect(record.mock.calls[0][0]).toMatchObject({
+          type: 'trigger.failed',
+          entityId: 'trig-1',
+          excludeTriggerId: 'trig-1',
+        });
+        await worker.process(queueRow({ event_type: 'trigger.failed' }) as never);
+        await worker.process(queueRow({ event_type: 'test' }) as never);
+        expect(record).toHaveBeenCalledTimes(1);
+      });
+
       it('a retry that finally succeeds is marked delivered with the cumulative attempt count', async () => {
         const { worker, find } = setup();
         await worker.process(queueRow({ attempts: 2 }) as never);

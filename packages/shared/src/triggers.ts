@@ -17,7 +17,22 @@ export const HARNESS_TRIGGER_EVENTS = [
 ] as const;
 
 /** Workspace events, subscribed on the trigger itself (no harness binding exists yet/anymore). */
-export const WORKSPACE_TRIGGER_EVENTS = ['harness.created', 'harness.deleted'] as const;
+export const WORKSPACE_TRIGGER_EVENTS = [
+  'harness.created',
+  'harness.deleted',
+  'model.added',
+  'model.removed',
+  'model.error',
+  'oauth.refresh_failed',
+  'trigger.failed',
+  'audit.created',
+  'audit.updated',
+  'audit.deleted',
+  'user.login',
+  'user.logout',
+  'user.login_failed',
+  'user.password_changed',
+] as const;
 
 export const TRIGGER_EVENT_TYPES = [
   ...HARNESS_TRIGGER_EVENTS,
@@ -107,6 +122,18 @@ export const DEFAULT_SYSLOG_SEVERITIES: Record<string, SyslogSeverity> = {
   'request.debug.failed': 'err',
   'harness.created': 'notice',
   'harness.deleted': 'notice',
+  'model.added': 'notice',
+  'model.removed': 'warning',
+  'model.error': 'err',
+  'oauth.refresh_failed': 'err',
+  'trigger.failed': 'err',
+  'audit.created': 'notice',
+  'audit.updated': 'notice',
+  'audit.deleted': 'notice',
+  'user.login': 'info',
+  'user.logout': 'info',
+  'user.login_failed': 'warning',
+  'user.password_changed': 'notice',
   test: 'info',
 };
 
@@ -116,6 +143,11 @@ export const TRIGGER_LIMITS = {
   retryDelaySeconds: { min: 1, max: 3600, default: 30 },
   timeoutSeconds: { min: 1, max: 60, default: 10 },
 } as const;
+
+/** Workspace events that come from Alerts (system events). */
+const ALERT_EVENTS: TriggerEventType[] = WORKSPACE_TRIGGER_EVENTS.filter(
+  (e) => e !== 'harness.created' && e !== 'harness.deleted',
+);
 
 /** Template variables, grouped by the events that fill them. */
 export const TRIGGER_VARIABLES: Array<{ name: string; events: 'all' | TriggerEventType[] }> = [
@@ -161,7 +193,16 @@ export const TRIGGER_VARIABLES: Array<{ name: string; events: 'all' | TriggerEve
   { name: 'connection.label', events: ['credential.expired'] },
   { name: 'connection.http_status', events: ['credential.expired'] },
   { name: 'connection.error', events: ['credential.expired'] },
-  { name: 'actor.email', events: ['harness.created', 'harness.deleted'] },
+  { name: 'actor.email', events: ['harness.created', 'harness.deleted', ...ALERT_EVENTS] },
+  { name: 'alert.id', events: ALERT_EVENTS },
+  { name: 'alert.level', events: ALERT_EVENTS },
+  { name: 'alert.category', events: ALERT_EVENTS },
+  { name: 'alert.url', events: ALERT_EVENTS },
+  { name: 'entity.type', events: ALERT_EVENTS },
+  { name: 'entity.id', events: ALERT_EVENTS },
+  { name: 'entity.name', events: ALERT_EVENTS },
+  { name: 'actor.ip', events: ALERT_EVENTS },
+  { name: 'audit.fields', events: ['audit.created', 'audit.updated', 'audit.deleted'] },
 ];
 
 export const DEFAULT_TRIGGER_TEMPLATES = {

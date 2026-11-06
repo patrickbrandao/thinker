@@ -1,3 +1,4 @@
+import { Audit } from '../alerts/audit.decorator';
 import {
   Body,
   Controller,
@@ -130,6 +131,12 @@ export class TenantProvidersController {
     return { ok: true };
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'label',
+    nameParams: ['provider', 'label'],
+  })
   @Patch(':provider/keys/:label')
   async renameProviderKey(
     @TenantCtx() ctx: TenantContext,
@@ -160,6 +167,11 @@ export class TenantProvidersController {
    * providers: SSRF validation with THINKER_PROVIDER_PRIVATE_URLS. Models are
    * discovered again against the new URL.
    */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
   @Patch('connections/:id/base-url')
   async setBaseUrl(
     @TenantCtx() ctx: TenantContext,
@@ -183,6 +195,11 @@ export class TenantProvidersController {
   }
 
   /** Set or clear a connection's stream idle timeout override. */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
   @Patch('connections/:id/stream-idle')
   async setStreamIdle(
     @TenantCtx() ctx: TenantContext,
@@ -200,6 +217,11 @@ export class TenantProvidersController {
   }
 
   /** Set or clear a connection's stream warm-up override (#244). */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
   @Patch('connections/:id/stream-warmup')
   async setStreamWarmup(
     @TenantCtx() ctx: TenantContext,
@@ -255,6 +277,7 @@ export class TenantProvidersController {
     return { ok: true };
   }
 
+  @Audit({ entity: 'connection', action: 'deleted', idParam: 'provider', nameParams: ['provider'] })
   @Delete(':provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,

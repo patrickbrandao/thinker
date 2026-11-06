@@ -1,3 +1,4 @@
+import { Audit } from '../alerts/audit.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
@@ -31,18 +32,29 @@ export class ProxyServersController {
     return this.proxies.get(ctx.tenantId, id);
   }
 
+  @Audit({ entity: 'proxy_server', action: 'created' })
   @Post('proxy-servers')
   async create(@TenantCtx() ctx: TenantContext, @Body() body: ProxyServerInput) {
     const tenantId = ctx.tenantId ?? (await this.tenantCache.ensureForUser(ctx.userId!));
     return this.proxies.create(tenantId, ctx.userId, body ?? {});
   }
 
+  @Audit({
+    entity: 'proxy_server',
+    action: 'updated',
+    lookup: { table: 'proxy_servers', nameColumn: 'name' },
+  })
   @Patch('proxy-servers/:id')
   update(@TenantCtx() ctx: TenantContext, @Param('id') id: string, @Body() body: ProxyServerInput) {
     return this.proxies.update(ctx.tenantId, id, body ?? {});
   }
 
   /** 409 with the bindings unless `mode` is `remove` or `replace` (+ `replace_with`). */
+  @Audit({
+    entity: 'proxy_server',
+    action: 'deleted',
+    lookup: { table: 'proxy_servers', nameColumn: 'name' },
+  })
   @Delete('proxy-servers/:id')
   remove(
     @TenantCtx() ctx: TenantContext,
@@ -90,12 +102,18 @@ export class ProxyServersController {
   }
 
   /** Body `{ name, chain: [proxyId | "direct", ...] }`. */
+  @Audit({ entity: 'proxy_profile', action: 'created' })
   @Post('proxy-profiles')
   async createProfile(@TenantCtx() ctx: TenantContext, @Body() body: ProxyProfileInput) {
     const tenantId = ctx.tenantId ?? (await this.tenantCache.ensureForUser(ctx.userId!));
     return this.proxies.createProfile(tenantId, body ?? {});
   }
 
+  @Audit({
+    entity: 'proxy_profile',
+    action: 'updated',
+    lookup: { table: 'proxy_profiles', nameColumn: 'name' },
+  })
   @Patch('proxy-profiles/:id')
   updateProfile(
     @TenantCtx() ctx: TenantContext,
@@ -106,6 +124,11 @@ export class ProxyServersController {
   }
 
   /** 409 with the objects using it unless `mode=remove`. */
+  @Audit({
+    entity: 'proxy_profile',
+    action: 'deleted',
+    lookup: { table: 'proxy_profiles', nameColumn: 'name' },
+  })
   @Delete('proxy-profiles/:id')
   removeProfile(
     @TenantCtx() ctx: TenantContext,
@@ -130,6 +153,12 @@ export class ProxyServersController {
   }
 
   /** Body `{ mode: 'inherit' | 'global' | 'direct' | 'profile', profile_id? }`. */
+  @Audit({
+    entity: 'proxy_assignment',
+    action: 'updated',
+    idParam: 'targetId',
+    nameParams: ['targetType', 'targetId'],
+  })
   @Put('proxy-assignments/:targetType/:targetId')
   setAssignment(
     @TenantCtx() ctx: TenantContext,

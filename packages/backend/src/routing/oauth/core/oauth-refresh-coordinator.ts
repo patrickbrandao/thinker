@@ -26,6 +26,7 @@
  *   - Inside the lock: re-read the blob, skip refresh if already valid,
  *     then refresh + persist with retries (never re-refresh on persist fail).
  */
+import { emitAlert } from '../../../common/services/alert-sink';
 import { Logger } from '@nestjs/common';
 
 /** Minimum shape every provider's stored OAuth blob shares. */
@@ -143,6 +144,9 @@ export async function coordinateOAuthRefresh<T extends RefreshableBlob>(
   inFlight.set(params.key, run);
   try {
     return await run;
+  } catch (err) {
+    alertRefreshFailure(params.key, err);
+    throw err;
   } finally {
     inFlight.delete(params.key);
   }
@@ -198,6 +202,32 @@ async function persistWithRetry<T extends RefreshableBlob>(
   // have rotated; retrying the same blob is the best we can do without a
   // durable outbox.
   throw lastErr;
+}
+
+/** oauth.refresh_failed alert, at most one per credential per hour. */
+function alertRefreshFailure(key: string, err: unknown): void {
+  const [provider = '', tenantId = '', ...rest] = key.split(':');
+  const label = rest.join(':') || 'Default';
+  if (!tenantId) return;
+  const message = err instanceof Error ? err.message : String(err);
+  emitAlert({
+    tenantId,
+    level: 'error',
+    type: 'oauth.refresh_failed',
+    title: `OAuth refresh failed: ${provider} "${label}"`,
+    message: `The ${provider} subscription "${label}" could not renew its access token: ${message.slice(0, 500)}. Reconnect it if this keeps happening.`,
+    entityType: 'connection',
+    entityId: `${provider}:${label}`,
+    entityName: `${provider} "${label}"`,
+    metadata: { provider, label },
+    dedupeKey: `oauth.refresh_failed:${key}`,
+    dedupeWindowMs: 60 * 60_000,
+    vars: {
+      'connection.provider': provider,
+      'connection.label': label,
+      'connection.error': message,
+    },
+  });
 }
 
 /** Test seam: clear in-flight state between cases. */

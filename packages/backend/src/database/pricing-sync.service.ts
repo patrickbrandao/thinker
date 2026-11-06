@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { alertCatalogFailure } from '../common/services/alert-sink';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   catalogSyncBootWarning,
@@ -153,12 +154,14 @@ export class PricingSyncService implements OnModuleInit {
       const res = await outboundFetch(OPENROUTER_API, { signal: controller.signal });
       if (!res.ok) {
         this.logger.error(`OpenRouter API returned ${res.status}`);
+        alertCatalogFailure('openrouter', `OpenRouter API returned HTTP ${res.status}`);
         return null;
       }
       const body = (await res.json()) as OpenRouterResponse;
       return body.data ?? [];
     } catch (err) {
       this.logger.error(`Failed to fetch OpenRouter models: ${err}`);
+      alertCatalogFailure('openrouter', `Failed to fetch OpenRouter models: ${err}`);
       return null;
     } finally {
       clearTimeout(timeout);
