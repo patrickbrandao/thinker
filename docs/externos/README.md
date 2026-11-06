@@ -87,7 +87,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `local-ollama` | Local | Ollama | `ollama` | [dossiê](local/local-ollama.md) | 2026-11-04 | 1 |
 | `local-llamacpp` | Local | llama.cpp (llama-server) | `llamacpp` | [dossiê](local/local-llamacpp.md) | 2026-11-04 | 3 |
 | `harness-claude-code` | Harness | Claude Code | `claude-code` | [dossiê](harness/harness-claude-code.md) | 2026-11-03 | 4 |
-| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 3 |
+| `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-06 | 5 |
 | `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 3 |
 | `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | 2026-11-03 | 3 |
 | `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | 2026-11-06 | 1 |
