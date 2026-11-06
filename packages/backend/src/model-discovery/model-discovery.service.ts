@@ -52,6 +52,8 @@ import { resolveMetadataEntry } from './metadata-identity';
 import { lookupKnownPrice } from './known-model-prices';
 import { lookupKnownModalities } from './known-model-modalities';
 import { mergeModelCapabilities, modelSupportsStreaming } from './model-capabilities';
+import { LiveContextService } from './live-context';
+import { localServerRootUrl } from '../common/constants/local-servers';
 // Import static helpers directly to avoid circular dependency with RoutingModule
 const customProviderKey = (id: string) => `custom:${id}`;
 const customModelKey = (id: string, modelName: string) => `custom:${id}/${modelName}`;
@@ -129,6 +131,9 @@ export class ModelDiscoveryService {
     @Optional()
     @Inject(ProxyEgressService)
     private readonly egress: ProxyEgressService | null = null,
+    @Optional()
+    @Inject(LiveContextService)
+    private readonly liveContext: LiveContextService | null = null,
   ) {}
 
   /** Discovery goes out through the connection's outbound proxy chain. */
@@ -523,7 +528,20 @@ export class ModelDiscoveryService {
    * cached list when warm, otherwise runs the full DB-backed assembly and
    * caches the result. Invalidated on any provider mutation (see invalidate()).
    */
+  /**
+   * The agent's catalog snapshot (one per `/v1/models` or proxied request).
+   * llama.cpp windows are lowered to the server's live `n_ctx` here, so the
+   * listing, `auto`/virtual windows and context-window fit all see it.
+   */
   async getModelsForAgent(tenantId: string, agentId?: string): Promise<DiscoveredModel[]> {
+    const models = await this.getRegisteredModelsForAgent(tenantId, agentId);
+    return this.liveContext ? this.liveContext.apply(models) : models;
+  }
+
+  private async getRegisteredModelsForAgent(
+    tenantId: string,
+    agentId?: string,
+  ): Promise<DiscoveredModel[]> {
     if (!agentId) return this.fetchModelsForAgent(tenantId);
 
     const cached = this.modelsCache.get(agentId);
@@ -632,6 +650,14 @@ export class ModelDiscoveryService {
     for (const cp of customProviders) {
       if (!Array.isArray(cp.models)) continue;
       const cpKey = customProviderKey(cp.id);
+      // A single-model llama.cpp server reports its runtime context on
+      // /props; router mode (several models) has no single n_ctx.
+      this.liveContext?.setTarget(
+        cpKey,
+        cp.local_type === 'llamacpp' && cp.local_config && cp.models.length === 1
+          ? { rootUrl: localServerRootUrl(cp.local_config) }
+          : null,
+      );
       if (agentId && !customAuthTypes.has(cpKey)) continue;
       for (const m of cp.models) {
         const modelKey = customModelKey(cp.id, m.model_name);

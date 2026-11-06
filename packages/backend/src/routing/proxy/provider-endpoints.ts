@@ -66,6 +66,13 @@ export interface ProviderEndpoint {
    */
   timeoutMs?: number;
   /**
+   * The server implements `reasoning_effort` itself (llama-server: `none`
+   * disables thinking, other values reach the chat template), so it is kept
+   * instead of stripped as an OpenAI-only field, and a disabled Anthropic
+   * `thinking` becomes `none`.
+   */
+  nativeReasoningEffort?: boolean;
+  /**
    * When `true`, the proxy wraps the outgoing Google-shape request body in
    * the CodeAssist envelope (`{ model, project, request }`) and unwraps
    * `{ response }` from the upstream reply. The project id is read from
@@ -113,6 +120,7 @@ const localServerEndpoint = (id: LocalServerId): ProviderEndpoint => ({
   buildPath: openaiPath,
   format: 'openai',
   ...openaiStreamUsage,
+  ...(id === 'llamacpp' ? { nativeReasoningEffort: true } : {}),
 });
 
 const BEDROCK_OPENAI_MODEL_RE = /(?:^|\.)openai\./i;
@@ -721,7 +729,7 @@ function opencodeEndpoints(id: string, base: string): Record<string, ProviderEnd
 export function buildCustomEndpoint(
   baseUrl: string,
   apiKind: 'openai' | 'anthropic' = 'openai',
-  local?: { timeoutMs?: number },
+  local?: { timeoutMs?: number; localType?: string | null },
 ): ProviderEndpoint {
   // Strip trailing /v1 (or /v1/) since both buildPath callbacks include /v1.
   const normalized = normalizeProviderBaseUrl(baseUrl);
@@ -735,6 +743,7 @@ export function buildCustomEndpoint(
       ...openaiStreamUsage,
       requiresSsrfRevalidation: true,
       ...(local.timeoutMs ? { timeoutMs: local.timeoutMs } : {}),
+      ...(local.localType === 'llamacpp' ? { nativeReasoningEffort: true } : {}),
     };
   }
   if (apiKind === 'anthropic') {

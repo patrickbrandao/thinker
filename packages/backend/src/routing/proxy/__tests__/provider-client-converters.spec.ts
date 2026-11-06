@@ -1,3 +1,4 @@
+import { buildCustomEndpoint } from '../provider-endpoints';
 import {
   createReasoningContentStreamTransformer,
   sanitizeOpenAiBody,
@@ -1403,5 +1404,43 @@ describe('sanitizeOpenAiBody provider-specific fields', () => {
 
     const messages = result.messages as Array<Record<string, unknown>>;
     expect(messages[0].reasoning_content).toBe('upstream thinking');
+  });
+});
+
+describe('sanitizeOpenAiBody with a native reasoning_effort (llama.cpp)', () => {
+  it('keeps the caller effort instead of stripping it', () => {
+    expect(
+      sanitizeOpenAiBody({ model: 'q', reasoning_effort: 'low' }, 'custom', 'q', {
+        nativeReasoningEffort: true,
+      }).reasoning_effort,
+    ).toBe('low');
+    expect(
+      sanitizeOpenAiBody({ model: 'q', reasoning_effort: 'low' }, 'custom', 'q').reasoning_effort,
+    ).toBeUndefined();
+  });
+
+  it('turns a disabled thinking into none and adds nothing otherwise', () => {
+    const tools = [{ type: 'function', function: { name: 'f', parameters: {} } }];
+    expect(
+      sanitizeOpenAiBody({ model: 'q', thinking: { type: 'disabled' } }, 'custom', 'q', {
+        nativeReasoningEffort: true,
+      }).reasoning_effort,
+    ).toBe('none');
+    expect(
+      sanitizeOpenAiBody({ model: 'q', tools }, 'custom', 'q', { nativeReasoningEffort: true }),
+    ).not.toHaveProperty('reasoning_effort');
+  });
+});
+
+describe('buildCustomEndpoint for local servers', () => {
+  it('marks only llama.cpp as implementing reasoning_effort', () => {
+    expect(
+      buildCustomEndpoint('http://llama:9931/v1', 'openai', { localType: 'llamacpp' })
+        .nativeReasoningEffort,
+    ).toBe(true);
+    expect(
+      buildCustomEndpoint('http://lms:1234/v1', 'openai', { localType: 'lmstudio' })
+        .nativeReasoningEffort,
+    ).toBeUndefined();
   });
 });

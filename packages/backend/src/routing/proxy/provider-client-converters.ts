@@ -438,6 +438,13 @@ export interface SanitizeOpenAiBodyOptions {
    * without one.
    */
   forwardReasoningEffort?: boolean;
+  /**
+   * The upstream implements `reasoning_effort` (ProviderEndpoint
+   * nativeReasoningEffort): keep the caller's value, and turn a disabled
+   * `thinking` into `none`. Unlike forwardReasoningEffort, nothing is added
+   * when the caller sent no effort.
+   */
+  nativeReasoningEffort?: boolean;
 }
 
 /**
@@ -494,7 +501,9 @@ export function sanitizeOpenAiBody(
     // non-passthrough provider gets the OpenAI-only field stripped below.
     if (
       key === 'reasoning_effort' &&
-      (REASONING_EFFORT_ENDPOINTS.has(endpointKey) || options.forwardReasoningEffort)
+      (REASONING_EFFORT_ENDPOINTS.has(endpointKey) ||
+        options.forwardReasoningEffort ||
+        options.nativeReasoningEffort)
     ) {
       cleaned[key] = value;
       continue;
@@ -521,7 +530,7 @@ export function sanitizeOpenAiBody(
   const thinking = body.thinking as { type?: unknown } | undefined;
   const thinkingKey = endpointKey.toLowerCase();
   if (
-    Object.hasOwn(THINKING_AS_EFFORT, thinkingKey) &&
+    (Object.hasOwn(THINKING_AS_EFFORT, thinkingKey) || options.nativeReasoningEffort) &&
     cleaned.reasoning_effort === undefined &&
     thinking &&
     typeof thinking === 'object'
