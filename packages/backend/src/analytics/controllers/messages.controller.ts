@@ -72,6 +72,7 @@ export class MessagesController {
       origin: query.origin,
       error_class: query.error_class,
       routing_tier: query.routing_tier,
+      served_provider: query.served_provider,
       specificity_category: query.specificity_category,
       include_total: query.include_total,
       cache_total: query.cache_total,

@@ -62,6 +62,8 @@ export type ResolvedRouteCredentials =
       keyLabel: string;
       /** The selected row's stream warm-up override (#244). */
       streamWarmupMs: number | null;
+      /** The selected row's stream idle timeout override. */
+      streamIdleTimeoutMs: number | null;
       /** Outbound proxy scope of the selected connection (Proxy Servers). */
       egressScope?: OutboundScope;
     }
@@ -306,6 +308,7 @@ export async function resolveRouteCredentials(
     // have fallen back to the default key when the pin matched nothing.
     keyLabel: key.label,
     streamWarmupMs: key.streamWarmupMs ?? null,
+    streamIdleTimeoutMs: key.streamIdleTimeoutMs ?? null,
     ...(egressScope ? { egressScope } : {}),
   };
 }

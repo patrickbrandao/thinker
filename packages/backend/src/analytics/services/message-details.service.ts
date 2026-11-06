@@ -39,6 +39,10 @@ export interface MessageDetailResponse {
     specificity_miscategorized: boolean;
     auth_type: string | null;
     provider_key_label: string | null;
+    /** What the upstream says served the attempt (OpenRouter `provider`). */
+    served_provider: string | null;
+    upstream_generation_id: string | null;
+    served_model: string | null;
     skill_name: string | null;
     fallback_from_model: string | null;
     fallback_index: number | null;
@@ -202,6 +206,9 @@ export class MessageDetailsService {
         specificity_miscategorized: message?.specificity_miscategorized ?? false,
         auth_type: message?.auth_type ?? null,
         provider_key_label: message?.provider_key_label ?? null,
+        served_provider: message?.served_provider ?? null,
+        upstream_generation_id: message?.upstream_generation_id ?? null,
+        served_model: message?.served_model ?? null,
         skill_name: message?.skill_name ?? null,
         fallback_from_model: message?.fallback_from_model ?? null,
         fallback_index: message?.fallback_index ?? null,

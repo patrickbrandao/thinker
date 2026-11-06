@@ -35,6 +35,7 @@ import {
   LOCAL_SERVER_TYPES,
   type LocalServerType,
 } from '../../common/constants/local-servers';
+import { MAX_STREAM_IDLE_OVERRIDE_MS, MIN_STREAM_IDLE_OVERRIDE_MS } from '../proxy/stream-writer';
 
 /**
  * Connection settings of a local server. The service assembles the base URL
@@ -272,4 +273,14 @@ export class UpdateCustomProviderDto {
   @Min(MIN_STREAM_WARMUP_OVERRIDE_MS)
   @Max(MAX_STREAM_WARMUP_OVERRIDE_MS)
   stream_warmup_ms?: number | null;
+
+  /**
+   * Stream idle timeout override in ms for the provider's primary connection.
+   * Omitted leaves it untouched; null clears it.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_STREAM_IDLE_OVERRIDE_MS)
+  @Max(MAX_STREAM_IDLE_OVERRIDE_MS)
+  stream_idle_timeout_ms?: number | null;
 }

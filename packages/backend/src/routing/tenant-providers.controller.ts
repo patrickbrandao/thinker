@@ -30,6 +30,7 @@ import {
   RemoveProviderQueryDto,
   RenameProviderKeyDto,
   SetStreamWarmupDto,
+  SetStreamIdleDto,
   SetBaseUrlDto,
 } from './dto/routing.dto';
 import { MinRole } from '../common/decorators/roles.decorator';
@@ -181,6 +182,23 @@ export class TenantProvidersController {
     };
   }
 
+  /** Set or clear a connection's stream idle timeout override. */
+  @Patch('connections/:id/stream-idle')
+  async setStreamIdle(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetStreamIdleDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const updated = await this.providerService.setStreamIdleTimeout(
+      tenantId,
+      id,
+      body.stream_idle_timeout_ms,
+    );
+    await this.invalidateTenantRouting(tenantId);
+    return { id: updated.id, stream_idle_timeout_ms: updated.stream_idle_timeout_ms };
+  }
+
   /** Set or clear a connection's stream warm-up override (#244). */
   @Patch('connections/:id/stream-warmup')
   async setStreamWarmup(
@@ -285,6 +303,7 @@ export class TenantProvidersController {
           cached_model_count: number;
           is_active: boolean;
           stream_warmup_ms: number | null;
+          stream_idle_timeout_ms: number | null;
           region: string | null;
           base_url: string | null;
           default_base_url: string | null;
@@ -323,6 +342,7 @@ export class TenantProvidersController {
           cached_model_count: modelCount,
           is_active: p.is_active,
           stream_warmup_ms: p.stream_warmup_ms ?? null,
+          stream_idle_timeout_ms: p.stream_idle_timeout_ms ?? null,
           ...baseUrlFields(p),
         });
         existing.total_models = Math.max(existing.total_models, modelCount);
@@ -341,6 +361,7 @@ export class TenantProvidersController {
               cached_model_count: modelCount,
               is_active: p.is_active,
               stream_warmup_ms: p.stream_warmup_ms ?? null,
+              stream_idle_timeout_ms: p.stream_idle_timeout_ms ?? null,
               ...baseUrlFields(p),
             },
           ],

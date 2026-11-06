@@ -17,9 +17,14 @@ import { t } from '../i18n/index.js';
 import {
   MAX_STREAM_WARMUP_SECONDS,
   MIN_STREAM_WARMUP_SECONDS,
+  MAX_STREAM_IDLE_SECONDS,
+  MIN_STREAM_IDLE_SECONDS,
   parseWarmupSeconds,
+  parseIdleSeconds,
   warmupMsToSecondsInput,
+  idleMsToSecondsInput,
   streamWarmupError,
+  streamIdleError,
 } from '../services/stream-warmup.js';
 import { customProviderColor } from '../services/formatters.js';
 import type { ProviderDef } from '../services/providers.js';
@@ -113,6 +118,8 @@ export default function CustomProviderForm(props: Props) {
   const [editingKey, setEditingKey] = useState(false);
   const initialWarmupMs = initialData?.stream_warmup_ms ?? null;
   const [warmupSeconds, setWarmupSeconds] = useState(() => warmupMsToSecondsInput(initialWarmupMs));
+  const initialIdleMs = initialData?.stream_idle_timeout_ms ?? null;
+  const [idleSeconds, setIdleSeconds] = useState(() => idleMsToSecondsInput(initialIdleMs));
   const [rows, setRows] = useState<ModelRow[]>(() =>
     initialData ? toModelRows(initialData.models) : prefillRows(props.prefill),
   );
@@ -305,6 +312,12 @@ export default function CustomProviderForm(props: Props) {
       return;
     }
     if (warmupMs !== initialWarmupMs) data.stream_warmup_ms = warmupMs;
+    const idleMs = parseIdleSeconds(idleSeconds);
+    if (idleMs === undefined) {
+      setError(streamIdleError());
+      return;
+    }
+    if (idleMs !== initialIdleMs) data.stream_idle_timeout_ms = idleMs;
 
     setBusy(true);
     try {
@@ -526,6 +539,30 @@ export default function CustomProviderForm(props: Props) {
               }}
             />
             <p className="hint">{t('providers.customForm.warmupHint')}</p>
+          </div>
+        ) : null}
+
+        {isEdit ? (
+          <div>
+            <label className="label" htmlFor="cp-stream-idle">
+              {t('providers.customForm.streamIdle')}{' '}
+              <span className="font-normal text-muted">{t('providers.customForm.optional')}</span>
+            </label>
+            <input
+              id="cp-stream-idle"
+              className="field"
+              type="number"
+              min={MIN_STREAM_IDLE_SECONDS}
+              max={MAX_STREAM_IDLE_SECONDS}
+              step="1"
+              placeholder={t('providers.customForm.inherit')}
+              value={idleSeconds}
+              onChange={(e) => {
+                setIdleSeconds(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+            <p className="hint">{t('providers.customForm.idleHint')}</p>
           </div>
         ) : null}
 

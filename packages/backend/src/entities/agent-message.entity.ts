@@ -144,6 +144,21 @@ export class AgentMessage {
   @Column('varchar', { nullable: true })
   provider!: string | null;
 
+  /**
+   * The upstream that actually served the attempt, as an aggregator reports
+   * it (OpenRouter's `provider` field, or `error.metadata.provider_name`).
+   */
+  @Column('varchar', { length: 120, nullable: true })
+  served_provider!: string | null;
+
+  /** The upstream response id (OpenRouter `gen-...`, OpenAI `chatcmpl-...`). */
+  @Column('varchar', { length: 128, nullable: true })
+  upstream_generation_id!: string | null;
+
+  /** The model the upstream says it answered with. */
+  @Column('varchar', { length: 200, nullable: true })
+  served_model!: string | null;
+
   @Column('varchar', { nullable: true })
   routing_tier!: string | null;
 

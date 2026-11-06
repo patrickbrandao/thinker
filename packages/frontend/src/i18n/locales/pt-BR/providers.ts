@@ -137,6 +137,10 @@ const ptBR: Catalog<typeof en> = {
     warmupHint:
       'Opcional. Quanto tempo uma requisição em stream espera pelo primeiro token antes de passar para o fallback. Deixe vazio para usar o padrão.',
     warmupSaved: 'Aquecimento do stream salvo',
+    streamIdle: 'Timeout de inatividade do stream (segundos)',
+    idleHint:
+      'Pausa máxima permitida entre dois trechos de uma resposta em stream antes de a tentativa falhar. Vazio herda o timeout de requisição do servidor local e, depois, STREAM_IDLE_TIMEOUT_MS (180 s).',
+    idleSaved: 'Timeout de inatividade do stream salvo',
     baseUrlSaved: 'URL base salva; os modelos estão sendo descobertos de novo.',
     credential: 'Credencial',
     credentialKeyHint:
@@ -218,6 +222,9 @@ const ptBR: Catalog<typeof en> = {
     inherit: 'Herdar',
     warmupHint:
       'Quanto tempo uma requisição em stream espera pelo primeiro token antes de passar para o fallback. Aumente para modelos locais que demoram a carregar. Deixe vazio para usar o padrão.',
+    streamIdle: 'Timeout de inatividade do stream (segundos)',
+    idleHint:
+      'Pausa máxima permitida entre dois trechos de uma resposta em stream antes de a tentativa falhar. Vazio herda o timeout de requisição do servidor local e, depois, STREAM_IDLE_TIMEOUT_MS (180 s).',
     apiKey: 'Chave de API',
     apiKeyOptional: '(opcional para provedores locais)',
     noKeySet: 'Nenhuma chave definida',

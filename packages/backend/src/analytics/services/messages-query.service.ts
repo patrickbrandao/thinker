@@ -133,6 +133,8 @@ interface MessageQueryParams extends MessageFilterParams {
   origin?: MessageOriginFilter;
   error_class?: string;
   routing_tier?: string;
+  /** Upstream that served an attempt (agent_messages.served_provider), case-insensitive. */
+  served_provider?: string;
   specificity_category?: string;
   include_total?: boolean;
   /** Allow a recent exact total to be reused instead of forcing a fresh first-page count. */
@@ -396,6 +398,10 @@ export class MessagesQueryService {
     if (params.routing_tier) {
       attemptPredicates.push('filtered_attempt.routing_tier = :requestTier');
       attemptParameters['requestTier'] = params.routing_tier;
+    }
+    if (params.served_provider) {
+      attemptPredicates.push('LOWER(filtered_attempt.served_provider) = LOWER(:requestServed)');
+      attemptParameters['requestServed'] = params.served_provider;
     }
     if (params.specificity_category) {
       attemptPredicates.push('filtered_attempt.specificity_category = :requestSpecificity');
@@ -829,6 +835,7 @@ export class MessagesQueryService {
     origin?: MessageOriginFilter;
     error_class?: string;
     routing_tier?: string;
+    served_provider?: string;
     specificity_category?: string;
   }): Promise<SelectQueryBuilder<AgentMessage>> {
     const cutoff = params.range ? computeCutoff(rangeToInterval(params.range)) : undefined;
@@ -875,6 +882,11 @@ export class MessagesQueryService {
 
     if (params.routing_tier) {
       qb.andWhere('at.routing_tier = :tierFilter', { tierFilter: params.routing_tier });
+    }
+    if (params.served_provider) {
+      qb.andWhere('LOWER(at.served_provider) = LOWER(:servedFilter)', {
+        servedFilter: params.served_provider,
+      });
     }
 
     if (params.specificity_category) {
@@ -1132,6 +1144,7 @@ export class MessagesQueryService {
     origin?: MessageOriginFilter;
     error_class?: string;
     routing_tier?: string;
+    served_provider?: string;
     specificity_category?: string;
     exclude_playground?: boolean;
     exclude_direct?: boolean;
@@ -1155,6 +1168,7 @@ export class MessagesQueryService {
       params.origin ?? '',
       params.error_class ?? '',
       params.routing_tier ?? '',
+      params.served_provider ?? '',
       params.specificity_category ?? '',
       params.exclude_playground ? 'exclude-playground' : '',
       params.exclude_direct ? 'exclude-direct' : '',

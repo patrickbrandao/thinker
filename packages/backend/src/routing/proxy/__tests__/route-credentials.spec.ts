@@ -193,6 +193,7 @@ describe('route-credentials', () => {
         tenantProviderId: 'up-1',
         keyLabel: 'Work',
         streamWarmupMs: null,
+        streamIdleTimeoutMs: null,
       });
     });
 

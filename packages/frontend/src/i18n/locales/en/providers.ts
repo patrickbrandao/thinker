@@ -133,6 +133,10 @@ export default {
     warmupHint:
       'Optional. How long a streaming request waits for the first token before failing over. Leave empty to use the default.',
     warmupSaved: 'Stream warm-up saved',
+    streamIdle: 'Stream idle timeout (seconds)',
+    idleHint:
+      "Longest pause allowed between two chunks of a streaming response before the attempt fails. Empty inherits the local server's request timeout, then STREAM_IDLE_TIMEOUT_MS (180 s).",
+    idleSaved: 'Stream idle timeout saved',
     baseUrlSaved: 'Base URL saved; models are being discovered again.',
     credential: 'Credential',
     credentialKeyHint:
@@ -213,6 +217,9 @@ export default {
     inherit: 'Inherit',
     warmupHint:
       'How long a streaming request waits for the first token before failing over. Raise it for local models with slow cold loads. Leave empty to use the default.',
+    streamIdle: 'Stream idle timeout (seconds)',
+    idleHint:
+      "Longest pause allowed between two chunks of a streaming response before the attempt fails. Empty inherits the local server's request timeout, then STREAM_IDLE_TIMEOUT_MS (180 s).",
     apiKey: 'API Key',
     apiKeyOptional: '(optional for local providers)',
     noKeySet: 'No key set',

@@ -45,6 +45,8 @@ const ptBR: Catalog<typeof en> = {
       origin: 'Filtro de origem',
       period: 'Filtro de período',
       allTiers: 'Todos os níveis',
+      servedBy: 'Filtro de servido por',
+      servedByPlaceholder: 'Servido por, ex.: DeepInfra',
     },
     range: {
       all: 'Todo o período',
@@ -276,6 +278,9 @@ const ptBR: Catalog<typeof en> = {
       provider: 'Provedor',
       auth: 'Autenticação',
       apiKey: 'Chave de API',
+      servedBy: 'Servido por',
+      upstreamId: 'ID no upstream',
+      servedModel: 'Modelo servido',
       model: 'Modelo',
       modelId: 'ID do modelo',
       trace: 'Trace',

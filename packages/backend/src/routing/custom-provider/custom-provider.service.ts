@@ -581,6 +581,17 @@ export class CustomProviderService {
         this.routingCache.invalidateTenant(tenantId);
       }
     }
+    if (dto.stream_idle_timeout_ms !== undefined) {
+      const primary = await this.primaryConnection(tenantId, id);
+      if (primary) {
+        await this.providerService.setStreamIdleTimeout(
+          tenantId,
+          primary.id,
+          dto.stream_idle_timeout_ms,
+        );
+        this.routingCache.invalidateTenant(tenantId);
+      }
+    }
 
     this.notifyChange(tenantId, actorUserId);
     return cp;
