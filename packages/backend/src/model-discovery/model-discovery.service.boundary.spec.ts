@@ -347,13 +347,10 @@ describe('ModelDiscoveryService — boundary conditions', () => {
   /* ── contextWindow boundary handling ── */
 
   describe('enrichModel — contextWindow boundary inputs', () => {
-    // The source uses `mdEntry.contextWindow ?? model.contextWindow` (nullish
-    // coalescing), which only short-circuits on null/undefined. Zero, NaN,
-    // and Infinity all pass through. These tests document the current
-    // behavior — a future sanitization PR should clamp to a safe range and
-    // flip the `.toBe(...)` assertions to `.toBe(128_000)` / `.toBe(32_000_000)`.
+    // A catalog window replaces the provider's only when it is a positive
+    // finite number; zero, NaN and Infinity keep the provider's value.
 
-    it('passes a zero contextWindow from models.dev through (current behavior)', async () => {
+    it('ignores a zero contextWindow from models.dev', async () => {
       mockModelsDevSync.lookupModel.mockReturnValue({
         id: 'zero-ctx',
         name: 'Zero',
@@ -364,7 +361,7 @@ describe('ModelDiscoveryService — boundary conditions', () => {
       fetcher.fetch.mockResolvedValue([makeModel({ id: 'zero-ctx' })]);
 
       const result = await service.discoverModels(makeProvider());
-      expect(result[0].contextWindow).toBe(0);
+      expect(result[0].contextWindow).toBe(makeModel({ id: 'zero-ctx' }).contextWindow);
     });
 
     it('falls back to model.contextWindow when models.dev contextWindow is undefined', async () => {
@@ -380,7 +377,7 @@ describe('ModelDiscoveryService — boundary conditions', () => {
       expect(result[0].contextWindow).toBe(64000);
     });
 
-    it('passes Infinity contextWindow from OpenRouter through (current behavior)', async () => {
+    it('ignores an Infinity contextWindow from OpenRouter', async () => {
       mockPricingSync.lookupPricing.mockReturnValue({
         input: 0.0001,
         output: 0.0001,
@@ -389,10 +386,10 @@ describe('ModelDiscoveryService — boundary conditions', () => {
       fetcher.fetch.mockResolvedValue([makeModel({ id: 'inf-ctx' })]);
 
       const result = await service.discoverModels(makeProvider());
-      expect(result[0].contextWindow).toBe(Number.POSITIVE_INFINITY);
+      expect(result[0].contextWindow).toBe(makeModel({ id: 'inf-ctx' }).contextWindow);
     });
 
-    it('passes NaN contextWindow from OpenRouter through (current behavior)', async () => {
+    it('ignores a NaN contextWindow from OpenRouter', async () => {
       mockPricingSync.lookupPricing.mockReturnValue({
         input: 0.0001,
         output: 0.0001,
@@ -401,7 +398,7 @@ describe('ModelDiscoveryService — boundary conditions', () => {
       fetcher.fetch.mockResolvedValue([makeModel({ id: 'nan-ctx' })]);
 
       const result = await service.discoverModels(makeProvider());
-      expect(Number.isNaN(result[0].contextWindow)).toBe(true);
+      expect(result[0].contextWindow).toBe(makeModel({ id: 'nan-ctx' }).contextWindow);
     });
 
     it('preserves a sane contextWindow value from OpenRouter', async () => {

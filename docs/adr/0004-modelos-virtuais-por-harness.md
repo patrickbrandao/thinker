@@ -163,7 +163,7 @@ Entrada de um virtual:
   - **Virtual:** a cadeia do virtual mais a do Default, quando `continue_on_default` estiver ligado.
   - **`auto`, roteamento por complexidade desligado:** a cadeia do Default, no mesmo sentido da seção 4, passo 2 (inclui o `auto_assigned_route` legado).
   - **`auto`, roteamento por complexidade ligado:** o mínimo entre as cadeias de todos os destinos que `auto` pode alcançar sem cabeçalho: os slots `simple`, `standard`, `complex`, `reasoning` e `default` (cada um montado como em `buildResolvedRouteChain`), mais as atribuições de especificidade ativas. Header tiers ficam de fora porque exigem cabeçalho.
-- Os modelos reais continuam sem `context_length`. Publicar o campo para eles fica fora deste ADR.
+- ~~Os modelos reais continuam sem `context_length`.~~ **Emenda (2026-11-06, relatório da NOC Norte, P1):** todo modelo real também publica `context_length`, com a própria `contextWindow` do mesmo snapshot (gap G3 do dossiê `harness-hermes`). Uma janela que é só o padrão do Thinker (`contextWindowSource: 'default'`, quando nem o provedor nem models.dev/OpenRouter informam) ou que está fora de 1.024 a 10.000.000 conta como desconhecida: é omitida no modelo real e torna desconhecida a cadeia de `auto` e dos virtuais que a usam. `openrouter/free` publica a menor janela entre os modelos `:free` da mesma conexão (omite se não houver). Regra em `routing/virtual-models/published-context.ts`. Não há piso: o mínimo real da cadeia continua sendo o valor publicado.
 - Cada chave só vê os virtuais do próprio agente. A lista sai do mesmo `agentId` que o `AgentKeyAuthGuard` já resolve.
 
 ### 8. Observabilidade

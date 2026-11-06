@@ -83,6 +83,9 @@ function makeDiscoveredModel(overrides: Partial<DiscoveredModel> = {}): Discover
     displayName: 'GPT-4o',
     provider: 'openai',
     contextWindow: 128000,
+    // A stand-in window: these listing tests pin the other metadata; the
+    // published context_length is covered by proxy.controller.models.spec.
+    contextWindowSource: 'default',
     inputPricePerToken: 0.0000025,
     outputPricePerToken: 0.00001,
     capabilityReasoning: false,
