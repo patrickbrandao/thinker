@@ -1,6 +1,7 @@
 import { APIError, betterAuth } from 'better-auth';
 import type { Auth } from 'better-auth';
-import { createAuthMiddleware } from 'better-auth/api';
+import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { recordAuthAlert, type AuthHookContext } from './auth-alerts';
 import { jwt } from 'better-auth/plugins';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
@@ -268,6 +269,15 @@ const pluginAuth = betterAuth({
     // success (anti-enumeration), so the explicit refusal happens here.
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === '/sign-up/email') await assertUserCreationAllowed();
+      // The session is gone after sign-out: read who is leaving first.
+      if (ctx.path === '/sign-out') {
+        const session = await getSessionFromCtx(ctx).catch(() => null);
+        if (session?.user) recordAuthAlert(ctx as unknown as AuthHookContext, session.user);
+      }
+    }),
+    // Alerts: sign-in (and failed sign-in) and password changes.
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/sign-out') recordAuthAlert(ctx as unknown as AuthHookContext);
     }),
   },
   databaseHooks: {

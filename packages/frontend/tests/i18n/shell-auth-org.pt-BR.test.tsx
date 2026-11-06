@@ -184,7 +184,7 @@ describe('shell, auth and organization screens in pt-BR', () => {
     inRouter(<AlertsMenu />);
     const bell = await screen.findByRole('button', { name: 'Alertas, 1 novos' });
     fireEvent.click(bell);
-    expect(await screen.findByText('Ver requisições com falha')).toBeTruthy();
+    expect(await screen.findByText('Ver todos os alertas')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Marcar todos como vistos' }));
     expect(await screen.findByText('Últimas 24 horas')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Alertas' })).toBeTruthy();

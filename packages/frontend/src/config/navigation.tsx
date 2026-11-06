@@ -16,6 +16,7 @@ import {
   Zap,
   type LucideIcon,
   Network,
+  BellRing,
   Boxes,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
@@ -48,6 +49,7 @@ export const NAVIGATION: NavGroup[] = [
       { key: 'overview', to: '/overview', label: 'nav.overview', icon: LayoutDashboard },
       { key: 'sessions', to: '/sessions', label: 'nav.sessions', icon: MessagesSquare },
       { key: 'requests', to: '/messages', label: 'nav.requests', icon: ScrollText },
+      { key: 'alerts', to: '/alerts', label: 'nav.alerts', icon: BellRing },
       { key: 'topology', to: '/topology', label: 'nav.topology', icon: LayoutArrowRight },
     ],
   },

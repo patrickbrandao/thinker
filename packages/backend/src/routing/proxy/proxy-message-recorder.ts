@@ -587,6 +587,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       tenantProviderId: row.tenant_provider_id ?? null,
       provider: row.provider ?? null,
       keyLabel: row.provider_key_label ?? null,
+      model: row.model ?? null,
+      errorOrigin: row.error_origin ?? null,
       ok: normalizeStatus(row.status ?? 'ok') === 'success',
       httpStatus: row.error_http_status ?? null,
       errorCode: row.error_code ?? null,

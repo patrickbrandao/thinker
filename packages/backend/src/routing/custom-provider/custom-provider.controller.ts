@@ -1,3 +1,4 @@
+import { Audit } from '../../alerts/audit.decorator';
 import { Body, Controller, Delete, Get, Param, Post, Put, Optional } from '@nestjs/common';
 import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
@@ -168,6 +169,7 @@ export class CustomProviderController {
     return { models };
   }
 
+  @Audit({ entity: 'custom_provider', action: 'created' })
   @Post(':agentName/custom-providers')
   async create(
     @TenantCtx() ctx: TenantContext,
@@ -185,6 +187,11 @@ export class CustomProviderController {
     return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
+  @Audit({
+    entity: 'custom_provider',
+    action: 'updated',
+    lookup: { table: 'custom_providers', nameColumn: 'name' },
+  })
   @Put(':agentName/custom-providers/:id')
   async update(
     @TenantCtx() ctx: TenantContext,
@@ -203,6 +210,11 @@ export class CustomProviderController {
     return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
+  @Audit({
+    entity: 'custom_provider',
+    action: 'deleted',
+    lookup: { table: 'custom_providers', nameColumn: 'name' },
+  })
   @Delete(':agentName/custom-providers/:id')
   async remove(
     @TenantCtx() ctx: TenantContext,

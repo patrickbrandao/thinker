@@ -16,6 +16,7 @@ import {
   type OutboundScope,
 } from '../common/outbound/outbound-proxy';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
+import { SystemEventsService } from '../common/services/system-events.service';
 import { deliver, type DeliveryResult } from './trigger-senders';
 import { TriggerDispatchService } from './trigger-dispatch.service';
 import { isHttpTrigger, type TriggerConfig, type TriggerSecrets } from './trigger-config';
@@ -76,6 +77,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
     private readonly dispatch: TriggerDispatchService,
     config: ConfigService,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly alerts?: SystemEventsService,
   ) {
     this.defaultFrom =
       config.get<string>('app.emailFrom') ||
@@ -239,6 +241,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
           WHERE id = $1`,
         [row.id, attempt, result.error],
       );
+      if (!manual) this.alertFailure(row, trigger, attempt, result);
     } else {
       await this.ds.query(
         `UPDATE trigger_events
@@ -249,6 +252,40 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
       );
     }
     return result;
+  }
+
+  /**
+   * trigger.failed alert once a delivery gives up. No recursion: a failed
+   * trigger.failed delivery raises nothing, and the trigger that failed is
+   * never told about itself.
+   */
+  private alertFailure(
+    row: QueueRow,
+    trigger: TriggerRow | undefined,
+    attempts: number,
+    result: DeliveryResult,
+  ): void {
+    if (!this.alerts || row.event_type === 'trigger.failed' || row.event_type === 'test') return;
+    const name = trigger?.name ?? 'deleted trigger';
+    this.alerts.record({
+      tenantId: row.tenant_id,
+      level: 'error',
+      type: 'trigger.failed',
+      title: `Trigger "${name}" failed to deliver ${row.event_type}`,
+      message: `Gave up after ${attempts} attempt${attempts === 1 ? '' : 's'}: ${result.error ?? 'unknown error'}`,
+      entityType: 'trigger',
+      entityId: row.trigger_id,
+      entityName: name,
+      metadata: {
+        trigger_type: trigger?.type ?? null,
+        event_type: row.event_type,
+        event_id: row.id,
+        attempts,
+        status_code: result.statusCode,
+      },
+      excludeTriggerId: row.trigger_id,
+      vars: { 'trigger.failed_event': row.event_type, 'trigger.error': result.error ?? '' },
+    });
   }
 
   /** Claims and delivers one specific row now (the test button). */

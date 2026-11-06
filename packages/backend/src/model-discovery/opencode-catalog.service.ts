@@ -6,6 +6,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { alertCatalogFailure } from '../common/services/alert-sink';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PROVIDER_BY_ID } from '../common/constants/providers';
@@ -381,6 +382,7 @@ export class OpencodeCatalogService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(
         `OpenCode catalog fetch from models.opencode.ai failed: ${errorMessage(err)}`,
       );
+      alertCatalogFailure('opencode', `models.opencode.ai fetch failed: ${errorMessage(err)}`);
       shared.retryAt = Date.now() + ERROR_BACKOFF_MS;
       return false;
     }

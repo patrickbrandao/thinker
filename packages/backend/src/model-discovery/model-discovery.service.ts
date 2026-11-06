@@ -1,4 +1,6 @@
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { emitAlert } from '../common/services/alert-sink';
+import { modelChangeAlerts } from './model-change-alerts';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -389,9 +391,11 @@ export class ModelDiscoveryService {
       return provider.cached_models ?? [];
     }
 
+    const changes = modelChangeAlerts(provider, provider.cached_models, filtered);
     provider.cached_models = filtered;
     provider.models_fetched_at = new Date().toISOString();
     await this.providerRepo.save(provider);
+    for (const alert of changes) emitAlert(alert);
     await this.invalidateProviderAccess(provider);
 
     this.logger.log(
@@ -416,6 +420,7 @@ export class ModelDiscoveryService {
         .map((p) =>
           this.discoverModels(p, discoveryOptions).catch((err) => {
             this.logger.warn(`Discovery failed for ${p.provider}: ${err}`);
+            alertDiscoveryFailure(p, err);
           }),
         ),
     );
@@ -499,6 +504,7 @@ export class ModelDiscoveryService {
           this.logger.warn(
             `Per-provider refresh failed for ${provider.provider} (tenant ${tenantId}): ${message}`,
           );
+          alertDiscoveryFailure(provider, err);
           return {
             ok: false,
             modelCount: previousCount,
@@ -923,4 +929,25 @@ function providerModalitiesFirst(
     ...(inputModalities ? { inputModalities } : {}),
     ...(outputModalities ? { outputModalities } : {}),
   };
+}
+
+/** catalog.sync_failed (instance event) for a failed model discovery, at most hourly per provider. */
+function alertDiscoveryFailure(
+  provider: { provider: string; tenant_id: string; label?: string | null },
+  err: unknown,
+): void {
+  const message = err instanceof Error ? err.message : String(err);
+  emitAlert({
+    tenantId: null,
+    level: 'warning',
+    type: 'catalog.sync_failed',
+    title: `Model discovery failed for ${provider.provider}`,
+    message: message.slice(0, 1000),
+    entityType: 'provider',
+    entityId: provider.provider,
+    entityName: provider.provider,
+    metadata: { source: 'discovery', tenant_id: provider.tenant_id, label: provider.label ?? null },
+    dedupeKey: `catalog.sync_failed:discovery:${provider.provider}`,
+    dedupeWindowMs: 60 * 60_000,
+  });
 }

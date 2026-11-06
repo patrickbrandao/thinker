@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AlertsModule } from './alerts/alerts.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from './common/guards/roles.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -94,6 +95,7 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     SetupModule,
     OrganizationsModule,
     ConsoleModule,
+    AlertsModule,
     BackfillModule,
     ...mcpImports,
   ],

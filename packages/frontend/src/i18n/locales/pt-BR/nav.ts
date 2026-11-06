@@ -17,6 +17,7 @@ const ptBR: Catalog<typeof en> = {
   local: 'Locais',
   usageBased: 'Por uso',
   subscriptions: 'Assinaturas',
+  alerts: 'Alertas',
   models: 'Modelos',
   sectionIntegrations: 'INTEGRAÇÕES',
   mcpServer: 'Servidor MCP',

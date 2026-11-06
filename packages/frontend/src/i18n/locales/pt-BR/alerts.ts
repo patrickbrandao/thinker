@@ -1,0 +1,48 @@
+/** Página de alertas (/alerts) e o sino de alertas. */
+export default {
+  title: 'Alertas',
+  pageTitle: 'Alertas | Thinker',
+  subtitle:
+    'O que aconteceu neste workspace: mudanças de modelos, falhas de credencial e OAuth, limites, entregas de trigger que falharam, a auditoria e os logins. A primeira pessoa que lê um alerta o marca como lido para todos.',
+  tabs: { events: 'Eventos', requests: 'Requisições com falha' },
+  filter: {
+    level: 'Nível',
+    category: 'Categoria',
+    allLevels: 'Todos os níveis',
+    allCategories: 'Todas as categorias',
+    unread: 'Não lidos',
+  },
+  level: { error: 'Erro', warning: 'Aviso', info: 'Info' },
+  category: {
+    models: 'Modelos',
+    credentials: 'Credenciais',
+    limits: 'Limites',
+    triggers: 'Triggers',
+    audit: 'Auditoria',
+    auth: 'Autenticação',
+    catalog: 'Catálogo',
+  },
+  col: {
+    event: 'Evento',
+    category: 'Categoria',
+    actor: 'Quem',
+    when: 'Quando',
+    read: 'Lido',
+    request: 'Requisição',
+    harness: 'Harness',
+  },
+  system: 'Sistema',
+  someone: 'alguém',
+  readBy: 'Lido por {{ who }} em {{ when }}',
+  markRead: 'Marcar como lido',
+  markAllRead: 'Marcar todos como lidos',
+  empty: 'Nenhum alerta.',
+  prev: 'Anterior',
+  next: 'Próxima',
+  pageOf: 'Página {{ page }} de {{ pages }}',
+  bell: {
+    events: 'Alertas não lidos',
+    requests: 'Requisições com falha (24h)',
+    viewAll: 'Ver todos os alertas',
+  },
+};

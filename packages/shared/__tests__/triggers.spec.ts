@@ -64,7 +64,8 @@ describe('trigger events', () => {
       'credential.expired',
       'request.debug',
     ]);
-    expect([...WORKSPACE_TRIGGER_EVENTS]).toEqual(['harness.created', 'harness.deleted']);
+    expect(WORKSPACE_TRIGGER_EVENTS.slice(0, 2)).toEqual(['harness.created', 'harness.deleted']);
+    expect(WORKSPACE_TRIGGER_EVENTS).toContain('trigger.failed');
   });
 });
 
@@ -176,7 +177,8 @@ describe('TRIGGER_VARIABLES', () => {
     expect(eventsOf('failure.count')).toEqual(['provider.failure']);
     expect(eventsOf('connection.id')).toEqual(['credential.expired']);
     expect(eventsOf('request.cost')).toEqual(['request.debug']);
-    expect(eventsOf('actor.email')).toEqual(['harness.created', 'harness.deleted']);
+    expect(eventsOf('actor.email')).toEqual([...WORKSPACE_TRIGGER_EVENTS]);
+    expect(eventsOf('audit.fields')).toEqual(['audit.created', 'audit.updated', 'audit.deleted']);
   });
 
   it('covers every variable the default templates use', () => {

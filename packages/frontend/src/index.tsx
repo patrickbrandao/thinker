@@ -37,6 +37,7 @@ const AgentLimitsRedirect = lazyReload(() => import('./pages/AgentLimitsRedirect
 const AgentMessagesRedirect = lazyReload(() => import('./pages/AgentMessagesRedirect.jsx'));
 const MessageLog = lazyReload(() => import('./pages/MessageLog.jsx'));
 const Sessions = lazyReload(() => import('./pages/Sessions.jsx'));
+const Alerts = lazyReload(() => import('./pages/Alerts.jsx'));
 const SessionDetail = lazyReload(() => import('./pages/SessionDetail.jsx'));
 const Settings = lazyReload(() => import('./pages/Settings.jsx'));
 const Routing = lazyReload(() => import('./pages/Routing.jsx'));
@@ -142,6 +143,14 @@ function AppRoutes() {
           element={
             <Lazy>
               <GlobalOverview />
+            </Lazy>
+          }
+        />
+        <Route
+          path="alerts"
+          element={
+            <Lazy>
+              <Alerts />
             </Lazy>
           }
         />

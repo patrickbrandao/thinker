@@ -1,3 +1,4 @@
+import { Audit } from '../alerts/audit.decorator';
 import { parseVertexDeployment } from './vertex-deployment';
 import {
   BadRequestException,
@@ -123,6 +124,7 @@ export class ProviderController {
     }));
   }
 
+  @Audit({ entity: 'connection', action: 'created' })
   @Post(':agentName/providers')
   async upsertProvider(
     @TenantCtx() ctx: TenantContext,
@@ -245,6 +247,12 @@ export class ProviderController {
     };
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'label',
+    nameParams: ['provider', 'label'],
+  })
   @Patch(':agentName/providers/:provider/keys/:label')
   async renameProviderKey(
     @TenantCtx() ctx: TenantContext,
@@ -273,6 +281,7 @@ export class ProviderController {
     };
   }
 
+  @Audit({ entity: 'connection', action: 'updated', idParam: 'provider', nameParams: ['provider'] })
   @Put(':agentName/providers/:provider/keys/order')
   async reorderProviderKeys(
     @TenantCtx() ctx: TenantContext,
@@ -300,6 +309,12 @@ export class ProviderController {
       }));
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'agentName',
+    nameParams: ['agentName'],
+  })
   @Post(':agentName/providers/deactivate-all')
   async deactivateAllProviders(
     @TenantCtx() ctx: TenantContext,
@@ -314,6 +329,7 @@ export class ProviderController {
     return { ok: true };
   }
 
+  @Audit({ entity: 'connection', action: 'deleted', idParam: 'provider', nameParams: ['provider'] })
   @Delete(':agentName/providers/:provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,

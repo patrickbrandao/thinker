@@ -1,0 +1,48 @@
+/** Alerts page (/alerts) and the alerts bell. */
+export default {
+  title: 'Alerts',
+  pageTitle: 'Alerts | Thinker',
+  subtitle:
+    'What happened in this workspace: model changes, credential and OAuth failures, limits, failed trigger deliveries, the audit trail and sign-ins. The first person who reads an alert marks it read for everyone.',
+  tabs: { events: 'Events', requests: 'Failed requests' },
+  filter: {
+    level: 'Level',
+    category: 'Category',
+    allLevels: 'All levels',
+    allCategories: 'All categories',
+    unread: 'Unread',
+  },
+  level: { error: 'Error', warning: 'Warning', info: 'Info' },
+  category: {
+    models: 'Models',
+    credentials: 'Credentials',
+    limits: 'Limits',
+    triggers: 'Triggers',
+    audit: 'Audit',
+    auth: 'Authentication',
+    catalog: 'Catalog',
+  },
+  col: {
+    event: 'Event',
+    category: 'Category',
+    actor: 'Who',
+    when: 'When',
+    read: 'Read',
+    request: 'Request',
+    harness: 'Harness',
+  },
+  system: 'System',
+  someone: 'someone',
+  readBy: 'Read by {{ who }} on {{ when }}',
+  markRead: 'Mark as read',
+  markAllRead: 'Mark all as read',
+  empty: 'No alerts.',
+  prev: 'Previous',
+  next: 'Next',
+  pageOf: 'Page {{ page }} of {{ pages }}',
+  bell: {
+    events: 'Unread alerts',
+    requests: 'Failed requests (24h)',
+    viewAll: 'View all alerts',
+  },
+};

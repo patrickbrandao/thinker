@@ -27,6 +27,8 @@ export interface EmitInput {
   vars?: TemplateVars;
   /** Restrict to one trigger (the test button). */
   triggerId?: string;
+  /** Never deliver to this trigger (a trigger is not told about its own failure). */
+  excludeTriggerId?: string | null;
 }
 
 /**
@@ -83,6 +85,10 @@ export class TriggerDispatchService {
 
   harnessUrl(agentName: string): string {
     return `${this.runtime.getAuthBaseUrl()}/harnesses/${encodeURIComponent(agentName)}`;
+  }
+
+  alertsUrl(): string {
+    return `${this.runtime.getAuthBaseUrl()}/alerts`;
   }
 
   requestUrl(requestId: string): string {
@@ -172,6 +178,8 @@ export class TriggerDispatchService {
       )) as Array<{ id: string }>;
       triggerIds = rows.map((r) => r.id);
     }
+    if (input.excludeTriggerId)
+      triggerIds = triggerIds.filter((id) => id !== input.excludeTriggerId);
     if (triggerIds.length === 0) return [];
     const rows = (await this.ds.query(
       `SELECT t.id, t.name, t.type,
