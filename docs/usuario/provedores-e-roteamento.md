@@ -86,6 +86,10 @@ Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, respo
 
 **Idle do streaming.** No mesmo lugar, o campo opcional "Stream idle timeout (seconds)" (1 a 3600 s) define a maior pausa aceita entre dois trechos de uma resposta em streaming antes de a tentativa falhar. Vazio herda o `request_timeout_ms` do servidor local (para conexões locais) e, depois, `STREAM_IDLE_TIMEOUT_MS` (padrão 180 s). Na API: `stream_idle_timeout_ms` em milissegundos (1000 a 3600000; `null` limpa), em `PATCH /api/v1/providers/connections/:id/stream-idle` e no `PUT` de custom provider.
 
+**Fixar o provedor do OpenRouter.** Numa rota do OpenRouter, o diálogo de parâmetros do modelo tem a seção "Provider routing": ordem de provedores (`order`), só estes (`only`), ignorar (`ignore`), permitir outros (`allow_fallbacks`), ordenação (`sort`), coleta de dados e retenção zero, e um JSON avançado para as demais chaves (quantizações, preço máximo, latência e vazão preferidas). Vale só para essa rota; os fallbacks seguem o roteamento normal do OpenRouter. Se o cliente mandar o próprio objeto `provider`, ele substitui o da rota por inteiro. Uma ordem manual desliga a afinidade de sessão do OpenRouter, e com ela o cache de prompt aquecido. Para conferir qual provedor atendeu, veja "Served by" no detalhe da mensagem.
+
+**Modelo fora do catálogo.** Quando o provedor deixa de listar o modelo de uma rota, a linha da rota mostra o aviso "Not in catalog": os pedidos pulam para a próxima rota até você trocar o modelo.
+
 ## Modelos virtuais
 
 Um **modelo virtual** é um nome público que você cria em um harness, com uma cadeia própria de modelos. O harness manda esse nome no campo `model`, e o Thinker roteia pela cadeia, sem cabeçalho. Serve para harnesses que escolhem o modelo pelo nome (Claude Code, seletores de modelo de editores) e para dar fallback a um nome que o cliente não deixa trocar. Na página **Roteamento** do harness, a cadeia `auto` aparece como o card "Modelo virtual: `auto`", na mesma grade dos modelos virtuais, e o botão **Criar modelo virtual** fica na barra de ações, à esquerda de **Atualizar modelos**.

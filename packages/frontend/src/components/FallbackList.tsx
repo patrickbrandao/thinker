@@ -25,6 +25,8 @@ import { t } from '../i18n/index.js';
 import { authBadgeFor } from './AuthBadge.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
+import NotInCatalogBadge from './NotInCatalogBadge.js';
+import { routeNotInCatalog } from '../lib/route-catalog.js';
 import RouteKeyChip from './RouteKeyChip.js';
 import { cx } from './ui.js';
 import { modelParamsScopeForTier } from 'thinker-shared';
@@ -533,6 +535,7 @@ export default function FallbackList(props: FallbackListProps) {
                           {t('routing.skippedInStream')}
                         </span>
                       ) : null}
+                      {routeNotInCatalog(route, props.models) ? <NotInCatalogBadge /> : null}
                       {keys.length > 1 ? (
                         <RouteKeyChip
                           keys={keys}
