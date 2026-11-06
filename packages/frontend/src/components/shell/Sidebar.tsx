@@ -5,6 +5,7 @@ import { NAVIGATION, isNavActive, navLabel } from '../../config/navigation.js';
 import { roleCan } from '../../services/session-store.js';
 import { brandingSignal, loadBranding } from '../../services/branding.js';
 import { useSignal } from '../../lib/signal.js';
+import { connectionBreadcrumbSignal } from '../../services/connection-breadcrumb-store.js';
 import { t } from '../../i18n/index.js';
 import { cx } from '../ui.jsx';
 import AddAgentModal from '../AddAgentModal.jsx';
@@ -25,6 +26,8 @@ export default function Sidebar({
   onNavigate: () => void;
 }) {
   const { pathname } = useLocation();
+  // A connection page highlights its account kind once the connection loads.
+  useSignal(connectionBreadcrumbSignal);
   const [addOpen, setAddOpen] = useState(false);
   const branding = useSignal(brandingSignal);
   useEffect(() => {

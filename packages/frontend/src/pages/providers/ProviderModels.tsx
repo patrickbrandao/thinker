@@ -40,7 +40,7 @@ const kindLabel = (kind: ModelAccountKind) =>
   t(`providers.models.kind.${kind}` as 'providers.models.kind.api_key');
 
 /** "$x / $y" per million tokens, or Subscription / Local when there is no price. */
-function priceCell(
+export function priceCell(
   account: Pick<ProviderModelAccount, 'kind' | 'input_price_per_token' | 'output_price_per_token'>,
 ) {
   if (account.input_price_per_token == null && account.output_price_per_token == null) {
@@ -67,7 +67,7 @@ function headlineAccount(m: ProviderModelEntry): ProviderModelAccount | undefine
   return priced[0] ?? m.accounts[0];
 }
 
-function ProviderCell({ m }: { m: ProviderModelEntry }) {
+export function ProviderCell({ m }: { m: ProviderModelEntry }) {
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       {m.provider.startsWith('custom:') ? null : providerIcon(m.provider, 14)}
@@ -76,7 +76,7 @@ function ProviderCell({ m }: { m: ProviderModelEntry }) {
   );
 }
 
-function ModelCell({ m }: { m: ProviderModelEntry }) {
+export function ModelCell({ m }: { m: ProviderModelEntry }) {
   return (
     <div className="min-w-0">
       <div className="row-title truncate">{m.display_name}</div>
@@ -85,10 +85,10 @@ function ModelCell({ m }: { m: ProviderModelEntry }) {
   );
 }
 
-const contextCell = (m: ProviderModelEntry) =>
+export const contextCell = (m: ProviderModelEntry) =>
   m.context_window ? formatNumber(m.context_window) : '—';
 
-function Capabilities({ m }: { m: ProviderModelEntry }) {
+export function Capabilities({ m }: { m: ProviderModelEntry }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       <ModelCapabilityBadges capabilities={m.capabilities} iconOnly />
@@ -219,7 +219,7 @@ const VIEWS: Record<
   },
 };
 
-function Details({ m }: { m: ProviderModelEntry }) {
+export function Details({ m }: { m: ProviderModelEntry }) {
   const row = (k: string, v: ReactNode) => (
     <>
       <dt className="text-muted">{k}</dt>

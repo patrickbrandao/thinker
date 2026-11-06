@@ -16,6 +16,7 @@ import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
 import { Badge, Button, Field, cx } from './ui.js';
+import type { FormLayout } from './TabbedWindow.js';
 
 export const LOCAL_SERVER_TYPE_NAMES: Record<LocalServerType, string> = {
   ollama: 'Ollama',
@@ -36,6 +37,8 @@ interface Props {
   onCancel: () => void;
   /** Inside a window whose title already names the server: no title row. */
   embedded?: boolean;
+  /** Lay the form out as window tabs (server, models) with its actions in a footer. */
+  layout?: FormLayout;
 }
 
 interface FormState {
@@ -280,8 +283,8 @@ export default function LocalServerForm(props: Props) {
       })
     : null;
 
-  return (
-    <div className="flex flex-col gap-4">
+  const header = (
+    <>
       {props.embedded ? (
         <div className="text-xs text-muted">{defaultsHint}</div>
       ) : (
@@ -299,7 +302,10 @@ export default function LocalServerForm(props: Props) {
           </div>
         </div>
       )}
-
+    </>
+  );
+  const serverSection = (
+    <div className="flex flex-col gap-4">
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -445,9 +451,17 @@ export default function LocalServerForm(props: Props) {
           </span>
         </div>
       ) : null}
-
+    </div>
+  );
+  const modelsSection = (
+    <>
       {listed.length > 0 ? (
-        <div className="flex max-h-60 flex-col overflow-y-auto border-t border-line">
+        <div
+          className={cx(
+            'flex flex-col border-t border-line',
+            !props.layout && 'max-h-60 overflow-y-auto',
+          )}
+        >
           {listed.map((m) => {
             const on = selected.has(m.model_name);
             return (
@@ -495,31 +509,64 @@ export default function LocalServerForm(props: Props) {
           {t('providerSetup.local.noModelsLoaded', { url: probe.base_url, name: typeName })}
         </div>
       ) : null}
-
-      <div className="flex items-center justify-end gap-3">
-        {isEdit ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="mr-auto"
-            busy={deleting}
-            onClick={() => void remove()}
-          >
-            {t('providerSetup.localServer.remove')}
-          </Button>
-        ) : null}
-        <Button size="sm" variant="ghost" onClick={props.onCancel}>
-          {t('common.cancel')}
-        </Button>
+    </>
+  );
+  const actions = (
+    <div className="flex w-full items-center justify-end gap-3">
+      {isEdit ? (
         <Button
           size="sm"
-          busy={saving}
-          disabled={selected.size === 0 || probing || (!isEdit && !probe)}
-          onClick={() => void save()}
+          variant="ghost"
+          className="mr-auto"
+          busy={deleting}
+          onClick={() => void remove()}
         >
-          {isEdit ? t('common.saveChanges') : t('providerSetup.local.connectModels', selected.size)}
+          {t('providerSetup.localServer.remove')}
         </Button>
-      </div>
+      ) : null}
+      <Button size="sm" variant="ghost" onClick={props.onCancel}>
+        {t('common.cancel')}
+      </Button>
+      <Button
+        size="sm"
+        busy={saving}
+        disabled={selected.size === 0 || probing || (!isEdit && !probe)}
+        onClick={() => void save()}
+      >
+        {isEdit ? t('common.saveChanges') : t('providerSetup.local.connectModels', selected.size)}
+      </Button>
+    </div>
+  );
+
+  if (props.layout) {
+    return props.layout({
+      sections: [
+        {
+          key: 'server',
+          label: t('providers.detail.manageTab.server'),
+          content: (
+            <div className="flex flex-col gap-4">
+              {header}
+              {serverSection}
+            </div>
+          ),
+        },
+        {
+          key: 'models',
+          label: t('providers.detail.manageTab.models'),
+          content: modelsSection,
+        },
+      ],
+      actions,
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {header}
+      {serverSection}
+      {modelsSection}
+      {actions}
     </div>
   );
 }

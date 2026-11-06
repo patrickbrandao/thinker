@@ -49,15 +49,18 @@ The CLI uses that gateway for later commands. You can select another gateway wit
 
 ## Useful commands
 
-| Task                           | Command                                          |
-| ------------------------------ | ------------------------------------------------ |
-| Check your connection          | `thinker doctor`                                 |
-| List available agent platforms | `thinker agent platforms`                        |
-| List connectable providers     | `thinker provider catalog`                       |
-| Review an agent's routing      | `thinker routing status my-app`                  |
-| Read or set model params       | `thinker routing params get my-app`              |
-| Read recent requests           | `thinker requests get --agent my-app --range 7d` |
-| See all commands and options   | `thinker --help`                                 |
+| Task                             | Command                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| Check your connection            | `thinker doctor`                                                                 |
+| List available agent platforms   | `thinker agent platforms`                                                        |
+| List connectable providers       | `thinker provider catalog`                                                       |
+| Review an agent's routing        | `thinker routing status my-app`                                                  |
+| Read or set model params         | `thinker routing params get my-app`                                              |
+| Read recent requests             | `thinker requests get --agent my-app --range 7d`                                 |
+| Add an LM Studio/Ollama server   | `thinker provider local add --type lmstudio --name lab --host 10.0.0.5`          |
+| Manage triggers, proxies, limits | `thinker trigger list`, `thinker proxy server list`, `thinker limit list my-app` |
+| Manage workspaces and users      | `thinker org list`, `thinker user list`                                          |
+| See all commands and options     | `thinker --help`                                                                 |
 
 Most commands write JSON to stdout for scripts and coding agents. `thinker agent env` and `thinker skill show` write text. `thinker routing test` sends a real provider request, which may incur provider charges. Destructive commands require `--yes`.
 

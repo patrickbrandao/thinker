@@ -78,6 +78,20 @@ const ptBR: Catalog<typeof en> = {
     listView: 'Visualização em lista',
   },
   detail: {
+    tabActivity: 'Atividade',
+    tabModels: 'Modelos',
+    manageTab: {
+      general: 'Geral',
+      streaming: 'Streaming',
+      credential: 'Credencial',
+      proxy: 'Proxy de saída',
+      server: 'Servidor',
+      models: 'Modelos',
+      keys: 'Chaves',
+    },
+    accountModelsEmpty:
+      'Esta conta ainda não tem modelos. Use Atualizar modelos para buscá-los no provedor.',
+    changesSaved: 'Alterações salvas',
     loadErrorTitle: 'Não foi possível carregar a conexão | Thinker',
     loadErrorHeading: 'Não foi possível carregar esta conexão',
     loadErrorBody: 'Algo deu errado ao carregar esta conexão. Tente de novo.',

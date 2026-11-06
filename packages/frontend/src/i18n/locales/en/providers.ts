@@ -74,6 +74,20 @@ export default {
     listView: 'List view',
   },
   detail: {
+    tabActivity: 'Activity',
+    tabModels: 'Models',
+    manageTab: {
+      general: 'General',
+      streaming: 'Streaming',
+      credential: 'Credential',
+      proxy: 'Outbound proxy',
+      server: 'Server',
+      models: 'Models',
+      keys: 'Keys',
+    },
+    accountModelsEmpty:
+      'This account has no models yet. Use Refresh models to fetch them from the provider.',
+    changesSaved: 'Changes saved',
     loadErrorTitle: "Couldn't load connection | Thinker",
     loadErrorHeading: "Couldn't load this connection",
     loadErrorBody: 'Something went wrong loading this connection. Please try again.',

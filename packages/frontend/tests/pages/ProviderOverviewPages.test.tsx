@@ -16,6 +16,7 @@ const apiMocks = vi.hoisted(() => ({
   disconnectConnection: vi.fn(),
   renameConnection: vi.fn(),
   refreshConnectionModels: vi.fn(),
+  getProviderModels: vi.fn(),
   fetchMutate: vi.fn(),
   getOverview: vi.fn(),
   getRecentRequests: vi.fn(),
@@ -64,6 +65,10 @@ vi.mock('../../src/services/api/routing.js', () => ({
   disconnectConnection: (...args: unknown[]) => apiMocks.disconnectConnection(...args),
   renameConnection: (...args: unknown[]) => apiMocks.renameConnection(...args),
   refreshConnectionModels: (...args: unknown[]) => apiMocks.refreshConnectionModels(...args),
+}));
+
+vi.mock('../../src/services/api/provider-models.js', () => ({
+  getProviderModels: (...args: unknown[]) => apiMocks.getProviderModels(...args),
 }));
 
 vi.mock('../../src/services/api/analytics.js', () => ({
@@ -733,6 +738,39 @@ beforeEach(() => {
   apiMocks.disconnectConnection.mockResolvedValue({ ok: true, notifications: [] });
   apiMocks.renameConnection.mockResolvedValue(undefined);
   apiMocks.refreshConnectionModels.mockResolvedValue({ ok: true });
+  apiMocks.getProviderModels.mockResolvedValue({
+    models: [
+      {
+        key: 'openai/gpt-5',
+        id: 'gpt-5',
+        display_name: 'GPT-5 test',
+        provider: 'openai',
+        provider_name: 'OpenAI',
+        context_window: 400000,
+        capability_reasoning: true,
+        capability_code: true,
+        capabilities: [],
+        input_modalities: ['text'],
+        output_modalities: ['text'],
+        supported_endpoints: [],
+        long_context_pricing: null,
+        accounts: [
+          {
+            connection_id: 'conn-openai',
+            label: 'Default',
+            auth_type: 'api_key',
+            kind: 'api_key',
+            is_active: true,
+            input_price_per_token: 0.000001,
+            output_price_per_token: 0.000002,
+            cache_read_price_per_token: null,
+            cache_write_price_per_token: null,
+            models_fetched_at: null,
+          },
+        ],
+      },
+    ],
+  });
   apiMocks.fetchMutate.mockResolvedValue({});
   apiMocks.getOverview.mockResolvedValue(overviewResponse);
   apiMocks.getRecentRequests.mockResolvedValue({ items: overviewResponse.recent_activity });
@@ -974,11 +1012,11 @@ describe('ConnectionDetail (analytics)', () => {
     // BYOK connection → cost columns present
     expect(screen.getByText('Active')).toBeDefined();
 
-    // Manage opens an inline modal (not the ProviderSelectModal).
+    // Manage opens the settings window (not the ProviderSelectModal).
     fireEvent.click(screen.getByText('Manage'));
     expect(screen.getByText('Connection name')).toBeDefined();
-    // Close the inline manage modal via the Done button.
-    fireEvent.click(screen.getByText('Done'));
+    // Close the window via its Cancel button.
+    fireEvent.click(screen.getByText('Cancel'));
     await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
 
     // Requests, models and harnesses each render a scrollable data table.
@@ -1143,9 +1181,10 @@ describe('ConnectionDetail (analytics)', () => {
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByText('Manage'));
-    // The inline manage modal shows connection name, models, and disconnect.
+    // The settings window opens on its General tab, with the connection name.
     expect(screen.getByText('Connection name')).toBeDefined();
-    fireEvent.click(screen.getByText('Done'));
+    expect(screen.getByRole('tab', { name: 'Streaming' })).toBeDefined();
+    fireEvent.click(screen.getByText('Cancel'));
   });
 
   it('renders inactive custom connection with reactivation copy', async () => {
@@ -1424,7 +1463,7 @@ describe('ConnectionDetail (analytics)', () => {
     // Manage still opens the inline modal even when harness list fails.
     fireEvent.click(screen.getByText('Manage'));
     expect(screen.getByText('Connection name')).toBeDefined();
-    fireEvent.click(screen.getByText('Done'));
+    fireEvent.click(screen.getByText('Cancel'));
   });
 
   it('swallows storage failures across chart and filter persistence', async () => {
@@ -1455,6 +1494,12 @@ describe('ConnectionDetail (analytics)', () => {
   });
 
   // Helper: open the manage modal and return the rename input.
+  const openModelsTab = async () => {
+    await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+    await screen.findByText('GPT-5 test');
+  };
+
   const openManageModal = async () => {
     await waitFor(() => expect(screen.getAllByText('Default').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByText('Manage'));
@@ -1466,7 +1511,7 @@ describe('ConnectionDetail (analytics)', () => {
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Save changes'));
 
     await waitFor(() =>
       expect(apiMocks.renameConnection).toHaveBeenCalledWith(
@@ -1476,7 +1521,7 @@ describe('ConnectionDetail (analytics)', () => {
         'api_key',
       ),
     );
-    expect(toastMock.success).toHaveBeenCalledWith('Connection renamed');
+    expect(toastMock.success).toHaveBeenCalledWith('Changes saved');
     // Modal closes on success.
     await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
     // Detail is refetched (initial load + refetch).
@@ -1489,7 +1534,7 @@ describe('ConnectionDetail (analytics)', () => {
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Save changes'));
 
     // The thrown message surfaces inline (line 938 renders renameError()).
     await waitFor(() => expect(screen.getByText('rename boom')).toBeDefined());
@@ -1504,7 +1549,7 @@ describe('ConnectionDetail (analytics)', () => {
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Save changes'));
 
     await waitFor(() => expect(screen.getByText('Failed to rename')).toBeDefined());
   });
@@ -1515,21 +1560,20 @@ describe('ConnectionDetail (analytics)', () => {
 
     // Whitespace-only trims to empty → validation error, no API call.
     fireEvent.input(input, { target: { value: '   ' } });
-    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Save changes'));
 
     await waitFor(() => expect(screen.getByText('Name cannot be empty')).toBeDefined());
     expect(apiMocks.renameConnection).not.toHaveBeenCalled();
   });
 
-  it('closes the modal without an API call when the name is unchanged', async () => {
+  it('keeps Save disabled and makes no API call while nothing changed', async () => {
     renderPage(<ConnectionDetail />);
     const input = await openManageModal();
 
-    // The Save button is disabled when the value equals the label, so submit via
-    // Enter (line 924) to exercise the unchanged-name early return (lines 397-399).
+    expect((screen.getByText('Save changes') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
+    expect(screen.getByText('Connection name')).toBeDefined();
     expect(apiMocks.renameConnection).not.toHaveBeenCalled();
   });
 
@@ -1539,7 +1583,7 @@ describe('ConnectionDetail (analytics)', () => {
     const input = await openManageModal();
 
     fireEvent.input(input, { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByText('Save'));
+    fireEvent.click(screen.getByText('Save changes'));
 
     await waitFor(() =>
       expect(apiMocks.renameConnection).toHaveBeenCalledWith(
@@ -1549,7 +1593,7 @@ describe('ConnectionDetail (analytics)', () => {
         'api_key',
       ),
     );
-    expect(toastMock.success).toHaveBeenCalledWith('Connection renamed');
+    expect(toastMock.success).toHaveBeenCalledWith('Changes saved');
   });
 
   it('disconnects a connection and navigates back on success', async () => {
@@ -1566,7 +1610,7 @@ describe('ConnectionDetail (analytics)', () => {
     expect(routerState.navigate).toHaveBeenCalledWith('/providers/usage-based');
   });
 
-  it('disables the Disconnect and Done buttons and shows progress while in flight', async () => {
+  it('disables the Disconnect and Cancel buttons and shows progress while in flight', async () => {
     let resolveDisconnect!: (value: unknown) => void;
     apiMocks.disconnectConnection.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -1583,7 +1627,7 @@ describe('ConnectionDetail (analytics)', () => {
       screen.getByText('Disconnecting...'),
     )) as HTMLButtonElement;
     expect(inFlightBtn.disabled).toBe(true);
-    expect((screen.getByText('Done') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText('Cancel') as HTMLButtonElement).disabled).toBe(true);
 
     resolveDisconnect({ notifications: [] });
     await waitFor(() =>
@@ -1628,19 +1672,19 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('refreshes models and refetches on success', async () => {
     renderPage(<ConnectionDetail />);
-    await openManageModal();
+    await openModelsTab();
 
     fireEvent.click(screen.getByText('Refresh models'));
 
     await waitFor(() => expect(apiMocks.refreshConnectionModels).toHaveBeenCalledWith());
     expect(toastMock.success).toHaveBeenCalledWith('Models refreshed');
-    expect(apiMocks.getConnectionDetail.mock.calls.length).toBeGreaterThan(1);
+    await waitFor(() => expect(apiMocks.getConnectionDetail.mock.calls.length).toBeGreaterThan(1));
   });
 
   it('shows an error toast when refreshing models fails', async () => {
     apiMocks.refreshConnectionModels.mockRejectedValueOnce(new Error('refresh boom'));
     renderPage(<ConnectionDetail />);
-    await openManageModal();
+    await openModelsTab();
 
     fireEvent.click(screen.getByText('Refresh models'));
 
@@ -1650,7 +1694,7 @@ describe('ConnectionDetail (analytics)', () => {
   it('refreshes models when the workspace has no harness', async () => {
     apiMocks.getAgents.mockResolvedValue({ agents: [] });
     renderPage(<ConnectionDetail />);
-    await openManageModal();
+    await openModelsTab();
 
     fireEvent.click(screen.getByText('Refresh models'));
 
@@ -1675,13 +1719,14 @@ describe('ConnectionDetail (analytics)', () => {
     expect(screen.getByText('Disconnect')).toBeDefined();
   });
 
-  it('closes the manage modal when Escape is pressed on the overlay', async () => {
+  it('closes the manage window when Escape is pressed', async () => {
     renderPage(<ConnectionDetail />);
     await openManageModal();
     expect(screen.getByText('Connection name')).toBeDefined();
+    // A floating window, not a modal: no backdrop over the page.
+    expect(document.querySelector('.overlay')).toBeNull();
 
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
   });
@@ -1752,7 +1797,7 @@ describe('ConnectionDetail (analytics)', () => {
 
     expect(screen.queryByRole('alertdialog', { name: 'Delete usage history?' })).toBeNull();
     expect(screen.getByText('Delete')).toBeDefined();
-    fireEvent.click(screen.getByText('Close'));
+    fireEvent.click(screen.getByText('Cancel'));
 
     await waitFor(() => expect(screen.queryByText('Connection name')).toBeNull());
     expect(apiMocks.disconnectConnection).not.toHaveBeenCalled();
