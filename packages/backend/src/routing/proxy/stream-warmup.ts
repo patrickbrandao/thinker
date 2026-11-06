@@ -8,6 +8,7 @@
  */
 
 import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
+import { scanSseStart } from './upstream-error-classifier';
 
 export const DEFAULT_STREAM_WARMUP_MS = 15_000;
 /** Cold local models (Ollama, LM Studio, llama.cpp) can take 30-60s to load (#128). */
@@ -168,4 +169,218 @@ export async function peekStream(
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, reason: 'error', message };
   }
+}
+
+/* ── Error peek (report from NOC Norte, P5) ── */
+
+export type StreamErrorPeekMode = 'all' | 'context' | 'off';
+
+export function parseStreamErrorPeekMode(
+  raw = process.env.THINKER_STREAM_ERROR_PEEK,
+): StreamErrorPeekMode {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (/^(0|false|off|no)$/.test(value)) return 'off';
+  return value === 'context' ? 'context' : 'all';
+}
+
+function boundedInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return fallback;
+  const n = Number(raw.trim());
+  return n >= min && n <= max ? n : fallback;
+}
+
+export const STREAM_ERROR_PEEK_MODE = parseStreamErrorPeekMode();
+/** Longest wait for the first content event after the first byte. */
+export const STREAM_PEEK_MS = boundedInt(process.env.THINKER_STREAM_PEEK_MS, 20_000, 0, 600_000);
+/** Most bytes held while waiting for the first content event. */
+export const STREAM_PEEK_MAX_BYTES = boundedInt(
+  process.env.THINKER_STREAM_PEEK_MAX_BYTES,
+  262_144,
+  1_024,
+  8 * 1024 * 1024,
+);
+
+export interface StreamStartOptions {
+  /** First-byte wait (the warm-up). */
+  warmupMs: number;
+  signal?: AbortSignal;
+  mode?: StreamErrorPeekMode;
+  peekMs?: number;
+  maxBytes?: number;
+  /**
+   * Upstream content type. Only SSE is scanned: a binary event stream
+   * (Bedrock) or NDJSON would never show an SSE boundary and be held for the
+   * whole peek window. Omitted: scanned.
+   */
+  contentType?: string | null;
+}
+
+export interface StreamStartError {
+  ok: false;
+  reason: 'upstream_error';
+  message: string;
+  status: number;
+  /** The error event's JSON, for the synthetic error response. */
+  body: string;
+  contextLength: boolean;
+}
+
+export type StreamStartResult = WarmupResult | StreamStartError;
+
+/**
+ * Warm-up plus error peek: after the first byte arrives (within `warmupMs`),
+ * keep reading while the stream holds only SSE comments, keepalives and
+ * preamble events, until the first content event (replay everything, byte
+ * for byte), an error event (report it, so the hop fails before the client
+ * sees a byte), the end of the stream, `peekMs` or `maxBytes` (pass through as
+ * read). An error after the first content still reaches the client as SSE.
+ */
+export async function peekStreamStart(
+  source: ReadableStream<Uint8Array>,
+  opts: StreamStartOptions,
+): Promise<StreamStartResult> {
+  const mode = opts.mode ?? STREAM_ERROR_PEEK_MODE;
+  const first = await peekStream(source, opts.warmupMs, opts.signal);
+  if (!first.ok || mode === 'off') return first;
+  if (opts.contentType != null && !opts.contentType.toLowerCase().includes('event-stream')) {
+    return first;
+  }
+
+  const reader = first.stream.getReader();
+  const decoder = new TextDecoder();
+  const chunks: Uint8Array[] = [];
+  let text = '';
+  let bytes = 0;
+  let pending: Promise<ReadableStreamReadResult<Uint8Array>> | null = null;
+  let done = false;
+  let readError: unknown = null;
+  const peekMs = opts.peekMs ?? STREAM_PEEK_MS;
+  const maxBytes = opts.maxBytes ?? STREAM_PEEK_MAX_BYTES;
+  const deadline = Date.now() + peekMs;
+
+  const passThrough = (): WarmupSuccess => ({
+    ok: true,
+    stream: replayStream(chunks, reader, pending, done, readError),
+  });
+
+  for (;;) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0 || bytes >= maxBytes) return passThrough();
+    const read = pending ?? reader.read();
+    pending = read;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    let outcome: ReadableStreamReadResult<Uint8Array> | 'timeout' | 'aborted';
+    try {
+      outcome = await Promise.race([
+        read,
+        new Promise<'timeout'>((resolve) => {
+          timer = setTimeout(() => resolve('timeout'), remaining);
+        }),
+        new Promise<'aborted'>((resolve) => {
+          if (!opts.signal) return;
+          if (opts.signal.aborted) return resolve('aborted');
+          onAbort = () => resolve('aborted');
+          opts.signal.addEventListener('abort', onAbort, { once: true });
+        }),
+      ]);
+    } catch (err) {
+      pending = null;
+      readError = err;
+      return passThrough();
+    } finally {
+      clearTimeout(timer);
+      if (onAbort) opts.signal?.removeEventListener('abort', onAbort);
+    }
+    if (outcome === 'aborted') {
+      reader.cancel().catch(() => {});
+      return { ok: false, reason: 'aborted', message: 'Client disconnected during warm-up' };
+    }
+    if (outcome === 'timeout') return passThrough();
+    pending = null;
+    if (outcome.done) {
+      done = true;
+      return passThrough();
+    }
+    const value = outcome.value;
+    if (!value || value.length === 0) continue;
+    chunks.push(value);
+    bytes += value.length;
+    text += decoder.decode(value, { stream: true });
+    const verdict = scanSseStart(text);
+    if (verdict.state === 'content') return passThrough();
+    if (verdict.state === 'error') {
+      if (mode === 'context' && !verdict.contextLength) return passThrough();
+      reader.cancel().catch(() => {});
+      return {
+        ok: false,
+        reason: 'upstream_error',
+        message: `Upstream error before the first content (status ${verdict.status})`,
+        status: verdict.status,
+        body: verdict.body,
+        contextLength: verdict.contextLength,
+      };
+    }
+  }
+}
+
+/** Everything read so far, then the rest of the upstream stream. */
+function replayStream(
+  chunks: readonly Uint8Array[],
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  pendingRead: Promise<ReadableStreamReadResult<Uint8Array>> | null,
+  ended: boolean,
+  readError: unknown,
+): ReadableStream<Uint8Array> {
+  let index = 0;
+  let pending = pendingRead;
+  let done = ended;
+  const release = () => {
+    try {
+      reader.releaseLock();
+    } catch {
+      // already released
+    }
+  };
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (index < chunks.length) {
+        controller.enqueue(chunks[index++]);
+        return;
+      }
+      if (readError) {
+        release();
+        controller.error(readError);
+        return;
+      }
+      if (done) {
+        release();
+        controller.close();
+        return;
+      }
+      try {
+        for (;;) {
+          const next = pending ?? reader.read();
+          pending = null;
+          const { done: nextDone, value } = await next;
+          if (nextDone) {
+            done = true;
+            release();
+            controller.close();
+            return;
+          }
+          if (value && value.length > 0) {
+            controller.enqueue(value);
+            return;
+          }
+        }
+      } catch (err) {
+        release();
+        controller.error(err);
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason).catch(() => {});
+    },
+  });
 }

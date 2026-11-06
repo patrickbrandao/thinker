@@ -63,6 +63,18 @@ interface ForwardProviderOptions {
   paramMergeContext?: ParamMergeContext;
   /** The chain route this attempt serves; picks its params scope. */
   paramsRoute?: ModelRoute | null;
+  /**
+   * First-byte wait of a streaming hop (streamWarmupMsFor). Set: the stream
+   * is warmed up and its start peeked for an error event before the hop is
+   * committed (stream-warmup.ts peekStreamStart).
+   */
+  warmupMs?: number;
+  /**
+   * Whether the chain still has a route after this one. With the default
+   * `last-route` retry mode, a transient 5xx is retried on the same route
+   * only when nothing else is left to try.
+   */
+  hasNextRoute?: boolean;
   tenantProviderId?: string | null;
   startProviderAttempt?: StartProviderAttempt;
 }
@@ -85,7 +97,19 @@ import { CopilotTokenService } from './copilot-token.service';
 import { ReasoningContentCache } from './reasoning-content-cache';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
-import { peekStream, streamWarmupMsFor } from './stream-warmup';
+import { peekStreamStart, streamWarmupMsFor } from './stream-warmup';
+import {
+  EMBEDDED_UPSTREAM_ERROR_HEADER,
+  embeddedErrorResponse,
+  embeddedUpstreamError,
+  isContextLengthBody,
+  isEmbeddedErrorCheckEnabled,
+} from './upstream-error-classifier';
+import {
+  parseUpstreamRetryPolicy,
+  waitUnlessAborted,
+  type UpstreamRetryPolicy,
+} from './upstream-retry';
 import {
   buildEmptyResponseError,
   isEmptyResponseFallbackEnabled,
@@ -360,48 +384,42 @@ export class ProxyFallbackService {
       );
 
       // A hop's stream is warmed up exactly like the primary's: a 200 that
-      // never sends a byte becomes a failed hop, so the next route still gets
-      // its turn instead of the client receiving a dead stream.
-      const forward = await this.warmUpStreamBody(
-        await this.tryForwardToProvider({
-          provider,
-          apiKey: credentials.apiKey,
-          model,
-          body,
-          resolveChatBody,
-          stream,
-          sessionKey,
-          reasoningCacheKey,
-          providerCacheKey,
-          signal,
-          agentId,
-          tenantId,
-          rawApiKey: credentials.rawApiKey,
-          providerKeyLabel,
-          authType,
-          apiMode,
-          resourceUrl: credentials.resourceUrl,
-          providerRegion: credentials.providerRegion,
-          providerBaseUrl: credentials.providerBaseUrl,
-          signatureLookup,
-          thinkingLookup,
-          clientAnthropicBeta,
-          paramMergeContext,
-          paramsRoute: route,
-          tenantProviderId,
-          startProviderAttempt,
+      // never sends a byte, or whose first event is an error, becomes a failed
+      // hop, so the next route still gets its turn instead of the client
+      // receiving a dead stream.
+      const forward = await this.tryForwardToProvider({
+        provider,
+        apiKey: credentials.apiKey,
+        model,
+        body,
+        resolveChatBody,
+        stream,
+        sessionKey,
+        reasoningCacheKey,
+        providerCacheKey,
+        signal,
+        agentId,
+        tenantId,
+        rawApiKey: credentials.rawApiKey,
+        providerKeyLabel,
+        authType,
+        apiMode,
+        resourceUrl: credentials.resourceUrl,
+        providerRegion: credentials.providerRegion,
+        providerBaseUrl: credentials.providerBaseUrl,
+        signatureLookup,
+        thinkingLookup,
+        clientAnthropicBeta,
+        paramMergeContext,
+        paramsRoute: route,
+        tenantProviderId,
+        startProviderAttempt,
+        warmupMs: streamWarmupMsFor(provider, {
+          connectionMs: credentials.streamWarmupMs,
+          local: authType === 'local',
         }),
-        {
-          stream,
-          provider,
-          model,
-          warmupMs: streamWarmupMsFor(provider, {
-            connectionMs: credentials.streamWarmupMs,
-            local: authType === 'local',
-          }),
-          signal,
-        },
-      );
+        hasNextRoute: i < fallbackModels.length - 1,
+      });
       // A custom provider's key pool may have rotated to another key.
       if (forward.servedByKey) {
         tenantProviderId = forward.servedByKey.tenantProviderId;
@@ -452,48 +470,6 @@ export class ProxyFallbackService {
     return { success: null, failures };
   }
 
-  /**
-   * Streaming counterpart of {@link bufferNonStreamBody} for fallback hops.
-   * Peek at the first chunk before the hop is committed; on a stall, error or
-   * empty stream, return a synthetic 502 so the chain treats it as a failed
-   * hop. The primary gets the same warm-up in ProxyService.proxyRequest.
-   */
-  private async warmUpStreamBody(
-    forward: ForwardResult,
-    opts: {
-      stream: boolean;
-      provider: string;
-      model: string;
-      warmupMs: number;
-      signal?: AbortSignal;
-    },
-  ): Promise<ForwardResult> {
-    const { response, attempt } = forward;
-    if (!opts.stream || !response.ok || !response.body) return forward;
-    const warmup = await peekStream(response.body, opts.warmupMs, opts.signal);
-    if (warmup.ok) {
-      return {
-        ...forward,
-        response: new Response(warmup.stream, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-        }),
-      };
-    }
-    if (attempt) attempt.completedAtMs = Date.now();
-    this.logger.warn(
-      `Fallback stream warmup failed: provider=${opts.provider} model=${opts.model} reason=${warmup.reason} message=${warmup.message}`,
-    );
-    return {
-      ...forward,
-      response: new Response(
-        JSON.stringify({ error: { message: `Stream warmup failed: ${warmup.message}` } }),
-        { status: 502, headers: { 'content-type': 'application/json' } },
-      ),
-    };
-  }
-
   private routeCredentialDeps(): RouteCredentialDeps {
     return {
       providerKeyService: this.providerKeyService,
@@ -518,6 +494,45 @@ export class ProxyFallbackService {
    * a provider call, unless no other key is left to try.
    */
   async tryForwardToProvider(opts: ForwardProviderOptions): Promise<ForwardResult> {
+    let result = await this.tryKeyPool(opts);
+    // Read per request: cheap, and tests can vary the environment.
+    const policy = parseUpstreamRetryPolicy();
+    for (let retry = 1; retry <= policy.retries; retry++) {
+      if (!(await this.shouldRetrySameRoute(result, opts, policy))) break;
+      this.logger.warn(
+        `Upstream retry ${retry}/${policy.retries}: provider=${opts.provider} model=${opts.model} status=${result.response.status}; same route in ${policy.delayMs}ms`,
+      );
+      if (!(await waitUnlessAborted(policy.delayMs, opts.signal))) break;
+      await this.supersedeFailedAttempt(result);
+      result = await this.tryKeyPool(opts);
+    }
+    return result;
+  }
+
+  /**
+   * Same-route retry of a transient upstream failure (report from NOC
+   * Norte, P4): only the configured statuses, never a context-window
+   * overflow (the same route refuses again), and in `last-route` mode only
+   * when no other route is left.
+   */
+  private async shouldRetrySameRoute(
+    result: ForwardResult,
+    opts: ForwardProviderOptions,
+    policy: UpstreamRetryPolicy,
+  ): Promise<boolean> {
+    if (policy.mode === 'off' || result.response.ok) return false;
+    if (!policy.statuses.has(result.response.status)) return false;
+    if (policy.mode === 'last-route' && opts.hasNextRoute) return false;
+    if (opts.signal?.aborted) return false;
+    const text = await result.response
+      .clone()
+      .text()
+      .catch(() => '');
+    return !isContextLengthBody(text);
+  }
+
+  /** One hop over the connection's key pool (see tryForwardToProvider). */
+  private async tryKeyPool(opts: ForwardProviderOptions): Promise<ForwardResult> {
     const pool = await this.keyPoolCandidates(opts);
     for (let i = 0; i < pool.length; i++) {
       const candidate = pool[i];
@@ -638,7 +653,14 @@ export class ProxyFallbackService {
       if (result.response.status === 401) {
         this.credentialRejections.reject(this.credentialRef(opts, apiKey));
       }
-      return await this.bufferNonStreamBody(result, opts);
+      const buffered = await this.bufferNonStreamBody(result, opts);
+      const peeked = await this.peekStreamBody(buffered, opts);
+      // An error rebuilt from a 200 body or stream start counts like a real
+      // one: a 429 starts the same cooldown.
+      if (peeked.response.headers.get(EMBEDDED_UPSTREAM_ERROR_HEADER)) {
+        await this.recordRateLimitCooldown(opts, peeked.response);
+      }
+      return peeked;
     } catch (error) {
       if (opts.signal?.aborted) throw error;
       if (!isTransportError(error)) throw error;
@@ -658,6 +680,60 @@ export class ProxyFallbackService {
         isChatGpt: false,
       };
     }
+  }
+
+  /**
+   * Warm up a streaming hop before it is committed: a stall, an empty stream
+   * or an error event before the first content becomes a failed hop (502, or
+   * the error's own status) while nothing has reached the client yet.
+   */
+  private async peekStreamBody(
+    forward: ForwardResult,
+    opts: ForwardProviderOptions,
+  ): Promise<ForwardResult> {
+    const { response, attempt } = forward;
+    if (!opts.stream || opts.warmupMs === undefined || !response.ok || !response.body) {
+      return forward;
+    }
+    const peek = await peekStreamStart(response.body, {
+      warmupMs: opts.warmupMs,
+      signal: opts.signal,
+      contentType: response.headers.get('content-type'),
+    });
+    if (peek.ok) {
+      return {
+        ...forward,
+        response: new Response(peek.stream, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        }),
+      };
+    }
+    if (attempt) attempt.completedAtMs = Date.now();
+    if (peek.reason === 'upstream_error') {
+      this.logger.warn(
+        `Provider stream error before the first content: provider=${opts.provider} model=${opts.model} status=${peek.status}`,
+      );
+      return {
+        ...forward,
+        response: embeddedErrorResponse(
+          { status: peek.status, body: peek.body, contextLength: peek.contextLength },
+          undefined,
+        ),
+        providerCallStarted: true,
+      };
+    }
+    this.logger.warn(
+      `Stream warmup failed: provider=${opts.provider} model=${opts.model} reason=${peek.reason} message=${peek.message}`,
+    );
+    return {
+      ...forward,
+      response: new Response(
+        JSON.stringify({ error: { message: `Stream warmup failed: ${peek.message}` } }),
+        { status: 502, headers: { 'content-type': 'application/json' } },
+      ),
+    };
   }
 
   /**
@@ -686,6 +762,19 @@ export class ProxyFallbackService {
           `Provider empty response: provider=${opts.provider} model=${opts.model} (no content, zero tokens)`,
         );
         return { ...forward, response: buildEmptyResponseError(), providerCallStarted: true };
+      }
+      // A 200 whose body is only `{"error": ...}` (OpenRouter's provider
+      // failures): the real status, so fallback and retry see it.
+      const embedded = isEmbeddedErrorCheckEnabled() ? embeddedUpstreamError(body) : null;
+      if (embedded) {
+        this.logger.warn(
+          `Provider error inside a 200: provider=${opts.provider} model=${opts.model} status=${embedded.status}`,
+        );
+        return {
+          ...forward,
+          response: embeddedErrorResponse(embedded, response.headers),
+          providerCallStarted: true,
+        };
       }
       return {
         ...forward,

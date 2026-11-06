@@ -17,6 +17,9 @@ import { AgentModelParamsService } from '../../routing-core/agent-model-params.s
 import { ProviderParamSpecService } from '../../routing-core/provider-param-spec.service';
 import type { StartProviderAttempt } from '../proxy-types';
 
+// These specs pin single-attempt behaviour; the same-route retry has its own spec.
+process.env.THINKER_UPSTREAM_RETRY_MODE = 'off';
+
 /**
  * Status-code-driven fallback chain behavior for tryFallbacks().
  *

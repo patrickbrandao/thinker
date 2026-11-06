@@ -16,6 +16,9 @@ import { ModelPricingCacheService } from '../../../model-prices/model-pricing-ca
 import { AgentModelParamsService } from '../../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../../routing-core/provider-param-spec.service';
 
+// These specs pin single-attempt behaviour; the same-route retry has its own spec.
+process.env.THINKER_UPSTREAM_RETRY_MODE = 'off';
+
 /**
  * Locks the route-aware behavior of ProxyFallbackService.tryFallbacks:
  *   - When the caller passes structured `fallbackRoutes`, the loop uses

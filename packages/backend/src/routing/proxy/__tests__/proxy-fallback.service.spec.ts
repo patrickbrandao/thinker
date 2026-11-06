@@ -27,6 +27,9 @@ jest.mock('../stream-warmup', () => ({
   streamWarmupMsFor: () => 50,
 }));
 
+// These specs pin single-attempt behaviour; the same-route retry has its own spec.
+process.env.THINKER_UPSTREAM_RETRY_MODE = 'off';
+
 const specCatalog: ProviderParamSpecCatalog = [
   {
     provider: 'deepseek',
@@ -718,6 +721,176 @@ describe('ProxyFallbackService', () => {
           sessionKey: 'sess-1',
         }),
       ).rejects.toThrow('boom');
+    });
+
+    describe('upstream errors disguised as success and same-route retry', () => {
+      const enc = new TextEncoder();
+      const sse = (...events: string[]) =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const e of events) controller.enqueue(enc.encode(e));
+            controller.close();
+          },
+        });
+      const forwardOpts = (overrides: Record<string, unknown> = {}) => ({
+        provider: 'OpenRouter',
+        apiKey: 'sk-test',
+        model: 'nvidia/nemotron',
+        body,
+        stream: false,
+        sessionKey: 'sess-1',
+        ...overrides,
+      });
+      const reply = (status: number, text = 'boom', headers: Record<string, string> = {}) => ({
+        response: new Response(text, { status, headers }),
+        isGoogle: false,
+        isAnthropic: false,
+        isChatGpt: false,
+      });
+      const withRetry = (mode: string, fn: () => Promise<void>) => async () => {
+        const saved = { ...process.env };
+        process.env.THINKER_UPSTREAM_RETRY_MODE = mode;
+        process.env.THINKER_UPSTREAM_RETRY_DELAY_MS = '0';
+        try {
+          await fn();
+        } finally {
+          process.env = saved;
+        }
+      };
+
+      it('turns a 200 carrying only an error into its real status', async () => {
+        providerClient.forward.mockResolvedValue(
+          reply(200, '{"error":{"code":503,"message":"overloaded"}}', {
+            'content-type': 'application/json',
+          }),
+        );
+        const result = await service.tryForwardToProvider(forwardOpts());
+        expect(result.response.status).toBe(503);
+        expect(result.response.headers.get('x-thinker-embedded-upstream-error')).toBe('1');
+        expect(await result.response.text()).toContain('overloaded');
+      });
+
+      it('keeps a 200 with choices untouched', async () => {
+        providerClient.forward.mockResolvedValue(
+          reply(200, '{"choices":[{"message":{"content":"hi"}}],"error":null}'),
+        );
+        const result = await service.tryForwardToProvider(forwardOpts());
+        expect(result.response.status).toBe(200);
+      });
+
+      it('fails a stream whose first event after keepalives is an error', async () => {
+        providerClient.forward.mockResolvedValue({
+          response: new Response(
+            sse(
+              ': OPENROUTER PROCESSING\n\n',
+              'data: {"error":{"code":502,"message":"upstream"}}\n\n',
+            ),
+            { status: 200, headers: { 'content-type': 'text/event-stream' } },
+          ),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: false,
+        });
+        const result = await service.tryForwardToProvider(
+          forwardOpts({ stream: true, warmupMs: 1000 }),
+        );
+        expect(result.response.status).toBe(502);
+        expect(await result.response.text()).toContain('upstream');
+      });
+
+      it('replays a healthy stream byte for byte', async () => {
+        const events = [': keepalive\n\n', 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n'];
+        providerClient.forward.mockResolvedValue({
+          response: new Response(sse(...events), {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: false,
+        });
+        const result = await service.tryForwardToProvider(
+          forwardOpts({ stream: true, warmupMs: 1000 }),
+        );
+        expect(result.response.status).toBe(200);
+        expect(await result.response.text()).toBe(events.join(''));
+      });
+
+      it(
+        'retries a 503 once on the last route, superseding the failed attempt',
+        withRetry('last-route', async () => {
+          const completeFailure = jest.fn().mockResolvedValue(undefined);
+          const startProviderAttempt = jest.fn(() => ({ completeFailure }) as never);
+          providerClient.forward
+            .mockResolvedValueOnce(reply(503))
+            .mockResolvedValueOnce(reply(200, '{"choices":[]}'));
+          const result = await service.tryForwardToProvider(
+            forwardOpts({ hasNextRoute: false, startProviderAttempt }),
+          );
+          expect(result.response.status).toBe(200);
+          expect(providerClient.forward).toHaveBeenCalledTimes(2);
+          expect(completeFailure).toHaveBeenCalledWith(
+            expect.objectContaining({ status: 503, superseded: true }),
+          );
+        }),
+      );
+
+      it(
+        'leaves the retry to the fallback chain when a route is left',
+        withRetry('last-route', async () => {
+          providerClient.forward.mockResolvedValue(reply(503));
+          const result = await service.tryForwardToProvider(forwardOpts({ hasNextRoute: true }));
+          expect(result.response.status).toBe(503);
+          expect(providerClient.forward).toHaveBeenCalledTimes(1);
+        }),
+      );
+
+      it(
+        'retries even with a route left in always mode',
+        withRetry('always', async () => {
+          providerClient.forward
+            .mockResolvedValueOnce(reply(502))
+            .mockResolvedValueOnce(reply(200, '{"choices":[]}'));
+          const result = await service.tryForwardToProvider(forwardOpts({ hasNextRoute: true }));
+          expect(result.response.status).toBe(200);
+        }),
+      );
+
+      it(
+        'never retries when off, on a 504, or on a context-window overflow',
+        withRetry('off', async () => {
+          providerClient.forward.mockResolvedValue(reply(503));
+          await service.tryForwardToProvider(forwardOpts());
+          expect(providerClient.forward).toHaveBeenCalledTimes(1);
+
+          process.env.THINKER_UPSTREAM_RETRY_MODE = 'last-route';
+          providerClient.forward.mockClear();
+          providerClient.forward.mockResolvedValue(reply(504));
+          await service.tryForwardToProvider(forwardOpts());
+          expect(providerClient.forward).toHaveBeenCalledTimes(1);
+
+          providerClient.forward.mockClear();
+          providerClient.forward.mockResolvedValue(
+            reply(502, '{"error":{"message":"maximum context length is 8192 tokens"}}'),
+          );
+          await service.tryForwardToProvider(forwardOpts());
+          expect(providerClient.forward).toHaveBeenCalledTimes(1);
+        }),
+      );
+
+      it(
+        'stops waiting and does not retry when the client hangs up during the delay',
+        withRetry('last-route', async () => {
+          process.env.THINKER_UPSTREAM_RETRY_DELAY_MS = '5000';
+          const controller = new AbortController();
+          providerClient.forward.mockResolvedValue(reply(503));
+          const pending = service.tryForwardToProvider(forwardOpts({ signal: controller.signal }));
+          setTimeout(() => controller.abort(), 10);
+          const result = await pending;
+          expect(result.response.status).toBe(503);
+          expect(providerClient.forward).toHaveBeenCalledTimes(1);
+        }),
+      );
     });
 
     describe('non-streaming body read', () => {

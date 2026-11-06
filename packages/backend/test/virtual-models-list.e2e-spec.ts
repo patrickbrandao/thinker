@@ -313,8 +313,8 @@ describe('virtual models in the list', () => {
       created: 0,
       owned_by: 'thinker',
     });
-    // Real models never carry context_length.
-    expect(entry(res.body, 'deepseek/deepseek-chat')).not.toHaveProperty('context_length');
+    // Real models publish their own window (ADR 0004 section 7, amendment).
+    expect(entry(res.body, 'deepseek/deepseek-chat')).toHaveProperty('context_length', 64000);
   });
 
   it('adds the Default chain to context_length with continue_on_default', async () => {

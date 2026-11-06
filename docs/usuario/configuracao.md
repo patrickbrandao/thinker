@@ -87,6 +87,14 @@ Cada servidor local guarda a própria configuração (host, porta, prefixo, chav
 | `STREAM_WARMUP_MS` | `15000` | Espera pelo primeiro trecho de uma resposta em streaming antes de tentar o fallback. |
 | `THINKER_LOCAL_STREAM_WARMUP_MS` | `60000` | A mesma espera para provedores locais (Ollama, LM Studio, llama.cpp), que demoram para carregar um modelo frio. Nunca fica abaixo de `STREAM_WARMUP_MS`. |
 | `THINKER_EMPTY_RESPONSE_FALLBACK` | `true` | Uma resposta 200 sem streaming, sem conteúdo e com zero tokens (comum em modelos gratuitos do OpenRouter) vira falha e aciona o fallback. `false` desliga. |
+| `THINKER_EMBEDDED_ERROR_CHECK` | `true` | Uma resposta 200 sem streaming cujo corpo só traz `error` (o OpenRouter devolve assim as falhas do provedor) vira o status real do erro, aciona o fallback e é registrada como falha. |
+| `THINKER_STREAM_ERROR_PEEK` | `all` | Em streaming, o que fazer com um erro que chega antes do primeiro conteúdo (depois de keepalives): `all` trata qualquer erro como falha da tentativa (fallback e nova tentativa), `context` só erro de janela de contexto, `off` repassa ao cliente. |
+| `THINKER_STREAM_PEEK_MS` | `20000` | Espera máxima pelo primeiro conteúdo depois do primeiro byte. Passado o limite, o stream segue para o cliente como está. |
+| `THINKER_STREAM_PEEK_MAX_BYTES` | `262144` | Bytes retidos no máximo enquanto espera o primeiro conteúdo. |
+| `THINKER_UPSTREAM_RETRY_MODE` | `last-route` | Nova tentativa na mesma rota quando o provedor devolve um erro transitório: `last-route` só quando não sobra rota de fallback, `always` sempre antes do fallback, `off` nunca. Erro de janela de contexto nunca é repetido. |
+| `THINKER_UPSTREAM_RETRIES` | `1` | Quantas novas tentativas na mesma rota (0 a 5; 0 desliga). |
+| `THINKER_UPSTREAM_RETRY_DELAY_MS` | `1000` | Espera antes de cada nova tentativa (0 a 60000). |
+| `THINKER_UPSTREAM_RETRY_STATUSES` | `500,502,503` | Status que contam como transitórios. O 504 fica fora de propósito: repetir um timeout dobra a espera. |
 | `STREAM_IDLE_TIMEOUT_MS` | `180000` | Silêncio máximo entre eventos de streaming antes de falhar a tentativa (HTTP 504). |
 | `CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS` | `60000` | Espera por texto ou saída de ferramenta úteis do ChatGPT Codex. |
 | `THINKER_CONCURRENCY_MAX` | `10` | Requisições simultâneas por tenant, por processo (erro M203). |
