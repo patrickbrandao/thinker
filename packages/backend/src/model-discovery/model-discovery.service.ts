@@ -15,7 +15,7 @@ import {
   type ProviderModelFetchOptions,
 } from './provider-model-fetcher.service';
 import { ProviderModelRegistryService } from './provider-model-registry.service';
-import { DiscoveredModel, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { DiscoveredModel, contextWindowFields } from './model-fetcher';
 import { decryptWithAny, getDecryptionSecrets } from '../common/utils/crypto.util';
 import { computeQualityScore } from '../database/quality-score.util';
 import { PricingSyncService } from '../database/pricing-sync.service';
@@ -650,7 +650,7 @@ export class ModelDiscoveryService {
           displayName: m.model_name,
           provider: cpKey,
           authType: customAuthTypes.get(cpKey) ?? 'api_key',
-          contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+          ...contextWindowFields(m.context_window),
           inputPricePerToken: inputPerToken,
           outputPricePerToken: outputPerToken,
           capabilityReasoning: m.capabilities?.includes('reasoning') === true,
@@ -783,8 +783,10 @@ export class ModelDiscoveryService {
           ...modelWithMetadataName,
           inputPricePerToken: mdEntry.inputPricePerToken,
           outputPricePerToken: mdEntry.outputPricePerToken,
-          contextWindow:
-            mdEntry.contextWindow ?? capabilityEntry.contextWindow ?? model.contextWindow,
+          ...catalogContextWindow(
+            modelWithMetadataName,
+            mdEntry.contextWindow ?? capabilityEntry.contextWindow,
+          ),
           displayName: capabilityEntry.name || mdEntry.name || modelWithMetadataName.displayName,
           capabilityReasoning: capabilityEntry.reasoning ?? model.capabilityReasoning,
           capabilityCode: capabilityEntry.toolCall ?? model.capabilityCode,
@@ -811,7 +813,7 @@ export class ModelDiscoveryService {
           ...modelWithMetadataName,
           inputPricePerToken: pricing.input,
           outputPricePerToken: pricing.output,
-          contextWindow: pricing.contextWindow ?? modelWithMetadataName.contextWindow,
+          ...catalogContextWindow(modelWithMetadataName, pricing.contextWindow),
           displayName: pricing.displayName || modelWithMetadataName.displayName,
         };
       }
@@ -859,6 +861,24 @@ export class ModelDiscoveryService {
     });
     return { ...model, qualityScore: score };
   }
+}
+
+/**
+ * A catalog (models.dev, OpenRouter) window replaces the provider's, and a
+ * real value clears the `default` stand-in mark.
+ */
+function catalogContextWindow(
+  model: DiscoveredModel,
+  catalogWindow: number | null | undefined,
+): Pick<DiscoveredModel, 'contextWindow' | 'contextWindowSource'> {
+  if (typeof catalogWindow !== 'number' || !Number.isFinite(catalogWindow) || catalogWindow <= 0) {
+    return { contextWindow: model.contextWindow, contextWindowSource: model.contextWindowSource };
+  }
+  return {
+    contextWindow: catalogWindow,
+    contextWindowSource:
+      model.contextWindowSource === 'default' ? undefined : model.contextWindowSource,
+  };
 }
 
 /** Unknown modalities (no list) count as text so the model is kept. */

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DiscoveredModel, FetcherConfig, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { DiscoveredModel, FetcherConfig, contextWindowFields } from './model-fetcher';
 import { rebaseUrl } from '../routing/account-base-url';
 import { validatePublicUrl } from '../common/utils/url-validation';
 import { parseModalities } from './model-capabilities';
@@ -87,7 +87,7 @@ interface ModelParserConfig<T> {
   filter: (entry: T) => boolean;
   getId: (entry: T) => string;
   getDisplayName: (entry: T, id: string) => string;
-  contextWindow?: number | ((entry: T) => number);
+  contextWindow?: number | ((entry: T) => number | null | undefined);
   contextWindowSource?: (entry: T) => DiscoveredModel['contextWindowSource'];
   inputPricePerToken?: number | null;
   outputPricePerToken?: number | null;
@@ -116,8 +116,9 @@ function createModelParser<T>(
       .map((m: unknown) => {
         const entry = m as T;
         const id = config.getId(entry);
-        const ctxVal = config.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
-        const contextWindowSource = config.contextWindowSource?.(entry);
+        const ctxVal = config.contextWindow;
+        const ctx = contextWindowFields(typeof ctxVal === 'function' ? ctxVal(entry) : ctxVal);
+        const contextWindowSource = ctx.contextWindowSource ?? config.contextWindowSource?.(entry);
         const supportedEndpoints = config.supportedEndpoints?.(entry);
         const inputModalities = resolvePerEntry(config.inputModalities, entry);
         const outputModalities = resolvePerEntry(config.outputModalities, entry);
@@ -125,7 +126,7 @@ function createModelParser<T>(
           id,
           displayName: config.getDisplayName(entry, id),
           provider,
-          contextWindow: typeof ctxVal === 'function' ? ctxVal(entry) : ctxVal,
+          contextWindow: ctx.contextWindow,
           ...(contextWindowSource ? { contextWindowSource } : {}),
           inputPricePerToken: config.inputPricePerToken ?? null,
           outputPricePerToken: config.outputPricePerToken ?? null,
@@ -238,7 +239,7 @@ const parsePioneer = createModelParser<PioneerModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
   getId: (entry) => entry.id,
   getDisplayName: (entry, id) => entry.display_name || id,
-  contextWindow: (entry) => entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.context_length,
 });
 
 function perMillionToPerToken(value: number | null | undefined): number | null {
@@ -301,7 +302,7 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.id,
         provider,
-        contextWindow: contextLength ?? DEFAULT_CONTEXT_WINDOW,
+        ...contextWindowFields(contextLength),
         inputPricePerToken: perMillionToPerToken(priced?.pricing?.input),
         outputPricePerToken: perMillionToPerToken(priced?.pricing?.output),
         capabilityReasoning: false,
@@ -358,7 +359,7 @@ const parseCommandCode = createModelParser<CommandCodeModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
   getId: (entry) => `commandcode/${entry.id}`,
   getDisplayName: (entry, id) => entry.name || id,
-  contextWindow: (entry) => entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.context_length,
   capabilityCode: true,
 });
 
@@ -393,7 +394,7 @@ const parseXiaomiMimo = createModelParser<OpenAIModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.startsWith('mimo-v'),
   getId: (entry) => entry.id,
   getDisplayName: (_entry, id) => id,
-  contextWindow: (entry) => XIAOMI_MIMO_CONTEXT_WINDOWS.get(entry.id) ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => XIAOMI_MIMO_CONTEXT_WINDOWS.get(entry.id),
   capabilityCode: true,
 });
 
@@ -627,7 +628,7 @@ const parseGroq = createModelParser<GroqModelEntry>({
   contextWindow: (entry) =>
     typeof entry.context_window === 'number' && entry.context_window > 0
       ? entry.context_window
-      : DEFAULT_CONTEXT_WINDOW,
+      : undefined,
   inputModalities: (entry) => parseModalities(entry.input_modalities),
   outputModalities: (entry) => parseModalities(entry.output_modalities),
 });
@@ -702,7 +703,7 @@ const parseFireworks = createModelParser<FireworksModelEntry>({
     typeof entry.name === 'string' && entry.name.length > 0 && entry.supportsServerless !== false,
   getId: (entry) => entry.name,
   getDisplayName: (entry, id) => entry.displayName || id,
-  contextWindow: (entry) => entry.contextLength ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.contextLength,
   capabilityCode: (entry) => entry.supportsTools === true,
 });
 
@@ -738,7 +739,7 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.name || entry.id,
         provider,
-        contextWindow: entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+        ...contextWindowFields(entry.context_length),
         inputPricePerToken:
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
@@ -815,8 +816,7 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.name || entry.id,
         provider,
-        contextWindow:
-          entry.context_length ?? entry.top_provider?.context_length ?? DEFAULT_CONTEXT_WINDOW,
+        ...contextWindowFields(entry.context_length ?? entry.top_provider?.context_length),
         inputPricePerToken:
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
@@ -852,7 +852,7 @@ const parseLmStudio = createModelParser<LmStudioModelEntry>({
       : undefined) ??
     (typeof entry.max_context_length === 'number' && entry.max_context_length > 0
       ? entry.max_context_length
-      : DEFAULT_CONTEXT_WINDOW),
+      : undefined),
   capabilityCode: (entry) => entry.capabilities?.includes('tool_use') === true,
 });
 
@@ -971,10 +971,9 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
       defaultPricing && longContextTier && longContextThreshold
         ? { thresholdTokens: longContextThreshold, ...longContextTier }
         : null;
-    const contextWindow =
-      copilotContextMax(tokenPrices?.long_context) ??
-      longContextThreshold ??
-      DEFAULT_CONTEXT_WINDOW;
+    const contextFields = contextWindowFields(
+      copilotContextMax(tokenPrices?.long_context) ?? longContextThreshold,
+    );
     const supportedEndpoints = getStringArray(entry.supported_endpoints);
 
     return [
@@ -982,7 +981,7 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
         id: `copilot/${entry.id}`,
         displayName: entry.id,
         provider,
-        contextWindow,
+        ...contextFields,
         inputPricePerToken: defaultPricing?.inputPricePerToken ?? 0,
         outputPricePerToken: defaultPricing?.outputPricePerToken ?? 0,
         ...(defaultPricing?.cacheReadPricePerToken !== undefined
@@ -1672,13 +1671,14 @@ export class ProviderModelFetcherService {
   }
 
   private async fetchClinePassModels(): Promise<DiscoveredModel[]> {
-    const contextWindow =
-      getSubscriptionCapabilities('cline-pass')?.maxContextWindow ?? DEFAULT_CONTEXT_WINDOW;
+    const contextFields = contextWindowFields(
+      getSubscriptionCapabilities('cline-pass')?.maxContextWindow,
+    );
     const toDiscovered = (id: string): DiscoveredModel => ({
       id,
       displayName: id,
       provider: 'cline-pass',
-      contextWindow,
+      ...contextFields,
       inputPricePerToken: null,
       outputPricePerToken: null,
       capabilityReasoning: true,
@@ -1741,7 +1741,7 @@ function opencodeDiscoveredModel(
     id: `${provider}/${entry.id}`,
     displayName: entry.name,
     provider,
-    contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    ...contextWindowFields(entry.contextWindow),
     ...(provider === 'opencode-go'
       ? // A subscription: quota cost is recorded per request, not shown as a price.
         { inputPricePerToken: 0, outputPricePerToken: 0 }

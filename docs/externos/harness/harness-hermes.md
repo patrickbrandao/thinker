@@ -4,8 +4,8 @@ categoria: harness
 entidade: Hermes Agent
 agente: harness-hermes
 thinker_ids: [hermes]
-revisado_em: 2026-11-03
-versao_observada: hermes-agent v0.22.7 (commit 9302ba9e)
+revisado_em: 2026-11-06
+versao_observada: hermes-agent v0.22.7 (commit 9302ba9e, revisão completa); v0.23.0 (commit 2bd378ed, revisão pontual da sondagem de servidor)
 ---
 
 # Hermes Agent (harness)
@@ -30,8 +30,9 @@ Especificação mantida pelo agente `harness-hermes` conforme [`.claude/external
 | Docs no repositório: `providers:`, `session_affinity_header` | `website/docs/user-guide/configuring-models.md` | v0.22.7 |
 | Docs no repositório: API server (entrada, só referência) | `website/docs/user-guide/features/api-server.md` | v0.22.7 |
 | Código: cabeçalhos de afinidade | `agent/opencode_affinity.py`, `hermes_cli/config_providers.py` | v0.22.7 |
+| Código: sondagem do tipo de servidor e context length local | `agent/model_metadata.py`, `agent/image_routing.py`, `agent/agent_init_ollama.py` | v0.23.0, commit 2bd378ed (2026-11-05) |
 
-Release cadence: patch a cada poucos dias a semanas (`v0.22.4` 2026-10-21, `v0.22.5` 2026-10-23, `v0.22.6` 2026-11-02, `v0.22.7` 2026-11-03). O site público de docs (hermes-agent.nousresearch.com) não foi consultado; a fonte foi a pasta `website/docs` do repositório na tag.
+Release cadence: patch a cada poucos dias a semanas (`v0.22.4` 2026-10-21, `v0.22.5` 2026-10-23, `v0.22.6` 2026-11-02, `v0.22.7` 2026-11-03, `v0.23.0` 2026-11-05). A v0.23.0 só foi lida na parte de sondagem; o resto do Contrato segue da v0.22.7. O site público de docs (hermes-agent.nousresearch.com) não foi consultado; a fonte foi a pasta `website/docs` do repositório na tag.
 
 ## Contrato
 
@@ -63,7 +64,29 @@ Fonte: `website/docs/integrations/providers.md` (seção Custom & Self-Hosted), 
 ### Outros endpoints
 
 - `GET /models`: usado para descoberta e metadados (acima). Falha não é fatal; recai nos `models` configurados e nos metadados externos.
+- Sondagem do tipo de servidor (`detect_local_server_type`, `agent/model_metadata.py:722-777`, v0.23.0 commit 2bd378ed). Detalhes na seção abaixo.
 - Sem chamada a `/v1/embeddings`, `/v1/messages/count_tokens` ou telemetria no caminho do provedor custom nas fontes lidas `(não confirmado para plugins opcionais)`. Existe o recurso opcional de embeddings em chamadas auxiliares (`key_cmd` cita "embedding"), `(não confirmado)` se usa o provedor principal.
+
+### Sondagem do tipo de servidor (`/version`, `/props`, `/api/tags`)
+
+Fonte: `agent/model_metadata.py` na tag `v0.23.0` (commit 2bd378ed, 2026-11-05). O mesmo mecanismo já estava na v0.22.7 `(não confirmado linha a linha)`.
+
+- Quando roda: só para endpoints **locais** (`is_local_endpoint`, `model_metadata.py:680`: loopback, nomes sem ponto como serviços do Docker Compose, `*.local`, RFC 1918, link-local, Tailscale 100.64/10). Quem chama: inicialização do agente (`agent/agent_init_ollama.py:19`, detecção de `num_ctx`), sondagem local de context length (`model_metadata.py:2058`, `:2316`) e a reconciliação do valor em cache a cada leitura (`:1994`, memo de 30 s), roteamento de imagem (`agent/image_routing.py:251`) e descoberta de modelos (`model_metadata.py:1050`). Um Thinker com host público (`api.tmsoft.com.br`) não é sondado.
+- Raiz: `base_url` sem o sufixo `/v1`, com `localhost` trocado por `127.0.0.1` (`_server_root`, `:538`). Com `base_url: http://localhost:2099/v1`, as sondas vão em `http://127.0.0.1:2099/...`. Envia `Authorization: Bearer <api_key>`; timeout 2 s.
+- Sequência (`:748-753`), na ordem, parando na primeira que casar:
+
+| Veredito | Requisição | Condição para casar |
+|---|---|---|
+| `lm-studio` | `GET /api/v1/models` | qualquer 200 (o corpo não é checado) |
+| `ollama` | `GET /api/tags` | 200 e corpo JSON com a chave `models` |
+| `llamacpp` | `GET /v1/props`, depois `GET /props` | 200 e o texto do corpo contém `default_generation_settings` |
+| `vllm` | `GET /version` | 200 e corpo JSON (objeto) com a chave `version` |
+
+- O que lê de `/version`: só a presença da chave `version` (`"version" in r.json()`). O valor, prefixo e formato não importam; `name` é ignorado. Um corpo HTML faz `r.json()` lançar exceção, que é engolida, e o veredito fica nulo.
+- Cache do veredito (`:81`, `:87`, `:151`, `:736`, `:774-776`): positivo fica 3600 s em memória (por processo) e 300 s em disco (`~/.hermes/cache/local_endpoint_probes.json`); negativo (nenhuma sonda casou) fica 300 s só em memória, nunca em disco. Isso confirma o relato de terceiros: sem veredito, a sequência inteira (5 GETs) se repete a cada 5 min; com veredito, 1 h por processo. Um processo novo do CLI depois de 5 min refaz a sequência mesmo com veredito positivo (o disco expira em 300 s). Timeout de conexão marca o host como "buraco negro" por 30 s e pula as sondas.
+- O que muda com o veredito (`_query_local_context_length_uncached`, `:1588-1625`): `ollama` usa `POST /api/show`; `lm-studio` usa `/api/v1/models` nativo também para descoberta de modelos (`:1050`); `llamacpp` usa `/props` (`n_ctx`). Com `vllm` não há sonda específica, mas é liberado `GET /v1/models/{id}` (`_model_detail_ctx`), que fica desligado quando o veredito é nulo; depois vem a lista `GET /v1/models`. Fora disso, nenhum código compara o veredito com `"vllm"`.
+- Ordem real de context length para endpoint custom: o `/models` do endpoint vem antes da sondagem local (`_resolve_custom_endpoint_context_length`, `:2051-2060`). Com `context_length` publicado em `/v1/models`, a sondagem local não é necessária para achar a janela; ela ainda roda na reconciliação do cache (`:1994`) e na inicialização do agente.
+- Restrições para o gateway: nunca responder 200 em `GET /api/v1/models` (vira `lm-studio` e a descoberta de modelos passa a ler o formato nativo do LM Studio); não responder `/props` ou `/v1/props` com `default_generation_settings`; não responder `/api/tags` com `models`.
 
 ### Recursos usados
 
@@ -111,7 +134,8 @@ model:
 - Snippet de setup: `packages/frontend/src/components/HermesSetup.tsx:25-26` (YAML com `model.provider: custom`, `base_url`, `api_key`, `default: auto`); abas "Configuration file" (`hermes config edit`, `HermesSetup.tsx:58`) e "Hermes onboard" que mostra `hermes model` (`HermesSetup.tsx:51,102`).
 - Guia do usuário: `docs/usuario/conectar-harnesses.md:82-100` (mesmo YAML) e `:145` (troca de modelo via `default`).
 - Sessão: o proxy só lê `x-session-key` (`packages/backend/src/routing/proxy/proxy.controller.ts:277` e `:900`, via `buildProxySessionScope` em `proxy-session-scope.ts:17`). Não há leitura de `x-hermes-session-id` / `x-hermes-session-key` em nenhum arquivo (grep em `packages/backend/src` não encontra "hermes" no roteamento). O que o esqueleto descrevia como "cabeçalhos de sessão `x-hermes-session-*` lidos em `proxy.controller.ts` e `provider-hooks.ts`" é incorreto: `provider-hooks.ts:41-66` só repassa o `sessionKey` já extraído de `x-session-key` a provedores (OpenCode, xAI, OpenRouter). O agrupamento por sessão (`harness-session.ts`) existe apenas em outra sessão de desenvolvimento, fora da `main`.
-- `GET /v1/models`: `proxy.controller.ts:176`; `auto` e modelos virtuais publicam `context_length` (smallest window) (`proxy.controller.ts:94`, `:203-207`), o que o Hermes aproveita via `/models`. Modelos reais só com `?capabilities=true`.
+- `GET /v1/models`: `proxy.controller.ts:230`; `GET /v1/models/:id`: `proxy.controller.ts:311` (404 JSON se o id não estiver na lista; ids com `/` não casam o parâmetro e caem em 404, e o Hermes recai na lista). `auto` e modelos virtuais publicam `context_length` (smallest window); desde 2026-11-06 todo modelo real também publica `context_length` (omitido quando a janela é só o padrão).
+- Respostas às sondas do Hermes (só quando o Thinker é endpoint local para o Hermes): `GET /version` responde `{"version":"thinker-X.Y.Z","name":"thinker"}`, público, `Cache-Control: no-cache` (`packages/backend/src/health/version.controller.ts:14-19`), o que faz o Hermes classificar o Thinker como `vllm`. `GET /props` cai no fallback da SPA e responde HTML 200 sem `default_generation_settings` (`packages/backend/src/common/filters/spa-fallback.filter.ts:8,38-40`). `GET /v1/props`, `GET /api/tags` e `GET /api/v1/models` não têm rota e respondem 404 JSON (prefixos `/v1/` e `/api/` fora da SPA, `spa-fallback.filter.ts:8,26-34`; nenhum `@Get('models')` sob `api/v1`).
 - Classificação do chamador: `packages/backend/src/routing/proxy/caller-classifier.ts` (sem regra específica de Hermes). Peeling de envelope de prompt: `packages/backend/src/scoring/envelope-peeler.ts:4` cita Hermes como agente que embrulha o prompt.
 - Dica de modelos virtuais: `packages/frontend/src/components/VirtualModelsHint.tsx:54` (`hermes model`); textos em `packages/frontend/src/i18n/locales/{en,pt-BR}/harnesses.ts:270-275` e `models.ts:174`.
 
@@ -119,6 +143,8 @@ Pontos no código:
 
 - `packages/shared/src/agent-type.ts`
 - `packages/backend/src/routing/proxy/proxy.controller.ts`
+- `packages/backend/src/health/version.controller.ts`
+- `packages/backend/src/common/filters/spa-fallback.filter.ts`
 - `packages/backend/src/routing/proxy/proxy-session-scope.ts`
 - `packages/backend/src/routing/proxy/provider-hooks.ts`
 - `packages/backend/src/routing/proxy/caller-classifier.ts`
@@ -135,9 +161,10 @@ Pontos no código:
 |---|---|---|---|---|---|
 | G1 | degradação | Hermes só envia cabeçalho de sessão se `providers.<nome>.session_affinity_header` estiver configurado; o snippet usa só `model:` e o Thinker lê apenas `x-session-key`, então toda requisição cai em `default`. Sugestão: snippet com `providers.thinker` e `session_affinity_header: x-session-key`. Arquivos: `HermesSetup.tsx`, `conectar-harnesses.md`. Mesmo sintoma de #318, #320 e #369, causa diferente (aqui é configuração do cliente). | frontend-dev | [#378](https://github.com/patrickbrandao/thinker/issues/378) | resolvida (snippet com providers.thinker e session_affinity_header) |
 | G2 | oportunidade | A aba "Hermes onboard" executa `hermes model` (wizard "Custom endpoint"); não há `hermes onboard` confirmado. Renomear o rótulo e, no wizard, orientar também o campo de context length. Sem issue. | frontend-dev | — | aberta |
-| G3 | oportunidade | O Hermes lê `context_length` do `/models` e do `models.<id>` por entrada; o Thinker publica `context_length` só para `auto` e virtuais. Publicar também para modelos reais (ou sugerir `models.<id>.context_length` no snippet) evitaria cair em 128K ou sondagem por erro. Depende do ADR 0004. Sem issue. | backend-dev | — | aberta |
+| G3 | oportunidade | O Hermes lê `context_length` do `/models` e do `models.<id>` por entrada; o Thinker publica `context_length` só para `auto` e virtuais. Publicar também para modelos reais (ou sugerir `models.<id>.context_length` no snippet) evitaria cair em 128K ou sondagem por erro. Depende do ADR 0004. Sem issue. | backend-dev | — | resolvida (2026-11-06, emenda do ADR 0004 §7) |
 
 ## Histórico
 
 - 2026-11-03: esqueleto criado, sem pesquisa.
 - 2026-11-03: primeira revisão completa contra `hermes-agent` v0.22.7 (commit 9302ba9e). Projeto confirmado. Corrigido o esqueleto: `X-Hermes-Session-*` são cabeçalhos de entrada do API server, não saem para o Thinker; sessão de saída é opt-in via `session_affinity_header`. Aberta a issue #378 (G1).
+- 2026-11-06: revisão pontual contra `v0.23.0` (commit 2bd378ed): documentada a sondagem do tipo de servidor (`/api/v1/models`, `/api/tags`, `/v1/props`, `/props`, `/version`), os TTLs (positivo 1 h em memória e 5 min em disco, negativo 5 min só em memória) e o efeito do `GET /version` JSON do Thinker (veredito `vllm`, libera `GET /v1/models/{id}`). Sem lacuna nova. G3 marcada resolvida pela sessão principal.

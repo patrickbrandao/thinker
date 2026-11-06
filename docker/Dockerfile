@@ -100,6 +100,7 @@ COPY --from=build --chown=nonroot:nonroot /app/packages/backend/dist packages/ba
 COPY --from=build --chown=nonroot:nonroot /app/packages/frontend/dist packages/frontend/dist
 COPY --chown=nonroot:nonroot packages/shared/package.json packages/shared/
 COPY --chown=nonroot:nonroot packages/backend/package.json packages/backend/
+COPY --chown=nonroot:nonroot packages/thinker/package.json packages/thinker/
 # Thinker's license (it keeps the upstream copyright notice) and the
 # notices of every bundled third-party package.
 COPY --chown=nonroot:nonroot LICENSE LICENSE

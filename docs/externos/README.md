@@ -90,7 +90,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `harness-opencode` | Harness | OpenCode | `opencode` | [dossiê](harness/harness-opencode.md) | 2026-11-03 | 3 |
 | `harness-codex` | Harness | Codex CLI | `codex` | [dossiê](harness/harness-codex.md) | 2026-11-03 | 3 |
 | `harness-openclaw` | Harness | OpenClaw | `openclaw` | [dossiê](harness/harness-openclaw.md) | 2026-11-03 | 3 |
-| `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | 2026-11-03 | 2 |
+| `harness-hermes` | Harness | Hermes Agent | `hermes` | [dossiê](harness/harness-hermes.md) | 2026-11-06 | 1 |
 | `harness-nanobot` | Harness | Nanobot | `nanobot` | [dossiê](harness/harness-nanobot.md) | 2026-11-03 | 2 |
 | `harness-craft` | Harness | Craft Agent | `craft` | [dossiê](harness/harness-craft.md) | 2026-11-03 | 3 |
 | `harness-claude-app` | Harness | Claude (desktop app) | `claude-app` | [dossiê](harness/harness-claude-app.md) | 2026-11-03 | 3 |

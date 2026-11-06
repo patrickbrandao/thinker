@@ -78,6 +78,7 @@ import { ResponsesSseError } from './chatgpt-adapter';
 import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
+import { publishedContextWindow } from '../virtual-models/published-context';
 import { StreamFailure } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
@@ -102,9 +103,10 @@ interface OpenAiModelObject {
   created: number;
   owned_by: string;
   /**
-   * Smallest context window (tokens) among the routes the entry can be
-   * served by. Published only for `auto` and virtual models, and omitted
-   * when any of those windows is unknown (ADR 0004, section 7).
+   * Context window (tokens). For `auto` and virtual models, the smallest
+   * among the routes the entry can be served by, omitted when any of those
+   * windows is unknown (ADR 0004, section 7). For a real model, its own
+   * window, omitted when only a stand-in default is known.
    */
   context_length?: number;
   provider_model_id?: string;
@@ -267,6 +269,10 @@ export class ProxyController {
         // them, not the internal `custom:<uuid>` key.
         owned_by: model.providerName ?? model.provider,
       };
+      // Every real model publishes its window (harness-hermes G3), judged from
+      // the same snapshot as `auto`: a stand-in default is never published.
+      const contextLength = publishedContextWindow(model, models);
+      if (contextLength !== null) entry.context_length = contextLength;
       if (includeRouteMetadata) {
         entry.provider_model_id = model.id;
         entry.auth_type = model.authType;
