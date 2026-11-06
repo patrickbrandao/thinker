@@ -70,10 +70,19 @@ function Canvas({
   const [selecting, setSelecting] = useState(false);
 
   useEffect(() => {
-    // A data refresh or a saved move keeps the user's selection.
+    // A data refresh or a saved move keeps the user's selection, and never
+    // moves a node that is being dragged (it would jump back, then return).
     setNodes((prev) => {
-      const selected = new Set(prev.filter((n) => n.selected).map((n) => n.id));
-      return graph.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+      const current = new Map(prev.map((n) => [n.id, n]));
+      return graph.nodes.map((n) => {
+        const old = current.get(n.id);
+        if (!old?.selected && !old?.dragging) return n;
+        return {
+          ...n,
+          selected: old.selected,
+          ...(old.dragging ? { dragging: true, position: old.position } : {}),
+        };
+      });
     });
     setEdges(
       validEdges(graph.nodes, graph.edges).map((e) => ({

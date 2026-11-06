@@ -217,6 +217,10 @@
   .n8n-box.is-round {
     border-radius: 50%;
   }
+  /* The end of the flow (a destination host): rounder on every corner. */
+  .n8n-box.is-sink {
+    border-radius: 36px;
+  }
   .n8n-box.is-idle {
     border-style: dashed;
   }

@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (222 BEM blocks, 240 classes)
+## Blocks (223 BEM blocks, 241 classes)
 actions (shell.css): actions
 agent-type-select (shell.css): agent-type-select__option
 alert-row (shell.css): alert-row
@@ -179,6 +179,7 @@ is-pulse (base.css): is-pulse
 is-round (canvas.css): is-round
 is-selected (base.css, canvas.css): is-selected
 is-selecting (canvas.css): is-selecting
+is-sink (canvas.css): is-sink
 is-success (shell.css): is-success
 is-unread (shell.css): is-unread
 is-unseen (shell.css): is-unseen

@@ -17,7 +17,7 @@ import {
   type LucideIcon,
   Network,
   BellRing,
-  Boxes,
+  Brain,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
 
@@ -71,7 +71,7 @@ export const NAVIGATION: NavGroup[] = [
         icon: CreditCard,
         match: ['/providers/connections'],
       },
-      { key: 'models', to: '/providers/models', label: 'nav.models', icon: Boxes },
+      { key: 'models', to: '/providers/models', label: 'nav.models', icon: Brain },
     ],
   },
   {
