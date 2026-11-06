@@ -227,9 +227,10 @@ export function buildTopologyGraph(
         type: 'node',
         data: {
           kind: 'node',
+          // A local server added as a custom provider shows its runtime's icon.
           icon:
-            providerIcon(p.provider.toLowerCase(), ICON) ??
-            lucide(p.authType === 'local' ? Server : Plug),
+            providerIcon((p.localType ?? p.provider).toLowerCase(), ICON) ??
+            lucide(p.authType === 'local' || p.localType ? Server : Plug),
           badge: authIcon ? createElement(authIcon, { size: 14, strokeWidth: 2 }) : undefined,
           badgeLabel: auth,
           title: name,

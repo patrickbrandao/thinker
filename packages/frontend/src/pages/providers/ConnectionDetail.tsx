@@ -22,7 +22,6 @@ import { getAgents, getCustomProviders as fetchCustomProviders } from '../../ser
 import {
   renameConnection,
   disconnectConnection,
-  refreshConnectionModels,
   setConnectionStreamWarmup,
   setConnectionStreamIdle,
   setConnectionBaseUrl,
@@ -58,18 +57,14 @@ import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import LocalServerForm from '../../components/LocalServerForm.jsx';
 import ConnectionKeyField from '../../components/ConnectionKeyField.jsx';
 import { useResource } from '../../lib/use-resource.js';
-import {
-  Badge,
-  Button,
-  ButtonLink,
-  EmptyState,
-  Modal,
-  Panel,
-  Skel,
-  cx,
-} from '../../components/ui.js';
+import { Badge, Button, ButtonLink, EmptyState, Panel, Skel, Tabs } from '../../components/ui.js';
 import { ThemedIcon } from '../../components/setup-ui.js';
 import OutboundProxyPanel from '../../components/proxy/OutboundProxyPanel.js';
+import ConnectionModels from './ConnectionModels.js';
+import TabbedWindow, {
+  type FormLayoutParts,
+  type WindowSection,
+} from '../../components/TabbedWindow.js';
 
 const AUTH_TYPE_KIND: Record<string, string> = {
   subscription: 'subscriptions',
@@ -266,6 +261,7 @@ const ConnectionDetail = () => {
       : (provider ?? '');
 
   const backLink = backLinkFor(authType);
+  const localType: string | null = customProviderData?.local_type ?? null;
 
   // Set breadcrumb for the topbar; cleared when the page unmounts.
   useEffect(() => {
@@ -274,11 +270,12 @@ const ConnectionDetail = () => {
         providerDisplayName,
         backLinkFor(conn.auth_type),
         () => backLabelFor(conn.auth_type),
-        conn.provider,
+        // A local server added as a custom provider shows its runtime's icon.
+        localType ?? conn.provider,
         conn.label,
       );
     }
-  }, [conn?.provider, conn?.label, conn?.auth_type, providerDisplayName]);
+  }, [conn?.provider, conn?.label, conn?.auth_type, providerDisplayName, localType]);
   useEffect(() => () => setConnectionBreadcrumb(null), []);
 
   // Chart state (persisted in sessionStorage)
@@ -462,39 +459,24 @@ const ConnectionDetail = () => {
     />
   );
 
-  // Manage modal state
+  // Activity (usage) or the account's model list.
+  const [tab, setTab] = useState<'activity' | 'models'>('activity');
+
+  // Manage window state
   const [showManageModal, setShowManageModal] = useState(false);
+  const [manageTab, setManageTab] = useState('general');
+  const [savingAll, setSavingAll] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState('');
-  const [refreshingModels, setRefreshingModels] = useState(false);
   const [warmupValue, setWarmupValue] = useState('');
-  const [savingWarmup, setSavingWarmup] = useState(false);
   const [warmupError, setWarmupError] = useState('');
   const [idleValue, setIdleValue] = useState('');
-  const [savingIdle, setSavingIdle] = useState(false);
   const [idleError, setIdleError] = useState('');
+  const [baseUrlValue, setBaseUrlValue] = useState('');
+  const [baseUrlError, setBaseUrlError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deletingConnection, setDeletingConnection] = useState(false);
-
-  const [baseUrlValue, setBaseUrlValue] = useState('');
-  const [savingBaseUrl, setSavingBaseUrl] = useState(false);
-  const [baseUrlError, setBaseUrlError] = useState('');
-  const handleSaveBaseUrl = async () => {
-    if (!conn) return;
-    setSavingBaseUrl(true);
-    setBaseUrlError('');
-    try {
-      await setConnectionBaseUrl(conn.id, baseUrlValue.trim() || null);
-      toast.success(t('providers.detail.baseUrlSaved'));
-      void detail.reload();
-    } catch (e: any) {
-      setBaseUrlError(e?.message ?? t('providers.detail.saveFailed'));
-    } finally {
-      setSavingBaseUrl(false);
-    }
-  };
 
   const openManageModal = () => {
     if (conn) setRenameValue(conn.label);
@@ -507,6 +489,7 @@ const ConnectionDetail = () => {
     setIdleError('');
     setShowDeleteConfirm(false);
     setDeleteConfirmName('');
+    setManageTab('general');
     setShowManageModal(true);
   };
 
@@ -518,72 +501,73 @@ const ConnectionDetail = () => {
 
   const deleteConfirmMatches = !!conn && deleteConfirmName === conn.label;
 
-  const handleRename = async () => {
-    if (!conn) return;
-    const newLabel = renameValue.trim();
-    if (!newLabel) {
-      setRenameError(t('providers.nameEmpty'));
-      return;
-    }
-    if (newLabel === conn.label) {
-      closeManageModal();
-      return;
-    }
-    setRenaming(true);
-    setRenameError('');
-    try {
-      await renameConnection(conn.provider, conn.label, newLabel, conn.auth_type as any);
-      toast.success(t('providers.connectionRenamed'));
-      closeManageModal();
-      void detail.reload();
-    } catch (e: any) {
-      setRenameError(e?.message ?? t('providers.renameFailed'));
-    } finally {
-      setRenaming(false);
-    }
-  };
-
+  const labelChanged = !!conn && renameValue.trim() !== conn.label;
+  const baseUrlChanged =
+    !!conn?.supports_base_url && baseUrlValue.trim() !== (conn?.base_url ?? '');
   const warmupUnchanged = parseWarmupSeconds(warmupValue) === (conn?.stream_warmup_ms ?? null);
-
-  const handleSaveWarmup = async () => {
-    if (!conn) return;
-    const ms = parseWarmupSeconds(warmupValue);
-    if (ms === undefined) {
-      setWarmupError(streamWarmupError());
-      return;
-    }
-    setSavingWarmup(true);
-    setWarmupError('');
-    try {
-      await setConnectionStreamWarmup(conn.id, ms);
-      toast.success(t('providers.detail.warmupSaved'));
-      void detail.reload();
-    } catch (e: any) {
-      setWarmupError(e?.message ?? t('providers.detail.saveFailed'));
-    } finally {
-      setSavingWarmup(false);
-    }
-  };
-
   const idleUnchanged = parseIdleSeconds(idleValue) === (conn?.stream_idle_timeout_ms ?? null);
+  const manageDirty = labelChanged || baseUrlChanged || !warmupUnchanged || !idleUnchanged;
 
-  const handleSaveIdle = async () => {
+  /**
+   * Applies every changed setting of the window. Settings keyed by the
+   * connection id go first; the rename (keyed by the old label) goes last.
+   * A failure points the window at the tab holding the field.
+   */
+  const handleSaveAll = async () => {
     if (!conn) return;
-    const ms = parseIdleSeconds(idleValue);
-    if (ms === undefined) {
-      setIdleError(streamIdleError());
+    const label = renameValue.trim();
+    if (!label) {
+      setRenameError(t('providers.nameEmpty'));
+      setManageTab('general');
       return;
     }
-    setSavingIdle(true);
-    setIdleError('');
+    const warmupMs = parseWarmupSeconds(warmupValue);
+    if (warmupMs === undefined) {
+      setWarmupError(streamWarmupError());
+      setManageTab('streaming');
+      return;
+    }
+    const idleMs = parseIdleSeconds(idleValue);
+    if (idleMs === undefined) {
+      setIdleError(streamIdleError());
+      setManageTab('streaming');
+      return;
+    }
+    const fail = (tab: string, set: (m: string) => void, fallback: string) => (e: any) => {
+      set(e?.message ?? fallback);
+      setManageTab(tab);
+      throw e;
+    };
+    setSavingAll(true);
     try {
-      await setConnectionStreamIdle(conn.id, ms);
-      toast.success(t('providers.detail.idleSaved'));
+      if (baseUrlChanged) {
+        await setConnectionBaseUrl(conn.id, baseUrlValue.trim() || null).catch(
+          fail('general', setBaseUrlError, t('providers.detail.saveFailed')),
+        );
+      }
+      if (!warmupUnchanged) {
+        await setConnectionStreamWarmup(conn.id, warmupMs).catch(
+          fail('streaming', setWarmupError, t('providers.detail.saveFailed')),
+        );
+      }
+      if (!idleUnchanged) {
+        await setConnectionStreamIdle(conn.id, idleMs).catch(
+          fail('streaming', setIdleError, t('providers.detail.saveFailed')),
+        );
+      }
+      if (labelChanged) {
+        await renameConnection(conn.provider, conn.label, label, conn.auth_type as any).catch(
+          fail('general', setRenameError, t('providers.renameFailed')),
+        );
+      }
+      toast.success(t('providers.detail.changesSaved'));
+      closeManageModal();
       void detail.reload();
-    } catch (e: any) {
-      setIdleError(e?.message ?? t('providers.detail.saveFailed'));
+    } catch {
+      // The field error is shown on its tab.
+      void detail.reload();
     } finally {
-      setSavingIdle(false);
+      setSavingAll(false);
     }
   };
 
@@ -672,19 +656,6 @@ const ConnectionDetail = () => {
     }
   };
 
-  const handleRefreshModels = async () => {
-    setRefreshingModels(true);
-    try {
-      await refreshConnectionModels();
-      toast.success(t('providers.detail.modelsRefreshed'));
-      void detail.reload();
-    } catch {
-      toast.error(t('providers.detail.refreshFailed'));
-    } finally {
-      setRefreshingModels(false);
-    }
-  };
-
   // Deep links into the Requests log, scoped to THIS connection and the
   // card's current window, so the list matches what the card counted.
   const requestsLink = (extra: string) =>
@@ -759,6 +730,335 @@ const ConnectionDetail = () => {
     </span>
   );
 
+  // ── Manage window ─────────────────────────────────────────────
+  const windowIcon = provDef ? (
+    <span className="flex size-5 items-center">{providerIcon(provDef.id, 20)}</span>
+  ) : customProviderData?.local_type ? (
+    <span className="flex size-5 items-center">
+      {providerIcon(customProviderData.local_type, 20)}
+    </span>
+  ) : null;
+
+  const proxySection: WindowSection | null = roleCan.manageProviders()
+    ? {
+        key: 'proxy',
+        label: t('providers.detail.manageTab.proxy'),
+        content: (
+          <OutboundProxyPanel
+            bare
+            targetType="connection"
+            targetId={c.id}
+            canManage
+            title={t('proxies.binding.connectionTitle')}
+          />
+        ),
+      }
+    : null;
+
+  /** Custom provider or local server: its form's tabs, plus credential and proxy. */
+  const manageWindow = (parts: FormLayoutParts) => (
+    <>
+      <TabbedWindow
+        open
+        onClose={closeManageModal}
+        title={`${providerDisplayName} · ${c.label}`}
+        icon={windowIcon}
+        sections={[
+          ...parts.sections,
+          ...(c.key_masked
+            ? [
+                {
+                  key: 'credential',
+                  label: t('providers.detail.manageTab.credential'),
+                  content: (
+                    <ConnectionKeyField
+                      connectionId={c.id}
+                      authType={c.auth_type}
+                      keyMasked={c.key_masked}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(proxySection ? [proxySection] : []),
+        ]}
+        notice={parts.notice}
+        footer={parts.actions}
+      />
+      {parts.extra}
+    </>
+  );
+
+  const builtInSections: WindowSection[] = [
+    {
+      key: 'general',
+      label: t('providers.detail.manageTab.general'),
+      content: (
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="label" htmlFor="connection-rename">
+              {t('providers.detail.connectionNameLabel')}
+            </label>
+            <input
+              id="connection-rename"
+              type="text"
+              className="field"
+              aria-invalid={renameError ? true : undefined}
+              value={renameValue}
+              onChange={(e) => {
+                setRenameValue(e.currentTarget.value);
+                setRenameError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && manageDirty) void handleSaveAll();
+              }}
+            />
+            {renameError ? <p className="form-error mt-1">{renameError}</p> : null}
+          </div>
+          {c.supports_base_url ? (
+            <div>
+              <AccountBaseUrlField
+                id="connection-base-url"
+                provider={c.provider}
+                defaultUrl={c.default_base_url ?? null}
+                value={baseUrlValue}
+                onChange={(v) => {
+                  setBaseUrlValue(v);
+                  setBaseUrlError('');
+                }}
+                disabled={savingAll}
+              />
+              {baseUrlError ? <p className="form-error mt-1">{baseUrlError}</p> : null}
+            </div>
+          ) : null}
+          <p className="m-0 text-sm text-muted">
+            {t('providers.detail.connectedVia')}{' '}
+            {c.auth_type === 'subscription'
+              ? t('providers.detail.viaSubscription')
+              : c.auth_type === 'api_key'
+                ? t('providers.detail.viaApiKey')
+                : t('providers.detail.viaLocal')}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'streaming',
+      label: t('providers.detail.manageTab.streaming'),
+      content: (
+        <div className="flex flex-col gap-4">
+          {/* Stream warm-up override (#244) */}
+          <div>
+            <label className="label" htmlFor="connection-stream-warmup">
+              {t('providers.detail.streamWarmup')}
+            </label>
+            <input
+              id="connection-stream-warmup"
+              type="number"
+              min={MIN_STREAM_WARMUP_SECONDS}
+              max={MAX_STREAM_WARMUP_SECONDS}
+              step="1"
+              placeholder={t('providers.detail.inherit')}
+              className="field"
+              aria-invalid={warmupError ? true : undefined}
+              value={warmupValue}
+              onChange={(e) => {
+                setWarmupValue(e.currentTarget.value);
+                setWarmupError('');
+              }}
+            />
+            <p className="hint">{t('providers.detail.warmupHint')}</p>
+            {warmupError ? <p className="form-error mt-1">{warmupError}</p> : null}
+          </div>
+          <div>
+            <label className="label" htmlFor="connection-stream-idle">
+              {t('providers.detail.streamIdle')}
+            </label>
+            <input
+              id="connection-stream-idle"
+              type="number"
+              min={MIN_STREAM_IDLE_SECONDS}
+              max={MAX_STREAM_IDLE_SECONDS}
+              step="1"
+              placeholder={t('providers.detail.inherit')}
+              className="field"
+              aria-invalid={idleError ? true : undefined}
+              value={idleValue}
+              onChange={(e) => {
+                setIdleValue(e.currentTarget.value);
+                setIdleError('');
+              }}
+            />
+            <p className="hint">{t('providers.detail.idleHint')}</p>
+            {idleError ? <p className="form-error mt-1">{idleError}</p> : null}
+          </div>
+        </div>
+      ),
+    },
+  ];
+  if (c.is_active && credentialMode && firstAgentName) {
+    builtInSections.push({
+      key: 'credential',
+      label: t('providers.detail.manageTab.credential'),
+      content: (
+        <div className="connection-credential">
+          {credentialMode === 'key' ? (
+            <>
+              <ConnectionKeyField
+                connectionId={c.id}
+                authType={c.auth_type}
+                keyMasked={c.key_masked}
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  id="connection-new-key"
+                  type="password"
+                  autoComplete="off"
+                  className="field flex-1 font-mono"
+                  placeholder={t('providers.detail.newKeyPlaceholder')}
+                  aria-label={t('providers.detail.newKeyPlaceholder')}
+                  aria-invalid={newKeyError ? true : undefined}
+                  value={newKey}
+                  onChange={(e) => {
+                    setNewKey(e.currentTarget.value);
+                    setNewKeyError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleReplaceKey();
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={replacingKey || !newKey.trim()}
+                  onClick={() => void handleReplaceKey()}
+                >
+                  {replacingKey
+                    ? t('providers.detail.replacingKey')
+                    : t('providers.detail.replaceKey')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Button size="sm" className="self-start" onClick={() => void handleReauth()}>
+              {t('providers.detail.reauthenticate')}
+            </Button>
+          )}
+          <p className="hint">
+            {credentialMode === 'key'
+              ? t('providers.detail.credentialKeyHint')
+              : t('providers.detail.credentialReauthHint')}
+          </p>
+          {newKeyError ? <p className="form-error mt-1">{newKeyError}</p> : null}
+        </div>
+      ),
+    });
+  }
+  if (proxySection) builtInSections.push(proxySection);
+
+  const deleteConfirm = (
+    <div
+      className="flex flex-col gap-3"
+      role="alertdialog"
+      aria-labelledby="delete-connection-confirm-title"
+      aria-describedby="delete-connection-confirm-copy"
+    >
+      <div className="rounded-control bg-danger-tint p-3">
+        <h3 id="delete-connection-confirm-title" className="text-sm text-danger">
+          {t('providers.detail.deleteHistoryTitle')}
+        </h3>
+        <p id="delete-connection-confirm-copy" className="mt-1 text-sm text-dim">
+          {t('providers.detail.deleteHistoryBody')}
+        </p>
+      </div>
+      <div>
+        <label htmlFor="delete-connection-confirm-input" className="label">
+          {t('providers.detail.typeNameToConfirm')}
+        </label>
+        <input
+          id="delete-connection-confirm-input"
+          className="field"
+          type="text"
+          value={deleteConfirmName}
+          onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && deleteConfirmMatches) void handleDisconnect();
+          }}
+          placeholder={c.label}
+        />
+      </div>
+    </div>
+  );
+
+  const builtInFooter = showDeleteConfirm ? (
+    <div className="flex w-full items-center justify-end gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setShowDeleteConfirm(false);
+          setDeleteConfirmName('');
+        }}
+        disabled={deletingConnection}
+      >
+        {t('providers.detail.cancel')}
+      </Button>
+      <Button
+        variant="danger"
+        size="sm"
+        onClick={() => void handleDisconnect()}
+        disabled={!deleteConfirmMatches || deletingConnection}
+      >
+        {deletingConnection
+          ? t('providers.detail.deleting')
+          : t('providers.detail.deleteConnection')}
+      </Button>
+    </div>
+  ) : (
+    <div className="flex w-full items-center justify-end gap-2">
+      {c.is_active ? (
+        <Button
+          variant="danger"
+          size="sm"
+          className="mr-auto"
+          onClick={() => void handleDisconnect()}
+          disabled={deletingConnection || savingAll}
+        >
+          {deletingConnection
+            ? t('providers.detail.disconnecting')
+            : t('providers.detail.disconnect')}
+        </Button>
+      ) : (
+        <Button
+          variant="danger"
+          size="sm"
+          className="mr-auto"
+          onClick={() => {
+            setDeleteConfirmName('');
+            setShowDeleteConfirm(true);
+          }}
+        >
+          {t('providers.detail.delete')}
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={closeManageModal}
+        disabled={savingAll || deletingConnection}
+      >
+        {t('common.cancel')}
+      </Button>
+      <Button
+        size="sm"
+        busy={savingAll}
+        disabled={!manageDirty}
+        onClick={() => void handleSaveAll()}
+      >
+        {t('common.saveChanges')}
+      </Button>
+    </div>
+  );
+
   return (
     <div className="page">
       <title>
@@ -791,8 +1091,10 @@ const ConnectionDetail = () => {
           </div>
         </div>
         <div className="page-actions">
-          {allAgents.length > 1 ? harnessFilter : null}
-          <Select value={chartRange} onChange={setChartRange} options={cdRangeOptions()} />
+          {tab === 'activity' && allAgents.length > 1 ? harnessFilter : null}
+          {tab === 'activity' ? (
+            <Select value={chartRange} onChange={setChartRange} options={cdRangeOptions()} />
+          ) : null}
           {roleCan.manageProviders() ? (
             <Button variant="ghost" size="sm" onClick={openManageModal}>
               {t('providers.detail.manage')}
@@ -801,283 +1103,307 @@ const ConnectionDetail = () => {
         </div>
       </div>
 
-      {/* Attempt world cards: the connection's own numbers on the filtered period. */}
-      <div className="stat-tiles mb-4">
-        <StatTile
-          label={
-            <>
-              {t('providers.successRate')}
-              <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
-            </>
-          }
-          value={formatRate(
-            b ? attemptSuccessRate({ attempts: b.attempts, succeeded: b.succeeded }) : null,
-          )}
-        />
-        <StatTile
-          label={t('providers.detail.succeededAttempts')}
-          title={t('providers.detail.succeededTitle')}
-          onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
-          value={formatNumber(b?.succeeded ?? 0)}
-          extra={viewMore}
-        />
-        <StatTile
-          label={t('providers.detail.failedAttempts')}
-          title={t('providers.detail.failedTitle')}
-          onClick={() => navigate(requestsLink('&attempts=has_failed'))}
-          value={formatNumber(b?.failed ?? 0)}
-          extra={viewMore}
-        />
-        <StatTile
-          label={t('providers.detail.fallbackRetries')}
-          title={t('providers.detail.fallbackTitle')}
-          onClick={() => navigate(requestsLink('&trigger=fallback'))}
-          value={formatNumber(b?.fallback_retries ?? 0)}
-          extra={
-            <>
-              {(b?.fallback_retries ?? 0) > 0 ? (
-                <span className="text-xs text-muted">
-                  {t('providers.detail.succeeded', {
-                    count: formatNumber(b?.fallback_retries_succeeded ?? 0),
-                  })}
-                </span>
-              ) : null}
-              {viewMore}
-            </>
-          }
-        />
-      </div>
+      <Tabs<'activity' | 'models'>
+        className="mb-4"
+        label={c.label}
+        value={tab}
+        onChange={setTab}
+        items={[
+          { key: 'activity', label: t('providers.detail.tabActivity') },
+          {
+            key: 'models',
+            label: t('providers.detail.tabModels'),
+            count: c.cached_model_count || undefined,
+          },
+        ]}
+      />
 
-      {analytics.data ? (
-        <div className="mb-4">
-          <UnifiedChartCard
-            activeTab={chartView}
-            onTabChange={setChartView}
-            requestsLabel={t('providers.detail.attempts')}
-            requestsInfoTooltip={t('ui.analytics.totalAttempts')}
-            requestsValue={attemptTotals.attempts}
-            requestsTrendPct={0}
-            tokensValue={analytics.data.summary.tokens.value}
-            tokensTrendPct={analytics.data.summary.tokens.trend_pct}
-            costValue={isByok ? (totalCost ?? 0) : undefined}
-            range={chartRange}
-            agentTimeseries={filterSeries(agentTimeseries.data)}
-            agentRequestTimeseries={
-              groupBy === 'harness' ? filterSeries(attemptsByAgentTs.data) : undefined
-            }
-            requestStatusTimeseries={
-              groupBy === 'status'
-                ? (attemptStatusTs.data ?? undefined)
-                : groupBy === 'http'
-                  ? (httpStatusTs.data ?? undefined)
-                  : undefined
-            }
-            requestStatusSeriesMode={groupBy === 'http' ? 'http_status' : 'disposition'}
-            agentCostTimeseries={isByok ? filterSeries(agentCostTimeseries.data) : undefined}
-            colorMap={agentColorMap}
-            seriesFilters={
-              <>
-                {/* Status/harness grouping only applies to the Attempts tab;
-                    Tokens and Cost stay per-harness. */}
-                {chartView === 'requests' ? (
-                  <div className="segmented">
-                    {(
-                      [
-                        ['http', t('providers.detail.byHttpStatus')],
-                        ['status', t('providers.detail.byAttemptStatus')],
-                        ['harness', t('providers.detail.byHarness')],
-                      ] as const
-                    ).map(([key, text]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        aria-pressed={groupBy === key}
-                        onClick={() => setGroupBy(key)}
-                      >
-                        {text}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {(chartView !== 'requests' || groupBy === 'harness') && allAgents.length > 1
-                  ? harnessFilter
-                  : null}
-              </>
-            }
-          />
-        </div>
-      ) : null}
+      {tab === 'models' ? (
+        <ConnectionModels
+          connectionId={c.id}
+          canRefresh={c.is_active && !isCustomProvider}
+          onRefreshed={() => void detail.reload()}
+        />
+      ) : (
+        <>
+          {/* Attempt world cards: the connection's own numbers on the filtered period. */}
+          <div className="stat-tiles mb-4">
+            <StatTile
+              label={
+                <>
+                  {t('providers.successRate')}
+                  <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
+                </>
+              }
+              value={formatRate(
+                b ? attemptSuccessRate({ attempts: b.attempts, succeeded: b.succeeded }) : null,
+              )}
+            />
+            <StatTile
+              label={t('providers.detail.succeededAttempts')}
+              title={t('providers.detail.succeededTitle')}
+              onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
+              value={formatNumber(b?.succeeded ?? 0)}
+              extra={viewMore}
+            />
+            <StatTile
+              label={t('providers.detail.failedAttempts')}
+              title={t('providers.detail.failedTitle')}
+              onClick={() => navigate(requestsLink('&attempts=has_failed'))}
+              value={formatNumber(b?.failed ?? 0)}
+              extra={viewMore}
+            />
+            <StatTile
+              label={t('providers.detail.fallbackRetries')}
+              title={t('providers.detail.fallbackTitle')}
+              onClick={() => navigate(requestsLink('&trigger=fallback'))}
+              value={formatNumber(b?.fallback_retries ?? 0)}
+              extra={
+                <>
+                  {(b?.fallback_retries ?? 0) > 0 ? (
+                    <span className="text-xs text-muted">
+                      {t('providers.detail.succeeded', {
+                        count: formatNumber(b?.fallback_retries_succeeded ?? 0),
+                      })}
+                    </span>
+                  ) : null}
+                  {viewMore}
+                </>
+              }
+            />
+          </div>
 
-      <div className="flex flex-col gap-4">
-        <Panel title={t('providers.detail.recentRequests')} bodyClassName="p-0">
-          {data.recent_messages.length > 0 ? (
-            <div className="table-wrap max-h-96 rounded-none border-0">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('providers.detail.colDate')}</th>
-                    <th>{t('providers.detail.colRequestId')}</th>
-                    <th>{t('providers.detail.colModel')}</th>
-                    <th className="num">{t('providers.detail.colTokens')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recent_messages.map((msg: any, i: number) => (
-                    <tr key={msg.id ?? i}>
-                      <td className="whitespace-nowrap">
-                        {msg.timestamp ? formatTimeAgo(msg.timestamp) : '—'}
-                      </td>
-                      <td className="font-mono text-xs text-muted">
-                        {msg.id ? msg.id.slice(0, 8) : '—'}
-                      </td>
-                      <td className="max-w-45 truncate">
-                        {msg.model ? (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="inline-flex size-3.5 shrink-0">
-                              {providerIcon(msg.provider ?? c.provider, 14)}
-                            </span>
-                            {getModelDisplayName(msg.model)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="num">
-                        {formatNumber((msg.input_tokens ?? 0) + (msg.output_tokens ?? 0))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            emptyRow(t('providers.detail.noRequests'))
-          )}
-        </Panel>
-
-        <Panel title={t('providers.detail.modelsTitle')} bodyClassName="p-0">
-          {data.model_usage.length > 0 ? (
-            <div className="table-wrap max-h-96 rounded-none border-0">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('providers.detail.colModel')}</th>
-                    <th className="num">{t('providers.detail.colTokens')}</th>
-                    <th>{t('providers.detail.colPctTotal')}</th>
-                    {isByok ? <th className="num">{t('providers.detail.colCost')}</th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.model_usage.map((m) => (
-                    <tr key={m.model}>
-                      <td className="row-title max-w-50 truncate">{m.model}</td>
-                      <td className="num">{formatNumber(m.tokens)}</td>
-                      <td>
-                        <ShareBar pct={m.pct_of_total} />
-                      </td>
-                      {isByok ? (
-                        <td className="num font-semibold text-ink">
-                          {formatCost(m.cost) ?? '$0.00'}
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            emptyRow(t('providers.detail.noModelUsage'))
-          )}
-        </Panel>
-
-        <Panel title={t('providers.detail.harnessesTitle')} bodyClassName="p-0">
-          {data.agents.length > 0 ? (
-            <div className="table-wrap max-h-96 rounded-none border-0">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('providers.detail.colHarness')}</th>
-                    <th className="num">{t('providers.detail.colTokens30d')}</th>
-                    <th>{t('providers.detail.colPctTotal')}</th>
-                    {isByok ? <th className="num">{t('providers.detail.colCost30d')}</th> : null}
-                    <th className="num">
-                      <span className="inline-flex items-center gap-1">
-                        {t('providers.totalAttempts')}
-                        <InfoTooltip text={t('ui.analytics.totalAttempts')} />
-                      </span>
-                    </th>
-                    <th className="num">
-                      <span className="inline-flex items-center gap-1">
-                        {t('providers.successRate')}
-                        <InfoTooltip text={t('ui.analytics.connectionHarnessSuccessRate')} />
-                      </span>
-                    </th>
-                    <th>{t('providers.lastUsed')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.agents.map((agent) => {
-                    const platform = platformIcon(agent.agent_platform, null);
-                    return (
-                      <tr key={agent.agent_name}>
-                        <td>
-                          <Link
-                            to={`/harnesses/${encodeURIComponent(agent.agent_name)}`}
-                            className="row-title flex items-center gap-2 no-underline"
+          {analytics.data ? (
+            <div className="mb-4">
+              <UnifiedChartCard
+                activeTab={chartView}
+                onTabChange={setChartView}
+                requestsLabel={t('providers.detail.attempts')}
+                requestsInfoTooltip={t('ui.analytics.totalAttempts')}
+                requestsValue={attemptTotals.attempts}
+                requestsTrendPct={0}
+                tokensValue={analytics.data.summary.tokens.value}
+                tokensTrendPct={analytics.data.summary.tokens.trend_pct}
+                costValue={isByok ? (totalCost ?? 0) : undefined}
+                range={chartRange}
+                agentTimeseries={filterSeries(agentTimeseries.data)}
+                agentRequestTimeseries={
+                  groupBy === 'harness' ? filterSeries(attemptsByAgentTs.data) : undefined
+                }
+                requestStatusTimeseries={
+                  groupBy === 'status'
+                    ? (attemptStatusTs.data ?? undefined)
+                    : groupBy === 'http'
+                      ? (httpStatusTs.data ?? undefined)
+                      : undefined
+                }
+                requestStatusSeriesMode={groupBy === 'http' ? 'http_status' : 'disposition'}
+                agentCostTimeseries={isByok ? filterSeries(agentCostTimeseries.data) : undefined}
+                colorMap={agentColorMap}
+                seriesFilters={
+                  <>
+                    {/* Status/harness grouping only applies to the Attempts tab;
+                        Tokens and Cost stay per-harness. */}
+                    {chartView === 'requests' ? (
+                      <div className="segmented">
+                        {(
+                          [
+                            ['http', t('providers.detail.byHttpStatus')],
+                            ['status', t('providers.detail.byAttemptStatus')],
+                            ['harness', t('providers.detail.byHarness')],
+                          ] as const
+                        ).map(([key, text]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            aria-pressed={groupBy === key}
+                            onClick={() => setGroupBy(key)}
                           >
-                            {platform ? (
-                              <ThemedIcon
-                                src={platform}
-                                size={16}
-                                className="platform-icon rounded-sm"
-                              />
-                            ) : null}
-                            {agent.agent_name}
-                          </Link>
-                        </td>
-                        <td className="num">{formatNumber(agent.tokens_30d)}</td>
-                        <td>
-                          <ShareBar pct={agent.pct_of_total} />
-                        </td>
-                        {isByok ? (
-                          <td className="num">{formatCost(agent.cost_30d) ?? '$0.00'}</td>
-                        ) : null}
-                        <td className="num">{formatNumber(agent.attempts_30d ?? 0)}</td>
-                        <td className="num">
-                          {formatRate(
-                            attemptSuccessRate({
-                              attempts: agent.attempts_30d ?? 0,
-                              succeeded: agent.succeeded_30d,
-                            }),
-                          )}
-                        </td>
-                        <td className="text-muted">
-                          {agent.last_used ? formatTimeAgo(agent.last_used) : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            {text}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {(chartView !== 'requests' || groupBy === 'harness') && allAgents.length > 1
+                      ? harnessFilter
+                      : null}
+                  </>
+                }
+              />
             </div>
-          ) : (
-            emptyRow(t('providers.detail.noHarnesses'))
-          )}
-        </Panel>
-      </div>
+          ) : null}
 
-      {/* Custom provider edit modal */}
-      <Modal
-        open={showManageModal && isCustomProvider && !!customProviderData}
-        onClose={closeManageModal}
-        label={t('providers.detail.editCustomProvider')}
-        wide
-      >
-        {customProviderData?.local_type ? (
+          <div className="flex flex-col gap-4">
+            <Panel title={t('providers.detail.recentRequests')} bodyClassName="p-0">
+              {data.recent_messages.length > 0 ? (
+                <div className="table-wrap max-h-96 rounded-none border-0">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>{t('providers.detail.colDate')}</th>
+                        <th>{t('providers.detail.colRequestId')}</th>
+                        <th>{t('providers.detail.colModel')}</th>
+                        <th className="num">{t('providers.detail.colTokens')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recent_messages.map((msg: any, i: number) => (
+                        <tr key={msg.id ?? i}>
+                          <td className="whitespace-nowrap">
+                            {msg.timestamp ? formatTimeAgo(msg.timestamp) : '—'}
+                          </td>
+                          <td className="font-mono text-xs text-muted">
+                            {msg.id ? msg.id.slice(0, 8) : '—'}
+                          </td>
+                          <td className="max-w-45 truncate">
+                            {msg.model ? (
+                              <span className="inline-flex items-center gap-1">
+                                <span className="inline-flex size-3.5 shrink-0">
+                                  {providerIcon(msg.provider ?? c.provider, 14)}
+                                </span>
+                                {getModelDisplayName(msg.model)}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="num">
+                            {formatNumber((msg.input_tokens ?? 0) + (msg.output_tokens ?? 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                emptyRow(t('providers.detail.noRequests'))
+              )}
+            </Panel>
+
+            <Panel title={t('providers.detail.modelsTitle')} bodyClassName="p-0">
+              {data.model_usage.length > 0 ? (
+                <div className="table-wrap max-h-96 rounded-none border-0">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>{t('providers.detail.colModel')}</th>
+                        <th className="num">{t('providers.detail.colTokens')}</th>
+                        <th>{t('providers.detail.colPctTotal')}</th>
+                        {isByok ? <th className="num">{t('providers.detail.colCost')}</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.model_usage.map((m) => (
+                        <tr key={m.model}>
+                          <td className="row-title max-w-50 truncate">{m.model}</td>
+                          <td className="num">{formatNumber(m.tokens)}</td>
+                          <td>
+                            <ShareBar pct={m.pct_of_total} />
+                          </td>
+                          {isByok ? (
+                            <td className="num font-semibold text-ink">
+                              {formatCost(m.cost) ?? '$0.00'}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                emptyRow(t('providers.detail.noModelUsage'))
+              )}
+            </Panel>
+
+            <Panel title={t('providers.detail.harnessesTitle')} bodyClassName="p-0">
+              {data.agents.length > 0 ? (
+                <div className="table-wrap max-h-96 rounded-none border-0">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>{t('providers.detail.colHarness')}</th>
+                        <th className="num">{t('providers.detail.colTokens30d')}</th>
+                        <th>{t('providers.detail.colPctTotal')}</th>
+                        {isByok ? (
+                          <th className="num">{t('providers.detail.colCost30d')}</th>
+                        ) : null}
+                        <th className="num">
+                          <span className="inline-flex items-center gap-1">
+                            {t('providers.totalAttempts')}
+                            <InfoTooltip text={t('ui.analytics.totalAttempts')} />
+                          </span>
+                        </th>
+                        <th className="num">
+                          <span className="inline-flex items-center gap-1">
+                            {t('providers.successRate')}
+                            <InfoTooltip text={t('ui.analytics.connectionHarnessSuccessRate')} />
+                          </span>
+                        </th>
+                        <th>{t('providers.lastUsed')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.agents.map((agent) => {
+                        const platform = platformIcon(agent.agent_platform, null);
+                        return (
+                          <tr key={agent.agent_name}>
+                            <td>
+                              <Link
+                                to={`/harnesses/${encodeURIComponent(agent.agent_name)}`}
+                                className="row-title flex items-center gap-2 no-underline"
+                              >
+                                {platform ? (
+                                  <ThemedIcon
+                                    src={platform}
+                                    size={16}
+                                    className="platform-icon rounded-sm"
+                                  />
+                                ) : null}
+                                {agent.agent_name}
+                              </Link>
+                            </td>
+                            <td className="num">{formatNumber(agent.tokens_30d)}</td>
+                            <td>
+                              <ShareBar pct={agent.pct_of_total} />
+                            </td>
+                            {isByok ? (
+                              <td className="num">{formatCost(agent.cost_30d) ?? '$0.00'}</td>
+                            ) : null}
+                            <td className="num">{formatNumber(agent.attempts_30d ?? 0)}</td>
+                            <td className="num">
+                              {formatRate(
+                                attemptSuccessRate({
+                                  attempts: agent.attempts_30d ?? 0,
+                                  succeeded: agent.succeeded_30d,
+                                }),
+                              )}
+                            </td>
+                            <td className="text-muted">
+                              {agent.last_used ? formatTimeAgo(agent.last_used) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                emptyRow(t('providers.detail.noHarnesses'))
+              )}
+            </Panel>
+          </div>
+        </>
+      )}
+
+      {/* Custom provider / local server: the form lays itself out as window tabs. */}
+      {showManageModal && isCustomProvider && customProviderData ? (
+        customProviderData.local_type ? (
           <LocalServerForm
             agentName={firstAgentName}
             type={customProviderData.local_type}
             editData={customProviderData}
+            embedded
+            layout={(parts) => manageWindow(parts)}
             onSaved={() => {
               closeManageModal();
               void detail.reload();
@@ -1091,7 +1417,9 @@ const ConnectionDetail = () => {
         ) : (
           <CustomProviderForm
             agentName={firstAgentName}
-            initialData={customProviderData!}
+            initialData={customProviderData}
+            embedded
+            layout={(parts) => manageWindow(parts)}
             onCreated={() => {
               closeManageModal();
               void detail.reload();
@@ -1102,29 +1430,8 @@ const ConnectionDetail = () => {
               navigate(backLink);
             }}
           />
-        )}
-        {c?.key_masked ? (
-          <div className="mt-4 border-t border-line pt-3">
-            <span className="label">{t('providers.detail.credential')}</span>
-            <ConnectionKeyField
-              connectionId={c.id}
-              authType={c.auth_type}
-              keyMasked={c.key_masked}
-            />
-          </div>
-        ) : null}
-        {roleCan.manageProviders() && c ? (
-          <div className="mt-4 border-t border-line pt-3">
-            <OutboundProxyPanel
-              bare
-              targetType="connection"
-              targetId={c.id}
-              canManage
-              title={t('proxies.binding.connectionTitle')}
-            />
-          </div>
-        ) : null}
-      </Modal>
+        )
+      ) : null}
 
       {/* Manage connection modal */}
       {reauthOpen && provDef && firstAgentName && reauthProviders.data ? (
@@ -1151,342 +1458,19 @@ const ConnectionDetail = () => {
         />
       ) : null}
 
-      <Modal
+      {/* Built-in provider account */}
+      <TabbedWindow
         open={showManageModal && !(isCustomProvider && customProviderData)}
         onClose={closeManageModal}
-        label={providerDisplayName}
-        title={
-          <span className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center">
-              {provDef ? (
-                providerIcon(provDef.id, 28)
-              ) : (
-                <span className="flex size-7 items-center justify-center rounded-full bg-s3 text-sm font-semibold text-muted">
-                  {providerDisplayName.charAt(0)}
-                </span>
-              )}
-            </span>
-            {providerDisplayName}
-          </span>
-        }
+        title={`${providerDisplayName} · ${c.label}`}
+        icon={windowIcon}
+        tab={manageTab}
+        onTabChange={setManageTab}
+        sections={builtInSections}
+        footer={builtInFooter}
       >
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="label" htmlFor="connection-rename">
-              {t('providers.detail.connectionNameLabel')}
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="connection-rename"
-                type="text"
-                className="field flex-1"
-                aria-invalid={renameError ? true : undefined}
-                value={renameValue}
-                onChange={(e) => {
-                  setRenameValue(e.currentTarget.value);
-                  setRenameError('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleRename();
-                }}
-              />
-              <Button
-                size="sm"
-                disabled={renaming || renameValue.trim() === c.label}
-                onClick={() => void handleRename()}
-              >
-                {renaming ? t('providers.detail.saving') : t('providers.detail.save')}
-              </Button>
-            </div>
-            {renameError ? <p className="form-error mt-1">{renameError}</p> : null}
-          </div>
-
-          {c.supports_base_url ? (
-            <div>
-              <AccountBaseUrlField
-                id="connection-base-url"
-                provider={c.provider}
-                defaultUrl={c.default_base_url ?? null}
-                value={baseUrlValue}
-                onChange={(v) => {
-                  setBaseUrlValue(v);
-                  setBaseUrlError('');
-                }}
-                disabled={savingBaseUrl}
-              />
-              <div className="mt-2 flex justify-end">
-                <Button
-                  size="sm"
-                  disabled={savingBaseUrl || baseUrlValue.trim() === (c.base_url ?? '')}
-                  onClick={() => void handleSaveBaseUrl()}
-                >
-                  {savingBaseUrl ? t('providers.detail.applying') : t('providers.detail.apply')}
-                </Button>
-              </div>
-              {baseUrlError ? <p className="form-error mt-1">{baseUrlError}</p> : null}
-            </div>
-          ) : null}
-
-          {/* Stream warm-up override (#244) */}
-          <div>
-            <label className="label" htmlFor="connection-stream-warmup">
-              {t('providers.detail.streamWarmup')}
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="connection-stream-warmup"
-                type="number"
-                min={MIN_STREAM_WARMUP_SECONDS}
-                max={MAX_STREAM_WARMUP_SECONDS}
-                step="1"
-                placeholder={t('providers.detail.inherit')}
-                className="field flex-1"
-                aria-invalid={warmupError ? true : undefined}
-                value={warmupValue}
-                onChange={(e) => {
-                  setWarmupValue(e.currentTarget.value);
-                  setWarmupError('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSaveWarmup();
-                }}
-              />
-              <Button
-                size="sm"
-                disabled={savingWarmup || warmupUnchanged}
-                onClick={() => void handleSaveWarmup()}
-              >
-                {savingWarmup ? t('providers.detail.applying') : t('providers.detail.apply')}
-              </Button>
-            </div>
-            <p className="hint">{t('providers.detail.warmupHint')}</p>
-            {warmupError ? <p className="form-error mt-1">{warmupError}</p> : null}
-          </div>
-
-          {/* Stream idle timeout override */}
-          <div>
-            <label className="label" htmlFor="connection-stream-idle">
-              {t('providers.detail.streamIdle')}
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="connection-stream-idle"
-                type="number"
-                min={MIN_STREAM_IDLE_SECONDS}
-                max={MAX_STREAM_IDLE_SECONDS}
-                step="1"
-                placeholder={t('providers.detail.inherit')}
-                className="field flex-1"
-                aria-invalid={idleError ? true : undefined}
-                value={idleValue}
-                onChange={(e) => {
-                  setIdleValue(e.currentTarget.value);
-                  setIdleError('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSaveIdle();
-                }}
-              />
-              <Button
-                size="sm"
-                disabled={savingIdle || idleUnchanged}
-                onClick={() => void handleSaveIdle()}
-              >
-                {savingIdle ? t('providers.detail.applying') : t('providers.detail.apply')}
-              </Button>
-            </div>
-            <p className="hint">{t('providers.detail.idleHint')}</p>
-            {idleError ? <p className="form-error mt-1">{idleError}</p> : null}
-          </div>
-
-          {c.is_active && credentialMode && firstAgentName ? (
-            <div className="connection-credential">
-              <span className="label">{t('providers.detail.credential')}</span>
-              {credentialMode === 'key' ? (
-                <ConnectionKeyField
-                  connectionId={c.id}
-                  authType={c.auth_type}
-                  keyMasked={c.key_masked}
-                />
-              ) : null}
-              {credentialMode === 'key' ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    id="connection-new-key"
-                    type="password"
-                    autoComplete="off"
-                    className="field flex-1 font-mono"
-                    placeholder={t('providers.detail.newKeyPlaceholder')}
-                    aria-label={t('providers.detail.newKeyPlaceholder')}
-                    aria-invalid={newKeyError ? true : undefined}
-                    value={newKey}
-                    onChange={(e) => {
-                      setNewKey(e.currentTarget.value);
-                      setNewKeyError('');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void handleReplaceKey();
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    disabled={replacingKey || !newKey.trim()}
-                    onClick={() => void handleReplaceKey()}
-                  >
-                    {replacingKey
-                      ? t('providers.detail.replacingKey')
-                      : t('providers.detail.replaceKey')}
-                  </Button>
-                </div>
-              ) : (
-                <Button size="sm" onClick={() => void handleReauth()}>
-                  {t('providers.detail.reauthenticate')}
-                </Button>
-              )}
-              <p className="hint">
-                {credentialMode === 'key'
-                  ? t('providers.detail.credentialKeyHint')
-                  : t('providers.detail.credentialReauthHint')}
-              </p>
-              {newKeyError ? <p className="form-error mt-1">{newKeyError}</p> : null}
-            </div>
-          ) : null}
-
-          {roleCan.manageProviders() ? (
-            <div className="border-t border-line pt-3">
-              <OutboundProxyPanel
-                bare
-                targetType="connection"
-                targetId={c.id}
-                canManage
-                title={t('proxies.binding.connectionTitle')}
-              />
-            </div>
-          ) : null}
-
-          {c.is_active ? (
-            <>
-              <div className="flex items-center justify-between border-t border-line pt-3">
-                <span className="text-sm text-muted">
-                  {t('providers.detail.modelCount', c.cached_model_count ?? 0)}
-                </span>
-                {/* Custom provider models are entered by hand; discovery skips them. */}
-                {!isCustomProvider ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={refreshingModels}
-                    onClick={() => void handleRefreshModels()}
-                  >
-                    {refreshingModels
-                      ? t('providers.detail.refreshing')
-                      : t('providers.detail.refreshModels')}
-                  </Button>
-                ) : null}
-              </div>
-              <div className="border-t border-line pt-3 text-sm text-muted">
-                {t('providers.detail.connectedVia')}{' '}
-                {c.auth_type === 'subscription'
-                  ? t('providers.detail.viaSubscription')
-                  : c.auth_type === 'api_key'
-                    ? t('providers.detail.viaApiKey')
-                    : t('providers.detail.viaLocal')}
-              </div>
-              <div className="flex items-center justify-between border-t border-line pt-4">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => void handleDisconnect()}
-                  disabled={deletingConnection}
-                >
-                  {deletingConnection
-                    ? t('providers.detail.disconnecting')
-                    : t('providers.detail.disconnect')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeManageModal}
-                  disabled={deletingConnection}
-                >
-                  {t('providers.detail.done')}
-                </Button>
-              </div>
-            </>
-          ) : showDeleteConfirm ? (
-            <div
-              className="flex flex-col gap-3 border-t border-line pt-3"
-              role="alertdialog"
-              aria-labelledby="delete-connection-confirm-title"
-              aria-describedby="delete-connection-confirm-copy"
-            >
-              <div className="rounded-control bg-danger-tint p-3">
-                <h3 id="delete-connection-confirm-title" className="text-sm text-danger">
-                  {t('providers.detail.deleteHistoryTitle')}
-                </h3>
-                <p id="delete-connection-confirm-copy" className="mt-1 text-sm text-dim">
-                  {t('providers.detail.deleteHistoryBody')}
-                </p>
-              </div>
-              <div>
-                <label htmlFor="delete-connection-confirm-input" className="label">
-                  {t('providers.detail.typeNameToConfirm')}
-                </label>
-                <input
-                  id="delete-connection-confirm-input"
-                  className="field"
-                  type="text"
-                  value={deleteConfirmName}
-                  onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && deleteConfirmMatches) void handleDisconnect();
-                  }}
-                  placeholder={c.label}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setDeleteConfirmName('');
-                  }}
-                  disabled={deletingConnection}
-                >
-                  {t('providers.detail.cancel')}
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => void handleDisconnect()}
-                  disabled={!deleteConfirmMatches || deletingConnection}
-                >
-                  {deletingConnection
-                    ? t('providers.detail.deleting')
-                    : t('providers.detail.deleteConnection')}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className={cx('flex items-center justify-between border-t border-line pt-3')}>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  setDeleteConfirmName('');
-                  setShowDeleteConfirm(true);
-                }}
-              >
-                {t('providers.detail.delete')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={closeManageModal}>
-                {t('providers.detail.close')}
-              </Button>
-            </div>
-          )}
-        </div>
-      </Modal>
+        {showDeleteConfirm ? deleteConfirm : undefined}
+      </TabbedWindow>
     </div>
   );
 };

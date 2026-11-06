@@ -20,6 +20,7 @@ import {
   Brain,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
+import { connectionBreadcrumbSignal } from '../services/connection-breadcrumb-store.js';
 
 /**
  * The main menu. The sidebar, the topbar trail and the ⌘K "Go to" commands
@@ -69,7 +70,6 @@ export const NAVIGATION: NavGroup[] = [
         to: '/providers/subscriptions',
         label: 'nav.subscriptions',
         icon: CreditCard,
-        match: ['/providers/connections'],
       },
       { key: 'models', to: '/providers/models', label: 'nav.models', icon: Brain },
     ],
@@ -81,7 +81,18 @@ export const NAVIGATION: NavGroup[] = [
   },
 ];
 
-export function isNavActive(item: NavItem, pathname: string): boolean {
+/**
+ * The path the menu highlights. A connection page belongs to the list of its
+ * account kind (Local, Usage-based or Subscriptions), known once it loads.
+ */
+function menuPath(pathname: string): string {
+  if (!pathname.startsWith('/providers/connections/')) return pathname;
+  const crumb = connectionBreadcrumbSignal();
+  return crumb.name ? crumb.backLink : pathname;
+}
+
+export function isNavActive(item: NavItem, rawPathname: string): boolean {
+  const pathname = menuPath(rawPathname);
   return [item.to, ...(item.match ?? [])].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

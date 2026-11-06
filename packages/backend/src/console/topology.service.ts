@@ -80,6 +80,8 @@ export interface TopologyProvider extends Usage {
   name: string;
   label: string;
   active: boolean;
+  /** Runtime of a local server added as a custom provider (lmstudio, ollama, llamacpp). */
+  localType: string | null;
 }
 
 /** An outbound proxy profile, or the global proxy of the environment (`profileId` null). */
@@ -479,6 +481,7 @@ export class TopologyService {
         name: customById.get(c.provider.toLowerCase())?.name ?? c.provider,
         label: c.label,
         active: c.is_active,
+        localType: customById.get(c.provider.toLowerCase())?.local_type ?? null,
         ...zero(),
       });
     }

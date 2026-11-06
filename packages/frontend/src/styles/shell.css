@@ -629,6 +629,15 @@
     resize: vertical;
     max-height: 320px;
   }
+  /* Settings window: the tab strip stays under the title while the tab scrolls. */
+  .tabbed-window .tabbed-window-tabs {
+    position: sticky;
+    top: -18px;
+    z-index: 1;
+    margin: -18px -18px 16px;
+    padding: 6px 18px 0;
+    background: var(--bg-elev);
+  }
   .floating-window-head {
     flex: none;
     cursor: move;

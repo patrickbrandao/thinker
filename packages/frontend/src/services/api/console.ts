@@ -64,6 +64,8 @@ export interface Topology {
       name: string;
       label: string;
       active: boolean;
+      /** Runtime of a local server added as a custom provider (lmstudio, ollama, llamacpp). */
+      localType?: string | null;
     }
   >;
   /** Outbound proxy profiles in use (`profileId` null: the global proxy). */

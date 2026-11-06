@@ -16,9 +16,14 @@ import * as requests from './commands/requests';
 import * as doctorCommand from './commands/doctor';
 import * as modelPrices from './commands/model-prices';
 import * as skill from './commands/skill';
+import * as manage from './commands/manage';
 import { CATEGORY_CATALOG } from './provider-catalog.gen';
 
 type Handler = (io: CliIo, argv: string[]) => Promise<number | void>;
+
+function prefixed(prefix: string, handlers: Record<string, Handler>): Record<string, Handler> {
+  return Object.fromEntries(Object.entries(handlers).map(([k, h]) => [`${prefix} ${k}`, h]));
+}
 
 /**
  * Command registry keyed by the longest verb path. Dispatch tries the
@@ -71,6 +76,15 @@ export const COMMANDS: Record<string, Handler> = {
   'routing params set': routing.routingParams.set,
 
   'requests get': requests.requestsGet,
+
+  ...prefixed('trigger', manage.trigger),
+  ...prefixed('proxy', manage.proxy),
+  ...prefixed('alert', manage.alert),
+  ...prefixed('limit', manage.limit),
+  ...prefixed('provider local', manage.providerLocal),
+  ...prefixed('connection', manage.connection),
+  ...prefixed('org', manage.org),
+  ...prefixed('user', manage.user),
 
   run: runCommand.runCmd,
 
@@ -145,6 +159,55 @@ Routing readouts and virtual models (default-route writes go through thinker age
   thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false
   thinker routing params get <agent> [--tier <t> | --virtual <v>] [--model <m>]
   thinker routing params set <agent> [--tier <t> | --virtual <v>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]
+
+Local servers and connection settings
+  thinker provider local defaults [--agent <name>]     (types, default host/port and config per runtime)
+  thinker provider local add --type ollama|lmstudio|llamacpp --name <n> [--host <h>] [--port <p>] [--scheme http|https]
+      [--path-prefix <p>] [--alias <a>] [--request-timeout-ms <ms>] [--probe-timeout-ms <ms>] [--credential-stdin|--credential-env <e>] [--agent <name>]
+    (probes the runtime's native API — models, context, capabilities — then registers it; remove with provider custom remove)
+  thinker connection set <connection-id> [--base-url <url>|default] [--stream-idle-ms <ms>|default] [--stream-warmup-ms <ms>|default]
+
+Body flags (create/update below): --data '<json>' | --data-file <path> | --data-stdin, then --set <path>=<value> (repeatable;
+  dotted paths nest, values parse as JSON when they can). Typed flags fill the same fields; every API field is reachable.
+
+Triggers (admin)
+  thinker trigger list | thinker trigger get <id|name>
+  thinker trigger create --name <n> --type email|webhook|telegram|syslog|gelf|relp [--enabled true|false] [--event <e> ...]
+      [--max-retries <n>] [--retry-delay <s>] [--timeout <s>] [body flags: --set config.<field>=<v> --set secrets.<field>=<v>]
+  thinker trigger update <id|name> [same flags] | thinker trigger delete <id|name> --yes
+  thinker trigger test <id|name> [body flags]
+  thinker trigger events [--trigger-id <id>] [--status <s>] [--event-type <t>] [--agent <a>] [--before <cursor>] [--limit <n>]
+  thinker trigger event get|retry <event-id>
+  thinker trigger bind get <agent> | thinker trigger bind set <agent> <body flags>
+
+Outbound proxies
+  thinker proxy server list | get|test <id|name> | logs <id|name> [--result <r>] [--source-type <t>] [--limit <n>] [--before <c>] | stats <id|name> [--days <n>]
+  thinker proxy server create --name <n> --scheme <s> --host <h> --port <p> [--username <u>] [--password-stdin|--password-env <e>]
+      [--enabled true|false] [--connect-timeout-ms <ms>] [--debug off|1h|24h|7d|forever] [--log-retention-days <n>] [body flags]
+  thinker proxy server update <id|name> [same flags] [--no-auth] | thinker proxy server delete <id|name> --yes [--mode <m>] [--replace-with <id>]
+  thinker proxy profile list | create --name <n> --hop <proxy-id|direct> ... | update <id|name> [...] | delete <id|name> --yes
+  thinker proxy assign list [--target-type <t>] | get <target-type> <target-id>
+  thinker proxy assign set <target-type> <target-id> --mode inherit|global|direct|profile [--profile <id|name>]
+
+Alerts
+  thinker alert list [--level <l>] [--category <c>] [--unread] [--page <n>] [--limit <n>]
+  thinker alert read <alert-id> | thinker alert read-all [--level <l>] [--category <c>]
+
+Limits (per agent: notify, block or both when a threshold is crossed)
+  thinker limit list <agent> | thinker limit logs <agent>
+  thinker limit create <agent> --metric tokens|cost --threshold <n> --period hour|day|week|month [--action notify|block|both]
+  thinker limit update <limit-id> [--metric ...] [--threshold ...] [--period ...] [--action ...] [--active true|false]
+  thinker limit delete <limit-id> --yes
+
+Organizations (workspaces) and users
+  thinker org list | create --name <n> | rename <id|name> --name <n> | delete <id|name> --yes
+  thinker org retention get <id|name> | thinker org retention set <id|name> --days <n>|default
+  thinker org members <id|name>
+  thinker org member add <id|name> --email <e> [--name <n>] [--role owner|admin|member|viewer]
+  thinker org member role <id|name> <user-id> --role <r> | thinker org member remove <id|name> <user-id> --yes
+  thinker user list | create --email <e> --name <n> [--instance-admin] [--org <id|name> [--role <r>]]   (instance admins only)
+  thinker user reset-password <id|email> --yes | thinker user set-admin <id|email> --enabled true|false
+    (create and reset-password print a temporary password — hand it to the user, it is shown once)
 
 Requests (paginated, mirrors the API: opaque cursor, one page per call)
   thinker requests get [--agent <name>] [--range <r>] [--status <s>] [--provider <p>] [--origin <o>] [--limit <1-200>] [--cursor <c>] [--full]
