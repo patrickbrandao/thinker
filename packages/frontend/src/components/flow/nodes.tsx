@@ -29,6 +29,7 @@ function StepNodeView({ data, selected }: NodeProps<FlowNode>) {
         className={cx(
           'n8n-box',
           data.round && 'is-round',
+          data.sink && 'is-sink',
           data.badge ? 'has-badge' : null,
           data.state && `is-${data.state}`,
           selected && 'is-selected',

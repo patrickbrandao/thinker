@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import {
   Bot,
   BrainCircuit,
+  CpuAi,
   CreditCard,
   Globe,
   GlobeLock,
@@ -9,7 +10,6 @@ import {
   HardDrive,
   House,
   KeyRound,
-  MapPin,
   Plug,
   Server,
   Waypoints,
@@ -315,8 +315,9 @@ export function buildTopologyGraph(
         type: 'node',
         data: {
           kind: 'node',
-          icon: lucide(MapPin),
+          icon: lucide(CpuAi),
           title: dest.host,
+          sink: true,
           subtitle: t('shell.flow.destination'),
           tooltip: usageTooltip(`${t('shell.flow.destination')} · ${dest.host}`, dest),
           state: nodeState(dest),

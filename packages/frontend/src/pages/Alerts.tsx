@@ -83,50 +83,6 @@ export default function Alerts() {
     <div className="page full">
       <title>{t('alerts.pageTitle')}</title>
       <meta name="description" content={t('alerts.subtitle')} />
-      <div className="page-head">
-        <p className="m-0 max-w-2xl text-sm text-muted">{t('alerts.subtitle')}</p>
-        {view === 'events' ? (
-          <div className="page-actions w-full lg:w-auto lg:justify-end">
-            <button
-              type="button"
-              className={cx(
-                'feedback-tag btn btn-sm',
-                unread ? 'feedback-tag--selected' : 'btn-ghost',
-              )}
-              aria-pressed={unread}
-              onClick={() => setParam('unread', unread ? '' : '1')}
-            >
-              {t('alerts.filter.unread')}
-            </button>
-            <div className="w-full sm:w-40">
-              <Select
-                value={level}
-                onChange={(v) => setParam('level', v)}
-                options={levelOptions}
-                label={t('alerts.filter.level')}
-              />
-            </div>
-            <div className="w-full sm:w-44">
-              <Select
-                value={category}
-                onChange={(v) => setParam('category', v)}
-                options={categoryOptions}
-                label={t('alerts.filter.category')}
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy || !data || data.unread === 0}
-              onClick={() => void markAll()}
-            >
-              <Check size={14} />
-              {t('alerts.markAllRead')}
-            </Button>
-          </div>
-        ) : null}
-      </div>
-
       <Tabs<View>
         className="mb-4"
         label={t('alerts.title')}
@@ -141,6 +97,47 @@ export default function Alerts() {
           },
         ]}
       />
+
+      {view === 'events' ? (
+        <div className="page-actions mb-4 w-full">
+          <button
+            type="button"
+            className={cx(
+              'feedback-tag btn btn-sm',
+              unread ? 'feedback-tag--selected' : 'btn-ghost',
+            )}
+            aria-pressed={unread}
+            onClick={() => setParam('unread', unread ? '' : '1')}
+          >
+            {t('alerts.filter.unread')}
+          </button>
+          <div className="w-full sm:w-40">
+            <Select
+              value={level}
+              onChange={(v) => setParam('level', v)}
+              options={levelOptions}
+              label={t('alerts.filter.level')}
+            />
+          </div>
+          <div className="w-full sm:w-44">
+            <Select
+              value={category}
+              onChange={(v) => setParam('category', v)}
+              options={categoryOptions}
+              label={t('alerts.filter.category')}
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy || !data || data.unread === 0}
+            onClick={() => void markAll()}
+          >
+            <Check size={14} />
+            {t('alerts.markAllRead')}
+          </Button>
+        </div>
+      ) : null}
 
       {view === 'requests' ? (
         <FailedRequests items={failed.data?.items ?? null} total={failed.data?.total ?? 0} />

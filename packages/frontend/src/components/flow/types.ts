@@ -43,6 +43,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   state?: 'active' | 'error' | 'idle';
   /** For steps: a circle instead of a square (where traffic ends). */
   round?: boolean;
+  /** For steps: the end of the flow (a destination host), with rounder corners. */
+  sink?: boolean;
   /** Where a double-click goes. */
   href?: string;
 }

@@ -1109,6 +1109,14 @@
         "canvas.css"
       ]
     },
+    "is-sink": {
+      "classes": [
+        "is-sink"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-success": {
       "classes": [
         "is-success"
@@ -2236,8 +2244,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 222,
-    "classes": 240,
+    "blocks": 223,
+    "classes": 241,
     "canonicalRules": 5,
     "ghostRules": 5
   }
