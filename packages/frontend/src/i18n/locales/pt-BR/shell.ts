@@ -82,6 +82,7 @@ const shell: Catalog<typeof en> = {
     proxy: 'Proxy Switch',
     globalProxy: 'Global',
     proxyServer: 'Servidor de proxy',
+    destination: 'Destino',
     egress: { internet: 'Internet', gateway: 'Local Gateway', local: 'Rede local' },
     disabled: 'desativado',
     metrics: {

@@ -18,7 +18,7 @@ import {
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { deliver, type DeliveryResult } from './trigger-senders';
 import { TriggerDispatchService } from './trigger-dispatch.service';
-import type { TriggerConfig, TriggerSecrets } from './trigger-config';
+import { isHttpTrigger, type TriggerConfig, type TriggerSecrets } from './trigger-config';
 import type { TemplateVars } from './trigger-template';
 
 const POLL_MS = 10_000;
@@ -176,12 +176,11 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
           'trigger.name': trigger.name,
           'delivery.attempt': String(attempt),
         };
-        // Webhook, Telegram and e-mail deliveries go out through the
-        // trigger's proxy chain (syslog is not HTTP).
-        scope =
-          trigger.type === 'syslog'
-            ? undefined
-            : await this.egress?.scopeForTarget(row.tenant_id, 'trigger', trigger.id, trigger.name);
+        // Webhook, Telegram, e-mail and GELF over HTTP go out through the
+        // trigger's proxy chain (syslog, RELP and GELF over UDP/TCP are not HTTP).
+        scope = !isHttpTrigger(trigger.type, parseJson<TriggerConfig>(trigger.config))
+          ? undefined
+          : await this.egress?.scopeForTarget(row.tenant_id, 'trigger', trigger.id, trigger.name);
         result = await runWithOutboundScope(scope, () =>
           deliver({
             type: trigger.type,

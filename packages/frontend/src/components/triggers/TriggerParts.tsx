@@ -1,4 +1,4 @@
-import { Mail, Send, Server, Webhook } from 'lucide-react';
+import { Mail, Send, Server, Webhook, ScrollText, FileStack } from 'lucide-react';
 import type { TriggerType } from 'thinker-shared';
 import { t } from '../../i18n/index.js';
 import { formatDuration } from '../../services/formatters.js';
@@ -6,7 +6,14 @@ import type { TriggerTestResult } from '../../services/api/triggers.js';
 import { Badge } from '../ui.js';
 import { triggerTypeLabel } from './trigger-form.js';
 
-const ICONS = { email: Mail, webhook: Webhook, telegram: Send, syslog: Server } as const;
+const ICONS = {
+  email: Mail,
+  webhook: Webhook,
+  telegram: Send,
+  syslog: Server,
+  gelf: ScrollText,
+  relp: FileStack,
+} as const;
 
 export function TriggerTypeIcon({ type, className }: { type: TriggerType; className?: string }) {
   const Icon = ICONS[type] ?? Webhook;

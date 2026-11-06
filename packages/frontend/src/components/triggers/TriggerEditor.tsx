@@ -6,6 +6,8 @@ import {
   SYSLOG_FORMATS,
   SYSLOG_SEVERITIES,
   SYSLOG_TRANSPORTS,
+  GELF_COMPRESSIONS,
+  GELF_TRANSPORTS,
   TRIGGER_LIMITS,
   TRIGGER_VARIABLES,
   WEBHOOK_METHODS,
@@ -71,9 +73,11 @@ export default function TriggerEditor({
   }, [open, trigger]);
 
   const isCreate = !trigger;
+  /** Syslog and RELP share the syslog line fields. */
+  const log = form.type === 'syslog' || form.type === 'relp' ? form.type : null;
   const patch = <K extends keyof TriggerForm>(key: K, value: TriggerForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const patchIn = <K extends 'email' | 'webhook' | 'telegram' | 'syslog'>(
+  const patchIn = <K extends 'email' | 'webhook' | 'telegram' | 'syslog' | 'relp' | 'gelf'>(
     key: K,
     value: Partial<TriggerForm[K]>,
   ) => setForm((f) => ({ ...f, [key]: { ...f[key], ...value } }));
@@ -439,27 +443,27 @@ export default function TriggerEditor({
           </>
         ) : null}
 
-        {form.type === 'syslog' ? (
+        {log ? (
           <>
             <div className="grid gap-4 sm:grid-cols-[1fr_110px_110px]">
               <Field
                 label={t('triggers.editor.syslog.host')}
                 htmlFor="trigger-syslog-host"
-                error={errors['syslog.host']}
+                error={errors[`${log}.host`]}
               >
                 <input
                   id="trigger-syslog-host"
                   className="field font-mono"
                   type="text"
                   placeholder={t('triggers.editor.syslog.hostPlaceholder')}
-                  value={form.syslog.host}
-                  onChange={(e) => patchIn('syslog', { host: e.currentTarget.value })}
+                  value={form[log].host}
+                  onChange={(e) => patchIn(log, { host: e.currentTarget.value })}
                 />
               </Field>
               <Field
                 label={t('triggers.editor.syslog.port')}
                 htmlFor="trigger-syslog-port"
-                error={errors['syslog.port']}
+                error={errors[`${log}.port`]}
               >
                 <input
                   id="trigger-syslog-port"
@@ -467,40 +471,42 @@ export default function TriggerEditor({
                   type="number"
                   min={1}
                   max={65535}
-                  value={form.syslog.port}
-                  onChange={(e) => patchIn('syslog', { port: e.currentTarget.value })}
+                  value={form[log].port}
+                  onChange={(e) => patchIn(log, { port: e.currentTarget.value })}
                 />
               </Field>
-              <Field
-                label={t('triggers.editor.syslog.transport')}
-                htmlFor="trigger-syslog-transport"
-              >
-                <select
-                  id="trigger-syslog-transport"
-                  className="field"
-                  value={form.syslog.transport}
-                  onChange={(e) =>
-                    patchIn('syslog', {
-                      transport: e.currentTarget.value as TriggerForm['syslog']['transport'],
-                    })
-                  }
+              {log === 'syslog' ? (
+                <Field
+                  label={t('triggers.editor.syslog.transport')}
+                  htmlFor="trigger-syslog-transport"
                 >
-                  {SYSLOG_TRANSPORTS.map((v) => (
-                    <option key={v} value={v}>
-                      {v.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  <select
+                    id="trigger-syslog-transport"
+                    className="field"
+                    value={form[log].transport}
+                    onChange={(e) =>
+                      patchIn(log, {
+                        transport: e.currentTarget.value as TriggerForm['syslog']['transport'],
+                      })
+                    }
+                  >
+                    {SYSLOG_TRANSPORTS.map((v) => (
+                      <option key={v} value={v}>
+                        {v.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label={t('triggers.editor.syslog.format')} htmlFor="trigger-syslog-format">
                 <select
                   id="trigger-syslog-format"
                   className="field"
-                  value={form.syslog.format}
+                  value={form[log].format}
                   onChange={(e) =>
-                    patchIn('syslog', {
+                    patchIn(log, {
                       format: e.currentTarget.value as TriggerForm['syslog']['format'],
                     })
                   }
@@ -516,9 +522,9 @@ export default function TriggerEditor({
                 <select
                   id="trigger-syslog-facility"
                   className="field"
-                  value={form.syslog.facility}
+                  value={form[log].facility}
                   onChange={(e) =>
-                    patchIn('syslog', {
+                    patchIn(log, {
                       facility: e.currentTarget.value as TriggerForm['syslog']['facility'],
                     })
                   }
@@ -535,8 +541,8 @@ export default function TriggerEditor({
                   id="trigger-syslog-app"
                   className="field font-mono"
                   type="text"
-                  value={form.syslog.app_name}
-                  onChange={(e) => patchIn('syslog', { app_name: e.currentTarget.value })}
+                  value={form[log].app_name}
+                  onChange={(e) => patchIn(log, { app_name: e.currentTarget.value })}
                 />
               </Field>
             </div>
@@ -544,54 +550,148 @@ export default function TriggerEditor({
               <textarea
                 id="trigger-syslog-message"
                 className="field trigger-template min-h-[72px] font-mono"
-                value={form.syslog.message}
-                onChange={(e) => patchIn('syslog', { message: e.currentTarget.value })}
+                value={form[log].message}
+                onChange={(e) => patchIn(log, { message: e.currentTarget.value })}
               />
             </Field>
-            <div>
-              <span className="label">{t('triggers.editor.syslog.severities')}</span>
-              <div className="table-wrap scroll-section">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>{t('triggers.editor.syslog.event')}</th>
-                      <th>{t('triggers.editor.syslog.severity')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.keys(DEFAULT_SYSLOG_SEVERITIES).map((key) => (
-                      <tr key={key}>
-                        <td>
-                          <div className="row-title">{eventLabel(key)}</div>
-                          <div className="row-sub font-mono">{key}</div>
-                        </td>
-                        <td>
-                          <select
-                            className="field h-[30px] w-auto"
-                            aria-label={`${t('triggers.editor.syslog.severity')}: ${eventLabel(key)}`}
-                            value={form.syslog.severities[key] ?? DEFAULT_SYSLOG_SEVERITIES[key]}
-                            onChange={(e) =>
-                              patchIn('syslog', {
-                                severities: {
-                                  ...form.syslog.severities,
-                                  [key]: e.currentTarget.value as SyslogSeverity,
-                                },
-                              })
-                            }
-                          >
-                            {SYSLOG_SEVERITIES.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
+            <SeverityTable
+              value={form[log].severities}
+              onChange={(severities) => patchIn(log, { severities })}
+            />
+          </>
+        ) : null}
+
+        {form.type === 'gelf' ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t('triggers.editor.gelf.transport')} htmlFor="trigger-gelf-transport">
+                <select
+                  id="trigger-gelf-transport"
+                  className="field"
+                  value={form.gelf.transport}
+                  onChange={(e) =>
+                    patchIn('gelf', {
+                      transport: e.currentTarget.value as TriggerForm['gelf']['transport'],
+                    })
+                  }
+                >
+                  {GELF_TRANSPORTS.map((v) => (
+                    <option key={v} value={v}>
+                      {t(`triggers.editor.gelf.transports.${v}`)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {form.gelf.transport !== 'tcp' ? (
+                <Field
+                  label={t('triggers.editor.gelf.compression')}
+                  htmlFor="trigger-gelf-compression"
+                >
+                  <select
+                    id="trigger-gelf-compression"
+                    className="field"
+                    value={form.gelf.compression}
+                    onChange={(e) =>
+                      patchIn('gelf', {
+                        compression: e.currentTarget.value as TriggerForm['gelf']['compression'],
+                      })
+                    }
+                  >
+                    {GELF_COMPRESSIONS.map((v) => (
+                      <option key={v} value={v}>
+                        {t(`triggers.editor.gelf.compressions.${v}`)}
+                      </option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </select>
+                </Field>
+              ) : null}
             </div>
+            {form.gelf.transport === 'http' ? (
+              <Field
+                label={t('triggers.editor.gelf.url')}
+                htmlFor="trigger-gelf-url"
+                error={errors['gelf.url']}
+              >
+                <input
+                  id="trigger-gelf-url"
+                  className="field font-mono"
+                  type="url"
+                  placeholder="https://logs.example.com:12202/gelf"
+                  value={form.gelf.url}
+                  onChange={(e) => patchIn('gelf', { url: e.currentTarget.value })}
+                />
+              </Field>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-[1fr_110px]">
+                <Field
+                  label={t('triggers.editor.syslog.host')}
+                  htmlFor="trigger-gelf-host"
+                  error={errors['gelf.host']}
+                >
+                  <input
+                    id="trigger-gelf-host"
+                    className="field font-mono"
+                    type="text"
+                    placeholder={t('triggers.editor.syslog.hostPlaceholder')}
+                    value={form.gelf.host}
+                    onChange={(e) => patchIn('gelf', { host: e.currentTarget.value })}
+                  />
+                </Field>
+                <Field
+                  label={t('triggers.editor.syslog.port')}
+                  htmlFor="trigger-gelf-port"
+                  error={errors['gelf.port']}
+                >
+                  <input
+                    id="trigger-gelf-port"
+                    className="field font-mono"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={form.gelf.port}
+                    onChange={(e) => patchIn('gelf', { port: e.currentTarget.value })}
+                  />
+                </Field>
+              </div>
+            )}
+            <Field
+              label={t('triggers.editor.gelf.source')}
+              htmlFor="trigger-gelf-source"
+              hint={t('triggers.editor.gelf.sourceHint')}
+            >
+              <input
+                id="trigger-gelf-source"
+                className="field font-mono"
+                type="text"
+                value={form.gelf.source}
+                onChange={(e) => patchIn('gelf', { source: e.currentTarget.value })}
+              />
+            </Field>
+            <Field label={t('triggers.editor.gelf.shortMessage')} htmlFor="trigger-gelf-short">
+              <textarea
+                id="trigger-gelf-short"
+                className="field trigger-template min-h-[48px] font-mono"
+                value={form.gelf.short_message}
+                onChange={(e) => patchIn('gelf', { short_message: e.currentTarget.value })}
+              />
+            </Field>
+            <Field
+              label={t('triggers.editor.gelf.fullMessage')}
+              htmlFor="trigger-gelf-full"
+              hint={t('triggers.editor.gelf.fieldsHint')}
+            >
+              <textarea
+                id="trigger-gelf-full"
+                className="field trigger-template min-h-[72px] font-mono"
+                value={form.gelf.full_message}
+                onChange={(e) => patchIn('gelf', { full_message: e.currentTarget.value })}
+              />
+            </Field>
+            <SeverityTable
+              label={t('triggers.editor.gelf.levels')}
+              value={form.gelf.severities}
+              onChange={(severities) => patchIn('gelf', { severities })}
+            />
           </>
         ) : null}
 
@@ -665,7 +765,7 @@ export default function TriggerEditor({
         </div>
       </fieldset>
 
-      {trigger && !readOnly && trigger.type !== 'syslog' ? (
+      {trigger && !readOnly && sendsOverHttp(trigger) ? (
         <div className="mt-4 border-t border-line pt-4">
           <OutboundProxyPanel
             bare
@@ -797,4 +897,65 @@ function VariablesHelp() {
       </ul>
     </details>
   );
+}
+
+/** Severity per event (syslog and RELP severity, GELF `level`). */
+function SeverityTable({
+  value,
+  onChange,
+  label,
+}: {
+  value: Record<string, SyslogSeverity>;
+  onChange: (value: Record<string, SyslogSeverity>) => void;
+  label?: string;
+}) {
+  return (
+    <div>
+      <span className="label">{label ?? t('triggers.editor.syslog.severities')}</span>
+      <div className="table-wrap scroll-section">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>{t('triggers.editor.syslog.event')}</th>
+              <th>{t('triggers.editor.syslog.severity')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.keys(DEFAULT_SYSLOG_SEVERITIES).map((key) => (
+              <tr key={key}>
+                <td>
+                  <div className="row-title">{eventLabel(key)}</div>
+                  <div className="row-sub font-mono">{key}</div>
+                </td>
+                <td>
+                  <select
+                    className="field h-[30px] w-auto"
+                    aria-label={`${t('triggers.editor.syslog.severity')}: ${eventLabel(key)}`}
+                    value={value[key] ?? DEFAULT_SYSLOG_SEVERITIES[key]}
+                    onChange={(e) =>
+                      onChange({ ...value, [key]: e.currentTarget.value as SyslogSeverity })
+                    }
+                  >
+                    {SYSLOG_SEVERITIES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Only HTTP deliveries go through an outbound proxy (not syslog, RELP or GELF over UDP/TCP). */
+function sendsOverHttp(trigger: TriggerView): boolean {
+  if (trigger.type === 'syslog' || trigger.type === 'relp') return false;
+  if (trigger.type === 'gelf')
+    return (trigger.config as { transport?: string }).transport === 'http';
+  return true;
 }

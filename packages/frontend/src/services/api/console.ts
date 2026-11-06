@@ -81,6 +81,8 @@ export interface Topology {
   >;
   /** `internet` behind a proxy, `gateway` (direct from the instance) or `local` (local servers). */
   egress: Array<Usage & { id: 'internet' | 'gateway' | 'local' }>;
+  /** Hosts the traffic finally reaches (`dest:<host>`), shared by the connections that use them. */
+  destinations?: Array<Usage & { id: string; host: string }>;
   links: TopologyLink[];
   /** Saved canvas positions, by node id. */
   positions: Record<string, { x: number; y: number }>;

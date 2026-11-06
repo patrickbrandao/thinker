@@ -1,4 +1,4 @@
-import { topologyInterval, topologyMinutes } from './topology.service';
+import { urlHost, topologyInterval, topologyMinutes } from './topology.service';
 
 describe('topologyMinutes', () => {
   it('converts minutes, hours and days', () => {
@@ -27,5 +27,18 @@ describe('topologyInterval', () => {
     expect(topologyInterval(undefined, '2026-11-03T00:00:00Z')).toBeUndefined();
     expect(topologyInterval('soon', '2026-11-03T00:00:00Z')).toBeUndefined();
     expect(topologyInterval('2026-11-03T12:00:00Z', '2026-11-03T00:00:00Z')).toBeUndefined();
+  });
+});
+
+describe('urlHost', () => {
+  it('keeps the host and a non-default port, lowercased', () => {
+    expect(urlHost('https://API.anthropic.com/v1')).toBe('api.anthropic.com');
+    expect(urlHost('http://192.168.0.10:11434/v1')).toBe('192.168.0.10:11434');
+    expect(urlHost('https://opencode.ai:443/zen')).toBe('opencode.ai');
+  });
+
+  it('is null for an empty or malformed URL', () => {
+    expect(urlHost(null)).toBeNull();
+    expect(urlHost('not a url')).toBeNull();
   });
 });

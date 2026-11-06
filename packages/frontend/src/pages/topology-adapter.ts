@@ -9,6 +9,7 @@ import {
   HardDrive,
   House,
   KeyRound,
+  MapPin,
   Plug,
   Server,
   Waypoints,
@@ -25,7 +26,15 @@ import { PROVIDERS } from '../services/providers.js';
 import { t, tMaybe } from '../i18n/index.js';
 
 const ICON = 40;
-const COLUMN = { client: 0, harness: 1, connection: 2, proxy: 3, server: 4, egress: 5 } as const;
+const COLUMN = {
+  client: 0,
+  harness: 1,
+  connection: 2,
+  proxy: 3,
+  server: 4,
+  egress: 5,
+  destination: 6,
+} as const;
 const EGRESS_ICON = { internet: Globe, gateway: GlobeLock, local: House } as const;
 /** Kind of provider connection, with the sidebar icon of its page. */
 const AUTH_ICON: Record<string, typeof Bot> = {
@@ -141,7 +150,8 @@ function linkTooltip(l: TopologyLink): string | undefined {
 /**
  * Turns the topology API payload into a laid-out flow graph, one column per
  * kind: client address → harness → provider connection → proxy profile →
- * proxy server → internet, local gateway or local network (drawn round). Saved positions win over the column layout.
+ * proxy server → internet, local gateway or local network (drawn round) →
+ * destination host. Saved positions win over the column layout.
  * With `activeOnly`, nodes and links without traffic in the window are left
  * out. With `live` (data of the `live` range), a link is lit while a request on
  * it is in flight or just ended, and counts the requests still waiting for an
@@ -295,6 +305,24 @@ export function buildTopologyGraph(
         },
       },
       COLUMN.egress,
+    );
+  }
+  for (const dest of data.destinations ?? []) {
+    if (!keep(dest.id)) continue;
+    push(
+      {
+        id: dest.id,
+        type: 'node',
+        data: {
+          kind: 'node',
+          icon: lucide(MapPin),
+          title: dest.host,
+          subtitle: t('shell.flow.destination'),
+          tooltip: usageTooltip(`${t('shell.flow.destination')} · ${dest.host}`, dest),
+          state: nodeState(dest),
+        },
+      },
+      COLUMN.destination,
     );
   }
 

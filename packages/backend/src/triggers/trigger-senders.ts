@@ -1,7 +1,8 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { createSocket } from 'node:dgram';
 import { connect } from 'node:net';
 import { hostname } from 'node:os';
+import { gzipSync } from 'node:zlib';
 import { render } from '@react-email/render';
 import {
   DEFAULT_SYSLOG_SEVERITIES,
@@ -98,6 +99,10 @@ export async function deliver(input: DeliveryInput): Promise<DeliveryResult> {
       return deliverEmail(input);
     case 'syslog':
       return deliverSyslog(input);
+    case 'gelf':
+      return deliverGelf(input);
+    case 'relp':
+      return deliverRelp(input);
   }
 }
 
@@ -400,6 +405,278 @@ function deliverSyslog({
       clearTimeout(timer);
       socket.close();
       resolve(err ? fail(err) : ok('udp'));
+    });
+  });
+}
+
+const sent = (bytes: number, via: string, target: string): DeliveryResult => ({
+  success: true,
+  statusCode: null,
+  error: null,
+  response: `Sent ${bytes} bytes via ${via} to ${target}`,
+});
+const failed = (err: unknown): DeliveryResult => ({
+  success: false,
+  statusCode: null,
+  error: describe(err),
+  response: null,
+});
+
+/** GELF additional field names allow word characters, dots and dashes only. */
+const GELF_FIELD_RE = /[^\w.-]/g;
+
+/**
+ * GELF 1.1 document: `short_message`/`full_message` from the templates,
+ * `level` from the per-event severity, and every event variable as an
+ * `_extra` field (`_event.type`, `_harness.name`...).
+ */
+export function buildGelf(
+  config: TriggerConfig,
+  eventType: string,
+  vars: TemplateVars,
+  now = new Date(),
+): Record<string, unknown> {
+  const doc: Record<string, unknown> = {
+    version: '1.1',
+    host: String(config.source || hostname() || 'thinker'),
+    short_message:
+      renderTemplate(String(config.short_message ?? ''), vars, 'line') || eventType || '-',
+    timestamp: Math.round(now.getTime()) / 1000,
+    level: syslogSeverity(config, eventType, vars),
+  };
+  const full = renderTemplate(String(config.full_message ?? ''), vars, 'raw');
+  if (full) doc.full_message = full;
+  for (const [name, value] of Object.entries(vars)) {
+    const field = `_${name.replace(GELF_FIELD_RE, '_')}`;
+    // `_id` is reserved by GELF.
+    if (field === '_id' || field in doc) continue;
+    doc[field] = value;
+  }
+  if (!('_event.type' in doc)) doc['_event.type'] = eventType;
+  return doc;
+}
+
+/** Payload bytes per UDP chunk (header is 12 bytes; stays under common MTUs on a LAN). */
+export const GELF_CHUNK_DATA = 8180;
+export const GELF_MAX_CHUNKS = 128;
+
+/** Splits a UDP datagram into GELF chunks (magic 0x1e 0x0f, 8-byte id, sequence, count). */
+export function gelfChunks(payload: Buffer, size = GELF_CHUNK_DATA): Buffer[] {
+  if (payload.length <= size) return [payload];
+  const count = Math.ceil(payload.length / size);
+  if (count > GELF_MAX_CHUNKS) {
+    throw new Error(`GELF message needs ${count} chunks (at most ${GELF_MAX_CHUNKS})`);
+  }
+  const id = randomBytes(8);
+  const chunks: Buffer[] = [];
+  for (let i = 0; i < count; i++) {
+    const header = Buffer.from([0x1e, 0x0f, ...id, i, count]);
+    chunks.push(Buffer.concat([header, payload.subarray(i * size, (i + 1) * size)]));
+  }
+  return chunks;
+}
+
+async function deliverGelf({
+  config,
+  vars,
+  timeoutMs,
+  eventType,
+}: DeliveryInput): Promise<DeliveryResult> {
+  const json = Buffer.from(JSON.stringify(buildGelf(config, eventType, vars)));
+  const gzip = config.compression === 'gzip';
+  if (config.transport === 'http') {
+    const url = String(config.url ?? '');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Thinker-Triggers',
+    };
+    if (gzip) headers['Content-Encoding'] = 'gzip';
+    const body = gzip ? gzipSync(json) : json;
+    return httpCall(
+      url,
+      { method: 'POST', headers, body: new Uint8Array(body), redirect: 'manual' },
+      timeoutMs,
+    );
+  }
+  const host = String(config.host);
+  const port = Number(config.port);
+  const target = `${host}:${port}`;
+  if (config.transport === 'tcp') {
+    return tcpSend(host, port, timeoutMs, Buffer.concat([json, Buffer.from([0])]), (n) =>
+      sent(n, 'tcp', target),
+    );
+  }
+  let chunks: Buffer[];
+  try {
+    chunks = gelfChunks(gzip ? gzipSync(json) : json);
+  } catch (err) {
+    return failed(err);
+  }
+  return new Promise((resolve) => {
+    const socket = createSocket(host.includes(':') ? 'udp6' : 'udp4');
+    let settled = false;
+    const done = (result: DeliveryResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.close();
+      resolve(result);
+    };
+    const timer = setTimeout(
+      () => done(failed(new Error(`Timed out sending to ${target}`))),
+      timeoutMs,
+    );
+    socket.on('error', (err) => done(failed(err)));
+    let left = chunks.length;
+    const bytes = chunks.reduce((n, c) => n + c.length, 0);
+    for (const chunk of chunks) {
+      socket.send(chunk, port, host, (err) => {
+        if (err) return done(failed(err));
+        if (--left === 0) {
+          const via = chunks.length > 1 ? `udp (${chunks.length} chunks)` : 'udp';
+          done(sent(bytes, via, target));
+        }
+      });
+    }
+  });
+}
+
+/** Writes one buffer over TCP and closes; timeouts and socket errors fail the delivery. */
+function tcpSend(
+  host: string,
+  port: number,
+  timeoutMs: number,
+  data: Buffer,
+  ok: (bytes: number) => DeliveryResult,
+): Promise<DeliveryResult> {
+  return new Promise((resolve) => {
+    const socket = connect({ host, port });
+    let settled = false;
+    const done = (result: DeliveryResult) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs, () =>
+      done(failed(new Error(`Timed out connecting to ${host}:${port}`))),
+    );
+    socket.on('error', (err) => done(failed(err)));
+    socket.on('connect', () => socket.end(data, () => done(ok(data.length))));
+  });
+}
+
+/** One RELP frame: `TXNR SP COMMAND SP DATALEN [SP DATA] LF`. */
+export function relpFrame(txnr: number, command: string, data = ''): Buffer {
+  const body = Buffer.from(data);
+  const head = `${txnr} ${command} ${body.length}`;
+  return Buffer.concat([Buffer.from(body.length ? `${head} ` : head), body, Buffer.from('\n')]);
+}
+
+export interface RelpResponse {
+  txnr: number;
+  command: string;
+  data: string;
+}
+
+/** Parses complete frames off the front of `buffer`; returns them and what is left. */
+export function parseRelpFrames(buffer: Buffer): { frames: RelpResponse[]; rest: Buffer } {
+  const frames: RelpResponse[] = [];
+  let rest = buffer;
+  for (;;) {
+    const text = rest.toString('latin1');
+    const header = /^(\d{1,9}) ([a-zA-Z]{1,32}) (\d{1,9})/.exec(text);
+    if (!header) {
+      if (/^\d{0,9}( [a-zA-Z]{0,32}( \d{0,9})?)?$/.test(text)) break; // still incomplete
+      throw new Error('Malformed RELP response');
+    }
+    const len = Number(header[3]);
+    const start = header[0].length + (len > 0 ? 1 : 0);
+    if (rest.length < start + len + 1) break;
+    if (rest[start + len] !== 0x0a) throw new Error('Malformed RELP response');
+    frames.push({
+      txnr: Number(header[1]),
+      command: header[2],
+      data: rest.subarray(start, start + len).toString('utf8'),
+    });
+    rest = rest.subarray(start + len + 1);
+  }
+  return { frames, rest };
+}
+
+/**
+ * RELP client: `open` (offers relp_version=0 and the syslog command), one
+ * `syslog` frame acknowledged by `rsp 200`, then `close`. Anything else, a
+ * timeout or a dropped connection fails the delivery (the worker retries).
+ */
+function deliverRelp({
+  config,
+  vars,
+  timeoutMs,
+  eventType,
+}: DeliveryInput): Promise<DeliveryResult> {
+  const line = formatSyslog(config, eventType, vars);
+  const host = String(config.host);
+  const port = Number(config.port);
+  const target = `${host}:${port}`;
+  return new Promise((resolve) => {
+    const socket = connect({ host, port });
+    let settled = false;
+    let buffer: Buffer = Buffer.alloc(0);
+    let stage: 'open' | 'syslog' | 'close' = 'open';
+    const done = (result: DeliveryResult) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    const ok = () => sent(Buffer.byteLength(line), 'relp', target);
+    socket.setTimeout(timeoutMs, () =>
+      // The message was acknowledged; a server that never answers `close` is fine.
+      done(stage === 'close' ? ok() : failed(new Error(`Timed out waiting for ${target}`))),
+    );
+    socket.on('error', (err) => done(stage === 'close' ? ok() : failed(err)));
+    socket.on('close', () =>
+      done(stage === 'close' ? ok() : failed(new Error(`${target} closed the RELP session`))),
+    );
+    socket.on('connect', () => {
+      socket.write(relpFrame(1, 'open', 'relp_version=0\nrelp_software=thinker\ncommands=syslog'));
+    });
+    socket.on('data', (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      let frames: RelpResponse[];
+      try {
+        ({ frames, rest: buffer } = parseRelpFrames(buffer));
+      } catch (err) {
+        return done(failed(err));
+      }
+      for (const frame of frames) {
+        if (frame.command === 'serverclose') {
+          return done(stage === 'close' ? ok() : failed(new Error(`${target} closed the session`)));
+        }
+        if (frame.command !== 'rsp') continue;
+        const status = frame.data.split(/[ \n]/, 1)[0];
+        if (stage === 'close') return done(ok());
+        if (status !== '200') {
+          const what = stage === 'open' ? 'RELP open' : 'RELP syslog';
+          return done({
+            success: false,
+            statusCode: Number(status) || null,
+            error: `${what} refused: ${truncate(frame.data.split('\n', 1)[0] ?? '', 200)}`,
+            response: truncate(frame.data),
+          });
+        }
+        if (stage === 'open') {
+          if (!/(^|\n)commands=[^\n]*\bsyslog\b/.test(frame.data)) {
+            return done(failed(new Error(`${target} does not offer the RELP syslog command`)));
+          }
+          stage = 'syslog';
+          socket.write(relpFrame(2, 'syslog', line));
+        } else if (stage === 'syslog') {
+          stage = 'close';
+          socket.write(relpFrame(3, 'close'));
+        }
+      }
     });
   });
 }

@@ -243,6 +243,10 @@ export {
   SYSLOG_SEVERITIES,
   SYSLOG_FACILITIES,
   DEFAULT_SYSLOG_SEVERITIES,
+  GELF_TRANSPORTS,
+  GELF_COMPRESSIONS,
+  GELF_DEFAULT_PORT,
+  RELP_DEFAULT_PORT,
   TRIGGER_LIMITS,
   TRIGGER_VARIABLES,
   DEFAULT_TRIGGER_TEMPLATES,
@@ -259,4 +263,6 @@ export type {
   SyslogFormat,
   SyslogSeverity,
   SyslogFacility,
+  GelfTransport,
+  GelfCompression,
 } from './triggers';
