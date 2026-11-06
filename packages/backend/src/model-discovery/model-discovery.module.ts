@@ -8,6 +8,7 @@ import { ProviderModelFetcherService } from './provider-model-fetcher.service';
 import { ModelDiscoveryService } from './model-discovery.service';
 import { OpencodeCatalogService } from './opencode-catalog.service';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
+import { LiveContextService } from './live-context';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
     ModelDiscoveryService,
     OpencodeCatalogService,
     CopilotTokenService,
+    LiveContextService,
   ],
   exports: [ModelDiscoveryService, ProviderModelFetcherService, OpencodeCatalogService],
 })

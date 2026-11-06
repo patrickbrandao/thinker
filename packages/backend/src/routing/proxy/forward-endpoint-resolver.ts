@@ -141,7 +141,10 @@ export function resolveForwardEndpoint(
         customProvider.base_url,
         customProvider.api_kind ?? 'openai',
         customProvider.local_type
-          ? { timeoutMs: customProvider.local_config?.request_timeout_ms }
+          ? {
+              timeoutMs: customProvider.local_config?.request_timeout_ms,
+              localType: customProvider.local_type,
+            }
           : undefined,
       );
       forwardModel = CustomProviderService.rawModelName(model);

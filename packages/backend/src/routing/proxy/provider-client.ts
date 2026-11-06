@@ -975,6 +975,7 @@ export class ProviderClient {
       // tools next to their default reasoning effort (mnfst/llm-gateway#3065).
       requireMaxCompletionTokens: isBedrockRuntimeGpt,
       forwardReasoningEffort: isBedrockRuntimeGpt,
+      nativeReasoningEffort: endpoint.nativeReasoningEffort === true,
     });
     if (stream && endpoint.streamUsageReporting === 'openai_stream_options') {
       const existing =
