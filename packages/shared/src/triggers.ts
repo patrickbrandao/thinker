@@ -1,10 +1,10 @@
 /**
  * Event triggers: workspace-scoped delivery targets (e-mail, HTTP webhook,
- * Telegram, remote log) that harnesses point at instead of each carrying its
+ * Telegram, remote log: syslog, GELF, RELP) that harnesses point at instead of each carrying its
  * own notification settings.
  */
 
-export const TRIGGER_TYPES = ['email', 'webhook', 'telegram', 'syslog'] as const;
+export const TRIGGER_TYPES = ['email', 'webhook', 'telegram', 'syslog', 'gelf', 'relp'] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 /** Events a harness can route to a trigger (stored on the harness binding). */
@@ -42,6 +42,15 @@ export const SYSLOG_TRANSPORTS = ['udp', 'tcp'] as const;
 export const SYSLOG_FORMATS = ['rfc5424', 'rfc3164'] as const;
 export type SyslogTransport = (typeof SYSLOG_TRANSPORTS)[number];
 export type SyslogFormat = (typeof SYSLOG_FORMATS)[number];
+
+/** GELF 1.1 transports: UDP (chunked, optional gzip), TCP (`\0` framed) and HTTP(S) `POST /gelf`. */
+export const GELF_TRANSPORTS = ['udp', 'tcp', 'http'] as const;
+export type GelfTransport = (typeof GELF_TRANSPORTS)[number];
+export const GELF_COMPRESSIONS = ['none', 'gzip'] as const;
+export type GelfCompression = (typeof GELF_COMPRESSIONS)[number];
+export const GELF_DEFAULT_PORT = 12201;
+/** RELP (syslog over plain TCP with per-message acknowledgement). */
+export const RELP_DEFAULT_PORT = 20514;
 
 /** RFC 5424 severities, index = numeric code. */
 export const SYSLOG_SEVERITIES = [
@@ -160,4 +169,6 @@ export const DEFAULT_TRIGGER_TEMPLATES = {
   webhook: { body: '{{event.json}}', contentType: 'application/json' },
   telegram: { text: '<b>{{event.title}}</b>\n{{event.message}}' },
   syslog: { message: '{{event.title}}: {{event.message}}' },
+  gelf: { shortMessage: '{{event.title}}', fullMessage: '{{event.message}}' },
+  relp: { message: '{{event.title}}: {{event.message}}' },
 } as const;

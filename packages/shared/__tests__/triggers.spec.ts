@@ -19,8 +19,8 @@ import {
 const unique = (values: readonly string[]) => new Set(values).size === values.length;
 
 describe('trigger types and statuses', () => {
-  it('lists the four delivery channels', () => {
-    expect(TRIGGER_TYPES).toEqual(['email', 'webhook', 'telegram', 'syslog']);
+  it('lists the six delivery channels', () => {
+    expect(TRIGGER_TYPES).toEqual(['email', 'webhook', 'telegram', 'syslog', 'gelf', 'relp']);
   });
 
   it('lists the delivery states of a queued event', () => {

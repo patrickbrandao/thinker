@@ -78,7 +78,7 @@ describe('TriggerEditor', () => {
     it('offers every trigger kind, with the e-mail providers as separate choices', () => {
       setup();
       const options = Array.from((within(dialog()).getByLabelText('Type') as HTMLSelectElement).options).map((o) => o.textContent);
-      expect(options).toEqual(['Email API Resend', 'Email API Mailgun', 'Email API SendGrid', 'Webhook', 'Telegram', 'Syslog']);
+      expect(options).toEqual(['Email API Resend', 'Email API Mailgun', 'Email API SendGrid', 'Webhook', 'Telegram', 'Syslog', 'GELF (Graylog)', 'RELP (syslog)']);
     });
 
     it('closes with Cancel and Escape without saving', () => {

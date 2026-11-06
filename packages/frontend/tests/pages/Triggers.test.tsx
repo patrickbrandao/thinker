@@ -120,6 +120,8 @@ describe('Triggers page', () => {
       'Webhook',
       'Telegram',
       'Syslog',
+      'GELF (Graylog)',
+      'RELP (syslog)',
     ]);
   });
 

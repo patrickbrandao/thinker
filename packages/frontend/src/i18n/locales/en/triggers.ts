@@ -2,9 +2,9 @@
 export default {
   title: 'Triggers',
   metaDescription:
-    'Workspace delivery targets for harness and workspace events: e-mail, webhook, Telegram and syslog.',
+    'Workspace delivery targets for harness and workspace events: e-mail, webhook, Telegram, syslog, GELF and RELP.',
   subtitle:
-    'Send harness and workspace events to e-mail, webhooks, Telegram or a syslog server. Each harness picks the triggers that receive its events on its Triggers tab.',
+    'Send harness and workspace events to e-mail, webhooks, Telegram or a log server (syslog, GELF, RELP). Each harness picks the triggers that receive its events on its Triggers tab.',
   readOnlyNotice: 'You have read-only access to triggers. Only admins and owners can change them.',
   create: 'New trigger',
   tabs: {
@@ -19,6 +19,8 @@ export default {
     webhook: 'Webhook',
     telegram: 'Telegram',
     syslog: 'Syslog',
+    gelf: 'GELF (Graylog)',
+    relp: 'RELP (syslog)',
   },
   events: {
     limitAlert: 'Limit alert',
@@ -135,6 +137,27 @@ export default {
       silent: 'Send silently',
       text: 'Message',
       textHint: 'Telegram HTML: <b>, <i>, <code>, <a href="...">.',
+    },
+    gelf: {
+      transport: 'Transport',
+      compression: 'Compression',
+      url: 'URL',
+      source: 'Source host',
+      sourceHint: 'The GELF host field; blank uses the instance hostname.',
+      shortMessage: 'Short message',
+      fullMessage: 'Full message',
+      fieldsHint:
+        'Every event variable also goes as an _extra field (_harness.name, _event.type...).',
+      levels: 'Level per event',
+      transports: {
+        udp: 'UDP (chunked)',
+        tcp: 'TCP',
+        http: 'HTTP / HTTPS',
+      },
+      compressions: {
+        none: 'None',
+        gzip: 'gzip',
+      },
     },
     syslog: {
       host: 'Host',
@@ -264,7 +287,7 @@ export default {
   },
   org: {
     title: 'Triggers',
-    body: 'E-mail, webhook, Telegram and syslog targets for harness and workspace events.',
+    body: 'E-mail, webhook, Telegram, syslog, GELF and RELP targets for harness and workspace events.',
     open: 'Open triggers',
   },
 };

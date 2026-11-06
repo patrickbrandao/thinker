@@ -78,6 +78,7 @@ export default {
     proxy: 'Proxy Switch',
     globalProxy: 'Global',
     proxyServer: 'Proxy server',
+    destination: 'Destination',
     egress: { internet: 'Internet', gateway: 'Local Gateway', local: 'Local network' },
     disabled: 'disabled',
     metrics: {

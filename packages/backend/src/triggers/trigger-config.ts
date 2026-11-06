@@ -2,6 +2,10 @@ import {
   DEFAULT_SYSLOG_SEVERITIES,
   DEFAULT_TRIGGER_TEMPLATES,
   EMAIL_TRIGGER_PROVIDERS,
+  GELF_COMPRESSIONS,
+  GELF_DEFAULT_PORT,
+  GELF_TRANSPORTS,
+  RELP_DEFAULT_PORT,
   SYSLOG_FACILITIES,
   SYSLOG_FORMATS,
   SYSLOG_SEVERITIES,
@@ -103,6 +107,50 @@ function patchSecret(
   }
   const value = patch[key];
   if (typeof value === 'string' && value.trim()) next[key] = value.trim();
+}
+
+/** Host and port of a log target (syslog, GELF over UDP/TCP, RELP). */
+function hostPort(
+  configIn: Record<string, unknown>,
+  defaultPort: number,
+  errors: string[],
+): { host: string; port: number } {
+  const host = str(configIn.host);
+  if (!host || /[\s/]/.test(host)) errors.push('config.host is required');
+  const port = configIn.port ?? defaultPort;
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+    errors.push('config.port must be between 1 and 65535');
+  }
+  return { host, port: port as number };
+}
+
+/** Severity per event over the defaults (syslog, GELF `level`, RELP). */
+function severityMap(configIn: Record<string, unknown>, errors: string[]): Record<string, string> {
+  const severities: Record<string, string> = { ...DEFAULT_SYSLOG_SEVERITIES };
+  if (isObject(configIn.severities)) {
+    for (const [key, value] of Object.entries(configIn.severities)) {
+      if (!(key in DEFAULT_SYSLOG_SEVERITIES)) continue;
+      if (!(SYSLOG_SEVERITIES as readonly unknown[]).includes(value)) {
+        errors.push(`severity for ${key} is invalid`);
+      } else severities[key] = value as string;
+    }
+  }
+  return severities;
+}
+
+/** Syslog line options shared by syslog and RELP. */
+function syslogLine(configIn: Record<string, unknown>, errors: string[]) {
+  const format = str(configIn.format) || 'rfc5424';
+  if (!(SYSLOG_FORMATS as readonly string[]).includes(format)) {
+    errors.push('config.format must be rfc5424 or rfc3164');
+  }
+  const facility = str(configIn.facility) || 'local0';
+  if (!(SYSLOG_FACILITIES as readonly string[]).includes(facility)) {
+    errors.push('config.facility is not a syslog facility');
+  }
+  const appName = str(configIn.app_name) || 'thinker';
+  if (!/^[\x21-\x7e]{1,48}$/.test(appName)) errors.push('config.app_name is invalid');
+  return { format, facility, app_name: appName };
 }
 
 /**
@@ -283,49 +331,82 @@ export function normalizeTrigger(
       break;
     }
     case 'syslog': {
-      const host = str(configIn.host);
-      if (!host || /[\s/]/.test(host)) errors.push('config.host is required');
-      const port = configIn.port ?? 514;
-      if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
-        errors.push('config.port must be between 1 and 65535');
-      }
+      const { host, port } = hostPort(configIn, 514, errors);
       const transport = str(configIn.transport) || 'udp';
       if (!(SYSLOG_TRANSPORTS as readonly string[]).includes(transport)) {
         errors.push('config.transport must be udp or tcp');
-      }
-      const format = str(configIn.format) || 'rfc5424';
-      if (!(SYSLOG_FORMATS as readonly string[]).includes(format)) {
-        errors.push('config.format must be rfc5424 or rfc3164');
-      }
-      const facility = str(configIn.facility) || 'local0';
-      if (!(SYSLOG_FACILITIES as readonly string[]).includes(facility)) {
-        errors.push('config.facility is not a syslog facility');
-      }
-      const appName = str(configIn.app_name) || 'thinker';
-      if (!/^[\x21-\x7e]{1,48}$/.test(appName)) errors.push('config.app_name is invalid');
-      const severities: Record<string, string> = { ...DEFAULT_SYSLOG_SEVERITIES };
-      if (isObject(configIn.severities)) {
-        for (const [key, value] of Object.entries(configIn.severities)) {
-          if (!(key in DEFAULT_SYSLOG_SEVERITIES)) continue;
-          if (!(SYSLOG_SEVERITIES as readonly unknown[]).includes(value)) {
-            errors.push(`severity for ${key} is invalid`);
-          } else severities[key] = value as string;
-        }
       }
       config = {
         host,
         port,
         transport,
-        format,
-        facility,
-        app_name: appName,
+        ...syslogLine(configIn, errors),
         message: template(
           configIn.message,
           DEFAULT_TRIGGER_TEMPLATES.syslog.message,
           'config.message',
           errors,
         ),
-        severities,
+        severities: severityMap(configIn, errors),
+      };
+      break;
+    }
+    case 'relp': {
+      const { host, port } = hostPort(configIn, RELP_DEFAULT_PORT, errors);
+      config = {
+        host,
+        port,
+        ...syslogLine(configIn, errors),
+        message: template(
+          configIn.message,
+          DEFAULT_TRIGGER_TEMPLATES.relp.message,
+          'config.message',
+          errors,
+        ),
+        severities: severityMap(configIn, errors),
+      };
+      break;
+    }
+    case 'gelf': {
+      const transport = str(configIn.transport) || 'udp';
+      if (!(GELF_TRANSPORTS as readonly string[]).includes(transport)) {
+        errors.push(`config.transport must be one of ${GELF_TRANSPORTS.join(', ')}`);
+      }
+      const compression = str(configIn.compression) || 'none';
+      if (!(GELF_COMPRESSIONS as readonly string[]).includes(compression)) {
+        errors.push('config.compression must be none or gzip');
+      }
+      if (transport === 'tcp' && compression !== 'none') {
+        errors.push('GELF over TCP is not compressed');
+      }
+      let target: Record<string, unknown>;
+      if (transport === 'http') {
+        const url = str(configIn.url);
+        if (!/^https?:\/\/[^\s/]+/i.test(url)) errors.push('config.url must be an http(s) URL');
+        target = { url };
+      } else {
+        target = hostPort(configIn, GELF_DEFAULT_PORT, errors);
+      }
+      const source = str(configIn.source) || null;
+      if (source && !/^[\x21-\x7e]{1,255}$/.test(source)) errors.push('config.source is invalid');
+      config = {
+        transport,
+        ...target,
+        compression,
+        source,
+        short_message: template(
+          configIn.short_message,
+          DEFAULT_TRIGGER_TEMPLATES.gelf.shortMessage,
+          'config.short_message',
+          errors,
+        ),
+        full_message: template(
+          configIn.full_message,
+          DEFAULT_TRIGGER_TEMPLATES.gelf.fullMessage,
+          'config.full_message',
+          errors,
+        ),
+        severities: severityMap(configIn, errors),
       };
       break;
     }
@@ -390,4 +471,11 @@ function stripInternal(config: TriggerConfig): TriggerConfig {
 function maskHeader(value: string | undefined): string {
   if (!value) return '';
   return value.length <= 6 ? '••••' : `${value.slice(0, 4)}…`;
+}
+
+/** Whether a trigger delivers over HTTP (and so through its outbound proxy chain). */
+export function isHttpTrigger(type: TriggerType, config: TriggerConfig): boolean {
+  if (type === 'syslog' || type === 'relp') return false;
+  if (type === 'gelf') return config.transport === 'http';
+  return true;
 }

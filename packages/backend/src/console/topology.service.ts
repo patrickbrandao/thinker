@@ -5,6 +5,7 @@ import { PENDING_STATUS, type ModelRoute } from 'thinker-shared';
 import { ERROR_MESSAGE_STATUSES } from '../analytics/services/query-helpers';
 import { getGlobalProxyConfig } from '../common/outbound/outbound-proxy';
 import { authKindOf, defaultTargetOf } from '../proxy-servers/proxy-egress.service';
+import { defaultAccountBaseUrl } from '../routing/account-base-url';
 
 /** Units of a range (`<n>m`, `<n>h`, `<n>d`): minutes per step and the largest count. */
 export const TOPOLOGY_UNITS = {
@@ -109,6 +110,12 @@ export interface TopologyEgress extends Usage {
   id: EgressId;
 }
 
+/** A host the traffic finally reaches (`api.anthropic.com`, `192.168.0.10:11434`), shared by the connections that use it. */
+export interface TopologyDestination extends Usage {
+  id: string;
+  host: string;
+}
+
 export type LinkKind = 'client' | 'primary' | 'fallback' | 'usage' | 'egress';
 
 /** A model a harness reaches through a provider link (`via`: virtual model, or "auto"). */
@@ -139,6 +146,7 @@ export interface Topology {
   proxies: TopologyProxy[];
   servers: TopologyServer[];
   egress: TopologyEgress[];
+  destinations: TopologyDestination[];
   links: TopologyLink[];
   /** Positions the user saved on the canvas, by node id. */
   positions: Record<string, { x: number; y: number }>;
@@ -160,6 +168,17 @@ export const connectionNodeId = (id: string) => `connection:${id}`;
 export const profileNodeId = (id: string) => `proxy:${id}`;
 export const GLOBAL_PROXY_NODE = 'proxy:global';
 export const serverNodeId = (id: string) => `server:${id}`;
+export const destinationNodeId = (host: string) => `dest:${host}`;
+
+/** Host (with a non-default port) of a URL, lowercased; null when it does not parse. */
+export function urlHost(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host.toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
 
 /** Link kinds ranked: a link drawn for several reasons takes the strongest. */
 const KIND_RANK: Record<LinkKind, number> = {
@@ -188,6 +207,8 @@ interface ConnectionRow {
   auth_type: string | null;
   label: string;
   is_active: boolean;
+  base_url?: string | null;
+  region?: string | null;
 }
 
 interface UsageRow {
@@ -316,13 +337,16 @@ export class TopologyService {
         [tenantId],
       ) as Promise<Array<Pick<RouteRow, 'agent_id' | 'override_route' | 'fallback_routes'>>>,
       this.ds.query(
-        `SELECT id, provider, auth_type, label, is_active
+        `SELECT id, provider, auth_type, label, is_active, base_url, region
              FROM tenant_providers WHERE tenant_id = $1 ORDER BY provider, priority, label`,
         [tenantId],
       ) as Promise<ConnectionRow[]>,
-      this.ds.query(`SELECT id, name, local_type FROM custom_providers WHERE tenant_id = $1`, [
-        tenantId,
-      ]) as Promise<Array<{ id: string; name: string; local_type: string | null }>>,
+      this.ds.query(
+        `SELECT id, name, local_type, base_url FROM custom_providers WHERE tenant_id = $1`,
+        [tenantId],
+      ) as Promise<
+        Array<{ id: string; name: string; local_type: string | null; base_url: string | null }>
+      >,
       this.ds.query(
         `SELECT p.id, p.name,
                   COALESCE(bool_or(b.proxy_id IS NOT NULL), false) AS has_proxy,
@@ -632,6 +656,25 @@ export class TopologyService {
       leftBy.set(provider.id, split);
     }
 
+    // The host each connection finally reaches: its own base URL, the custom
+    // provider's, else the provider's built-in (region-aware) endpoint.
+    const connectionById = new Map(connections.map((c) => [connectionNodeId(c.id), c]));
+    const destinations = new Map<string, TopologyDestination>();
+    const toDestination = (from: EgressId, p: TopologyProvider, u: Usage) => {
+      const c = connectionById.get(p.id);
+      const custom = customById.get(p.provider.toLowerCase());
+      const host = urlHost(
+        c?.base_url ||
+          (custom ? custom.base_url : defaultAccountBaseUrl(p.provider, p.authType, c?.region)),
+      );
+      if (!host) return;
+      const id = destinationNodeId(host);
+      const node = destinations.get(id) ?? { id, host, ...zero() };
+      add(node, u);
+      destinations.set(id, node);
+      flow(from, id, u);
+    };
+
     const proxies = new Map<string, TopologyProxy>();
     const proxySplit = new Map<string, Map<string, Usage>>();
     for (const p of providerList) {
@@ -656,8 +699,20 @@ export class TopologyService {
       if (!proxyId) {
         flow(p.id, end, p);
         reach(end, p);
+        toDestination(end, p, p);
         continue;
       }
+      // Through a proxy, attempts recorded as Direct left by the gateway; the rest by the internet.
+      const direct = hasItems ? leftBy.get(p.id)?.get('direct') : undefined;
+      if (direct && direct.requests > 0) toDestination('gateway', p, direct);
+      const viaProxy: Usage = { ...p, tokens: 0 };
+      if (direct) {
+        viaProxy.requests = Math.max(0, viaProxy.requests - direct.requests);
+        viaProxy.errors = Math.max(0, viaProxy.errors - direct.errors);
+        viaProxy.costUsd = Math.max(0, viaProxy.costUsd - direct.costUsd);
+        viaProxy.recent = Math.max(0, viaProxy.recent - direct.recent);
+      }
+      if (viaProxy.requests > 0 || !direct) toDestination('internet', p, viaProxy);
       const proxy = proxies.get(proxyId) ?? {
         id: proxyId,
         profileId: hasItems ? profile.id : null,
@@ -770,6 +825,7 @@ export class TopologyService {
       proxies: [...proxies.values()].sort((a, b) => a.name.localeCompare(b.name)),
       servers: [...serverNodes.values()].sort((a, b) => a.name.localeCompare(b.name)),
       egress: [...egress.values()],
+      destinations: [...destinations.values()].sort((a, b) => a.host.localeCompare(b.host)),
       links: [...links.values()],
       positions: Object.fromEntries(saved.map((r) => [r.node_id, { x: r.x, y: r.y }])),
     };

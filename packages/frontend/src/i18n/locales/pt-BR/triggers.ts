@@ -4,9 +4,9 @@ import type { Catalog } from '../../types.js';
 const ptBR: Catalog<typeof en> = {
   title: 'Triggers',
   metaDescription:
-    'Destinos de entrega do workspace para eventos de harness e do workspace: e-mail, webhook, Telegram e syslog.',
+    'Destinos de entrega do workspace para eventos de harness e do workspace: e-mail, webhook, Telegram, syslog, GELF e RELP.',
   subtitle:
-    'Envie eventos de harness e do workspace para e-mail, webhooks, Telegram ou um servidor syslog. Cada harness escolhe na aba Triggers os triggers que recebem seus eventos.',
+    'Envie eventos de harness e do workspace para e-mail, webhooks, Telegram ou um servidor de log (syslog, GELF, RELP). Cada harness escolhe na aba Triggers os triggers que recebem seus eventos.',
   readOnlyNotice:
     'Você tem acesso somente leitura aos triggers. Só administradores e proprietários podem alterá-los.',
   create: 'Novo trigger',
@@ -22,6 +22,8 @@ const ptBR: Catalog<typeof en> = {
     webhook: 'Webhook',
     telegram: 'Telegram',
     syslog: 'Syslog',
+    gelf: 'GELF (Graylog)',
+    relp: 'RELP (syslog)',
   },
   events: {
     limitAlert: 'Alerta de limite',
@@ -139,6 +141,27 @@ const ptBR: Catalog<typeof en> = {
       silent: 'Enviar em silêncio',
       text: 'Mensagem',
       textHint: 'HTML do Telegram: <b>, <i>, <code>, <a href="...">.',
+    },
+    gelf: {
+      transport: 'Transporte',
+      compression: 'Compressão',
+      url: 'URL',
+      source: 'Host de origem',
+      sourceHint: 'O campo host do GELF; em branco usa o hostname da instância.',
+      shortMessage: 'Mensagem curta',
+      fullMessage: 'Mensagem completa',
+      fieldsHint:
+        'Todas as variáveis do evento também vão como campos _extra (_harness.name, _event.type...).',
+      levels: 'Nível por evento',
+      transports: {
+        udp: 'UDP (em chunks)',
+        tcp: 'TCP',
+        http: 'HTTP / HTTPS',
+      },
+      compressions: {
+        none: 'Nenhuma',
+        gzip: 'gzip',
+      },
     },
     syslog: {
       host: 'Host',
@@ -269,7 +292,7 @@ const ptBR: Catalog<typeof en> = {
   },
   org: {
     title: 'Triggers',
-    body: 'Destinos de e-mail, webhook, Telegram e syslog para eventos de harness e do workspace.',
+    body: 'Destinos de e-mail, webhook, Telegram, syslog, GELF e RELP para eventos de harness e do workspace.',
     open: 'Abrir triggers',
   },
 };

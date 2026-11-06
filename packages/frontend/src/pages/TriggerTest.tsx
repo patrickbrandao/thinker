@@ -17,6 +17,8 @@ import {
   testTrigger,
   type EmailTriggerConfig,
   type SyslogTriggerConfig,
+  type GelfTriggerConfig,
+  type RelpTriggerConfig,
   type TelegramTriggerConfig,
   type TriggerTestResult,
   type TriggerView,
@@ -50,6 +52,17 @@ function destination(trigger: TriggerView): string {
     case 'syslog': {
       const config = trigger.config as SyslogTriggerConfig;
       return `${config.transport.toUpperCase()} ${config.host}:${config.port} (${config.format.toUpperCase()})`;
+    }
+    case 'relp': {
+      const config = trigger.config as RelpTriggerConfig;
+      return `RELP ${config.host}:${config.port} (${config.format.toUpperCase()})`;
+    }
+    case 'gelf': {
+      const config = trigger.config as GelfTriggerConfig;
+      const where =
+        config.transport === 'http' ? config.url : `${config.host}:${config.port ?? ''}`;
+      const gzip = config.compression === 'gzip' ? ', gzip' : '';
+      return `GELF ${config.transport.toUpperCase()} ${where}${gzip}`;
     }
     default:
       return '';
