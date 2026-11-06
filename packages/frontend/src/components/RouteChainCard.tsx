@@ -24,6 +24,8 @@ import { PROVIDERS } from '../services/providers.js';
 import FallbackList from './FallbackList.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
 import ModelPickerModal from './ModelPickerModal.js';
+import NotInCatalogBadge from './NotInCatalogBadge.js';
+import { routeNotInCatalog } from '../lib/route-catalog.js';
 import RouteKeyChip from './RouteKeyChip.js';
 import KeyPickerModal from './KeyPickerModal.js';
 import { toast } from '../services/toast-store.js';
@@ -425,6 +427,9 @@ export default function RouteChainCard(props: RouteChainCardProps) {
                     : priceLabel}
                 </span>
                 {skippedBadge}
+                {routeNotInCatalog(props.chain.override_route, props.models) ? (
+                  <NotInCatalogBadge />
+                ) : null}
               </span>
             </div>
           </div>

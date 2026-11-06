@@ -29,6 +29,7 @@ export function applyRequestParamDefaults<T extends Record<string, unknown>>(
   const expanded = expandConfiguredParamDefaults(defaults, orderedSpecs);
   let merged: Record<string, unknown> = {};
   for (const spec of orderedSpecs) {
+    if (spec.clientOwnsRoot && body[spec.path.split('.')[0]] !== undefined) continue;
     if (!providerParamIsApplicable(spec, expanded)) continue;
     if (!hasPath(expanded, spec.path)) continue;
     merged = setProviderParamValue(merged, spec.path, getPath(expanded, spec.path) as JsonValue);

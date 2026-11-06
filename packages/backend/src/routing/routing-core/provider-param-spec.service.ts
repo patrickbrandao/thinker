@@ -25,6 +25,7 @@ import {
   type ProviderParamSpec,
   type ProviderParamSpecCatalog,
 } from 'thinker-shared';
+import { OPENROUTER_PROVIDER_ROUTING_PARAMS } from './openrouter-provider-routing';
 
 const MODELPARAMS_PACKAGE_JSON = 'modelparams/package.json';
 const MODELPARAMS_DATA_RELATIVE_PATH = 'dist/generated/data.js';
@@ -38,6 +39,7 @@ const MODEL_PARAM_TYPES: readonly ModelParamType[] = [
   'integer',
   'number',
   'string',
+  'string_list',
 ];
 const MODEL_PARAM_GROUPS: readonly ModelParamGroup[] = [
   'generation_length',
@@ -47,6 +49,7 @@ const MODEL_PARAM_GROUPS: readonly ModelParamGroup[] = [
   'output_format',
   'observability',
   'provider_metadata',
+  'provider_routing',
 ];
 const API_LEVEL_PARAM_PATHS = new Set(['stream']);
 /** Kimi Code wire ids mapped to their equivalent modelparams catalog entries. */
@@ -102,6 +105,18 @@ export class ProviderParamSpecService {
     authType: AuthType | undefined,
     model: string | undefined,
   ): Promise<readonly ProviderParamSpec[]> {
+    const catalogSpecs = await this.getCatalogSpecs(providerId, authType, model);
+    const gateway = gatewayRoutingSpecs(providerId, authType, model);
+    return gateway.length === 0
+      ? catalogSpecs
+      : [...catalogSpecs, ...gateway].sort(compareProviderParamSpecs);
+  }
+
+  private async getCatalogSpecs(
+    providerId: string | undefined,
+    authType: AuthType | undefined,
+    model: string | undefined,
+  ): Promise<readonly ProviderParamSpec[]> {
     const providerlessSpecs = this.getProviderlessSpecs(this.specs, providerId, authType, model);
     if (providerlessSpecs.length > 0) return providerlessSpecs;
 
@@ -152,6 +167,25 @@ export class ProviderParamSpecService {
     }
     return [];
   }
+}
+
+/**
+ * Params Thinker adds on top of the modelparams catalog: OpenRouter's
+ * `provider` routing object, for every OpenRouter model (P8).
+ */
+function gatewayRoutingSpecs(
+  providerId: string | undefined,
+  authType: AuthType | undefined,
+  model: string | undefined,
+): ProviderParamSpec[] {
+  if (!providerId || !authType || !model || authType !== 'api_key') return [];
+  if (normalizeProviderParamProviderId(providerId) !== 'openrouter') return [];
+  return OPENROUTER_PROVIDER_ROUTING_PARAMS.map((param) => ({
+    provider: 'openrouter',
+    authType,
+    model,
+    ...param,
+  }));
 }
 
 function loadModelparamsCatalog(): ProviderParamSpecCatalog {

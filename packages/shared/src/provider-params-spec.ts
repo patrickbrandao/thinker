@@ -11,7 +11,8 @@ export const MODEL_CAPABILITIES = [...MODEL_MODALITIES, 'stream', 'tools'] as co
 
 export type ModelCapability = (typeof MODEL_CAPABILITIES)[number];
 
-export type ModelParamType = 'boolean' | 'enum' | 'integer' | 'number' | 'string';
+/** `string_list`: an array of non-empty strings (e.g. OpenRouter `provider.order`). */
+export type ModelParamType = 'boolean' | 'enum' | 'integer' | 'number' | 'string' | 'string_list';
 
 export type ModelParamGroup =
   | 'generation_length'
@@ -20,7 +21,8 @@ export type ModelParamGroup =
   | 'tooling'
   | 'output_format'
   | 'observability'
-  | 'provider_metadata';
+  | 'provider_metadata'
+  | 'provider_routing';
 
 export interface ModelParamRange {
   min?: number;
@@ -66,6 +68,12 @@ export interface ModelParamDefinition {
   range?: ModelParamRange;
   group: ModelParamGroup;
   applicability?: ParamApplicability;
+  /**
+   * The request's own value wins as a whole: when the client already sent the
+   * path's root object (e.g. `provider`), no route value under that root is
+   * merged in. Without it, a configured route value overrides the client's.
+   */
+  clientOwnsRoot?: boolean;
 }
 
 export interface ProviderModelParamSpec {
@@ -244,6 +252,15 @@ export function providerParamValueIsValid(spec: ModelParamDefinition, value: unk
   }
   if (spec.type === 'integer') return numberValueIsValid(spec, value, Number.isInteger);
   if (spec.type === 'number') return numberValueIsValid(spec, value);
+  if (spec.type === 'string_list') {
+    return (
+      Array.isArray(value) &&
+      value.length <= 64 &&
+      value.every(
+        (item) => typeof item === 'string' && item.trim().length > 0 && item.length <= 120,
+      )
+    );
+  }
   return false;
 }
 

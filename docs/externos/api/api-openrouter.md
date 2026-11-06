@@ -97,6 +97,8 @@ O OpenRouter é um agregador: uma chave `Authorization: Bearer` dá acesso a ~45
 
 ## Como o Thinker implementa hoje
 
+- **Roteamento de provedores por rota** (desde 2026-11-06): os campos `provider.*` são parâmetros por rota (`routing-core/openrouter-provider-routing.ts`, `clientOwnsRoot`: o objeto `provider` do cliente vence por inteiro). Erro embutido em 200 e erro SSE antes do primeiro conteúdo viram status real (`upstream-error-classifier.ts`, `stream-warmup.ts` `peekStreamStart`). O `provider` da resposta, o `id` (`gen-...`) e o `model` vão para `agent_messages.served_provider`, `upstream_generation_id` e `served_model` (`served-provider.ts`). `openrouter/free` publica em `/v1/models` a menor janela dos `:free`.
+
 Estado conferido no código em 2026-11-04 (branch `docs/externos-onda3`, commit base `2f97f17`).
 
 - **Inferência.** Base `https://openrouter.ai`, caminho fixo `/api/v1/chat/completions`, formato `openai`, `Authorization: Bearer`, `Content-Type`, `HTTP-Referer: https://github.com/patrickbrandao/thinker` e `X-Title: Thinker` (`packages/backend/src/routing/proxy/provider-endpoints.ts:573-584`). Não usa `/responses` nem `/messages`, e não envia `X-OpenRouter-Categories`, `session_id`, `provider` ou `reasoning`.

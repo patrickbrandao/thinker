@@ -781,3 +781,75 @@ describe('ModelParamsDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
+
+describe('ModelParamsDialog provider routing', () => {
+  const routing = (path: string, def: Partial<ProviderParamSpec>): ProviderParamSpec =>
+    ({
+      provider: 'openrouter',
+      authType: 'api_key',
+      model: 'deepseek/deepseek-v4',
+      path,
+      label: path,
+      description: 'd',
+      group: 'provider_routing',
+      clientOwnsRoot: true,
+      type: 'boolean',
+      ...def,
+    }) as ProviderParamSpec;
+  const specs = [
+    routing('provider.order', { type: 'string_list', label: 'Provider order' }),
+    routing('provider.require_parameters', { type: 'boolean' }),
+    routing('provider.max_price.prompt', { type: 'number', range: { min: 0 } }),
+  ];
+  const props = {
+    open: true,
+    slotLabel: 'deepseek-v4',
+    current: null as RequestParamDefaults | null,
+    specs,
+    onClose: vi.fn(),
+  };
+
+  it('adds chips with Enter/comma and saves them with the advanced JSON', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ModelParamsDialog {...props} onSave={onSave} />);
+    expect(screen.getByText('Provider routing')).toBeTruthy();
+    expect(screen.getByRole('note').textContent).toContain('session affinity');
+
+    const input = screen.getByLabelText('Provider order');
+    fireEvent.change(input, { target: { value: 'deepinfra' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.change(input, { target: { value: 'together,' } });
+    expect(screen.getByLabelText('Remove together')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Remove together'));
+
+    fireEvent.change(screen.getByRole('textbox', { name: /Advanced/ }), {
+      target: { value: '{"max_price":{"prompt":-1}}' },
+    });
+    expect(screen.getByRole('alert').textContent).toBe('"max_price.prompt" must be a number ≥ 0.');
+    expect((screen.getByText('Save').closest('button') as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByRole('textbox', { name: /Advanced/ }), {
+      target: { value: '{"require_parameters":true,"max_price":{"prompt":2}}' },
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        provider: { order: ['deepinfra'], require_parameters: true, max_price: { prompt: 2 } },
+      }),
+    );
+  });
+
+  it('seeds the chips and the advanced box from saved values', () => {
+    render(
+      <ModelParamsDialog
+        {...props}
+        onSave={vi.fn()}
+        current={{ provider: { order: ['a', 'b'], require_parameters: false } }}
+      />,
+    );
+    expect(screen.getByLabelText('Remove a')).toBeTruthy();
+    const box = screen.getByRole('textbox', { name: /Advanced/ }) as HTMLTextAreaElement;
+    expect(JSON.parse(box.value)).toEqual({ require_parameters: false });
+  });
+});

@@ -18,6 +18,9 @@ export default {
   auto: 'auto',
   skippedInStream: 'Skipped in Stream',
   skippedWhileStream: 'Skipped while Stream mode is active',
+  notInCatalog: 'Not in catalog',
+  notInCatalogTitle:
+    'This model is no longer listed by the provider; requests skip to the next route.',
   includedInSubscription: 'Included in subscription',
   pricePerM: '{{ input }} in · {{ output }} out per 1M',
   free: 'Free',

@@ -20,6 +20,9 @@ const ptBR: Catalog<typeof en> = {
   auto: 'auto',
   skippedInStream: 'Ignorado em stream',
   skippedWhileStream: 'Ignorado enquanto o modo stream estiver ativo',
+  notInCatalog: 'Fora do catálogo',
+  notInCatalogTitle:
+    'O provedor não lista mais este modelo; as requisições pulam para a próxima rota.',
   includedInSubscription: 'Incluído na assinatura',
   pricePerM: '{{ input }} entrada · {{ output }} saída por 1M',
   free: 'Grátis',

@@ -9,8 +9,16 @@ import {
   type ProviderParamSpec,
 } from 'thinker-shared';
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { CircleHelp } from 'lucide-react';
+import { CircleHelp, X } from 'lucide-react';
 import type { RequestParamDefaults } from '../services/api.js';
+import {
+  STRING_LIST_MAX_ITEMS,
+  STRING_LIST_MAX_ITEM_LENGTH,
+  addToStringList,
+  advancedJsonText,
+  advancedRoutingSpecs,
+  parseAdvancedJson,
+} from '../lib/model-params-json.js';
 import Select from './Select.jsx';
 import { t } from '../i18n/index.js';
 import { Button, Modal, cx } from './ui.js';
@@ -43,6 +51,7 @@ const GROUP_ORDER: readonly ModelParamGroup[] = [
   'output_format',
   'observability',
   'provider_metadata',
+  'provider_routing',
 ];
 
 const stateFromCurrent = (
@@ -77,11 +86,31 @@ const setPathsFromCurrent = (
       : [],
   );
 
-const groupSpecs = (specs: readonly ProviderParamSpec[]) =>
+// Advanced provider routing params are edited as JSON, not as rows.
+const groupSpecs = (specs: readonly ProviderParamSpec[], advanced: readonly ProviderParamSpec[]) =>
   GROUP_ORDER.map((group) => ({
     group,
-    specs: specs.filter((spec) => spec.group === group).sort(compareProviderParamSpecs),
-  })).filter((item) => item.specs.length > 0);
+    specs: specs
+      .filter((spec) => spec.group === group && !advanced.includes(spec))
+      .sort(compareProviderParamSpecs),
+  })).filter(
+    (item) => item.specs.length > 0 || (item.group === 'provider_routing' && advanced.length > 0),
+  );
+
+// JSON example, not copy: the same in every language.
+const ADVANCED_PLACEHOLDER = JSON.stringify({ require_parameters: true, max_price: { prompt: 1 } });
+
+/** Renders `text` with its backtick-quoted parts as inline code. */
+const withInlineCode = (text: string) =>
+  text.split('`').map((part, i) =>
+    i % 2 === 1 ? (
+      <code key={i} className="font-mono text-xs">
+        {part}
+      </code>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  );
 
 const valuesEqual = (a: unknown, b: unknown) =>
   typeof a === 'object' || typeof b === 'object'
@@ -137,6 +166,73 @@ function SliderTextInput(props: {
   );
 }
 
+/**
+ * Chips input for a `string_list` param: comma or Enter adds, Backspace on an
+ * empty box removes the last chip, blur commits what was typed.
+ */
+export function StringListInput(props: {
+  value: readonly string[];
+  label: string;
+  disabled: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const [text, setText] = useState('');
+  const commit = (raw: string) => {
+    setText('');
+    const next = addToStringList(props.value, raw);
+    if (next.length !== props.value.length) props.onChange(next);
+  };
+  const full = props.value.length >= STRING_LIST_MAX_ITEMS;
+  return (
+    <div
+      className={cx(
+        'model-params__string-list field flex min-h-8 w-64 max-w-full flex-wrap items-center gap-1 py-1',
+        props.disabled && 'opacity-60',
+      )}
+    >
+      {props.value.map((item) => (
+        <span key={item} className="badge font-mono">
+          {item}
+          <button
+            type="button"
+            className="inline-flex cursor-pointer border-0 bg-transparent p-0 text-muted hover:text-ink disabled:cursor-not-allowed"
+            aria-label={t('models.params.removeItem', { item })}
+            disabled={props.disabled}
+            onClick={() => props.onChange(props.value.filter((v) => v !== item))}
+          >
+            <X aria-hidden="true" className="size-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        type="text"
+        className="min-w-16 flex-1 border-0 bg-transparent p-0 font-mono text-sm text-ink outline-none select-text"
+        value={text}
+        maxLength={STRING_LIST_MAX_ITEM_LENGTH}
+        placeholder={props.value.length === 0 ? t('models.params.listPlaceholder') : ''}
+        disabled={props.disabled || full}
+        aria-label={props.label}
+        onChange={(e) => {
+          const raw = e.currentTarget.value;
+          if (raw.includes(',')) commit(raw);
+          else setText(raw);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit(text);
+          } else if (e.key === 'Backspace' && text === '' && props.value.length > 0) {
+            props.onChange(props.value.slice(0, -1));
+          }
+        }}
+        onBlur={() => {
+          if (text.trim()) commit(text);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function ModelParamsDialog(props: Props) {
   const [draft, setDraft] = useState<DraftState>(() =>
     stateFromCurrent(props.specs, props.current),
@@ -146,14 +242,27 @@ export default function ModelParamsDialog(props: Props) {
   );
   const [saving, setSaving] = useState(false);
   const hasSpecs = props.specs.length > 0;
+  const advancedSpecs = advancedRoutingSpecs(props.specs);
+  const [advancedText, setAdvancedText] = useState(() =>
+    advancedJsonText(advancedSpecs, stateFromCurrent(props.specs, props.current), (path) =>
+      setPathsFromCurrent(props.specs, props.current).has(path),
+    ),
+  );
+  const [advancedError, setAdvancedError] = useState<string | null>(null);
 
   // Re-seed the draft when the dialog opens or its inputs change. `current`
   // is compared by value: callers rebuild it on every render.
   const currentKey = JSON.stringify(props.current);
   useEffect(() => {
     if (props.open) {
-      setDraft(stateFromCurrent(props.specs, props.current));
-      setSetPaths(setPathsFromCurrent(props.specs, props.current));
+      const nextDraft = stateFromCurrent(props.specs, props.current);
+      const nextSet = setPathsFromCurrent(props.specs, props.current);
+      setDraft(nextDraft);
+      setSetPaths(nextSet);
+      setAdvancedText(
+        advancedJsonText(advancedRoutingSpecs(props.specs), nextDraft, (p) => nextSet.has(p)),
+      );
+      setAdvancedError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.open, props.specs, currentKey]);
@@ -205,6 +314,23 @@ export default function ModelParamsDialog(props: Props) {
       next.delete(spec.path);
       return next;
     });
+  };
+
+  // The advanced box owns its params: a valid edit sets the paths it names and
+  // unsets the others; an invalid one blocks Save until fixed.
+  const onAdvancedChange = (text: string) => {
+    setAdvancedText(text);
+    const result = parseAdvancedJson(text, advancedSpecs);
+    if (!result.ok) {
+      setAdvancedError(result.error);
+      return;
+    }
+    setAdvancedError(null);
+    for (const spec of advancedSpecs) {
+      const value = result.values.get(spec.path);
+      if (value === undefined) unsetValue(spec);
+      else setValue(spec, value);
+    }
   };
 
   const labelForPath = (path: string): string =>
@@ -446,7 +572,23 @@ export default function ModelParamsDialog(props: Props) {
     );
   };
 
+  const stringListRow = (spec: ProviderParamSpec) => {
+    const value = valueFor(spec);
+    const list = Array.isArray(value)
+      ? value.filter((v): v is string => typeof v === 'string')
+      : [];
+    return (
+      <StringListInput
+        value={list}
+        label={spec.label}
+        disabled={isDisabled(spec)}
+        onChange={(next) => (next.length === 0 ? unsetValue(spec) : setValue(spec, next))}
+      />
+    );
+  };
+
   const renderControl = (spec: ProviderParamSpec) => {
+    if (spec.type === 'string_list') return stringListRow(spec);
     if (spec.type === 'boolean') return toggleRow(spec);
     if (spec.type === 'enum') {
       const values = spec.values?.map(String) ?? [];
@@ -462,7 +604,7 @@ export default function ModelParamsDialog(props: Props) {
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || advancedError) return;
     setSaving(true);
     try {
       let out: RequestParamDefaults = {};
@@ -584,17 +726,55 @@ export default function ModelParamsDialog(props: Props) {
           ) : !hasSpecs ? (
             <p className="text-sm text-muted">{t('models.params.noParams')}</p>
           ) : (
-            groupSpecs(props.specs).map((group) => (
+            groupSpecs(props.specs, advancedSpecs).map((group) => (
               <div key={group.group} className="flex flex-col gap-2">
                 <div className="eyebrow">{groupLabel(group.group)}</div>
-                <div className="rounded-surface border border-line">
-                  {group.specs.map((spec, index) => (
-                    <Fragment key={spec.path}>
-                      {index > 0 ? <div className="border-t border-line" /> : null}
-                      {paramRow(spec)}
-                    </Fragment>
-                  ))}
-                </div>
+                {group.group === 'provider_routing' ? (
+                  <p className="model-params__routing-note notice is-warn text-sm" role="note">
+                    <span>{withInlineCode(t('models.params.routingNote'))}</span>
+                  </p>
+                ) : null}
+                {group.specs.length > 0 ? (
+                  <div className="rounded-surface border border-line">
+                    {group.specs.map((spec, index) => (
+                      <Fragment key={spec.path}>
+                        {index > 0 ? <div className="border-t border-line" /> : null}
+                        {paramRow(spec)}
+                      </Fragment>
+                    ))}
+                  </div>
+                ) : null}
+                {group.group === 'provider_routing' && advancedSpecs.length > 0 ? (
+                  <label className="model-params__advanced flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-ink">
+                      {t('models.params.advanced.title')}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {t('models.params.advanced.desc', {
+                        keys: advancedSpecs
+                          .map((s) => s.path.slice(s.path.indexOf('.') + 1))
+                          .join(', '),
+                      })}
+                    </span>
+                    <textarea
+                      className="model-params__advanced-json field min-h-28 select-text font-mono text-xs"
+                      value={advancedText}
+                      placeholder={ADVANCED_PLACEHOLDER}
+                      spellCheck={false}
+                      disabled={saving}
+                      aria-invalid={advancedError ? true : undefined}
+                      onChange={(e) => onAdvancedChange(e.currentTarget.value)}
+                    />
+                    {advancedError ? (
+                      <span
+                        className="model-params__advanced-error text-xs text-danger"
+                        role="alert"
+                      >
+                        {advancedError}
+                      </span>
+                    ) : null}
+                  </label>
+                ) : null}
               </div>
             ))
           )}
@@ -605,7 +785,11 @@ export default function ModelParamsDialog(props: Props) {
             {!props.loading && hasSpecs ? t('models.params.cancel') : t('models.params.close')}
           </Button>
           {!props.loading && hasSpecs ? (
-            <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
+            <Button
+              size="sm"
+              onClick={() => void handleSave()}
+              disabled={saving || advancedError !== null}
+            >
               {saving ? <span className="spinner" /> : t('models.params.save')}
             </Button>
           ) : null}
