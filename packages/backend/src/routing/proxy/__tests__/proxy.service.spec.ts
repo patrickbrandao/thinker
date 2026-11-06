@@ -2265,7 +2265,7 @@ describe('ProxyService — orchestration', () => {
       });
     });
 
-    it('returns the peeked stream when warmup succeeds', async () => {
+    it('asks the forward to warm up the stream and says whether a route is left', async () => {
       const streamRes = new Response(new ReadableStream(), {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
@@ -2278,17 +2278,16 @@ describe('ProxyService — orchestration', () => {
         isAnthropic: false,
         isChatGpt: false,
       });
-      mockedPeek.mockResolvedValue({
-        ok: true,
-        stream: new ReadableStream(),
-      } as never);
 
       const result = await svc.proxyRequest({
         ...baseOpts({ body: { messages: [{ role: 'user', content: 'hi' }], stream: true } }),
       });
       expect(result.forward.response.status).toBe(200);
       expect(result.forward.attempt).toBe(attempt);
-      expect(mockedPeek).toHaveBeenCalledWith(streamRes.body, 15_000, undefined);
+      expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ warmupMs: 15_000, hasNextRoute: true }),
+      );
+      expect(mockedPeek).not.toHaveBeenCalled();
       expect(momentum.recordTier).toHaveBeenCalled();
     });
 
@@ -2297,17 +2296,16 @@ describe('ProxyService — orchestration', () => {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
       });
+      void streamRes;
+      // The forward warms the stream up itself and reports a stall as 502.
       fallbackService.tryForwardToProvider.mockResolvedValue({
-        response: streamRes,
+        response: new Response('{"error":{"message":"Stream warmup failed: peek timeout"}}', {
+          status: 502,
+        }),
         isGoogle: false,
         isAnthropic: false,
         isChatGpt: false,
       });
-      mockedPeek.mockResolvedValue({
-        ok: false,
-        reason: 'timeout',
-        message: 'peek timeout',
-      } as never);
       fallbackService.tryFallbacks.mockResolvedValue({
         success: {
           forward: {
@@ -2342,22 +2340,23 @@ describe('ProxyService — orchestration', () => {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
       });
+      void streamRes;
       fallbackService.tryForwardToProvider.mockResolvedValue({
-        response: streamRes,
+        response: new Response('{"error":{"message":"Stream warmup failed: closed"}}', {
+          status: 502,
+        }),
         isGoogle: false,
         isAnthropic: false,
         isChatGpt: false,
       });
-      mockedPeek.mockResolvedValue({
-        ok: false,
-        reason: 'closed',
-        message: 'closed before data',
-      } as never);
 
       const result = await svc.proxyRequest(
         baseOpts({ body: { messages: [{ role: 'user', content: 'hi' }], stream: true } }),
       );
       expect(result.forward.response.status).toBe(502);
+      expect(fallbackService.tryForwardToProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ hasNextRoute: false }),
+      );
     });
     it('preserves isResponses on the peeked stream (warmup success path)', async () => {
       const streamRes = new Response(new ReadableStream(), {

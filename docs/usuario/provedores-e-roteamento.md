@@ -75,11 +75,12 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 
 ## Fallback
 
-Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
+Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens, resposta 200 que só traz um erro, erro no início do streaming antes de qualquer conteúdo), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
 
 - Cada tentativa fica registrada separadamente (provedor, modelo, status, custo). A requisição conta como "recuperada por fallback" quando termina com sucesso depois de uma tentativa falha.
 - Se **todas** as tentativas falham, o cliente recebe o erro do provedor da última tentativa. Isso é um erro do provedor, não um código `M###`.
 - Deixe `PROVIDER_TIMEOUT_MS` abaixo do timeout do cliente para o fallback ter tempo de rodar.
+- Um erro transitório (500, 502 ou 503) na última rota da cadeia é repetido uma vez na mesma rota, depois de 1 s, antes de chegar ao cliente (`THINKER_UPSTREAM_RETRY_MODE`; veja [configuração](configuracao.md)).
 
 **Warm-up do streaming.** A espera pelo primeiro trecho de uma resposta em streaming pode ser ajustada por conexão de provedor (botão de gerenciar na página da conexão; para provedores customizados, no formulário de edição), no campo opcional "Stream warm-up (seconds)", de 1 a 600 segundos. Vale o mais específico: o valor da conexão que atende a tentativa, depois `THINKER_LOCAL_STREAM_WARMUP_MS` (padrão 60 s) para runners locais e, por fim, `STREAM_WARMUP_MS` (padrão 15 s). Campo vazio herda o próximo nível. Na API, o campo é `stream_warmup_ms` em milissegundos (1000 a 600000; `null` limpa): `PATCH /api/v1/providers/connections/:id/stream-warmup` e `PUT /api/v1/routing/:agente/custom-providers/:id`. Só administradores da organização alteram esses valores.
 

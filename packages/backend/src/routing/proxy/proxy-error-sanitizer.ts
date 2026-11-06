@@ -6,6 +6,7 @@ import {
   isGatewayProviderUrlBlockedBody,
   stripGatewayMarker,
 } from './proxy-transport';
+import { isContextLengthBody } from './upstream-error-classifier';
 
 const KNOWN_ERROR_MESSAGES: Record<number, string> = {
   400: 'Bad request to upstream provider',
@@ -53,13 +54,6 @@ export interface StructuredProviderError {
   param: string | null;
   code: string | null;
 }
-
-const KNOWN_CONTEXT_ERROR_CODES = new Set(['context_length_exceeded']);
-
-const KNOWN_CONTEXT_ERROR_MESSAGE_PATTERNS = [
-  /\b(?:this (?:model|endpoint)'s )?maximum context length is \d+ tokens\b/i,
-  /\bmaximum context length exceeded\b/i,
-];
 
 function sanitizeSensitivePatterns(msg: string): string {
   return scrubSecrets(
@@ -188,31 +182,9 @@ function htmlEndpointError(status: number | null | undefined, rawBody: string): 
     : `Upstream endpoint returned HTTP ${status}`;
 }
 
-function extractProviderErrorCode(rawBody: string): string | null {
-  try {
-    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-    const error = parsed.error as Record<string, unknown> | undefined;
-    const code = error?.code ?? parsed.code;
-    return typeof code === 'string' && code.length > 0 ? code : null;
-  } catch {
-    return null;
-  }
-}
-
-function hasKnownContextErrorCode(rawBody: string): boolean {
-  const code = extractProviderErrorCode(rawBody);
-  if (code && KNOWN_CONTEXT_ERROR_CODES.has(code.toLowerCase())) return true;
-  return /\bcontext_length_exceeded\b/i.test(rawBody);
-}
-
-function hasKnownContextErrorMessage(rawBody: string): boolean {
-  const message = extractProviderMessage(rawBody) ?? rawBody;
-  return KNOWN_CONTEXT_ERROR_MESSAGE_PATTERNS.some((pattern) => pattern.test(message));
-}
-
 function isContextLengthError(status: number, rawBody: string): boolean {
   if (status < 400) return false;
-  return hasKnownContextErrorCode(rawBody) || hasKnownContextErrorMessage(rawBody);
+  return isContextLengthBody(rawBody);
 }
 
 export function openAiErrorTypeForStatus(status: number): OpenAiCompatibleErrorType {

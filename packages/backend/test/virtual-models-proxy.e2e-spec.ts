@@ -22,6 +22,10 @@ import {
 import { encrypt, getEncryptionSecret } from '../src/common/utils/crypto.util';
 import { RoutingCacheService } from '../src/routing/routing-core/routing-cache.service';
 
+// Chain semantics are pinned one upstream hit per route; the same-route retry
+// of a 5xx on the last route has its own spec (proxy-fallback.service.spec).
+process.env.THINKER_UPSTREAM_RETRY_MODE = 'off';
+
 let app: INestApplication;
 let ds: DataSource;
 let originalFetch: typeof global.fetch;

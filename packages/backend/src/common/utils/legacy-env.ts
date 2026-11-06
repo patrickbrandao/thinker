@@ -23,6 +23,14 @@ const RENAMED_SUFFIXES: ReadonlySet<string> = new Set([
   'FRONTEND_DIR',
   'EMBEDDED',
   'MIGRATION_FORCE',
+  // NOC Norte's patches on the upstream image used these names (P3-P5).
+  'EMBEDDED_ERROR_CHECK',
+  'UPSTREAM_RETRIES',
+  'UPSTREAM_RETRY_DELAY_MS',
+  'UPSTREAM_RETRY_STATUSES',
+  'STREAM_ERROR_PEEK',
+  'STREAM_PEEK_MS',
+  'STREAM_PEEK_MAX_BYTES',
 ]);
 
 export interface LegacyEnvVar {
