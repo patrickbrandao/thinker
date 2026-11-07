@@ -454,10 +454,22 @@ export const proxy: Record<string, Handler> = {
     );
   },
   'server test': async (io, argv) => {
-    const args = parseArgs(argv, { strings: ['url'], maxPositionals: 1 });
+    const args = parseArgs(argv, { strings: ['url', 'target'], maxPositionals: 1 });
     const id = await proxyServerId(io, args);
     const { client } = clientFromFlags(io, args);
-    printJson(io, await client.request('POST', `/proxy-servers/${enc(id)}/test`));
+    // --url is the Thinker server; --target is the address fetched through the
+    // proxy (default: the proxy's suggested test URL, as in the dashboard).
+    let target = args.strings['target'];
+    if (!target) {
+      const proxy = (await client.request('GET', `/proxy-servers/${enc(id)}`)) as {
+        suggested_test_url?: string | null;
+      };
+      target = proxy.suggested_test_url || 'https://api.openai.com/';
+    }
+    printJson(
+      io,
+      await client.request('POST', `/proxy-servers/${enc(id)}/test`, { body: { url: target } }),
+    );
   },
   'server logs': async (io, argv) => {
     const args = parseArgs(argv, {

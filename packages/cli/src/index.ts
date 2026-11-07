@@ -182,7 +182,7 @@ Triggers (admin)
   thinker trigger bind get <agent> | thinker trigger bind set <agent> <body flags>
 
 Outbound proxies
-  thinker proxy server list | get|test <id|name> | logs <id|name> [--result <r>] [--source-type <t>] [--limit <n>] [--before <c>] | stats <id|name> [--days <n>]
+  thinker proxy server list | get <id|name> | test <id|name> [--target <url>] | logs <id|name> [--result <r>] [--source-type <t>] [--limit <n>] [--before <c>] | stats <id|name> [--days <n>]
   thinker proxy server create --name <n> --scheme <s> --host <h> --port <p> [--username <u>] [--password-stdin|--password-env <e>]
       [--enabled true|false] [--connect-timeout-ms <ms>] [--debug off|1h|24h|7d|forever] [--log-retention-days <n>] [body flags]
   thinker proxy server update <id|name> [same flags] [--no-auth] | thinker proxy server delete <id|name> --yes [--mode <m>] [--replace-with <id>]
