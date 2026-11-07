@@ -48,9 +48,10 @@ export function sqlNow(): string {
 }
 
 export function sqlHourBucket(col: string): string {
-  // Stored values are already in the Node process's local timezone (the pg
-  // driver serialises JS Dates using local time into `timestamp without time
-  // zone` columns). Truncate directly — no AT TIME ZONE conversion needed.
+  // Stored values are UTC (#58: the process and every DB session run in UTC,
+  // see utc-clock.ts). The bucket is printed without an offset, so clients
+  // must read it as UTC (the dashboard's chart-utils does). Truncate directly —
+  // no AT TIME ZONE conversion needed.
   return `to_char(date_trunc('hour', ${col}), 'YYYY-MM-DD"T"HH24:MI:SS')`;
 }
 

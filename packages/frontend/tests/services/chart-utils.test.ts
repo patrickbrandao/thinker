@@ -256,9 +256,18 @@ describe('parseTimestamps', () => {
   it('prefers hour over date when both present', () => {
     const data = [{ hour: '2024-01-15 10:00', date: '2024-01-20' }];
     const result = parseTimestamps(data);
-    // hour is checked first; parsed as local time (no 'Z')
-    const expected = new Date(2024, 0, 15, 10, 0).getTime() / 1000;
+    // hour is checked first; backend hour buckets are UTC without an offset
+    const expected = Date.UTC(2024, 0, 15, 10, 0) / 1000;
     expect(result[0]).toBe(expected);
+  });
+
+  it('reads offset-less hour buckets as UTC, whatever the viewer timezone', () => {
+    expect(parseTimestamps([{ hour: '2026-11-07T15:00:00' }])[0]).toBe(
+      Date.UTC(2026, 10, 7, 15) / 1000,
+    );
+    expect(parseTimestamps([{ hour: '2026-11-07T15:00:00Z' }])[0]).toBe(
+      Date.UTC(2026, 10, 7, 15) / 1000,
+    );
   });
 
   it('handles entries with extra record fields', () => {
@@ -952,6 +961,16 @@ describe('createFormatLegendTimestamp', () => {
 // ---------- sanitizeNumbers ----------
 
 describe('fillDailyGaps', () => {
+  it('keys the hourly range by the UTC buckets the backend returns', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 10, 7, 23, 30)));
+    const rows = [{ hour: '2026-11-07T23:00:00', value: 5 }];
+    const filled = fillDailyGaps(rows, '24h', 'hour', (hour) => ({ hour, value: 0 }));
+    expect(filled[filled.length - 1]).toEqual({ hour: '2026-11-07T23:00:00', value: 5 });
+    vi.useRealTimers();
+  });
+
+
   const zeroToken = (date: string) => ({ date, input_tokens: 0, output_tokens: 0 });
   const zeroCost = (date: string) => ({ date, cost: 0 });
 
