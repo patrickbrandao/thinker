@@ -1367,10 +1367,14 @@ describe('MCP tools', () => {
     it('renders setup masked, revealed, and generic', async () => {
       const tools = registerAll(makeDeps());
       const masked = await call(tools, 'thinker_agent_setup', { agent: 'demo' });
-      expect((masked.data as { setup: string }).setup).toContain('THINKER_AGENT_KEY');
+      // Masked: the key is a placeholder telling how to fetch it.
+      expect((masked.data as { setup: string }).setup).toContain('<THINKER_AGENT_KEY');
 
+      // Revealed: the real key, no placeholder (the snippet itself names the
+      // THINKER_AGENT_KEY variable the harness reads).
       const revealed = await call(tools, 'thinker_agent_setup', { agent: 'demo', reveal: true });
-      expect((revealed.data as { setup: string }).setup).not.toContain('THINKER_AGENT_KEY');
+      expect((revealed.data as { setup: string }).setup).not.toContain('<THINKER_AGENT_KEY');
+      expect((revealed.data as { setup: string }).setup).toContain('"full"');
 
       const deps = makeDeps();
       (deps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValue({
