@@ -24,8 +24,11 @@ export function computePeriodBoundaries(period: string): PeriodBoundaries {
   let start: Date;
 
   switch (period) {
+    // The current clock hour, like day/week/month start at the current
+    // period: the block notice promises a reset at the next full hour
+    // (computePeriodResetDate), and at that instant the window must be empty.
     case 'hour':
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1);
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
       break;
     case 'day':
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -40,7 +43,7 @@ export function computePeriodBoundaries(period: string): PeriodBoundaries {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
       break;
     default:
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1);
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
   }
 
   const end = new Date(now.getTime());
