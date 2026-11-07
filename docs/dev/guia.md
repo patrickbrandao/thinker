@@ -12,6 +12,8 @@ O Thinker é um gateway de LLM auto-hospedado. Ele fica entre agentes ("harnesse
 
 Três superfícies de gestão compartilham a mesma API REST (`/api/v1/*`): o dashboard, a CLI `thinker` (`packages/cli/`) e o servidor MCP remoto (`packages/backend/src/mcp/`). Adicione a capacidade uma vez na camada de serviço e exponha onde precisar; nunca duplique a lógica por superfície.
 
+A imagem Docker traz a CLI no PATH (`/app/cli-bin/thinker`, lançador com shebang `#!/nodejs/bin/node`, já que a imagem distroless não tem shell nem `/usr/bin/env`): `docker exec -e THINKER_API_KEY=thk_... <contêiner> thinker proxy server list`. Ela usa `http://localhost:2099` por padrão e precisa de uma chave `thk_`.
+
 ## Arquitetura
 
 Monorepo com npm workspaces e Turborepo:
