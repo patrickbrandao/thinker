@@ -49,6 +49,37 @@ describe('assertConnectableHost', () => {
   );
 });
 
+describe('destinations registered without private access (ADR 0006 item 7)', () => {
+  beforeEach(() => lookup.mockReset());
+
+  it('refuses a public name rebound onto the LAN or loopback at connect time', async () => {
+    for (const address of ['10.0.0.5', '127.0.0.1', '192.168.1.20', 'fd12::5']) {
+      lookup.mockResolvedValueOnce([{ address, family: address.includes(':') ? 6 : 4 }]);
+      await expect(
+        resolveConnectableAddresses('llm.example.com', { allowPrivate: false }),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+    }
+  });
+
+  it('still connects to public addresses, and refuses private literals before DNS', async () => {
+    lookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    await expect(
+      resolveConnectableAddresses('llm.example.com', { allowPrivate: false }),
+    ).resolves.toEqual([{ address: '93.184.216.34', family: 4 }]);
+    expect(() => assertConnectableHost('10.0.0.5', { allowPrivate: false })).toThrow(
+      SsrfBlockedError,
+    );
+    expect(() => assertConnectableHost('10.0.0.5')).not.toThrow();
+  });
+
+  it('ssrfSafeFetch refuses the rebound connection without opening it', async () => {
+    lookup.mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+    await expect(
+      ssrfSafeFetch('http://rebind.example:9/', {}, { allowPrivate: false }),
+    ).rejects.toThrow();
+  });
+});
+
 describe('resolveConnectableAddresses', () => {
   beforeEach(() => lookup.mockReset());
 

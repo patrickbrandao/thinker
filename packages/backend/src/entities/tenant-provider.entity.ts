@@ -43,6 +43,13 @@ export class TenantProvider {
   @Column('varchar', { nullable: true, default: null })
   base_url!: string | null;
 
+  /**
+   * Whether `base_url` may reach private/LAN addresses at connect time: what
+   * THINKER_PROVIDER_PRIVATE_URLS allowed whoever set it (ADR 0006 item 7).
+   */
+  @Column('boolean', { default: true })
+  allow_private_destination!: boolean;
+
   @Column('boolean', { default: true })
   is_active!: boolean;
 

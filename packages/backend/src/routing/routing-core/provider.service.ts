@@ -731,6 +731,8 @@ export class ProviderService {
     tenantId: string,
     connectionId: string,
     baseUrl: string | null,
+    /** What the private-URL policy allowed the caller (ADR 0006 item 7). */
+    allowPrivate = true,
   ): Promise<TenantProvider> {
     const row = await this.providerRepo.findOne({
       where: { id: connectionId, tenant_id: tenantId },
@@ -742,6 +744,7 @@ export class ProviderService {
       );
     }
     row.base_url = baseUrl;
+    row.allow_private_destination = baseUrl === null ? true : allowPrivate;
     row.updated_at = new Date().toISOString();
     await this.providerRepo.save(row);
     return row;

@@ -1,3 +1,4 @@
+import { allowsPrivateDestination } from '../common/utils/private-url-policy';
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { emitAlert } from '../common/services/alert-sink';
 import { modelChangeAlerts } from './model-change-alerts';
@@ -258,6 +259,7 @@ export class ModelDiscoveryService {
             accountBaseUrl: {
               base: accountBaseUrl,
               official: defaultAccountBaseUrl(provider.provider, 'api_key', provider.region),
+              allowPrivate: allowsPrivateDestination(provider.allow_private_destination),
             },
           }
         : {}),

@@ -506,6 +506,7 @@ export class ProxyService {
       resourceUrl: credentials.resourceUrl,
       providerRegion: credentials.providerRegion,
       providerBaseUrl: credentials.providerBaseUrl,
+      providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
       signatureLookup,
       thinkingLookup,
       clientAnthropicBeta: headers?.['anthropic-beta'],

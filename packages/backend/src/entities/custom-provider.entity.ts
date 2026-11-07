@@ -49,6 +49,13 @@ export class CustomProvider {
   @Column('varchar')
   base_url!: string;
 
+  /**
+   * Whether `base_url` may reach private/LAN addresses at connect time: what
+   * THINKER_PROVIDER_PRIVATE_URLS allowed whoever set it (ADR 0006 item 7).
+   */
+  @Column('boolean', { default: true })
+  allow_private_destination!: boolean;
+
   @Column('varchar', { default: 'openai' })
   api_kind!: CustomProviderApiKind;
 

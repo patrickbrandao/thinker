@@ -560,6 +560,12 @@ export function classifyProxyError(error: unknown): ProxyErrorClass | null {
 export interface OutboundFetchOptions {
   /** User-supplied destination: pin direct connections to validated addresses. */
   pinDestination?: boolean;
+  /**
+   * With `pinDestination`: false also refuses private, LAN and loopback
+   * addresses on direct connections (a destination the private-URL policy did
+   * not allow when it was registered). Default true.
+   */
+  allowPrivateDestination?: boolean;
 }
 
 type FetchInit = RequestInit;
@@ -614,8 +620,15 @@ function countBody(response: Response, done: (bytes: number) => void): Response 
   });
 }
 
-function directFetch(url: string, init: FetchInit, pin: boolean): Promise<Response> {
-  return pin ? pinnedDirectFetch(url, init) : fetch(url, init);
+function directFetch(
+  url: string,
+  init: FetchInit,
+  pin: boolean,
+  allowPrivate = true,
+): Promise<Response> {
+  return pin
+    ? pinnedDirectFetch(url, init, allowPrivate ? {} : { allowPrivate: false })
+    : fetch(url, init);
 }
 
 /** One fetch through `proxy`. Throws the raw undici error on failure. */
@@ -648,6 +661,7 @@ async function runChain(
   url: string,
   init: FetchInit,
   pin: boolean,
+  allowPrivate = true,
 ): Promise<Response> {
   const target = new URL(url);
   const destination = destinationOf(target);
@@ -713,7 +727,7 @@ async function runChain(
       let tunnelMs: number | null = null;
       try {
         if (item.kind === 'direct') {
-          response = await directFetch(url, init, pin);
+          response = await directFetch(url, init, pin, allowPrivate);
         } else {
           ({ response, tunnelMs } = await fetchViaProxy(item.proxy, url, init));
         }
@@ -882,10 +896,11 @@ export async function outboundFetch(
 ): Promise<Response> {
   const href = typeof url === 'string' ? url : url.href;
   const pin = opts.pinDestination === true;
+  const allowPrivate = opts.allowPrivateDestination !== false;
   const scope = currentOutboundScope();
   const chain = scope?.chain;
   if (scope && chain && chain.length > 0) {
-    return runChain(scope, chain, href, init, pin);
+    return runChain(scope, chain, href, init, pin, allowPrivate);
   }
   const global = getGlobalProxyConfig();
   const hostname = new URL(href).hostname;
@@ -893,7 +908,7 @@ export async function outboundFetch(
     return viaGlobal(global, scope, href, init);
   }
   const started = performance.now();
-  const response = await directFetch(href, init, pin);
+  const response = await directFetch(href, init, pin, allowPrivate);
   scope?.hops.push({
     kind: 'direct',
     proxy_id: null,

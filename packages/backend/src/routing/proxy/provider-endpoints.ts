@@ -61,6 +61,12 @@ export interface ProviderEndpoint {
    */
   requiresSsrfRevalidation?: boolean;
   /**
+   * With requiresSsrfRevalidation: false refuses private, LAN and loopback
+   * addresses at connect time (a user URL registered by someone the
+   * private-URL policy did not allow, ADR 0006 item 7). Absent = allowed.
+   */
+  allowPrivateDestination?: boolean;
+  /**
    * Upper bound of one forwarded request, overriding PROVIDER_TIMEOUT_MS.
    * Set per local server, whose first call may have to load the model.
    */

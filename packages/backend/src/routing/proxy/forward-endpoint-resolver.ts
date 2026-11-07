@@ -35,6 +35,7 @@ import {
   isXiaomiTokenPlanRegion,
 } from '../xiaomi-region';
 import { getZaiCodingPlanBaseUrl } from '../zai-region';
+import { allowsPrivateDestination } from '../../common/utils/private-url-policy';
 
 const XIAOMI_MODEL_PREFIXES = ['xiaomi/', 'mimo/', 'xiaomi-mimo/'] as const;
 
@@ -44,6 +45,8 @@ export interface CustomProviderEndpointConfig {
   api_kind?: 'openai' | 'anthropic' | null;
   local_type?: string | null;
   local_config?: { request_timeout_ms?: number } | null;
+  /** What the private-URL policy allowed whoever registered it (default true). */
+  allow_private_destination?: boolean | null;
 }
 
 export interface ResolveForwardEndpointParams {
@@ -59,6 +62,8 @@ export interface ResolveForwardEndpointParams {
    * built-in endpoint; only the base changes, the API paths stay the same.
    */
   providerBaseUrl?: string | null;
+  /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
+  providerBaseUrlAllowsPrivate?: boolean;
   /** OAuth resource_url (MiniMax region base URL), when present. */
   resourceUrl?: string;
   /**
@@ -93,6 +98,7 @@ export function resolveForwardEndpoint(
     model,
     providerRegion,
     providerBaseUrl,
+    providerBaseUrlAllowsPrivate,
     resourceUrl,
     customProvider,
     logger,
@@ -147,6 +153,9 @@ export function resolveForwardEndpoint(
             }
           : undefined,
       );
+      customEndpoint.allowPrivateDestination = allowsPrivateDestination(
+        customProvider.allow_private_destination,
+      );
       forwardModel = CustomProviderService.rawModelName(model);
     }
   } else if (providerBaseUrl && authType === 'api_key' && resolveEndpointKey(provider)) {
@@ -155,6 +164,7 @@ export function resolveForwardEndpoint(
       providerBaseUrl,
       key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key,
     );
+    customEndpoint.allowPrivateDestination = allowsPrivateDestination(providerBaseUrlAllowsPrivate);
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
     customEndpoint = buildEndpointOverride(
