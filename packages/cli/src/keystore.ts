@@ -34,6 +34,24 @@ export function saveAgentKey(env: Env, origin: string, agentName: string, key: s
   return filePath;
 }
 
+/**
+ * Best-effort saveAgentKey: the keystore is only a cache, so an unwritable
+ * config directory (a read-only container, HOME missing) must not fail the
+ * command that already changed the server. Returns null when nothing was saved.
+ */
+export function cacheAgentKey(
+  env: Env,
+  origin: string,
+  agentName: string,
+  key: string,
+): string | null {
+  try {
+    return saveAgentKey(env, origin, agentName, key);
+  } catch {
+    return null;
+  }
+}
+
 export function deleteAgentKey(env: Env, origin: string, agentName: string): void {
   try {
     fs.unlinkSync(agentKeyPath(env, origin, agentName));

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { agentKeyPath, readAgentKey, saveAgentKey } from './keystore';
+import { agentKeyPath, cacheAgentKey, readAgentKey, saveAgentKey } from './keystore';
 
 describe('keystore', () => {
   let dir: string;
@@ -53,5 +53,17 @@ describe('keystore', () => {
     saveAgentKey(env(), 'http://localhost:2222', 'bot', 'key-b');
     expect(readAgentKey(env(), 'http://localhost:1111', 'bot')).toBe('key-a');
     expect(readAgentKey(env(), 'http://localhost:2222', 'bot')).toBe('key-b');
+  });
+
+  it('cacheAgentKey returns null instead of throwing when the config dir is unwritable', () => {
+    // A file where the config directory should be: mkdir fails, as in a
+    // read-only container. The server already holds the key; the cache is optional.
+    const blocker = path.join(dir, 'not-a-dir');
+    fs.writeFileSync(blocker, '');
+    const blocked = { XDG_CONFIG_HOME: blocker };
+    expect(cacheAgentKey(blocked, 'http://localhost:2099', 'bot', 'thk_x')).toBeNull();
+    expect(cacheAgentKey(env(), 'http://localhost:2099', 'bot', 'thk_y')).toBe(
+      agentKeyPath(env(), 'http://localhost:2099', 'bot'),
+    );
   });
 });

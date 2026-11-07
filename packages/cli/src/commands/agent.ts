@@ -2,7 +2,7 @@ import { CliIo, clientFromFlags, printJson } from '../context';
 import { CliError } from '../errors';
 import { ParsedArgs, parseArgs, requirePositional, requireString, requireYes } from '../args';
 import { keyPrefixOf, validateKeyFileDestination, writeKeyFile } from '../secrets';
-import { agentKeyPath, deleteAgentKey, readAgentKey, saveAgentKey } from '../keystore';
+import { agentKeyPath, cacheAgentKey, deleteAgentKey, readAgentKey } from '../keystore';
 import { slugifyAgentName } from '../slug';
 import { CATEGORY_CATALOG, PLATFORM_CATALOG, SETUP_TEMPLATES } from '../provider-catalog.gen';
 
@@ -201,7 +201,7 @@ export async function agentCreate(io: CliIo, argv: string[]): Promise<void> {
 
   // The keystore is the CLI's memory of the key — ALWAYS refresh it, or
   // run/key-show would keep serving a stale credential after this mutation.
-  const keyPath = saveAgentKey(io.env, target.origin, slugifyAgentName(name), result.apiKey);
+  const keyPath = cacheAgentKey(io.env, target.origin, slugifyAgentName(name), result.apiKey);
   if (keyFile) {
     writeKeyFile(keyFile, result.apiKey);
     printJson(io, { agent: result.agent, keyPrefix: keyPrefixOf(result.apiKey), keyFile, keyPath });
@@ -258,7 +258,7 @@ export async function agentUpdate(io: CliIo, argv: string[]): Promise<void> {
     const nextName = slugifyAgentName(body['name']);
     if (nextName !== name) {
       const cached = readAgentKey(io.env, target.origin, name);
-      if (cached) saveAgentKey(io.env, target.origin, nextName, cached);
+      if (cached) cacheAgentKey(io.env, target.origin, nextName, cached);
       deleteAgentKey(io.env, target.origin, name);
     }
   }
@@ -292,7 +292,7 @@ export async function agentRotateKey(io: CliIo, argv: string[]): Promise<void> {
     'POST',
     `/agents/${encodeURIComponent(name)}/rotate-key`,
   )) as { apiKey: string };
-  const keyPath = saveAgentKey(io.env, target.origin, name, result.apiKey);
+  const keyPath = cacheAgentKey(io.env, target.origin, name, result.apiKey);
   if (keyFile) {
     writeKeyFile(keyFile, result.apiKey);
     printJson(io, { rotated: true, keyPrefix: keyPrefixOf(result.apiKey), keyFile, keyPath });
@@ -309,7 +309,7 @@ export async function resolveAgentKey(
   io: CliIo,
   args: ParsedArgs,
   name: string,
-): Promise<{ key: string; path: string; origin: string; source: 'keystore' | 'server' }> {
+): Promise<{ key: string; path: string | null; origin: string; source: 'keystore' | 'server' }> {
   const { client, target } = clientFromFlags(io, args);
   const cached = readAgentKey(io.env, target.origin, name);
   if (cached) {
@@ -331,7 +331,7 @@ export async function resolveAgentKey(
       `Run thinker agent rotate-key ${name} --yes to mint a fresh one`,
     );
   }
-  const path = saveAgentKey(io.env, target.origin, name, result.apiKey);
+  const path = cacheAgentKey(io.env, target.origin, name, result.apiKey);
   return { key: result.apiKey, path, origin: target.origin, source: 'server' };
 }
 
